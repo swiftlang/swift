@@ -174,16 +174,12 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
   // the partial_apply into to the corresponding index into the arguments of
   // the called function.
 
-  // The first operand to partial_apply is the called function, so adjust the
-  // operand number to get the argument.
-  unsigned partialApplyArgumentIndex =
-      applyArgumentOperand->getOperandNumber() - 1;
-
   // The argument index in the called function.
-  unsigned argumentIndex = calleeFunction->getArguments().size() -
-                           apply->getNumArguments() + partialApplyArgumentIndex;
-  processCall(callerInfo, callerArgumentIndex, calleeFunction, argumentIndex,
-              order);
+  ApplySite site(apply);
+  unsigned calleeArgumentIndex = site.getCalleeArgIndex(*applyArgumentOperand);
+
+  processCall(callerInfo, callerArgumentIndex, calleeFunction,
+              calleeArgumentIndex, order);
 }
 
 void AccessSummaryAnalysis::processFullApply(FunctionInfo *callerInfo,

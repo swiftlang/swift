@@ -11,6 +11,7 @@
 // REQUIRES: objc_interop
 
 import Foundation
+import CoreGraphics
 
 #if FOUNDATION_XCTEST
 import XCTest
@@ -57,12 +58,21 @@ func expectRoundTripEquality<T : Codable>(of value: T, encode: (T) throws -> Dat
 }
 
 func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T) where T : Equatable {
+    let inf = "INF", negInf = "-INF", nan = "NaN"
     let encode = { (_ value: T) throws -> Data in
-        return try JSONEncoder().encode(value)
+        let encoder = JSONEncoder()
+        encoder.nonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: inf,
+                                                                      negativeInfinity: negInf,
+                                                                      nan: nan)
+        return try encoder.encode(value)
     }
 
     let decode = { (_ data: Data) throws -> T in
-        return try JSONDecoder().decode(T.self, from: data)
+        let decoder = JSONDecoder()
+        decoder.nonConformingFloatDecodingStrategy = .convertFromString(positiveInfinity: inf,
+                                                                        negativeInfinity: negInf,
+                                                                        nan: nan)
+        return try decoder.decode(T.self, from: data)
     }
 
     expectRoundTripEquality(of: value, encode: encode, decode: decode)
@@ -183,6 +193,151 @@ class TestCodable : TestCodableSuper {
     func test_CharacterSet_Plist() {
         for characterSet in characterSetValues {
             expectRoundTripEqualityThroughPlist(for: characterSet)
+        }
+    }
+
+    // MARK: - CGAffineTransform
+    lazy var cg_affineTransformValues: [CGAffineTransform] = {
+        var values = [
+            CGAffineTransform.identity,
+            CGAffineTransform(),
+            CGAffineTransform(translationX: 2.0, y: 2.0),
+            CGAffineTransform(scaleX: 2.0, y: 2.0),
+            CGAffineTransform(a: 1.0, b: 2.5, c: 66.2, d: 40.2, tx: -5.5, ty: 3.7),
+            CGAffineTransform(a: -55.66, b: 22.7, c: 1.5, d: 0.0, tx: -22, ty: -33),
+            CGAffineTransform(a: 4.5, b: 1.1, c: 0.025, d: 0.077, tx: -0.55, ty: 33.2),
+            CGAffineTransform(a: 7.0, b: -2.3, c: 6.7, d: 0.25, tx: 0.556, ty: 0.99),
+            CGAffineTransform(a: 0.498, b: -0.284, c: -0.742, d: 0.3248, tx: 12, ty: 44)
+        ]
+
+        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+            values.append(CGAffineTransform(rotationAngle: .pi / 2))
+        }
+
+        return values
+    }()
+
+    func test_CGAffineTransform_JSON() {
+        for transform in cg_affineTransformValues {
+            expectRoundTripEqualityThroughJSON(for: transform)
+        }
+    }
+
+    func test_CGAffineTransform_Plist() {
+        for transform in cg_affineTransformValues {
+            expectRoundTripEqualityThroughPlist(for: transform)
+        }
+    }
+
+    // MARK: - CGPoint
+    lazy var cg_pointValues: [CGPoint] = {
+        var values = [
+            CGPoint.zero,
+            CGPoint(x: 10, y: 20)
+        ]
+
+        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+            // Limit on magnitude in JSON. See rdar://problem/12717407
+            values.append(CGPoint(x: CGFloat.greatestFiniteMagnitude,
+                                  y: CGFloat.greatestFiniteMagnitude))
+        }
+
+        return values
+    }()
+
+    func test_CGPoint_JSON() {
+        for point in cg_pointValues {
+            expectRoundTripEqualityThroughJSON(for: point)
+        }
+    }
+
+    func test_CGPoint_Plist() {
+        for point in cg_pointValues {
+            expectRoundTripEqualityThroughPlist(for: point)
+        }
+    }
+
+    // MARK: - CGSize
+    lazy var cg_sizeValues: [CGSize] = {
+        var values = [
+            CGSize.zero,
+            CGSize(width: 30, height: 40)
+        ]
+
+        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+            // Limit on magnitude in JSON. See rdar://problem/12717407
+            values.append(CGSize(width: CGFloat.greatestFiniteMagnitude,
+                                 height: CGFloat.greatestFiniteMagnitude))
+        }
+
+        return values
+    }()
+
+    func test_CGSize_JSON() {
+        for size in cg_sizeValues {
+            expectRoundTripEqualityThroughJSON(for: size)
+        }
+    }
+
+    func test_CGSize_Plist() {
+        for size in cg_sizeValues {
+            expectRoundTripEqualityThroughPlist(for: size)
+        }
+    }
+
+    // MARK: - CGRect
+    lazy var cg_rectValues: [CGRect] = {
+        var values = [
+            CGRect.zero,
+            CGRect.null,
+            CGRect(x: 10, y: 20, width: 30, height: 40)
+        ]
+
+        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+            // Limit on magnitude in JSON. See rdar://problem/12717407
+            values.append(CGRect.infinite)
+        }
+
+        return values
+    }()
+
+    func test_CGRect_JSON() {
+        for rect in cg_rectValues {
+            expectRoundTripEqualityThroughJSON(for: rect)
+        }
+    }
+
+    func test_CGRect_Plist() {
+        for rect in cg_rectValues {
+            expectRoundTripEqualityThroughPlist(for: rect)
+        }
+    }
+
+    // MARK: - CGVector
+    lazy var cg_vectorValues: [CGVector] = {
+        var values = [
+            CGVector.zero,
+            CGVector(dx: 0.0, dy: -9.81)
+        ]
+
+        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+            // Limit on magnitude in JSON. See rdar://problem/12717407
+            values.append(CGVector(dx: CGFloat.greatestFiniteMagnitude,
+                                   dy: CGFloat.greatestFiniteMagnitude))
+        }
+
+        return values
+    }()
+
+    func test_CGVector_JSON() {
+        for vector in cg_vectorValues {
+            expectRoundTripEqualityThroughJSON(for: vector)
+        }
+    }
+
+    func test_CGVector_Plist() {
+        for vector in cg_vectorValues {
+            expectRoundTripEqualityThroughPlist(for: vector)
         }
     }
 
@@ -458,6 +613,16 @@ CodableTests.test("test_Calendar_JSON") { TestCodable().test_Calendar_JSON() }
 CodableTests.test("test_Calendar_Plist") { TestCodable().test_Calendar_Plist() }
 CodableTests.test("test_CharacterSet_JSON") { TestCodable().test_CharacterSet_JSON() }
 CodableTests.test("test_CharacterSet_Plist") { TestCodable().test_CharacterSet_Plist() }
+CodableTests.test("test_CGAffineTransform_JSON") { TestCodable().test_CGAffineTransform_JSON() }
+CodableTests.test("test_CGAffineTransform_Plist") { TestCodable().test_CGAffineTransform_Plist() }
+CodableTests.test("test_CGPoint_JSON") { TestCodable().test_CGPoint_JSON() }
+CodableTests.test("test_CGPoint_Plist") { TestCodable().test_CGPoint_Plist() }
+CodableTests.test("test_CGSize_JSON") { TestCodable().test_CGSize_JSON() }
+CodableTests.test("test_CGSize_Plist") { TestCodable().test_CGSize_Plist() }
+CodableTests.test("test_CGRect_JSON") { TestCodable().test_CGRect_JSON() }
+CodableTests.test("test_CGRect_Plist") { TestCodable().test_CGRect_Plist() }
+CodableTests.test("test_CGVector_JSON") { TestCodable().test_CGVector_JSON() }
+CodableTests.test("test_CGVector_Plist") { TestCodable().test_CGVector_Plist() }
 CodableTests.test("test_DateComponents_JSON") { TestCodable().test_DateComponents_JSON() }
 CodableTests.test("test_DateComponents_Plist") { TestCodable().test_DateComponents_Plist() }
 

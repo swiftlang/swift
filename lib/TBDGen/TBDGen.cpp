@@ -62,22 +62,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
       addSymbol(linkage.getName());
   }
 
-  void addConformances(DeclContext *DC) {
-    for (auto conformance : DC->getLocalConformances()) {
-      auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
-          conformance->getProtocol());
-      if (!needsWTable)
-        continue;
-
-      // Only normal conformances get symbols; the others get any public symbols
-      // from their parent normal conformance.
-      if (conformance->getKind() != ProtocolConformanceKind::Normal)
-        continue;
-
-      addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
-      addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
-    }
-  }
+  void addConformances(DeclContext *DC);
 
 public:
   TBDGenVisitor(StringSet &symbols,
@@ -96,6 +81,8 @@ public:
       addMembers(ED->getMembers());
     else if (auto NTD = dyn_cast<NominalTypeDecl>(D))
       addMembers(NTD->getMembers());
+    else if (auto VD = dyn_cast<VarDecl>(D))
+      VD->getAllAccessorFunctions(members);
 
     for (auto member : members) {
       ASTVisitor::visit(member);
@@ -160,10 +147,6 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
   // currently need to refer to them by symbol for their own vtable.
   switch (declRef.getSubclassScope()) {
   case SubclassScope::External:
-    // Allocating constructors retain their normal linkage behavior.
-    if (declRef.kind == SILDeclRef::Kind::Allocator)
-      break;
-
     // Unlike the "truly" public things, private things have public symbols
     // unconditionally, even if they're theoretically SIL only.
     if (isPrivate) {
@@ -184,6 +167,81 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
     return;
 
   addSymbol(declRef.mangle());
+}
+
+void TBDGenVisitor::addConformances(DeclContext *DC) {
+  for (auto conformance : DC->getLocalConformances()) {
+    auto protocol = conformance->getProtocol();
+    auto needsWTable =
+        Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
+    if (!needsWTable)
+      continue;
+
+    // Only normal conformances get symbols; the others get any public symbols
+    // from their parent normal conformance.
+    auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
+    if (!normalConformance)
+      continue;
+
+    addSymbol(LinkEntity::forDirectProtocolWitnessTable(normalConformance));
+    addSymbol(
+        LinkEntity::forProtocolWitnessTableAccessFunction(normalConformance));
+
+    // FIXME: the logic around visibility in extensions is confusing, and
+    // sometimes witness thunks need to be manually made public.
+
+    auto conformanceIsSerialized = normalConformance->isSerialized();
+    auto addSymbolIfNecessary = [&](ValueDecl *valueReq,
+                                    SILLinkage witnessLinkage) {
+      if (conformanceIsSerialized &&
+          fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
+        Mangle::ASTMangler Mangler;
+        addSymbol(Mangler.mangleWitnessThunk(normalConformance, valueReq));
+      }
+    };
+    normalConformance->forEachValueWitness(nullptr, [&](ValueDecl *valueReq,
+                                                        Witness witness) {
+      if (isa<AbstractFunctionDecl>(valueReq)) {
+        auto witnessLinkage =
+            SILDeclRef(witness.getDecl()).getLinkage(ForDefinition);
+        addSymbolIfNecessary(valueReq, witnessLinkage);
+      } else if (auto VD = dyn_cast<AbstractStorageDecl>(valueReq)) {
+        // A var or subscript decl needs special handling in the special
+        // handling: the things that end up in the witness table are the
+        // accessors, but the compiler only talks about the actual storage decl
+        // in the conformance, so we have to manually walk over the members,
+        // having pulled out something that will have the right linkage.
+        auto witnessVD = cast<AbstractStorageDecl>(witness.getDecl());
+
+        SmallVector<Decl *, 4> members;
+        VD->getAllAccessorFunctions(members);
+
+        // Grab one of the accessors, and then use that to pull out which of the
+        // getter or setter will have the appropriate linkage.
+        FuncDecl *witnessWithRelevantLinkage;
+        switch (cast<FuncDecl>(members[0])->getAccessorKind()) {
+        case AccessorKind::NotAccessor:
+          llvm_unreachable("must be an accessor");
+        case AccessorKind::IsGetter:
+        case AccessorKind::IsAddressor:
+          witnessWithRelevantLinkage = witnessVD->getGetter();
+          break;
+        case AccessorKind::IsSetter:
+        case AccessorKind::IsWillSet:
+        case AccessorKind::IsDidSet:
+        case AccessorKind::IsMaterializeForSet:
+        case AccessorKind::IsMutableAddressor:
+          witnessWithRelevantLinkage = witnessVD->getSetter();
+          break;
+        }
+        auto witnessLinkage =
+            SILDeclRef(witnessWithRelevantLinkage).getLinkage(ForDefinition);
+        for (auto member : members) {
+          addSymbolIfNecessary(cast<ValueDecl>(member), witnessLinkage);
+        }
+      }
+    });
+  }
 }
 
 void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
@@ -225,9 +283,11 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     // like globals.
     if (!FileHasEntryPoint)
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
-  }
 
-  visitMembers(VD);
+    // In this case, the members of the VarDecl don't also appear as top-level
+    // decls, so we need to explicitly walk them.
+    visitMembers(VD);
+  }
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
@@ -281,9 +341,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     auto hasFieldOffset =
         !isGeneric && var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {
-      // Field are only direct if the class's internals are completely known.
-      auto isIndirect = !CD->hasFixedLayout();
-      addSymbol(LinkEntity::forFieldOffset(var, isIndirect));
+      // FIXME: a field only has one sort of offset, but it is moderately
+      // non-trivial to compute which one. Including both is less painful than
+      // missing the correct one (for now), so we do that.
+      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
+      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/true));
     }
 
     // The non-allocating forms of the constructors and destructors.

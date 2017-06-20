@@ -2313,8 +2313,8 @@ public:
   public:
     explicit Param(Type t) : Ty(t), Label(Identifier()), Flags() {}
     explicit Param(const TupleTypeElt &tte)
-      : Ty(tte.getType()), Label(tte.getName()),
-        Flags(tte.getParameterFlags()) {}
+      : Ty(tte.isVararg() ? tte.getVarargBaseTy() : tte.getType()),
+        Label(tte.getName()), Flags(tte.getParameterFlags()) {}
     
   private:
     /// The type of the parameter. For a variadic parameter, this is the
@@ -2332,6 +2332,8 @@ public:
     
     Identifier getLabel() const { return Label; }
     
+    ParameterTypeFlags getParameterFlags() const { return Flags; }
+
     /// Whether the parameter is varargs
     bool isVariadic() const { return Flags.isVariadic(); }
     
@@ -2622,13 +2624,12 @@ struct CallArgParam {
 SmallVector<CallArgParam, 4>
 decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
-/// Break a parameter type into an array of \c CallArgParams.
-///
-/// \param paramOwner The declaration that owns this parameter.
-/// \param level The level of parameters that are being decomposed.
-SmallVector<CallArgParam, 4>
-decomposeParamType(Type type, const ValueDecl *paramOwner, unsigned level);
-
+/// Break the parameter list into an array of booleans describing whether
+/// the argument type at each index has a default argument associated with
+/// it.
+void computeDefaultMap(Type type, const ValueDecl *paramOwner, unsigned level,
+                       SmallVectorImpl<bool> &outDefaultMap);
+  
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)
 std::string getParamListAsString(ArrayRef<CallArgParam> parameters);

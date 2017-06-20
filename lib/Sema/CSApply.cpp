@@ -1234,7 +1234,7 @@ namespace {
     /// This operation cannot fail.
     ///
     /// \param arg The argument expression.
-    /// \param paramType The parameter type.
+    /// \param funcType The function type.
     /// \param apply The ApplyExpr that forms the call.
     /// \param argLabels The argument labels provided for the call.
     /// \param hasTrailingClosure Whether the last argument is a trailing
@@ -1243,7 +1243,7 @@ namespace {
     ///
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *
-    coerceCallArguments(Expr *arg, Type paramType,
+    coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
                         ApplyExpr *apply,
                         ArrayRef<Identifier> argLabels,
                         bool hasTrailingClosure,
@@ -5168,12 +5168,13 @@ static unsigned computeCallLevel(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 Expr *ExprRewriter::coerceCallArguments(
-    Expr *arg, Type paramType,
+    Expr *arg, AnyFunctionType *funcType,
     ApplyExpr *apply,
     ArrayRef<Identifier> argLabels,
     bool hasTrailingClosure,
     ConstraintLocatorBuilder locator) {
-
+  
+  auto paramType = funcType->getInput();
   // Local function to produce a locator to refer to the ith element of the
   // argument tuple.
   auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
@@ -5205,6 +5206,9 @@ Expr *ExprRewriter::coerceCallArguments(
         }
       }
     }
+    
+    // Rebuild the function type.
+    funcType = FunctionType::get(paramType, funcType->getResult());
   }
 
   bool allParamsMatch = cs.getType(arg)->isEqual(paramType);
@@ -5217,7 +5221,9 @@ Expr *ExprRewriter::coerceCallArguments(
   unsigned level = computeCallLevel(cs, callee, apply);
 
   // Determine the parameter bindings.
-  auto params = decomposeParamType(paramType, callee.getDecl(), level);
+  auto params = funcType->getParams();
+  SmallVector<bool, 4> defaultMap;
+  computeDefaultMap(paramType, callee.getDecl(), level, defaultMap);
   auto args = decomposeArgType(cs.getType(arg), argLabels);
 
   // Quickly test if any further fix-ups for the argument types are necessary.
@@ -5231,7 +5237,7 @@ Expr *ExprRewriter::coerceCallArguments(
     
       for (size_t i = 0; i < params.size(); i++) {
         if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(argElts[i])) {
-          auto paramTy = params[i].Ty->getLValueOrInOutObjectType();
+          auto paramTy = params[i].getType()->getLValueOrInOutObjectType();
           auto argTy = cs.getType(dotExpr)->getLValueOrInOutObjectType();
           if (!paramTy->isEqual(argTy)) {
             allParamsMatch = false;
@@ -5246,9 +5252,9 @@ Expr *ExprRewriter::coerceCallArguments(
     return arg;
   
   MatchCallArgumentListener listener;
-  
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(args, params,
+                                                defaultMap,
                                                 hasTrailingClosure,
                                                 /*allowFixes=*/false, listener,
                                                 parameterBindings);
@@ -5306,11 +5312,11 @@ Expr *ExprRewriter::coerceCallArguments(
         return nullptr;
 
       // Record this parameter.
-      auto paramBaseType = param.Ty;
+      auto paramBaseType = param.getType();
       assert(sliceType.isNull() && "Multiple variadic parameters?");
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
       toSugarFields.push_back(
-          TupleTypeElt(sliceType, param.Label, param.parameterFlags));
+          TupleTypeElt(sliceType, param.getLabel(), param.getParameterFlags()));
       sources.push_back(TupleShuffleExpr::Variadic);
 
       // Convert the arguments.
@@ -5354,10 +5360,10 @@ Expr *ExprRewriter::coerceCallArguments(
       toSugarFields.push_back(TupleTypeElt(
                                 param.isVariadic()
                                   ? tc.getArraySliceType(arg->getLoc(),
-                                                         param.Ty)
-                                  : param.Ty,
-                                param.Label,
-                                param.parameterFlags));
+                                                         param.getType())
+                                  : param.getType(),
+                                param.getLabel(),
+                                param.getParameterFlags()));
 
       if (defArg) {
         callerDefaultArgs.push_back(defArg);
@@ -5379,12 +5385,12 @@ Expr *ExprRewriter::coerceCallArguments(
     sources.push_back(argIdx);
 
     // If the types exactly match, this is easy.
-    auto paramType = param.Ty;
+    auto paramType = param.getType();
     if (argType->isEqual(paramType)) {
       toSugarFields.push_back(
-          TupleTypeElt(argType, getArgLabel(argIdx), param.parameterFlags));
+          TupleTypeElt(argType, getArgLabel(argIdx), param.getParameterFlags()));
       fromTupleExprFields[argIdx] =
-          TupleTypeElt(paramType, getArgLabel(argIdx), param.parameterFlags);
+          TupleTypeElt(paramType, getArgLabel(argIdx), param.getParameterFlags());
       fromTupleExpr[argIdx] = arg;
       continue;
     }
@@ -5398,9 +5404,9 @@ Expr *ExprRewriter::coerceCallArguments(
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;
     fromTupleExprFields[argIdx] = TupleTypeElt(
-        cs.getType(convertedArg), getArgLabel(argIdx), param.parameterFlags);
+        cs.getType(convertedArg), getArgLabel(argIdx), param.getParameterFlags());
     toSugarFields.push_back(
-        TupleTypeElt(argType, param.Label, param.parameterFlags));
+        TupleTypeElt(argType, param.getLabel(), param.getParameterFlags()));
   }
 
   // Compute a new 'arg', from the bits we have.  We have three cases: the
@@ -6697,7 +6703,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         SmallVector<Identifier, 2> argLabelsScratch;
 
         auto fnType = cs.getType(fn)->getAs<FunctionType>();
-        arg = coerceCallArguments(arg, fnType->getInput(),
+        arg = coerceCallArguments(arg, fnType,
                                   apply,
                                   apply->getArgumentLabels(argLabelsScratch),
                                   hasTrailingClosure,
@@ -6876,7 +6882,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   SmallVector<Identifier, 2> argLabelsScratch;
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
-    Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
+    Expr *arg = coerceCallArguments(origArg, fnType,
                                     apply,
                                     apply->getArgumentLabels(argLabelsScratch),
                                     hasTrailingClosure,

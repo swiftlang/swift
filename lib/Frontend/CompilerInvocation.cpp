@@ -1329,6 +1329,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.MergePartialModules = true;
 
   Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
+  Opts.SILSerializeWitnessTables |=
+    Args.hasArg(OPT_sil_serialize_witness_tables);
+
   // Parse the optimization level.
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
     if (A->getOption().matches(OPT_Onone)) {

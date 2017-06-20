@@ -397,7 +397,14 @@ public:
   AbstractStorageDecl *getBehaviorDecl() const {
     return ContextAndInvalid.getPointer().dyn_cast<AbstractStorageDecl *>();
   }
-  
+
+  bool isSerialized() const {
+    auto *nominal = getType()->getAnyNominal();
+    return nominal->hasFixedLayout() &&
+           getProtocol()->getEffectiveAccess() >= Accessibility::Public &&
+           nominal->getEffectiveAccess() >= Accessibility::Public;
+  }
+
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   std::pair<Type, TypeDecl *>

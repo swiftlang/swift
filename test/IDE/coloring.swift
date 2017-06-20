@@ -227,6 +227,15 @@ func f(x: Int) -> Int {
   // CHECK: <str>"This is string </str>\<anchor>(</anchor>genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a})<anchor>)</anchor><str> interpolation"</str>
   "This is string \(genFn({(a:Int -> Int) in a})) interpolation"
 
+  // CHECK: <str>"This is unterminated</str>
+  "This is unterminated
+
+  // CHECK: <str>"This is unterminated with ignored \(interpolation) in it</str>
+  "This is unterminated with ignored \(interpolation) in it
+
+  // CHECK: <str>"This is terminated with invalid \(interpolation" + "in it"</str>
+  "This is terminated with invalid \(interpolation" + "in it"
+
   // CHECK: <str>"""
   // CHECK-NEXT: This is a multiline string.
   // CHECK-NEXT: """</str>
@@ -236,9 +245,19 @@ func f(x: Int) -> Int {
 
   // CHECK: <str>"""
   // CHECK-NEXT: This is a multiline</str>\<anchor>(</anchor> <str>"interpolated"</str> <anchor>)</anchor><str>string
+  // CHECK-NEXT: </str>\<anchor>(</anchor>
+  // CHECK-NEXT: <str>"""
+  // CHECK-NEXT: inner
+  // CHECK-NEXT: """</str>
+  // CHECK-NEXT: <anchor>)</anchor><str>
   // CHECK-NEXT: """</str>
   """
       This is a multiline\( "interpolated" )string
+   \(
+   """
+    inner
+   """
+   )
    """
 }
 

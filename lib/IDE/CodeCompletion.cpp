@@ -1548,20 +1548,18 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 /// that is of type () -> ().
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
-  unsigned level = FD->isInstanceMember() ? 1 : 0;
-  auto Args = decomposeParamType(funcType->getInput(), FD, level);
-  bool OneArg = Args.size() == 1;
-  if (Args.size() > 1) {
-    unsigned NonDefault =
-        std::count_if(Args.begin(), Args.end() - 1, [](const CallArgParam &P) {
-          return !P.HasDefaultArgument;
-        });
-
-    OneArg = NonDefault == 0;
+  SmallVector<bool, 4> defaultMap;
+  computeDefaultMap(funcType->getInput(), FD,
+                    /*level*/ FD->isInstanceMember() ? 1 : 0, defaultMap);
+  
+  bool OneArg = defaultMap.size() == 1;
+  if (defaultMap.size() > 1) {
+    auto NonDefault = std::count(defaultMap.begin(), defaultMap.end() - 1, false);
+    OneArg = (NonDefault == 0);
   }
 
   if (OneArg)
-    if (auto Fn = Args.back().Ty->getAs<AnyFunctionType>())
+    if (auto Fn = funcType->getParams().back().getType()->getAs<AnyFunctionType>())
       return Fn->getInput()->isVoid() && Fn->getResult()->isVoid();
 
   return false;
