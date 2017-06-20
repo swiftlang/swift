@@ -299,7 +299,8 @@ private:
                                              const RequirementSource *Source);
 
   /// Try to resolve the given unresolved potential archetype.
-  ConstraintResult resolveUnresolvedType(PotentialArchetype *pa);
+  ConstraintResult resolveUnresolvedType(PotentialArchetype *pa,
+                                         bool allowTypoCorrection);
 
 public:
   /// \brief Add a new same-type requirement between two fully resolved types
