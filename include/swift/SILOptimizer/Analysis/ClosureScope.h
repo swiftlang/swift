@@ -95,7 +95,7 @@ class ClosureScopeAnalysis : public SILAnalysis {
     IndexLookupFunc(const std::vector<SILFunction *> &indexedScopes)
         : indexedScopes(indexedScopes) {}
 
-    Optional<SILFunction *> operator()(int &idx) const {
+    Optional<SILFunction *> operator()(int idx) const {
       if (auto funcPtr = indexedScopes[idx]) {
         return funcPtr;
       }
