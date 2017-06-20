@@ -556,6 +556,7 @@ class ThrowBaseClass {
   required init(throwingCanary: Canary) throws {}
   init(canary: Canary) {}
   init(noFail: ()) {}
+  init(noFail: Int) {}
 }
 
 class ThrowDerivedClass : ThrowBaseClass {
@@ -604,6 +605,57 @@ class ThrowDerivedClass : ThrowBaseClass {
     try unwrap(failBeforeFullInitialization)
     try super.init()
     try unwrap(failAfterFullInitialization)
+  }
+
+  // CHECK-LABEL: sil hidden @_T021failable_initializers17ThrowDerivedClassCACSi41delegatingFailDuringDelegationArgEmission_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK: bb0(
+  // First initialize.
+  // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
+  // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
+  // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT]]
+  // CHECK:   store {{%.*}} to [init] [[PROJ]]
+  //
+  // Then initialize the canary with nil. We are able to borrow the initialized self to avoid retain/release overhead.
+  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @_T021failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvfi :
+  // CHECK:   [[OPT_CANARY:%.*]] = apply [[CANARY_FUNC]]()
+  // CHECK:   [[SELF:%.*]] = load_borrow [[PROJ]]
+  // CHECK:   [[CANARY_ADDR:%.*]] = ref_element_addr [[SELF]]
+  // CHECK:   [[CANARY_ACCESS:%.*]] = begin_access [modify] [dynamic] [[CANARY_ADDR]]
+  // CHECK:   assign [[OPT_CANARY]] to [[CANARY_ACCESS]]
+  // CHECK:   end_access [[CANARY_ACCESS]]
+  // CHECK:   end_borrow [[SELF]] from [[PROJ]]
+  //
+  // Now we begin argument emission where we perform the unwrap.
+  // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
+  // CHECK:   [[BASE_SELF:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
+  // CHECK:   [[INIT_FN:%.*]] = function_ref @_T021failable_initializers14ThrowBaseClassCACSi6noFail_tcfc : $@convention(method)
+  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @_T021failable_initializers6unwrapS2iKF : $@convention(thin)
+  // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  //
+  // Now we emit the call to the initializer. Notice how we return self back to
+  // its memory locatio nbefore any other work is done.
+  // CHECK: [[NORMAL_BB]](
+  // CHECK:   [[BASE_SELF_INIT:%.*]] = apply [[INIT_FN]]({{%.*}}, [[BASE_SELF]])
+  // CHECK:   [[SELF:%.*]] = unchecked_ref_cast [[BASE_SELF_INIT]] : $ThrowBaseClass to $ThrowDerivedClass
+  // CHECK:   store [[SELF]] to [init] [[PROJ]]
+  //
+  // Handle the return value.
+  // CHECK:   [[SELF:%.*]] = load [copy] [[PROJ]]
+  // CHECK:   destroy_value [[MARK_UNINIT]]
+  // CHECK:   return [[SELF]]
+  //
+  // When the error is thrown, we need to:
+  // 1. Store self back into the "conceptually" uninitialized box.
+  // 2. destroy the box.
+  // 3. Perform the rethrow.
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : $Error):
+  // CHECK:   [[SELF:%.*]] = unchecked_ref_cast [[BASE_SELF]] : $ThrowBaseClass to $ThrowDerivedClass
+  // CHECK:   store [[SELF]] to [init] [[PROJ]]
+  // CHECK:   destroy_value [[MARK_UNINIT]]
+  // CHECK:   throw [[ERROR]]
+  // CHECK: } // end sil function '_T021failable_initializers17ThrowDerivedClassCACSi41delegatingFailDuringDelegationArgEmission_tKcfc'
+  init(delegatingFailDuringDelegationArgEmission : Int) throws {
+    super.init(noFail: try unwrap(delegatingFailDuringDelegationArgEmission))
   }
 
   convenience init(noFail2: ()) {
