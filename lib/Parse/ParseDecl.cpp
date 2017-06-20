@@ -2766,6 +2766,23 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
 
   P.checkForInputIncomplete();
 
+  if (P.Tok.is(tok::integer_literal) || P.Tok.is(tok::floating_literal) ||
+      (P.Tok.is(tok::unknown) && isdigit(P.Tok.getText()[0]))) {
+    // Per rdar://problem/32316666, using numbers for identifiers is a common
+    // error for beginners, so it's worth handling this in a special way.
+    P.diagnose(P.Tok, diag::number_cant_start_decl_name, DeclKindName);
+
+    // Pretend this works as an identifier, which shouldn't be observable since
+    // actual uses of it will hit random other errors, e.g. `1()` won't be
+    // callable.
+    Result = P.Context.getIdentifier(P.Tok.getText());
+    Loc = P.Tok.getLoc();
+    P.consumeToken();
+
+    // We recovered, so this is a success.
+    return makeParserSuccess();
+  }
+
   if (P.Tok.isKeyword()) {
     P.diagnose(P.Tok, diag::keyword_cant_be_identifier, P.Tok.getText());
     P.diagnose(P.Tok, diag::backticks_to_escape)
@@ -4708,7 +4725,12 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   Token NameTok = Tok;
   SourceLoc NameLoc;
 
-  if (Tok.is(tok::identifier) || Tok.isKeyword()) {
+  if (Tok.isAny(tok::identifier, tok::integer_literal, tok::floating_literal,
+                tok::unknown) ||
+      Tok.isKeyword()) {
+    // This non-operator path is quite accepting of what tokens might be a name,
+    // because we're aggressive about recovering/providing good diagnostics for
+    // beginners.
     ParserStatus NameStatus =
         parseIdentifierDeclName(*this, SimpleName, NameLoc, "function",
                                 tok::l_paren, tok::arrow, tok::l_brace,
