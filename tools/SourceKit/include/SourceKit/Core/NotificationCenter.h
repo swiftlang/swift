@@ -24,13 +24,13 @@ typedef std::function<void(StringRef DocumentName)>
     DocumentUpdateNotificationReceiver;
 
 class NotificationCenter {
-	bool DispatchToMain;
+  bool DispatchToMain;
   std::vector<DocumentUpdateNotificationReceiver> DocUpdReceivers;
   mutable llvm::sys::Mutex Mtx;
 
 public:
-	explicit NotificationCenter(bool dispatchToMain);
-	~NotificationCenter();
+  explicit NotificationCenter(bool dispatchToMain);
+  ~NotificationCenter();
 
   void addDocumentUpdateNotificationReceiver(
       DocumentUpdateNotificationReceiver Receiver);

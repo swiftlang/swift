@@ -646,6 +646,12 @@ SwiftDocumentSemanticInfo::getSemanticDiagnostics(
   finalDiags.reserve(sortedParserDiags.size()+curSemaDiags.size());
 
   // Add sema diagnostics unless it is an existing parser diagnostic.
+  // Note that we want to merge and eliminate diagnostics from the 'sema' set
+  // that also show up in the 'parser' set, but we don't want to remove
+  // duplicate diagnostics from within the same set (e.g. duplicates existing in
+  // the 'sema' set). We want to report the diagnostics as the compiler reported
+  // them, even if there's some duplicate one. This is why we don't just do a
+  // simple append/sort/keep-uniques step.
   for (const auto &curDE : curSemaDiags) {
     bool existsAsParserDiag = std::binary_search(sortedParserDiags.begin(),
                                                  sortedParserDiags.end(),
