@@ -2046,7 +2046,7 @@ ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
 
 NOTE(codable_extraneous_codingkey_case_here,none,
-     "CodingKey case %0 does match any stored properties", (Identifier))
+     "CodingKey case %0 does not match any stored properties", (Identifier))
 NOTE(codable_non_conforming_property_here,none,
      "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Type))
 NOTE(codable_non_decoded_property_here,none,
