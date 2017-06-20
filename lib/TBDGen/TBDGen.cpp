@@ -24,6 +24,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -41,6 +42,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   bool FileHasEntryPoint;
+  bool SILSerializeWitnessTables;
 
   void addSymbol(StringRef name) {
     auto isNewValue = Symbols.insert(name).second;
@@ -67,9 +69,11 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
   TBDGenVisitor(StringSet &symbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, bool fileHasEntryPoint)
+                ModuleDecl *swiftModule, bool fileHasEntryPoint,
+                bool silSerializeWitnessTables)
       : Symbols(symbols), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule), FileHasEntryPoint(fileHasEntryPoint) {}
+        SwiftModule(swiftModule), FileHasEntryPoint(fileHasEntryPoint),
+        SILSerializeWitnessTables(silSerializeWitnessTables) {}
 
   void visitMembers(Decl *D) {
     SmallVector<Decl *, 4> members;
@@ -190,10 +194,12 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     // FIXME: the logic around visibility in extensions is confusing, and
     // sometimes witness thunks need to be manually made public.
 
-    auto conformanceIsSerialized = normalConformance->isSerialized();
+    auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
+        normalConformance, SwiftModule->getResilienceStrategy(),
+        SILSerializeWitnessTables);
     auto addSymbolIfNecessary = [&](ValueDecl *valueReq,
                                     SILLinkage witnessLinkage) {
-      if (conformanceIsSerialized &&
+      if (conformanceIsFixed &&
           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
         Mangle::ASTMangler Mangler;
         addSymbol(Mangler.mangleWitnessThunk(normalConformance, valueReq));
@@ -390,7 +396,8 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
                                    bool hasMultipleIRGenThreads,
-                                   bool isWholeModule) {
+                                   bool isWholeModule,
+                                   bool silSerializeWitnessTables) {
   UniversalLinkageInfo linkInfo(file->getASTContext().LangOpts.Target,
                                 hasMultipleIRGenThreads, isWholeModule);
 
@@ -400,7 +407,7 @@ void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
   auto hasEntryPoint = file->hasEntryPoint();
 
   TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule(),
-                        hasEntryPoint);
+                        hasEntryPoint, silSerializeWitnessTables);
   for (auto d : decls)
     visitor.visit(d);
 

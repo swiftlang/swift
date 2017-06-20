@@ -665,8 +665,10 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (Action == FrontendOptions::EmitTBD) {
-    auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
+    const auto &silOpts = Invocation.getSILOptions();
+    auto hasMultipleIRGenThreads = silOpts.NumThreads > 1;
     return writeTBD(Instance.getMainModule(), hasMultipleIRGenThreads,
+                    silOpts.SILSerializeWitnessTables,
                     opts.getSingleOutputFilename());
   }
 
@@ -942,14 +944,16 @@ static bool performCompile(CompilerInstance &Instance,
         !astGuaranteedToCorrespondToSIL)
       break;
 
-    auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
+    const auto &silOpts = Invocation.getSILOptions();
+    auto hasMultipleIRGenThreads = silOpts.NumThreads > 1;
     bool error;
     if (PrimarySourceFile)
       error = validateTBD(PrimarySourceFile, *IRModule, hasMultipleIRGenThreads,
-                          allSymbols);
+                          silOpts.SILSerializeWitnessTables, allSymbols);
     else
       error = validateTBD(Instance.getMainModule(), *IRModule,
-                          hasMultipleIRGenThreads, allSymbols);
+                          hasMultipleIRGenThreads,
+                          silOpts.SILSerializeWitnessTables, allSymbols);
     if (error)
       return true;
 
