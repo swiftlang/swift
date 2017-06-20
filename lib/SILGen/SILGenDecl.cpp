@@ -378,9 +378,12 @@ public:
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
 
+    // Erase DynamicSelfType from the box type, because we don't want
+    // dependent types in box layouts.
+    auto declType = decl->getType()->eraseDynamicSelfType();
     auto boxType = SGF.SGM.Types
       .getContextBoxTypeForCapture(decl,
-                     SGF.getLoweredType(decl->getType()).getSwiftRValueType(),
+                     SGF.getLoweredType(declType).getSwiftRValueType(),
                      SGF.F.getGenericEnvironment(),
                      /*mutable*/ true);
 
@@ -394,6 +397,14 @@ public:
       allocBox = SGF.B.createMarkUninitialized(decl, allocBox, kind.getValue());
 
     SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
+
+    // If we erased a DynamicSelfType above, cast the projected address
+    // to get it back.
+    if (!decl->getType()->isEqual(declType)) {
+      addr = SGF.B.createUncheckedAddrCast(
+          decl, addr,
+          SGF.getLoweredType(decl->getType()).getAddressType());
+    }
 
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
