@@ -1055,26 +1055,10 @@ sourcekitd_variant_t LatestSemaAnnotations = {{0,0,0}};
 sourcekitd_variant_t LatestSemaDiags = {{0,0,0}};
 
 static void getSemanticInfoImpl(sourcekitd_variant_t Info) {
-  sourcekitd_variant_t annotations =
+  LatestSemaAnnotations =
     sourcekitd_variant_dictionary_get_value(Info, KeyAnnotations);
-  sourcekitd_variant_t diagnosticStage =
-    sourcekitd_variant_dictionary_get_value(Info, KeyDiagnosticStage);
-
-  auto hasSemaInfo = [&]{
-    if (sourcekitd_variant_get_type(annotations) != SOURCEKITD_VARIANT_TYPE_NULL)
-      return true;
-    if (sourcekitd_variant_get_type(diagnosticStage) == SOURCEKITD_VARIANT_TYPE_UID) {
-      return sourcekitd_variant_uid_get_value(diagnosticStage) == SemaDiagnosticStage;
-    }
-    return false;
-  };
-
-  if (hasSemaInfo()) {
-    LatestSemaAnnotations =
-      sourcekitd_variant_dictionary_get_value(Info, KeyAnnotations);
-    LatestSemaDiags =
-      sourcekitd_variant_dictionary_get_value(Info, KeyDiagnostics);
-  }
+  LatestSemaDiags =
+    sourcekitd_variant_dictionary_get_value(Info, KeyDiagnostics);
 }
 
 static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename) {
