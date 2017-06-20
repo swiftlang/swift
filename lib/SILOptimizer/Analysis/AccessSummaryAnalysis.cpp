@@ -104,6 +104,7 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       break;
     case ValueKind::CopyAddrInst:
     case ValueKind::ExistentialMetatypeInst:
+    case ValueKind::ValueMetatypeInst:
     case ValueKind::LoadInst:
     case ValueKind::OpenExistentialAddrInst:
     case ValueKind::ProjectBlockStorageInst:
@@ -114,10 +115,40 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       break;
     default:
       // TODO: These requirements should be checked for in the SIL verifier.
-      llvm_unreachable("Unrecognized argument use");
+      // This is an assertion rather than llvm_unreachable() because
+      // it is likely the whitelist above for scenarios in which we'ren
+      // not generating access markers is not comprehensive.
+      assert(false && "Unrecognized argument use");
+      break;
     }
   }
 }
+
+#ifndef NDEBUG
+/// Sanity check to make sure that a noescape partial apply is
+/// only ultimately used by an apply, a try_apply or as an argument (but not
+/// the called function) in a partial_apply.
+/// TODO: This really should be checked in the SILVerifier.
+static bool isExpectedUseOfNoEscapePartialApply(SILInstruction *user) {
+  if (!user)
+    return true;
+
+  // It is fine to call the partial apply
+  if (isa<ApplyInst>(user) || isa<TryApplyInst>(user)) {
+    return true;
+  }
+
+  if (isa<ConvertFunctionInst>(user)) {
+    return isExpectedUseOfNoEscapePartialApply(user->getSingleUse()->getUser());
+  }
+
+  if (auto *PAI = dyn_cast<PartialApplyInst>(user)) {
+    return user != PAI->getCallee();
+  }
+
+  return false;
+}
+#endif
 
 void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
                                                 unsigned callerArgumentIndex,
@@ -133,12 +164,9 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
   assert(isa<FunctionRefInst>(apply->getCallee()) &&
          "Noescape partial apply of non-functionref?");
 
-  // Make sure the partial_apply is used by an apply and not another
-  // partial_apply
   SILInstruction *user = apply->getSingleUse()->getUser();
-  assert((isa<ApplyInst>(user) || isa<TryApplyInst>(user) ||
-          isa<ConvertFunctionInst>(user)) &&
-         "noescape partial_apply has non-apply use!");
+  assert(isExpectedUseOfNoEscapePartialApply(user) &&
+         "noescape partial_apply has unexpected use!");
   (void)user;
 
   // The arguments to partial_apply are a suffix of the arguments to the

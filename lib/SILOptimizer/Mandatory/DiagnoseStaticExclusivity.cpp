@@ -163,25 +163,74 @@ public:
   }
 };
 
+enum class RecordedAccessKind {
+  /// The access was for a 'begin_access' instruction in the current function
+  /// being checked.
+  BeginInstruction,
+
+  /// The access was inside noescape closure that we either
+  /// passed to function or called directly. It results from applying the
+  /// the summary of the closure to the closure's captures.
+  NoescapeClosureCapture
+};
+
 /// Records an access to an address and the single subpath of projections
 /// that was performed on the address, if such a single subpath exists.
 class RecordedAccess {
 private:
-  BeginAccessInst *Inst;
+  RecordedAccessKind RecordKind;
+  union {
+   BeginAccessInst *Inst;
+    struct {
+      SILAccessKind ClosureAccessKind;
+      SILLocation ClosureAccessLoc;
+    };
+  };
+
   const IndexTrieNode *SubPath;
-
 public:
-  RecordedAccess(BeginAccessInst *BAI, const IndexTrieNode *SubPath)
-      : Inst(BAI), SubPath(SubPath) {}
+  RecordedAccess(BeginAccessInst *BAI, const IndexTrieNode *SubPath) :
+      RecordKind(RecordedAccessKind::BeginInstruction), Inst(BAI),
+      SubPath(SubPath) { }
 
-  BeginAccessInst *getInstruction() const { return Inst; }
+  RecordedAccess(SILAccessKind ClosureAccessKind,
+                 SILLocation ClosureAccessLoc, const IndexTrieNode *SubPath) :
+      RecordKind(RecordedAccessKind::NoescapeClosureCapture),
+      ClosureAccessKind(ClosureAccessKind), ClosureAccessLoc(ClosureAccessLoc),
+      SubPath(SubPath) { }
 
-  SILAccessKind getAccessKind() const { return Inst->getAccessKind(); }
+  RecordedAccessKind getRecordKind() const {
+    return RecordKind;
+  }
 
-  SILLocation getAccessLoc() const { return Inst->getLoc(); }
+  BeginAccessInst *getInstruction() const {
+    assert(RecordKind == RecordedAccessKind::BeginInstruction);
+    return Inst;
+  }
 
-  const IndexTrieNode *getSubPath() const { return SubPath; }
+  SILAccessKind getAccessKind() const {
+    switch (RecordKind) {
+      case RecordedAccessKind::BeginInstruction:
+        return Inst->getAccessKind();
+      case RecordedAccessKind::NoescapeClosureCapture:
+        return ClosureAccessKind;
+    };
+  }
+
+  SILLocation getAccessLoc() const {
+    switch (RecordKind) {
+      case RecordedAccessKind::BeginInstruction:
+        return Inst->getLoc();
+      case RecordedAccessKind::NoescapeClosureCapture:
+        return ClosureAccessLoc;
+    };
+  }
+
+  const IndexTrieNode *getSubPath() const {
+    return SubPath;
+  }
 };
+
 
 /// Records the in-progress accesses to a given sub path.
 class SubAccessInfo {
@@ -676,9 +725,11 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
         diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
                  PathDescription, AccessKindForMain);
     D.highlight(RangeForMain);
-    tryFixItWithCallToCollectionSwapAt(FirstAccess.getInstruction(),
-                                       SecondAccess.getInstruction(),
-                                       CallsToSwap, Ctx, D);
+    if (SecondAccess.getRecordKind() == RecordedAccessKind::BeginInstruction) {
+      tryFixItWithCallToCollectionSwapAt(FirstAccess.getInstruction(),
+                                         SecondAccess.getInstruction(),
+                                         CallsToSwap, Ctx, D);
+    }
   } else {
     auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
                          diag::exclusivity_access_required_unknown_decl_swift3 :
@@ -868,6 +919,102 @@ Optional<RecordedAccess> shouldReportAccess(const AccessInfo &Info,
   return Info.conflictsWithAccess(Kind, SubPath);
 }
 
+/// Use the summary analysis to check whether a call to the given
+/// function would conflict with any in progress accesses. The starting
+/// index indicates what index into the the callee's parameters the
+/// arguments array starts at -- this is useful for partial_apply functions,
+/// which pass only a suffix of the callee's arguments at the apply site.
+static void checkForViolationWithCall(
+    const StorageMap &Accesses, SILFunction *Callee, unsigned StartingAtIndex,
+    OperandValueArrayRef Arguments, AccessSummaryAnalysis *ASA,
+    llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses) {
+  const AccessSummaryAnalysis::FunctionSummary &FS =
+      ASA->getOrCreateSummary(Callee);
+
+  // For each argument in the suffix of the callee arguments being passed
+  // at this call site, determine whether the arguments will be accessed
+  // in a way that conflicts with any currently in progress accesses.
+  // If so, diagnose.
+  for (unsigned ArgumentIndex : indices(Arguments)) {
+    unsigned CalleeIndex = StartingAtIndex + ArgumentIndex;
+
+    const AccessSummaryAnalysis::ArgumentSummary &AS =
+        FS.getAccessForArgument(CalleeIndex);
+    Optional<SILAccessKind> Kind = AS.getAccessKind();
+    if (!Kind)
+      continue;
+
+    SILValue Argument = Arguments[ArgumentIndex];
+    assert(Argument->getType().isAddress());
+
+    const AccessedStorage &Storage = findAccessedStorage(Argument);
+    auto AccessIt = Accesses.find(Storage);
+    if (AccessIt == Accesses.end())
+      continue;
+    const AccessInfo &Info = AccessIt->getSecond();
+
+    // TODO: For now, treat a summarized access as an access to the whole
+    // address. Once the summary analysis is sensitive to stored properties,
+    // this should be updated look at the subpaths from the summary.
+    const IndexTrieNode *SubPath = ASA->getSubPathTrieRoot();
+    if (auto Conflict = shouldReportAccess(Info, *Kind, SubPath)) {
+      SILLocation AccessLoc = AS.getAccessLoc();
+      const auto &SecondAccess = RecordedAccess(*Kind, AccessLoc, SubPath);
+      ConflictingAccesses.emplace_back(Storage, *Conflict, SecondAccess);
+    }
+  }
+}
+
+/// Look through a value passed as a function argument to determine whether
+/// it is a partial_apply.
+static PartialApplyInst *lookThroughForPartialApply(SILValue V) {
+  while (true) {
+    if (auto CFI = dyn_cast<ConvertFunctionInst>(V)) {
+      V = CFI->getOperand();
+      continue;
+    }
+
+    if (auto *PAI = dyn_cast<PartialApplyInst>(V))
+      return PAI;
+
+    return nullptr;
+  }
+}
+
+/// Checks whether any of the arguments to the apply are closures and diagnoses
+/// if any of the @inout_aliasable captures passed to those closures have
+/// in-progress accesses that would conflict with any access the summary
+/// says the closure would perform.
+static void checkForViolationsInNoEscapeClosures(
+    const StorageMap &Accesses, FullApplySite FAS, AccessSummaryAnalysis *ASA,
+    llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses) {
+
+  SILFunction *Callee = FAS.getCalleeFunction();
+  if (Callee && !Callee->empty()) {
+    // Check for violation with directly called closure
+    checkForViolationWithCall(Accesses, Callee, 0, FAS.getArguments(), ASA,
+                              ConflictingAccesses);
+  }
+
+  // Check for violation with closures passed as arguments
+  for (SILValue Argument : FAS.getArguments()) {
+    auto *PAI = lookThroughForPartialApply(Argument);
+    if (!PAI)
+      continue;
+
+    SILFunction *Closure = PAI->getCalleeFunction();
+    if (!Closure || Closure->empty())
+      continue;
+
+    // Check the closure's captures, which are a suffix of the closure's
+    // parameters.
+    unsigned StartIndex =
+        Closure->getArguments().size() - PAI->getNumCallArguments();
+    checkForViolationWithCall(Accesses, Closure, StartIndex,
+                              PAI->getArguments(), ASA, ConflictingAccesses);
+  }
+}
+
 static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
                                    AccessSummaryAnalysis *ASA) {
   // The implementation relies on the following SIL invariants:
@@ -966,8 +1113,17 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
         // Record calls to swap() for potential Fix-Its.
         if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
           CallsToSwap.push_back(AI);
+        else
+          checkForViolationsInNoEscapeClosures(Accesses, AI, ASA,
+                                               ConflictingAccesses);
+        continue;
       }
 
+      if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
+        checkForViolationsInNoEscapeClosures(Accesses, TAI, ASA,
+                                             ConflictingAccesses);
+        continue;
+      }
       // Sanity check to make sure entries are properly removed.
       assert((!isa<ReturnInst>(&I) || Accesses.size() == 0) &&
              "Entries were not properly removed?!");
