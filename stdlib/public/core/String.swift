@@ -144,10 +144,13 @@ extension _SwiftStringView {
 
 extension StringProtocol {
   internal var _ephemeralString : String {
-    if _fastPath(self is _SwiftStringView) {
-      return (self as! _SwiftStringView)._ephemeralContent
+    @inline(__always)
+    get {
+      if _fastPath(self is _SwiftStringView) {
+        return (self as! _SwiftStringView)._ephemeralContent
+      }
+      return String(String.CharacterView(self))
     }
-    return String(String.CharacterView(self))
   }
 
   internal var _persistentString : String {
@@ -234,9 +237,18 @@ extension _StringCore {
     encoding targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
   ) rethrows -> Result {
+    typealias P = UnsafeMutablePointer<TargetEncoding.CodeUnit>
+    
     if _fastPath(hasContiguousStorage) {
       defer { _fixLifetime(self) }
       if isASCII {
+        if _fastPath(
+          hasNulTerminator && (
+            targetEncoding == Unicode.UTF8.self
+            || targetEncoding == Unicode.ASCII.self)) {
+          return try body(_identityCast(startASCII, to: P.self), count)
+        }
+        
         return try Swift._withCStringAndLength(
           encodedAs: targetEncoding,
           from: UnsafeBufferPointer(start: startASCII, count: count)[bounds],
@@ -245,6 +257,10 @@ extension _StringCore {
         )
       }
       else {
+        if _fastPath(hasNulTerminator && targetEncoding == Unicode.UTF16.self) {
+          return try body(_identityCast(startUTF16, to: P.self), count)
+        }
+        
         return try Swift._withCStringAndLength(
           encodedAs: targetEncoding,
           from: UnsafeBufferPointer(start: startUTF16, count: count)[bounds],
@@ -715,6 +731,7 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
         count: Int(utf16CodeUnitCount),
         elementShift: 1,
         hasCocoaBuffer: false,
+        hasNulTerminator: false,
         owner: nil))
   }
 }
@@ -734,6 +751,7 @@ extension String : _ExpressibleByBuiltinStringLiteral {
           count: Int(utf8CodeUnitCount),
           elementShift: 0,
           hasCocoaBuffer: false,
+          hasNulTerminator: false,
           owner: nil))
     }
     else {

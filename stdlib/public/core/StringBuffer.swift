@@ -18,24 +18,19 @@ struct _StringBufferIVars {
     capacityAndElementShift = _elementWidth - 1
   }
 
-  internal init(
-    _usedEnd: UnsafeMutableRawPointer,
-    byteCapacity: Int,
-    elementWidth: Int
-  ) {
-    _sanityCheck(elementWidth == 1 || elementWidth == 2)
-    _sanityCheck((byteCapacity & 0x1) == 0)
-    self.usedEnd = _usedEnd
-    self.capacityAndElementShift = byteCapacity + (elementWidth - 1)
-  }
-
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it using _HeapBuffer's pointer.
   var usedEnd: UnsafeMutableRawPointer?
 
   var capacityAndElementShift: Int
   var byteCapacity: Int {
-    return capacityAndElementShift & ~0x1
+    get {
+      return Int(extendingOrTruncating:
+        UInt(extendingOrTruncating: capacityAndElementShift) &>> 1)
+    }
+    set {
+      capacityAndElementShift = elementShift | (newValue &<< 1)
+    }
   }
   var elementShift: Int {
     return capacityAndElementShift & 0x1
@@ -58,37 +53,41 @@ public struct _StringBuffer {
     _storage = storage
   }
 
+  /// Creates an instance with sufficient space for `capacity` elements and a
+  /// `NUL` terminator.
+  ///
+  /// - Postcondition: `usedCount == initialSize`, 
+  ///
+  /// - Requires: `initialSize` <= `capacity`
+  /// - Requires: `elementWidth == 1 || elementWidth == 2`
   public init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     _sanityCheck(initialSize <= capacity)
-    // We don't check for elementWidth overflow and underflow because
-    // elementWidth is known to be 1 or 2.
-    let elementShift = elementWidth &- 1
-
-    // We need at least 1 extra byte if we're storing 8-bit elements,
-    // because indexing will always grab 2 consecutive bytes at a
-    // time.
-    let capacityBump = 1 &- elementShift
-
-    // Used to round capacity up to nearest multiple of 16 bits, the
-    // element size of our storage.
-    let divRound = 1 &- elementShift
-    _storage = _Storage(
-      HeapBufferStorage.self,
-      _StringBufferIVars(_elementWidth: elementWidth),
-      (capacity + capacityBump + divRound) &>> divRound
-    )
-    // This conditional branch should fold away during code gen.
-    if elementShift == 0 {
-      start.bindMemory(to: UTF8.CodeUnit.self, capacity: initialSize)
+    let header = _StringBufferIVars(_elementWidth: elementWidth)
+    if elementWidth == 1 {
+      // 1 byte to ensure rounding up when dividing by 2 and 1 byte for NUL
+      // termination.
+      _storage = _Storage(HeapBufferStorage.self, header, (capacity + 2) &>> 1)
+      
+      let nulTerminatedUTF8Capacity = _storage.capacity &<< 1
+      _storage.value.byteCapacity = nulTerminatedUTF8Capacity &- 1
+      
+      let p = start.bindMemory(
+        to: UTF8.CodeUnit.self, capacity: nulTerminatedUTF8Capacity)
+      
+      self.usedEnd = UnsafeMutableRawPointer(p + initialSize)
     }
     else {
-      start.bindMemory(to: UTF16.CodeUnit.self, capacity: initialSize)
-    }
+      _storage = _Storage(HeapBufferStorage.self, header, capacity + 1)
 
-    self.usedEnd = start + (initialSize &<< elementShift)
-    _storage.value.capacityAndElementShift
-      = ((_storage.capacity - capacityBump) &<< 1) + elementShift
+      let nulTerminatedUTF16Capacity = _storage.capacity
+      _storage.value.byteCapacity = (nulTerminatedUTF16Capacity &- 1) &<< 1
+      
+      let p = start.bindMemory(
+        to: UTF16.CodeUnit.self, capacity: nulTerminatedUTF16Capacity)
+      
+      self.usedEnd = UnsafeMutableRawPointer(p + initialSize)
+    }
   }
 
   static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(

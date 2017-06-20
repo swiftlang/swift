@@ -227,13 +227,7 @@ public struct Substring : StringProtocol {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   public func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
-    return try _slice._base._core._withCSubstringAndLength(
-      in: startIndex._base._position..<endIndex._base._position,
-      encoding: UTF8.self) {
-      p, length in try p.withMemoryRebound(to: CChar.self, capacity: length) {
-        try body($0)
-      }
-    }
+    return try _ephemeralString.withCString(body)
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -256,9 +250,7 @@ public struct Substring : StringProtocol {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    return try _slice._base._core._withCSubstring(
-      in: startIndex._base._position..<endIndex._base._position,
-      encoding: targetEncoding, body)
+    return try _ephemeralString.withCString(encodedAs: targetEncoding, body)
   }
 }
 

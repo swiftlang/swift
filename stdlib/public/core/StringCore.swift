@@ -51,6 +51,14 @@ public struct _StringCore {
 #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(count >= 0)
 
+    if hasNulTerminator {
+      if let b = asciiBuffer {
+        _sanityCheck((b.baseAddress! + b.count).pointee == 0)
+      }
+      else if _baseAddress != nil && elementWidth == 2 {
+        _sanityCheck((startUTF16 + count).pointee == 0)
+      }
+    }
     if _baseAddress == nil {
 #if _runtime(_ObjC)
       _sanityCheck(hasCocoaBuffer,
@@ -60,6 +68,7 @@ public struct _StringCore {
         "Opaque cocoa strings should have an elementWidth of 2")
     }
     else if _baseAddress == _emptyStringBase {
+      _sanityCheck(nativeBuffer == nil)
       _sanityCheck(!hasCocoaBuffer)
       _sanityCheck(count == 0, "Empty string storage with non-zero count")
       _sanityCheck(_owner == nil, "String pointing at empty storage has owner")
@@ -77,7 +86,7 @@ public struct _StringCore {
 
   /// Bitmask for the count part of `_countAndFlags`.
   var _countMask: UInt {
-    return UInt.max &>> 2
+    return UInt.max &>> 3
   }
 
   /// Bitmask for the flags part of `_countAndFlags`.
@@ -101,18 +110,19 @@ public struct _StringCore {
     return _baseAddress! + (n &<< elementShift)
   }
 
-  static func _copyElements(
+  static func _appendElements(
     _ srcStart: UnsafeMutableRawPointer, srcElementWidth: Int,
     dstStart: UnsafeMutableRawPointer, dstElementWidth: Int,
     count: Int
   ) {
+    // Make sure we don't NUL-terminate memory we don't own
+    guard count != 0 else { return }
+    
     // Copy the old stuff into the new storage
     if _fastPath(srcElementWidth == dstElementWidth) {
+      let byteCount = count &<< (srcElementWidth &- 1)
       // No change in storage width; we can use memcpy
-      _memcpy(
-        dest: dstStart,
-        src: srcStart,
-        size: UInt(count &<< (srcElementWidth - 1)))
+      _memcpy(dest: dstStart, src: srcStart, size: UInt(byteCount))
     }
     else if srcElementWidth < dstElementWidth {
       // Widening ASCII to UTF-16; we need to copy the bytes manually
@@ -145,6 +155,7 @@ public struct _StringCore {
     count: Int,
     elementShift: Int,
     hasCocoaBuffer: Bool,
+    hasNulTerminator: Bool,
     owner: AnyObject?
   ) {
     _sanityCheck(elementShift == 0 || elementShift == 1)
@@ -153,6 +164,7 @@ public struct _StringCore {
     self._countAndFlags
       = (UInt(extendingOrTruncating: elementShift) &<< (UInt.bitWidth - 1))
       | ((hasCocoaBuffer ? 1 : 0) &<< (UInt.bitWidth - 2))
+      | ((hasNulTerminator ? 1 : 0) as UInt &<< (UInt.bitWidth - 3))
       | UInt(extendingOrTruncating: count)
 
     self._owner = owner
@@ -168,6 +180,7 @@ public struct _StringCore {
       count: buffer.usedCount,
       elementShift: buffer.elementShift,
       hasCocoaBuffer: false,
+      hasNulTerminator: false,
       owner: buffer._anyObject
     )
   }
@@ -176,10 +189,14 @@ public struct _StringCore {
   ///
   /// - Note: There is no null terminator in an empty string.
   public init() {
-    self._baseAddress = _emptyStringBase
-    self._countAndFlags = 0
-    self._owner = nil
-    _invariantCheck()
+    self.init(
+      baseAddress: _emptyStringBase,
+      count: 0,
+      elementShift: 0,
+      hasCocoaBuffer: false,
+      hasNulTerminator: true,
+      owner: nil
+    )
   }
 
   //===--------------------------------------------------------------------===//
@@ -219,6 +236,21 @@ public struct _StringCore {
 #endif
   }
 
+  internal var hasNulTerminator: Bool {
+    get {
+      return _countAndFlags & 1 &<< (UInt.bitWidth - 3) != 0
+    }
+    set {
+      if newValue {
+        _countAndFlags |= 1 &<< (UInt.bitWidth - 3)
+      }
+      else {
+        _countAndFlags |= ~(1 &<< (UInt.bitWidth - 3))
+      }
+    }
+  }
+
+  
   /// Are we using an `NSString` for storage?
   public var hasCocoaBuffer: Bool {
     return Int((_countAndFlags &<< 1)._value) < 0
@@ -287,7 +319,10 @@ public struct _StringCore {
     if hasContiguousStorage {
       return _StringCore(
         baseAddress: _pointer(toElementAt: bounds.lowerBound),
-        _countAndFlags: (_countAndFlags & _flagMask) | UInt(newCount),
+        count: newCount,
+        elementShift: elementShift,
+        hasCocoaBuffer: hasCocoaBuffer,
+        hasNulTerminator: self.hasNulTerminator && bounds.upperBound == count,
         owner: _owner)
     }
 #if _runtime(_ObjC)
@@ -428,7 +463,6 @@ public struct _StringCore {
       // In order to grow the substring in place, this _StringCore should point
       // at the substring at the end of a _StringBuffer.  Otherwise, some other
       // String is using parts of the buffer beyond our last byte.
-      let usedStart = _pointer(toElementAt:0)
       let usedEnd = _pointer(toElementAt:count)
 
       // Attempt to claim unused capacity in the buffer
@@ -446,8 +480,8 @@ public struct _StringCore {
   }
 
   /// Ensure that this String references a _StringBuffer having
-  /// a capacity of at least newSize elements of at least the given width.
-  /// Effectively appends garbage to the String until it has newSize
+  /// a capacity of at least newSize+1 elements of at least the given width.
+  /// Effectively appends garbage to the String until it has newSize+1
   /// UTF-16 code units.  Returns a pointer to the garbage code units;
   /// you must immediately copy valid data into that storage.
   @inline(__always)
@@ -491,10 +525,11 @@ public struct _StringCore {
                                    elementWidth: newElementWidth)
 
     if hasContiguousStorage {
-      _StringCore._copyElements(
+      _StringCore._appendElements(
         _baseAddress!, srcElementWidth: elementWidth,
         dstStart: UnsafeMutableRawPointer(newStorage.start),
         dstElementWidth: newElementWidth, count: oldCount)
+      hasNulTerminator = false
     }
     else {
 #if _runtime(_ObjC)
@@ -503,13 +538,12 @@ public struct _StringCore {
       // FIXME: can we get Cocoa to tell us quickly that an opaque
       // string is ASCII?  Do we care much about that edge case?
       _sanityCheck(newStorage.elementShift == 1)
-      _cocoaStringReadAll(cocoaBuffer!,
-        newStorage.start.assumingMemoryBound(to: UTF16.CodeUnit.self))
+      let start = newStorage.start.assumingMemoryBound(to: UTF16.CodeUnit.self)
+      _cocoaStringReadAll(cocoaBuffer!, start)
 #else
       _sanityCheckFailure("_copyInPlace: non-native string without objc runtime")
 #endif
     }
-
     self = _StringCore(newStorage)
   }
 
@@ -543,8 +577,8 @@ public struct _StringCore {
     if _fastPath(elementWidth == 1) {
       _sanityCheck(_pointer(toElementAt:count) == destination + 1)
 
-      destination.assumingMemoryBound(to: UTF8.CodeUnit.self)[0]
-        = UTF8.CodeUnit(u0)
+      var d = destination.assumingMemoryBound(to: UTF8.CodeUnit.self)
+      d[0] = UTF8.CodeUnit(u0)
     }
     else {
       let destination16
@@ -561,6 +595,10 @@ public struct _StringCore {
   @inline(never)
   mutating func append(_ rhs: _StringCore) {
     _invariantCheck()
+
+    // Don't NUL-terminate storage we might not own
+    guard rhs.count != 0 else { return }
+    
     let minElementWidth
     = elementWidth >= rhs.elementWidth
       ? elementWidth
@@ -570,15 +608,16 @@ public struct _StringCore {
       count + rhs.count, minElementWidth: minElementWidth)
 
     if _fastPath(rhs.hasContiguousStorage) {
-      _StringCore._copyElements(
+      _sanityCheck(nativeBuffer != nil)
+      _StringCore._appendElements(
         rhs._baseAddress!, srcElementWidth: rhs.elementWidth,
         dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
     }
     else {
 #if _runtime(_ObjC)
       _sanityCheck(elementWidth == 2)
-      _cocoaStringReadAll(rhs.cocoaBuffer!,
-        destination.assumingMemoryBound(to: UTF16.CodeUnit.self))
+      let start = destination.assumingMemoryBound(to: UTF16.CodeUnit.self)
+      _cocoaStringReadAll(rhs.cocoaBuffer!, start)
 #else
       _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
@@ -641,15 +680,10 @@ extension _StringCore : RangeReplaceableCollection {
     let width = elementWidth == 2 || newElements.contains { $0 > 0x7f } ? 2 : 1
     let replacementCount = numericCast(newElements.count) as Int
     let replacedCount = bounds.count
-    let tailCount = count - bounds.upperBound
+    let tailCount = count - bounds.upperBound + elementWidth
     let growth = replacementCount - replacedCount
     let newCount = count + growth
 
-    // Successfully claiming capacity only ensures that we can modify
-    // the newly-claimed storage without observably mutating other
-    // strings, i.e., when we're appending.  Already-used characters
-    // can only be mutated when we have a unique reference to the
-    // buffer.
     let appending = bounds.lowerBound == endIndex
 
     let existingStorage = !hasCocoaBuffer && (
@@ -722,28 +756,32 @@ extension _StringCore : RangeReplaceableCollection {
   }
 
   public mutating func append<S : Sequence>(contentsOf s: S)
-    where S.Element == UTF16.CodeUnit {
+  where S.Element == Unicode.UTF16.CodeUnit {
     var width = elementWidth
     if width == 1 {
-      if let hasNonAscii = s._preprocessingPass({
-          s.contains { $0 > 0x7f }
-        }) {
+      if let hasNonAscii = s._preprocessingPass({s.contains { $0 > 0x7f }}) {
         width = hasNonAscii ? 2 : 1
       }
     }
 
-    let growth = s.underestimatedCount
     var iter = s.makeIterator()
 
+    defer { _fixLifetime(self) }
+
+    // Handle elements from 0..<s.underestimatedCount
+    var growth = s.underestimatedCount
     if _fastPath(growth > 0) {
       let newSize = count + growth
       let destination = _growBuffer(newSize, minElementWidth: width)
+
       if elementWidth == 1 {
         let destination8
           = destination.assumingMemoryBound(to: UTF8.CodeUnit.self)
         for i in 0..<growth {
           destination8[i] = UTF8.CodeUnit(iter.next()!)
         }
+        _sanityCheck(nativeBuffer != nil)
+        startASCII[growth] = 0
       }
       else {
         let destination16
@@ -751,8 +789,11 @@ extension _StringCore : RangeReplaceableCollection {
         for i in 0..<growth {
           destination16[i] = iter.next()!
         }
+        _sanityCheck(nativeBuffer != nil)
+        startUTF16[growth] = 0
       }
     }
+    
     // Append any remaining elements
     for u in IteratorSequence(iter) {
       self.append(u)
