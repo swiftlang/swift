@@ -1286,6 +1286,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         }
         return;
       }
+      case SemaTokenKind::ExprStart:
       case SemaTokenKind::StmtStart: {
         Receiver({});
         return;
