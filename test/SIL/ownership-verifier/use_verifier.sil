@@ -309,6 +309,31 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   return %2 : $Builtin.NativeObject
 }
 
+sil @access_tests : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %1 = project_box %0 : ${ var Builtin.Int64 }, 0
+  %2 = begin_access [read] [static] %1 : $*Builtin.Int64
+  %3 = load [trivial] %2 : $*Builtin.Int64
+  end_access %2 : $*Builtin.Int64
+  destroy_value %0 : ${ var Builtin.Int64 }
+
+  %01 = alloc_ref $RefWithInt
+  %011 = begin_borrow %01 : $RefWithInt
+  %11 = alloc_stack $Builtin.UnsafeValueBuffer
+  %21 = ref_element_addr %011 : $RefWithInt, #RefWithInt.value
+  %31 = begin_unpaired_access [modify] [dynamic] %21 : $*Builtin.Int32, %11 : $*Builtin.UnsafeValueBuffer
+  %41 = end_unpaired_access [dynamic] %11 : $*Builtin.UnsafeValueBuffer
+  %51 = begin_unpaired_access [read] [dynamic] %21 : $*Builtin.Int32, %11 : $*Builtin.UnsafeValueBuffer
+  %61 = end_unpaired_access [dynamic] %11 : $*Builtin.UnsafeValueBuffer
+  end_borrow %011 from %01 : $RefWithInt, $RefWithInt
+  dealloc_stack %11 : $*Builtin.UnsafeValueBuffer
+  destroy_value %01 : $RefWithInt
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////
