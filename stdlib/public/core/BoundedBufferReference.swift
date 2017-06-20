@@ -40,7 +40,7 @@ protocol _BoundedBufferReference
   @nonobjc
   var _baseAddress: UnsafeMutablePointer<Iterator.Element> { get }
 
-  static func make(uninitializedWithMinimumCapacity: Int) -> Self
+  static func make(uninitializedWithMinCapacity: Int) -> Self
 
   /// A number of extra elements to allocate for
   ///
@@ -69,11 +69,11 @@ extension _BoundedBufferReference {
   public static var extraCapacity: Int { return 0 }
   
   public static func make(
-    minimumCapacity: Int = 0,
+    minCapacity: Int = 0,
     makeInitialHeader: (_ allocatedCapacity: Int)->Header
   ) -> Self {
     let extra = Self.extraCapacity
-    let r = make(uninitializedWithMinimumCapacity: minimumCapacity + extra)
+    let r = make(uninitializedWithMinCapacity: minCapacity + extra)
     withUnsafeMutablePointer(to: &r._header) {
       $0.initialize(to: makeInitialHeader(r.allocatedCapacity() - extra))
     }
@@ -81,10 +81,10 @@ extension _BoundedBufferReference {
   }
 
   public static func make(
-    _uninitializedCount: Int, minimumCapacity: Int = 0
+    _uninitializedCount: Int, minCapacity: Int = 0
   ) -> Self {
     return make(
-      minimumCapacity: Swift.max(_uninitializedCount, minimumCapacity)
+      minCapacity: Swift.max(_uninitializedCount, minCapacity)
     ) {
       Header(count: _uninitializedCount, capacity: $0)
     }
@@ -251,7 +251,7 @@ extension _BoundedBufferReference {
   public static func make<
     Head : Collection, Middle : Collection, Tail : Collection
   >(
-    joining head: Head, _ middle: Middle, _ tail: Tail, minimumCapacity: Int = 0
+    joining head: Head, _ middle: Middle, _ tail: Tail, minCapacity: Int = 0
   ) -> Self
   where
     Head.Iterator.Element == Iterator.Element,
@@ -264,7 +264,7 @@ extension _BoundedBufferReference {
 
     let r = self.make(
       _uninitializedCount: numericCast(newCount),
-      minimumCapacity: minimumCapacity)
+      minCapacity: minCapacity)
     
     r.withUnsafeMutableBufferPointer { b0 in
 
