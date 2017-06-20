@@ -265,6 +265,10 @@ private:
   GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
   GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
 
+  /// Record that the given potential archetype is unresolved, so we know to
+  /// resolve it later.
+  void recordUnresolvedType(PotentialArchetype *unresolvedPA);
+
   /// When a particular requirement cannot be resolved due to, e.g., a
   /// currently-unresolvable or nested type, this routine should be
   /// called to cope with the unresolved requirement.
@@ -293,6 +297,9 @@ private:
   ConstraintResult addConformanceRequirement(PotentialArchetype *T,
                                              ProtocolDecl *Proto,
                                              const RequirementSource *Source);
+
+  /// Try to resolve the given unresolved potential archetype.
+  ConstraintResult resolveUnresolvedType(PotentialArchetype *pa);
 
 public:
   /// \brief Add a new same-type requirement between two fully resolved types
@@ -1325,13 +1332,7 @@ class GenericSignatureBuilder::PotentialArchetype {
 
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
-  PotentialArchetype(PotentialArchetype *parent, Identifier name)
-    : parentOrBuilder(parent), identifier(name), isUnresolvedNestedType(true),
-      IsRecursive(false), Invalid(false),
-      DiagnosedRename(false)
-  { 
-    assert(parent != nullptr && "Not an associated type?");
-  }
+  PotentialArchetype(PotentialArchetype *parent, Identifier name);
 
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
@@ -1688,6 +1689,9 @@ public:
 
     /// A same-type requirement.
     SameType,
+
+    /// An unresolved potential archetype.
+    Unresolved,
   };
 
   Kind kind;
