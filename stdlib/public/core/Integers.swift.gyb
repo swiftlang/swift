@@ -1888,6 +1888,13 @@ extension BinaryInteger {
 #endif
 
 extension BinaryInteger {
+  // FIXME(integers): Should be removed once words get implemented properly.
+  // Meanhile it allows to conform to the BinaryInteger without implementing
+  // underscored APIs. https://bugs.swift.org/browse/SR-5275
+  public func _word(at n: Int) -> UInt {
+    fatalError("Should be overridden")
+  }
+
   // FIXME(integers): inefficient. Should get rid of _word(at:) and
   // countRepresentedWords, and make `words` the basic operation.
   public var words: [UInt] {
