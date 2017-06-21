@@ -233,7 +233,9 @@ struct _TruncExt<Input: BinaryInteger, Output: FixedWidthInteger>
 
 extension String._XContent.UTF16View : BidirectionalCollection {
   @inline(__always)
-  init<C : Collection>(_ c: C, maxElement: UInt16? = nil)
+  init<C : Collection>(
+    _ c: C, maxElement: UInt16? = nil, minCapacity: Int = 0
+  )
   where C.Element == UInt16 {
     if let x = String._XContent._Inline<UInt8>(c) {
       _content = .inline8(x)
@@ -248,28 +250,33 @@ extension String._XContent.UTF16View : BidirectionalCollection {
           unsafeDowncast(
             _mkLatin1(
               _MapCollection(c, through: _TruncExt()),
-              isKnownASCII: maxCodeUnit <= 0x7f),
+              minCapacity: minCapacity,
+              isASCII: maxCodeUnit <= 0x7f),
             to: String._Latin1Storage.self))
       }
       else {
         _content = .utf16(//.init(c)
           unsafeDowncast(
-            _mkUTF16(c, maxElement: maxCodeUnit),
+            _mkUTF16(
+              c,
+              minCapacity: minCapacity,
+              maxElement: maxCodeUnit),
             to: String._UTF16Storage.self))
       }
     }
   }
   
   @inline(__always)
-  init<C : Collection>(_ c: C, isASCII: Bool? = nil)
-  where C.Element == UInt8 {
+  init<C : Collection>(
+    _ c: C, minCapacity: Int = 0, isASCII: Bool? = nil
+  ) where C.Element == UInt8 {
     if let x = String._XContent._Inline<UInt8>(c) {
       _content = .inline8(x)
     }
     else {
       _content = .latin1(//.init(c)
         unsafeDowncast(
-          _mkLatin1(c, isKnownASCII: isASCII ?? false),
+          _mkLatin1(c, minCapacity: minCapacity, isASCII: isASCII),
           to: String._Latin1Storage.self))
     }
   }
@@ -291,8 +298,8 @@ extension String._XContent.UTF16View : BidirectionalCollection {
     else {
       _content = .latin1(//.init(c)
         unsafeDowncast(
-          _mkLatin1(source, isKnownASCII: isASCII ?? false)
-          , to: String._Latin1Storage.self))
+          _mkLatin1(source, isASCII: isASCII),
+          to: String._Latin1Storage.self))
     }
   }
   
@@ -318,7 +325,7 @@ extension String._XContent.UTF16View : BidirectionalCollection {
         unsafeDowncast(
           _mkLatin1(
             _MapCollection(source, through: _TruncExt()),
-            isKnownASCII: true),
+            isASCII: true),
           to: String._Latin1Storage.self))
     }
     else {
@@ -377,7 +384,7 @@ extension String._XContent.UTF16View : BidirectionalCollection {
   func index(before i: Int) -> Int { return i - 1 }
 }
 
-extension String._XContent.UTF16View /* : RangeReplaceableCollection */ {
+extension String._XContent.UTF16View : RangeReplaceableCollection {
   public init() {
     _content = String._XContent()
   }
