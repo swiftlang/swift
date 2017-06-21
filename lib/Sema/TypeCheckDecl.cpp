@@ -4914,7 +4914,7 @@ public:
     // Look through parentheses.
     if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
       if (!parenRepr->isParenType()) return false;
-      return checkDynamicSelfReturn(func, parenRepr->getType(0),
+      return checkDynamicSelfReturn(func, parenRepr->getElementType(0),
                                     optionalDepth);
     }
 

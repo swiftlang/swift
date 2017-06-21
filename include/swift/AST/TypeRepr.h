@@ -628,7 +628,7 @@ public:
     }
   }
 
-  TypeRepr *getType(unsigned i) const {
+  TypeRepr *getElementType(unsigned i) const {
     return getElement(i).Type;
   }
 

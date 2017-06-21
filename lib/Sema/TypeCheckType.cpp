@@ -2333,7 +2333,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     if (const auto Tuple = dyn_cast<TupleTypeRepr>(args)) {
       if (Tuple->getNumElements() == 1) {
         if (const auto Void =
-            dyn_cast<SimpleIdentTypeRepr>(Tuple->getType(0))) {
+            dyn_cast<SimpleIdentTypeRepr>(Tuple->getElementType(0))) {
           if (Void->getIdentifier().str() == "Void") {
             TC.diagnose(args->getStartLoc(), diag::paren_void_probably_void)
               .fixItReplace(args->getSourceRange(), "()");
@@ -2866,7 +2866,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   }
 
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
-    auto *tyR = repr->getType(i);
+    auto *tyR = repr->getElementType(i);
     Type ty;
     Identifier name;
     bool variadic = false;
@@ -2912,7 +2912,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         TC.diagnose(repr->getElementNameLoc(0),
                     diag::tuple_single_element)
           .fixItRemoveChars(repr->getElementNameLoc(0),
-                            repr->getType(0)->getStartLoc());
+                            repr->getElementType(0)->getStartLoc());
       }
 
       elements[0] = TupleTypeElt(elements[0].getType());

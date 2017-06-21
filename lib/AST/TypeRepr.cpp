@@ -503,7 +503,7 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
         Printer << ": ";
       }
     }
-    printTypeRepr(getType(i), Printer, Opts);
+    printTypeRepr(getElementType(i), Printer, Opts);
     Printer.printStructurePost(PrintStructureKind::TupleElement);
 
     if (hasEllipsis() && getEllipsisIndex() == i)

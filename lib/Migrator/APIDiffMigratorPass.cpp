@@ -168,7 +168,7 @@ public:
     // as their own index level
     if (T->getNumElements() == 1) {
       ParentIsOptional = false;
-      return visit(T->getType(0));
+      return visit(T->getElementType(0));
     }
     llvm::SmallVector<TypeRepr *, 8> Children;
     T->getElementTypes(Children);
