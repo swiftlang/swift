@@ -53,4 +53,9 @@ tests.test("convenience") {
     expectEqual("bar", (error3 as NSError).userInfo["foo"] as? String)
 }
 
+tests.test("Hashable") {
+  checkHashable([CocoaError.Code.fileNoSuchFile, .fileReadUnknown, .keyValueValidation], equalityOracle: { $0 == $1 })
+  checkHashable([URLError.Code.unknown, .cancelled, .badURL], equalityOracle: { $0 == $1 })
+}
+
 runAllTests()
