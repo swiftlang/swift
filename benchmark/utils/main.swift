@@ -55,7 +55,6 @@ import DropWhile
 import ErrorHandling
 import ExistentialPerformance
 import Fibonacci
-import GlobalClass
 import Hanoi
 import Hash
 import HashQuadratic
@@ -237,7 +236,6 @@ addTo(&precommitTests, "EqualSubstringString", run_EqualSubstringString)
 addTo(&precommitTests, "EqualSubstringSubstring", run_EqualSubstringSubstring)
 addTo(&precommitTests, "EqualSubstringSubstringGenericEquatable", run_EqualSubstringSubstringGenericEquatable)
 addTo(&precommitTests, "ErrorHandling", run_ErrorHandling)
-addTo(&precommitTests, "GlobalClass", run_GlobalClass)
 addTo(&precommitTests, "Hanoi", run_Hanoi)
 addTo(&precommitTests, "HashTest", run_HashTest)
 addTo(&precommitTests, "Histogram", run_Histogram)
