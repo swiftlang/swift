@@ -727,7 +727,8 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
 
     for (auto i : range(0, tupleTy->getNumElements())) {
       const auto &elt = tupleTy->getElement(i);
-      assert(elt.getParameterFlags().isNone() &&
+      assert((elt.getParameterFlags().isNone() ||
+              elt.getParameterFlags().isInOut()) &&
              "Vararg, autoclosure, or escaping argument tuple"
              "doesn't make sense");
       CallArgParam argParam;

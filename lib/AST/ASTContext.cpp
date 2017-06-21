@@ -2737,6 +2737,14 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   return New;
 }
 
+TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
+                           ParameterTypeFlags fl)
+: Name(name), ElementType(ty), Flags(fl) {
+  // FIXME: Re-enable this assertion and hunt down the callers that aren't
+  // setting parameter bits correctly.
+  // assert((ty->is<InOutType>() && fl.isInOut()) && "caller did not set flags");
+}
+
 void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
                                  GenericTypeDecl *TheDecl, Type Parent) {
   ID.AddPointer(TheDecl);
