@@ -274,7 +274,7 @@ extension _BoundedBufferReference {
   public static func joining<
     Head : Collection, Middle : Collection, Tail : Collection
   >(
-    joining head: Head, _ middle: Middle, _ tail: Tail, minCapacity: Int = 0
+    _ head: Head, _ middle: Middle, _ tail: Tail, minCapacity: Int = 0
   ) -> Self
   where
     Head.Iterator.Element == Iterator.Element,

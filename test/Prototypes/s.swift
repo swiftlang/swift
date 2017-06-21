@@ -686,7 +686,6 @@ func testme2() {
       }
     }
   }
-  lex_new()
 
   func lex_old() {
     time {
@@ -700,7 +699,9 @@ func testme2() {
     }
   }
   lex_old()
-
+  lex_new()
+  print()
+  
   func init_new() {
     time {
       for _ in 0...10*N {
@@ -710,7 +711,6 @@ func testme2() {
       }
     }
   }
-  init_new()
   
   func init_old() {
     time {
@@ -722,7 +722,9 @@ func testme2() {
     }
   }
   init_old()
-
+  init_new()
+  print()
+  
   func concat3Iteration() {
     time {
       for _ in 0...100*N {
@@ -733,7 +735,8 @@ func testme2() {
     }
   }
   concat3Iteration()
-
+  print()
+  
   let a_old = "a"._core
   let a_new = String._XContent.UTF16View(a_old)
   
@@ -765,6 +768,7 @@ func testme2() {
     }
   }
   buildString_new()
+  print()
   
   let short16_old = ["🎉","c","d","pizza"].map { $0._core }
   let short16_new = short16_old.map { String._XContent.UTF16View($0) }
@@ -794,6 +798,7 @@ func testme2() {
     }
   }
   buildStringUTF16_new()
+  print()
   
   let ghost_old = "👻"._core
   let ghost_new = String._XContent.UTF16View(ghost_old)
@@ -822,6 +827,83 @@ func testme2() {
     }
   }
   buildStringLong_new()
+  print()
+  
+  func  buildShortString_old() {
+    time {
+      for _ in 0...N*200 {
+        var sb = a_old
+        for x in short8_old {
+          sb.append(contentsOf: x)
+        }
+        total = total &+ sb.count
+      }
+    }
+  }
+  buildShortString_old()
+  
+  func  buildShortString_new() {
+    time {
+      for _ in 0...N*200 {
+        var sb = a_new
+        for x in short8_new {
+          sb.append(contentsOf: x)
+        }
+        total = total &+ sb.count
+      }
+    }
+  }
+  buildShortString_new()
+  print()
+  
+  func  buildShortStringUTF16_old() {
+    time {
+      for _ in 0...N*300 {
+        var sb = a_old
+        for x in short16_old {
+          sb.append(contentsOf: x)
+        }
+        total = total &+ sb.count
+      }
+    }
+  }
+  buildShortStringUTF16_old()
+  
+  func  buildShortStringUTF16_new() {
+    time {
+      for _ in 0...N*300 {
+        var sb = a_new
+        for x in short16_new {
+          sb.append(contentsOf: x)
+        }
+        total = total &+ sb.count
+      }
+    }
+  }
+  buildShortStringUTF16_new()
+  print()
+  
+  func  buildShortStringLong_old() {
+    time {
+      for _ in 0...N*20 {
+        var sb = ghost_old
+        sb.append(contentsOf: long_old)
+        total = total &+ sb.count
+      }
+    }
+  }
+  buildShortStringLong_old()
+  
+  func  buildShortStringLong_new() {
+    time {
+      for _ in 0...N*20 {
+      var sb = ghost_new
+        sb.append(contentsOf: long_new)
+      }
+    }
+  }
+  buildShortStringLong_new()
+  print()
   
   if total == 0 { print() }
 }
