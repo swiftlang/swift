@@ -21,25 +21,25 @@ func test5(_: (Int, Int, Int) -> ()) {}
 test5({ (x,y,z) in })
 
 func test6(_: ((Int, Int)) -> ()) {}
-test6({ let (x,y) = $0; })
+test6({ (x,y) in })
 func test7(_: ((Int, Int, Int)) -> ()) {}
-test7({ let (x,y,z) = $0; })
-test6({ let (x, y) = $0; })
-test6({ let (_, _) = $0; })
-test6({ (__val:(Int, Int)) in let (x,y) = __val; })
-test6({ (__val:(Int, Int)) ->() in let (_,_) = __val; })
+test7({ (x,y,z) in })
+test6({ (_ x, _ y) in })
+test6({ (_, _) in })
+test6({ (x:Int, y:Int) in })
+test6({ (_, _) ->() in })
 
 func test8(_: ((Int, Int)) -> Int) {}
-test8 { (__val:(Int, Int)) -> Int in let (_,_) = __val; return 2 }
-test8 { let (x, y) = $0; return x }
+test8 { (_, _) -> Int in 2 }
+test8 { (x, y) in x }
 
 func isEven(_ x: Int) -> Bool { return x % 2 == 0 }
 let items = Array(zip(0..<10, 0..<10))
-_ = items.filter { let (_, x) = $0; return isEven(x) }
+_ = items.filter { (_, x) in isEven(x) }
 _ = items.filter { _ in true }
 
 func toString(indexes: Int?...) -> String {
-  let _ = indexes.enumerated().flatMap({ (__val:(Int, Int?)) -> String? in let (i,index) = __val;
+  let _ = indexes.enumerated().flatMap({ (i: Int, index: Int?) -> String? in
     let _: Int = i
     if index != nil {}
     return ""
@@ -58,4 +58,4 @@ extension Dictionary {
 }
 
 let dictionary: [String: String] = [:]
-_ = dictionary.first { let (column, value) = $0; return true }!.value
+_ = dictionary.first { (column, value) in true }!.value
