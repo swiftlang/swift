@@ -602,13 +602,17 @@ public struct CocoaError : _BridgedStoredNSError {
   public static var _nsErrorDomain: String { return NSCocoaErrorDomain }
 
   /// The error code itself.
-  public struct Code : RawRepresentable, _ErrorCodeProtocol {
+  public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
     public typealias _ErrorType = CocoaError
 
     public let rawValue: Int
 
     public init(rawValue: Int) {
       self.rawValue = rawValue
+    }
+    
+    public var hashValue: Int {
+      return self.rawValue
     }
   }
 }
@@ -1845,13 +1849,17 @@ public struct URLError : _BridgedStoredNSError {
   public static var _nsErrorDomain: String { return NSURLErrorDomain }
 
   /// The error code itself.
-  public struct Code : RawRepresentable, _ErrorCodeProtocol {
+  public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
     public typealias _ErrorType = URLError
 
     public let rawValue: Int
 
     public init(rawValue: Int) {
       self.rawValue = rawValue
+    }
+
+    public var hashValue: Int {
+      return self.rawValue
     }
   }
 }
