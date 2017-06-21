@@ -1235,7 +1235,6 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       return nullptr;
 
     SmallVector<TupleTypeReprElement, 4> Elts;
-    Elts.resize(TE->getNumElements());
     unsigned EltNo = 0;
     for (auto Elt : TE->getElements()) {
       auto *eltTE = dyn_cast<TypeExpr>(Elt);
