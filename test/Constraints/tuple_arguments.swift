@@ -1547,9 +1547,7 @@ struct SR_5199 {}
 extension Sequence where Iterator.Element == (key: String, value: String?) {
   func f() -> [SR_5199] {
     return self.map { (key, value) in
-        // expected-error@-1 {{closure tuple parameter '(key: String, value: Optional<String>)' does not support destructuring}} {23-35=(arg) -> SR_5199}} {{9-9=\n        let (key, value) = arg\n        return }}
-        SR_5199()
+        SR_5199() // Ok
     }
   }
 }
-

@@ -5994,29 +5994,23 @@ static bool isCastToTypedPointer(ConstraintSystem *CS, const Expr *Fn,
   return true;
 }
 
-static bool diagnoseClosureExplicitParameterMismatch(ConstraintSystem *const CS,
-                                                     SourceLoc loc,
-                                                     Type paramType,
-                                                     Type argType) {
-  SmallVector<Identifier, 4> argLabels;
-  gatherArgumentLabels(argType, argLabels);
-
-  auto params = decomposeParamType(paramType, nullptr, 0);
-  auto args = decomposeArgType(argType, argLabels);
-
+static bool diagnoseClosureExplicitParameterMismatch(
+    ConstraintSystem *const CS, SourceLoc loc,
+    ArrayRef<AnyFunctionType::Param> params,
+    ArrayRef<AnyFunctionType::Param> args) {
   // We are not trying to diagnose structural problems with top-level
   // arguments here.
   if (params.size() != args.size())
     return false;
 
   for (unsigned i = 0, n = params.size(); i != n; ++i) {
-    auto &paramType = params[i].Ty;
-    auto &argType = args[i].Ty;
+    auto paramType = params[i].getType();
+    auto argType = args[i].getType();
 
     if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
       if (auto argFnType = argType->getAs<AnyFunctionType>())
         return diagnoseClosureExplicitParameterMismatch(
-            CS, loc, paramFnType->getInput(), argFnType->getInput());
+            CS, loc, paramFnType->getParams(), argFnType->getParams());
     }
 
     if (!paramType || !argType || isUnresolvedOrTypeVarType(paramType) ||
@@ -6137,12 +6131,13 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
       return false;
     }
 
-    if (auto fnType = paramType->getAs<AnyFunctionType>()) {
-      if (auto *params = closureExpr->getParameters()) {
-        auto closureParamType = params->getType(CS->getASTContext());
-        if (diagnoseClosureExplicitParameterMismatch(CS, params->getStartLoc(),
-                                                     closureParamType,
-                                                     fnType->getInput()))
+    if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
+      auto closureType = CS->getType(closureExpr);
+      if (auto *argFnType = closureType->getAs<AnyFunctionType>()) {
+        auto *params = closureExpr->getParameters();
+        auto loc = params ? params->getStartLoc() : closureExpr->getStartLoc();
+        if (diagnoseClosureExplicitParameterMismatch(
+                CS, loc, argFnType->getParams(), paramFnType->getParams()))
           return true;
       }
     }
