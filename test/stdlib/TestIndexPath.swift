@@ -720,6 +720,14 @@ class TestIndexPath: TestIndexPathSuper {
         let slice = indexPath[1..<1]
         expectEqual(0, slice.count)
     }
+
+    func test_dropFirst() {
+        var pth = IndexPath(indexes:[1,2,3,4])
+        while !pth.isEmpty {
+            // this should not crash 
+            pth = pth.dropFirst()
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -772,5 +780,6 @@ IndexPathTests.test("test_AnyHashableContainingIndexPath") { TestIndexPath().tes
 IndexPathTests.test("test_AnyHashableCreatedFromNSIndexPath") { TestIndexPath().test_AnyHashableCreatedFromNSIndexPath() }
 IndexPathTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexPath().test_unconditionallyBridgeFromObjectiveC() }
 IndexPathTests.test("test_slice_1ary") { TestIndexPath().test_slice_1ary() }
+IndexPathTests.test("test_dropFirst") { TestIndexPath().test_dropFirst() }
 runAllTests()
 #endif
