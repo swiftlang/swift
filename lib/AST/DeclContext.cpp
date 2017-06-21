@@ -61,17 +61,10 @@ DeclContext::getAsTypeOrTypeExtensionContext() const {
     auto ED = cast<ExtensionDecl>(this);
     auto type = ED->getExtendedType();
 
-    if (type.isNull() || type->hasError())
+    if (!type)
       return nullptr;
 
-    if (auto ND = type->getNominalOrBoundGenericNominal())
-      return ND;
-
-    if (auto unbound = dyn_cast<UnboundGenericType>(type.getPointer())) {
-      return unbound->getDecl();
-    }
-
-    return nullptr;
+    return type->getAnyNominal();
   }
 
   case DeclContextKind::GenericTypeDecl:
