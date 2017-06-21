@@ -150,7 +150,7 @@ struct Access {
 
   void setNext(Access *next) {
     NextAndAction =
-      reinterpret_cast<uintptr_t>(next) | (NextAndAction & NextMask);
+      reinterpret_cast<uintptr_t>(next) | (NextAndAction & ActionMask);
   }
 
   ExclusivityFlags getAccessAction() const {
@@ -209,8 +209,11 @@ public:
       return;
     }
 
-    for (Access *last = cur; cur != nullptr; last = cur, cur = cur->getNext()) {
-      if (last == access) {
+    Access *last = cur;
+    for (cur = cur->getNext(); cur != nullptr;
+         last = cur, cur = cur->getNext()) {
+      assert(last->getNext() == cur);
+      if (cur == access) {
         last->setNext(cur->getNext());
         return;
       }
