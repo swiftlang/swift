@@ -39,9 +39,13 @@ func foo() -> R31898542<()> {
 
 // rdar://problem/31973368 - Cannot convert value of type '(K, V) -> ()' to expected argument type '((key: _, value: _)) -> Void'
 
+// SE-0110: We reverted to allowing this for the time being, but this
+// test is valuable in case we end up disallowing it again in the
+// future.
+
 class R<K: Hashable, V> {
   func forEach(_ body: (K, V) -> ()) {
-    var dict: [K:V] = [:]
-    dict.forEach(body) // expected-error {{nested tuple parameter '(key: K, value: V)' of function '(((key: K, value: V)) throws -> Void) throws -> ()' does not support destructuring}}
+    let dict: [K:V] = [:]
+    dict.forEach(body)
   }
 }

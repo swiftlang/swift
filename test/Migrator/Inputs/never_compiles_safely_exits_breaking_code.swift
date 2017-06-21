@@ -1,1 +1,1 @@
-func foo(_ f: (Void) -> ()) {}
+func foo(_ f: (Int) -> ()) {}
