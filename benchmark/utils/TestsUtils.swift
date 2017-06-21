@@ -98,3 +98,6 @@ public func blackHole<T>(_ x: T) {
 @inline(never)
 public func getInt(_ x: Int) -> Int { return x }
 
+// The same for String.
+@inline(never)
+public func getString(_ s: String) -> String { return s }
