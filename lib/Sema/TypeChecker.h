@@ -870,6 +870,10 @@ public:
     DebugTimeExpressions = true;
   }
 
+  bool getDebugTimeExpressions() {
+    return DebugTimeExpressions;
+  }
+
   /// If \p timeInMS is non-zero, warn when a function body takes longer than
   /// this many milliseconds to type-check.
   ///
@@ -878,12 +882,19 @@ public:
     WarnLongFunctionBodies = timeInMS;
   }
 
-  /// If \p timeInMS is non-zero, warn when type-chcking an expression
+  /// If \p timeInMS is non-zero, warn when type-checking an expression
   /// takes longer than this many milliseconds.
   ///
   /// Intended for debugging purposes only.
   void setWarnLongExpressionTypeChecking(unsigned timeInMS) {
     WarnLongExpressionTypeChecking = timeInMS;
+  }
+
+  /// Return the current setting for the number of milliseconds
+  /// threshold we use to determine whether to warn about an
+  /// expression taking a long time.
+  unsigned getWarnLongExpressionTypeChecking() {
+    return WarnLongExpressionTypeChecking;
   }
 
   bool getInImmediateMode() {
