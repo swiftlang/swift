@@ -502,31 +502,39 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
   }
 
   mutating func replaceSubrange<C : Collection>(
-    _ subrange: Range<Index>,
-    with newElements: C
+    _ target: Range<Index>,
+    with newElements_: C
   ) where C.Element == Element {
     defer { _fixLifetime(self) }
+
+    let newElements = _Counted(newElements_)
     
-    if _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced()
-    ?? false {
+    // In-place dynamic buffer
+    if _rangeReplaceableStorageID?
+       ._liveObjectIsUniquelyReferenced() == true {
       switch self._content {
-      case .inline8(let x):
       case .latin1(let x):
         if newElements.max() ?? 0 <= 0xFF
         && x._tryToReplaceSubrange(
-          subrange,
-          with: _MapCollection(newElements, through: _TruncExt)) {
+          target,
+          with: _MapCollection(newElements, through: _TruncExt())) {
           return
         }
       case .utf16(let x):
-        if x._tryToReplaceSubrange(subrange, with: newElements) {
+        if x._tryToReplaceSubrange(target, with: newElements) {
           return
         }
       default: break
       }
     }
-    
-    
+
+    self = .init(
+      _Concat3(
+        self[..<target.lowerBound],
+        newElements,
+        self[target.upperBound...]),
+      minCapacity: count * 2
+    )
   }
 }
 
@@ -683,6 +691,96 @@ func testme2() {
     }
   }
   concat3Iteration()
+
+  let a_old = "a"._core
+  let a_new = String._XContent.UTF16View(a_old)
+  
+  let short8_old = ["b","c","d","pizza"].map { $0._core }
+  let short8_new = short8_old.map { String._XContent.UTF16View($0) }
+  
+  func  buildString_old() {
+    time {
+      var sb = a_old
+      for _ in 0...N*200 {
+        for x in short8_old {
+          sb.append(contentsOf: x)
+        }
+      }
+      total = total &+ sb.count
+    }
+  }
+  buildString_old()
+  
+  func  buildString_new() {
+    time {
+      var sb = a_new
+      for _ in 0...N*200 {
+        for x in short8_new {
+          sb.append(contentsOf: x)
+        }
+      }
+      total = total &+ sb.count
+    }
+  }
+  buildString_new()
+  
+  let short16_old = ["🎉","c","d","pizza"].map { $0._core }
+  let short16_new = short16_old.map { String._XContent.UTF16View($0) }
+
+  func  buildStringUTF16_old() {
+    time {
+      var sb = a_old
+      for _ in 0...N*300 {
+        for x in short16_old {
+          sb.append(contentsOf: x)
+        }
+      }
+      total = total &+ sb.count
+    }
+  }
+  buildStringUTF16_old()
+  
+  func  buildStringUTF16_new() {
+    time {
+      var sb = a_new
+      for _ in 0...N*300 {
+        for x in short16_new {
+          sb.append(contentsOf: x)
+        }
+      }
+      total = total &+ sb.count
+    }
+  }
+  buildStringUTF16_new()
+  
+  let ghost_old = "👻"._core
+  let ghost_new = String._XContent.UTF16View(ghost_old)
+  
+  let long_old = "Swift is a multi-paradigm, compiled programming language created for iOS, OS X, watchOS, tvOS and Linux development by Apple Inc. Swift is designed to work with Apple's Cocoa and Cocoa Touch frameworks and the large body of existing Objective-C code written for Apple products. Swift is intended to be more resilient to erroneous code (\"safer\") than Objective-C and also more concise. It is built with the LLVM compiler framework included in Xcode 6 and later and uses the Objective-C runtime, which allows C, Objective-C, C++ and Swift code to run within a single program."._core
+  let long_new = String._XContent.UTF16View(long_old)
+  
+  func  buildStringLong_old() {
+    time {
+      var sb = ghost_old
+      for _ in 0...N*20 {
+        sb.append(contentsOf: long_old)
+      }
+      total = total &+ sb.count
+    }
+  }
+  buildStringLong_old()
+  
+  func  buildStringLong_new() {
+    time {
+      var sb = ghost_new
+      for _ in 0...N*20 {
+        sb.append(contentsOf: long_new)
+      }
+      total = total &+ sb.count
+    }
+  }
+  buildStringLong_new()
+  
   if total == 0 { print() }
 }
 
