@@ -304,6 +304,7 @@ func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape (T) -> U) -> U
   // expected-warning@-2{{@noescape is the default and is deprecated}} {{46-56=}}
   // expected-warning@-3{{@noescape is the default and is deprecated}} {{57-66=}}
   return g(f)
+  // expected-warning@-1{{passing a non-escaping function parameter 'f' to a call to a non-escaping function parameter}}
 }
 
 // <rdar://problem/19997577> @noescape cannot be applied to locals, leading to duplication of code
