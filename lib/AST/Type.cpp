@@ -709,13 +709,13 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
-SmallVector<CallArgParam, 4>
+SmallVector<AnyFunctionType::Param, 4>
 swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
-  SmallVector<CallArgParam, 4> result;
+  SmallVector<AnyFunctionType::Param, 4> result;
   switch (type->getKind()) {
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
-
+    
     // If we have one argument label but a tuple argument with > 1 element,
     // put the whole tuple into the argument.
     // FIXME: This horribleness is due to the mis-modeling of arguments as
@@ -724,40 +724,33 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
       // Break out to do the default thing below.
       break;
     }
-
+    
     for (auto i : range(0, tupleTy->getNumElements())) {
       const auto &elt = tupleTy->getElement(i);
       assert((elt.getParameterFlags().isNone() ||
               elt.getParameterFlags().isInOut()) &&
              "Vararg, autoclosure, or escaping argument tuple"
              "doesn't make sense");
-      CallArgParam argParam;
-      argParam.Ty = elt.getType();
-      argParam.Label = argumentLabels[i];
-      result.push_back(argParam);
+      result.push_back(AnyFunctionType::Param(elt.getType(),
+                                              argumentLabels[i], {}));
     }
     return result;
   }
-
+    
   case TypeKind::Paren: {
-    CallArgParam argParam;
-    argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
-    result.push_back(argParam);
+    auto ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
+    result.push_back(AnyFunctionType::Param(ty, Identifier(), {}));
     return result;
   }
-
+    
   default:
     // Default behavior below; inject the argument as the sole parameter.
     break;
   }
-
+  
   // Just inject this parameter.
-  assert(result.empty());
-  CallArgParam argParam;
-  argParam.Ty = type;
-  assert(argumentLabels.size() == 1);
-  argParam.Label = argumentLabels[0];
-  result.push_back(argParam);
+  assert(result.empty() && (argumentLabels.size() == 1));
+  result.push_back(AnyFunctionType::Param(type, argumentLabels[0], {}));
   return result;
 }
 
@@ -805,13 +798,13 @@ void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (_:, b:, c:)
-std::string swift::getParamListAsString(ArrayRef<CallArgParam> params) {
+std::string swift::getParamListAsString(ArrayRef<AnyFunctionType::Param> params) {
   std::string result = "(";
 
   interleave(params,
-             [&](const CallArgParam &param) {
-               if (param.hasLabel())
-                 result += param.Label.str();
+             [&](const AnyFunctionType::Param &param) {
+               if (!param.getLabel().empty())
+                 result += param.getLabel().str();
                else
                  result += "_";
                result += ":";

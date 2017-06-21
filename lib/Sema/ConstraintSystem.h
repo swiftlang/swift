@@ -2646,7 +2646,7 @@ public:
 /// \param parameterBindings Will be populated with the arguments that are
 /// bound to each of the parameters.
 /// \returns true if the call arguments could not be matched to the parameters.
-bool matchCallArguments(ArrayRef<CallArgParam> argTuple,
+bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
                         ArrayRef<AnyFunctionType::Param> params,
                         const SmallVectorImpl<bool> &defaultMap,
                         bool hasTrailingClosure,

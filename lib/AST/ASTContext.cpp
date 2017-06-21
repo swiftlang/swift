@@ -3163,47 +3163,48 @@ AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   llvm_unreachable("unhandled function type");
 }
 
-static SmallVector<AnyFunctionType::Param, 4> decomposeInputType(Type type) {
-  SmallVector<AnyFunctionType::Param, 4> result;
+void AnyFunctionType::decomposeInput(
+    Type type, SmallVectorImpl<AnyFunctionType::Param> &result) {
   switch (type->getKind()) {
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
     for (auto &elt : tupleTy->getElements()) {
       result.push_back(AnyFunctionType::Param(elt));
     }
-    return result;
+    return;
   }
       
   case TypeKind::Paren: {
     auto ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
     result.push_back(AnyFunctionType::Param(ty));
-    return result;
+    return;
   }
       
   default:
     result.push_back(AnyFunctionType::Param(type));
-    return result;
+    return;
   }
 }
 
-FunctionType *FunctionType::get(Type Input, Type Result,
-                                const ExtInfo &Info) {
-  auto properties = getFunctionRecursiveProperties(Input, Result);
+FunctionType *FunctionType::get(Type input, Type result,
+                                const ExtInfo &info) {
+  auto properties = getFunctionRecursiveProperties(input, result);
   auto arena = getArena(properties);
-  uint16_t attrKey = Info.getFuncAttrKey();
+  uint16_t attrKey = info.getFuncAttrKey();
 
-  const ASTContext &C = Input->getASTContext();
+  const ASTContext &C = input->getASTContext();
 
   FunctionType *&Entry
-    = C.Impl.getArena(arena).FunctionTypes[{Input, {Result, attrKey} }];
+    = C.Impl.getArena(arena).FunctionTypes[{input, {result, attrKey} }];
   if (Entry) return Entry;
   
-  auto params = decomposeInputType(Input);
+  SmallVector<AnyFunctionType::Param, 4> params;
+  AnyFunctionType::decomposeInput(input, params);
   void *mem = C.Allocate(sizeof(FunctionType) +
                            sizeof(AnyFunctionType::Param) * params.size(),
                          alignof(FunctionType));
-  return Entry = new (mem) FunctionType(params, Input, Result,
-                                        properties, Info);
+  return Entry = new (mem) FunctionType(params, input, result,
+                                        properties, info);
 }
 
 // If the input and result types are canonical, then so is the result.
@@ -3265,7 +3266,8 @@ GenericFunctionType::get(GenericSignature *sig,
     return result;
   }
   
-  auto params = decomposeInputType(input);
+  SmallVector<AnyFunctionType::Param, 4> params;
+  AnyFunctionType::decomposeInput(input, params);
   void *mem = ctx.Allocate(sizeof(GenericFunctionType) +
                              sizeof(AnyFunctionType::Param) * params.size(),
                            alignof(GenericFunctionType));

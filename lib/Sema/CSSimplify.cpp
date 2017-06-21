@@ -89,12 +89,11 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   
   auto *fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
   
-  SmallVector<CallArgParam, 8> argInfos;
+  SmallVector<AnyFunctionType::Param, 8> argInfos;
   for (auto argLabel : labels) {
-    argInfos.push_back(CallArgParam());
-    argInfos.back().Label = argLabel;
+    argInfos.push_back(AnyFunctionType::Param(Type(), argLabel, {}));
   }
-  
+
   const AnyFunctionType *levelTy = fTy;
   for (auto level = parameterDepth; level != 0; --level) {
     levelTy = levelTy->getResult()->getAs<AnyFunctionType>();
@@ -122,7 +121,7 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 }
 
 bool constraints::
-matchCallArguments(ArrayRef<CallArgParam> args,
+matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
                    const SmallVectorImpl<bool> &defaultMap,
                    bool hasTrailingClosure,
@@ -159,7 +158,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argNumber] = expectedName;
-    } else if (args[argNumber].Label != expectedName && !ignoreNameClash) {
+    } else if (args[argNumber].getLabel() != expectedName && !ignoreNameClash) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
@@ -206,7 +205,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       // Nothing to claim.
       if (nextArgIdx == numArgs ||
           claimedArgs[nextArgIdx] ||
-          (args[nextArgIdx].hasLabel() && !ignoreNameMismatch))
+          (!(args[nextArgIdx].getLabel().empty() || ignoreNameMismatch)))
         return None;
 
       return claim(name, nextArgIdx);
@@ -214,7 +213,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
 
     // If the name matches, claim this argument.
     if (nextArgIdx != numArgs &&
-        (ignoreNameMismatch || args[nextArgIdx].Label == name)) {
+        (ignoreNameMismatch || args[nextArgIdx].getLabel() == name)) {
       return claim(name, nextArgIdx);
     }
 
@@ -223,7 +222,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       // Skip arguments where the name doesn't match.
-      if (args[i].Label != name)
+      if (args[i].getLabel() != name)
         continue;
 
       // Skip claimed arguments.
@@ -263,7 +262,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     }
 
     // Missing a keyword argument name.
-    if (nextArgIdx != numArgs && !args[nextArgIdx].hasLabel() &&
+    if (nextArgIdx != numArgs && args[nextArgIdx].getLabel().empty() &&
        ignoreNameMismatch) {
       // Claim the next argument.
       return claim(name, nextArgIdx);
@@ -333,7 +332,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
     for (nextArgIdx = 0; skipClaimedArgs(), nextArgIdx != numArgs;
          ++nextArgIdx) {
-      if (args[nextArgIdx].hasLabel())
+      if (!args[nextArgIdx].getLabel().empty())
         unclaimedNamedArgs.push_back(nextArgIdx);
     }
 
@@ -355,7 +354,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
         // FIXME: There is undoubtedly a good dynamic-programming algorithm
         // to find the best assignment here.
         for (auto argIdx : unclaimedNamedArgs) {
-          auto argName = args[argIdx].Label;
+          auto argName = args[argIdx].getLabel();
 
           // Find the closest matching unfulfilled named parameter.
           unsigned bestScore = 0;
@@ -480,13 +479,13 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       auto &parameter = params[prevArgIdx];
       if (!parameter.getLabel().empty()) {
         auto expectedLabel = parameter.getLabel();
-        auto argumentLabel = args[argIdx].Label;
+        auto argumentLabel = args[argIdx].getLabel();
         
         // If there is a label but it's incorrect it can only mean
         // situation like this: expected (x, _ y) got (y, _ x).
         if (argumentLabel.empty() ||
             (expectedLabel.compare(argumentLabel) != 0 &&
-             args[prevArgIdx].Label.empty())) {
+             args[prevArgIdx].getLabel().empty())) {
           listener.missingLabel(prevArgIdx);
           return true;
         }
@@ -660,9 +659,9 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   std::tie(callee, calleeLevel, argLabels, hasTrailingClosure) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
   
-  // HACK: FunctionType handles the decomposition for us, the return type is
-  // just for show.
-  auto params = FunctionType::get(paramType, paramType)->getParams();
+  SmallVector<AnyFunctionType::Param, 4> params;
+  AnyFunctionType::decomposeInput(paramType, params);
+  
   SmallVector<bool, 4> defaultMap;
   computeDefaultMap(paramType, callee, calleeLevel, defaultMap);
   
@@ -754,7 +753,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
       auto loc = locator.withPathElement(LocatorPathElt::
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
-      auto argTy = args[argIdx].Ty;
+      auto argTy = args[argIdx].getType();
 
       if (!haveOneNonUserConversion) {
         subflags |= ConstraintSystem::TMF_ApplyingOperatorParameter;
