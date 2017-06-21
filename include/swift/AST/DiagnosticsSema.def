@@ -1337,9 +1337,6 @@ ERROR(extension_constrained_inheritance,none,
       "inheritance clause", (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
-ERROR(extension_protocol_via_typealias,none,
-      "protocol %0 in the module being compiled cannot be extended via a "
-      "type alias", (Type))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())
