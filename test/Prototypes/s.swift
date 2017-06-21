@@ -508,16 +508,18 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
     defer { _fixLifetime(self) }
 
     let newElements = _Counted(newElements_)
+    var maxNewElement: UInt16? = nil
     
     // In-place dynamic buffer
     if _rangeReplaceableStorageID?
        ._liveObjectIsUniquelyReferenced() == true {
       switch self._content {
       case .latin1(let x):
-        if newElements.max() ?? 0 <= 0xFF
-        && x._tryToReplaceSubrange(
+        maxNewElement = newElements.max() ?? 0
+        if maxNewElement! <= 0xFF && x._tryToReplaceSubrange(
           target,
-          with: _MapCollection(newElements, through: _TruncExt())) {
+          with: _MapCollection(newElements, through: _TruncExt())
+        ) {
           return
         }
       case .utf16(let x):
@@ -527,7 +529,47 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       default: break
       }
     }
+    _replaceSubrangeSlow(
+      target, with: newElements, maxNewElement: maxNewElement)
+  }
 
+  mutating func _replaceSubrangeSlow<C : Collection>(
+    _ target: Range<Index>,
+    with newElements: C,
+      maxNewElement: UInt16?
+  ) where C.Element == Element {
+    var done: Bool = false
+
+    
+    _content._withExistingLatin1Buffer {
+      b in
+      guard maxNewElement ?? newElements.max() ?? 0 <= 0xFF
+      else { return }
+      
+      self = .init(
+        _Concat3(
+          b[..<target.lowerBound],
+          _MapCollection(newElements, through: _TruncExt()),
+          b[target.upperBound...]),
+        minCapacity: count * 2
+      )
+      done = true
+    }
+    if done { return }
+
+    _content._withExistingUTF16Buffer {
+      b in
+      self = .init(
+        _Concat3(
+          b[..<target.lowerBound],
+          newElements,
+          b[target.upperBound...]),
+        minCapacity: count * 2
+      )
+      done = true
+    }
+    if done { return }
+    
     self = .init(
       _Concat3(
         self[..<target.lowerBound],
