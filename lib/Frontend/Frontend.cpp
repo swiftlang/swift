@@ -519,7 +519,8 @@ void CompilerInstance::performSema() {
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                             TypeCheckOptions, CurTUElem,
                             options.WarnLongFunctionBodies,
-                            options.WarnLongExpressionTypeChecking);
+                            options.WarnLongExpressionTypeChecking,
+                            options.SolverExpressionTimeThreshold);
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);

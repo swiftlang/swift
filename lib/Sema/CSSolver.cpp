@@ -1985,12 +1985,9 @@ ConstraintSystem::solve(Expr *&expr,
 
   assert(!solverState && "use solveRec for recursive calls");
 
-  // If the frontend options for dumping expression times or warning
-  // about long expression type checking are enabled, set up the
-  // timer.
-  if (TC.getDebugTimeExpressions() || TC.getWarnLongExpressionTypeChecking())
-    Timer.emplace(expr, TC.getDebugTimeExpressions(),
-                  TC.getWarnLongExpressionTypeChecking(), TC.Context);
+  // Set up the expression type checker timer.
+  Timer.emplace(expr, TC.getDebugTimeExpressions(),
+                TC.getWarnLongExpressionTypeChecking(), TC.Context);
 
   // Try to shrink the system by reducing disjunction domains. This
   // goes through every sub-expression and generate its own sub-system, to

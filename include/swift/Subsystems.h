@@ -192,7 +192,8 @@ namespace swift {
                            OptionSet<TypeCheckingFlags> Options,
                            unsigned StartElem = 0,
                            unsigned WarnLongFunctionBodies = 0,
-                           unsigned WarnLongExpressionTypeChecking = 0);
+                           unsigned WarnLongExpressionTypeChecking = 0,
+                           unsigned ExpressionTimeoutThreshold = 0);
 
   /// Once type checking is complete, this walks protocol requirements
   /// to resolve default witnesses.
