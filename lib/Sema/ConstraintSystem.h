@@ -36,6 +36,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <functional>
@@ -113,6 +114,23 @@ public:
 
     return None;
   }
+};
+
+
+class ExpressionTimer {
+  Expr* E;
+  unsigned WarnLimit;
+  bool ShouldDump;
+  ASTContext &Context;
+  llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
+
+public:
+  ExpressionTimer(Expr *E, bool shouldDump, unsigned warnLimit,
+                  ASTContext &Context)
+      : E(E), WarnLimit(warnLimit), ShouldDump(shouldDump), Context(Context) {
+  }
+
+  ~ExpressionTimer();
 };
 
 } // end namespace constraints
@@ -850,6 +868,7 @@ public:
   TypeChecker &TC;
   DeclContext *DC;
   ConstraintSystemOptions Options;
+  Optional<ExpressionTimer> Timer;
   
   friend class Fix;
   friend class OverloadChoice;
