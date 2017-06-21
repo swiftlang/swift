@@ -96,20 +96,10 @@ struct TupleSplatMigratorPass : public ASTMigratorPass,
     }
 
     unsigned ClosureArity = Closure->getParameters()->size();
-    if (NativeArity == ClosureArity)
+    if (NativeArity <= ClosureArity)
       return false;
 
     ShorthandFinder Finder(Closure);
-    if (NativeArity == 1 && ClosureArity > 1) {
-      // Prepend $0. to existing references
-      Finder.forEachReference([this](Expr *Ref, ParamDecl* Def) {
-        if (auto *TE = dyn_cast<TupleElementExpr>(Ref))
-          Ref = TE->getBase();
-        SourceLoc AfterDollar = Ref->getStartLoc().getAdvancedLoc(1);
-        Editor.insert(AfterDollar, "0.");
-      });
-      return true;
-    }
 
     if (ClosureArity == 1 && NativeArity > 1) {
       // Remove $0. from existing references or if it's only $0, replace it
