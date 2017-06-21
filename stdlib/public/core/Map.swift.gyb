@@ -21,6 +21,7 @@ import gyb
 
 public // @testable
 struct _MapIterator<Unmapped: IteratorProtocol, Transform: _Function>
+  : IteratorProtocol, Sequence
 where Transform.Input == Unmapped.Element
 {
   public var _unmapped: Unmapped
