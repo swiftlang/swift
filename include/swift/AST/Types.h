@@ -2308,6 +2308,8 @@ public:
     explicit Param(const TupleTypeElt &tte)
       : Ty(tte.isVararg() ? tte.getVarargBaseTy() : tte.getType()),
         Label(tte.getName()), Flags(tte.getParameterFlags()) {}
+    explicit Param(Type t, Identifier l, ParameterTypeFlags f)
+      : Ty(t), Label(l), Flags(f) {}
     
   private:
     /// The type of the parameter. For a variadic parameter, this is the
@@ -2485,6 +2487,10 @@ protected:
   }
 
 public:
+  /// \brief Break an input type into an array of \c AnyFunctionType::Params.
+  static void decomposeInput(Type type,
+                             SmallVectorImpl<AnyFunctionType::Param> &result);
+  
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
   ArrayRef<AnyFunctionType::Param> getParams() const;
@@ -2581,37 +2587,12 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-
-/// A call argument or parameter.
-struct CallArgParam {
-  /// The type of the argument or parameter. For a variadic parameter,
-  /// this is the element type.
-  Type Ty;
-
-  // The label associated with the argument or parameter, if any.
-  Identifier Label;
   
-  /// Parameter specific flags, not valid for arguments
-  ParameterTypeFlags parameterFlags = {};
-
-  /// Whether the argument or parameter has a label.
-  bool hasLabel() const { return !Label.empty(); }
-
-  /// Whether the parameter is varargs
-  bool isVariadic() const { return parameterFlags.isVariadic(); }
-
-  /// Whether the parameter is autoclosure
-  bool isAutoClosure() const { return parameterFlags.isAutoClosure(); }
-
-  /// Whether the parameter is escaping
-  bool isEscaping() const { return parameterFlags.isEscaping(); }
-};
-
-/// Break an argument type into an array of \c CallArgParams.
+/// Break an argument type into an array of \c AnyFunctionType::Params.
 ///
 /// \param type The type to decompose.
 /// \param argumentLabels The argument labels to use.
-SmallVector<CallArgParam, 4>
+SmallVector<AnyFunctionType::Param, 4>
 decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
 /// Break the parameter list into an array of booleans describing whether
@@ -2622,7 +2603,7 @@ void computeDefaultMap(Type type, const ValueDecl *paramOwner, unsigned level,
   
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)
-std::string getParamListAsString(ArrayRef<CallArgParam> parameters);
+std::string getParamListAsString(ArrayRef<AnyFunctionType::Param> parameters);
 
 /// Describes a generic function type.
 ///

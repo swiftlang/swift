@@ -1035,9 +1035,9 @@ namespace {
     /// resultant set.
     ClosenessResultTy
     evaluateCloseness(UncurriedCandidate candidate,
-                      ArrayRef<CallArgParam> actualArgs);
+                      ArrayRef<AnyFunctionType::Param> actualArgs);
       
-    void filterListArgs(ArrayRef<CallArgParam> actualArgs);
+    void filterListArgs(ArrayRef<AnyFunctionType::Param> actualArgs);
     void filterList(Type actualArgsType, ArrayRef<Identifier> argLabels) {
       return filterListArgs(decomposeArgType(actualArgsType, argLabels));
     }
@@ -1231,7 +1231,7 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
 /// information about that failure.
 CalleeCandidateInfo::ClosenessResultTy
 CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
-                                       ArrayRef<CallArgParam> actualArgs) {
+                                       ArrayRef<AnyFunctionType::Param> actualArgs) {
   auto *dc = candidate.getDecl()
       ? candidate.getDecl()->getInnermostDeclContext()
       : nullptr;
@@ -1315,18 +1315,6 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     return param.getType();
   };
   
-  // Local function which extracts type from the parameter container.
-  auto getCallResultType = [](const CallArgParam &param) -> Type {
-    // If parameter is marked as @autoclosure, we are
-    // only interested in it's resulting type.
-    if (param.isAutoClosure()) {
-      if (auto fnType = param.Ty->getAs<AnyFunctionType>())
-        return fnType->getResult();
-    }
-    
-    return param.Ty;
-  };
-  
   for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
     // Bindings specify the arguments that source the parameter.  The only case
     // this returns a non-singular value is when there are varargs in play.
@@ -1334,7 +1322,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     auto paramType = getParamResultType(candArgs[i]);
     
     for (auto argNo : bindings) {
-      auto argType = getCallResultType(actualArgs[argNo]);
+      auto argType = getParamResultType(actualArgs[argNo]);
       auto rArgType = argType->getRValueType();
       
       // If the argument has an unresolved type, then we're not actually
@@ -1453,7 +1441,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
-  Type firstArg = actualArgs[0].Ty;
+  Type firstArg = actualArgs[0].getType();
   if (candArgs[0].getType()->is<InOutType>() && !(firstArg->hasLValueType() || firstArg->is<InOutType>()))
     return { CC_NonLValueInOut, {}};
   
@@ -1717,7 +1705,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
 /// After the candidate list is formed, it can be filtered down to discard
 /// obviously mismatching candidates and compute a "closeness" for the
 /// resultant set.
-void CalleeCandidateInfo::filterListArgs(ArrayRef<CallArgParam> actualArgs) {
+void CalleeCandidateInfo::filterListArgs(ArrayRef<AnyFunctionType::Param> actualArgs) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
   filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
@@ -1759,23 +1747,19 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     if (isa<InOutExpr>(argExpr))
       argType = LValueType::get(argType);
     
-    CallArgParam param;
-    param.Ty = argType;
-    return filterListArgs(param);
+    return filterListArgs(AnyFunctionType::Param({argType, Identifier(), {}}));
   }
   
   // If we have a tuple expression, form a tuple type.
-  SmallVector<CallArgParam, 4> ArgElts;
+  SmallVector<AnyFunctionType::Param, 4> ArgElts;
   for (unsigned i = 0, e = argTuple->getNumElements(); i != e; ++i) {
     // If the argument has an & specified, then we expect an lvalue.
     Type argType = URT;
     if (isa<InOutExpr>(argTuple->getElement(i)))
       argType = LValueType::get(argType);
 
-    CallArgParam param;
-    param.Ty = argType;
-    param.Label = argTuple->getElementName(i);
-    ArgElts.push_back(param);
+    ArgElts.push_back(AnyFunctionType::Param(argType,
+                                             argTuple->getElementName(i), {}));
   }
 
   return filterListArgs(ArgElts);
@@ -4502,12 +4486,9 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   // care about the actual types though, so we can just use 'void' for them.
   // FIXME: This doesn't need to be limited to tuple types.
   if (argType && argType->is<TupleType>()) {
-    // Decompose the parameter type, including information about default
-    // arguments.
-    
-    // HACK: Ask FunctionType to handle the decomposition for us.
-    auto *decomposeFunctionTy = FunctionType::get(argType, argType);
-    auto params = decomposeFunctionTy->getParams();
+    // Decompose the parameter type.
+    SmallVector<AnyFunctionType::Param, 4> params;
+    AnyFunctionType::decomposeInput(argType, params);
     
     // If we have a candidate function around, compute the position of its
     // default arguments.
@@ -4522,12 +4503,9 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // Form a set of call arguments, using a dummy type (Void), because the
     // argument/parameter matching code doesn't need it.
     auto voidTy = CS->getASTContext().TheEmptyTupleType;
-    SmallVector<CallArgParam, 4> args;
+    SmallVector<AnyFunctionType::Param, 4> args;
     for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
-      CallArgParam arg;
-      arg.Ty = voidTy;
-      arg.Label = TE->getElementName(i);
-      args.push_back(arg);
+      args.push_back(AnyFunctionType::Param(voidTy, TE->getElementName(i), {}));
     }
 
     /// Use a match call argument listener that allows relabeling.
@@ -5043,10 +5021,10 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   if (params.size() == 1 && args.size() == 1 &&
       candidate.getDecl() && isa<ConstructorDecl>(candidate.getDecl()) &&
       candidate.level == 1) {
-    CallArgParam &arg = args[0];
+    AnyFunctionType::Param &arg = args[0];
     auto resTy = candidate.getResultType()->lookThroughAllAnyOptionalTypes();
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
-    if (rawTy && arg.Ty && resTy->isEqual(arg.Ty)) {
+    if (rawTy && arg.getType() && resTy->isEqual(arg.getType())) {
       auto getInnerExpr = [](Expr *E) -> Expr* {
         auto *parenE = dyn_cast<ParenExpr>(E);
         if (!parenE)
@@ -5084,7 +5062,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     Expr *ArgExpr;
     ArrayRef<AnyFunctionType::Param> &Parameters;
     SmallVectorImpl<bool> &DefaultMap;
-    SmallVectorImpl<CallArgParam> &Arguments;
+    SmallVectorImpl<AnyFunctionType::Param> &Arguments;
 
     CalleeCandidateInfo CandidateInfo;
 
@@ -5101,14 +5079,14 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
                        Expr *argExpr,
                        ArrayRef<AnyFunctionType::Param> &params,
                        SmallVectorImpl<bool> &defaultMap,
-                       SmallVectorImpl<CallArgParam> &args,
+                       SmallVectorImpl<AnyFunctionType::Param> &args,
                        CalleeCandidateInfo &CCI, bool isSubscript)
         : TC(CCI.CS->TC), FnExpr(fnExpr), ArgExpr(argExpr),
           Parameters(params), DefaultMap(defaultMap), Arguments(args),
           CandidateInfo(CCI), IsSubscript(isSubscript) {}
 
     void extraArgument(unsigned extraArgIdx) override {
-      auto name = Arguments[extraArgIdx].Label;
+      auto name = Arguments[extraArgIdx].getLabel();
       Expr *arg = ArgExpr;
 
       auto tuple = dyn_cast<TupleExpr>(ArgExpr);
@@ -5427,7 +5405,7 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
 
     for (unsigned i = 0, n = parameters.size(); i != n; ++i) {
       auto paramType = parameters[i].getType();
-      auto argType = arguments[i].Ty;
+      auto argType = arguments[i].getType();
 
       for (auto kind : rawRepresentableProtocols) {
         // If trying to convert from raw type to raw representable,
@@ -5916,7 +5894,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     // Bindings specify the arguments that source the parameter. The only case
     // this returns a non-singular value is when there are varargs in play.
     for (auto argNo : bindings[i]) {
-      auto argType = args[argNo].Ty->getLValueOrInOutObjectType();
+      auto argType = args[argNo].getType()->getLValueOrInOutObjectType();
 
       if (argType->is<ArchetypeType>()) {
         diagnoseUnboundArchetype(archetype, fnExpr);
