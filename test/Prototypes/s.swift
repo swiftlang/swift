@@ -1,5 +1,106 @@
 import Swift
 
+internal struct _Concat3<C0: Collection, C1: Collection, C2: Collection>
+where C0.Element == C1.Element, C1.Element == C2.Element {
+  var c0: C0
+  var c1: C1
+  var c2: C2
+
+  init(_ c0: C0, _ c1: C1, _ c2: C2) {
+    self.c0 = c0
+    self.c1 = c1
+    self.c2 = c2
+  }
+}
+
+extension _Concat3 : Sequence {
+  struct Iterator : IteratorProtocol {
+    var i0: C0.Iterator
+    var i1: C1.Iterator
+    var i2: C2.Iterator
+
+    mutating func next() -> C0.Element? {
+      if let r = i0.next() { return r }
+      if let r = i1.next() { return r }
+      return i2.next()
+    }
+  }
+
+  func makeIterator() -> Iterator {
+    return Iterator(
+      i0: c0.makeIterator(),
+      i1: c1.makeIterator(),
+      i2: c2.makeIterator()
+    )
+  }
+}
+
+extension _Concat3 {
+  public enum Index {
+  case _0(C0.Index)
+  case _1(C1.Index)
+  case _2(C2.Index)
+  }
+}
+
+extension _Concat3.Index : Comparable {
+  static func == (lhs: _Concat3.Index, rhs: _Concat3.Index) -> Bool {
+    switch (lhs, rhs) {
+    case (._0(let l), ._0(let r)): return l == r
+    case (._1(let l), ._1(let r)): return l == r
+    case (._2(let l), ._2(let r)): return l == r
+    default: return false
+    }
+  }
+  
+  static func < (lhs: _Concat3.Index, rhs: _Concat3.Index) -> Bool {
+    switch (lhs, rhs) {
+    case (._0, ._1), (._0, ._2), (._1, ._2): return true
+    case (._1, ._0), (._2, ._0), (._2, ._1): return false
+    case (._0(let l), ._0(let r)): return l < r
+    case (._1(let l), ._1(let r)): return l < r
+    case (._2(let l), ._2(let r)): return l < r
+    }
+  }
+}
+
+extension _Concat3 : Collection {
+  var startIndex: Index {
+    return !c0.isEmpty ? ._0(c0.startIndex)
+         : !c1.isEmpty ? ._1(c1.startIndex) : ._2(c2.startIndex)
+  }
+
+  var endIndex: Index {
+    return ._2(c2.endIndex)
+  }
+
+  func index(after i: Index) -> Index {
+    switch i {
+    case ._0(let j):
+      let r = c0.index(after: j)
+      if _fastPath(r != c0.endIndex) { return ._0(r) }
+      if !c1.isEmpty { return ._1(c1.startIndex) }
+      return ._2(c2.startIndex)
+      
+    case ._1(let j):
+      let r = c1.index(after: j)
+      if _fastPath(r != c1.endIndex) { return ._1(r) }
+      return ._2(c2.startIndex)
+      
+    case ._2(let j):
+      return ._2(c2.index(after: j))
+    }
+  }
+
+  subscript(i: Index) -> C0.Element {
+    switch i {
+    case ._0(let j): return c0[j]
+    case ._1(let j): return c1[j]
+    case ._2(let j): return c2[j]
+    }
+  }
+}
+
 extension String {
   internal enum _XContent {
     internal struct _Inline<CodeUnit : FixedWidthInteger> {
@@ -571,10 +672,23 @@ func testme2() {
     }
   }
   init_old()
-  
+
+  func concat3Iteration() {
+    time {
+      for _ in 0...100*N {
+        for x in _Concat3(5..<90, 6...70, (4...30).dropFirst()) {
+          total = total &+ x
+        }
+      }
+    }
+  }
+  concat3Iteration()
   if total == 0 { print() }
 }
 
+let cat = _Concat3(5..<10, 15...20, (25...30).dropFirst())
+print(Array(cat))
+print(cat.indices.map { cat[$0] })
 print(MemoryLayout<String._XContent>.size)
 assert(MemoryLayout<String._XContent>.size <= 16)
 testme2()
