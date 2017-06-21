@@ -92,6 +92,9 @@ enum class ClassFlags : uint32_t {
 
   /// Does this class use Swift 1.0 refcounting?
   UsesSwift1Refcounting = 0x2,
+
+  /// Has this class a custom name, specified with the @objc attribute?
+  HasCustomObjCName = 0x4
 };
 inline bool operator&(ClassFlags a, ClassFlags b) {
   return (uint32_t(a) & uint32_t(b)) != 0;
