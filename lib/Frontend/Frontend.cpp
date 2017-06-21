@@ -520,7 +520,8 @@ void CompilerInstance::performSema() {
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                             TypeCheckOptions, CurTUElem,
                             options.WarnLongFunctionBodies,
-                            options.WarnLongExpressionTypeChecking);
+                            options.WarnLongExpressionTypeChecking,
+                            options.SolverExpressionTimeThreshold);
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
@@ -549,7 +550,8 @@ void CompilerInstance::performSema() {
         performTypeChecking(*SF, PersistentState.getTopLevelContext(),
                             TypeCheckOptions, /*curElem*/ 0,
                             options.WarnLongFunctionBodies,
-                            options.WarnLongExpressionTypeChecking);
+                            options.WarnLongExpressionTypeChecking,
+                            options.SolverExpressionTimeThreshold);
 
   // Even if there were no source files, we should still record known
   // protocols.

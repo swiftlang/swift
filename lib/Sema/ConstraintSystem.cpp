@@ -29,9 +29,7 @@ using namespace constraints;
 #define DEBUG_TYPE "ConstraintSystem"
 
 ExpressionTimer::~ExpressionTimer() {
-  llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
-
-  auto elapsed = endTime.getProcessTime() - StartTime.getProcessTime();
+  auto elapsed = getElapsedProcessTimeInFractionalSeconds();
   unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
 
   if (ShouldDump) {
