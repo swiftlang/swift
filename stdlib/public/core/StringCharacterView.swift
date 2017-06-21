@@ -365,88 +365,79 @@ extension String.CharacterView : BidirectionalCollection {
   internal func _measureExtendedGraphemeClusterForward(
     from start: UnicodeScalarView.Index
   ) -> Int {
-    let end = unicodeScalars.endIndex
-    if start == end {
+    let startPosition = start._position
+    let endPosition = unicodeScalars.endIndex._position
+
+    // No more graphemes
+    if startPosition == endPosition {
       return 0
     }
 
-    // Our relative position (offset). If our _core is not a substring, this is
-    // the same as start._position.
-    let relativeOffset = start._position - _coreOffset
+    // Last code unit means final grapheme length of 1
+    if startPosition == endPosition - 1 {
+      return 1
+    }
+
+    // Our relative offset from the _StringCore's baseAddress pointer. If our
+    // _core is not a substring, this is the same as start._position. Otherwise,
+    // it is the code unit relative offset into the substring and not the
+    // absolute offset into the outer string.
+    let startOffset = startPosition - _coreOffset
 
     // Grapheme breaking is much simpler if known ASCII
     if _core.isASCII {
       _onFastPath() // Please aggressively inline
       let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
+      _sanityCheck(startOffset+1 < asciiBuffer.endIndex, 
+        "Already checked for last code unit")
 
       // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
       // for that one exception.
       if _slowPath(
-        asciiBuffer[relativeOffset] == _CR &&
-        relativeOffset+1 < asciiBuffer.endIndex &&
-        asciiBuffer[relativeOffset+1] == _LF
+        asciiBuffer[startOffset] == _CR &&
+        asciiBuffer[startOffset+1] == _LF
       ) {
         return 2
       }
 
       return 1
-    } else {
-      // TODO: Check for (potentially non-contiguous) ASCII NSStrings,
-      // especially small tagged pointers.
     }
     
-    let startIndexUTF16 = start._position
-
-    // Last scalar is its own grapheme
-    if (startIndexUTF16+1 == end._position) {
-      return 1
-    }
-
-    // Perform a quick single-code-unit grapheme check
-    if _fastPath(_core._baseAddress != nil) {
-      if String.CharacterView._quickCheckGraphemeBreakBetween(
-        _core._nthContiguous(relativeOffset),
-        _core._nthContiguous(relativeOffset+1)
-      ) {
-        return 1
-      }
-    } else if String.CharacterView._quickCheckGraphemeBreakBetween(
-        _core[relativeOffset], _core[relativeOffset+1]
+    // Perform a quick single-code-unit grapheme check.
+    if _fastPath(String.CharacterView._quickCheckGraphemeBreakBetween(
+        _core[startOffset],
+        _core[startOffset+1])
     ) {
       return 1
     }
 
-    return _measureExtendedGraphemeClusterForwardSlow(
-      relativeOffset: relativeOffset,
-      start: start,
-      end: end,
-      startIndexUTF16: startIndexUTF16
-    )
+    return _measureExtendedGraphemeClusterForwardSlow(startOffset: startOffset)
   }
   
   @inline(never)
   @_versioned
   func _measureExtendedGraphemeClusterForwardSlow(
-    relativeOffset: Int,
-    start: String.UnicodeScalarView.Index,
-    end: String.UnicodeScalarView.Index,
-    startIndexUTF16: Int
+    startOffset: Int
   ) -> Int {
-    _sanityCheck(
-      start._position < end._position-1, "should have at least two code units")
+    let endOffset = unicodeScalars.endIndex._position - _coreOffset
+    let numCodeUnits = endOffset - startOffset
+    _sanityCheck(numCodeUnits >= 2, "should have at least two code units")
 
     // The vast majority of time, we can get a pointer and a length directly
     if _fastPath(_core._baseAddress != nil) {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
-      let ubrkFollowing = __swift_stdlib_ubrk_following(
-        breakIterator, Int32(relativeOffset)
+      let ubrkFollowingOffset = __swift_stdlib_ubrk_following(
+        breakIterator, Int32(startOffset)
       )
       // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
       // string.
-      let nextPosition =
-        ubrkFollowing == -1 ? end._position : Int(ubrkFollowing)
-      return nextPosition - relativeOffset
+      if _slowPath(ubrkFollowingOffset == -1) {
+        return numCodeUnits
+      }
+      _sanityCheck(startOffset != Int(ubrkFollowingOffset), 
+        "zero-sized grapheme?")
+      return Int(ubrkFollowingOffset) - startOffset
     }
 
     // We have a non-contiguous string. Pull out some code units into a fixed
@@ -454,12 +445,9 @@ extension String.CharacterView : BidirectionalCollection {
     // sufficient (i.e. very pathological) then copy into an Array.
     var codeUnitBuffer = _FixedArray16<UInt16>(allZeros:())
     let maxBufferCount = codeUnitBuffer.count
-    var bufferCount = 0
-    while bufferCount < Swift.min(
-      maxBufferCount, end._position - relativeOffset
-    ) {
-      codeUnitBuffer[bufferCount] = _core[relativeOffset + bufferCount]
-      bufferCount += 1
+    let bufferCount = Swift.min(maxBufferCount, numCodeUnits)
+    for i in 0..<bufferCount {
+      codeUnitBuffer[i] = _core[startOffset+i]
     }
 
     return withUnsafeBytes(of: &codeUnitBuffer.storage) {
@@ -469,66 +457,38 @@ extension String.CharacterView : BidirectionalCollection {
         count: bufferCount)
 
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: bufPtr)
-      let ubrkFollowing = __swift_stdlib_ubrk_following(
-        breakIterator, Int32(0)
-      )
+      let ubrkFollowingOffset = __swift_stdlib_ubrk_following(
+        breakIterator, Int32(0))
 
       if _fastPath(
-        ubrkFollowing != -1 && ubrkFollowing != maxBufferCount
+        bufferCount < maxBufferCount ||
+        (ubrkFollowingOffset != -1 && ubrkFollowingOffset != maxBufferCount)
       ) {
         // The offset into our buffer *is* the distance.
-        return Int(ubrkFollowing)
+        _sanityCheck(ubrkFollowingOffset != 0, "zero-sized grapheme?")
+        return Int(ubrkFollowingOffset)
       }
 
       // Nuclear option: copy out the rest of the string into an array
       var codeUnits = Array<UInt16>()
-      codeUnits.reserveCapacity(end._position - relativeOffset + 1)
-      for i in relativeOffset..<end._position {
+      codeUnits.reserveCapacity(numCodeUnits)
+      for i in startOffset..<endOffset {
         codeUnits.append(_core[i])
       }
       return codeUnits.withUnsafeBufferPointer { bufPtr -> Int in
         let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: bufPtr)
-        let ubrkFollowing = __swift_stdlib_ubrk_following(
+        let ubrkFollowingOffset = __swift_stdlib_ubrk_following(
           breakIterator, Int32(0)
         )
-        return ubrkFollowing == -1 ?
-          end._position - relativeOffset : Int(ubrkFollowing)
+        // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of
+        // the string.
+        if _slowPath(ubrkFollowingOffset == -1) {
+          return numCodeUnits
+        }
+        _sanityCheck(ubrkFollowingOffset != 0, "zero-sized grapheme?")
+        return Int(ubrkFollowingOffset)
       }
     }
-  }
-
-  @inline(never)
-  func legacyGraphemeForward(
-    start: UnicodeScalarView.Index,
-    end: UnicodeScalarView.Index,
-    startIndexUTF16: Int
-  ) -> Int {
-    var start = start
-    let graphemeClusterBreakProperty =
-      _UnicodeGraphemeClusterBreakPropertyTrie()
-    let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-    
-    var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
-      unicodeScalars[start].value)
-    unicodeScalars.formIndex(after: &start)
-    
-    while start != end {
-      // FIXME(performance): consider removing this "fast path".  A branch
-      // that is hard to predict could be worse for performance than a few
-      // loads from cache to fetch the property 'gcb1'.
-      if segmenter.isBoundaryAfter(gcb0) {
-        break
-      }
-      let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
-        unicodeScalars[start].value)
-      if segmenter.isBoundary(gcb0, gcb1) {
-        break
-      }
-      gcb0 = gcb1
-      unicodeScalars.formIndex(after: &start)
-    }
-    
-    return start._position - startIndexUTF16
   }
 
   // NOTE: Because this function is inlineable, it should contain only the fast
@@ -541,14 +501,25 @@ extension String.CharacterView : BidirectionalCollection {
   internal func _measureExtendedGraphemeClusterBackward(
     from end: UnicodeScalarView.Index
   ) -> Int {
-    let start = unicodeScalars.startIndex
-    if start == end {
+    let startPosition = unicodeScalars.startIndex._position
+    let endPosition = end._position
+
+    // No more graphemes
+    if startPosition == endPosition {
       return 0
     }
 
-    // The relative position (offset) to the last code unit.
-    let lastOffset = end._position - _coreOffset - 1
-    // The relative position (offset) that is one-past-the-last
+    // Last code unit means final grapheme length of 1
+    if startPosition == endPosition - 1 {
+      return 1
+    }
+
+    // The relative offset from the _StringCore's baseAddress pointer for the
+    // one-past-the-end and the last code unit under consideration.  If our
+    // _core is not a substring, these are the same as positions. Otherwise,
+    // these are code unit relative offsets into the substring and not the
+    // absolute positions into the outer string.
+    let lastOffset = endPosition - _coreOffset - 1
     let endOffset = lastOffset + 1
 
     // Grapheme breaking is much simpler if known ASCII
@@ -556,15 +527,14 @@ extension String.CharacterView : BidirectionalCollection {
       _onFastPath() // Please aggressively inline
       let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
       _sanityCheck(
-        lastOffset >= asciiBuffer.startIndex,
-        "should of been caught in earlier start-of-scalars check")
+        lastOffset-1 >= asciiBuffer.startIndex,
+        "should of been caught in earlier trivially-sized checks")
 
       // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
       // for that one exception.
       if _slowPath(
-        asciiBuffer[lastOffset] == _LF &&
-        lastOffset-1 >= asciiBuffer.startIndex &&
-        asciiBuffer[lastOffset-1] == _CR
+        asciiBuffer[lastOffset-1] == _CR &&
+        asciiBuffer[lastOffset] == _LF
       ) {
         return 2
       }
@@ -572,58 +542,46 @@ extension String.CharacterView : BidirectionalCollection {
       return 1
     }
     
-    let endIndexUTF16 = end._position
-
-    // First scalar is its own grapheme
-    if (endIndexUTF16-1 == start._position) {
-      return 1
-    }
-
     // Perform a quick single-code-unit grapheme check
-    if _fastPath(_core._baseAddress != nil) {
-      if String.CharacterView._quickCheckGraphemeBreakBetween(
-        _core._nthContiguous(lastOffset-1),
-        _core._nthContiguous(lastOffset)
-      ) {
-        return 1
-      }
-    } else if String.CharacterView._quickCheckGraphemeBreakBetween(
-        _core[lastOffset-1], _core[lastOffset]
+    if _fastPath(String.CharacterView._quickCheckGraphemeBreakBetween(
+      _core[lastOffset-1], _core[lastOffset])
     ) {
       return 1
     }
 
-    return _measureExtendedGraphemeClusterBackwardSlow(
-      endOffset: endOffset, start: start, end: end, endIndexUTF16: endIndexUTF16
-    )
+    return _measureExtendedGraphemeClusterBackwardSlow(endOffset: endOffset)
   }
   
   @inline(never)
   @_versioned
   func _measureExtendedGraphemeClusterBackwardSlow(
-    endOffset: Int,
-    start: String.UnicodeScalarView.Index,
-    end: String.UnicodeScalarView.Index,
-    endIndexUTF16: Int
+    endOffset: Int
   ) -> Int {
-    _sanityCheck(
-      end._position-1 > start._position, 
-      "should have at least two code units"
-    )
-    func measureFromUBreakPosition(_ ubrkPos: Int32) -> Int {
+    let startOffset = 0
+    let numCodeUnits = endOffset - startOffset
+    _sanityCheck(unicodeScalars.startIndex._position - _coreOffset == 0,
+      "position/offset mismatch in _StringCore as a substring")
+    _sanityCheck(numCodeUnits >= 2,
+      "should have at least two code units")
+
+    func measureFromUBreakOffset(_ ubrkOffset: Int32) -> Int {
       // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
       // string.
-      return endOffset - (ubrkPos == -1 ? start._position : Int(ubrkPos))
+      if _slowPath(ubrkOffset == -1) {
+        return numCodeUnits
+      }
+      _sanityCheck(endOffset > Int(ubrkOffset), "zero-sized grapheme?")
+      return endOffset - Int(ubrkOffset)
     }
 
     // The vast majority of time, we can get a pointer and a length directly
     if _fastPath(_core._baseAddress != nil) {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
-      let ubrkPreceding = __swift_stdlib_ubrk_preceding(
+      let ubrkPrecedingOffset = __swift_stdlib_ubrk_preceding(
         breakIterator, Int32(endOffset)
       )
-      return measureFromUBreakPosition(ubrkPreceding)
+      return measureFromUBreakOffset(ubrkPrecedingOffset)
     }
 
     // We have a non-contiguous string. Pull out some code units into a fixed
@@ -631,12 +589,10 @@ extension String.CharacterView : BidirectionalCollection {
     // sufficient (i.e. very pathological) then copy into an Array.
     var codeUnitBuffer = _FixedArray16<UInt16>(allZeros:())
     let maxBufferCount = codeUnitBuffer.count
-    var coreIdx = Swift.max(start._position, endOffset - maxBufferCount)
-    var bufferCount = 0
-    while coreIdx < endOffset {
-      codeUnitBuffer[bufferCount] = _core[coreIdx]
-      bufferCount += 1
-      coreIdx += 1
+    let coreStartIdx = Swift.max(startOffset, endOffset - maxBufferCount)
+    let bufferCount = Swift.min(maxBufferCount, numCodeUnits)
+    for i in 0..<bufferCount {
+      codeUnitBuffer[i] = _core[coreStartIdx+i]
     }
 
     return withUnsafeBytes(of: &codeUnitBuffer.storage) {
@@ -646,68 +602,34 @@ extension String.CharacterView : BidirectionalCollection {
         count: bufferCount)
 
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: bufPtr)
-      let ubrkPreceding = __swift_stdlib_ubrk_preceding(
+      let ubrkPrecedingOffset = __swift_stdlib_ubrk_preceding(
         breakIterator, Int32(bufferCount)
       )
 
-      if _fastPath(bufferCount != maxBufferCount || ubrkPreceding > 1) {
+      if _fastPath(numCodeUnits < maxBufferCount || ubrkPrecedingOffset > 1) {
         // There was a grapheme break within our buffer.
-        // Adjust ubrkPreceding, as it's relative to our buffer
-        let ubrkAbsPos = ubrkPreceding + (endOffset - bufferCount)
-        return measureFromUBreakPosition(ubrkAbsPos)
+        _sanityCheck(ubrkPrecedingOffset < bufferCount, "offset mismatch")
+        return bufferCount - Int(ubrkPrecedingOffset)
       }
 
       // Nuclear option: copy out the prefix of the string into an array
       var codeUnits = Array<UInt16>()
-      codeUnits.reserveCapacity(endOffset - start._position + 1)
-      for i in 0..<endOffset {
+      codeUnits.reserveCapacity(numCodeUnits)
+      for i in startOffset..<endOffset {
         codeUnits.append(_core[i])
       }
       return codeUnits.withUnsafeBufferPointer { bufPtr -> Int in
         let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: bufPtr)
-        let ubrkPreceding = __swift_stdlib_ubrk_preceding(
+        let ubrkPrecedingOffset = __swift_stdlib_ubrk_preceding(
           breakIterator, Int32(endOffset)
         )
-        // No need to adjust ubrkPreceding as we copied the prefix: it is the
-        // position in the original string
-        // dump(codeUnits)
-        return measureFromUBreakPosition(ubrkPreceding)
+        // No need to adjust ubrkPrecedingOffset as we copied the prefix: it is
+        // the position in the original string
+        return measureFromUBreakOffset(ubrkPrecedingOffset)
       }
     }    
   }
 
-  @inline(never)
-  func legacyGraphemeBackward(
-    start: UnicodeScalarView.Index,
-    end: UnicodeScalarView.Index,
-    endIndexUTF16: Int
-  ) -> Int {
-    let graphemeClusterBreakProperty =
-      _UnicodeGraphemeClusterBreakPropertyTrie()
-    let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-    
-    var graphemeClusterStart = end
-    
-    unicodeScalars.formIndex(before: &graphemeClusterStart)
-    var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
-      unicodeScalars[graphemeClusterStart].value)
-    
-    var graphemeClusterStartUTF16 = graphemeClusterStart._position
-    
-    while graphemeClusterStart != start {
-      unicodeScalars.formIndex(before: &graphemeClusterStart)
-      let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
-        unicodeScalars[graphemeClusterStart].value)
-      if segmenter.isBoundary(gcb1, gcb0) {
-        break
-      }
-      gcb0 = gcb1
-      graphemeClusterStartUTF16 = graphemeClusterStart._position
-    }
-    
-    return endIndexUTF16 - graphemeClusterStartUTF16
-  }
-  
   /// Accesses the character at the given position.
   ///
   /// The following example searches a string's character view for a capital

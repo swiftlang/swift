@@ -14,16 +14,31 @@ import StdlibUnittest
 let tests = TestSuite("NonContiguousStrings")
 
 // Perform expected test checks
-func check(_ s: String, expectedCount: Int, expectedCodeUnitCount: Int) {
-	expectEqual(expectedCount, s.count)
-	expectEqual(expectedCodeUnitCount, s.utf16.count)
+func checkSingleForm<S: StringProtocol>(
+	_ s: S, expectedCount: Int, expectedCodeUnitCount: Int?
+) {
+	expectEqual(expectedCount, Int(s.count))
+	if let cuCount = expectedCodeUnitCount {
+		expectEqual(expectedCodeUnitCount, Int(s.utf16.count))
+	}
 
 	// Now check various reversed properties
 	let reversedCharacters = Array<Character>(s.reversed())
 
-	expectEqual(s.count, reversedCharacters.count)
+	expectEqual(Int(s.count), reversedCharacters.count)
 	expectEqualSequence(s.reversed(), reversedCharacters)
-	expectEqual(s, String(reversedCharacters.reversed()))
+	expectEqual(String(s), String(reversedCharacters.reversed()))
+}
+func check(
+	_ s: String, expectedCount count: Int, expectedCodeUnitCount cuCount: Int
+) {
+	checkSingleForm(s, expectedCount: count, expectedCodeUnitCount: cuCount)
+
+	// TODO: substring tests
+	// checkSingleForm(s[...], expectedCount: count, expectedCodeUnitCount: cuCount)
+	// checkSingleForm(s.dropFirst(), expectedCount: count-1, expectedCodeUnitCount: nil)
+	// checkSingleForm(s.dropLast(), expectedCount: count-1, expectedCodeUnitCount: nil)
+	// checkSingleForm(s.dropLast().dropFirst(), expectedCount: count-2, expectedCodeUnitCount: nil)
 }
 
 tests.test("Unicode 9 grapheme breaking") {
