@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+@_versioned
 struct _SwiftUTF16StringHeader : _BoundedBufferHeader {
   var count: UInt32
   var capacity: UInt32
@@ -20,6 +21,8 @@ struct _SwiftUTF16StringHeader : _BoundedBufferHeader {
     self.flags = 0
   }
 }
+
+@_versioned
 struct _SwiftLatin1StringHeader : _BoundedBufferHeader {
   var count: UInt32
   var capacity: UInt32
@@ -74,9 +77,8 @@ extension String {
 
 extension String._StorageBase {
   @inline(__always)
-  public static func make(uninitializedWithMinCapacity n: Int) -> Self {
-    return Builtin.allocWithTailElems_1(
-        self, n._builtinWordValue, Element.self)
+  public static func _rawStorage(minCapacity n: Int) -> Self {
+    return Builtin.allocWithTailElems_1(self, n._builtinWordValue, Element.self)
   }
 }
 
@@ -138,95 +140,77 @@ extension String._UTF16Storage : _BoundedBufferReference {
 extension String._UTF16Storage /*: UnicodeStorage*/ {
   public typealias Encoding = Unicode.UTF16
 
+  internal func _getFlags(_ r: CountableClosedRange<UInt8>) -> UInt16 {
+    return _header.flags &>> r.lowerBound
+      & (~0 as UInt16 &>> (16 - r.count))
+  }
+  
+  internal func _setFlags(
+    _ r: CountableClosedRange<UInt8>, to newValue: UInt16
+  ) {
+    _header.flags &= ~(
+      (~0 as UInt16 &>> (16 - r.upperBound))
+      ^ (~0 as UInt16 &>> (16 - r.lowerBound)))
+    _header.flags |= newValue &<< r.lowerBound
+  }
+  
+  internal func _getTriBool(_ i: UInt8) -> Bool? {
+    let x = _getFlags(i...i+1)
+    guard x != 0 else { return nil }
+    return (x & 0x1) != 0
+  }
+  
+  internal func _setTriBool(_ i: UInt8, to newValue: Bool?) {
+    _setFlags(i...i+1, to: newValue == false ? 2 : newValue == true ? 3 : 0)
+  }
+  
   @nonobjc
-  public var isKnownASCII: Bool {
-    get { return _header.flags & 1<<0 as UInt16 != 0 }
-    set {
-      if newValue { _header.flags |= 1<<0 as UInt16 }
-      else { _header.flags &= ~(1<<0) }
-    }
+  public var isASCII: Bool? {
+    get { return _getTriBool(0) }
+    set { _setTriBool(0, to: newValue) }
   }
 
   @nonobjc
-  public var isKnownLatin1: Bool {
-    get { return _header.flags & 1<<1 as UInt16 != 0 }
-    set {
-      if newValue { _header.flags |= 1<<1 as UInt16 }
-      else { _header.flags &= ~(1<<1) as UInt16 }
-    }
+  public var isLatin1: Bool? {
+    get { return _getTriBool(2) }
+    set { _setTriBool(2, to: newValue) }
+  }
+
+  @nonobjc
+  public var isValidEncoding: Bool? {
+    get { return _getTriBool(4) }
+    set { _setTriBool(4, to: newValue) }
   }
   
   @nonobjc
-  public var isKnownValidEncoding: Bool {
-    get { return _header.flags & 1<<2 as UInt16 != 0 }
-    set {
-      if newValue { _header.flags |= 1<<2 as UInt16 }
-      else { _header.flags &= ~(1<<2) as UInt16 }
-    }
-  }
-  
-  @nonobjc
-  public var isKnownFCCNormalized: Bool {
-    get { return _header.flags & 1<<3 as UInt16 != 0 }
-    set {
-      if newValue { _header.flags |= 1<<3 as UInt16 }
-      else { _header.flags &= ~(1<<3) as UInt16 }
-    }
-  }
-  
-  @nonobjc
-  public var isKnownNFCNormalized: Bool {
-    get { return _header.flags & 1<<4 as UInt16 != 0 }
-    set {
-      if newValue { _header.flags |= 1<<4 as UInt16 }
-      else { _header.flags &= ~(1<<4) as UInt16 }
-    }
-  }
-  
-  @nonobjc
-  public var isKnownNFDNormalized: Bool {
-    get { return _header.flags & 1<<5 as UInt16 != 0 }
-    set {
-      if newValue { _header.flags |= 1<<5 as UInt16 }
-      else { _header.flags &= ~(1<<5) as UInt16 }
-    }
+  public var isFCCNormalized: Bool? {
+    get { return _getTriBool(6) }
+    set { _setTriBool(6, to: newValue) }
   }
   
   @nonobjc
   @_versioned
   internal func _setMaxStored(_ maxCodeUnit: UInt16) {
-    switch maxCodeUnit {
-    case 0..<0x80: self.isKnownASCII = true; fallthrough
-    case 0..<0x100: self.isKnownLatin1 = true; fallthrough
-    case 0..<0x300: self.isKnownFCCNormalized = true; fallthrough
-    case 0..<0xD800: self.isKnownValidEncoding = true
-    default: break
-    }
+    isASCII = maxCodeUnit < 0x80
+    isLatin1 = maxCodeUnit < 0x100
+    if maxCodeUnit < 0x300 { isFCCNormalized = true }
+    if maxCodeUnit < 0xD800 { isValidEncoding = true }
   }
   
   @inline(__always)
-  public static func make<Source : Collection>(
+  public static func copying<Source : Collection>(
     _ source: Source,
+    minCapacity: Int = 0,
     maxElement: UInt16? = nil
   ) -> String._UTF16Storage
   where Source.Iterator.Element == UInt16 {
-    let r = make(count: numericCast(source.count))
+    let r = instanceWithUnintializedElements(
+      count: numericCast(source.count), minCapacity: minCapacity)
     _ = r.withUnsafeMutableBufferPointer {
       source._copyCompleteContents(initializing: $0)
     }
     r._setMaxStored(maxElement ?? source.max() ?? 0)
     return r
-  }
-
-  @inline(__always)
-  public static func make(
-    count: Int,
-    minCapacity: Int = 0
-  ) -> String._UTF16Storage {
-    return make(minCapacity: Swift.max(count, minCapacity)) {
-      _SwiftUTF16StringHeader(
-        count: UInt32(count), capacity: UInt32($0), flags: 0)
-    }
   }
 }
 
@@ -283,42 +267,47 @@ extension String {
 extension String._Latin1Storage : _BoundedBufferReference {
   @nonobjc
   public static var extraCapacity: Int { return 1 }
-  
-  @inline(__always)
-  public static func make(
-    count: Int,
-    minCapacity: Int = 0
-  ) -> String._Latin1Storage {
-    return make(minCapacity: Swift.max(count, minCapacity)) {
-      _SwiftLatin1StringHeader(
-        count: UInt32(count), capacity: UInt32($0), flags: 0)
-    }
-  }
 }
 
 extension String._Latin1Storage {
-  public var isKnownNFDNormalized: Bool { return true }
-  public var isKnownNFCNormalized: Bool { return true }
-
-  @nonobjc
-  public var isKnownASCII: Bool {
-    get { return _header.flags & (1 as UInt8)<<0 != 0 }
-    set {
-      if newValue { _header.flags |= (1 as UInt8)<<0 }
-      else { _header.flags &= ~((1 as UInt8)<<0) }
-    }
+  internal func _getFlags(_ r: CountableClosedRange<UInt8>) -> UInt8 {
+    return _header.flags &>> r.lowerBound
+      & (~0 as UInt8 &>> (8 - r.count))
+  }
+  
+  internal func _setFlags(
+    _ r: CountableClosedRange<UInt8>, to newValue: UInt8
+  ) {
+    _header.flags &= ~(
+      (~0 as UInt8 &>> (8 - r.upperBound))
+      ^ (~0 as UInt8 &>> (8 - r.lowerBound)))
+    _header.flags |= newValue &<< r.lowerBound
+  }
+  
+  internal func _getTriBool(_ i: UInt8) -> Bool? {
+    let x = _getFlags(i...i+1)
+    guard x != 0 else { return nil }
+    return (x & 0x1) != 0
+  }
+  
+  internal func _setTriBool(_ i: UInt8, to newValue: Bool?) {
+    _setFlags(i...i+1, to: newValue == false ? 2 : newValue == true ? 3 : 0)
   }
 
-  public static func make<Source : Collection>(
+  @nonobjc
+  public var isASCII: Bool? {
+    get { return _getTriBool(0) }
+    set { _setTriBool(0, to: newValue) }
+  }
+
+  public static func copying<Source : Collection>(
     _ source: Source,
-    isKnownASCII: Bool = false
+    minCapacity: Int = 0,
+    isASCII: Bool? = nil
   ) -> String._Latin1Storage
   where Source.Iterator.Element == UInt8 {
-    let r = make(count: numericCast(source.count))
-    _ = r.withUnsafeMutableBufferPointer {
-      source._copyCompleteContents(initializing: $0)
-    }
-    r.isKnownASCII = isKnownASCII || (source.max() ?? 0) < 0x80
+    let r = self.copying(source, minCapacity: minCapacity, _force: ())
+    r.isASCII = isASCII ?? (source.max() ?? 0 < 0x80)
     return r
   }
 }
@@ -326,17 +315,23 @@ extension String._Latin1Storage {
 //===--- Multi-Format String Storage --------------------------------------===//
 
 @inline(__always)
-public func _mkLatin1<C: Collection>(_ x: C, isKnownASCII: Bool = false) -> AnyObject
+public func _mkLatin1<C: Collection>(
+  _ x: C, minCapacity: Int = 0, isASCII: Bool? = nil
+) -> AnyObject
 where C.Element == UInt8
 {
-  return String._Latin1Storage.make(x, isKnownASCII: isKnownASCII)
+  return String._Latin1Storage.copying(
+    x, minCapacity: minCapacity, isASCII: isASCII)
 }
 
 @inline(__always)
-public func _mkUTF16<C: Collection>(_ x: C, maxElement: UInt16? = nil) -> AnyObject
+public func _mkUTF16<C: Collection>(
+  _ x: C, minCapacity: Int = 0, maxElement: UInt16? = nil
+) -> AnyObject
 where C.Element == UInt16
 {
-  return String._UTF16Storage.make(x, maxElement: maxElement)
+  return String._UTF16Storage.copying(
+    x, minCapacity: minCapacity, maxElement: maxElement)
 }
 
 extension String {

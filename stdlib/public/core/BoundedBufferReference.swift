@@ -40,9 +40,12 @@ protocol _BoundedBufferReference
   @nonobjc
   var _baseAddress: UnsafeMutablePointer<Iterator.Element> { get }
 
-  static func make(uninitializedWithMinCapacity: Int) -> Self
+  /// Create the raw storage for a new instance with the given minimum capacity.
+  ///
+  /// Typically implemented with a call to `Builtin.allocWithTailElems_1`
+  static func _rawStorage(minCapacity: Int) -> Self
 
-  /// A number of extra elements to allocate for
+  /// A number of extra elements to allocate space for.
   ///
   /// Used for NUL-termination in String
   @nonobjc
@@ -61,32 +64,43 @@ extension _BoundedBufferReference {
   public init() {
     self.init(Self._emptyInstance())
   }
-  
+
   public static func _emptyInstance() -> Self {
-    return make(_uninitializedCount: 0, minCapacity: 0)
+    return instanceWithUnintializedElements()
   }
 
   public static var extraCapacity: Int { return 0 }
-  
-  public static func make(
+
+  /// Create an instance with the given minimum capacity, calling
+  /// `makeInitialHeader` to generate an initial value for the `_header`
+  /// property.
+  ///
+  /// If the header's `count` is not initialized to `0`, the element type should
+  /// be trivial or it will have to be initialized
+  public static func instanceWithUnintializedElements(
     minCapacity: Int = 0,
     makeInitialHeader: (_ allocatedCapacity: Int)->Header
   ) -> Self {
     let extra = Self.extraCapacity
-    let r = make(uninitializedWithMinCapacity: minCapacity + extra)
+    let r = self._rawStorage(minCapacity: minCapacity + extra)
     withUnsafeMutablePointer(to: &r._header) {
       $0.initialize(to: makeInitialHeader(r.allocatedCapacity() - extra))
     }
     return r
   }
 
-  public static func make(
-    _uninitializedCount: Int, minCapacity: Int = 0
+  /// Create an instance with the standard header for the given `minCapacity`.
+  ///
+  /// If `_uninitializedElementCount` is passed, the header's `count` will be
+  /// initialized accordingly, but the *elements will not be initialized*, and
+  /// should be initialized immediately thereafter.
+  public static func instanceWithUnintializedElements(
+    count: Int = 0, minCapacity: Int = 0
   ) -> Self {
-    return make(
-      minCapacity: Swift.max(_uninitializedCount, minCapacity)
+    return instanceWithUnintializedElements(
+      minCapacity: Swift.max(count, minCapacity)
     ) {
-      Header(count: _uninitializedCount, capacity: $0)
+      Header(count: count, capacity: $0)
     }
   }
   
@@ -133,15 +147,24 @@ extension _BoundedBufferReference {
 
 /// Fulfills the RangeReplaceableCollection requirements
 extension _BoundedBufferReference {
-  public static func make<S : Sequence>(_ elements: S) -> Self
-    where S.Iterator.Element == Iterator.Element {
-    return make(Array(elements))
+  public static func copying<S : Sequence>(_ elements: S) -> Self
+  where S.Iterator.Element == Iterator.Element {
+    // yes, copying to an Array is inefficient.  I'm gambling that this doesn't
+    // get used.  If it does, we can rewrite.
+    return self.copying(Array(elements))
   }
   
-  public static func make<C : Collection>(_ elements: C) -> Self
-    where C.Iterator.Element == Iterator.Element {
-    let r = make(_uninitializedCount: numericCast(elements.count))
-    _ = r.withUnsafeMutableBufferPointer {
+  @inline(__always)
+  public static func copying<C : Collection>(
+    _ elements: C, minCapacity: Int = 0, _force: () = ()
+  ) -> Self
+  where C.Iterator.Element == Iterator.Element {
+    
+    let r = instanceWithUnintializedElements(
+      count: numericCast(elements.count),
+      minCapacity: minCapacity)
+    
+    r.withUnsafeMutableBufferPointer {
       elements._copyCompleteContents(initializing: $0)
     }
     return r
@@ -248,7 +271,7 @@ extension _BoundedBufferReference {
 
 extension _BoundedBufferReference {
   /// Construct the concatenation of head, middle, and tail
-  public static func make<
+  public static func joining<
     Head : Collection, Middle : Collection, Tail : Collection
   >(
     joining head: Head, _ middle: Middle, _ tail: Tail, minCapacity: Int = 0
@@ -262,8 +285,8 @@ extension _BoundedBufferReference {
       + numericCast(middle.count) as IndexDistance
       + numericCast(tail.count) as IndexDistance
 
-    let r = self.make(
-      _uninitializedCount: numericCast(newCount),
+    let r = self.instanceWithUnintializedElements(
+      count: numericCast(newCount),
       minCapacity: minCapacity)
     
     r.withUnsafeMutableBufferPointer { b0 in
