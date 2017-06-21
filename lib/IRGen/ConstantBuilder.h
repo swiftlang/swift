@@ -107,6 +107,14 @@ public:
   Size getNextOffsetFromGlobal() const {
     return Size(super::getNextOffsetFromGlobal().getQuantity());
   }
+  
+  void addAlignmentPadding(Alignment align) {
+    auto misalignment = getNextOffsetFromGlobal() % IGM().getPointerAlignment();
+    if (misalignment != Size(0))
+      add(llvm::ConstantAggregateZero::get(
+            llvm::ArrayType::get(IGM().Int8Ty,
+                                 align.getValue() - misalignment.getValue())));
+  }
 };
 
 class ConstantArrayBuilder

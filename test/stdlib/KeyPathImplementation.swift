@@ -135,20 +135,33 @@ struct TestKeyPathBuilder {
   }
   
   mutating func push(_ value: UInt32) {
-    assert(buffer.count >= 4, "not enough room")
     buffer.storeBytes(of: value, as: UInt32.self)
     buffer = .init(start: buffer.baseAddress! + 4, count: buffer.count - 4)
+  }
+  mutating func push(_ value: Any.Type) {
+    var misalign = Int(bitPattern: buffer.baseAddress) % MemoryLayout<Int>.alignment
+    if misalign != 0 {
+      misalign = MemoryLayout<Int>.alignment - misalign
+      buffer = .init(start: buffer.baseAddress! + misalign,
+                     count: buffer.count - misalign)
+    }
+    buffer.storeBytes(of: value, as: Any.Type.self)
+    buffer = .init(start: buffer.baseAddress! + MemoryLayout<Int>.size,
+                   count: buffer.count - MemoryLayout<Int>.size)
   }
   
   mutating func addHeader(trivial: Bool, hasReferencePrefix: Bool) {
     assert(state == .header, "not expecting a header")
-    let size = buffer.count - 4
+    let size = buffer.count - MemoryLayout<Int>.size
     assert(buffer.count > 0 && buffer.count <= 0x3FFF_FFFF,
            "invalid buffer size")
     let header: UInt32 = UInt32(size)
       | (trivial ? 0x8000_0000 : 0)
       | (hasReferencePrefix ? 0x4000_0000 : 0)
     push(header)
+    if MemoryLayout<Int>.size == 8 {
+      push(0)
+    }
     self.hasReferencePrefix = hasReferencePrefix
     state.advance()
   }
@@ -194,18 +207,7 @@ struct TestKeyPathBuilder {
   
   mutating func addType(_ type: Any.Type) {
     assert(state == .type, "not expecting a type")
-    if MemoryLayout<Int>.size == 8 {
-      // Components are 4-byte aligned, but pointers are 8-byte aligned, so
-      // we have to store word-by-word
-      let words = unsafeBitCast(type, to: (UInt32, UInt32).self)
-      push(words.0)
-      push(words.1)
-    } else if MemoryLayout<Int>.size == 4 {
-      let word = unsafeBitCast(type, to: UInt32.self)
-      push(word)
-    } else {
-      fatalError("unsupported architecture")
-    }
+    push(type)
     state.advance()
   }
 }
@@ -223,30 +225,30 @@ extension AnyKeyPath {
 
 keyPathImpl.test("struct components") {
   let s_x = WritableKeyPath<S<String>, Int>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: S<String>.x_offset)
     }
 
   let s_y = WritableKeyPath<S<String>, LifetimeTracked?>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: S<String>.y_offset)
     }
 
   let s_z = WritableKeyPath<S<String>, String>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: S<String>.z_offset)
     }
 
   let s_p = WritableKeyPath<S<String>, Point>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: S<String>.p_offset)
     }
 
-  let twoComponentSize = 12 + MemoryLayout<Int>.size
+  let twoComponentSize = MemoryLayout<Int>.size * 3 + 4
   let s_p_x = WritableKeyPath<S<String>, Double>
     .build(capacityInBytes: twoComponentSize) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
@@ -331,19 +333,19 @@ keyPathImpl.test("struct components") {
 
 keyPathImpl.test("class components") {
   let c_x = ReferenceWritableKeyPath<C<String>, Int>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: C<String>.x_offset)
     }
 
   let c_y = ReferenceWritableKeyPath<C<String>, LifetimeTracked?>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: C<String>.y_offset)
     }
 
   let c_z = ReferenceWritableKeyPath<C<String>, String>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: C<String>.z_offset)
     }
@@ -394,7 +396,7 @@ keyPathImpl.test("class components") {
 
 keyPathImpl.test("reference prefix") {
   let s_c_x = ReferenceWritableKeyPath<S<String>, Int>
-    .build(capacityInBytes: 12 + MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 3 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       $0.addStructComponent(offset: S<String>.c_offset,
                             endsReferencePrefix: true)
@@ -403,7 +405,7 @@ keyPathImpl.test("reference prefix") {
     }
 
   let s_c_y = ReferenceWritableKeyPath<S<String>, LifetimeTracked?>
-    .build(capacityInBytes: 12 + MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 3 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       $0.addStructComponent(offset: S<String>.c_offset,
                             endsReferencePrefix: true)
@@ -412,7 +414,7 @@ keyPathImpl.test("reference prefix") {
     }
 
   let s_c_z = ReferenceWritableKeyPath<S<String>, String>
-    .build(capacityInBytes: 12 + MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 3 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       $0.addStructComponent(offset: S<String>.c_offset,
                             endsReferencePrefix: true)
@@ -484,14 +486,14 @@ keyPathImpl.test("reference prefix") {
 
 keyPathImpl.test("overflowed offsets") {
   let s_p = WritableKeyPath<S<String>, Point>
-    .build(capacityInBytes: 12) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: S<String>.p_offset,
                             forceOverflow: true)
     }
 
   let c_z = ReferenceWritableKeyPath<C<String>, String>
-    .build(capacityInBytes: 12) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: C<String>.z_offset,
                            forceOverflow: true)
@@ -516,7 +518,7 @@ keyPathImpl.test("overflowed offsets") {
 
 keyPathImpl.test("equality") {
   let s_c_z_p_x = ReferenceWritableKeyPath<S<S<String>>, Double>
-    .build(capacityInBytes: 20 + 3 * MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 7 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       // S<S<String>>.c
       $0.addStructComponent(offset: S<S<String>>.c_offset,
@@ -537,7 +539,7 @@ keyPathImpl.test("equality") {
 
   // Structurally equivalent to s_c_z_p_x
   let s_c_z_p_x_2 = ReferenceWritableKeyPath<S<S<String>>, Double>
-    .build(capacityInBytes: 20 + 3 * MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 7 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       // S<S<String>>.c
       $0.addStructComponent(offset: S<S<String>>.c_offset,
@@ -561,7 +563,7 @@ keyPathImpl.test("equality") {
 
   // Structurally equivalent, force-overflowed offset components
   let s_c_z_p_x_3 = ReferenceWritableKeyPath<S<S<String>>, Double>
-    .build(capacityInBytes: 36 + 3 * MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 4 * MemoryLayout<Int>.size + 4 * 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       // S<S<String>>.c
       $0.addStructComponent(offset: S<S<String>>.c_offset,
@@ -589,7 +591,7 @@ keyPathImpl.test("equality") {
 
   // Same path type, different suffixes
   let s_c_z_p_y = ReferenceWritableKeyPath<S<S<String>>, Double>
-    .build(capacityInBytes: 20 + 3 * MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 7 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       // S<S<String>>.c
       $0.addStructComponent(offset: S<S<String>>.c_offset,
@@ -610,7 +612,7 @@ keyPathImpl.test("equality") {
 
   // Different path type
   let s_c_z_p = ReferenceWritableKeyPath<S<S<String>>, Point>
-    .build(capacityInBytes: 16 + 2 * MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 5 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       // S<S<String>>.c
       $0.addStructComponent(offset: S<S<String>>.c_offset,
@@ -628,7 +630,7 @@ keyPathImpl.test("equality") {
 
   // Same path, no reference prefix
   let s_c_z_p_x_readonly = KeyPath<S<S<String>>, Double>
-    .build(capacityInBytes: 20 + 3 * MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 7 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       // S<S<String>>.c
       $0.addStructComponent(offset: S<S<String>>.c_offset)
@@ -648,7 +650,7 @@ keyPathImpl.test("equality") {
 
   // Same path type, different paths
   let s_p_y_readonly = KeyPath<S<S<String>>, Double>
-    .build(capacityInBytes: 12 + MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 3 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       // S<S<String>>.p
       $0.addStructComponent(offset: S<S<String>>.p_offset)
@@ -661,7 +663,7 @@ keyPathImpl.test("equality") {
   expectNotEqual(s_c_z_p_x_readonly, s_p_y_readonly)
 
   let o_o_o_o = ReferenceWritableKeyPath<Oroborous, Oroborous>
-    .build(capacityInBytes: 16 + 2*MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 5 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       // O.o
       $0.addClassComponent(offset: classHeaderSize)
@@ -675,7 +677,7 @@ keyPathImpl.test("equality") {
 
   // Different reference prefix length
   let o_o_o_o_rp1 = ReferenceWritableKeyPath<Oroborous, Oroborous>
-    .build(capacityInBytes: 16 + 2*MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 5 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       // O.o
       $0.addClassComponent(offset: classHeaderSize,
@@ -688,7 +690,7 @@ keyPathImpl.test("equality") {
       $0.addClassComponent(offset: classHeaderSize)
     }
   let o_o_o_o_rp2 = ReferenceWritableKeyPath<Oroborous, Oroborous>
-    .build(capacityInBytes: 16 + 2*MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 5 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       // O.o
       $0.addClassComponent(offset: classHeaderSize)
@@ -701,7 +703,7 @@ keyPathImpl.test("equality") {
       $0.addClassComponent(offset: classHeaderSize)
     }
   let o_o_o_o_rp2_2 = ReferenceWritableKeyPath<Oroborous, Oroborous>
-    .build(capacityInBytes: 16 + 2*MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 5 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       // O.o
       $0.addClassComponent(offset: classHeaderSize)
@@ -729,7 +731,7 @@ keyPathImpl.test("equality") {
 
   // Same type, different length of components with same prefix
   let o_o_o = ReferenceWritableKeyPath<Oroborous, Oroborous>
-    .build(capacityInBytes: 12 + MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 3 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       // O.o
       $0.addClassComponent(offset: classHeaderSize)
@@ -744,12 +746,12 @@ keyPathImpl.test("equality") {
 
 keyPathImpl.test("appending") {
   let s_p = WritableKeyPath<S<String>, Point>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: S<String>.p_offset)
     }
   let p_y = WritableKeyPath<Point, Double>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: Point.y_offset)
     }
@@ -772,7 +774,7 @@ keyPathImpl.test("appending") {
   expectEqual(s_p_y.hashValue, s_p_y2.hashValue)
   
   let s_p_y_manual = WritableKeyPath<S<String>, Double>
-    .build(capacityInBytes: 12 + MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 3 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: S<String>.p_offset)
       $0.addType(Point.self)
@@ -783,7 +785,7 @@ keyPathImpl.test("appending") {
   expectEqual(s_p_y.hashValue, s_p_y_manual.hashValue)
   
   let c_z = ReferenceWritableKeyPath<C<S<String>>, S<String>>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: C<S<String>>.z_offset)
     }
@@ -799,7 +801,7 @@ keyPathImpl.test("appending") {
   expectEqual(value2.z.p.x, 0.5)
   
   let c_z_p_y_manual = ReferenceWritableKeyPath<C<S<String>>, Double>
-    .build(capacityInBytes: 16 + MemoryLayout<Int>.size * 2) {
+    .build(capacityInBytes: 5 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: C<S<String>>.z_offset)
       $0.addType(S<String>.self)
@@ -813,7 +815,7 @@ keyPathImpl.test("appending") {
   expectEqual(c_z_p_y.hashValue, c_z_p_y_manual.hashValue)
   
   let s_c = WritableKeyPath<S<S<String>>, C<S<String>>>
-    .build(capacityInBytes: 8) {
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: S<S<String>>.c_offset)
     }
@@ -828,7 +830,7 @@ keyPathImpl.test("appending") {
   expectEqual(value2[keyPath: c_z_p_y], 11.0)
   
   let s_c_z_p_y_manual = ReferenceWritableKeyPath<S<S<String>>, Double>
-    .build(capacityInBytes: 20 + MemoryLayout<Int>.size * 3) {
+    .build(capacityInBytes: 7 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       $0.addStructComponent(offset: S<S<String>>.c_offset,
                             endsReferencePrefix: true)
@@ -846,7 +848,7 @@ keyPathImpl.test("appending") {
   
   typealias CP = CratePair<S<S<String>>, Int>
   let cratePair_left_value = ReferenceWritableKeyPath<CP, S<S<String>>>
-    .build(capacityInBytes: 12 + MemoryLayout<Int>.size) {
+    .build(capacityInBytes: 3 * MemoryLayout<Int>.size + 4) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
       $0.addStructComponent(offset: CratePair<S<S<String>>, Int>.left_offset,
                             endsReferencePrefix: true)
@@ -868,7 +870,7 @@ keyPathImpl.test("appending") {
 
   let cratePair_left_value_c_z_p_y_manual
     = ReferenceWritableKeyPath<CP, Double>
-      .build(capacityInBytes: 28 + 5*MemoryLayout<Int>.size) {
+      .build(capacityInBytes: 11 * MemoryLayout<Int>.size + 4) {
         $0.addHeader(trivial: true, hasReferencePrefix: true)
         $0.addStructComponent(offset: CP.left_offset)
         $0.addType(Crate<S<S<String>>>.self)

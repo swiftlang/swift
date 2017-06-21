@@ -123,7 +123,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   fields.add(emitMetadataGenerator(rootTy));
   fields.add(emitMetadataGenerator(valueTy));
   
-  // TODO: 32-bit still has a padding word
+  // TODO: 32-bit heap object header still has an extra word
   if (SizeTy == Int32Ty) {
     fields.addInt32(0);
   }
@@ -155,65 +155,31 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   // Leave a placeholder for the buffer header, since we need to know the full
   // buffer size to fill it in.
   auto headerPlaceholder = fields.addPlaceholderWithSize(Int32Ty);
+  fields.addAlignmentPadding(getPointerAlignment());
   
   auto startOfKeyPathBuffer = fields.getNextOffsetFromGlobal();
   
   // Build out the components.
   auto baseTy = rootTy;
   
-  auto getPropertyOffsetOrIndirectOffset
-    = [&](SILType loweredBaseTy, VarDecl *property)
-        -> std::pair<llvm::Constant*, bool> {
-      llvm::Constant *offset;
-      bool isResolved;
-      bool isStruct;
-      if (loweredBaseTy.getStructOrBoundGenericStruct()) {
-        offset = emitPhysicalStructMemberFixedOffset(*this,
-                                                     loweredBaseTy,
-                                                     property);
-        isStruct = true;
-      } else if (loweredBaseTy.getClassOrBoundGenericClass()) {
-        offset = tryEmitConstantClassFragilePhysicalMemberOffset(*this,
-                                                                 loweredBaseTy,
-                                                                 property);
-        isStruct = false;
-      } else {
-        llvm_unreachable("property of non-struct, non-class?!");
-      }
-      
-      // If the offset isn't fixed, try instead to get the field offset vector
-      // offset for the field to look it up dynamically.
-      isResolved = offset != nullptr;
-      if (!isResolved) {
-        if (isStruct) {
-          offset = emitPhysicalStructMemberOffsetOfFieldOffset(
-                                                *this, loweredBaseTy, property);
-          assert(offset && "field is neither fixed-offset nor in offset vector");
-        } else {
-          auto offsetValue = getClassFieldOffset(*this,
-                                loweredBaseTy.getClassOrBoundGenericClass(),
-                                property);
-          offset = llvm::ConstantInt::get(Int32Ty, offsetValue.getValue());
-        }
-      }
-      
-      return {offset, isResolved};
-    };
+  auto assertPointerAlignment = [&]{
+    assert(fields.getNextOffsetFromGlobal() % getPointerAlignment() == Size(0)
+           && "must be pointer-aligned here");
+  };
   
   for (unsigned i : indices(pattern->getComponents())) {
+    assertPointerAlignment();
     SILType loweredBaseTy;
     Lowering::GenericContextScope scope(getSILTypes(),
                                         pattern->getGenericSignature());
     loweredBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
                                    baseTy->getLValueOrInOutObjectType());
-
     auto &component = pattern->getComponents()[i];
     switch (auto kind = component.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {
       auto property = cast<VarDecl>(component.getStoredPropertyDecl());
       
       auto addFixedOffset = [&](bool isStruct, llvm::Constant *offset) {
-        offset = llvm::ConstantExpr::getTruncOrBitCast(offset, Int32Ty);
         if (auto offsetInt = dyn_cast_or_null<llvm::ConstantInt>(offset)) {
           auto offsetValue = offsetInt->getValue().getZExtValue();
           if (KeyPathComponentHeader::offsetCanBeInline(offsetValue)) {
@@ -228,7 +194,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
           ? KeyPathComponentHeader::forStructComponentWithOutOfLineOffset()
           : KeyPathComponentHeader::forClassComponentWithOutOfLineOffset();
         fields.addInt32(header.getData());
-        fields.add(offset);
+        fields.add(llvm::ConstantExpr::getTruncOrBitCast(offset, Int32Ty));
       };
       
       // For a struct stored property, we may know the fixed offset of the field,
@@ -247,11 +213,10 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         // of the type metadata at instantiation time.
         auto fieldOffset = emitPhysicalStructMemberOffsetOfFieldOffset(
                                                 *this, loweredBaseTy, property);
-        fieldOffset = llvm::ConstantExpr::getTruncOrBitCast(fieldOffset,
-                                                            Int32Ty);
         auto header = KeyPathComponentHeader::forStructComponentWithUnresolvedFieldOffset();
         fields.addInt32(header.getData());
-        fields.add(fieldOffset);
+        fields.add(llvm::ConstantExpr::getTruncOrBitCast(fieldOffset,
+                                                         Int32Ty));
         break;
       }
       
@@ -276,6 +241,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
           auto header =
             KeyPathComponentHeader::forClassComponentWithUnresolvedIndirectOffset();
           fields.addInt32(header.getData());
+          fields.addAlignmentPadding(getPointerAlignment());
           auto offsetVar = getAddrOfFieldOffset(property, /*indirect*/ false,
                                                 NotForDefinition);
           fields.add(cast<llvm::Constant>(offsetVar.getAddress()));
@@ -358,10 +324,36 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         break;
       }
       case KeyPathPatternComponent::ComputedPropertyId::Property:
-        idKind = KeyPathComponentHeader::StoredPropertyOffset;
-        std::tie(idValue, idResolved) =
-          getPropertyOffsetOrIndirectOffset(loweredBaseTy, id.getProperty());
-        idValue = llvm::ConstantExpr::getZExtOrBitCast(idValue, SizeTy);
+        // Use the index of the stored property within the aggregate to key
+        // the property.
+        auto property = id.getProperty();
+        idKind = KeyPathComponentHeader::StoredPropertyIndex;
+        if (baseTy->getStructOrBoundGenericStruct()) {
+          idResolved = true;
+          idValue = llvm::ConstantInt::get(SizeTy,
+            getPhysicalStructFieldIndex(*this,
+                           SILType::getPrimitiveAddressType(baseTy), property));
+        } else if (baseTy->getClassOrBoundGenericClass()) {
+          // TODO: This field index would require runtime resolution with Swift
+          // native class resilience. We never directly access ObjC-imported
+          // ivars so we can disregard ObjC ivar resilience for this computation
+          // and start counting at the Swift native root.
+          switch (getClassFieldAccess(*this, loweredBaseTy, property)) {
+          case FieldAccess::ConstantDirect:
+          case FieldAccess::ConstantIndirect:
+          case FieldAccess::NonConstantDirect:
+            idResolved = true;
+            idValue = llvm::ConstantInt::get(SizeTy,
+              getClassFieldIndex(*this,
+                           SILType::getPrimitiveAddressType(baseTy), property));
+            break;
+          case FieldAccess::NonConstantIndirect:
+            llvm_unreachable("not implemented");
+          }
+          
+        } else {
+          llvm_unreachable("neither struct nor class");
+        }
         break;
       }
       
@@ -369,6 +361,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                     idKind, !isInstantiableInPlace, idResolved);
       
       fields.addInt32(header.getData());
+      fields.addAlignmentPadding(getPointerAlignment());
       fields.add(idValue);
       
       if (isInstantiableInPlace) {
@@ -392,6 +385,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     
     // For all but the last component, we pack in the type of the component.
     if (i + 1 != pattern->getComponents().size()) {
+      fields.addAlignmentPadding(getPointerAlignment());
       fields.add(emitMetadataGenerator(component.getComponentType()));
     }
     baseTy = component.getComponentType();

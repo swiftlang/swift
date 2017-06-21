@@ -350,58 +350,6 @@ public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value>
 
 // MARK: Implementation details
 
-// Keypaths store word-sized values with 32-bit alignment for memory efficiency.
-// Since RawPointer's APIs currently require alignment, this means we need
-// to do some shuffling for the unaligned load/stores.
-
-extension UnsafeRawBufferPointer {
-  internal func _loadKeyPathWord<T>(fromByteOffset offset: Int = 0,
-                                    as _: T.Type) -> T {
-    _sanityCheck(_isPOD(T.self) &&
-                 MemoryLayout<T>.size == MemoryLayout<Int>.size,
-                 "not a word-sized trivial type")
-    if MemoryLayout<Int>.size == 8 {
-      let words = load(fromByteOffset: offset, as: (Int32, Int32).self)
-      return unsafeBitCast(words, to: T.self)
-    } else if MemoryLayout<Int>.size == 4 {
-      return load(fromByteOffset: offset, as: T.self)
-    } else {
-      _sanityCheckFailure("unsupported architecture")
-    }
-  }
-}
-
-extension UnsafeMutableRawBufferPointer {
-  internal func _loadKeyPathWord<T>(fromByteOffset offset: Int = 0,
-                                    as _: T.Type) -> T {
-    _sanityCheck(_isPOD(T.self) &&
-                 MemoryLayout<T>.size == MemoryLayout<Int>.size,
-                 "not a word-sized trivial type")
-    if MemoryLayout<Int>.size == 8 {
-      let words = load(fromByteOffset: offset, as: (Int32, Int32).self)
-      return unsafeBitCast(words, to: T.self)
-    } else if MemoryLayout<Int>.size == 4 {
-      return load(fromByteOffset: offset, as: T.self)
-    } else {
-      _sanityCheckFailure("unsupported architecture")
-    }
-  }
-  internal func _storeKeyPathWord<T>(of value: T,
-                                     toByteOffset offset: Int = 0) {
-    _sanityCheck(_isPOD(T.self) &&
-                 MemoryLayout<T>.size == MemoryLayout<Int>.size,
-                 "not a word-sized trivial type")
-    if MemoryLayout<Int>.size == 8 {
-      let words = unsafeBitCast(value, to: (Int32, Int32).self)
-      storeBytes(of: words, toByteOffset: offset, as: (Int32,Int32).self)
-    } else if MemoryLayout<Int>.size == 4 {
-      storeBytes(of: value, toByteOffset: offset, as: T.self)
-    } else {
-      _sanityCheckFailure("unsupported architecture")
-    }
-  }
-}
-
 internal enum KeyPathComponentKind {
   /// The keypath projects within the storage of the outer value, like a
   /// stored property in a struct.
@@ -642,9 +590,6 @@ internal struct RawKeyPathComponent {
     static var computedIDResolved: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDResolved
     }
-    static var computedIDUnresolvedFieldOffset: UInt32 {
-      return _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFieldOffset
-    }
     static var computedIDUnresolvedIndirectPointer: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
     }
@@ -695,6 +640,12 @@ internal struct RawKeyPathComponent {
         _sanityCheckFailure("invalid header")
       }
     }
+
+    // The component header is 4 bytes, but may be followed by an aligned
+    // pointer field for some kinds of component, forcing padding.
+    static var pointerAlignmentSkew: Int {
+      return MemoryLayout<Int>.size - MemoryLayout<Int32>.size
+    }
     
     var bodySize: Int {
       switch kind {
@@ -705,8 +656,8 @@ internal struct RawKeyPathComponent {
         return 0
       case .computed:
         let ptrSize = MemoryLayout<Int>.size
-        // minimum two pointers for id and get
-        var total = ptrSize * 2
+        // align to pointer, minimum two pointers for id and get
+        var total = Header.pointerAlignmentSkew + ptrSize * 2
         // additional word for a setter
         if payload & Header.computedSettableFlag != 0 {
           total += ptrSize
@@ -748,9 +699,8 @@ internal struct RawKeyPathComponent {
   var _computedIDValue: Int {
     _sanityCheck(header.kind == .computed,
                  "not a computed property")
-    _sanityCheck(body.count >= MemoryLayout<Int>.size,
-                 "component is not big enough")
-    return body._loadKeyPathWord(as: Int.self)
+    return body.load(fromByteOffset: Header.pointerAlignmentSkew,
+                     as: Int.self)
   }
 
   var _computedID: ComputedPropertyID {
@@ -764,11 +714,10 @@ internal struct RawKeyPathComponent {
   var _computedGetter: UnsafeRawPointer {
     _sanityCheck(header.kind == .computed,
                  "not a computed property")
-    _sanityCheck(body.count >= MemoryLayout<Int>.size * 2,
-                 "component is not big enough")
 
-    return body._loadKeyPathWord(fromByteOffset: MemoryLayout<Int>.size,
-                                 as: UnsafeRawPointer.self)
+    return body.load(
+      fromByteOffset: Header.pointerAlignmentSkew + MemoryLayout<Int>.size,
+      as: UnsafeRawPointer.self)
   }
 
   var _computedSetter: UnsafeRawPointer {
@@ -776,11 +725,10 @@ internal struct RawKeyPathComponent {
                  "not a computed property")
     _sanityCheck(header.payload & Header.computedSettableFlag != 0,
                  "not a settable property")
-    _sanityCheck(body.count >= MemoryLayout<Int>.size * 3,
-                 "component is not big enough")
 
-    return body._loadKeyPathWord(fromByteOffset: MemoryLayout<Int>.size * 2,
-                                 as: UnsafeRawPointer.self)
+    return body.load(
+      fromByteOffset: Header.pointerAlignmentSkew + MemoryLayout<Int>.size * 2,
+      as: UnsafeRawPointer.self)
   }
 
   var value: KeyPathComponent {
@@ -838,7 +786,7 @@ internal struct RawKeyPathComponent {
       return
     }
   }
-  
+
   func clone(into buffer: inout UnsafeMutableRawBufferPointer,
              endOfReferencePrefix: Bool) {
     var newHeader = header
@@ -860,28 +808,32 @@ internal struct RawKeyPathComponent {
          .optionalWrap:
       break
     case .computed:
+      // Fields are pointer-aligned after the header
+      componentSize += Header.pointerAlignmentSkew
       // TODO: nontrivial arguments need to be copied by value witness
       _sanityCheck(header.payload & Header.computedHasArgumentsFlag == 0,
                    "arguments not implemented")
-      buffer._storeKeyPathWord(of: _computedIDValue, toByteOffset: 4)
-      buffer._storeKeyPathWord(of: _computedGetter,
-                               toByteOffset: 4 + MemoryLayout<Int>.size)
+      buffer.storeBytes(of: _computedIDValue,
+                        toByteOffset: MemoryLayout<Int>.size,
+                        as: Int.self)
+      buffer.storeBytes(of: _computedGetter,
+                        toByteOffset: 2 * MemoryLayout<Int>.size,
+                        as: UnsafeRawPointer.self)
 
       componentSize += MemoryLayout<Int>.size * 2
 
       if header.payload & Header.computedSettableFlag != 0 {
-        buffer._storeKeyPathWord(of: _computedSetter,
-                                 toByteOffset: 4 + MemoryLayout<Int>.size * 2)
+        buffer.storeBytes(of: _computedSetter,
+                          toByteOffset: MemoryLayout<Int>.size * 3,
+                          as: UnsafeRawPointer.self)
         componentSize += MemoryLayout<Int>.size
       }
     }
-    _sanityCheck(buffer.count >= componentSize)
     buffer = UnsafeMutableRawBufferPointer(
       start: buffer.baseAddress.unsafelyUnwrapped + componentSize,
-      count: buffer.count - componentSize
-    )
+      count: buffer.count - componentSize)
   }
-  
+
   func projectReadOnly<CurValue, NewValue>(_ base: CurValue) -> NewValue {
     switch value {
     case .struct(let offset):
@@ -1062,9 +1014,8 @@ internal struct KeyPathBuffer {
   init(base: UnsafeRawPointer) {
     let header = base.load(as: Header.self)
     data = UnsafeRawBufferPointer(
-      start: base + MemoryLayout<Header>.size,
-      count: header.size
-    )
+      start: base + MemoryLayout<Int>.size,
+      count: header.size)
     trivial = header.trivial
     hasReferencePrefix = header.hasReferencePrefix
   }
@@ -1086,7 +1037,7 @@ internal struct KeyPathBuffer {
     let body: UnsafeRawBufferPointer
     let size = header.bodySize
     if size != 0 {
-      body = popRaw(size)
+      body = popRaw(size: size, alignment: 4)
     } else {
       body = UnsafeRawBufferPointer(start: nil, count: 0)
     }
@@ -1097,22 +1048,15 @@ internal struct KeyPathBuffer {
     if data.count == 0 {
       nextType = nil
     } else {
-      if MemoryLayout<Any.Type>.size == 8 {
-        // Words in the key path buffer are 32-bit aligned
-        nextType = unsafeBitCast(pop((Int32, Int32).self),
-                                 to: Any.Type.self)
-      } else if MemoryLayout<Any.Type>.size == 4 {
-        nextType = pop(Any.Type.self)
-      } else {
-        _sanityCheckFailure("unexpected word size")
-      }
+      nextType = pop(Any.Type.self)
     }
     return (component, nextType)
   }
   
   mutating func pop<T>(_ type: T.Type) -> T {
     _sanityCheck(_isPOD(T.self), "should be POD")
-    let raw = popRaw(MemoryLayout<T>.size)
+    let raw = popRaw(size: MemoryLayout<T>.size,
+                     alignment: MemoryLayout<T>.alignment)
     let resultBuf = UnsafeMutablePointer<T>.allocate(capacity: 1)
     _memcpy(dest: resultBuf,
             src: UnsafeMutableRawPointer(mutating: raw.baseAddress.unsafelyUnwrapped),
@@ -1121,13 +1065,18 @@ internal struct KeyPathBuffer {
     resultBuf.deallocate(capacity: 1)
     return result
   }
-  mutating func popRaw(_ size: Int) -> UnsafeRawBufferPointer {
-    _sanityCheck(data.count >= size,
-                 "not enough space for next component?")
-    let result = UnsafeRawBufferPointer(start: data.baseAddress, count: size)
+  mutating func popRaw(size: Int, alignment: Int) -> UnsafeRawBufferPointer {
+    var baseAddress = data.baseAddress.unsafelyUnwrapped
+    var misalignment = Int(bitPattern: baseAddress) % alignment
+    if misalignment != 0 {
+      misalignment = alignment - misalignment
+      baseAddress += misalignment
+    }
+
+    let result = UnsafeRawBufferPointer(start: baseAddress, count: size)
     data = UnsafeRawBufferPointer(
-      start: data.baseAddress.unsafelyUnwrapped + size,
-      count: data.count - size
+      start: baseAddress + size,
+      count: data.count - size - misalignment
     )
     return result
   }
@@ -1340,9 +1289,11 @@ public func _appendingKeyPaths<
 
       // Result buffer has room for both key paths' components, plus the
       // header, plus space for the middle type.
-      let resultSize = rootBuffer.data.count + leafBuffer.data.count
-        + MemoryLayout<KeyPathBuffer.Header>.size
-        + MemoryLayout<Int>.size
+      // Align up the root so that we can put the component type after it.
+      let alignMask = MemoryLayout<Int>.alignment - 1
+      let rootSize = (rootBuffer.data.count + alignMask) & ~alignMask
+      let resultSize = rootSize + leafBuffer.data.count
+        + 2 * MemoryLayout<Int>.size
       // Tail-allocate space for the KVC string.
       let totalResultSize = (resultSize + appendedKVCLength + 3) & ~3
 
@@ -1360,40 +1311,40 @@ public func _appendingKeyPaths<
                              count: resultSize)
         }
         
-        func pushRaw(_ count: Int) {
-          _sanityCheck(destBuffer.count >= count)
-          destBuffer = UnsafeMutableRawBufferPointer(
-            start: destBuffer.baseAddress.unsafelyUnwrapped + count,
-            count: destBuffer.count - count
-          )
-        }
-        func pushType(_ type: Any.Type) {
-          let intSize = MemoryLayout<Int>.size
-          _sanityCheck(destBuffer.count >= intSize)
-          if intSize == 8 {
-            let words = unsafeBitCast(type, to: (UInt32, UInt32).self)
-            destBuffer.storeBytes(of: words.0,
-                                  as: UInt32.self)
-            destBuffer.storeBytes(of: words.1, toByteOffset: 4,
-                                  as: UInt32.self)
-          } else if intSize == 4 {
-            destBuffer.storeBytes(of: type, as: Any.Type.self)
-          } else {
-            _sanityCheckFailure("unsupported architecture")
+        func pushRaw(size: Int, alignment: Int)
+            -> UnsafeMutableRawBufferPointer {
+          var baseAddress = destBuffer.baseAddress.unsafelyUnwrapped
+          var misalign = Int(bitPattern: baseAddress) % alignment
+          if misalign != 0 {
+            misalign = alignment - misalign
+            baseAddress = baseAddress.advanced(by: misalign)
           }
-          pushRaw(intSize)
+          let result = UnsafeMutableRawBufferPointer(
+            start: baseAddress,
+            count: size)
+          destBuffer = UnsafeMutableRawBufferPointer(
+            start: baseAddress + size,
+            count: destBuffer.count - size - misalign)
+          return result
+        }
+        func push<T>(_ value: T) {
+          let buf = pushRaw(size: MemoryLayout<T>.size,
+                            alignment: MemoryLayout<T>.alignment)
+          buf.storeBytes(of: value, as: T.self)
         }
         
         // Save space for the header.
         let leafIsReferenceWritable = type(of: leaf).kind == .reference
         let header = KeyPathBuffer.Header(
-          size: resultSize - MemoryLayout<KeyPathBuffer.Header>.size,
+          size: resultSize - MemoryLayout<Int>.size,
           trivial: rootBuffer.trivial && leafBuffer.trivial,
           hasReferencePrefix: rootBuffer.hasReferencePrefix
                               || leafIsReferenceWritable
         )
-        destBuffer.storeBytes(of: header, as: KeyPathBuffer.Header.self)
-        pushRaw(MemoryLayout<KeyPathBuffer.Header>.size)
+        push(header)
+        // Start the components at pointer alignment
+        _ = pushRaw(size: RawKeyPathComponent.Header.pointerAlignmentSkew,
+                alignment: 4)
         
         let leafHasReferencePrefix = leafBuffer.hasReferencePrefix
         
@@ -1415,13 +1366,12 @@ public func _appendingKeyPaths<
           
           component.clone(
             into: &destBuffer,
-            endOfReferencePrefix: endOfReferencePrefix
-          )
+            endOfReferencePrefix: endOfReferencePrefix)
           if let type = type {
-            pushType(type)
+            push(type)
           } else {
             // Insert our endpoint type between the root and leaf components.
-            pushType(Value.self)
+            push(Value.self as Any.Type)
             break
           }
         }
@@ -1432,11 +1382,10 @@ public func _appendingKeyPaths<
 
           component.clone(
             into: &destBuffer,
-            endOfReferencePrefix: component.header.endOfReferencePrefix
-          )
+            endOfReferencePrefix: component.header.endOfReferencePrefix)
 
           if let type = type {
-            pushType(type)
+            push(type)
           } else {
             break
           }
@@ -1570,7 +1519,7 @@ internal func _getKeyPath_instantiateInline(
 
   let bufferPtr = objectPtr.advanced(by: keyPathObjectHeaderSize)
   let buffer = KeyPathBuffer(base: bufferPtr)
-  let totalSize = buffer.data.count + MemoryLayout<KeyPathBuffer.Header>.size
+  let totalSize = buffer.data.count + MemoryLayout<Int>.size
   let bufferData = UnsafeMutableRawBufferPointer(
     start: bufferPtr,
     count: totalSize)
@@ -1610,7 +1559,7 @@ internal func _getKeyPathClassAndInstanceSize(
 
   let bufferPtr = pattern.advanced(by: keyPathObjectHeaderSize)
   var buffer = KeyPathBuffer(base: bufferPtr)
-  let size = buffer.data.count + MemoryLayout<KeyPathBuffer.Header>.size
+  let size = buffer.data.count + MemoryLayout<Int>.size
 
   scanComponents: while true {
     let header = buffer.pop(RawKeyPathComponent.Header.self)
@@ -1661,7 +1610,8 @@ internal func _getKeyPathClassAndInstanceSize(
         header.payload & RawKeyPathComponent.Header.computedHasArgumentsFlag == 0,
         "arguments not implemented yet")
 
-      _ = buffer.popRaw(MemoryLayout<Int>.size * (settable ? 3 : 2))
+      _ = buffer.popRaw(size: MemoryLayout<Int>.size * (settable ? 3 : 2),
+                        alignment: MemoryLayout<Int>.alignment)
 
     case .optionalChain,
          .optionalWrap:
@@ -1678,7 +1628,8 @@ internal func _getKeyPathClassAndInstanceSize(
     if buffer.data.count == 0 { break }
 
     // Pop the type accessor reference.
-    _ = buffer.popRaw(MemoryLayout<Int>.size)
+    _ = buffer.popRaw(size: MemoryLayout<Int>.size,
+                      alignment: MemoryLayout<Int>.alignment)
   }
 
   // Grab the class object for the key path type we'll end up with.
@@ -1712,27 +1663,26 @@ internal func _instantiateKeyPathBuffer(
 
   var patternBuffer = origPatternBuffer
   let destHeaderPtr = origDestData.baseAddress.unsafelyUnwrapped
-  _sanityCheck(origDestData.count >= MemoryLayout<KeyPathBuffer.Header>.size)
   var destData = UnsafeMutableRawBufferPointer(
-    start: destHeaderPtr.advanced(by: MemoryLayout<KeyPathBuffer.Header>.size),
-    count: origDestData.count - MemoryLayout<KeyPathBuffer.Header>.size)
+    start: destHeaderPtr.advanced(by: MemoryLayout<Int>.size),
+    count: origDestData.count - MemoryLayout<Int>.size)
 
   func pushDest<T>(_ value: T) {
-    // TODO: If key path patterns were better optimized to try to be constant-
-    // memory objects, then it might become profitable to try to avoid writes
-    // here in the case when the dest memory contains the value we want to write
-    // here so that we don't dirty memory. (In practice the current
-    // implementation will always dirty the page when the key path is
-    // instantiated.)
     _sanityCheck(_isPOD(T.self))
     var value2 = value
     let size = MemoryLayout<T>.size
-    _sanityCheck(destData.count >= size)
-    _memcpy(dest: destData.baseAddress.unsafelyUnwrapped, src: &value2,
+    let alignment = MemoryLayout<T>.alignment
+    var baseAddress = destData.baseAddress.unsafelyUnwrapped
+    var misalign = Int(bitPattern: baseAddress) % alignment
+    if misalign != 0 {
+      misalign = alignment - misalign
+      baseAddress = baseAddress.advanced(by: misalign)
+    }
+    _memcpy(dest: baseAddress, src: &value2,
             size: UInt(size))
     destData = UnsafeMutableRawBufferPointer(
-      start: destData.baseAddress.unsafelyUnwrapped.advanced(by: size),
-      count: destData.count - size)
+      start: baseAddress.advanced(by: size),
+      count: destData.count - size - misalign)
   }
 
   // Track where the reference prefix begins.
@@ -1747,6 +1697,7 @@ internal func _instantiateKeyPathBuffer(
   while true {
     let componentAddr = destData.baseAddress.unsafelyUnwrapped
     let header = patternBuffer.pop(RawKeyPathComponent.Header.self)
+
 
     func tryToResolveOffset() {
       if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload {
@@ -1774,8 +1725,12 @@ internal func _instantiateKeyPathBuffer(
         newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
         pushDest(newHeader)
         pushDest(offsetValue)
-        shrinkage += MemoryLayout<UnsafeRawPointer>.size
-                   - MemoryLayout<UInt32>.size
+        // On 64-bit systems the pointer to the ivar offset variable is
+        // pointer-sized and -aligned, but the resulting offset ought to be
+        // 32 bits only, so we can shrink the result object a bit.
+        if MemoryLayout<Int>.size == 8 {
+          shrinkage += MemoryLayout<UnsafeRawPointer>.size
+        }
         return
       }
 
@@ -1820,15 +1775,6 @@ internal func _instantiateKeyPathBuffer(
       case RawKeyPathComponent.Header.computedIDResolved:
         // Nothing to do.
         break
-      case RawKeyPathComponent.Header.computedIDUnresolvedFieldOffset:
-        // The value in the pattern is an offset into the type metadata that
-        // points to the field offset for the stored property identifying the
-        // component.
-        _sanityCheck(header.payload
-            & RawKeyPathComponent.Header.computedIDByStoredPropertyFlag != 0,
-          "only stored property IDs should need offset resolution")
-        let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
-        id = metadataPtr.load(fromByteOffset: id, as: Int.self)
       case RawKeyPathComponent.Header.computedIDUnresolvedIndirectPointer:
         // The value in the pattern is a pointer to the actual unique word-sized
         // value in memory.
@@ -1857,21 +1803,9 @@ internal func _instantiateKeyPathBuffer(
     if patternBuffer.data.count == 0 { break }
 
     // Resolve the component type.
-    if MemoryLayout<Int>.size == 4 {
-      let componentTyAccessor = patternBuffer.pop(MetadataAccessor.self)
-      base = unsafeBitCast(componentTyAccessor(arguments), to: Any.Type.self)
-      pushDest(base)
-    } else if MemoryLayout<Int>.size == 8 {
-      let componentTyAccessorWords = patternBuffer.pop((UInt32,UInt32).self)
-      let componentTyAccessor = unsafeBitCast(componentTyAccessorWords,
-                                              to: MetadataAccessor.self)
-      base = unsafeBitCast(componentTyAccessor(arguments), to: Any.Type.self)
-      let componentTyWords = unsafeBitCast(base,
-                                           to: (UInt32, UInt32).self)
-      pushDest(componentTyWords)
-    } else {
-      fatalError("unsupported architecture")
-    }
+    let componentTyAccessor = patternBuffer.pop(MetadataAccessor.self)
+    base = unsafeBitCast(componentTyAccessor(arguments), to: Any.Type.self)
+    pushDest(base)
     previousComponentAddr = componentAddr
   }
 
