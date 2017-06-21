@@ -675,6 +675,7 @@ func testme2() {
   }
 
   var total = 0
+  @inline(never)
   func lex_new() {
     time {
       for _ in 0...N {
@@ -687,6 +688,7 @@ func testme2() {
     }
   }
 
+  @inline(never)
   func lex_old() {
     time {
       for _ in 0...N {
@@ -702,6 +704,7 @@ func testme2() {
   lex_new()
   print()
   
+  @inline(never)
   func init_new() {
     time {
       for _ in 0...10*N {
@@ -712,6 +715,7 @@ func testme2() {
     }
   }
   
+  @inline(never)
   func init_old() {
     time {
       for _ in 0...10*N {
@@ -725,6 +729,7 @@ func testme2() {
   init_new()
   print()
   
+  @inline(never)
   func concat3Iteration() {
     time {
       for _ in 0...100*N {
@@ -743,6 +748,7 @@ func testme2() {
   let short8_old = ["b","c","d","pizza"].map { $0._core }
   let short8_new = short8_old.map { String._XContent.UTF16View($0) }
   
+  @inline(never)
   func  buildString_old() {
     time {
       var sb = a_old
@@ -756,6 +762,7 @@ func testme2() {
   }
   buildString_old()
   
+  @inline(never)
   func  buildString_new() {
     time {
       var sb = a_new
@@ -773,6 +780,7 @@ func testme2() {
   let short16_old = ["🎉","c","d","pizza"].map { $0._core }
   let short16_new = short16_old.map { String._XContent.UTF16View($0) }
 
+  @inline(never)
   func  buildStringUTF16_old() {
     time {
       var sb = a_old
@@ -786,6 +794,7 @@ func testme2() {
   }
   buildStringUTF16_old()
   
+  @inline(never)
   func  buildStringUTF16_new() {
     time {
       var sb = a_new
@@ -806,6 +815,7 @@ func testme2() {
   let long_old = "Swift is a multi-paradigm, compiled programming language created for iOS, OS X, watchOS, tvOS and Linux development by Apple Inc. Swift is designed to work with Apple's Cocoa and Cocoa Touch frameworks and the large body of existing Objective-C code written for Apple products. Swift is intended to be more resilient to erroneous code (\"safer\") than Objective-C and also more concise. It is built with the LLVM compiler framework included in Xcode 6 and later and uses the Objective-C runtime, which allows C, Objective-C, C++ and Swift code to run within a single program."._core
   let long_new = String._XContent.UTF16View(long_old)
   
+  @inline(never)
   func  buildStringLong_old() {
     time {
       var sb = ghost_old
@@ -817,6 +827,7 @@ func testme2() {
   }
   buildStringLong_old()
   
+  @inline(never)
   func  buildStringLong_new() {
     time {
       var sb = ghost_new
@@ -829,6 +840,7 @@ func testme2() {
   buildStringLong_new()
   print()
   
+  @inline(never)
   func  buildShortString_old() {
     time {
       for _ in 0...N*200 {
@@ -842,6 +854,7 @@ func testme2() {
   }
   buildShortString_old()
   
+  @inline(never)
   func  buildShortString_new() {
     time {
       for _ in 0...N*200 {
@@ -856,6 +869,7 @@ func testme2() {
   buildShortString_new()
   print()
   
+  @inline(never)
   func  buildShortStringUTF16_old() {
     time {
       for _ in 0...N*300 {
@@ -869,6 +883,7 @@ func testme2() {
   }
   buildShortStringUTF16_old()
   
+  @inline(never)
   func  buildShortStringUTF16_new() {
     time {
       for _ in 0...N*300 {
@@ -883,6 +898,7 @@ func testme2() {
   buildShortStringUTF16_new()
   print()
   
+  @inline(never)
   func  buildShortStringLong_old() {
     time {
       for _ in 0...N*20 {
@@ -894,10 +910,11 @@ func testme2() {
   }
   buildShortStringLong_old()
   
+  @inline(never)
   func  buildShortStringLong_new() {
     time {
       for _ in 0...N*20 {
-      var sb = ghost_new
+        var sb = ghost_new
         sb.append(contentsOf: long_new)
       }
     }
