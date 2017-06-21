@@ -57,6 +57,11 @@ static void setDynamicEnforcement(BeginAccessInst *access) {
 namespace {
 // Information about an address-type closure capture.
 // This is only valid for inout_aliasable parameters.
+//
+// TODO: Verify somewhere that we properly handle any non-inout_aliasable
+// partial apply captures or that they never happen. Eventually @inout_aliasable
+// should be simply replaced by @in or @out, once we don't have special aliasing
+// rules.
 struct AddressCapture {
   ApplySite site;
   unsigned calleeArgIdx;
