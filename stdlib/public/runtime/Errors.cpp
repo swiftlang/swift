@@ -249,7 +249,11 @@ void _swift_runtime_on_report(bool isFatal, const char *message,
   // Do nothing. This function is meant to be used by the debugger.
 
   // The following is necessary to avoid calls from being optimized out.
-  asm volatile("" ::: "memory");
+  asm volatile("" // Do nothing.
+               : // Output list, empty.
+               : "r" (isFatal), "r" (message), "r" (details) // Input list.
+               : // Clobber list, empty.
+               );
 }
 
 void swift::reportToDebugger(bool isFatal, const char *message,
