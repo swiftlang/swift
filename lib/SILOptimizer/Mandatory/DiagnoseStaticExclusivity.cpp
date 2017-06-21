@@ -985,6 +985,11 @@ static PartialApplyInst *lookThroughForPartialApply(SILValue V) {
 /// if any of the @inout_aliasable captures passed to those closures have
 /// in-progress accesses that would conflict with any access the summary
 /// says the closure would perform.
+//
+/// TODO: We currently fail to statically diagnose non-escaping closures pased
+/// via @block_storage convention. To enforce this case, we should statically
+/// recognize when the apply takes a block argument that has been initialized to
+/// a non-escaping closure.
 static void checkForViolationsInNoEscapeClosures(
     const StorageMap &Accesses, FullApplySite FAS, AccessSummaryAnalysis *ASA,
     llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses) {
