@@ -6400,12 +6400,16 @@ public:
     case ValueKind::TryApplyInst:
       return 0;
     case ValueKind::PartialApplyInst:
+      // The arguments to partial_apply are a suffix of the arguments to the
+      // the actually-called function.
       return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
     default:
       llvm_unreachable("not implemented for this instruction!");
     }
   }
 
+  // Translate the index of the argument to the full apply or partial_apply into
+  // to the corresponding index into the arguments of the called function.
   unsigned getCalleeArgIndex(Operand &oper) {
     assert(oper.getUser() == Inst);
     assert(oper.getOperandNumber() >= getOperandIndexOfFirstArgument());
