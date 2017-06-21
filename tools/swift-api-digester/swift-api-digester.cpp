@@ -299,6 +299,7 @@ struct SDKNodeInitInfo {
   Ownership Ownership = Ownership::Strong;
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
+  StringRef SuperclassUsr;
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
   SDKNodeInitInfo(SDKContext &Ctx, Type Ty);
@@ -683,10 +684,12 @@ SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
 }
 
 class SDKNodeTypeDecl : public SDKNodeDecl {
+  StringRef SuperclassUsr;
 public:
-  SDKNodeTypeDecl(SDKNodeInitInfo Info) : SDKNodeDecl(Info,
-                                                      SDKNodeKind::TypeDecl) {}
+  SDKNodeTypeDecl(SDKNodeInitInfo Info) : SDKNodeDecl(Info, SDKNodeKind::TypeDecl),
+                                          SuperclassUsr(Info.SuperclassUsr) {}
   static bool classof(const SDKNode *N);
+  StringRef getSuperClassUsr() const { return SuperclassUsr; }
 };
 
 class SDKNodeTypeAlias : public SDKNodeDecl {
@@ -827,6 +830,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       break;
     case KeyKind::KK_moduleName:
       Info.ModuleName = GetScalarString(Pair.getValue());
+      break;
+    case KeyKind::KK_superclassUsr:
+      Info.SuperclassUsr = GetScalarString(Pair.getValue());
       break;
     case KeyKind::KK_throwing:
       Info.IsThrowing = true;
@@ -1092,6 +1098,12 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
     IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
     IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
     Ownership(getOwnership(VD)) {
+
+  // Calculate usr for its super class.
+  if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
+    if (auto *Super = CD->getSuperclassDecl())
+      SuperclassUsr = calculateUsr(Ctx, Super);
+  }
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
 }
@@ -1439,6 +1451,13 @@ namespace swift {
               auto Index = F->getSelfIndex();
               out.mapRequired(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(),
                               Index);
+            }
+          }
+          if (auto *TD = dyn_cast<SDKNodeTypeDecl>(value)) {
+            auto Super = TD->getSuperClassUsr();
+            if (!Super.empty()) {
+              out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassUsr).data(),
+                              Super);
             }
           }
           auto Attributes = D->getDeclAttributes();
