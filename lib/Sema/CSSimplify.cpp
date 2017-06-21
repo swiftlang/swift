@@ -1372,7 +1372,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
 
     // If the types are obviously equivalent, we're done.
-    if (type1.getPointer() == type2.getPointer())
+    if (isa<ParenType>(type1.getPointer()) ==
+          isa<ParenType>(type2.getPointer()) &&
+        type1->isEqual(type2))
       return SolutionKind::Solved;
   } else {
     typeVar1 = desugar1->getAs<TypeVariableType>();
