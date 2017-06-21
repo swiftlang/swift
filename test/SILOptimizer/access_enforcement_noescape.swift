@@ -21,12 +21,6 @@ func doTwo(_: ()->(), _: ()->()) {}
 // Helper
 func doOneInout(_: ()->(), _: inout Int) {}
 
-// FIXME: statically prohibit a call to a non-escaping closure
-// parameter using another non-escaping closure parameter as an argument.
-func reentrantNoescape(fn: (() -> ()) -> ()) {
-  fn { fn {} }
-}
-
 // Error: Cannot capture nonescaping closure.
 // This triggers an early diagnostics, so it's handled in inout_capture_disgnostics.swift.
 // func reentrantCapturedNoescape(fn: (() -> ()) -> ()) {
