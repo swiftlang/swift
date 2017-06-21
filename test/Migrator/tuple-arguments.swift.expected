@@ -46,14 +46,14 @@ func toString(indexes: Int?...) -> String {
   })
   let _ = indexes.reduce(0) { print(($0, $1)); return $0 + ($1 ?? 0)}
   let _ = indexes.reduce(0) { (true ? ($0, $1) : (1, 2)).0 + ($1 ?? 0) }
-  let _ = [(1, 2)].contains { $0.0 != $0.1 }
+  let _ = [(1, 2)].contains { $0 != $1 }
   _ = ["Hello", "Foo"].sorted { print(($0, $1)); return $0.characters.count > $1.characters.count }
-  _ = ["Hello" : 2].map { ($0.0, ($0.1)) }
+  _ = ["Hello" : 2].map { ($0, ($1)) }
 }
 
 extension Dictionary {
   public mutating func merge(with dictionary: Dictionary) {
-    dictionary.forEach { updateValue($0.1, forKey: $0.0) }
+    dictionary.forEach { updateValue($1, forKey: $0) }
   }
 }
 
