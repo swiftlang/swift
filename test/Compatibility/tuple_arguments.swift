@@ -1460,7 +1460,7 @@ enum DataSourcePage<T> {
 }
 
 let pages1: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = MutableProperty((
-    // expected-error@-1 {{cannot convert value of type 'MutableProperty<(data: _, totalCount: Int)>' to specified type 'MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)>'}}
+    // expected-error@-1 {{expression type 'MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)>' is ambiguous without more context}}
     data: .notLoaded,
     totalCount: 0
 ))

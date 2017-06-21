@@ -750,6 +750,10 @@ enum class ConstraintSystemFlags {
   /// Set if the client prefers fixits to be in the form of force unwrapping
   /// or optional chaining to return an optional.
   PreferForceUnwrapToOptional = 0x02,
+
+  /// If set, this is going to prevent constraint system from erasing all
+  /// discovered solutions except the best one.
+  ReturnAllDiscoveredSolutions = 0x04,
 };
 
 /// Options that affect the constraint system as a whole.

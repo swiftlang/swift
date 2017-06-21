@@ -2173,6 +2173,11 @@ private:
       Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback = None,
       bool includeInaccessibleMembers = true);
 
+  bool diagnoseTrailingClosureErrors(ApplyExpr *expr);
+
+  bool diagnoseClosureExpr(ClosureExpr *closureExpr, Type contextualType,
+                           std::function<bool(Type, Type)> resultTypeProcessor);
+
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
@@ -5525,7 +5530,7 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
     // It could be that the argument doesn't conform to an archetype.
     if (CCI.diagnoseGenericParameterErrors(badArgExpr))
       return true;
-    
+
     // Re-type-check the argument with the expected type of the candidate set.
     // This should produce a specific and tailored diagnostic saying that the
     // type mismatches with expectations.
@@ -5989,10 +5994,223 @@ static bool isCastToTypedPointer(ConstraintSystem *CS, const Expr *Fn,
   return true;
 }
 
+static bool diagnoseClosureExplicitParameterMismatch(
+    ConstraintSystem *const CS, SourceLoc loc,
+    ArrayRef<AnyFunctionType::Param> params,
+    ArrayRef<AnyFunctionType::Param> args) {
+  // We are not trying to diagnose structural problems with top-level
+  // arguments here.
+  if (params.size() != args.size())
+    return false;
+
+  for (unsigned i = 0, n = params.size(); i != n; ++i) {
+    auto paramType = params[i].getType();
+    auto argType = args[i].getType();
+
+    if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
+      if (auto argFnType = argType->getAs<AnyFunctionType>())
+        return diagnoseClosureExplicitParameterMismatch(
+            CS, loc, paramFnType->getParams(), argFnType->getParams());
+    }
+
+    if (!paramType || !argType || isUnresolvedOrTypeVarType(paramType) ||
+        isUnresolvedOrTypeVarType(argType))
+      continue;
+
+    if (!CS->TC.isConvertibleTo(argType, paramType, CS->DC)) {
+      CS->TC.diagnose(loc, diag::types_not_convertible, false, paramType,
+                      argType);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
+  if (!callExpr->hasTrailingClosure())
+    return false;
+
+  auto *fnExpr = callExpr->getFn();
+  auto *argExpr = callExpr->getArg();
+
+  ClosureExpr *closureExpr = nullptr;
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    closureExpr = dyn_cast<ClosureExpr>(PE->getSubExpr());
+  } else {
+    return false;
+  }
+
+  if (!closureExpr)
+    return false;
+
+  class CallResultListener : public ExprTypeCheckListener {
+    Type expectedResultType;
+
+  public:
+    explicit CallResultListener(Type resultType)
+        : expectedResultType(resultType) {}
+
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
+      if (!expectedResultType)
+        return false;
+
+      auto resultType = cs.getType(expr);
+      auto *locator = cs.getConstraintLocator(expr);
+
+      // Since we know that this is trailing closure, format of the
+      // type could be like this - ((Input) -> Result) -> ClosureResult
+      // which we can leverage to create specific conversion for
+      // result type of the call itself, this might help us gain
+      // some valuable contextual information.
+      if (auto *fnType = resultType->getAs<AnyFunctionType>()) {
+        cs.addConstraint(ConstraintKind::Conversion, fnType->getResult(),
+                         expectedResultType, locator);
+      } else if (auto *typeVar = resultType->getAs<TypeVariableType>()) {
+        auto tv =
+            cs.createTypeVariable(cs.getConstraintLocator(expr),
+                                  TVO_CanBindToLValue | TVO_CanBindToInOut |
+                                      TVO_PrefersSubtypeBinding);
+
+        auto extInfo = FunctionType::ExtInfo().withThrows();
+        auto fTy = FunctionType::get(ParenType::get(cs.getASTContext(), tv),
+                                     expectedResultType, extInfo);
+
+        // Add a conversion constraint between the types.
+        cs.addConstraint(ConstraintKind::Conversion, typeVar, fTy, locator,
+                         /*isFavored*/ true);
+      }
+
+      return false;
+    }
+  };
+
+  SmallVector<Type, 4> possibleTypes;
+  auto currentType = CS->getType(fnExpr);
+
+  // If current type has type variables or unresolved types
+  // let's try to re-typecheck it to see if we can get some
+  // more information about what is going on.
+  if (currentType->hasTypeVariable() || currentType->hasUnresolvedType()) {
+    auto contextualType = CS->getContextualType();
+    CallResultListener listener(contextualType);
+    CS->TC.getPossibleTypesOfExpressionWithoutApplying(
+        fnExpr, CS->DC, possibleTypes, FreeTypeVariableBinding::UnresolvedType,
+        &listener);
+
+    // Looks like there is there a contextual mismatch
+    // related to function type, let's try to diagnose it.
+    if (possibleTypes.empty() && contextualType &&
+        !contextualType->hasUnresolvedType())
+      return diagnoseContextualConversionError();
+  } else {
+    possibleTypes.push_back(currentType);
+  }
+
+  for (auto type : possibleTypes) {
+    auto *fnType = type->getAs<AnyFunctionType>();
+    if (!fnType)
+      continue;
+
+    auto paramType = fnType->getInput();
+    switch (paramType->getKind()) {
+    case TypeKind::Tuple: {
+      auto tuple = paramType->getAs<TupleType>();
+      if (tuple->getNumElements() != 1)
+        continue;
+
+      paramType = tuple->getElement(0).getType();
+      break;
+    }
+
+    case TypeKind::Paren:
+      paramType = paramType->getWithoutParens();
+      break;
+
+    default:
+      return false;
+    }
+
+    if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
+      auto closureType = CS->getType(closureExpr);
+      if (auto *argFnType = closureType->getAs<AnyFunctionType>()) {
+        auto *params = closureExpr->getParameters();
+        auto loc = params ? params->getStartLoc() : closureExpr->getStartLoc();
+        if (diagnoseClosureExplicitParameterMismatch(
+                CS, loc, argFnType->getParams(), paramFnType->getParams()))
+          return true;
+      }
+    }
+
+    auto processor = [&](Type resultType, Type expectedResultType) -> bool {
+      if (resultType && expectedResultType) {
+        if (!resultType->isEqual(expectedResultType)) {
+          CS->TC.diagnose(closureExpr->getEndLoc(),
+                          diag::cannot_convert_closure_result, resultType,
+                          expectedResultType);
+          return true;
+        }
+
+        // Looks like both actual and expected result types match,
+        // there is nothing we can diagnose in this case.
+        return false;
+      }
+
+      // If we got a result type, let's re-typecheck the function using it,
+      // maybe we can find a problem where contextually we expect one type
+      // but trailing closure produces completely different one.
+      auto fnType = paramType->getAs<AnyFunctionType>();
+      if (!fnType)
+        return false;
+
+      auto expectedArgType = FunctionType::get(fnType->getInput(), resultType,
+                                               fnType->getExtInfo());
+
+      auto expectedType =
+          FunctionType::get(expectedArgType, CS->getContextualType());
+
+      class ClosureCalleeListener : public ExprTypeCheckListener {
+        Type contextualType;
+
+      public:
+        explicit ClosureCalleeListener(Type contextualType)
+            : contextualType(contextualType) {}
+
+        bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
+          cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                           contextualType, cs.getConstraintLocator(expr),
+                           /*isFavored*/ true);
+          return false;
+        }
+      };
+
+      ClosureCalleeListener listener(expectedType);
+      return !typeCheckChildIndependently(callExpr->getFn(), Type(),
+                                          CTP_CalleeResult, TCC_ForceRecheck,
+                                          &listener);
+    };
+
+    // Let's see if there are any structural problems with closure itself.
+    if (diagnoseClosureExpr(closureExpr, paramType, processor))
+      return true;
+  }
+
+  return false;
+}
+
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
-  // Type check the function subexpression to resolve a type for it if possible.
+  // If this call involves trailing closure as an argument,
+  // let's treat it specially, because re-typecheck of the
+  // either function or arguments might results in diagnosing
+  // of the unrelated problems due to luck of context.
+  if (diagnoseTrailingClosureErrors(callExpr))
+    return true;
+
+  // Type check the function subexpression to resolve a type for it if
+  // possible.
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
-  if (!fnExpr) return true;
+  if (!fnExpr)
+    return true;
 
   SWIFT_DEFER {
     if (!fnExpr) return;
@@ -6148,6 +6366,23 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     auto instanceTy = MTT->getInstanceType();
     if (auto tupleTy = instanceTy->getAs<TupleType>()) {
       argType = tupleTy;
+    }
+  }
+
+  // If there is a failing constraint associated with current constraint
+  // system which points to the argument/parameter mismatch, let's use
+  // that information while re-typechecking argument expression, this
+  // makes it a lot easier to determine contextual mismatch.
+  if (CS->failedConstraint && !hasTrailingClosure) {
+    auto *constraint = CS->failedConstraint;
+    if (constraint->getKind() == ConstraintKind::ArgumentTupleConversion) {
+      if (auto *locator = constraint->getLocator()) {
+        if (locator->getAnchor() == callExpr) {
+          argType = constraint->getSecondType();
+          if (auto *typeVar = argType->getAs<TypeVariableType>())
+            argType = CS->getFixedType(typeVar);
+        }
+      }
     }
   }
 
@@ -6629,9 +6864,36 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   return false;
 }
 
+static bool isInvalidClosureResultType(Type resultType) {
+  return !resultType || resultType->hasUnresolvedType() ||
+          resultType->hasTypeVariable() || resultType->hasArchetype();
+}
 
 bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
-  auto contextualType = CS->getContextualType();
+  return diagnoseClosureExpr(
+      CE, CS->getContextualType(),
+      [&](Type resultType, Type expectedResultType) -> bool {
+        if (isInvalidClosureResultType(expectedResultType))
+          return false;
+
+        // Following situations are possible:
+        // * No result type - possible structurable problem in the body;
+        // * Function result type - possible use of function without calling it,
+        //   which is properly diagnosed by actual type-check call.
+        if (resultType && !resultType->getRValueType()->is<AnyFunctionType>()) {
+          if (!resultType->isEqual(expectedResultType)) {
+            diagnose(CE->getEndLoc(), diag::cannot_convert_closure_result,
+                     resultType, expectedResultType);
+            return true;
+          }
+        }
+        return false;
+      });
+}
+
+bool FailureDiagnosis::diagnoseClosureExpr(
+    ClosureExpr *CE, Type contextualType,
+    std::function<bool(Type, Type)> resultTypeProcessor) {
   // Look through IUO because it doesn't influence
   // neither parameter nor return type diagnostics itself,
   // but if we have function type inside, that might
@@ -6792,7 +7054,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
               //  - if the there is a result type associated with the closure;
               //  - and it's not a void type;
               //  - and it hasn't been explicitly written.
-              auto resultType = CS->getResultType(CE);
+              auto resultType = fnType->getResult();
               auto hasResult = [](Type resultType) -> bool {
                 return resultType && !resultType->isVoid();
               };
@@ -6912,6 +7174,9 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   if (!CE->hasSingleExpressionBody())
     return false;
 
+  if (isInvalidClosureResultType(expectedResultType))
+    expectedResultType = Type();
+
   // When we're type checking a single-expression closure, we need to reset the
   // DeclContext to this closure for the recursive type checking.  Otherwise,
   // if there is a closure in the subexpression, we can violate invariants.
@@ -6937,19 +7202,8 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
       auto type = CS->TC.getTypeOfExpressionWithoutApplying(
           closure, CS->DC, decl, FreeTypeVariableBinding::Disallow);
 
-      Type resultType = type.hasValue() ? *type : Type();
-
-      // Following situations are possible:
-      // * No result type - possible structurable problem in the body;
-      // * Function result type - possible use of function without calling it,
-      //   which is properly diagnosed by actual type-check call.
-      if (resultType && !resultType->getRValueType()->is<AnyFunctionType>()) {
-        if (!resultType->isEqual(expectedResultType)) {
-          diagnose(closure->getEndLoc(), diag::cannot_convert_closure_result,
-                   resultType, expectedResultType);
-          return true;
-        }
-      }
+      if (type && resultTypeProcessor(*type, expectedResultType))
+        return true;
     }
 
     // If the closure had an expected result type, use it.
@@ -6960,9 +7214,14 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // let's run proper type-check with expected type and try to verify it.
 
     auto CTP = expectedResultType ? CTP_ClosureResult : CTP_Unused;
-    if (!typeCheckChildIndependently(CE->getSingleExpressionBody(),
-                                     expectedResultType, CTP, TCCOptions(),
-                                     nullptr, false))
+    auto *bodyExpr = typeCheckChildIndependently(CE->getSingleExpressionBody(),
+                                                 expectedResultType, CTP,
+                                                 TCCOptions(), nullptr, false);
+
+    if (!bodyExpr)
+      return true;
+
+    if (resultTypeProcessor(bodyExpr->getType(), expectedResultType))
       return true;
   }
 
@@ -6974,12 +7233,18 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     if (!fnType || fnType->isEqual(CS->getType(CE)))
       return false;
 
+    auto contextualResultType = fnType->getResult();
+    // If the result type was unknown, it doesn't really make
+    // sense to diagnose from expected to unknown here.
+    if (isInvalidClosureResultType(contextualResultType))
+      return false;
+
     // If the closure had an explicitly written return type incompatible with
     // the contextual type, diagnose that.
     if (CE->hasExplicitResultType() &&
         CE->getExplicitResultTypeLoc().getTypeRepr()) {
       auto explicitResultTy = CE->getExplicitResultTypeLoc().getType();
-      if (fnType && !explicitResultTy->isEqual(fnType->getResult())) {
+      if (fnType && !explicitResultTy->isEqual(contextualResultType)) {
         auto repr = CE->getExplicitResultTypeLoc().getTypeRepr();
         diagnose(repr->getStartLoc(), diag::incorrect_explicit_closure_result,
                  explicitResultTy, fnType->getResult())

@@ -1542,3 +1542,12 @@ func rdar32875953() {
 
   _ = zip(array1, array2).map(+)
 }
+
+struct SR_5199 {}
+extension Sequence where Iterator.Element == (key: String, value: String?) {
+  func f() -> [SR_5199] {
+    return self.map { (key, value) in
+        SR_5199() // Ok
+    }
+  }
+}
