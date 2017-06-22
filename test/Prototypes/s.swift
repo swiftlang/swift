@@ -151,7 +151,6 @@ extension String._XContent._Inline {
   }
 
   public var count : Int {
-    @inline(__always)
     get {
 #if arch(i386) || arch(arm)
       return Int(Builtin.zext_Int4_Int32(_count))
@@ -160,7 +159,6 @@ extension String._XContent._Inline {
 #endif
     }
     
-    @inline(__always)
     set {
 #if arch(i386) || arch(arm)
       _count = Builtin.trunc_Int32_Int4(newValue._value)
@@ -170,7 +168,6 @@ extension String._XContent._Inline {
     }
   }
   
-  @inline(__always)
   public init?<S: Sequence>(_ s: S) where S.Element : BinaryInteger {
     _storage = (0,0,0,0)
     let failed: Bool = withUnsafeMutableBufferPointer {
@@ -186,7 +183,6 @@ extension String._XContent._Inline {
     if failed { return nil }
   }
 
-  @inline(__always)
   public mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<CodeUnit>)->R
   ) -> R {
@@ -202,7 +198,6 @@ extension String._XContent._Inline {
 
   /// Calls `body` on a mutable buffer that covers the entire extent of
   /// allocated memory.
-  @inline(__always)
   public mutating func _withMutableCapacity<R>(
     body: (inout UnsafeMutableBufferPointer<CodeUnit>)->R
   ) -> R {
@@ -213,7 +208,6 @@ extension String._XContent._Inline {
     }
   }
   
-  @inline(__always)
   public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<CodeUnit>)->R
   ) -> R {
@@ -229,7 +223,6 @@ extension String._XContent._Inline {
     }
   }
 
-  @inline(__always)
   public mutating func append(_ u: CodeUnit) {
     let oldCount = count
     count = count &+ 1
@@ -259,7 +252,6 @@ extension String._XContent._Inline where CodeUnit == UInt16 {
 }
 
 extension String._XContent._Unowned {
-  @inline(__always)
   init?(
     _ source: UnsafeBufferPointer<CodeUnit>,
     isASCII: Bool?,
@@ -276,7 +268,6 @@ extension String._XContent._Unowned {
     self.isNULTerminated = isNULTerminated
   }
 
-  @inline(__always)
   public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<CodeUnit>)->R
   ) -> R {
@@ -287,12 +278,10 @@ extension String._XContent._Unowned {
 
 extension String._XContent {
 
-  @inline(__always)
   init() {
     self = .inline16(_Inline<UInt16>(EmptyCollection<UInt16>())!)
   }
   
-  @inline(__always)
   func _withExistingLatin1Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt8>) -> R
   ) -> R? {
@@ -319,7 +308,6 @@ extension String._XContent {
     }
   }
 
-  @inline(__always)
   func _withExistingUTF16Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt16>) -> R
   ) -> R? {
@@ -343,7 +331,6 @@ extension String._XContent {
   }
 
   var isASCII: Bool? {
-    @inline(__always)
     get {
       switch self {
       case .inline8(let x): return x.isASCII
@@ -382,7 +369,6 @@ struct _TruncExt<Input: BinaryInteger, Output: FixedWidthInteger>
 }
 
 extension String._XContent.UTF16View : BidirectionalCollection {
-  @inline(__always)
   init<C : Collection>(
     _ c: C, maxElement: UInt16? = nil, minCapacity: Int = 0
   )
@@ -416,7 +402,6 @@ extension String._XContent.UTF16View : BidirectionalCollection {
     }
   }
   
-  @inline(__always)
   init<C : Collection>(
     _ c: C, minCapacity: Int = 0, isASCII: Bool? = nil
   ) where C.Element == UInt8 {
@@ -524,7 +509,6 @@ extension String._XContent.UTF16View : BidirectionalCollection {
 
 extension String._XContent.UTF16View : RangeReplaceableCollection {
   public var capacity: Int {
-    @inline(__always)
     get {
       switch self._content {
       case .inline8(let x): return x.capacity
@@ -574,7 +558,6 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       Swift.max(minCapacity, 2 * count), forcingUTF16: forceUTF16)
   }
 
-  @inline(__always)
   mutating func _reserveCapacitySlow(_ minCapacity: Int, forcingUTF16: Bool) {
     if let _ = _content._withExistingLatin1Buffer({ buf in
         if !forcingUTF16 {
