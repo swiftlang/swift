@@ -13,6 +13,7 @@ public class C1 {
   public weak var CIIns1 : C1?
   public var CIIns2 : C1?
   public func foo3(a : Void?) {}
+  public func foo4(a : Void?) {}
 }
 
 public class C3 {}
