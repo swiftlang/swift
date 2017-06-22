@@ -36,6 +36,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <functional>
@@ -113,6 +114,35 @@ public:
 
     return None;
   }
+};
+
+
+class ExpressionTimer {
+  Expr* E;
+  unsigned WarnLimit;
+  bool ShouldDump;
+  ASTContext &Context;
+  llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
+
+public:
+  ExpressionTimer(Expr *E, bool shouldDump, unsigned warnLimit,
+                  ASTContext &Context)
+      : E(E), WarnLimit(warnLimit), ShouldDump(shouldDump), Context(Context) {
+  }
+
+  ~ExpressionTimer();
+
+  /// Return the elapsed process time (including fractional seconds)
+  /// as a double.
+  double getElapsedProcessTimeInFractionalSeconds() {
+    llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
+
+    return endTime.getProcessTime() - StartTime.getProcessTime();
+  }
+
+  // Disable emission of warnings about expressions that take longer
+  // than the warning threshold.
+  void disableWarning() { WarnLimit = 0; }
 };
 
 } // end namespace constraints
@@ -854,6 +884,7 @@ public:
   TypeChecker &TC;
   DeclContext *DC;
   ConstraintSystemOptions Options;
+  Optional<ExpressionTimer> Timer;
   
   friend class Fix;
   friend class OverloadChoice;
@@ -2529,6 +2560,17 @@ public:
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    if (Timer.hasValue()) {
+      auto elapsed = Timer->getElapsedProcessTimeInFractionalSeconds();
+      if (unsigned(elapsed) > TC.getExpressionTimeoutThresholdInSeconds()) {
+        // Disable warnings about expressions that go over the warning
+        // threshold since we're arbitrarily ending evaluation and
+        // emitting an error.
+        Timer->disableWarning();
+        return true;
+      }
+    }
+
     if (!getASTContext().isSwiftVersion3()) {
       if (CountScopes < TypeCounter)
         return false;
