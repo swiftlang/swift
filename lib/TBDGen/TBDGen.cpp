@@ -212,11 +212,11 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             SILDeclRef(witness.getDecl()).getLinkage(ForDefinition);
         addSymbolIfNecessary(valueReq, witnessLinkage);
       } else if (auto VD = dyn_cast<AbstractStorageDecl>(valueReq)) {
-        // A var or subscript decl needs special handling in the special
-        // handling: the things that end up in the witness table are the
-        // accessors, but the compiler only talks about the actual storage decl
-        // in the conformance, so we have to manually walk over the members,
-        // having pulled out something that will have the right linkage.
+        // A var or subscript decl needs extra special handling: the things that
+        // end up in the witness table are the accessors, but the compiler only
+        // talks about the actual storage decl in the conformance, so we have to
+        // manually walk over the members, having pulled out something that will
+        // have the right linkage.
         auto witnessVD = cast<AbstractStorageDecl>(witness.getDecl());
 
         SmallVector<Decl *, 4> members;
