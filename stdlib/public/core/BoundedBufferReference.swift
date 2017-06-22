@@ -169,6 +169,14 @@ extension _BoundedBufferReference {
     }
     return r
   }
+
+  public func append(_ x: Element) {
+    withUnsafeMutableBufferPointer {
+      _sanityCheck($0.count < capacity)
+      self.count = $0.count + 1
+      ($0.baseAddress._unsafelyUnwrappedUnchecked + $0.count).initialize(to: x)
+    }
+  }
   
   public func replaceSubrange<C>(
     _ target: Range<Int>,

@@ -1,5 +1,19 @@
 import Swift
 
+extension _BoundedBufferReference {
+  /// Calls `body` on a mutable buffer that covers the entire extent of
+  /// allocated memory.
+  func _withMutableCapacity<R>(
+    body: (inout UnsafeMutableBufferPointer<Element>)->R
+  ) -> R {
+    return self.withUnsafeMutableBufferPointer { buf in
+      var fullBuf = UnsafeMutableBufferPointer(
+        start: buf.baseAddress, count: capacity)
+      return body(&fullBuf)
+    }
+  }
+}
+
 internal struct _Concat3<C0: Collection, C1: Collection, C2: Collection>
 where C0.Element == C1.Element, C1.Element == C2.Element {
   var c0: C0
@@ -186,6 +200,19 @@ extension String._XContent._Inline {
     }
   }
 
+  /// Calls `body` on a mutable buffer that covers the entire extent of
+  /// allocated memory.
+  @inline(__always)
+  public mutating func _withMutableCapacity<R>(
+    body: (inout UnsafeMutableBufferPointer<CodeUnit>)->R
+  ) -> R {
+    return self.withUnsafeMutableBufferPointer { buf in
+      var fullBuf = UnsafeMutableBufferPointer(
+        start: buf.baseAddress, count: capacity)
+      return body(&fullBuf)
+    }
+  }
+  
   @inline(__always)
   public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<CodeUnit>)->R
@@ -200,6 +227,13 @@ extension String._XContent._Inline {
       return body(
         UnsafeBufferPointer(start: start, count: count))
     }
+  }
+
+  @inline(__always)
+  public mutating func append(_ u: CodeUnit) {
+    let oldCount = count
+    count = count &+ 1
+    withUnsafeMutableBufferPointer { $0[oldCount] = u }
   }
 }
 
@@ -305,6 +339,21 @@ extension String._XContent {
       }
     default:
       return nil
+    }
+  }
+
+  var isASCII: Bool? {
+    @inline(__always)
+    get {
+      switch self {
+      case .inline8(let x): return x.isASCII
+      case .inline16(let x): return x.isASCII 
+      case .unowned8(let x): return x.isASCII
+      case .unowned16(let x): return x.isASCII
+      case .latin1(let x):  return x.isASCII
+      case .utf16(let x): return x.isASCII
+      case .nsString: return nil
+      }
     }
   }
 }
@@ -450,12 +499,6 @@ extension String._XContent.UTF16View : BidirectionalCollection {
       case .utf16(let x): return x.count 
       case .nsString(let x): return x.length() 
       }
-      /*
-      return _content._withExistingLatin1Buffer { $0.count }
-      ?? _content._withExistingUTF16Buffer { $0.count }
-      ?? _content._nsString.length()
-      */
-      
     }
   }
   
@@ -463,18 +506,12 @@ extension String._XContent.UTF16View : BidirectionalCollection {
     @inline(__always)
     get {
       switch self._content {
-      case .inline8(let x):
-        return x.withUnsafeBufferPointer { UInt16($0[i]) }
-      case .inline16(let x):
-        return x.withUnsafeBufferPointer { $0[i] }
-      case .unowned8(let x):
-        return x.withUnsafeBufferPointer { UInt16($0[i]) }
-      case .unowned16(let x): 
-        return x.withUnsafeBufferPointer { $0[i] }
-      case .latin1(let x):
-        return UInt16(x[i])
-      case .utf16(let x):
-        return x[i]
+      case .inline8(let x): return x.withUnsafeBufferPointer { UInt16($0[i]) }
+      case .inline16(let x): return x.withUnsafeBufferPointer { $0[i] }
+      case .unowned8(let x): return x.withUnsafeBufferPointer { UInt16($0[i]) }
+      case .unowned16(let x): return x.withUnsafeBufferPointer { $0[i] }
+      case .latin1(let x): return UInt16(x[i])
+      case .utf16(let x): return x[i]
       case .nsString(let x):
         return x.characterAtIndex(i) 
       }
@@ -486,18 +523,186 @@ extension String._XContent.UTF16View : BidirectionalCollection {
 }
 
 extension String._XContent.UTF16View : RangeReplaceableCollection {
+  public var capacity: Int {
+    @inline(__always)
+    get {
+      switch self._content {
+      case .inline8(let x): return x.capacity
+      case .inline16(let x): return x.capacity
+      case .unowned8(let x): return Int(x._count)
+      case .unowned16(let x): return Int(x._count)
+      case .latin1(let x): return x.capacity
+      case .utf16(let x): return x.capacity
+      case .nsString(let x): return x.length()
+      }
+    }
+  }
+  
   public init() {
     _content = String._XContent()
   }
 
   internal var _rangeReplaceableStorageID: ObjectIdentifier? {
     switch self._content {
-    case .latin1(let x):
-      return ObjectIdentifier(x)
-    case .utf16(let x):
-      return ObjectIdentifier(x)
-    default:
-      return nil
+    case .latin1(let x): return ObjectIdentifier(x)
+    case .utf16(let x): return ObjectIdentifier(x)
+    default: return nil
+    }
+  }
+
+  @inline(__always)
+  mutating func reserveCapacity<S: Sequence>(forAppending s: S)
+  where S.Element == UInt16 {
+    let growth = s.underestimatedCount
+    guard growth > 0 else { return }
+
+    let minCapacity = count + growth
+
+    var forceUTF16 = false
+
+    // We have enough capacity and can write our storage
+    if capacity >= minCapacity
+    && _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced() != false {
+      // If our storage is already wide enough, we're done
+      if _content._withExistingLatin1Buffer({ _ in () }) == nil { return }
+      if (s._preprocessingPass { s.max() ?? 0 } ?? 0) <= 0xFF { return }
+      // Otherwise, widen when reserving
+      forceUTF16 = true
+    }
+    
+    _reserveCapacitySlow(
+      Swift.max(minCapacity, 2 * count), forcingUTF16: forceUTF16)
+  }
+
+  @inline(__always)
+  mutating func _reserveCapacitySlow(_ minCapacity: Int, forcingUTF16: Bool) {
+    if let _ = _content._withExistingLatin1Buffer({ buf in
+        if !forcingUTF16 {
+          self._content = .latin1(
+            String._Latin1Storage.copying(
+              buf, minCapacity: minCapacity, isASCII: _content.isASCII))
+        }
+        else {
+          self._content = .utf16(
+            String._UTF16Storage.copying(
+              _MapCollection(buf, through: _TruncExt()),
+              minCapacity: minCapacity,
+              maxElement: _content.isASCII == true ? 0x7F
+              : _content.isASCII == false ? 0xFF : nil)
+          )
+        }
+      }) { return }
+
+    if let _ = _content._withExistingUTF16Buffer({ buf in
+        self._content = .utf16(
+          String._UTF16Storage.copying(buf, minCapacity: minCapacity))
+      }) { return }
+
+    self._content = .utf16(
+      String._UTF16Storage.copying(self, minCapacity: minCapacity))
+  }
+  
+  mutating func reserveCapacity(_ minCapacity: Int) {
+    if capacity < minCapacity
+    || _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced() == false {
+      _reserveCapacitySlow(minCapacity, forcingUTF16: false)
+    }
+  }
+  
+  mutating func append<S: Sequence>(contentsOf source_: S)
+  where S.Element == Element {
+    reserveCapacity(forAppending: source_)
+
+    var source = source_.makeIterator()
+    defer { _fixLifetime(self) }
+
+    let isUnique = _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced()
+
+    switch _content {
+    case .inline8(var x):
+      x._withMutableCapacity { buf in
+        for i in count..<buf.count {
+          let u = source.next()
+          guard _fastPath(u != nil && u! <= 0xFF) else {
+            let newContent = String._XContent._Inline<UInt8>(buf[..<i])!
+            _content = .inline8(newContent)
+            if u != nil { self.append(u!) }
+            break
+          }
+          buf[i] = UInt8(extendingOrTruncating: u!)
+        }
+      }
+      
+    case .latin1(let x) where isUnique == true:
+      x._withMutableCapacity { buf in
+        for i in count..<buf.count {
+          guard let u = source.next() else { break }
+          guard _fastPath(u <= 0xFF) else {
+            self.append(u)
+            break
+          }
+          buf[i] = UInt8(extendingOrTruncating: u)
+          x.count += 1
+        }
+      }
+      
+    case .inline16(var x):
+      x._withMutableCapacity { buf in
+        for i in count..<buf.count {
+          let u = source.next()
+          guard _fastPath(u != nil) else {
+            _content = .inline16(String._XContent._Inline<UInt16>(buf[..<i])!)
+            break
+          }
+          buf[i] = u!
+        }
+      }
+      
+    case .utf16(let x) where isUnique == true:
+      x._withMutableCapacity { buf in
+        for i in count..<buf.count {
+          guard let u = source.next() else { break }
+          buf[i] = u
+          x.count += 1
+        }
+      }
+    default: break
+    }
+    for u in IteratorSequence(source) { append(u) }
+  }
+
+  mutating func append(_ u: UInt16) {
+    reserveCapacity(forAppending: CollectionOfOne(u))
+    
+    defer { _fixLifetime(self) }
+    
+    // In-place mutation
+    if _fastPath(
+      _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced() != false
+    ) {
+      switch self._content {
+      case .inline8(var x) where u <= 0xFF:
+        x.append(UInt8(u))
+        self._content = .inline8(x)
+        return
+
+      case .inline16(var x):
+        x.append(u)
+        self._content = .inline16(x)
+        return
+
+      case .latin1(let x) where u <= 0xFF:
+        x.append(UInt8(u))
+        return
+        
+      case .utf16(let x):
+        x.append(u)
+        return
+        
+      default: break
+      }
+      _replaceSubrangeSlow(
+        endIndex..<endIndex, with: CollectionOfOne(u), maxNewElement: u)
     }
   }
 
@@ -539,7 +744,6 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       maxNewElement: UInt16?
   ) where C.Element == Element {
     var done: Bool = false
-
     
     _content._withExistingLatin1Buffer {
       b in
