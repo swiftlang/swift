@@ -387,9 +387,14 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
 
   // Find the locators which have the largest numbers of distinct overloads.
   Optional<unsigned> bestOverload;
-  unsigned maxDistinctOverloads = 0;
-  unsigned maxDepth = 0;
-  unsigned minIndex = std::numeric_limits<unsigned>::max();
+  // Overloads are scored by lexicographical comparison of (# of distinct
+  // overloads, depth, *reverse* of the index). N.B. - cannot be used for the
+  // reversing: the score version of index == 0 should be > than that of 1, but
+  // -0 == 0 < UINT_MAX == -1, whereas ~0 == UINT_MAX > UINT_MAX - 1 == ~1.
+  auto score = [](unsigned distinctOverloads, unsigned depth, unsigned index) {
+    return std::make_tuple(distinctOverloads, depth, ~index);
+  };
+  auto bestScore = score(0, 0, std::numeric_limits<unsigned>::max());
 
   // Get a map of expressions to their depths and post-order traversal indices.
   // Heuristically, all other things being equal, we should complain about the
@@ -428,27 +433,10 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
 
     // If we have more distinct overload choices for this locator than for
     // prior locators, just keep this locator.
-    
-    bool better = false;
-    if (bestOverload) {
-      if (distinctOverloads > maxDistinctOverloads) {
-        better = true;
-      } else if (distinctOverloads == maxDistinctOverloads) {
-        if (depth > maxDepth) {
-          better = true;
-        } else if (depth == maxDepth) {
-          if (index < minIndex) {
-            better = true;
-          }
-        }
-      }
-    }
-
-    if (!bestOverload || better) {
+    auto thisScore = score(distinctOverloads, depth, index);
+    if (thisScore > bestScore) {
+      bestScore = thisScore;
       bestOverload = i;
-      maxDistinctOverloads = distinctOverloads;
-      maxDepth = depth;
-      minIndex = index;
       continue;
     }
 

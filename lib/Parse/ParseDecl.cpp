@@ -2762,8 +2762,8 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
 
   if (P.Tok.is(tok::integer_literal) || P.Tok.is(tok::floating_literal) ||
       (P.Tok.is(tok::unknown) && isdigit(P.Tok.getText()[0]))) {
-    // Per rdar://problem/32316666, using numbers for identifiers is a common
-    // error for beginners, so it's worth handling this in a special way.
+    // Using numbers for identifiers is a common error for beginners, so it's
+    // worth handling this in a special way.
     P.diagnose(P.Tok, diag::number_cant_start_decl_name, DeclKindName);
 
     // Pretend this works as an identifier, which shouldn't be observable since

@@ -2824,7 +2824,7 @@ static Identifier typoCorrectNestedType(
   // Look through all of the associated types of all of the protocols
   // to which the parent conforms.
   llvm::SmallVector<Identifier, 2> bestMatches;
-  unsigned bestEditDistance = 0;
+  unsigned bestEditDistance = UINT_MAX;
   unsigned maxScore = (name.size() + 1) / 3;
   for (auto proto : pa->getParent()->getConformsTo()) {
     for (auto member : getProtocolMembers(proto)) {
@@ -2836,16 +2836,12 @@ static Identifier typoCorrectNestedType(
                                          /*AllowReplacements=*/true,
                                          maxScore);
       assert(dist > 0 && "nested type should have matched associated type");
-      if (bestEditDistance == 0 || dist == bestEditDistance) {
-        bestEditDistance = dist;
-        maxScore = bestEditDistance;
-        bestMatches.push_back(assocType->getName());
-      } else if (dist < bestEditDistance) {
-        bestEditDistance = dist;
-        maxScore = bestEditDistance;
+      if (dist < bestEditDistance) {
+        maxScore = bestEditDistance = dist;
         bestMatches.clear();
-        bestMatches.push_back(assocType->getName());
       }
+      if (dist == bestEditDistance)
+        bestMatches.push_back(assocType->getName());
     }
   }
 
