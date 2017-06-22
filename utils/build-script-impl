@@ -3201,7 +3201,7 @@ for host in "${ALL_HOSTS[@]}"; do
             # Copy executables and shared libraries from the `host_install_destdir` to
             # INSTALL_SYMROOT and run dsymutil on them.
             (cd "${host_install_destdir}" &&
-             find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | cpio -pdm "${INSTALL_SYMROOT}")
+             find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | cpio --insecure -pdm "${INSTALL_SYMROOT}")
 
             # Run dsymutil on executables and shared libraries.
             #
