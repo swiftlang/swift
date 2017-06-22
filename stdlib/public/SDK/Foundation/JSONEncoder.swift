@@ -190,7 +190,7 @@ fileprivate class _JSONEncoder : Encoder {
     /// Returns whether a new element can be encoded at this coding path.
     ///
     /// `true` if an element has not yet been encoded at this coding path; `false` otherwise.
-    var canEncodeNewElement: Bool {
+    var canEncodeNewValue: Bool {
         // Every time a new value gets encoded, the key it's encoded for is pushed onto the coding path (even if it's a nil key from an unkeyed container).
         // At the same time, every time a container is requested, a new value gets pushed onto the storage stack.
         // If there are more values on the storage stack than on the coding path, it means the value is requesting more than one container, which violates the precondition.
@@ -200,39 +200,43 @@ fileprivate class _JSONEncoder : Encoder {
         return self.storage.count == self.codingPath.count
     }
 
-    /// Asserts that a new container can be requested at this coding path.
-    /// `preconditionFailure()`s if one cannot be requested.
-    func assertCanRequestNewContainer() {
-        guard self.canEncodeNewElement else {
-            let previousContainerType: String
-            if self.storage.containers.last is NSDictionary {
-                previousContainerType = "keyed"
-            } else if self.storage.containers.last is NSArray {
-                previousContainerType = "unkeyed"
-            } else {
-                previousContainerType = "single value"
-            }
-
-            preconditionFailure("Attempt to encode with new container when already encoded with \(previousContainerType) container.")
-        }
-    }
-
     // MARK: - Encoder Methods
     func container<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
-        assertCanRequestNewContainer()
-        let topContainer = self.storage.pushKeyedContainer()
+        // If an existing keyed container was already requested, return that one.
+        let topContainer: NSMutableDictionary
+        if self.canEncodeNewValue {
+            // We haven't yet pushed a container at this level; do so here.
+            topContainer = self.storage.pushKeyedContainer()
+        } else {
+            guard let container = self.storage.containers.last as? NSMutableDictionary else {
+                preconditionFailure("Attempt to push new keyed encoding container when already previously encoded at this path.")
+            }
+
+            topContainer = container
+        }
+
         let container = _JSONKeyedEncodingContainer<Key>(referencing: self, codingPath: self.codingPath, wrapping: topContainer)
         return KeyedEncodingContainer(container)
     }
 
     func unkeyedContainer() -> UnkeyedEncodingContainer {
-        assertCanRequestNewContainer()
-        let topContainer = self.storage.pushUnkeyedContainer()
+        // If an existing unkeyed container was already requested, return that one.
+        let topContainer: NSMutableArray
+        if self.canEncodeNewValue {
+            // We haven't yet pushed a container at this level; do so here.
+            topContainer = self.storage.pushUnkeyedContainer()
+        } else {
+            guard let container = self.storage.containers.last as? NSMutableArray else {
+                preconditionFailure("Attempt to push new unkeyed encoding container when already previously encoded at this path.")
+            }
+
+            topContainer = container
+        }
+
         return _JSONUnkeyedEncodingContainer(referencing: self, codingPath: self.codingPath, wrapping: topContainer)
     }
 
     func singleValueContainer() -> SingleValueEncodingContainer {
-        assertCanRequestNewContainer()
         return self
     }
 }
@@ -474,106 +478,89 @@ fileprivate struct _JSONUnkeyedEncodingContainer : UnkeyedEncodingContainer {
 }
 
 extension _JSONEncoder : SingleValueEncodingContainer {
-    // MARK: - Utility Methods
-
-    /// Asserts that a single value can be encoded at the current coding path (i.e. that one has not already been encoded through this container).
-    /// `preconditionFailure()`s if one cannot be encoded.
-    ///
-    /// This is similar to assertCanRequestNewContainer above.
-    func assertCanEncodeSingleValue() {
-        guard self.canEncodeNewElement else {
-            let previousContainerType: String
-            if self.storage.containers.last is NSDictionary {
-                previousContainerType = "keyed"
-            } else if self.storage.containers.last is NSArray {
-                previousContainerType = "unkeyed"
-            } else {
-                preconditionFailure("Attempt to encode multiple values in a single value container.")
-            }
-
-            preconditionFailure("Attempt to encode with new container when already encoded with \(previousContainerType) container.")
-        }
-    }
-
     // MARK: - SingleValueEncodingContainer Methods
 
+    func assertCanEncodeNewValue() {
+        precondition(self.canEncodeNewValue, "Attempt to encode value through single value container when previously value already encoded.")
+    }
+
     func encodeNil() throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: NSNull())
     }
 
     func encode(_ value: Bool) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: Int) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: Int8) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: Int16) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: Int32) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: Int64) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: UInt) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: UInt8) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: UInt16) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: UInt32) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: UInt64) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: String) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         self.storage.push(container: box(value))
     }
 
     func encode(_ value: Float) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         try self.storage.push(container: box(value))
     }
 
     func encode(_ value: Double) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         try self.storage.push(container: box(value))
     }
 
     func encode<T : Encodable>(_ value: T) throws {
-        assertCanEncodeSingleValue()
+        assertCanEncodeNewValue()
         try self.storage.push(container: box(value))
     }
 }
@@ -763,7 +750,7 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
 
     // MARK: - Coding Path Operations
 
-    override var canEncodeNewElement: Bool {
+    override var canEncodeNewValue: Bool {
         // With a regular encoder, the storage and coding path grow together.
         // A referencing encoder, however, inherits its parents coding path, as well as the key it was created for.
         // We have to take this into account.
