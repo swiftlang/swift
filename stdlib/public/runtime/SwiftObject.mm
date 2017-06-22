@@ -1444,7 +1444,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
     .replacementText = "@objc "
   };
   RuntimeErrorDetails::Note note = {
-    .description = "Method declaration; add '@objc' here",
+    .description = "add '@objc' to expose this Swift declaration to Objective-C",
     .numFixIts = 1,
     .fixIts = &fixit
   };
