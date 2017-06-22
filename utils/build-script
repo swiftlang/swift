@@ -682,6 +682,14 @@ class BuildScriptInvocation(object):
         # NOT pass them to build-script-impl.
         if args.enable_asan:
             impl_args += ["--enable-asan"]
+        # If we have lsan, we need to export our suppression list. The actual
+        # passing in of the LSAN flag is done via the normal cmake method. We
+        # do not pass the flag to build-script-impl.
+        if args.enable_lsan:
+            supp_file = os.path.join(SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME,
+                                     "utils",
+                                     "lsan_leaks_suppression_list.txt")
+            os.environ['LSAN_OPTIONS'] = 'suppressions={}'.format(supp_file)
         if args.verbose_build:
             impl_args += ["--verbose-build"]
         if args.install_symroot:
@@ -2018,6 +2026,10 @@ iterations with -O",
     parser.add_argument(
         "--enable-tsan-runtime",
         help="enable Thread Sanitizer on the swift runtime")
+    parser.add_argument(
+        "--enable-lsan",
+        help="enable Leak Sanitizer for swift tools",
+        action=arguments.action.optional_bool)
 
     parser.add_argument(
         "--compiler-vendor",
