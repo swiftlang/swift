@@ -549,7 +549,8 @@ void CompilerInstance::performSema() {
         performTypeChecking(*SF, PersistentState.getTopLevelContext(),
                             TypeCheckOptions, /*curElem*/ 0,
                             options.WarnLongFunctionBodies,
-                            options.WarnLongExpressionTypeChecking);
+                            options.WarnLongExpressionTypeChecking,
+                            options.SolverExpressionTimeThreshold);
 
   // Even if there were no source files, we should still record known
   // protocols.
