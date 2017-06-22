@@ -866,11 +866,12 @@ func testme2() {
   }
 
   var N = 10000
+  _sanityCheck({ N = 1; return true }()) // Reset N for debug builds
+  
   for (x, y) in zip(cores, contents) {
     if !x.elementsEqual(y) { fatalError("unequal") }
     _sanityCheck(
       {
-        N = 1
         debugPrint(String(x))
         dump(y)
         print()
