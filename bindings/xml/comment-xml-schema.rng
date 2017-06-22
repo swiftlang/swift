@@ -47,6 +47,9 @@
           <ref name="ResultDiscussion" />
         </optional>
         <optional>
+          <ref name="Tags" />
+        </optional>
+        <optional>
           <ref name="Discussion" />
         </optional>
       </element>
@@ -116,6 +119,9 @@
           <ref name="ResultDiscussion" />
         </optional>
         <optional>
+          <ref name="Tags" />
+        </optional>
+        <optional>
           <ref name="Discussion" />
         </optional>
     </element>
@@ -166,6 +172,9 @@
         <optional>
           <ref name="ResultDiscussion" />
         </optional>
+        <optional>
+          <ref name="Tags" />
+        </optional>
 
         <optional>
           <ref name="Discussion" />
@@ -208,6 +217,9 @@
         </optional>
         <optional>
           <ref name="ResultDiscussion" />
+        </optional>
+        <optional>
+          <ref name="Tags" />
         </optional>
 
         <optional>
@@ -252,6 +264,9 @@
         <optional>
           <ref name="ResultDiscussion" />
         </optional>
+        <optional>
+          <ref name="Tags" />
+        </optional>
 
         <optional>
           <ref name="Discussion" />
@@ -293,6 +308,9 @@
         </optional>
         <optional>
           <ref name="ResultDiscussion" />
+        </optional>
+        <optional>
+          <ref name="Tags" />
         </optional>
 
         <optional>
@@ -336,6 +354,9 @@
         </optional>
         <optional>
           <ref name="ResultDiscussion" />
+        </optional>
+        <optional>
+          <ref name="Tags" />
         </optional>
 
         <optional>
@@ -635,6 +656,16 @@
           <element name="Discussion">
             <ref name="BlockContent" />
           </element>
+        </element>
+      </oneOrMore>
+    </element>
+  </define>
+
+  <define name="Tags">
+    <element name="Tags">
+      <oneOrMore>
+        <element name="Tag">
+          <data type="string" />
         </element>
       </oneOrMore>
     </element>
