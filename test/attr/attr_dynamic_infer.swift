@@ -59,7 +59,7 @@ extension Sub {
 @objc class FinalTests {}
 
 extension FinalTests {
-  // CHECK:  @objc final func foo
+  // CHECK: @objc final func foo
   final func foo() { }
 
   // CHECK: @objc final var prop: Super
@@ -77,5 +77,11 @@ extension FinalTests {
     // CHECK: @objc final set
     set { }
   }
+
+  // CHECK: static @objc var x
+  static var x: Int = 0
+
+  // CHECK: @objc static func bar
+  static func bar() { }
 }
 
