@@ -40,3 +40,16 @@ try #sourceLocation(file: "try.swift", line: 100)
 LABEL:
 #line 200 "labeled.swift"
 #sourceLocation()
+
+class C {
+#sourceLocation(file: "sr5242.swift", line: 100)
+    func foo() {}
+    let bar = 12
+#sourceLocation(file: "sr5242.swift", line: 200)
+}
+enum E {
+#sourceLocation(file: "sr5242.swift", line: 300)
+    case A, B
+    case C, D
+#sourceLocation()
+}
