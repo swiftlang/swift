@@ -983,3 +983,21 @@ let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
 for var i in 0..<10 { // expected-warning {{variable 'i' was never mutated; consider changing to 'let' constant}} {{5-9=}}
   _ = i + 1
 }
+
+// rdar://problem/32726044 - shrink reduced domains too far
+
+public protocol P_32726044 {}
+
+extension Int: P_32726044 {}
+extension Float: P_32726044 {}
+
+public func *(lhs: P_32726044, rhs: P_32726044) -> Double {
+  fatalError()
+}
+
+func rdar32726044() -> Float {
+  var f: Float = 0
+  f = Float(1) * 100 // Ok
+  let _: Float = Float(42) + 0 // Ok
+  return f
+}

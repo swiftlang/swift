@@ -85,6 +85,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
+  if (retainAllSolutions())
+    return false;
+
   if (!solverState || !solverState->BestScore ||
       CurrentScore <= *solverState->BestScore)
     return false;
