@@ -2255,8 +2255,11 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             captureType = selfType->getSelfType();
 
             // We're capturing a 'self' value with dynamic 'Self' type;
-            // handle it specially.
+            // handle it specially. Note that 'var' storing a dynamic
+            // 'Self' are not considered as a source of 'Self' metadata
+            // because of representational issues with SILBoxType.
             if (!selfCapture &&
+                capturedVar->isLet() &&
                 captureType->getClassOrBoundGenericClass()) {
               selfCapture = capture;
               continue;
