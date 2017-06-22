@@ -16,7 +16,7 @@
 
 using namespace swift;
 
-TEST(TextExclusivity, testNullPC) {
+TEST(TestExclusivity, testNullPC) {
   ValueBuffer scratch, scratch2;
   long var;
   swift_beginAccess(&var, &scratch,
@@ -29,7 +29,7 @@ TEST(TextExclusivity, testNullPC) {
   swift_endAccess(&scratch);
 }
 
-TEST(TextExclusivity, testPCOne) {
+TEST(TestExclusivity, testPCOne) {
   ValueBuffer scratch, scratch2;
   long var;
   swift_beginAccess(&var, &scratch,
@@ -42,7 +42,7 @@ TEST(TextExclusivity, testPCOne) {
   swift_endAccess(&scratch);
 }
 
-TEST(TextExclusivity, testBogusPC) {
+TEST(TestExclusivity, testBogusPC) {
   ValueBuffer scratch, scratch2;
   long var;
   swift_beginAccess(&var, &scratch,
@@ -53,4 +53,35 @@ TEST(TextExclusivity, testBogusPC) {
                     /*pc=*/(void *)0xdeadbeefdeadbeefULL);
   swift_endAccess(&scratch2);
   swift_endAccess(&scratch);
+}
+
+// rdar://32866493
+TEST(TestExclusivity, testNonNested) {
+  const int N = 5;
+  ValueBuffer scratches[N];
+  long vars[N];
+
+  auto begin = [&](unsigned i) {
+    assert(i < N);
+    swift_beginAccess(&vars[i], &scratches[i], ExclusivityFlags::Modify, 0);
+  };
+  auto end = [&](unsigned i) {
+    assert(i < N);
+    swift_endAccess(&scratches[i]);
+    memset(&scratches[i], /*gibberish*/ 0x99, sizeof(ValueBuffer));
+  };
+  auto accessAll = [&] {
+    for (unsigned i = 0; i != N; ++i) begin(i);
+    for (unsigned i = 0; i != N; ++i) end(i);
+  };
+
+  accessAll();
+  begin(0); begin(1); end(0); end(1);
+  begin(0); begin(1); end(0); end(1);
+  accessAll();
+  begin(1); begin(0); begin(2); end(0); end(2); end(1);
+  accessAll();
+  begin(0); begin(1); begin(2); begin(3); begin(4);
+  end(1); end(4); end(0); end(2); end(3);
+  accessAll();
 }
