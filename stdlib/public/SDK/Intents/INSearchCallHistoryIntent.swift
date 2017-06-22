@@ -26,10 +26,10 @@ extension INSearchCallHistoryIntent {
     unseen: Bool? = nil
   ) {
     self.init(__dateCreated: dateCreated,
-              recipient: recipient,
-              callCapabilities: callCapabilities,
-              callTypes: callTypes,
-              unseen: unseen.map { NSNumber(value: $0) })
+      recipient: recipient,
+      callCapabilities: callCapabilities,
+      callTypes: callTypes,
+      unseen: unseen.map { NSNumber(value: $0) })
   }
 
   @available(iOS 11.0, watchOS 4.0, *)
