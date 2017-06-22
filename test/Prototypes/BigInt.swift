@@ -121,7 +121,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // FIXME: This is broken on 32-bit arch w/ Word = UInt64
     let wordRatio = UInt.bitWidth / Word.bitWidth
     _sanityCheck(wordRatio != 0)
-    for i in 0..<source.countRepresentedWords {
+    for i in 0..<source._countRepresentedWords {
       var sourceWord = source._word(at: i)
       for _ in 0..<wordRatio {
         _data.append(Word(extendingOrTruncating: sourceWord))
