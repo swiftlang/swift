@@ -2120,12 +2120,6 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
 ParserResult<Decl>
 Parser::parseDecl(ParseDeclOptions Flags,
                   llvm::function_ref<void(Decl*)> Handler) {
-  if (Tok.isAny(tok::pound_sourceLocation, tok::pound_line)) {
-    auto LineDirectiveStatus = parseLineDirective(Tok.is(tok::pound_line));
-    if (LineDirectiveStatus.isError())
-      return LineDirectiveStatus;
-    // If success, go on. line directive never produce decls.
-  }
 
   if (Tok.is(tok::pound_if)) {
     auto IfConfigResult = parseIfConfig(
@@ -2887,6 +2881,13 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
     auto endOfPrevious = getEndOfPreviousLoc();
     diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
       .fixItInsert(endOfPrevious, ";");
+  }
+
+  if (Tok.isAny(tok::pound_sourceLocation, tok::pound_line)) {
+    auto LineDirectiveStatus = parseLineDirective(Tok.is(tok::pound_line));
+    if (LineDirectiveStatus.isError())
+      skipUntilDeclRBrace(tok::semi, tok::pound_endif);
+    return LineDirectiveStatus;
   }
 
   auto Result = parseDecl(Options, handler);
