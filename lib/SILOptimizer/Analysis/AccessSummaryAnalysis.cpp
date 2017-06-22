@@ -145,7 +145,7 @@ static bool hasExpectedUsesOfNoEscapePartialApply(SILInstruction *closure) {
       return hasExpectedUsesOfNoEscapePartialApply(user);
 
     case ValueKind::PartialApplyInst:
-      return closure != cast<PartialApplyInst>(closure)->getCallee();
+      return closure != cast<PartialApplyInst>(user)->getCallee();
 
     case ValueKind::StoreInst:
     case ValueKind::DestroyValueInst:
