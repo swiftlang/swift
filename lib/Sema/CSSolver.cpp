@@ -110,7 +110,7 @@ Solution ConstraintSystem::finalize(
   Solution solution(*this, CurrentScore);
 
   // Update the best score we've seen so far.
-  if (solverState) {
+  if (solverState && !retainAllSolutions()) {
     assert(!solverState->BestScore || CurrentScore <= *solverState->BestScore);
     solverState->BestScore = CurrentScore;
   }
@@ -1499,7 +1499,8 @@ bool ConstraintSystem::Candidate::solve(
   };
 
   // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(TC, DC, None);
+  ConstraintSystem cs(TC, DC,
+                      ConstraintSystemFlags::ReturnAllDiscoveredSolutions);
 
   // Cleanup after constraint system generation/solving,
   // because it would assign types to expressions, which
@@ -2066,17 +2067,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Solve the system.
   solveRec(solutions, allowFreeTypeVariables);
 
-  // If there is more than one viable system, attempt to pick the best
-  // solution.
-  auto size = solutions.size();
-  if (size > 1 &&
-      !Options.contains(ConstraintSystemFlags::ReturnAllDiscoveredSolutions)) {
-    if (auto best = findBestSolution(solutions, /*minimize=*/false)) {
-      if (*best != 0)
-        solutions[0] = std::move(solutions[*best]);
-      solutions.erase(solutions.begin() + 1, solutions.end());
-    }
-  }
+  // Filter deduced solutions, try to figure out if there is
+  // a single best solution to use, if not explicitly disabled
+  // by constraint system options.
+  if (!retainAllSolutions())
+    filterSolutions(solutions);
 
   // We fail if there is no solution.
   return solutions.empty();
@@ -2289,11 +2284,8 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     auto &solutions = partialSolutions[component];
     // If there's a single best solution, keep only that one.
     // Otherwise, the set of solutions will at least have been minimized.
-    if (auto best = findBestSolution(solutions, /*minimize=*/true)) {
-      if (*best > 0)
-        solutions[0] = std::move(solutions[*best]);
-      solutions.erase(solutions.begin() + 1, solutions.end());
-    }
+    if (!retainAllSolutions())
+      filterSolutions(solutions, /*minimize=*/true);
   }
 
   // Produce all combinations of partial solutions.

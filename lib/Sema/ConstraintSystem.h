@@ -1382,6 +1382,13 @@ public:
   bool hasFreeTypeVariables();
 
 private:
+  /// \brief Indicates if the constraint system should retain all of the
+  /// solutions it has deduced regardless of their score.
+  bool retainAllSolutions() const {
+    return Options.contains(
+        ConstraintSystemFlags::ReturnAllDiscoveredSolutions);
+  }
+
   /// \brief Finalize this constraint system; we're done attempting to solve
   /// it.
   ///
@@ -1403,8 +1410,28 @@ private:
   /// diagnostic for it and returning true.  If the fixit hint turned out to be
   /// bogus, this returns false and doesn't emit anything.
   bool applySolutionFix(Expr *expr, const Solution &solution, unsigned fixNo);
-  
-  
+
+  /// \brief If there is more than one viable solution,
+  /// attempt to pick the best solution and remove all of the rest.
+  ///
+  /// \param solutions The set of solutions to filter.
+  ///
+  /// \param minimize The flag which idicates if the
+  /// set of solutions should be filtered even if there is
+  /// no single best solution, see `findBestSolution` for
+  /// more details.
+  void filterSolutions(SmallVectorImpl<Solution> &solutions,
+                       bool minimize = false) {
+    if (solutions.size() < 2)
+      return;
+
+    if (auto best = findBestSolution(solutions, minimize)) {
+      if (*best != 0)
+        solutions[0] = std::move(solutions[*best]);
+      solutions.erase(solutions.begin() + 1, solutions.end());
+    }
+  }
+
   /// \brief Restore the type variable bindings to what they were before
   /// we attempted to solve this constraint system.
   ///
