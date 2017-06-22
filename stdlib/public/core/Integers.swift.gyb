@@ -1548,7 +1548,7 @@ extension BinaryInteger {
   ///
   /// This property is a constant for instances of fixed-width integer types.
   @_transparent
-  public var countRepresentedWords: Int {
+  public var _countRepresentedWords: Int {
     return (self.bitWidth + ${word_bits} - 1) / ${word_bits}
   }
 
@@ -1896,11 +1896,11 @@ extension BinaryInteger {
   }
 
   // FIXME(integers): inefficient. Should get rid of _word(at:) and
-  // countRepresentedWords, and make `words` the basic operation.
+  // _countRepresentedWords, and make `words` the basic operation.
   public var words: [UInt] {
     var result = [UInt]()
-    result.reserveCapacity(countRepresentedWords)
-    for i in 0..<self.countRepresentedWords {
+    result.reserveCapacity(_countRepresentedWords)
+    for i in 0..<self._countRepresentedWords {
       result.append(_word(at: i))
     }
     return result
@@ -2328,7 +2328,7 @@ ${unsafeOperationComment(x.operator)}
     else {
       var result: Self = source < (0 as T) ? ~0 : 0
       // start with the most significant word
-      var n = source.countRepresentedWords
+      var n = source._countRepresentedWords
       while n >= 0 {
         // masking is OK here because this we have already ensured
         // that Self.bitWidth > ${word_bits}.  Not masking results in
@@ -2801,7 +2801,7 @@ ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public func _word(at n: Int) -> UInt {
     _precondition(n >= 0, "Negative word index")
-    if _fastPath(n < countRepresentedWords) {
+    if _fastPath(n < _countRepresentedWords) {
       let shift = UInt(n._value) &* ${word_bits}
       let bitWidth = UInt(self.bitWidth._value)
       _sanityCheck(shift < bitWidth)
