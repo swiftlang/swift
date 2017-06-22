@@ -39,7 +39,7 @@ static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
 }
 
 bool swift::writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
-                     StringRef OutputFilename) {
+                     bool silSerializeWitnessTables, StringRef OutputFilename) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
   if (EC) {
@@ -50,7 +50,7 @@ bool swift::writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
   llvm::StringSet<> symbols;
   for (auto file : M->getFiles())
     enumeratePublicSymbols(file, symbols, hasMultipleIRGenThreads,
-                           /*isWholeModule=*/true);
+                           /*isWholeModule=*/true, silSerializeWitnessTables);
 
   // Ensure the order is stable.
   for (auto &symbol : sortSymbols(symbols)) {
@@ -125,11 +125,12 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
 
 bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule,
                         bool hasMultipleIRGenThreads,
+                        bool silSerializeWitnessTables,
                         bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;
   for (auto file : M->getFiles())
     enumeratePublicSymbols(file, symbols, hasMultipleIRGenThreads,
-                           /*isWholeModule=*/true);
+                           /*isWholeModule=*/true, silSerializeWitnessTables);
 
   return validateSymbolSet(M->getASTContext().Diags, symbols, IRModule,
                            diagnoseExtraSymbolsInTBD);
@@ -137,10 +138,11 @@ bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule,
 
 bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule,
                         bool hasMultipleIRGenThreads,
+                        bool silSerializeWitnessTables,
                         bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;
   enumeratePublicSymbols(file, symbols, hasMultipleIRGenThreads,
-                         /*isWholeModule=*/false);
+                         /*isWholeModule=*/false, silSerializeWitnessTables);
 
   return validateSymbolSet(file->getParentModule()->getASTContext().Diags,
                            symbols, IRModule, diagnoseExtraSymbolsInTBD);
