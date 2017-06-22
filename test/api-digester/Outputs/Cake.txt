@@ -1,7 +1,6 @@
 
 /* Removed Decls */
 Class C3 has been removed
-Constructor C1.init() has been removed
 Constructor Somestruct2.init(_:) has been removed
 
 /* Moved Decls */
