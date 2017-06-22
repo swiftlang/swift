@@ -382,7 +382,9 @@ NativeConventionSchema::getCoercionTypes(
           packed = true;
         elts.push_back(type);
         expandedTyIndicesMap.push_back(idx - 1);
-        lastEnd = end;
+        lastEnd = begin + clang::CharUnits::fromQuantity(
+                              IGM.DataLayout.getTypeAllocSize(type));
+        assert(end <= lastEnd);
       });
 
   auto *coercionType = llvm::StructType::get(ctx, elts, packed);
@@ -419,7 +421,9 @@ NativeConventionSchema::getCoercionTypes(
           packed = true;
         elts.push_back(type);
         expandedTyIndicesMap.push_back(idx - 1);
-        lastEnd = end;
+        lastEnd = begin + clang::CharUnits::fromQuantity(
+                              IGM.DataLayout.getTypeAllocSize(type));
+        assert(end <= lastEnd);
       });
   auto *overlappedCoercionType = llvm::StructType::get(ctx, elts, packed);
   return {coercionType, overlappedCoercionType};
