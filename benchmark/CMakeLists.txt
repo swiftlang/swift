@@ -50,7 +50,6 @@ set(SWIFT_BENCH_MODULES
     single-source/ErrorHandling
     single-source/ExistentialPerformance
     single-source/Fibonacci
-    single-source/GlobalClass
     single-source/Hanoi
     single-source/Hash
     single-source/HashQuadratic
