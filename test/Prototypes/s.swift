@@ -605,7 +605,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
   where S.Element == Element {
     let knownMutable = _reserveCapacity(forAppending: source_)
     
-    var source = source_.makeIterator()
+    var source = IteratorSequence(source_.makeIterator())
     defer { _fixLifetime(self) }
 
     switch _content {
@@ -650,15 +650,18 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       
     case .utf16(let x) where knownMutable || _dynamicStorageIsMutable != false:
       x._withMutableCapacity { buf in
-        for i in count..<buf.count {
-          guard let u = source.next() else { break }
-          buf[i] = u
-          x.count += 1
-        }
+        var availableCapacity = UnsafeMutableBufferPointer(
+          start: buf.baseAddress._unsafelyUnwrappedUnchecked + x.count,
+          count: buf.count - x.count)
+        let (newSource, copiedCount) = source._copyContents(
+          initializing: availableCapacity
+        )
+        x.count += copiedCount
+        source = newSource
       }
     default: break
     }
-    for u in IteratorSequence(source) { append(u) }
+    for u in source { append(u) }
   }
 
   mutating func append(_ u: UInt16) {
