@@ -534,31 +534,41 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
     }
   }
 
+  internal var _dynamicStorageIsMutable: Bool? {
+    mutating get {
+      return _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced()
+    }
+  }
+
+  /// Reserve space for appending `s`, gathering as much of the appropriate space
+  /// as possible without consuming `s`.
+  ///
+  /// - Returns: `true` if `self` is known to have mutable capacity.
   @inline(__always)
-  mutating func reserveCapacity<S: Sequence>(forAppending s: S)
+  mutating func _reserveCapacity<S: Sequence>(forAppending s: S) -> Bool
   where S.Element == UInt16 {
     let growth = s.underestimatedCount
-    guard growth > 0 else { return }
+    guard growth > 0 else { return false }
 
     let minCapacity = count + growth
 
     var forceUTF16 = false
 
     // We have enough capacity and can write our storage
-    if capacity >= minCapacity
-    && _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced() != false {
+    if capacity >= minCapacity && _dynamicStorageIsMutable != false {
       // If our storage is already wide enough, we're done
-      if _content._withExistingLatin1Buffer({ _ in () }) == nil { return }
-      if (s._preprocessingPass { s.max() ?? 0 } ?? 0) <= 0xFF { return }
+      if _content._withExistingLatin1Buffer({ _ in () }) == nil { return true }
+      if (s._preprocessingPass { s.max() ?? 0 } ?? 0) <= 0xFF { return true }
       // Otherwise, widen when reserving
       forceUTF16 = true
     }
     
-    _reserveCapacitySlow(
+    _allocateCapacity(
       Swift.max(minCapacity, 2 * count), forcingUTF16: forceUTF16)
+    return true
   }
 
-  mutating func _reserveCapacitySlow(_ minCapacity: Int, forcingUTF16: Bool) {
+  mutating func _allocateCapacity(_ minCapacity: Int, forcingUTF16: Bool) {
     if let _ = _content._withExistingLatin1Buffer({ buf in
         if !forcingUTF16 {
           self._content = .latin1(
@@ -586,20 +596,17 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
   }
   
   mutating func reserveCapacity(_ minCapacity: Int) {
-    if capacity < minCapacity
-    || _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced() == false {
-      _reserveCapacitySlow(minCapacity, forcingUTF16: false)
+    if capacity < minCapacity || _dynamicStorageIsMutable == false {
+      _allocateCapacity(minCapacity, forcingUTF16: false)
     }
   }
   
   mutating func append<S: Sequence>(contentsOf source_: S)
   where S.Element == Element {
-    reserveCapacity(forAppending: source_)
-
+    let knownMutable = _reserveCapacity(forAppending: source_)
+    
     var source = source_.makeIterator()
     defer { _fixLifetime(self) }
-
-    let isUnique = _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced()
 
     switch _content {
     case .inline8(var x):
@@ -616,7 +623,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
         }
       }
       
-    case .latin1(let x) where isUnique == true:
+    case .latin1(let x) where knownMutable || _dynamicStorageIsMutable != false:
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
           guard let u = source.next() else { break }
@@ -641,7 +648,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
         }
       }
       
-    case .utf16(let x) where isUnique == true:
+    case .utf16(let x) where knownMutable || _dynamicStorageIsMutable != false:
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
           guard let u = source.next() else { break }
@@ -655,14 +662,12 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
   }
 
   mutating func append(_ u: UInt16) {
-    reserveCapacity(forAppending: CollectionOfOne(u))
+    let knownUnique = _reserveCapacity(forAppending: CollectionOfOne(u))
     
     defer { _fixLifetime(self) }
     
     // In-place mutation
-    if _fastPath(
-      _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced() != false
-    ) {
+    if _fastPath(knownUnique || _dynamicStorageIsMutable != false) {
       switch self._content {
       case .inline8(var x) where u <= 0xFF:
         x.append(UInt8(u))
@@ -699,8 +704,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
     var maxNewElement: UInt16? = nil
     
     // In-place dynamic buffer
-    if _rangeReplaceableStorageID?
-       ._liveObjectIsUniquelyReferenced() == true {
+    if _dynamicStorageIsMutable == true {
       switch self._content {
       case .latin1(let x):
         maxNewElement = newElements.max() ?? 0
