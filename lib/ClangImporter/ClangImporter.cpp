@@ -563,24 +563,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     }
   }
 
-  if (triple.isOSDarwin()) {
-    std::string minVersionBuf;
-    llvm::raw_string_ostream minVersionOpt{minVersionBuf};
-    minVersionOpt << getMinVersionOptNameForDarwinTriple(triple);
-
-    unsigned major, minor, micro;
-    if (triple.isiOS()) {
-      triple.getiOSVersion(major, minor, micro);
-    } else if (triple.isWatchOS()) {
-      triple.getWatchOSVersion(major, minor, micro);
-    } else {
-      assert(triple.isMacOSX());
-      triple.getMacOSXVersion(major, minor, micro);
-    }
-    minVersionOpt << clang::VersionTuple(major, minor, micro);
-    invocationArgStrs.push_back(std::move(minVersionOpt.str()));
-  }
-
   if (searchPathOpts.SDKPath.empty()) {
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
@@ -664,6 +646,24 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   invocationArgStrs.push_back("-target");
   invocationArgStrs.push_back(triple.str());
+
+  if (triple.isOSDarwin()) {
+    std::string minVersionBuf;
+    llvm::raw_string_ostream minVersionOpt{minVersionBuf};
+    minVersionOpt << getMinVersionOptNameForDarwinTriple(triple);
+
+    unsigned major, minor, micro;
+    if (triple.isiOS()) {
+      triple.getiOSVersion(major, minor, micro);
+    } else if (triple.isWatchOS()) {
+      triple.getWatchOSVersion(major, minor, micro);
+    } else {
+      assert(triple.isMacOSX());
+      triple.getMacOSXVersion(major, minor, micro);
+    }
+    minVersionOpt << clang::VersionTuple(major, minor, micro);
+    invocationArgStrs.push_back(std::move(minVersionOpt.str()));
+  }
 
   invocationArgStrs.push_back(ImporterImpl::moduleImportBufferName);
 
