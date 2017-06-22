@@ -1082,6 +1082,43 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         
     }
     
+    // slightly faster paths for common sequences
+    
+    public init<S: Sequence>(_ elements: S) where S.Iterator.Element == UInt8 {
+        let underestimatedCount = elements.underestimatedCount
+        self.init(count: underestimatedCount)
+        var idx = 0
+        for byte in elements {
+            if idx < underestimatedCount {
+                self[idx] = byte
+            } else {
+                self.append(byte)
+            }
+            idx += 1
+        }
+    }
+    
+    public init(_ bytes: Array<UInt8>) {
+        self.init(bytes: bytes)
+    }
+    
+    public init(_ bytes: ArraySlice<UInt8>) {
+        self.init(bytes: bytes)
+    }
+    
+    public init(_ buffer: UnsafeBufferPointer<UInt8>) {
+        self.init(buffer: buffer)
+    }
+    
+    public init(_ buffer: UnsafeMutableBufferPointer<UInt8>) {
+        self.init(buffer: buffer)
+    }
+    
+    public init(_ data: Data) {
+        _sliceRange = 0..<data.count
+        _backing = data._backing.mutableCopy(data._sliceRange)
+    }
+    
     @_versioned
     internal init(backing: _DataStorage, range: Range<Index>) {
         _backing = backing
