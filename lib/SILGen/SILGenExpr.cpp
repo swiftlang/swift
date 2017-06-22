@@ -1422,8 +1422,6 @@ ManagedValue emitCFunctionPointer(SILGenFunction &gen,
     // in the metatype.
     assert(!declRef.getDecl()->getDeclContext()->isTypeContext()
            && "c pointers to static methods not implemented");
-    assert(declRef.getSubstitutions().empty()
-           && "c pointers to generics not implemented");
     loc = declRef.getDecl();
   };
   
