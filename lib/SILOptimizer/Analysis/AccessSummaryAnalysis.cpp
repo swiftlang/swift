@@ -131,46 +131,45 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
 /// only ultimately used by an apply, a try_apply or as an argument (but not
 /// the called function) in a partial_apply.
 /// TODO: This really should be checked in the SILVerifier.
-static bool hasExpectedUsesOfNoEscapePartialApply(SILInstruction *closure) {
-  for (Operand *use : closure->getUses()) {
-    SILInstruction *user = use->getUser();
+static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
+  SILInstruction *user = partialApplyUse->getUser();
 
-    // It is fine to call the partial apply
-    switch (user->getKind()) {
-    case ValueKind::ApplyInst:
-    case ValueKind::TryApplyInst:
-      return true;
+  // It is fine to call the partial apply
+  switch (user->getKind()) {
+  case ValueKind::ApplyInst:
+  case ValueKind::TryApplyInst:
+    return true;
 
-    case ValueKind::ConvertFunctionInst:
-      return hasExpectedUsesOfNoEscapePartialApply(user);
+  case ValueKind::ConvertFunctionInst:
+    return llvm::all_of(user->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
 
-    case ValueKind::PartialApplyInst:
-      return closure != cast<PartialApplyInst>(user)->getCallee();
+  case ValueKind::PartialApplyInst:
+    return partialApplyUse->get() != cast<PartialApplyInst>(user)->getCallee();
 
-    case ValueKind::StoreInst:
-    case ValueKind::DestroyValueInst:
-      // @block_storage is passed by storing it to the stack. We know this is
-      // still nonescaping simply because our original argument convention is
-      // @inout_aliasable. In this SIL, both store and destroy_value are users
-      // of %closure:
-      //
-      // %closure = partial_apply %f1(%arg)
-      //   : $@convention(thin) (@inout_aliasable T) -> ()
-      // %storage = alloc_stack $@block_storage @callee_owned () -> ()
-      // %block_addr = project_block_storage %storage
-      //   : $*@block_storage @callee_owned () -> ()
-      // store %closure to [init] %block_addr : $*@callee_owned () -> ()
-      // %block = init_block_storage_header %storage
-      //     : $*@block_storage @callee_owned () -> (),
-      //   invoke %f2 : $@convention(c)
-      //     (@inout_aliasable @block_storage @callee_owned () -> ()) -> (),
-      //   type $@convention(block) () -> ()
-      // %copy = copy_block %block : $@convention(block) () -> ()
-      // destroy_value %storage : $@callee_owned () -> ()
-      return true;
-    default:
-      return false;
-    }
+  case ValueKind::StoreInst:
+  case ValueKind::DestroyValueInst:
+    // @block_storage is passed by storing it to the stack. We know this is
+    // still nonescaping simply because our original argument convention is
+    // @inout_aliasable. In this SIL, both store and destroy_value are users
+    // of %closure:
+    //
+    // %closure = partial_apply %f1(%arg)
+    //   : $@convention(thin) (@inout_aliasable T) -> ()
+    // %storage = alloc_stack $@block_storage @callee_owned () -> ()
+    // %block_addr = project_block_storage %storage
+    //   : $*@block_storage @callee_owned () -> ()
+    // store %closure to [init] %block_addr : $*@callee_owned () -> ()
+    // %block = init_block_storage_header %storage
+    //     : $*@block_storage @callee_owned () -> (),
+    //   invoke %f2 : $@convention(c)
+    //     (@inout_aliasable @block_storage @callee_owned () -> ()) -> (),
+    //   type $@convention(block) () -> ()
+    // %copy = copy_block %block : $@convention(block) () -> ()
+    // destroy_value %storage : $@callee_owned () -> ()
+    return true;
+  default:
+    return false;
   }
 }
 #endif
@@ -189,8 +188,9 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
   assert(isa<FunctionRefInst>(apply->getCallee()) &&
          "Noescape partial apply of non-functionref?");
 
-  assert(hasExpectedUsesOfNoEscapePartialApply(apply)
-         && "noescape partial_apply has unexpected use!");
+  assert(llvm::all_of(apply->getUses(),
+                      hasExpectedUsesOfNoEscapePartialApply) &&
+         "noescape partial_apply has unexpected use!");
 
   // The argument index in the called function.
   ApplySite site(apply);
