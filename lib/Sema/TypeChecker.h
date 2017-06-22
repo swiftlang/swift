@@ -837,7 +837,7 @@ private:
 
   /// If non-zero, abort the expression type checker if it takes more
   /// than this many seconds.
-  unsigned ExpressionTimeoutThreshold = 60;
+  unsigned ExpressionTimeoutThreshold = 600;
 
   /// If true, the time it takes to type-check each function will be dumped
   /// to llvm::errs().
