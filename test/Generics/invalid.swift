@@ -54,8 +54,8 @@ func eatDinnerConcrete(d: Pizzas<Pepper>.DeepDish,
 func badDiagnostic1() {
 
   _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>(
-      leftovers: Pizzas<ChiliFlakes>.NewYork(),
-      transformation: { _ in HotDog() }) // expected-error {{cannot convert value of type 'HotDog' to closure result type '_'}}
+      leftovers: Pizzas<ChiliFlakes>.NewYork(),  // expected-error {{cannot convert value of type 'Pizzas<ChiliFlakes>.NewYork' to expected argument type 'Pizzas<Pepper>.NewYork'}}
+      transformation: { _ in HotDog() })
 }
 
 func badDiagnostic2() {
