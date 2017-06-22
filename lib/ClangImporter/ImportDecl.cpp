@@ -5288,16 +5288,30 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
   auto &C = Impl.SwiftContext;
   SmallVector<ParameterList *, 2> bodyParams;
 
-  // There is an inout 'self' when we have an instance method of a
-  // value-semantic type whose 'self' parameter is a
-  // pointer-to-non-const.
+  // There is an inout 'self' when the parameter is a pointer to a non-const
+  // instance of the type we're importing onto. Importing this as a method means
+  // that the method should be treated as mutating in this situation.
   bool selfIsInOut = false;
   if (selfIdx && !dc->getDeclaredTypeOfContext()->hasReferenceSemantics()) {
     auto selfParam = decl->getParamDecl(*selfIdx);
     auto selfParamTy = selfParam->getType();
     if ((selfParamTy->isPointerType() || selfParamTy->isReferenceType()) &&
-        !selfParamTy->getPointeeType().isConstQualified())
+        !selfParamTy->getPointeeType().isConstQualified()) {
       selfIsInOut = true;
+
+      // If there's a swift_newtype, check the levels of indirection: self is
+      // only inout if this is a pointer to the typedef type (which itself is a
+      // pointer).
+      if (auto nominalTypeDecl =
+              dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        if (auto clangDCTy = dyn_cast_or_null<clang::TypedefNameDecl>(
+                nominalTypeDecl->getClangDecl()))
+          if (auto newtypeAttr = getSwiftNewtypeAttr(clangDCTy, getVersion()))
+            if (clangDCTy->getUnderlyingType().getCanonicalType() !=
+                selfParamTy->getPointeeType().getCanonicalType())
+              selfIsInOut = false;
+      }
+    }
   }
 
   bodyParams.push_back(ParameterList::createWithoutLoc(ParamDecl::createSelf(

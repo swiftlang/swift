@@ -159,3 +159,71 @@ class ObjCTest {
     return num
   }
 }
+
+// OPT-LABEL: _T07newtype6mutateyyF
+public func mutate() {
+  // Check for a mismatch in indirectness of the swift_newtype and the Clang
+  // type. These pointers should be passed directly for non-mutating functions,
+  // rather than passing a pointer indirectly. I.e. only 1 overall level of
+  // indirection for non-mutating, 2 for mutating.
+  //
+  // OPT: [[TRefAlloca:%.+]] = alloca %struct.T*, align 8
+  // OPT: [[TRef:%.+]] = tail call %struct.T* @create_T()
+  // OPT: store %struct.T* [[TRef]], %struct.T** [[TRefAlloca]], align 8
+  var myT = create_T()
+
+  // OPT: [[TRefConst:%.+]] = tail call %struct.T* @create_ConstT()
+  let myConstT = create_ConstT()
+
+  // OPT: tail call void @mutate_TRef_Pointee(%struct.T* [[TRef]])
+  myT.mutatePointee()
+
+  // OPT: call void @mutate_TRef(%struct.T** nonnull [[TRefAlloca]])
+  myT.mutate()
+
+  // Since myT itself got mutated, now we have to reload from the alloca
+  //
+  // OPT: [[TRefReloaded:%.+]] = load %struct.T*, %struct.T** [[TRefAlloca]], align 8
+  // OPT: call void @mutate_TRef_Pointee(%struct.T* [[TRefReloaded]])
+  myT.mutatePointee()
+
+  // OPT: call void @use_ConstT(%struct.T* [[TRefConst]])
+  myConstT.use()
+
+  // OPT: ret void
+}
+
+// OPT-LABEL: _T07newtype9mutateRefyyF
+public func mutateRef() {
+  // Check for a mismatch in indirectness of the swift_newtype and the Clang
+  // type. These pointer pointers should be passed directly, rather than passing
+  // a pointer pointer indirectly. I.e. only 2 overall levels of indirection for
+  // non-mutating, 3 for mutating.
+  //
+  // OPT: [[TRefRefAlloca:%.+]] = alloca %struct.T**, align 8
+  // OPT: [[TRefRef:%.+]] = tail call %struct.T** @create_TRef()
+  // OPT: store %struct.T** [[TRefRef]], %struct.T*** [[TRefRefAlloca]], align 8
+  var myTRef = create_TRef()
+
+  // OPT: [[ConstTRefRef:%.+]] = tail call %struct.T** @create_ConstTRef()
+  let myConstTRef = create_ConstTRef()
+
+  // OPT: tail call void @mutate_TRefRef_Pointee(%struct.T** [[TRefRef]])
+  myTRef.mutatePointee()
+
+  // OPT: call void @mutate_TRefRef(%struct.T*** nonnull [[TRefRefAlloca]])
+  myTRef.mutate()
+
+  // Since myTRef itself got mutated, now we have to reload from the alloca
+  //
+  // OPT: [[TRefReloaded:%.+]] = load %struct.T**, %struct.T*** [[TRefRefAlloca]], align 8
+  // OPT: call void @mutate_TRefRef_Pointee(%struct.T** [[TRefReloaded]])
+  myTRef.mutatePointee()
+
+  // OPT: call void @use_ConstTRef(%struct.T** [[ConstTRefRef]])
+  myConstTRef.use()
+
+  // OPT: ret void
+}
+
+
