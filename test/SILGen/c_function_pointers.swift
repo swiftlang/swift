@@ -63,3 +63,9 @@ struct StructWithInitializers {
   init(a: ()) {}
   init(b: ()) {}
 }
+
+func pointers_to_nested_local_functions_in_generics<T>(x: T) -> Int{
+  func foo(y: Int) -> Int { return y }
+
+  return calls(foo, 0)
+}
