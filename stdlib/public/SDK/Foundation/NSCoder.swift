@@ -145,27 +145,13 @@ extension NSKeyedUnarchiver {
   }
 
   @nonobjc
-  @available(swift, obsoleted: 4)
-  @available(OSX 10.11, iOS 9.0, *)
-  public class func unarchiveTopLevelObjectWithData(_ data: Data) throws -> AnyObject? {
-      return try self.unarchiveTopLevelObjectWithData(data as NSData)
-  }
-
-  @nonobjc
-  @available(swift, introduced: 4)
-  @available(OSX 10.11, iOS 9.0, *)
-  public class func unarchiveTopLevelObjectWithData(_ data: NSData) throws -> Any? {
-    var error: NSError?
-    let result = __NSKeyedUnarchiverUnarchiveObject(self, data, &error)
-    try resolveError(error)
-    return result
-  }
-
-  @nonobjc
   @available(swift, introduced: 4)
   @available(OSX 10.11, iOS 9.0, *)
   public class func unarchiveTopLevelObjectWithData(_ data: Data) throws -> Any? {
-      return try self.unarchiveTopLevelObjectWithData(data as NSData)
+    var error: NSError?
+    let result = __NSKeyedUnarchiverUnarchiveObject(self, data as NSData, &error)
+    try resolveError(error)
+    return result
   }
 }
 
