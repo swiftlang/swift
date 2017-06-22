@@ -105,3 +105,46 @@ test2(42)()
 
 print("END: func local")
 // CHECK-NEXT: END: func local
+
+//------------------------------------------------------------------------------
+print("START: nested directives")
+// CHECK-LABEL: START: nested directives
+
+#if PATTERN_1 || PATTERN_2
+func test3() {
+#if PATTERN_1 || PATTERN_2
+  class Nested {
+#if PATTERN_1 || PATTERN_2
+    func foo(_ x: Int) {
+      switch x {
+#if true
+#if PATTERN_1
+      case 0..<42:
+        print("output7 - 0..<42 \(x)")
+#elseif PATTERN_2
+      case 0..<42:
+        print("output8 - 0..<42 \(x)")
+#else
+      case 0..<42:
+        print("NEVER")
+#endif
+      default:
+        print("output9 - default \(x)")
+#endif
+      }
+    }
+#endif
+  }
+  Nested().foo(12)
+#endif
+  Nested().foo(53)
+}
+#endif
+test3()
+// CHECK1-NEXT: output7 - 0..<42 12
+// CHECK1-NEXT: output9 - default 53
+// CHECK2-NEXT: output8 - 0..<42 12
+// CHECK2-NEXT: output9 - default 53
+
+print("END: nested directives")
+// CHECK-NEXT: END: nested directives
