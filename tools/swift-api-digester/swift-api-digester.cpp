@@ -2666,7 +2666,8 @@ void DiagnosisEmitter::collectAddedDecls(NodePtr Root,
 SDKNodeDecl *DiagnosisEmitter::findAddedDecl(const SDKNodeDecl *Root) {
   for (auto *Added : AddedDecls) {
     if (Root->getKind() == Added->getKind() &&
-        Root->getPrintedName() == Added->getPrintedName())
+        Root->getPrintedName() == Added->getPrintedName() &&
+        Root->getUsr() == Added->getUsr())
       return Added;
   }
   return nullptr;
