@@ -14,27 +14,28 @@
 import Foundation
 
 #if os(iOS) || os(watchOS)
-@available(iOS 11.0, watchOS 4.0, *)
+@available(iOS 10.0, watchOS 3.2, *)
 extension INSearchCallHistoryIntent {
-    @nonobjc
-    public convenience init(
-        dateCreated: INDateComponentsRange? = nil,
-        recipient: INPerson? = nil,
-        callCapabilities: INCallCapabilityOptions,
-        callTypes: INCallRecordTypeOptions,
-        unseen: Bool? = nil
-        ) {
+  @available(iOS 10.0, watchOS 3.2, *)
+  @nonobjc
+  public convenience init(
+    dateCreated: INDateComponentsRange? = nil,
+    recipient: INPerson? = nil,
+    callCapabilities: INCallCapabilityOptions,
+    callTypes: INCallRecordTypeOptions,
+    unseen: Bool? = nil
+  ) {
+    self.init(__dateCreated: dateCreated,
+      recipient: recipient,
+      callCapabilities: callCapabilities,
+      callTypes: callTypes,
+      unseen: unseen.map { NSNumber(value: $0) })
+  }
 
-        self.init(__dateCreated: dateCreated,
-                  recipient: recipient,
-                  callCapabilities: callCapabilities,
-                  callTypes: callTypes,
-                  unseen: unseen.map { NSNumber(value: $0) })
-    }
-    
-    @nonobjc
-    public final var unseen: Bool? {
-        return __unseen?.boolValue
-    }
+  @available(iOS 11.0, watchOS 4.0, *)
+  @nonobjc
+  public final var unseen: Bool? {
+    return __unseen?.boolValue
+  }
 }
 #endif
