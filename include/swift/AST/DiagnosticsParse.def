@@ -1421,7 +1421,7 @@ WARNING(swift3_where_inside_brackets,none,
         "'where' clause next to generic parameters is deprecated "
         "and will be removed in the future version of Swift", ())
 ERROR(where_inside_brackets,none,
-        "'where' clause next to generic parameters is obsoleted", ())
+        "'where' clause next to generic parameters is obsolete", ())
 
 //------------------------------------------------------------------------------
 // Conditional compilation parsing diagnostics
