@@ -2560,8 +2560,8 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   if (auto VD = dyn_cast<VarDecl>(D)) {
     auto staticSpelling = VD->getParentPatternBinding()->getStaticSpelling();
 
-    // The presence of 'static' bocks the inference of 'dynamic'.
-    if (VD->isStatic() && staticSpelling == StaticSpellingKind::KeywordStatic)
+    // The presence of 'static' blocks the inference of 'dynamic'.
+    if (staticSpelling == StaticSpellingKind::KeywordStatic)
       return;
 
     if (VD->isLet() && !isNSManaged)
@@ -2577,7 +2577,7 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     auto staticSpelling = FD->getStaticSpelling();
 
     // The presence of 'static' bocks the inference of 'dynamic'.
-    if (FD->isStatic() && staticSpelling == StaticSpellingKind::KeywordStatic)
+    if (staticSpelling == StaticSpellingKind::KeywordStatic)
       return;
   }
 
