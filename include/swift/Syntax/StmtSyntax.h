@@ -59,7 +59,6 @@ public:
 
 class UnknownStmtSyntax : public UnknownSyntax {
   friend class SyntaxData;
-  friend class UnknownStmtSyntaxData;
   friend class LegacyASTTransformer;
 
   virtual void validate() const override;
@@ -128,8 +127,6 @@ public:
 class FallthroughStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
   friend class SyntaxData;
-  friend class FallthroughStmtSyntaxData;
-
 
   enum class Cursor : CursorIndex {
     FallthroughKeyword,
@@ -162,7 +159,6 @@ public:
 /// label-name -> identifier
 class BreakStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-  friend class BreakStmtSyntaxData;
   friend class SyntaxData;
 
 
@@ -202,9 +198,7 @@ public:
 /// label-name -> identifier
 class ContinueStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-  friend class ContinueStmtSyntaxData;
   friend class SyntaxData;
-
 
   enum class Cursor : CursorIndex {
     ContinueKeyword,
@@ -241,7 +235,6 @@ public:
 /// return-statement -> 'return' expression? ';'?
 class ReturnStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-  friend class ReturnStmtSyntaxData;
   friend class SyntaxData;
   friend class Syntax;
 

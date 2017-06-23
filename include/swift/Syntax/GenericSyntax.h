@@ -28,7 +28,6 @@ namespace syntax {
 
 class TypeSyntax;
 class TypeIdentifierSyntax;
-class TypeIdentifierSyntaxData;
 
 #pragma mark - generic-requirement API
 
@@ -54,7 +53,6 @@ public:
 /// conformance-requirement -> type-identifier : type-identifier
 class ConformanceRequirementSyntax final : public GenericRequirementSyntax {
 
-  friend class ConformanceRequirementSyntaxData;
   friend class SyntaxData;
   friend class Syntax;
 

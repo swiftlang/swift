@@ -57,7 +57,6 @@ public:
 
 class UnknownExprSyntax : public UnknownSyntax {
   friend class SyntaxData;
-  friend class UnknownExprSyntaxData;
   friend class LegacyASTTransformer;
 
   virtual void validate() const override;
@@ -75,7 +74,6 @@ public:
 class IntegerLiteralExprSyntax : public ExprSyntax {
     friend struct SyntaxFactory;
   friend class SyntaxData;
-  friend class IntegerLiteralExprSyntaxData;
 
   virtual void validate() const override;
 
@@ -121,7 +119,6 @@ class SymbolicReferenceExprSyntax : public ExprSyntax {
   friend struct SyntaxFactory;
   friend class SyntaxData;
   friend class Syntax;
-  friend class SymbolicReferenceExprSyntaxData;
 
   enum class Cursor : CursorIndex {
     Identifier,
@@ -220,7 +217,6 @@ public:
 
 class FunctionCallExprSyntax : public ExprSyntax {
   friend struct SyntaxFactory;
-  friend class FunctionCallExprSyntaxData;
   friend class FunctionCallExprSyntaxBuilder;
   friend class Syntax;
   friend class SyntaxData;

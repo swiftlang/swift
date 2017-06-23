@@ -66,7 +66,6 @@ class DeclModifierSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
-  friend class DeclModifierSyntaxData;
 
   enum class Cursor : CursorIndex {
     Name,
@@ -136,7 +135,6 @@ public:
 
 class UnknownDeclSyntax : public UnknownSyntax {
   friend class SyntaxData;
-  friend class UnknownStmtSyntaxData;
   friend class LegacyASTTransformer;
 
   virtual void validate() const override;
@@ -198,7 +196,6 @@ class StructDeclSyntax final : public DeclSyntax {
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
-  friend class StructDeclSyntaxData;
   friend class StructDeclSyntaxBuilder;
 
   enum class Cursor : CursorIndex {
@@ -299,7 +296,6 @@ public:
 class TypeAliasDeclSyntax final : public DeclSyntax {
   friend struct SyntaxFactory;
   friend class SyntaxData;
-  friend class TypeAliasDeclSyntaxData;
   friend class TypeAliasDeclSyntaxBuilder;
 
   enum Cursor : CursorIndex {
@@ -389,7 +385,6 @@ class FunctionParameterSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
-  friend class FunctionParameterSyntaxData;
 
   enum class Cursor : CursorIndex {
     ExternalName,
@@ -483,7 +478,6 @@ class FunctionSignatureSyntax final : public Syntax {
   friend struct SyntaxBuilder;
   friend class Syntax;
   friend class SyntaxData;
-  friend class FunctionSignatureSyntaxData;
 
   enum class Cursor : CursorIndex {
     LeftParen,
@@ -569,7 +563,6 @@ class FunctionDeclSyntax final : public DeclSyntax {
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
-  friend class FunctionDeclSyntaxData;
 
   enum class Cursor : CursorIndex {
     Attributes,

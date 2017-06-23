@@ -152,7 +152,6 @@ public:
 ///                  | type-name generic-argument-clause '.' type-identifier
 class TypeIdentifierSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class TypeIdentifierSyntaxData;
   friend class SyntaxData;
 
 private:
@@ -266,7 +265,6 @@ public:
 /// tuple-type -> '(' tuple-type-element-list ')'
 class TupleTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class TupleTypeSyntaxData;
   friend class SyntaxData;
   friend class TupleTypeSyntaxBuilder;
 
@@ -337,7 +335,6 @@ public:
 ///                | type '.' 'Protocol'
 class MetatypeTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class MetatypeTypeSyntaxData;
   friend class SyntaxData;
 
   enum class Cursor : CursorIndex {
@@ -380,7 +377,6 @@ public:
 /// optional-type -> type '?'
 class OptionalTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class OptionalTypeSyntaxData;
   friend class SyntaxData;
 
   enum class Cursor : CursorIndex {
@@ -501,7 +497,6 @@ public:
 // dictionary-type -> '[' type ':' type ']'
 class DictionaryTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class DictionaryTypeSyntaxData;
   friend class SyntaxData;
 
   enum class Cursor : CursorIndex {
