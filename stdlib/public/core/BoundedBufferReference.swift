@@ -165,7 +165,7 @@ extension _BoundedBufferReference {
       minCapacity: minCapacity)
     
     r.withUnsafeMutableBufferPointer {
-      elements._copyCompleteContents(initializing: $0)
+      elements._copyContents(initializing: $0)
     }
     return r
   }
