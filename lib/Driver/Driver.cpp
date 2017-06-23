@@ -173,8 +173,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
                      diag::verify_debug_info_requires_debug_option);
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(options::OPT_D),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(options::OPT_D)) {
     StringRef name = A->getValue();
     if (name.find('=') != StringRef::npos)
       diags.diagnose(SourceLoc(),
