@@ -949,21 +949,17 @@ static bool replaceModuleFlagsEntry(llvm::LLVMContext &Ctx,
 }
 
 void IRGenModule::emitAutolinkInfo() {
-
-  // FIXME: This constant should be vended by LLVM somewhere.
-  static const char * const LinkerOptionsFlagName = "Linker Options";
-
   // Collect the linker options already in the module (from ClangCodeGen).
-  auto *LinkerOptions = Module.getModuleFlag(LinkerOptionsFlagName);
-  if (LinkerOptions)
-    for (const auto &LinkOption : cast<llvm::MDNode>(LinkerOptions)->operands())
-      AutolinkEntries.push_back(LinkOption);
+  // FIXME: This constant should be vended by LLVM somewhere.
+  auto *Metadata = Module.getOrInsertNamedMetadata("llvm.linker.options");
+  for (llvm::MDNode *LinkOption : Metadata->operands())
+    AutolinkEntries.push_back(LinkOption);
 
   // Remove duplicates.
-  llvm::SmallPtrSet<llvm::Metadata*, 4> knownAutolinkEntries;
+  llvm::SmallPtrSet<llvm::MDNode *, 4> knownAutolinkEntries;
   AutolinkEntries.erase(std::remove_if(AutolinkEntries.begin(),
                                        AutolinkEntries.end(),
-                                       [&](llvm::Metadata *entry) -> bool {
+                                       [&](llvm::MDNode *entry) -> bool {
                                          return !knownAutolinkEntries.insert(
                                                    entry).second;
                                        }),
@@ -972,21 +968,12 @@ void IRGenModule::emitAutolinkInfo() {
   if ((TargetInfo.OutputObjectFormat == llvm::Triple::COFF &&
        !Triple.isOSCygMing()) ||
       TargetInfo.OutputObjectFormat == llvm::Triple::MachO || Triple.isPS4()) {
-    llvm::LLVMContext &ctx = Module.getContext();
 
-    if (!LinkerOptions) {
-      // Create a new linker flag entry.
-      Module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
-                           llvm::MDNode::get(ctx, AutolinkEntries));
-    } else {
-      // Replace the old linker flag entry.
-      bool FoundOldEntry = replaceModuleFlagsEntry(
-          ctx, Module, LinkerOptionsFlagName, llvm::Module::AppendUnique,
-          llvm::MDNode::get(ctx, AutolinkEntries));
+    // On platforms that support autolinking, continue to use the metadata.
+    Metadata->clearOperands();
+    for (auto *Entry : AutolinkEntries)
+      Metadata->addOperand(Entry);
 
-      (void)FoundOldEntry;
-      assert(FoundOldEntry && "Could not replace old linker options entry?");
-    }
   } else {
     assert((TargetInfo.OutputObjectFormat == llvm::Triple::ELF ||
             Triple.isOSCygMing()) &&
