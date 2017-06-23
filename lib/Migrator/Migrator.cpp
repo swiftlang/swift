@@ -53,9 +53,11 @@ bool migrator::updateCodeAndEmitRemap(CompilerInstance *Instance,
   }
 
   // Phase 2: Syntactic Transformations
-  auto FailedSyntacticPasses = M.performSyntacticPasses();
-  if (FailedSyntacticPasses) {
-    return true;
+  if (Invocation.getLangOptions().EffectiveLanguageVersion[0] < 4) {
+    auto FailedSyntacticPasses = M.performSyntacticPasses();
+    if (FailedSyntacticPasses) {
+      return true;
+    }
   }
 
   // Phase 3: Post Fix-it Passes
