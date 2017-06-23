@@ -206,9 +206,9 @@ extension String._UTF16Storage /*: UnicodeStorage*/ {
   where Source.Iterator.Element == UInt16 {
     let r = instanceWithUnintializedElements(
       count: numericCast(source.count), minCapacity: minCapacity)
-    _ = r.withUnsafeMutableBufferPointer {
-      source._copyCompleteContents(initializing: $0)
-    }
+    defer { _fixLifetime(r) }
+    var buf = r.withUnsafeMutableBufferPointer { $0 }
+    source._copyCompleteContents(initializing: buf)
     r._setMaxStored(maxElement ?? source.max() ?? 0)
     return r
   }
