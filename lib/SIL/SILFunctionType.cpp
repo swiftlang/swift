@@ -2318,7 +2318,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
 
   // Merge inputs and generic parameters from the uncurry levels.
   for (;;) {
-    inputs.push_back(TupleTypeElt(fnType->getInput()));
+    inputs.push_back(TupleTypeElt(fnType->getInput()->getCanonicalType()));
 
     // The uncurried function calls all of the intermediate function
     // levels and so throws if any of them do.

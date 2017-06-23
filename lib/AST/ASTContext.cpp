@@ -3186,6 +3186,30 @@ void AnyFunctionType::decomposeInput(
   }
 }
 
+Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
+                                   bool canonicalVararg) {
+  SmallVector<TupleTypeElt, 4> elements;
+  for (const auto &param : params) {
+    Type eltType = param.getType();
+    if (param.isVariadic()) {
+      if (canonicalVararg)
+        eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});
+      else
+        eltType = ArraySliceType::get(eltType);
+    }
+    elements.push_back(TupleTypeElt(eltType, param.getLabel(),
+                                    param.getParameterFlags()));
+  }
+  return TupleType::get(elements, ctx);
+}
+
+FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
+                                Type result, const ExtInfo &info,
+                                bool canonicalVararg) {
+  return get(composeInput(result->getASTContext(), params, canonicalVararg),
+             result, info);
+}
+
 FunctionType *FunctionType::get(Type input, Type result,
                                 const ExtInfo &info) {
   auto properties = getFunctionRecursiveProperties(input, result);
@@ -3213,7 +3237,8 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                            RecursiveTypeProperties properties,
                            const ExtInfo &Info)
     : AnyFunctionType(TypeKind::Function,
-                      (input->isCanonical() && output->isCanonical())
+                      (isCanonicalFunctionInputType(input) &&
+                       output->isCanonical())
                           ? &input->getASTContext()
                           : nullptr,
                       input, output, properties, params.size(), Info) {
@@ -3230,6 +3255,25 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(input.getPointer());
   ID.AddPointer(result.getPointer());
   ID.AddInteger(info.getFuncAttrKey());
+}
+
+/// If this is a ParenType, unwrap it to produce the underlying type.
+/// Otherwise, return \c type.
+static Type unwrapParenType(Type type) {
+  if (auto parenTy = dyn_cast<ParenType>(type.getPointer()))
+    return parenTy->getUnderlyingType();
+
+  return type;
+}
+
+GenericFunctionType *GenericFunctionType::get(GenericSignature *sig,
+                                              ArrayRef<Param> params,
+                                              Type result,
+                                              const ExtInfo &info,
+                                              bool canonicalVararg) {
+  return get(sig, composeInput(result->getASTContext(), params,
+                               canonicalVararg),
+             result, info);
 }
 
 GenericFunctionType *
@@ -3258,7 +3302,9 @@ GenericFunctionType::get(GenericSignature *sig,
   // point.
   auto &moduleForCanonicality = *ctx.TheBuiltinModule;
   bool isCanonical = sig->isCanonical()
-    && sig->isCanonicalTypeInContext(input, moduleForCanonicality)
+    && isCanonicalFunctionInputType(input)
+    && sig->isCanonicalTypeInContext(unwrapParenType(input),
+                                     moduleForCanonicality)
     && sig->isCanonicalTypeInContext(output, moduleForCanonicality);
 
   if (auto result
