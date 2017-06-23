@@ -113,7 +113,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     .frames = &oldPC
   };
   RuntimeErrorDetails details = {
-    .version = 1,
+    .version = RuntimeErrorDetails::currentVersion,
     .errorType = "exclusivity-violation",
     .currentStackDescription = newAccess,
     .framesToSkip = framesToSkip,
