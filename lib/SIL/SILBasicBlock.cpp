@@ -355,3 +355,7 @@ bool SILBasicBlock::isTrampoline() const {
     return false;
   return begin() == Branch->getIterator();
 }
+
+bool SILBasicBlock::isLegalToHoistInto() const {
+  return true;
+}
