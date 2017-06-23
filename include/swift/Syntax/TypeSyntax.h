@@ -135,7 +135,7 @@ class TypeSyntax : public Syntax {
   friend class FunctionParameterSyntax;
   friend class FunctionSignatureSyntax;
 protected:
-  virtual void validate() const override;
+  virtual void validate() const override {}
 
 public:
   static TypeSyntax makeBlank();

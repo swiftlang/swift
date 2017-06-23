@@ -122,11 +122,12 @@ public:
 class DeclSyntax : public Syntax {
   friend class Syntax;
 protected:
-  virtual void validate() const override;
+  virtual void validate() const override {}
 
 public:
   static DeclSyntax makeBlank();
-  DeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data);
+  DeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
 
   static bool classof(const SyntaxData *S) { return S->isDecl(); }
 };
@@ -142,7 +143,8 @@ class UnknownDeclSyntax : public UnknownSyntax {
 
 public:
   static UnknownDeclSyntax makeBlank();
-  UnknownDeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data);
+  UnknownDeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : UnknownSyntax(Root, Data)  {}
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::UnknownDecl;
@@ -159,11 +161,12 @@ class DeclMembersSyntax final : public Syntax {
   friend class DeclMembersSyntaxBuilder;
   friend class StructDeclSyntax;
 
-  virtual void validate() const override;
+  virtual void validate() const override {}
 
 public:
   static DeclMembersSyntax makeBlank();
-  DeclMembersSyntax(RC<SyntaxData> Root, const SyntaxData *Data);
+  DeclMembersSyntax(RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::DeclMembers;
   }
@@ -214,7 +217,8 @@ class StructDeclSyntax final : public DeclSyntax {
 
 public:
   static StructDeclSyntax makeBlank();
-  StructDeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data);
+  StructDeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : DeclSyntax(Root, Data) {}
 
   /// Return the 'struct' keyword attached to the declaration.
   RC<TokenSyntax> getStructKeyword() const;
@@ -306,7 +310,7 @@ class TypeAliasDeclSyntax final : public DeclSyntax {
     Type
   };
 
-  virtual void validate() const override;
+  virtual void validate() const override {}
 
 public:
   static TypeAliasDeclSyntax makeBlank();

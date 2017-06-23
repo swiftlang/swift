@@ -34,7 +34,8 @@ class UnknownSyntax : public Syntax {
 
   virtual void validate() const override;
 public:
-  UnknownSyntax(const RC<SyntaxData> Root, const SyntaxData *Data);
+  UnknownSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
 
   /// Get the number of child nodes in this piece of syntax, not including
   /// tokens.

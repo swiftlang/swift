@@ -37,7 +37,7 @@ class GenericRequirementSyntax : public Syntax {
   friend class SyntaxData;
 
 protected:
-  virtual void validate() const override;
+  virtual void validate() const override {}
 public:
   static GenericRequirementSyntax makeBlank();
   GenericRequirementSyntax(const RC<SyntaxData> Root,
@@ -294,7 +294,7 @@ class GenericArgumentClauseSyntax : public Syntax {
   };
 
 protected:
-  virtual void validate() const override;
+  virtual void validate() const override {}
 
 public:
   static GenericArgumentClauseSyntax makeBlank();

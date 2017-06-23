@@ -42,7 +42,7 @@ class ExprSyntax : public Syntax {
   friend class FunctionParameterSyntax;
 
 protected:
-  virtual void validate() const override;
+  virtual void validate() const override {}
 
 public:
   static ExprSyntax makeBlank();

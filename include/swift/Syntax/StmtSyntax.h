@@ -45,7 +45,7 @@ class ExprSyntax;
 class StmtSyntax : public Syntax {
   friend class Syntax;
 protected:
-  virtual void validate() const override;
+  virtual void validate() const override {}
 public:
   static StmtSyntax makeBlank();
   StmtSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)

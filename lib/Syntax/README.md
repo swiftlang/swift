@@ -370,10 +370,10 @@ A couple of remarks about the `EOF` token:
 additional information: a pointer to a parent, the position in which the node
 occurs in its parent, and cached children.
 
-For example, if we have a `StructDeclSyntaxData`, wrapping a `RawSyntax` for a
+For example, if we have a `SyntaxData`, wrapping a `RawSyntax` for a
 struct declaration, we might ask for the generic parameter clause. At first,
 this is only represented in the raw syntax. On first ask, we thaw those out by
-creating a new `GenericParameterClauseSyntaxData`, cache it as our child, set
+creating a new `SyntaxData`, cache it as our child, set
 its parent to `this`, and send it back to the caller. These cached children
 are strong references, keeping the syntax tree alive in memory.
 
@@ -484,8 +484,6 @@ Here's a handy checklist when implementing a production in the grammar.
   are affected.
   - **Add the `Syntax` bug label!**
 - Add a *kind* to include/swift/Syntax/SyntaxKinds.def
-- Create the `${KIND}SyntaxData` class.  
-  - Cached children members as `RC<${CHILDKIND}SyntaxData>`
 - Create the `${KIND}Syntax` class.  
   Be sure to implement the following:
   - Define the `Cursor` enum for the syntax node. This specifies all of the
@@ -494,7 +492,7 @@ Here's a handy checklist when implementing a production in the grammar.
     `same-type-requirement -> type-identifier '==' type`
 
     That's three terms in the production, and you can see this reflected in the
-    `StructDeclSyntaxData` class:
+    `SameTypeRequirementSyntax` class:
 
     ```c++
     enum Cursor : CursorIndex {
@@ -509,7 +507,6 @@ Here's a handy checklist when implementing a production in the grammar.
         what you changed. `print` the new node and check the text.
       - Check that the new node has a different parent.
   - Getters for all layout elements (e.g. `getLeftTypeIdentifier()`)
-    - Caching mechanics in corresponding `${KIND}SyntaxData` class.
     - Add a C++ unit test.
       - After `get`ing the child, verify:
         - The child's parent and root are correct
