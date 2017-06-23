@@ -2814,6 +2814,70 @@ ${assignmentOperatorComment(x.operator, True)}
 % end
   }
 
+% if Self == 'UInt' or (bits > word_bits and not signed):
+  // FIXME should be RandomAccessCollection
+  public struct Words : BidirectionalCollection {
+    public typealias Indices = CountableRange<Int>
+    public typealias SubSequence = BidirectionalSlice<${Self}.Words>
+
+    public var _value: ${Self}
+
+    @_transparent
+    public init(_ value: ${Self}) {
+      self._value = value
+    }
+
+    @_transparent
+    public var count: Int {
+      return (${bits} + ${word_bits} - 1) / ${word_bits}
+    }
+
+    @_transparent
+    public var startIndex: Int { return 0 }
+
+    @_transparent
+    public var endIndex: Int { return count }
+
+    @_transparent
+    public var indices: Indices { return startIndex ..< endIndex }
+
+    @_transparent
+    public func index(after i: Int) -> Int { return i + 1 }
+
+    @_transparent
+    public func index(before i: Int) -> Int { return i - 1 }
+
+    public subscript(position: Int) -> UInt {
+      @_transparent
+      get {
+        _precondition(position >= 0, "Negative word index")
+        _precondition(position < endIndex, "Word index out of range")
+        let shift = UInt(position._value) &* ${word_bits}
+        _sanityCheck(shift < UInt(_value.bitWidth._value))
+        return (_value &>> ${Self}(_truncatingBits: shift))._lowUWord
+      }
+    }
+  }
+
+  @_transparent
+  public var words: Words {
+    return Words(self)
+  }
+% elif bits > word_bits:
+  public typealias Words = ${OtherSelf}.Words
+
+  @_transparent
+  public var words: Words {
+    return Words(${OtherSelf}(self._value))
+  }
+% else:
+  public typealias Words = UInt.Words
+
+  @_transparent
+  public var words: Words {
+    return Words(self._lowUWord)
+  }
+% end
 
   @_transparent
   public // transparent

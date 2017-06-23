@@ -692,6 +692,29 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     return result
   }
 
+  public var words: [UInt] {
+    _sanityCheck(UInt.bitWidth % Word.bitWidth == 0)
+    var words: [UInt] = []
+    var word: UInt = 0
+    var shift = 0
+    for w in _dataAsTwosComplement() {
+      word |= UInt(extendingOrTruncating: w) << shift
+      shift += Word.bitWidth
+      if shift == UInt.bitWidth {
+        words.append(word)
+        word = 0
+        shift = 0
+      }
+    }
+    if shift != 0 {
+      if isNegative {
+        word |= ~((1 << shift) - 1)
+      }
+      words.append(word)
+    }
+    return words
+  }
+
   /// The number of bits used for storage of this value. Always a multiple of
   /// `Word.bitWidth`.
   public var bitWidth: Int {
@@ -1295,6 +1318,10 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
 
   func _word(at n: Int) -> UInt {
     return UInt(value)
+  }
+
+  var words: UInt.Words {
+    return UInt(value).words
   }
 
   // Hashable, CustomStringConvertible
