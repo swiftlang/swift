@@ -14,10 +14,12 @@
 #define SWIFT_SYNTAX_SYNTAXCOLLECTION_H
 
 #include "swift/Syntax/Syntax.h"
-#include "swift/Syntax/SyntaxCollectionData.h"
 
 namespace swift {
 namespace syntax {
+
+template <SyntaxKind CollectionKind, typename Element>
+class SyntaxCollection;
 
 template <SyntaxKind CollectionKind, typename Element>
 struct SyntaxCollectionIterator {
@@ -52,10 +54,9 @@ class SyntaxCollection : public Syntax {
   friend struct SyntaxFactory;
   friend class SyntaxData;
   friend class Syntax;
-  using DataType = SyntaxCollectionData<CollectionKind, Element>;
 
 private:
-  static RC<DataType>
+  static RC<SyntaxData>
   makeData(std::vector<Element> &Elements) {
     RawSyntax::LayoutList List;
     for (auto &Elt : Elements) {
@@ -63,14 +64,18 @@ private:
     }
     auto Raw = RawSyntax::make(CollectionKind, List,
                                SourcePresence::Present);
-    return DataType::make(Raw);
+    return SyntaxData::make(Raw);
   }
 
-protected:
-  SyntaxCollection(const RC<SyntaxData> Root, const DataType *Data)
-    : Syntax(Root, Data) {}
-
 public:
+
+  static SyntaxCollection<CollectionKind, Element> makeBlank() {
+    auto Raw = RawSyntax::make(CollectionKind, {}, SourcePresence::Present);
+    return make<SyntaxCollection<CollectionKind, Element>>(Raw);
+  }
+
+  SyntaxCollection(const RC<SyntaxData> Root, const SyntaxData *Data)
+  : Syntax(Root, Data) {}
 
   /// Returns true if the collection is empty.
   bool empty() const {
@@ -104,22 +109,8 @@ public:
     assert(Index < size());
     assert(!empty());
 
-    auto RawElement = getRaw()->Layout[Index];
-    auto *MyData = getUnsafeData<SyntaxCollection<CollectionKind, Element>>();
-
-    if (auto Data = MyData->CachedElements[Index].get()) {
-      return Element { Root, Data };
-    }
-
-    auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
-      MyData->CachedElements.data() + Index);
-
-    SyntaxData::realizeSyntaxNode<Element>(ChildPtr, RawElement, MyData, Index);
-
-    return Element {
-      Root,
-      MyData->CachedElements[Index].get()
-    };
+    auto ChildData = Data->getChild(Index);
+    return Element { Root, ChildData.get() };
   }
 
   /// Return a new collection with the given element added to the end.
@@ -128,7 +119,7 @@ public:
     auto NewLayout = getRaw()->Layout;
     NewLayout.push_back(E.getRaw());
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return Data->replaceSelf(Raw);
   }
 
   /// Return a new collection with an element removed from the end.
@@ -139,7 +130,7 @@ public:
     auto NewLayout = getRaw()->Layout;
     NewLayout.pop_back();
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return Data->replaceSelf(Raw);
   }
 
   /// Return a new collection with the given element appended to the front.
@@ -150,7 +141,7 @@ public:
               getRaw()->Layout.end(),
               std::back_inserter(NewLayout));
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return Data->replaceSelf(Raw);
   }
 
   /// Return a new collection with an element removed from the end.
@@ -163,7 +154,7 @@ public:
               getRaw()->Layout.end(),
               std::back_inserter(NewLayout));
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return Data->replaceSelf(Raw);
   }
 
   /// Return a new collection with the Element inserted at index i.
@@ -179,7 +170,7 @@ public:
     std::copy(getRaw()->Layout.begin() + i, getRaw()->Layout.end(),
               std::back_inserter(NewLayout));
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return Data->replaceSelf(Raw);
   }
 
   /// Return a new collection with the element removed at index i.
@@ -187,19 +178,25 @@ public:
     auto NewLayout = getRaw()->Layout;
     NewLayout.erase(NewLayout.begin() + i);
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return Data->replaceSelf(Raw);
   }
 
   /// Return an empty syntax collection of this type.
   SyntaxCollection<CollectionKind, Element> cleared() const {
     auto Raw = RawSyntax::make(CollectionKind, {}, getRaw()->Presence);
-    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return Data->replaceSelf(Raw);
   }
 
   static bool classof(const Syntax *S) {
     return S->getKind() == CollectionKind;
   }
 };
+
+#define SYNTAX(Id, Super)
+#define SYNTAX_COLLECTION(Id, Element) \
+class Element;                         \
+using Id##Syntax = SyntaxCollection<SyntaxKind::Id, Element>;
+#include "swift/Syntax/SyntaxKinds.def"
 
 } // end namespace syntax
 } // end namespace swift
