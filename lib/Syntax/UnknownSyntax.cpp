@@ -22,6 +22,10 @@ void UnknownSyntax::validate() const {
 
 #pragma mark - unknown-syntax API
 
+size_t UnknownSyntax::getNumChildren() const {
+  return Data->getNumChildren();
+}
+
 Syntax UnknownSyntax::getChild(const size_t N) const {
   return Syntax { Root, Data->getChild(N).get() };
 }

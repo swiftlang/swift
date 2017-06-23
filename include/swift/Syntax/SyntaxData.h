@@ -185,9 +185,16 @@ public:
     return IndexInParent;
   }
 
+  /// Returns the number of children this SyntaxData represents.
+  size_t getNumChildren() const {
+    return Raw->Layout.size();
+  }
+
+  /// Gets the child at the index specified by the provided cursor,
+  /// lazily creating it if necessary.
   template <typename CursorType>
   RC<SyntaxData> getChild(CursorType Cursor) const {
-    return getChild(cursorIndex(Cursor));
+    return getChild((size_t)cursorIndex(Cursor));
   }
 
   /// Gets the child at the specified index in this data's children array.
