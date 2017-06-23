@@ -1422,6 +1422,11 @@ public:
                                        : value - ParameterTypeFlags::Escaping);
   }
 
+  ParameterTypeFlags withInOut(bool isInout) const {
+    return ParameterTypeFlags(isInout ? value | ParameterTypeFlags::InOut
+                                      : value - ParameterTypeFlags::InOut);
+  }
+
   bool operator ==(const ParameterTypeFlags &other) const {
     return value.toRaw() == other.value.toRaw();
   }
