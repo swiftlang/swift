@@ -1344,6 +1344,24 @@ static void castTupleInstr(SILInstruction *instr, IRGenModule &Mod) {
   castInstr->setOperand(0, instr);
 }
 
+static SILValue createCopyOfEnum(StructLoweringState &pass,
+                                 SwitchEnumInst *orig) {
+  auto value = orig->getOperand();
+  SILBuilder allocBuilder(pass.F->begin()->begin());
+  auto *allocInstr =
+      allocBuilder.createAllocStack(getLocForValue(value), value->getType());
+
+  SILBuilder copyBuilder(orig);
+  createOutlinedCopyCall(copyBuilder, value, allocInstr, pass);
+
+  for (TermInst *termInst : pass.returnInsts) {
+    SILBuilder deallocBuilder(termInst);
+    deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
+  }
+
+  return allocInstr;
+}
+
 static void rewriteFunction(StructLoweringState &pass,
                             LoadableStorageAllocation &allocator) {
 
@@ -1357,6 +1375,9 @@ static void rewriteFunction(StructLoweringState &pass,
   do {
     while (!pass.switchEnumInstsToMod.empty()) {
       auto *instr = pass.switchEnumInstsToMod.pop_back_val();
+      /* unchecked_take_enum_data_addr can be destructive.
+       * work on a copy instead of the original enum */
+      auto copiedValue = createCopyOfEnum(pass, instr);
       SILBuilder enumBuilder(instr);
       unsigned numOfCases = instr->getNumCases();
       SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 16> caseBBs;
@@ -1374,8 +1395,7 @@ static void rewriteFunction(StructLoweringState &pass,
           }
 
           auto *newArg = argBuilder.createUncheckedTakeEnumDataAddr(
-              instr->getLoc(), instr->getOperand(), decl,
-              newSILType.getAddressType());
+              instr->getLoc(), copiedValue, decl, newSILType.getAddressType());
           arg->replaceAllUsesWith(newArg);
           currBB->eraseArgument(0);
 
@@ -1401,7 +1421,7 @@ static void rewriteFunction(StructLoweringState &pass,
       SILBasicBlock *defaultBB =
           instr->hasDefault() ? instr->getDefaultBB() : nullptr;
       auto *newInstr = enumBuilder.createSwitchEnumAddr(
-          instr->getLoc(), instr->getOperand(), defaultBB, caseBBs);
+          instr->getLoc(), copiedValue, defaultBB, caseBBs);
       instr->replaceAllUsesWith(newInstr);
       instr->getParent()->erase(instr);
     }

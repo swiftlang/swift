@@ -111,3 +111,28 @@ class Foo {
 // CHECK: getelementptr inbounds void (i8*, %swift.refcounted*, %T22big_types_corner_cases3FooC*)*, void (i8*, %swift.refcounted*, %T22big_types_corner_cases3FooC*)**
 // CHECK: call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata*
 // CHECK: ret { i8*, %swift.refcounted* }
+
+public enum LargeEnum {
+  public enum InnerEnum {
+    case simple(Int64)
+    case hard(Int64, String?)
+  }
+  case Empty1
+  case Empty2
+  case Full(InnerEnum)
+}
+
+public func enumCallee(_ x: LargeEnum) {
+  switch x {
+    case .Full(let inner): print(inner)
+    case .Empty1: break
+    case .Empty2: break
+  }
+}
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10enumCalleeyAA9LargeEnumOF(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable(34)) #0 {
+// CHECK: alloca %T22big_types_corner_cases9LargeEnumO05InnerF0O
+// CHECK: alloca %T22big_types_corner_cases9LargeEnumO
+// CHECK: call void @llvm.memcpy.p0i8.p0i8.i64
+// CHECK: call void @llvm.memcpy.p0i8.p0i8.i64
+// CHECK: call %swift.type* @_T0ypMa()
+// CHECK: ret void
