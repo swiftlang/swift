@@ -86,6 +86,12 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     _testRoundTrip(of: company)
   }
 
+  func testEncodingClassWhichSharesEncoderWithSuper() {
+    // Employee is a type which shares its encoder & decoder with its superclass, Person.
+    let employee = Employee.testValue
+    _testRoundTrip(of: employee)
+  }
+
   // MARK: - Output Formatting Tests
   func testEncodingOutputFormattingDefault() {
     let expectedJSON = "{\"name\":\"Johnny Appleseed\",\"email\":\"appleseed@apple.com\"}".data(using: .utf8)!
@@ -527,10 +533,6 @@ fileprivate struct Address : Codable, Equatable {
 fileprivate class Person : Codable, Equatable {
   let name: String
   let email: String
-
-  // FIXME: This property is present only in order to test the expected result of Codable synthesis in the compiler.
-  // We want to test against expected encoded output (to ensure this generates an encodeIfPresent call), but we need an output format for that.
-  // Once we have a VerifyingEncoder for compiler unit tests, we should move this test there.
   let website: URL?
 
   init(name: String, email: String, website: URL? = nil) {
@@ -539,23 +541,86 @@ fileprivate class Person : Codable, Equatable {
     self.website = website
   }
 
-  static func ==(_ lhs: Person, _ rhs: Person) -> Bool {
-    return lhs.name == rhs.name &&
-           lhs.email == rhs.email &&
-           lhs.website == rhs.website
+  private enum CodingKeys : String, CodingKey {
+    case name
+    case email
+    case website
   }
 
-  static var testValue: Person {
+  // FIXME: Remove when subclasses (Employee) are able to override synthesized conformance.
+  required init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decode(String.self, forKey: .name)
+    email = try container.decode(String.self, forKey: .email)
+    website = try container.decodeIfPresent(URL.self, forKey: .website)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(name, forKey: .name)
+    try container.encode(email, forKey: .email)
+    try container.encodeIfPresent(website, forKey: .website)
+  }
+
+  func isEqual(_ other: Person) -> Bool {
+    return self.name == other.name &&
+           self.email == other.email &&
+           self.website == other.website
+  }
+
+  static func ==(_ lhs: Person, _ rhs: Person) -> Bool {
+    return lhs.isEqual(rhs)
+  }
+
+  class var testValue: Person {
     return Person(name: "Johnny Appleseed", email: "appleseed@apple.com")
+  }
+}
+
+/// A class which shares its encoder and decoder with its superclass.
+fileprivate class Employee : Person {
+  let id: Int
+
+  init(name: String, email: String, website: URL? = nil, id: Int) {
+    self.id = id
+    super.init(name: name, email: email, website: website)
+  }
+
+  enum CodingKeys : String, CodingKey {
+    case id
+  }
+
+  required init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(Int.self, forKey: .id)
+    try super.init(from: decoder)
+  }
+
+  override func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(id, forKey: .id)
+    try super.encode(to: encoder)
+  }
+
+  override func isEqual(_ other: Person) -> Bool {
+    if let employee = other as? Employee {
+      guard self.id == employee.id else { return false }
+    }
+
+    return super.isEqual(other)
+  }
+
+  override class var testValue: Employee {
+    return Employee(name: "Johnny Appleseed", email: "appleseed@apple.com", id: 42)
   }
 }
 
 /// A simple company struct which encodes as a dictionary of nested values.
 fileprivate struct Company : Codable, Equatable {
   let address: Address
-  var employees: [Person]
+  var employees: [Employee]
 
-  init(address: Address, employees: [Person]) {
+  init(address: Address, employees: [Employee]) {
     self.address = address
     self.employees = employees
   }
@@ -565,7 +630,7 @@ fileprivate struct Company : Codable, Equatable {
   }
 
   static var testValue: Company {
-    return Company(address: Address.testValue, employees: [Person.testValue])
+    return Company(address: Address.testValue, employees: [Employee.testValue])
   }
 }
 
@@ -799,6 +864,7 @@ JSONEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestJSONEnc
 JSONEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestJSONEncoder().testEncodingTopLevelDeepStructuredType()}
 JSONEncoderTests.test("testEncodingTopLevelStructuredClass") { TestJSONEncoder().testEncodingTopLevelStructuredClass() }
 JSONEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestJSONEncoder().testEncodingTopLevelDeepStructuredType()}
+JSONEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestJSONEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 JSONEncoderTests.test("testEncodingOutputFormattingDefault") { TestJSONEncoder().testEncodingOutputFormattingDefault() }
 JSONEncoderTests.test("testEncodingOutputFormattingPrettyPrinted") { TestJSONEncoder().testEncodingOutputFormattingPrettyPrinted() }
 JSONEncoderTests.test("testEncodingOutputFormattingSortedKeys") { TestJSONEncoder().testEncodingOutputFormattingSortedKeys() }
