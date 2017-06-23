@@ -166,9 +166,9 @@ public func mutate() {
   // rather than passing a pointer indirectly. I.e. only 1 overall level of
   // indirection for non-mutating, 2 for mutating.
   //
-  // OPT: [[TRefAlloca:%.+]] = alloca %struct.T*, align 8
+  // OPT: [[TRefAlloca:%.+]] = alloca %struct.T*,
   // OPT: [[TRef:%.+]] = tail call %struct.T* @create_T()
-  // OPT: store %struct.T* [[TRef]], %struct.T** [[TRefAlloca]], align 8
+  // OPT: store %struct.T* [[TRef]], %struct.T** [[TRefAlloca]],
   var myT = create_T()
 
   // OPT: [[TRefConst:%.+]] = tail call %struct.T* @create_ConstT()
@@ -182,7 +182,7 @@ public func mutate() {
 
   // Since myT itself got mutated, now we have to reload from the alloca
   //
-  // OPT: [[TRefReloaded:%.+]] = load %struct.T*, %struct.T** [[TRefAlloca]], align 8
+  // OPT: [[TRefReloaded:%.+]] = load %struct.T*, %struct.T** [[TRefAlloca]],
   // OPT: call void @mutate_TRef_Pointee(%struct.T* [[TRefReloaded]])
   myT.mutatePointee()
 
@@ -199,9 +199,9 @@ public func mutateRef() {
   // a pointer pointer indirectly. I.e. only 2 overall levels of indirection for
   // non-mutating, 3 for mutating.
   //
-  // OPT: [[TRefRefAlloca:%.+]] = alloca %struct.T**, align 8
+  // OPT: [[TRefRefAlloca:%.+]] = alloca %struct.T**,
   // OPT: [[TRefRef:%.+]] = tail call %struct.T** @create_TRef()
-  // OPT: store %struct.T** [[TRefRef]], %struct.T*** [[TRefRefAlloca]], align 8
+  // OPT: store %struct.T** [[TRefRef]], %struct.T*** [[TRefRefAlloca]]
   var myTRef = create_TRef()
 
   // OPT: [[ConstTRefRef:%.+]] = tail call %struct.T** @create_ConstTRef()
@@ -215,7 +215,7 @@ public func mutateRef() {
 
   // Since myTRef itself got mutated, now we have to reload from the alloca
   //
-  // OPT: [[TRefReloaded:%.+]] = load %struct.T**, %struct.T*** [[TRefRefAlloca]], align 8
+  // OPT: [[TRefReloaded:%.+]] = load %struct.T**, %struct.T*** [[TRefRefAlloca]]
   // OPT: call void @mutate_TRefRef_Pointee(%struct.T** [[TRefReloaded]])
   myTRef.mutatePointee()
 
