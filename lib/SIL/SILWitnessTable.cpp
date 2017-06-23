@@ -161,13 +161,13 @@ bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance,
                                               ResilienceStrategy strategy,
                                               bool silSerializeWitnessTables) {
   auto *nominal = conformance->getType()->getAnyNominal();
-  // Only serialize if the witness table is sufficiently static, andresilience
+  // Only serialize if the witness table is sufficiently static, and resilience
   // is explicitly enabled for this compilation or if we serialize all eligible
   // witness tables.
-  return (strategy == ResilienceStrategy::Resilient ||
-          silSerializeWitnessTables) &&
-         nominal->hasFixedLayout() &&
-         conformance->getProtocol()->getEffectiveAccess() >=
-             Accessibility::Public &&
-         nominal->getEffectiveAccess() >= Accessibility::Public;
+  auto moduleIsResilient = strategy == ResilienceStrategy::Resilient;
+  auto protocolIsPublic =
+      conformance->getProtocol()->getEffectiveAccess() >= Accessibility::Public;
+  auto typeIsPublic = nominal->getEffectiveAccess() >= Accessibility::Public;
+  return (moduleIsResilient || silSerializeWitnessTables) &&
+         nominal->hasFixedLayout() && protocolIsPublic && typeIsPublic;
 }
