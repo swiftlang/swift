@@ -605,8 +605,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                                           Arg->getStartLoc().getAdvancedLoc(1));
 
           // Replace "x.getY(" with "x.Y =".
-          Editor.replace(ReplaceRange, (llvm::Twine(Walker.Result.str().
-                                                   substr(3)) + " = ").str());
+          auto Replacement = (llvm::Twine(Walker.Result.str()
+                                          .substr(3)) + " = ").str();
+          Replacement[0] = tolower(Replacement[0]);
+          Editor.replace(ReplaceRange, Replacement);
+
           // Remove ")"
           Editor.remove(CharSourceRange(SM, Arg->getEndLoc(), Arg->getEndLoc().
                                         getAdvancedLoc(1)));
