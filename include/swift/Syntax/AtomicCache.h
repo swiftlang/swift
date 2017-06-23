@@ -1,4 +1,4 @@
-//===------------- AtomicCache.h - Lazy Atomic Cache -------------*- C++ -*-===//
+//===------------- AtomicCache.h - Lazy Atomic Cache ------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -41,29 +41,29 @@ public:
   RC<T> getOrCreate(std::function<RC<T> ()> Create) const {
     auto &Ptr = *reinterpret_cast<std::atomic<uintptr_t> *>(&Storage);
 
-    if (Ptr == 0) {
-      // We expect the uncached value to wrap a nullptr. If another thread
-      // beats us to caching the child, it'll be non-null, so we would
-      // leave it alone.
-      uintptr_t Expected = 0;
-
-      // Make a RC<T> at RefCount == 1, which we'll try to
-      // atomically swap in.
-      auto Data = Create();
-
-      // Try to swap in raw pointer value.
-      auto SuccessfullySwapped =
-      Ptr.compare_exchange_strong(Expected,
-                                  reinterpret_cast<uintptr_t>(Data.get()));
-
-      // If we won, then leave the RefCount == 1.
-      if (SuccessfullySwapped) {
-        Data.resetWithoutRelease();
-      }
-
-      // Otherwise, the Data we just made is unfortunately useless.
-      // Let it die on this scope exit after its terminal release.
+    // If an atomic load gets an initialized value, then return Storage.
+    if (Ptr) {
+      return Storage;
     }
+
+    // We expect the uncached value to wrap a nullptr. If another thread
+    // beats us to caching the child, it'll be non-null, so we would
+    // leave it alone.
+    uintptr_t Expected = 0;
+
+    // Make a RC<T> at RefCount == 1, which we'll try to
+    // atomically swap in.
+    auto Data = Create();
+
+    // Try to swap in raw pointer value.
+    // If we won, then leave the RefCount == 1.
+    if (Ptr.compare_exchange_strong(Expected,
+          reinterpret_cast<uintptr_t>(Data.get()))) {
+      Data.resetWithoutRelease();
+    }
+
+    // Otherwise, the Data we just made is unfortunately useless.
+    // Let it die on this scope exit after its terminal release.
 
     return Storage;
   }
