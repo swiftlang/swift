@@ -48,7 +48,7 @@ Here are the passes:
 2. AST Passes
 
    If the Pre-fix-it Pass was successful, or skipped because it was unnecessary, the
-   *AST Passes* run. These include:
+   *AST Passes* run if you are migrating *from before Swift 4*. These include:
 
    - API Diff Pass
 
