@@ -87,10 +87,10 @@ static void notification_receiver(sourcekitd_response_t resp);
 static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 
 #define KEY(NAME, CONTENT) static sourcekitd_uid_t Key##NAME;
-#include "SourceKit/Core/Keys.def"
+#include "SourceKit/Core/ProtocolUIDs.def"
 
 #define REQUEST(NAME, CONTENT) static sourcekitd_uid_t Request##NAME;
-#include "SourceKit/Core/Keys.def"
+#include "SourceKit/Core/ProtocolUIDs.def"
 
 static sourcekitd_uid_t SemaDiagnosticStage;
 
@@ -136,14 +136,14 @@ static int skt_main(int argc, const char **argv) {
   });
 
 #define KEY(NAME, CONTENT) Key##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
-#include "SourceKit/Core/Keys.def"
+#include "SourceKit/Core/ProtocolUIDs.def"
 
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
   NoteDocUpdate = sourcekitd_uid_get_from_cstr("source.notification.editor.documentupdate");
 
 #define REQUEST(NAME, CONTENT) Request##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
-#include "SourceKit/Core/Keys.def"
+#include "SourceKit/Core/ProtocolUIDs.def"
 
   KindNameObjc = sourcekitd_uid_get_from_cstr("source.lang.name.kind.objc");
   KindNameSwift = sourcekitd_uid_get_from_cstr("source.lang.name.kind.swift");
