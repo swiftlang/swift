@@ -1900,6 +1900,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         assert(component.getComputedPropertyIndices().empty()
                && "indices not implemented");
         break;
+      case KeyPathPatternComponent::Kind::OptionalChain:
+        handleComponentCommon(KeyPathComponentKindEncoding::OptionalChain);
+        break;
+      case KeyPathPatternComponent::Kind::OptionalForce:
+        handleComponentCommon(KeyPathComponentKindEncoding::OptionalForce);
+        break;
+      case KeyPathPatternComponent::Kind::OptionalWrap:
+        handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
+        break;
       }
     }
     

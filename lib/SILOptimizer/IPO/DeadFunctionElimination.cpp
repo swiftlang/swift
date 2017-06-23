@@ -226,6 +226,9 @@ protected:
         continue;
       }
       case KeyPathPatternComponent::Kind::StoredProperty:
+      case KeyPathPatternComponent::Kind::OptionalChain:
+      case KeyPathPatternComponent::Kind::OptionalForce:
+      case KeyPathPatternComponent::Kind::OptionalWrap:            
         continue;
       }
     }

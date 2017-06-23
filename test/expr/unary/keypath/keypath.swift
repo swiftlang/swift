@@ -322,6 +322,20 @@ func testKeyPathSubscriptTuple(readonly: (Z,Z), writable: inout (Z,Z),
   writable[keyPath: rkp] = sink
 }
 
+struct AA {
+  subscript(x: Int) -> Int { return x }
+  var c: CC? = CC()
+}
+
+class CC {
+  var i = 0
+}
+
+func testKeyPathOptional() {
+  _ = \AA.c?.i
+  _ = \AA.c!.i
+}
+
 func testSyntaxErrors() { // expected-note{{}}
   // TODO: recovery
   _ = \.  ; // expected-error{{expected member name following '.'}}
