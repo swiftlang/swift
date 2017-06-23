@@ -1546,26 +1546,35 @@ static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
   return 0;
 }
 
+/// Whether there are any concrete type declarations in the potential archetype.
+static bool hasConcreteDecls(const PotentialArchetype *pa) {
+  auto parent = pa->getParent();
+  if (!parent) return false;
+
+  if (pa->getConcreteTypeDecl())
+    return true;
+
+  return hasConcreteDecls(parent);
+}
+
 /// Canonical ordering for dependent types in generic signatures.
 static int compareDependentTypes(PotentialArchetype * const* pa,
-                                 PotentialArchetype * const* pb) {
+                                 PotentialArchetype * const* pb,
+                                 bool outermost) {
   auto a = *pa, b = *pb;
 
   // Fast-path check for equality.
   if (a == b)
     return 0;
 
-  // Concrete types must be ordered *after* everything else, to ensure they
-  // don't become representatives in the case where a concrete type is equated
-  // with an associated type.
-  if (a->getParent() && b->getParent() &&
-      !!a->getConcreteTypeDecl() != !!b->getConcreteTypeDecl())
-    return a->getConcreteTypeDecl() ? +1 : -1;
-
-  // Types that are equivalent to concrete types follow types that are still
-  // type parameters.
-  if (a->isConcreteType() != b->isConcreteType())
-    return a->isConcreteType() ? +1 : -1;
+  // If one has concrete declarations somewhere but the other does not,
+  // prefer the one without concrete declarations.
+  if (outermost) {
+    bool aHasConcreteDecls = hasConcreteDecls(a);
+    bool bHasConcreteDecls = hasConcreteDecls(b);
+    if (aHasConcreteDecls != bHasConcreteDecls)
+      return aHasConcreteDecls ? +1 : -1;
+  }
 
   // Ordering is as follows:
   // - Generic params
@@ -1581,8 +1590,20 @@ static int compareDependentTypes(PotentialArchetype * const* pa,
   auto ppb = b->getParent();
 
   // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
-  if (int compareBases = compareDependentTypes(&ppa, &ppb))
+  if (int compareBases = compareDependentTypes(&ppa, &ppb, /*outermost=*/false))
     return compareBases;
+
+  // Types that are equivalent to concrete types follow types that are still
+  // type parameters.
+  if (a->isConcreteType() != b->isConcreteType())
+    return a->isConcreteType() ? +1 : -1;
+
+  // Concrete types must be ordered *after* everything else, to ensure they
+  // don't become representatives in the case where a concrete type is equated
+  // with an associated type.
+  if (a->getParent() && b->getParent() &&
+      !!a->getConcreteTypeDecl() != !!b->getConcreteTypeDecl())
+    return a->getConcreteTypeDecl() ? +1 : -1;
 
   // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
   if (int compareNames = a->getNestedName().str().compare(
@@ -1627,6 +1648,11 @@ static int compareDependentTypes(PotentialArchetype * const* pa,
   llvm_unreachable("potential archetype total order failure");
 }
 
+static int compareDependentTypes(PotentialArchetype * const* pa,
+                                 PotentialArchetype * const* pb) {
+  return compareDependentTypes(pa, pb, /*outermost=*/true);
+}
+
 PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
                                            GenericSignatureBuilder &builder) {
   // Find the best archetype within this equivalence class.
@@ -1635,6 +1661,7 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
   if (auto parent = getParent()) {
     // For a nested type, retrieve the parent archetype anchor first.
     auto parentAnchor = parent->getArchetypeAnchor(builder);
+    assert(parentAnchor->getNestingDepth() <= parent->getNestingDepth());
     anchor = parentAnchor->getNestedArchetypeAnchor(
                                           getNestedName(), builder,
                                           ArchetypeResolutionKind::AlreadyKnown);
@@ -1654,7 +1681,8 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
       equivClass->archetypeAnchorCache.numMembers
         == equivClass->members.size()) {
     ++NumArchetypeAnchorCacheHits;
-
+    assert(equivClass->archetypeAnchorCache.anchor->getNestingDepth()
+             <= rep->getNestingDepth());
     return equivClass->archetypeAnchorCache.anchor;
   }
 
@@ -1672,6 +1700,8 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
            "archetype anchor isn't a total order");
   }
 #endif
+
+  assert(anchor->getNestingDepth() <= rep->getNestingDepth());
 
   // Record the cache miss and update the cache.
   ++NumArchetypeAnchorCacheMisses;
@@ -3304,10 +3334,15 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   if (T1 == T2)
     return ConstraintResult::Resolved;
 
+  unsigned nestingDepth1 = T1->getNestingDepth();
+  unsigned nestingDepth2 = T2->getNestingDepth();
+
   // Decide which potential archetype is to be considered the representative.
-  // It doesn't specifically matter which we use, but it's a minor optimization
-  // to prefer the canonical type.
-  if (compareDependentTypes(&T2, &T1) < 0) {
+  // We prefer potential archetypes with lower nesting depths (because it
+  // prevents us from unnecessarily building deeply nested potential archetypes)
+  // and prefer anchors because it's a minor optimization.
+  if (nestingDepth2 < nestingDepth1 ||
+      compareDependentTypes(&T2, &T1) < 0) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
   }
