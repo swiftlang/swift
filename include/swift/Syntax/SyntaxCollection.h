@@ -119,7 +119,7 @@ public:
     auto NewLayout = getRaw()->Layout;
     NewLayout.push_back(E.getRaw());
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf(Raw);
+    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }
 
   /// Return a new collection with an element removed from the end.
@@ -130,7 +130,7 @@ public:
     auto NewLayout = getRaw()->Layout;
     NewLayout.pop_back();
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf(Raw);
+    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }
 
   /// Return a new collection with the given element appended to the front.
@@ -141,7 +141,7 @@ public:
               getRaw()->Layout.end(),
               std::back_inserter(NewLayout));
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf(Raw);
+    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }
 
   /// Return a new collection with an element removed from the end.
@@ -154,7 +154,7 @@ public:
               getRaw()->Layout.end(),
               std::back_inserter(NewLayout));
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf(Raw);
+    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }
 
   /// Return a new collection with the Element inserted at index i.
@@ -170,7 +170,7 @@ public:
     std::copy(getRaw()->Layout.begin() + i, getRaw()->Layout.end(),
               std::back_inserter(NewLayout));
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf(Raw);
+    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }
 
   /// Return a new collection with the element removed at index i.
@@ -178,13 +178,13 @@ public:
     auto NewLayout = getRaw()->Layout;
     NewLayout.erase(NewLayout.begin() + i);
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->Presence);
-    return Data->replaceSelf(Raw);
+    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }
 
   /// Return an empty syntax collection of this type.
   SyntaxCollection<CollectionKind, Element> cleared() const {
     auto Raw = RawSyntax::make(CollectionKind, {}, getRaw()->Presence);
-    return Data->replaceSelf(Raw);
+    return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }
 
   static bool classof(const Syntax *S) {
