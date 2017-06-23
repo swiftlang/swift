@@ -565,7 +565,6 @@ namespace {
       // Pull the corresponding generic type parameter from the imported class.
       const auto *typeParamContext = objcTypeParamDecl->getDeclContext();
       GenericSignature *genericSig = nullptr;
-      GenericEnvironment *genericEnv = nullptr;
       if (auto *category =
             dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
         auto ext = cast_or_null<ExtensionDecl>(
@@ -573,7 +572,6 @@ namespace {
         if (!ext)
           return ImportResult();
         genericSig = ext->getGenericSignature();
-        genericEnv = ext->getGenericEnvironment();
       } else if (auto *interface =
           dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
         auto cls = castIgnoringCompatibilityAlias<ClassDecl>(
@@ -581,7 +579,6 @@ namespace {
         if (!cls)
           return ImportResult();
         genericSig = cls->getGenericSignature();
-        genericEnv = cls->getGenericEnvironment();
       }
       unsigned index = objcTypeParamDecl->getIndex();
       // Pull the generic param decl out of the imported class.
@@ -593,8 +590,8 @@ namespace {
       if (index > genericSig->getGenericParams().size()) {
         return ImportResult();
       }
-      auto *paramDecl = genericSig->getGenericParams()[index];
-      return ImportResult(genericEnv->mapTypeIntoContext(paramDecl),
+
+      return ImportResult(genericSig->getGenericParams()[index],
                           ImportHint::ObjCPointer);
     }
 
@@ -1585,15 +1582,11 @@ Type ClangImporter::Implementation::importFunctionReturnType(
   }
 
   // Import the result type.
-  auto type = importType(clangDecl->getReturnType(),
-                         (isAuditedResult ? ImportTypeKind::AuditedResult
-                                          : ImportTypeKind::Result),
-                         allowNSUIntegerAsInt,
-                         /*isFullyBridgeable*/ true, OptionalityOfReturn);
-  if (!type)
-    return type;
-
-  return dc->mapTypeOutOfContext(type);
+  return importType(clangDecl->getReturnType(),
+                    (isAuditedResult ? ImportTypeKind::AuditedResult
+                                     : ImportTypeKind::Result),
+                    allowNSUIntegerAsInt,
+                    /*isFullyBridgeable*/ true, OptionalityOfReturn);
 }
 
 Type ClangImporter::Implementation::
@@ -1684,10 +1677,11 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     auto paramInfo = createDeclWithClangNode<ParamDecl>(
         param, Accessibility::Private,
         /*IsLet*/ true, SourceLoc(), SourceLoc(), name,
-        importSourceLoc(param->getLocation()), bodyName, swiftParamTy,
+        importSourceLoc(param->getLocation()), bodyName,
+        dc->mapTypeIntoContext(swiftParamTy),
         ImportedHeaderUnit);
-    paramInfo->setInterfaceType(
-        dc->mapTypeOutOfContext(swiftParamTy));
+
+    paramInfo->setInterfaceType(swiftParamTy);
 
     if (addNoEscapeAttr)
       paramInfo->getAttrs().add(new (SwiftContext)
@@ -1876,6 +1870,21 @@ getForeignErrorInfo(ForeignErrorConvention::Info errorInfo,
   llvm_unreachable("bad error convention");
 }
 
+// Sometimes re-mapping type from one context to another is required,
+// because the other context might have some of the generic parameters
+// bound to concerete types, which means that we might loose generic
+// signature when converting from class method to constructor and that
+// is going to result in incorrect type interpretation of the method.
+static Type mapTypeIntoContext(const DeclContext *fromDC,
+                               const DeclContext *toDC, Type type) {
+  if (fromDC == toDC)
+    return toDC->mapTypeIntoContext(type);
+
+  auto subs = toDC->getDeclaredTypeInContext()->getContextSubstitutionMap(
+                                            toDC->getParentModule(), fromDC);
+  return type.subst(subs);
+}
+
 Type ClangImporter::Implementation::importMethodType(
        const DeclContext *dc,
        const clang::ObjCMethodDecl *clangDecl,
@@ -1910,22 +1919,6 @@ Type ClangImporter::Implementation::importMethodType(
   DeclContext *origDC = importDeclContextOf(clangDecl,
                                             clangDecl->getDeclContext());
   assert(origDC);
-  auto mapTypeIntoContext = [&](Type type) -> Type {
-    if (dc != origDC) {
-      // Replace origDC's archetypes with interface types.
-      type = origDC->mapTypeOutOfContext(type);
-
-      // Get the substitutions that we need to access a member of
-      // 'origDC' on 'dc'.
-      auto subs = dc->getDeclaredTypeInContext()
-          ->getContextSubstitutionMap(dc->getParentModule(), origDC);
-
-      // Apply them to the interface type to produce the final
-      // substituted type.
-      type = type.subst(subs);
-    }
-    return type;
-  };
 
   // Import the result type.
   CanType origSwiftResultTy;
@@ -1986,9 +1979,11 @@ Type ClangImporter::Implementation::importMethodType(
         swiftResultTy = OptionalType::get(OptionalityOfReturn, swiftResultTy);
     }
   }
+
   if (!swiftResultTy)
     return Type();
-  swiftResultTy = mapTypeIntoContext(swiftResultTy);
+
+  swiftResultTy = mapTypeIntoContext(origDC, dc, swiftResultTy);
 
   CanType errorParamType;
 
@@ -2079,6 +2074,8 @@ Type ClangImporter::Implementation::importMethodType(
     if (!swiftParamTy)
       return Type();
 
+    swiftParamTy = mapTypeIntoContext(origDC, dc, swiftParamTy);
+
     // If this is the error parameter, remember it, but don't build it
     // into the parameter type.
     if (paramIsError) {
@@ -2114,20 +2111,16 @@ Type ClangImporter::Implementation::importMethodType(
     }
     ++nameIndex;
 
-    // It doesn't actually matter which DeclContext we use, so just use the
-    // imported header unit.
-    swiftParamTy = mapTypeIntoContext(swiftParamTy);
-
     // Set up the parameter info.
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, Accessibility::Private,
                                            /*IsLet*/ true,
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
-                                           bodyName, swiftParamTy,
+                                           bodyName,
+                                           swiftParamTy,
                                            ImportedHeaderUnit);
-    paramInfo->setInterfaceType(
-        dc->mapTypeOutOfContext(swiftParamTy));
+    paramInfo->setInterfaceType(dc->mapTypeOutOfContext(swiftParamTy));
 
     if (addNoEscapeAttr) {
       paramInfo->getAttrs().add(
@@ -2193,13 +2186,10 @@ Type ClangImporter::Implementation::importMethodType(
     // Mark that the function type throws.
     extInfo = extInfo.withThrows(true);
   }
- 
-  swiftResultTy = dc->mapTypeOutOfContext(swiftResultTy);
 
   // Form the function type.
-  return FunctionType::get(
-      (*bodyParams)->getInterfaceType(SwiftContext),
-      swiftResultTy, extInfo);
+  return FunctionType::get((*bodyParams)->getInterfaceType(SwiftContext),
+                           dc->mapTypeOutOfContext(swiftResultTy), extInfo);
 }
 
 Type ClangImporter::Implementation::importAccessorMethodType(
@@ -2228,36 +2218,18 @@ Type ClangImporter::Implementation::importAccessorMethodType(
   DeclContext *origDC = importDeclContextOf(property,
                                             property->getDeclContext());
   assert(origDC);
-  auto mapTypeIntoContext = [&](Type type) -> Type {
-    if (dc != origDC) {
-      // Replace origDC's archetypes with interface types.
-      type = origDC->mapTypeOutOfContext(type);
-
-      // Get the substitutions that we need to access a member of
-      // 'origDC' on 'dc'.
-      auto subs = dc->getDeclaredTypeInContext()
-          ->getContextSubstitutionMap(dc->getParentModule(), origDC);
-
-      // Apply them to the interface type to produce the final
-      // substituted type.
-      type = type.subst(subs);
-    }
-    return type;
-  };
 
   // Import the property type, independent of what kind of accessor this is.
   Type propertyTy = importPropertyType(property, isFromSystemModule);
   if (!propertyTy)
     return Type();
-  propertyTy = mapTypeIntoContext(propertyTy);
-  Type propertyInterfaceTy = dc->mapTypeOutOfContext(propertyTy);
 
+  propertyTy = mapTypeIntoContext(origDC, dc, propertyTy);
   // Now build up the resulting FunctionType and parameters.
   Type resultTy;
   if (isGetter) {
     *params = ParameterList::createEmpty(SwiftContext);
-    resultTy = propertyInterfaceTy;
-
+    resultTy = dc->mapTypeOutOfContext(propertyTy);
   } else {
     const clang::ParmVarDecl *param = clangDecl->parameters().front();
     ImportedName fullBodyName = importFullName(param, CurrentVersion);
@@ -2272,7 +2244,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
                                            argLabel, nameLoc, bodyName,
                                            propertyTy,
                                            /*dummy DC*/ImportedHeaderUnit);
-    paramInfo->setInterfaceType(propertyInterfaceTy);
+    paramInfo->setInterfaceType(dc->mapTypeOutOfContext(propertyTy));
 
     *params = ParameterList::create(SwiftContext, paramInfo);
     resultTy = SwiftContext.getVoidDecl()->getDeclaredInterfaceType();
