@@ -263,25 +263,6 @@ private:
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (!report(VD))
         return false;
-      if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
-        // Avoid indexing the indices, only walk the getter/setter.
-        if (SD->getGetter())
-          if (SourceEntityWalker::walk(cast<Decl>(SD->getGetter())))
-            return false;
-        if (SD->getSetter())
-          if (SourceEntityWalker::walk(cast<Decl>(SD->getSetter())))
-            return false;
-        if (SD->hasAddressors()) {
-          if (auto FD = SD->getAddressor())
-            SourceEntityWalker::walk(cast<Decl>(FD));
-          if (Cancelled)
-            return false;
-          if (auto FD = SD->getMutableAddressor())
-            SourceEntityWalker::walk(cast<Decl>(FD));
-        }
-        walkToDeclPost(D);
-        return false; // already walked what we needed.
-      }
     }
     if (auto *ED = dyn_cast<ExtensionDecl>(D))
       return reportExtension(ED);
@@ -885,12 +866,13 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
 bool IndexSwiftASTWalker::report(ValueDecl *D) {
   if (startEntityDecl(D)) {
     // Pass accessors.
-    if (auto VarD = dyn_cast<VarDecl>(D)) {
+    if (auto StoreD = dyn_cast<AbstractStorageDecl>(D)) {
       auto isNullOrImplicit = [](const Decl *D) -> bool {
         return !D || D->isImplicit();
       };
-      if (isNullOrImplicit(VarD->getGetter()) &&
-          isNullOrImplicit(VarD->getSetter())) {
+      if (isa<VarDecl>(D) && isNullOrImplicit(StoreD->getGetter()) &&
+          isNullOrImplicit(StoreD->getSetter())) {
+        auto VarD = cast<VarDecl>(D);
         // No actual getter or setter, pass 'pseudo' accessors.
         // We create accessor entities so we can implement the functionality
         // of libclang, which reports implicit method property accessor
@@ -903,31 +885,31 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
         if (!reportPseudoSetterDecl(VarD))
           return false;
       } else {
-        if (auto FD = VarD->getGetter())
+        if (auto FD = StoreD->getGetter())
           SourceEntityWalker::walk(cast<Decl>(FD));
         if (Cancelled)
           return false;
-        if (auto FD = VarD->getSetter())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-      }
-      if (VarD->hasObservers()) {
-        if (auto FD = VarD->getWillSetFunc())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-        if (auto FD = VarD->getDidSetFunc())
+        if (auto FD = StoreD->getSetter())
           SourceEntityWalker::walk(cast<Decl>(FD));
         if (Cancelled)
           return false;
       }
-      if (VarD->hasAddressors()) {
-        if (auto FD = VarD->getAddressor())
+      if (StoreD->hasObservers()) {
+        if (auto FD = StoreD->getWillSetFunc())
           SourceEntityWalker::walk(cast<Decl>(FD));
         if (Cancelled)
           return false;
-        if (auto FD = VarD->getMutableAddressor())
+        if (auto FD = StoreD->getDidSetFunc())
+          SourceEntityWalker::walk(cast<Decl>(FD));
+        if (Cancelled)
+          return false;
+      }
+      if (StoreD->hasAddressors()) {
+        if (auto FD = StoreD->getAddressor())
+          SourceEntityWalker::walk(cast<Decl>(FD));
+        if (Cancelled)
+          return false;
+        if (auto FD = StoreD->getMutableAddressor())
           SourceEntityWalker::walk(cast<Decl>(FD));
       }
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {

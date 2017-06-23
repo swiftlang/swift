@@ -37,6 +37,9 @@ struct AStruct {
       return base
     }
   }
+  // CHECK: [[@LINE-20]]:13 | param/Swift | index | {{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-21]]:20 | struct/Swift | Int | {{.*}} | Ref | rel: 0
+  // CHECK: [[@LINE-22]]:28 | struct/Swift | Int | {{.*}} | Ref | rel: 0
 }
 
 // Class
