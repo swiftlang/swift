@@ -19,6 +19,7 @@
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DiagnosticsSIL.h"
 
 namespace swift {
 namespace migrator {
@@ -133,7 +134,9 @@ struct FixitFilter {
         Info.ID == diag::missing_particular_case.ID ||
         Info.ID == diag::paren_void_probably_void.ID ||
         Info.ID == diag::make_decl_objc.ID ||
-        Info.ID == diag::optional_req_nonobjc_near_match_add_objc.ID)
+        Info.ID == diag::optional_req_nonobjc_near_match_add_objc.ID ||
+        Info.ID == diag::exclusivity_access_required_swift3.ID ||
+        Info.ID == diag::exclusivity_access_required.ID)
       return true;
 
     return false;
