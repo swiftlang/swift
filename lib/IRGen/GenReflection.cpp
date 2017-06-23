@@ -927,8 +927,7 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     // extra inhabitants as these. But maybe it's best not to codify
     // that in the ABI anyway.
     CanType thinFunction = CanFunctionType::get(
-      TupleType::getEmpty(Context),
-      TupleType::getEmpty(Context),
+      { }, Context.TheEmptyTupleType,
       AnyFunctionType::ExtInfo().withRepresentation(
           FunctionTypeRepresentation::Thin));
     BuiltinTypes.insert(thinFunction);

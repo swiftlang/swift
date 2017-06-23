@@ -1891,12 +1891,11 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
                                                funcType->throws());
 
   if (!genericSig)
-    return CanFunctionType::get(funcType.getInput(),
-                                funcType.getResult(),
+    return CanFunctionType::get(funcType->getParams(), funcType.getResult(),
                                 innerExtInfo);
-    
+
   return CanGenericFunctionType::get(genericSig,
-                                     funcType.getInput(),
+                                     funcType->getParams(),
                                      funcType.getResult(),
                                      innerExtInfo);
 }

@@ -1426,12 +1426,19 @@ void ASTMangler::appendParams(Type ParamsTy, bool forceSingleParam) {
       return;
     }
     if (forceSingleParam && Tuple->getNumElements() > 1) {
+      if (ParenType *Paren = dyn_cast<ParenType>(ParamsTy.getPointer()))
+        ParamsTy = Paren->getUnderlyingType();
+
       appendType(ParamsTy);
       appendListSeparator();
       appendOperator("t");
       return;
     }
   }
+
+  if (ParenType *Paren = dyn_cast<ParenType>(ParamsTy.getPointer()))
+    ParamsTy = Paren->getUnderlyingType();
+
   appendType(ParamsTy);
 }
 
@@ -1673,7 +1680,8 @@ CanType ASTMangler::getDeclTypeForMangling(
   auto &C = decl->getASTContext();
   if (!decl->hasInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
     if (isa<AbstractFunctionDecl>(decl))
-      return CanFunctionType::get(C.TheErrorType, C.TheErrorType);
+      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
+                                  C.TheErrorType, AnyFunctionType::ExtInfo());
     return C.TheErrorType;
   }
 
@@ -1687,7 +1695,7 @@ CanType ASTMangler::getDeclTypeForMangling(
     genericParams = sig->getGenericParams();
     requirements = sig->getRequirements();
 
-    type = CanFunctionType::get(gft.getInput(), gft.getResult(),
+    type = CanFunctionType::get(gft->getParams(), gft.getResult(),
                                 gft->getExtInfo());
   } else {
     genericParams = {};

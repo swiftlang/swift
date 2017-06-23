@@ -1107,7 +1107,9 @@ CanType TypeBase::getCanonicalType() {
     // Transform the input and result types.
     auto &ctx = function->getInput()->getASTContext();
     auto &mod = *ctx.TheBuiltinModule;
-    auto inputTy = function->getInput()->getCanonicalType(sig, mod);
+    Type inputTy = function->getInput()->getCanonicalType(sig, mod);
+    if (!AnyFunctionType::isCanonicalFunctionInputType(inputTy))
+      inputTy = ParenType::get(ctx, inputTy);
     auto resultTy = function->getResult()->getCanonicalType(sig, mod);
 
     Result = GenericFunctionType::get(sig, inputTy, resultTy,
@@ -1124,6 +1126,10 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
+    if (!AnyFunctionType::isCanonicalFunctionInputType(In)) {
+      In = ParenType::get(In->getASTContext(), In);
+      assert(AnyFunctionType::isCanonicalFunctionInputType(In));
+    }
     Type Out = FT->getResult()->getCanonicalType();
     Result = FunctionType::get(In, Out, FT->getExtInfo());
     break;
@@ -2834,6 +2840,17 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   // TODO: Canonicalize away HasExplicitAnyObject if it is implied
   // by one of our member protocols.
   return build(C, CanTypes, HasExplicitAnyObject);
+}
+
+bool AnyFunctionType::isCanonicalFunctionInputType(Type input) {
+  // Canonically, we should have a tuple type or parenthesized type.
+  if (auto tupleTy = dyn_cast<TupleType>(input.getPointer()))
+    return tupleTy->isCanonical();
+  if (auto parenTy = dyn_cast<ParenType>(input.getPointer()))
+    return parenTy->getUnderlyingType()->isCanonical();
+
+  // FIXME: Still required for the constraint solver.
+  return isa<TypeVariableType>(input.getPointer());
 }
 
 FunctionType *
