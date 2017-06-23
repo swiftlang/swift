@@ -60,9 +60,19 @@ class alignas(8) TypeRepr {
     unsigned Warned : 1;
   };
   enum { NumTypeReprBits = 8 };
+  class TupleTypeReprBitfields {
+    friend class TupleTypeRepr;
+    unsigned : NumTypeReprBits;
+
+    /// Whether this tuple has '...' and its position.
+    unsigned HasEllipsis : 1;
+  };
 
 protected:
-  TypeReprBitfields TypeReprBits;
+  union {
+    TypeReprBitfields TypeReprBits;
+    TupleTypeReprBitfields TupleTypeReprBits;
+  };
 
   TypeRepr(TypeReprKind K) {
     TypeReprBits.Kind = static_cast<unsigned>(K);
@@ -584,38 +594,30 @@ struct TupleTypeReprElement {
 ///   (_ x: Foo)
 /// \endcode
 class TupleTypeRepr final : public TypeRepr,
-    private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement> {
+    private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement,
+                                  std::pair<SourceLoc, unsigned>> {
   friend TrailingObjects;
-
-  enum NameInfo: uint8_t {
-    NotNamed = 0,
-    HasNames = 1,
-    HasLabels = 2
-  };
-
-  SourceLoc EllipsisLoc;
-  unsigned EllipsisIdx;
+  typedef std::pair<SourceLoc, unsigned> SourceLocAndIdx;
 
   unsigned NumElements;
   SourceRange Parens;
-
-  NameInfo NameStatus;
   
   size_t numTrailingObjects(OverloadToken<TupleTypeReprElement>) const {
     return NumElements;
   }
 
   TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
-                SourceRange Parens,
-                SourceLoc Ellipsis, unsigned EllipsisIdx);
+                SourceRange Parens, SourceLoc Ellipsis, unsigned EllipsisIdx);
 
 public:
   unsigned getNumElements() const { return NumElements; }
   bool hasElementNames() const {
-    return NameStatus >= HasNames;
-  }
-  bool hasUnderscoreLocs() const {
-    return NameStatus == HasLabels;
+    for (auto &Element : getElements()) {
+      if (Element.NameLoc.isValid()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   ArrayRef<TupleTypeReprElement> getElements() const {
@@ -661,23 +663,23 @@ public:
   SourceRange getParens() const { return Parens; }
 
   bool hasEllipsis() const {
-    return EllipsisLoc.isValid();
+    return TupleTypeReprBits.HasEllipsis;
   }
 
   SourceLoc getEllipsisLoc() const {
     return hasEllipsis() ?
-      EllipsisLoc : SourceLoc();
+      getTrailingObjects<SourceLocAndIdx>()[0].first : SourceLoc();
   }
 
   unsigned getEllipsisIndex() const {
     return hasEllipsis() ?
-      EllipsisIdx : NumElements;
+      getTrailingObjects<SourceLocAndIdx>()[0].second : NumElements;
   }
 
   void removeEllipsis() {
     if (hasEllipsis()) {
-      EllipsisLoc = SourceLoc();
-      EllipsisIdx = NumElements;
+      TupleTypeReprBits.HasEllipsis = false;
+      getTrailingObjects<SourceLocAndIdx>()[0] = {SourceLoc(), NumElements};
     }
   }
 
