@@ -27,71 +27,23 @@ namespace swift {
 namespace syntax {
 
 class TypeSyntax;
-class TypeSyntaxData;
 class TypeIdentifierSyntax;
-class TypeIdentifierSyntaxData;
-
-#pragma mark - generic-requirement Data
-
-class GenericRequirementSyntaxData : public SyntaxData {
-  friend class GenericRequirementSyntax;
-  friend class SyntaxData;
-
-protected:
-  GenericRequirementSyntaxData(const RC<RawSyntax> Raw,
-                               const SyntaxData *Parent = nullptr,
-                               const CursorIndex IndexInParent = 0)
-  : SyntaxData(Raw, Parent, IndexInParent) {}
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::ConformanceRequirement ||
-      SD->getKind() == SyntaxKind::SameTypeRequirement;
-  }
-};
 
 #pragma mark - generic-requirement API
 
 class GenericRequirementSyntax : public Syntax {
   friend class Syntax;
-  friend class SyntaxData;
-  friend class GenericRequirementSyntaxData;
-
+  
+protected:
+  virtual void validate() const override {}
 public:
-  using DataType = GenericRequirementSyntaxData;
-
-  GenericRequirementSyntax(const RC<SyntaxData> Root, const DataType *Data)
+  static GenericRequirementSyntax makeBlank();
+  GenericRequirementSyntax(const RC<SyntaxData> Root,
+                               const SyntaxData *Data)
     : Syntax(Root, Data) {}
-
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::ConformanceRequirement ||
-    S->getKind() == SyntaxKind::SameTypeRequirement;
-  }
-};
-
-#pragma mark - conformance-requirement Data
-
-class ConformanceRequirementSyntaxData final
-    : public GenericRequirementSyntaxData {
-  friend class SyntaxData;
-
-  RC<TypeIdentifierSyntaxData> CachedConformingTypeIdentifier;
-  RC<TypeSyntaxData> InheritedType;
-
-  ConformanceRequirementSyntaxData(RC<RawSyntax> Raw,
-                                   const SyntaxData *Parent = nullptr,
-                                   CursorIndex IndexInParent = 0);
-  static RC<ConformanceRequirementSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-  static RC<ConformanceRequirementSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::ConformanceRequirement;
-  }
-  static bool classof(const GenericRequirementSyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::ConformanceRequirement;
+           S->getKind() == SyntaxKind::SameTypeRequirement;
   }
 };
 
@@ -100,8 +52,6 @@ public:
 /// conformance-requirement -> type-identifier : type-identifier
 class ConformanceRequirementSyntax final : public GenericRequirementSyntax {
 
-  friend class ConformanceRequirementSyntaxData;
-  friend class SyntaxData;
   friend class Syntax;
 
   enum Cursor : CursorIndex {
@@ -110,19 +60,15 @@ class ConformanceRequirementSyntax final : public GenericRequirementSyntax {
     RightTypeIdentifier,
   };
 
-  ConformanceRequirementSyntax(RC<SyntaxData> Root,
-                               ConformanceRequirementSyntaxData *Data);
-
-  static ConformanceRequirementSyntax make(RC<RawSyntax> Raw,
-                                           const SyntaxData *Parent = nullptr,
-                                           CursorIndex IndexInParent = 0);
-
-  static ConformanceRequirementSyntax makeBlank();
-
+protected:
+  virtual void validate() const override;
 public:
-  using DataType = ConformanceRequirementSyntaxData;
+  static ConformanceRequirementSyntax makeBlank();
+  ConformanceRequirementSyntax(const RC<SyntaxData> Root,
+                            const SyntaxData *Data)
+    : GenericRequirementSyntax(Root, Data) {}
 
-  /// Return the conforming "left-hand" type identifier in the
+    /// Return the conforming "left-hand" type identifier in the
   /// conformance requirement.
   TypeIdentifierSyntax getConformingTypeIdentifier() const;
 
@@ -153,52 +99,27 @@ public:
   }
 };
 
-#pragma mark - same-type-requirement Data
-
-class SameTypeRequirementSyntaxData final
-    : public GenericRequirementSyntaxData {
-  friend struct SyntaxFactory;
-  friend class SyntaxData;
-
-  RC<TypeIdentifierSyntaxData> CachedLeftTypeIdentifier;
-  RC<TypeSyntaxData> CachedRightType;
-
-  SameTypeRequirementSyntaxData(RC<RawSyntax> Raw,
-                                const SyntaxData *Parent = nullptr,
-                                CursorIndex IndexInParent = 0);
-  static RC<SameTypeRequirementSyntaxData>
-  make(RC<RawSyntax> Raw,
-       const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-  static RC<SameTypeRequirementSyntaxData> makeBlank();
-
-public:
-static bool classof(const SyntaxData *S) {
-  return S->getKind() == SyntaxKind::SameTypeRequirement;
-}
-};
-
 #pragma mark -same-type-requirement API
 
 /// same-type-requirement -> type-identifier == type
 class SameTypeRequirementSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class Syntax;
-  friend class SyntaxData;
-  friend class SameTypeRequirementSyntaxData;
   enum Cursor : CursorIndex {
     LeftTypeIdentifier,
     EqualityToken,
     RightType,
   };
 
-  SameTypeRequirementSyntax(RC<SyntaxData> Root,
-                            const SameTypeRequirementSyntaxData *Data);
+  virtual void validate() const override;
 
 public:
-  using DataType = SameTypeRequirementSyntaxData;
+  static SameTypeRequirementSyntax makeBlank();
+  SameTypeRequirementSyntax(const RC<SyntaxData> Root,
+                            const SyntaxData *Data)
+    : Syntax(Root, Data) {}
 
-  /// Return the type identifier on the left side of the same-type requirement.
+    /// Return the type identifier on the left side of the same-type requirement.
   TypeIdentifierSyntax getLeftTypeIdentifier() const;
 
   /// Return a SameTypeRequirementSyntax with the given type identifier on
@@ -224,28 +145,6 @@ public:
   }
 };
 
-#pragma mark generic-parameter Data
-
-  class GenericParameterSyntaxData final : public SyntaxData {
-    friend class SyntaxData;
-    friend struct SyntaxFactory;
-    RC<TypeSyntaxData> CachedInheritedType;
-
-    GenericParameterSyntaxData(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent = nullptr,
-                               CursorIndex IndexInParent = 0);
-
-    static RC<GenericParameterSyntaxData>
-    make(RC<RawSyntax> Raw,
-         const SyntaxData *Parent = nullptr,
-         CursorIndex IndexInParent = 0);
-    static RC<GenericParameterSyntaxData> makeBlank();
-
-    static bool classof(const SyntaxData *S) {
-      return S->getKind() == SyntaxKind::GenericParameterClause;
-    }
-  };
-
 #pragma mark - generic-parameter API
 
 /// generic-parameter -> type-name
@@ -260,10 +159,14 @@ class GenericParameterSyntax final : public Syntax {
     InheritedType,
   };
 
-  GenericParameterSyntax(RC<SyntaxData> Root,
-                         const GenericParameterSyntaxData *Data);
+protected:
+  virtual void validate() const override;
 
 public:
+  static GenericParameterSyntax makeBlank();
+  GenericParameterSyntax(const RC<SyntaxData> Root,
+                         const SyntaxData *Data)
+    : Syntax(Root, Data) {}
 
   /// Return the name of the generic parameter.
   RC<TokenSyntax> getIdentifier() const;
@@ -296,64 +199,11 @@ public:
   }
 };
 
-
-#pragma mark - generic-parameter-list Data
-
-class GenericParameterListSyntaxData final : public SyntaxData {
-  friend class SyntaxData;
-
-  GenericParameterListSyntaxData(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent = nullptr,
-                                 CursorIndex IndexInParent = 0);
-  static RC<GenericParameterListSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-  static RC<GenericParameterListSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::GenericParameterList;
-  }
-};
-
-#pragma mark - generic-parameter-list API
-
-/// generic-parameter-list -> generic-parameter
-///                         | generic-parameter ',' generic-parameter-list
-class GenericParameterListSyntax final : public Syntax {
-  friend struct SyntaxFactory;
-};
-
-#pragma mark generic-parameter-clause Data
-
-class GenericParameterClauseSyntaxData final : public SyntaxData {
-  friend class SyntaxData;
-  friend struct SyntaxFactory;
-  friend class GenericParameterClauseBuilder;
-
-  RC<GenericParameterListSyntaxData> CachedGenericParameterList;
-
-  GenericParameterClauseSyntaxData(const RC<RawSyntax> Raw,
-                                   const SyntaxData *Parent = nullptr,
-                                   const CursorIndex IndexInParent = 0);
-  static RC<GenericParameterClauseSyntaxData>
-  make(RC<RawSyntax> Raw,
-       const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-  static RC<GenericParameterClauseSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::GenericParameterClause;
-  }
-};
-
 #pragma mark - generic-parameter-clause API
 
 /// generic-parameter-clause -> '<' generic-argument-list '>'
 class GenericParameterClauseSyntax final : public Syntax {
   friend struct SyntaxFactory;
-  friend class GenericParameterClauseSyntaxData;
   friend class GenericParameterClauseBuilder;
   friend class FunctionDeclSyntax;
 
@@ -363,10 +213,14 @@ class GenericParameterClauseSyntax final : public Syntax {
     RightAngleBracketToken,
   };
 
-  GenericParameterClauseSyntax(RC<SyntaxData> Root,
-                               const GenericParameterClauseSyntaxData *Data);
+protected:
+  virtual void validate() const override;
 
 public:
+  static GenericParameterClauseSyntax makeBlank();
+  GenericParameterClauseSyntax(const RC<SyntaxData> Root,
+                               const SyntaxData *Data)
+    : Syntax(Root, Data) {}
   /// Return the left angle bracket '<' token on the generic parameter clause.
   RC<TokenSyntax> getLeftAngleBracket() const;
 
@@ -418,73 +272,6 @@ public:
   GenericParameterClauseSyntax build() const;
 };
 
-#pragma mark - generic-argument-list Data
-
-class GenericArgumentListSyntaxData final : public SyntaxData {
-  friend class SyntaxData;
-  GenericArgumentListSyntaxData(RC<RawSyntax> Raw,
-                                const SyntaxData *Parent = nullptr,
-                                CursorIndex IndexInParent = 0);
-  static RC<GenericArgumentListSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-  static RC<GenericArgumentListSyntaxData> makeBlank();
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::GenericArgumentList;
-  }
-};
-
-#pragma mark - generic-argument-list API
-
-/// generic-argument-list -> generic-argument
-///                        | generic-argument ',' generic-argument-list
-class GenericArgumentListSyntax final : public Syntax {
-  friend struct SyntaxFactory;
-
-  GenericArgumentListSyntax(RC<SyntaxData> Root,
-                            GenericArgumentListSyntaxData *Data);
-
-  static GenericArgumentListSyntax make(RC<RawSyntax> Raw);
-
-  static GenericArgumentListSyntax makeBlank();
-
-public:
-  /// Get the n-th generic argument from this list.
-  TypeSyntax getArgument(unsigned n) const;
-
-  /// Return a GenericArgumentListSyntax with the given generic argument added.
-  GenericArgumentListSyntax
-  addGenericArgument(llvm::Optional<RC<TokenSyntax>> Comma,
-                     TypeSyntax NewArgument) const;
-
-  static bool classof (const Syntax *S) {
-    return S->getKind() == SyntaxKind::GenericArgumentList;
-  }
-};
-
-#pragma mark - generic-argument-clause Data
-
-class GenericArgumentClauseSyntaxData final : public SyntaxData {
-  friend class SyntaxData;
-  friend struct SyntaxFactory;
-  friend class GenericArgumentClauseBuilder;
-  RC<GenericArgumentListSyntaxData> CachedGenericArgumentList;
-
-  GenericArgumentClauseSyntaxData(RC<RawSyntax> Raw,
-                                  const SyntaxData *Parent = nullptr,
-                                  CursorIndex IndexInParent = 0);
-  static RC<GenericArgumentClauseSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-  static RC<GenericArgumentClauseSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::GenericArgumentClause;
-  }
-};
-
 #pragma mark - generic-argument-clause API
 
 /// generic-argument-clause -> '<' generic-argument-list '>'
@@ -492,21 +279,23 @@ class GenericArgumentClauseSyntax : public Syntax {
   friend struct SyntaxFactory;
   friend class GenericArgumentClauseBuilder;
   friend class SymbolicReferenceExprSyntax;
-  friend class SyntaxData;
   friend class Syntax;
 
-  using DataType = GenericArgumentClauseSyntaxData;
-
-  enum class Cursor : CursorIndex {
+    enum class Cursor : CursorIndex {
     LeftAngleBracketToken,
     GenericArgumentList,
     RightAngleBracketToken,
   };
 
-  GenericArgumentClauseSyntax(RC<SyntaxData> Root,
-                              const GenericArgumentClauseSyntaxData *Data);
+protected:
+  virtual void validate() const override {}
 
 public:
+  static GenericArgumentClauseSyntax makeBlank();
+  GenericArgumentClauseSyntax(const RC<SyntaxData> Root,
+                              const SyntaxData *Data)
+    : Syntax(Root, Data) {}
+
   /// Return the left angle bracket '<' token on the generic argument clause.
   RC<TokenSyntax> getLeftAngleBracket() const;
 
@@ -536,35 +325,6 @@ public:
   }
 };
 
-#pragma mark - generic-requirement-list Data
-
-using GenericRequirementListSyntaxData =
-  SyntaxCollectionData<SyntaxKind::GenericRequirementList,
-  GenericRequirementSyntax>;
-
-#pragma mark - generic-requirement-list API
-
-/// requirement-list -> requirement | requirement ',' requirement-list
-///
-/// requirement -> conformance-requirement | same-type-requirement
-class GenericRequirementListSyntax final
-  : public SyntaxCollection<SyntaxKind::GenericRequirementList,
-      GenericRequirementSyntax> {
-  friend struct SyntaxFactory;
-  friend class Syntax;
-  friend class SyntaxData;
-
-  using DataType = GenericRequirementListSyntaxData;
-
-  GenericRequirementListSyntax(const RC<SyntaxData> Root,
-                               const DataType *Data)
-      : SyntaxCollection(Root, Data) {}
-public:
-  static bool classof(const Syntax *S) {
-    return S->getKind() == SyntaxKind::GenericRequirementList;
-  }
-};
-
 #pragma mark - generic-argument-clause Builder
 
 class GenericArgumentClauseBuilder {
@@ -587,47 +347,25 @@ public:
   GenericArgumentClauseSyntax build() const;
 };
 
-#pragma mark - generic-where-clause Data
-
-class GenericWhereClauseSyntaxData final : public SyntaxData {
-  friend class SyntaxData;
-  friend struct SyntaxFactory;
-
-  RC<GenericRequirementListSyntaxData> CachedRequirementList;
-
-  GenericWhereClauseSyntaxData(const RC<RawSyntax> Raw,
-                               const SyntaxData *Parent = nullptr,
-                               const CursorIndex IndexInParent = 0);
-  static RC<GenericWhereClauseSyntaxData>
-  make(const RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       const CursorIndex IndexInParent = 0);
-  static RC<GenericWhereClauseSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::GenericWhereClause;
-  }
-};
-
 #pragma mark - generic-where-clause API
 
 /// generic-where-clause -> 'where' requirement-list
 class GenericWhereClauseSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class Syntax;
-  friend class SyntaxData;
-  friend class GenericWhereClauseSyntaxData;
   enum class Cursor : CursorIndex {
     WhereKeyword,
     RequirementList,
   };
 
-  using DataType = GenericWhereClauseSyntaxData;
-
-  GenericWhereClauseSyntax(RC<SyntaxData> Root,
-                           const GenericWhereClauseSyntaxData *Data);
+protected:
+  virtual void validate() const override;
 
 public:
+  static GenericWhereClauseSyntax makeBlank();
+  GenericWhereClauseSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
+
   /// Return the 'where' keyword in the generic where clause.
   RC<TokenSyntax> getWhereKeyword() const;
 

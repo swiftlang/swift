@@ -23,36 +23,19 @@ using namespace swift::syntax;
 
 #pragma mark - conformance-requirement Data
 
-ConformanceRequirementSyntaxData::
-ConformanceRequirementSyntaxData(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent,
-                                 CursorIndex IndexInParent)
-  : GenericRequirementSyntaxData(Raw, Parent, IndexInParent) {
+void ConformanceRequirementSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::ConformanceRequirement);
-  syntax_assert_child_kind(Raw,
-    ConformanceRequirementSyntax::Cursor::LeftTypeIdentifier,
+  syntax_assert_child_kind(Raw, Cursor::LeftTypeIdentifier,
     SyntaxKind::TypeIdentifier);
-  syntax_assert_child_token_text(Raw,
-                                 ConformanceRequirementSyntax::Cursor::Colon,
+  syntax_assert_child_token_text(Raw, Cursor::Colon,
                                  tok::colon, ":");
-  syntax_assert_child_kind(Raw,
-    ConformanceRequirementSyntax::Cursor::RightTypeIdentifier,
+  syntax_assert_child_kind(Raw, Cursor::RightTypeIdentifier,
     SyntaxKind::TypeIdentifier);
 }
 
-RC<ConformanceRequirementSyntaxData>
-ConformanceRequirementSyntaxData::make(RC<RawSyntax> Raw,
-                                      const SyntaxData *Parent,
-                                      CursorIndex IndexInParent) {
-  return RC<ConformanceRequirementSyntaxData> {
-    new ConformanceRequirementSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<ConformanceRequirementSyntaxData>
-ConformanceRequirementSyntaxData::makeBlank() {
+ConformanceRequirementSyntax
+ConformanceRequirementSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::ConformanceRequirement,
                              {
                                RawSyntax::missing(SyntaxKind::TypeIdentifier),
@@ -60,122 +43,53 @@ ConformanceRequirementSyntaxData::makeBlank() {
                                RawSyntax::missing(SyntaxKind::TypeIdentifier),
                              },
                              SourcePresence::Present);
-  return make(Raw);
-}
-
-
-#pragma mark - generic-parameter Data
-
-GenericParameterSyntaxData::
-GenericParameterSyntaxData(RC<RawSyntax> Raw,
-                           const SyntaxData *Parent,
-                           CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Kind == SyntaxKind::GenericParameter);
-}
-
-RC<GenericParameterSyntaxData>
-GenericParameterSyntaxData::make(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent,
-                                 CursorIndex IndexInParent) {
-  return RC<GenericParameterSyntaxData> {
-    new GenericParameterSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<GenericParameterSyntaxData> GenericParameterSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::GenericParameter,
-                              {
-                                TokenSyntax::missingToken(tok::identifier, ""),
-                                TokenSyntax::missingToken(tok::colon, ":"),
-                                RawSyntax::missing(SyntaxKind::MissingType),
-                              },
-                              SourcePresence::Present));
+  return make<ConformanceRequirementSyntax>(Raw);
 }
 
 #pragma mark - generic-parameter API
 
-GenericParameterSyntax::
-GenericParameterSyntax(RC<SyntaxData> Root,
-                       const GenericParameterSyntaxData *Data)
-  : Syntax(Root, Data) {}
-
-#pragma mark - generic-parameter-list Data
-
-GenericParameterListSyntaxData::
-GenericParameterListSyntaxData(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent,
-                               CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Kind == SyntaxKind::GenericParameterList);
+void GenericParameterSyntax::validate() const {
+  assert(Data->Raw->Kind == SyntaxKind::GenericParameter);
 }
 
-RC<GenericParameterListSyntaxData>
-GenericParameterListSyntaxData::make(RC<RawSyntax> Raw,
-                                     const SyntaxData *Parent,
-                                     CursorIndex IndexInParent) {
-  return RC<GenericParameterListSyntaxData> {
-    new GenericParameterListSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<GenericParameterListSyntaxData> GenericParameterListSyntaxData::makeBlank() {
-  auto Raw = RawSyntax::make(SyntaxKind::GenericParameterList,
-                             {}, SourcePresence::Present);
-  return make(Raw);
+GenericParameterSyntax GenericParameterSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::GenericParameter,
+                             {
+                               TokenSyntax::missingToken(tok::identifier, ""),
+                               TokenSyntax::missingToken(tok::colon, ":"),
+                               RawSyntax::missing(SyntaxKind::MissingType),
+                             },
+                             SourcePresence::Present);
+  return make<GenericParameterSyntax>(Raw);
 }
 
 #pragma mark -
-#pragma mark generic-parameter-clause Data
+#pragma mark - generic-parameter-clause API
 
-GenericParameterClauseSyntaxData::
-GenericParameterClauseSyntaxData(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent,
-                                 CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
-  syntax_assert_child_token_text(Raw,
-    GenericParameterClauseSyntax::Cursor::LeftAngleBracketToken,
+void GenericParameterClauseSyntax::validate() const {
+  auto Raw = Data->Raw;
+  syntax_assert_child_token_text(Raw, Cursor::LeftAngleBracketToken,
     tok::l_angle, "<");
 
-  syntax_assert_child_kind(Raw,
-    GenericParameterClauseSyntax::Cursor::GenericParameterList,
+  syntax_assert_child_kind(Raw, Cursor::GenericParameterList,
     SyntaxKind::GenericParameterList);
 
-  syntax_assert_child_token_text(Raw,
-    GenericParameterClauseSyntax::Cursor::RightAngleBracketToken,
+  syntax_assert_child_token_text(Raw, Cursor::RightAngleBracketToken,
     tok::r_angle, ">");
 }
 
-RC<GenericParameterClauseSyntaxData>
-GenericParameterClauseSyntaxData::make(const RC<RawSyntax> Raw,
-                                       const SyntaxData *Parent,
-                                       const CursorIndex IndexInParent) {
-  return RC<GenericParameterClauseSyntaxData> {
-    new GenericParameterClauseSyntaxData {
-      Raw, Parent, IndexInParent,
-    }
-  };
+GenericParameterClauseSyntax
+GenericParameterClauseSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(
+               SyntaxKind::GenericParameterClause,
+               {
+                 TokenSyntax::missingToken(tok::l_angle, "<"),
+                 RawSyntax::missing(SyntaxKind::GenericParameterList),
+                 TokenSyntax::missingToken(tok::r_angle, ">"),
+               },
+               SourcePresence::Present);
+  return make<GenericParameterClauseSyntax>(Raw);
 }
-
-RC<GenericParameterClauseSyntaxData>
-GenericParameterClauseSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::GenericParameterClause,
-    {
-      TokenSyntax::missingToken(tok::l_angle, "<"),
-      RawSyntax::missing(SyntaxKind::GenericParameterList),
-      TokenSyntax::missingToken(tok::r_angle, ">"),
-    },
-    SourcePresence::Present));
-}
-
-#pragma mark - generic-parameter-clause API
-
-GenericParameterClauseSyntax::
-GenericParameterClauseSyntax(const RC<SyntaxData> Root,
-                             const GenericParameterClauseSyntaxData *Data)
-  : Syntax(Root, Data) {}
 
 #pragma mark - generic-parameter-clause Builder
 
@@ -222,16 +136,14 @@ GenericParameterClauseSyntax GenericParameterClauseBuilder::build() const {
                                RightAngleToken,
                              },
                              SourcePresence::Present);
-  auto Data = GenericParameterClauseSyntaxData::make(Raw);
+  auto Data = SyntaxData::make(Raw);
   return { Data, Data.get() };
 }
 
-#pragma mark - generic-where-clause Data
+#pragma mark - generic-where-clause API
 
-GenericWhereClauseSyntaxData::
-GenericWhereClauseSyntaxData(const RC<RawSyntax> Raw, const SyntaxData *Parent,
-                             const CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
+void GenericWhereClauseSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::GenericWhereClause);
   syntax_assert_child_token_text(Raw,
     GenericWhereClauseSyntax::Cursor::WhereKeyword, tok::kw_where, "where");
@@ -240,30 +152,16 @@ GenericWhereClauseSyntaxData(const RC<RawSyntax> Raw, const SyntaxData *Parent,
     SyntaxKind::GenericRequirementList);
 }
 
-RC<GenericWhereClauseSyntaxData>
-GenericWhereClauseSyntaxData::make(const RC<RawSyntax> Raw,
-                                   const SyntaxData *Parent,
-                                   const CursorIndex IndexInParent) {
-  return RC<GenericWhereClauseSyntaxData> {
-    new GenericWhereClauseSyntaxData { Raw, Parent, IndexInParent }
-  };
+GenericWhereClauseSyntax GenericWhereClauseSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(
+               SyntaxKind::GenericWhereClause,
+               {
+                 TokenSyntax::missingToken(tok::kw_where, "where"),
+                 RawSyntax::missing(SyntaxKind::GenericRequirementList),
+               },
+               SourcePresence::Present);
+  return make<GenericWhereClauseSyntax>(Raw);
 }
-
-RC<GenericWhereClauseSyntaxData> GenericWhereClauseSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::GenericWhereClause,
-    {
-      TokenSyntax::missingToken(tok::kw_where, "where"),
-      RawSyntax::missing(SyntaxKind::GenericRequirementList),
-    },
-    SourcePresence::Present));
-}
-
-#pragma mark - generic-where-clause API
-
-GenericWhereClauseSyntax::
-GenericWhereClauseSyntax(RC<SyntaxData> Root,
-                         const GenericWhereClauseSyntaxData *Data)
-  : Syntax(Root, Data) {}
 
 GenericWhereClauseSyntax GenericWhereClauseSyntax::
 withWhereKeyword(RC<TokenSyntax> NewWhereKeyword) const {
@@ -278,99 +176,34 @@ withRequirementList(GenericRequirementListSyntax NewRequirements) const {
                                                       Cursor::RequirementList);
 }
 
-#pragma mark - same-type-requirement Data
-
-SameTypeRequirementSyntaxData::
-SameTypeRequirementSyntaxData(RC<RawSyntax> Raw,
-                              const SyntaxData *Parent,
-                              CursorIndex IndexInParent)
-  : GenericRequirementSyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Kind == SyntaxKind::SameTypeRequirement);
-  assert(Raw->Layout.size() == 3);
-  syntax_assert_child_kind(Raw,
-    SameTypeRequirementSyntax::Cursor::LeftTypeIdentifier,
-    SyntaxKind::TypeIdentifier);
-  syntax_assert_child_token_text(Raw,
-    SameTypeRequirementSyntax::Cursor::EqualityToken,
-    tok::oper_binary_spaced, "==");
-  assert(Raw->getChild(SameTypeRequirementSyntax::Cursor::RightType)->isType());
-}
-
-RC<SameTypeRequirementSyntaxData>
-SameTypeRequirementSyntaxData::make(RC<RawSyntax> Raw,
-                                    const SyntaxData *Parent,
-                                    CursorIndex IndexInParent) {
-  return RC<SameTypeRequirementSyntaxData> {
-    new SameTypeRequirementSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<SameTypeRequirementSyntaxData> SameTypeRequirementSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::SameTypeRequirement,
-                              {
-                                RawSyntax::missing(SyntaxKind::TypeIdentifier),
-                                TokenSyntax::missingToken(tok::equal, "="),
-                                RawSyntax::missing(SyntaxKind::MissingType),
-                              },
-                              SourcePresence::Present));
-}
-
 #pragma mark - same-type-requirement API
 
-SameTypeRequirementSyntax::
-SameTypeRequirementSyntax(RC<SyntaxData> Root,
-                          const SameTypeRequirementSyntaxData *Data)
-  : Syntax(Root, Data) {}
-
-#pragma mark - generic-argument-list Data
-
-GenericArgumentListSyntaxData::
-GenericArgumentListSyntaxData(RC<RawSyntax> Raw,
-                              const SyntaxData *Parent,
-                              CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
-    assert(Raw->Kind == SyntaxKind::GenericArgumentList);
+void SameTypeRequirementSyntax::validate() const {
+  auto Raw = Data->Raw;
+  assert(Raw->Kind == SyntaxKind::SameTypeRequirement);
+  assert(Raw->Layout.size() == 3);
+  syntax_assert_child_kind(Raw, Cursor::LeftTypeIdentifier,
+    SyntaxKind::TypeIdentifier);
+  syntax_assert_child_token_text(Raw, Cursor::EqualityToken,
+    tok::oper_binary_spaced, "==");
+  assert(Raw->getChild(Cursor::RightType)->isType());
 }
 
-RC<GenericArgumentListSyntaxData>
-GenericArgumentListSyntaxData::make(RC<RawSyntax> Raw, const SyntaxData *Parent,
-                                    CursorIndex IndexInParent) {
-  return RC<GenericArgumentListSyntaxData> {
-    new GenericArgumentListSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<GenericArgumentListSyntaxData> GenericArgumentListSyntaxData::makeBlank() {
-  auto Raw = RawSyntax::make(SyntaxKind::GenericArgumentList, {},
+SameTypeRequirementSyntax SameTypeRequirementSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::SameTypeRequirement,
+                             {
+                               RawSyntax::missing(SyntaxKind::TypeIdentifier),
+                               TokenSyntax::missingToken(tok::equal, "="),
+                               RawSyntax::missing(SyntaxKind::MissingType),
+                             },
                              SourcePresence::Present);
-  return make(Raw);
+  return make<SameTypeRequirementSyntax>(Raw);
 }
 
+#pragma mark - generic-argument-clause API (TODO)
 
-#pragma mark - generic-argument-list API (TODO)
-
-#pragma mark - generic-argument-clause Data
-
-GenericArgumentClauseSyntaxData::
-GenericArgumentClauseSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent,
-                                CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {}
-
-RC<GenericArgumentClauseSyntaxData>
-GenericArgumentClauseSyntaxData::make(RC<RawSyntax> Raw,
-                                      const SyntaxData *Parent,
-                                      CursorIndex IndexInParent) {
-  return RC<GenericArgumentClauseSyntaxData> {
-    new GenericArgumentClauseSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<GenericArgumentClauseSyntaxData>
-GenericArgumentClauseSyntaxData::makeBlank() {
+GenericArgumentClauseSyntax
+GenericArgumentClauseSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::GenericArgumentClause,
                              {
                                TokenSyntax::missingToken(tok::l_angle, "<"),
@@ -378,15 +211,9 @@ GenericArgumentClauseSyntaxData::makeBlank() {
                                TokenSyntax::missingToken(tok::r_angle, ">"),
                              },
                              SourcePresence::Present);
-  return make(Raw);
+  return make<GenericArgumentClauseSyntax>(Raw);
 }
 
-#pragma mark - generic-argument-clause API
-
-GenericArgumentClauseSyntax::
-GenericArgumentClauseSyntax(RC<SyntaxData> Root,
-                            const GenericArgumentClauseSyntaxData *Data)
-  : Syntax(Root, Data) {}
 
 GenericArgumentClauseSyntax GenericArgumentClauseSyntax::
 withLeftAngleBracket(RC<TokenSyntax> NewLeftAngleBracket) const {
@@ -449,6 +276,6 @@ GenericArgumentClauseSyntax GenericArgumentClauseBuilder::build() const {
                                RightAngleToken
                              },
                              SourcePresence::Present);
-  auto Data = GenericArgumentClauseSyntaxData::make(Raw);
+  auto Data = SyntaxData::make(Raw);
   return { Data, Data.get() };
 }

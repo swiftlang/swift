@@ -20,44 +20,22 @@ using namespace swift::syntax;
 using llvm::None;
 using llvm::Optional;
 
-TypeSyntaxData::TypeSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent,
-                               CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {}
-
-TypeSyntax::TypeSyntax(RC<SyntaxData> Root, const TypeSyntaxData *Data)
-  : Syntax(Root, Data) {}
-
 #pragma mark - balanced-tokens Data
 
-BalancedTokensSyntaxData::BalancedTokensSyntaxData(RC<RawSyntax> Raw,
-                                                   const SyntaxData *Parent,
-                                                   CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Kind == SyntaxKind::BalancedTokens);
+void BalancedTokensSyntax::validate() const {
+  assert(Data->Raw->Kind == SyntaxKind::BalancedTokens);
   // TODO: Add some checks here that each element of raw syntax
   // matches the grammar rules in the doc comment of
   // this class.
 }
 
-RC<BalancedTokensSyntaxData>
-BalancedTokensSyntaxData::make(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent,
-                               CursorIndex IndexInParent) {
-  return RC<BalancedTokensSyntaxData> {
-    new BalancedTokensSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<BalancedTokensSyntaxData> BalancedTokensSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::BalancedTokens, {},
-                              SourcePresence::Present));
+BalancedTokensSyntax BalancedTokensSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::BalancedTokens, {},
+                             SourcePresence::Present);
+  return make<BalancedTokensSyntax>(Raw);
 }
 
 #pragma mark - balanced-tokens API
-
-BalancedTokensSyntax::BalancedTokensSyntax(RC<SyntaxData> Root,
-                                           const BalancedTokensSyntaxData *Data)
-  : Syntax(Root, Data) {}
 
 BalancedTokensSyntax
 BalancedTokensSyntax::addBalancedToken(RC<TokenSyntax> NewBalancedToken) const {
@@ -86,10 +64,8 @@ BalancedTokensSyntax::addBalancedToken(RC<TokenSyntax> NewBalancedToken) const {
 
 #pragma mark - type-attribute Data
 
-TypeAttributeSyntaxData::TypeAttributeSyntaxData(RC<RawSyntax> Raw,
-                                                 const SyntaxData *Parent,
-                                                 CursorIndex IndexInParent)
-    : SyntaxData(Raw, Parent, IndexInParent) {
+void TypeAttributeSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::TypeAttribute);
   assert(Raw->Layout.size() == 5);
   syntax_assert_child_token_text(Raw,
@@ -109,16 +85,9 @@ TypeAttributeSyntaxData::TypeAttributeSyntaxData(RC<RawSyntax> Raw,
                                  ")");
 }
 
-RC<TypeAttributeSyntaxData>
-TypeAttributeSyntaxData::make(RC<RawSyntax> Raw,
-                              const SyntaxData *Parent,
-                              CursorIndex IndexInParent) {
-  return RC<TypeAttributeSyntaxData> {
-    new TypeAttributeSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
+#pragma mark - type-attribute API
 
-RC<TypeAttributeSyntaxData> TypeAttributeSyntaxData::makeBlank() {
+TypeAttributeSyntax TypeAttributeSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::TypeAttribute,
                              {
                                TokenSyntax::missingToken(tok::at_sign, "@"),
@@ -128,14 +97,8 @@ RC<TypeAttributeSyntaxData> TypeAttributeSyntaxData::makeBlank() {
                                TokenSyntax::missingToken(tok::r_paren, ")"),
                              },
                              SourcePresence::Present);
-  return make(Raw);
+  return make<TypeAttributeSyntax>(Raw);
 }
-
-#pragma mark - type-attribute API
-
-TypeAttributeSyntax::TypeAttributeSyntax(RC<SyntaxData> Root,
-                                         const TypeAttributeSyntaxData *Data)
-  : Syntax(Root, Data) {}
 
 TypeAttributeSyntax
 TypeAttributeSyntax::withAtSignToken(RC<TokenSyntax> NewAtSignToken) const {
@@ -171,50 +134,10 @@ withRightParenToken(RC<TokenSyntax> NewRightParenToken) const {
                                                  Cursor::RightParenToken);
 };
 
-#pragma mark - type-attributes Data
+#pragma mark - type-identifier API
 
-TypeAttributesSyntaxData::TypeAttributesSyntaxData(RC<RawSyntax> Raw,
-                                                   const SyntaxData *Parent,
-                                                   CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
-  // TODO: kind assertions
-}
-
-RC<TypeAttributesSyntaxData>
-TypeAttributesSyntaxData::make(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent,
-                               CursorIndex IndexInParent) {
-  return RC<TypeAttributesSyntaxData> {
-    new TypeAttributesSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<TypeAttributesSyntaxData> TypeAttributesSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::TypeAttributes, {},
-                              SourcePresence::Present));
-}
-
-#pragma mark - type-attributes API
-
-TypeAttributesSyntax::
-TypeAttributesSyntax(RC<SyntaxData> Root, const TypeAttributesSyntaxData *Data)
-  : Syntax(Root, Data) {}
-
-TypeAttributesSyntax TypeAttributesSyntax::
-addTypeAttribute(TypeAttributeSyntax NewTypeAttribute) const {
-  auto Layout = getRaw()->Layout;
-  Layout.push_back(NewTypeAttribute.getRaw());
-  auto NewRaw = RawSyntax::make(SyntaxKind::TypeAttributes, Layout,
-                                SourcePresence::Present);
-  return Data->replaceSelf<TypeAttributesSyntax>(NewRaw);
-}
-
-#pragma mark - type-identifier Data
-
-TypeIdentifierSyntaxData::TypeIdentifierSyntaxData(RC<RawSyntax> Raw,
-                                                   const SyntaxData *Parent,
-                                                   CursorIndex IndexInParent)
-    : TypeSyntaxData(Raw, Parent, IndexInParent) {
+void TypeIdentifierSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::TypeIdentifier);
   assert(Raw->Layout.size() == 4);
   syntax_assert_child_token(Raw, TypeIdentifierSyntax::Cursor::Identifier,
@@ -229,18 +152,8 @@ TypeIdentifierSyntaxData::TypeIdentifierSyntaxData(RC<RawSyntax> Raw,
                            SyntaxKind::TypeIdentifier);
 }
 
-RC<TypeIdentifierSyntaxData>
-TypeIdentifierSyntaxData::make(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent,
-                               CursorIndex IndexInParent) {
-  return RC<TypeIdentifierSyntaxData> {
-    new TypeIdentifierSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<TypeIdentifierSyntaxData>
-TypeIdentifierSyntaxData::makeBlank() {
-  return make(RawSyntax::make(
+TypeIdentifierSyntax TypeIdentifierSyntax::makeBlank() {
+  return make<TypeIdentifierSyntax>(RawSyntax::make(
     SyntaxKind::TypeIdentifier,
     {
       TokenSyntax::missingToken(tok::identifier, ""),
@@ -250,12 +163,6 @@ TypeIdentifierSyntaxData::makeBlank() {
     },
     SourcePresence::Present));
 }
-
-#pragma mark - type-identifier API
-
-TypeIdentifierSyntax::TypeIdentifierSyntax(RC<SyntaxData> Root,
-                                           const TypeIdentifierSyntaxData *Data)
-  : TypeSyntax(Root, Data) {}
 
 TypeIdentifierSyntax
 TypeIdentifierSyntax::addChildType(TypeIdentifierSyntax ChildType) const {
@@ -292,12 +199,10 @@ TypeIdentifierSyntax::withDotToken(RC<TokenSyntax> NewDotToken) const {
   return Data->replaceSelf<TypeIdentifierSyntax>(NewRaw);
 }
 
-#pragma mark - tuple-type Data
+#pragma mark - tuple-type API
 
-TupleTypeSyntaxData::TupleTypeSyntaxData(RC<RawSyntax> Raw,
-                                         const SyntaxData *Parent,
-                                         CursorIndex IndexInParent)
-    : TypeSyntaxData(Raw, Parent, IndexInParent) {
+void TupleTypeSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::TupleType);
   assert(Raw->Layout.size() == 3);
   syntax_assert_child_token_text(Raw, TupleTypeSyntax::Cursor::LeftParenToken,
@@ -310,18 +215,9 @@ TupleTypeSyntaxData::TupleTypeSyntaxData(RC<RawSyntax> Raw,
                                  ")");
 }
 
-RC<TupleTypeSyntaxData>
-TupleTypeSyntaxData::make(RC<RawSyntax> Raw,
-                          const SyntaxData *Parent,
-                          CursorIndex IndexInParent) {
-  return RC<TupleTypeSyntaxData> {
-    new TupleTypeSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<TupleTypeSyntaxData>
-TupleTypeSyntaxData::makeBlank() {
-  return make(
+TupleTypeSyntax
+TupleTypeSyntax::makeBlank() {
+  return make<TupleTypeSyntax>(
       RawSyntax::make(SyntaxKind::TupleType,
                       {
                         TokenSyntax::missingToken(tok::l_paren, "("),
@@ -330,12 +226,6 @@ TupleTypeSyntaxData::makeBlank() {
                       },
                       SourcePresence::Present));
 }
-
-#pragma mark - tuple-type API
-
-TupleTypeSyntax::TupleTypeSyntax(RC<SyntaxData> Root,
-                                 const TupleTypeSyntaxData *Data)
-  : TypeSyntax(Root, Data) {}
 
 TupleTypeSyntax
 TupleTypeSyntax::withLeftParen(RC<TokenSyntax> NewLeftParen) const {
@@ -393,17 +283,13 @@ TupleTypeSyntax TupleTypeSyntaxBuilder::build() const {
                                RightParenToken,
                              },
                              SourcePresence::Present);
-  auto Data = TupleTypeSyntaxData::make(Raw);
-  return { Data, Data.get() };
+  return make<TupleTypeSyntax>(Raw);
 }
 
-#pragma mark - tuple-type-element Data
+#pragma mark - tuple-type-element API
 
-TupleTypeElementSyntaxData::
-TupleTypeElementSyntaxData(RC<RawSyntax> Raw,
-                           const SyntaxData *Parent,
-                           CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
+void TupleTypeElementSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::TupleTypeElement);
   assert(Raw->Layout.size() == 6);
   syntax_assert_child_token(Raw, TupleTypeElementSyntax::Cursor::Label,
@@ -423,18 +309,8 @@ TupleTypeElementSyntaxData(RC<RawSyntax> Raw,
   assert(Raw->getChild(TupleTypeElementSyntax::Cursor::Type)->isType());
 }
 
-RC<TupleTypeElementSyntaxData>
-TupleTypeElementSyntaxData::make(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent,
-                                 CursorIndex IndexInParent) {
-  return RC<TupleTypeElementSyntaxData> {
-    new TupleTypeElementSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<TupleTypeElementSyntaxData>
-TupleTypeElementSyntaxData::makeBlank() {
-  return make(
+TupleTypeElementSyntax TupleTypeElementSyntax::makeBlank() {
+  return make<TupleTypeElementSyntax>(
       RawSyntax::make(SyntaxKind::TupleTypeElement,
                       {
                         TokenSyntax::missingToken(tok::identifier, ""),
@@ -447,12 +323,6 @@ TupleTypeElementSyntaxData::makeBlank() {
                       SourcePresence::Present));
 }
 
-#pragma mark - tuple-type-element API
-
-TupleTypeElementSyntax::
-TupleTypeElementSyntax(RC<SyntaxData> Root,
-                       const TupleTypeElementSyntaxData *Data)
-  : Syntax(Root, Data) {}
 
 RC<TokenSyntax>
 TupleTypeElementSyntax::getLabel() const {
@@ -516,12 +386,10 @@ TupleTypeElementSyntax::withTypeSyntax(TypeSyntax NewTypeSyntax) const {
   return Data->replaceSelf<TupleTypeElementSyntax>(NewRaw);
 }
 
-#pragma mark - metatype-type Data
+#pragma mark - metatype-type API
 
-MetatypeTypeSyntaxData::MetatypeTypeSyntaxData(RC<RawSyntax> Raw,
-                                               const SyntaxData *Parent,
-                                               CursorIndex IndexInParent)
-    : TypeSyntaxData(Raw, Parent, IndexInParent) {
+void MetatypeTypeSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::MetatypeType);
   assert(Raw->Layout.size() == 3);
   assert(Raw->getChild(MetatypeTypeSyntax::Cursor::BaseType)->isType());
@@ -531,30 +399,16 @@ MetatypeTypeSyntaxData::MetatypeTypeSyntaxData(RC<RawSyntax> Raw,
                             tok::identifier);
 }
 
-RC<MetatypeTypeSyntaxData>
-MetatypeTypeSyntaxData::make(RC<RawSyntax> Raw,
-                             const SyntaxData *Parent,
-                             CursorIndex IndexInParent) {
-  return RC<MetatypeTypeSyntaxData> {
-    new MetatypeTypeSyntaxData { Raw, Parent, IndexInParent }
-  };
+MetatypeTypeSyntax MetatypeTypeSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::MetatypeType,
+                             {
+                               RawSyntax::missing(SyntaxKind::MissingType),
+                               TokenSyntax::missingToken(tok::period, "."),
+                               TokenSyntax::missingToken(tok::identifier, ""),
+                             },
+                             SourcePresence::Present);
+  return make<MetatypeTypeSyntax>(Raw);
 }
-
-RC<MetatypeTypeSyntaxData> MetatypeTypeSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::MetatypeType,
-                              {
-                                RawSyntax::missing(SyntaxKind::MissingType),
-                                TokenSyntax::missingToken(tok::period, "."),
-                                TokenSyntax::missingToken(tok::identifier, ""),
-                              },
-                              SourcePresence::Present));
-}
-
-#pragma mark - metatype-type API
-
-MetatypeTypeSyntax::MetatypeTypeSyntax(RC<SyntaxData> Root,
-                                       const MetatypeTypeSyntaxData *Data)
-  : TypeSyntax(Root, Data) {}
 
 MetatypeTypeSyntax
 MetatypeTypeSyntax::withBaseTypeSyntax(TypeSyntax NewBaseTypeSyntax) const {
@@ -579,12 +433,10 @@ MetatypeTypeSyntax::withTypeToken(RC<TokenSyntax> NewTypeToken) const {
   return Data->replaceSelf<MetatypeTypeSyntax>(NewRaw);
 }
 
-#pragma mark - optional-type Data
+#pragma mark - optional-type API
 
-OptionalTypeSyntaxData::OptionalTypeSyntaxData(RC<RawSyntax> Raw,
-                                               const SyntaxData *Parent,
-                                               CursorIndex IndexInParent)
-    : TypeSyntaxData(Raw, Parent, IndexInParent) {
+void OptionalTypeSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::OptionalType);
   assert(Raw->Layout.size() == 2);
   assert(Raw->getChild(OptionalTypeSyntax::Cursor::BaseType)->isType());
@@ -592,29 +444,14 @@ OptionalTypeSyntaxData::OptionalTypeSyntaxData(RC<RawSyntax> Raw,
                                  tok::question_postfix, "?");
 }
 
-RC<OptionalTypeSyntaxData>
-OptionalTypeSyntaxData::make(RC<RawSyntax> Raw,
-                             const SyntaxData *Parent,
-                             CursorIndex IndexInParent) {
-  return RC<OptionalTypeSyntaxData> {
-    new OptionalTypeSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<OptionalTypeSyntaxData> OptionalTypeSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::OptionalType,
+OptionalTypeSyntax OptionalTypeSyntax::makeBlank() {
+  return make<OptionalTypeSyntax>(RawSyntax::make(SyntaxKind::OptionalType,
     {
       RawSyntax::missing(SyntaxKind::MissingType),
       TokenSyntax::missingToken(tok::question_postfix, "?"),
     },
     SourcePresence::Present));
 }
-
-#pragma mark - optional-type API
-
-OptionalTypeSyntax::OptionalTypeSyntax(RC<SyntaxData> Root,
-                                       const OptionalTypeSyntaxData *Data)
-  : TypeSyntax(Root, Data) {}
 
 OptionalTypeSyntax
 OptionalTypeSyntax::withBaseTypeSyntax(TypeSyntax NewTypeSyntax) const {
@@ -629,13 +466,10 @@ OptionalTypeSyntax::withQuestionToken(RC<TokenSyntax> NewQuestionToken) const {
   return Data->replaceSelf<OptionalTypeSyntax>(NewRaw);
 }
 
-#pragma mark - implicitly-unwrapped-optional-type Data
+#pragma mark - implicitly-unwrapped-optional-type API
 
-ImplicitlyUnwrappedOptionalTypeSyntaxData::
-ImplicitlyUnwrappedOptionalTypeSyntaxData(RC<RawSyntax> Raw,
-                                          const SyntaxData *Parent,
-                                          CursorIndex IndexInParent)
-    : TypeSyntaxData(Raw, Parent, IndexInParent) {
+void ImplicitlyUnwrappedOptionalTypeSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::ImplicitlyUnwrappedOptionalType);
   assert(Raw->Layout.size() == 2);
   assert(Raw->getChild(ImplicitlyUnwrappedOptionalTypeSyntax::Cursor::Type)
@@ -645,31 +479,17 @@ ImplicitlyUnwrappedOptionalTypeSyntaxData(RC<RawSyntax> Raw,
     tok::exclaim_postfix, "!");
 }
 
-RC<ImplicitlyUnwrappedOptionalTypeSyntaxData>
-ImplicitlyUnwrappedOptionalTypeSyntaxData::make(RC<RawSyntax> Raw,
-                                                const SyntaxData *Parent,
-                                                CursorIndex IndexInParent) {
-  return RC<ImplicitlyUnwrappedOptionalTypeSyntaxData> {
-    new ImplicitlyUnwrappedOptionalTypeSyntaxData { Raw, Parent, IndexInParent }
-  };
+ImplicitlyUnwrappedOptionalTypeSyntax
+ImplicitlyUnwrappedOptionalTypeSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(
+               SyntaxKind::ImplicitlyUnwrappedOptionalType,
+               {
+                 RawSyntax::missing(SyntaxKind::MissingType),
+                 TokenSyntax::missingToken(tok::exclaim_postfix, "!"),
+               },
+               SourcePresence::Present);
+  return make<ImplicitlyUnwrappedOptionalTypeSyntax>(Raw);
 }
-
-RC<ImplicitlyUnwrappedOptionalTypeSyntaxData>
-ImplicitlyUnwrappedOptionalTypeSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::ImplicitlyUnwrappedOptionalType,
-    {
-      RawSyntax::missing(SyntaxKind::MissingType),
-      TokenSyntax::missingToken(tok::exclaim_postfix, "!"),
-    },
-    SourcePresence::Present));
-}
-
-#pragma mark - implicitly-unwrapped-optional-type API
-
-ImplicitlyUnwrappedOptionalTypeSyntax::
-ImplicitlyUnwrappedOptionalTypeSyntax(RC<SyntaxData> Root,
-    const ImplicitlyUnwrappedOptionalTypeSyntaxData *Data)
-  : TypeSyntax(Root, Data) {}
 
 ImplicitlyUnwrappedOptionalTypeSyntax ImplicitlyUnwrappedOptionalTypeSyntax::
 withBaseTypeSyntax(TypeSyntax NewTypeSyntax) const {
@@ -684,12 +504,10 @@ withExclaimToken(RC<TokenSyntax> NewExclaimToken) const {
   return Data->replaceSelf<ImplicitlyUnwrappedOptionalTypeSyntax>(NewRaw);
 }
 
-#pragma mark - array-type Data
+#pragma mark - array-type API
 
-ArrayTypeSyntaxData::ArrayTypeSyntaxData(RC<RawSyntax> Raw,
-                                         const SyntaxData *Parent,
-                                         CursorIndex IndexInParent)
-    : TypeSyntaxData(Raw, Parent, IndexInParent) {
+void ArrayTypeSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::ArrayType);
   assert(Raw->Layout.size() == 3);
   syntax_assert_child_token_text(Raw,
@@ -701,29 +519,16 @@ ArrayTypeSyntaxData::ArrayTypeSyntaxData(RC<RawSyntax> Raw,
     tok::r_square, "]");
 }
 
-RC<ArrayTypeSyntaxData> ArrayTypeSyntaxData::make(RC<RawSyntax> Raw,
-                                                  const SyntaxData *Parent,
-                                                  CursorIndex IndexInParent) {
-  return RC<ArrayTypeSyntaxData> {
-    new ArrayTypeSyntaxData { Raw, Parent, IndexInParent }
-  };
+ArrayTypeSyntax ArrayTypeSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::ArrayType,
+                             {
+                               TokenSyntax::missingToken(tok::l_square, "["),
+                               RawSyntax::missing(SyntaxKind::MissingType),
+                               TokenSyntax::missingToken(tok::r_square, "]"),
+                             },
+                             SourcePresence::Present);
+  return make<ArrayTypeSyntax>(Raw);
 }
-
-RC<ArrayTypeSyntaxData> ArrayTypeSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::ArrayType,
-                              {
-                                TokenSyntax::missingToken(tok::l_square, "["),
-                                RawSyntax::missing(SyntaxKind::MissingType),
-                                TokenSyntax::missingToken(tok::r_square, "]"),
-                              },
-                              SourcePresence::Present));
-}
-
-#pragma mark - array-type API
-
-ArrayTypeSyntax::ArrayTypeSyntax(RC<SyntaxData> Root,
-                                 const ArrayTypeSyntaxData *Data)
-  : TypeSyntax(Root, Data) {}
 
 ArrayTypeSyntax ArrayTypeSyntax::
 withLeftSquareBracketToken(RC<TokenSyntax> NewLeftSquareBracketToken) const {
@@ -746,12 +551,10 @@ withRightSquareBracketToken(RC<TokenSyntax> NewRightSquareBracketToken) const {
   return Data->replaceSelf<ArrayTypeSyntax>(NewRaw);
 }
 
-#pragma mark - dictionary-type Data
+#pragma mark - dictionary-type API
 
-DictionaryTypeSyntaxData::DictionaryTypeSyntaxData(RC<RawSyntax> Raw,
-                                                   const SyntaxData *Parent,
-                                                   CursorIndex IndexInParent)
-    : TypeSyntaxData(Raw, Parent, IndexInParent) {
+void DictionaryTypeSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::DictionaryType);
   assert(Raw->Layout.size() == 5);
 
@@ -767,33 +570,18 @@ DictionaryTypeSyntaxData::DictionaryTypeSyntaxData(RC<RawSyntax> Raw,
     tok::r_square, "]");
 }
 
-RC<DictionaryTypeSyntaxData>
-DictionaryTypeSyntaxData::make(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent,
-                               CursorIndex IndexInParent) {
-  return RC<DictionaryTypeSyntaxData> {
-    new DictionaryTypeSyntaxData { Raw, Parent, IndexInParent }
-  };
+DictionaryTypeSyntax DictionaryTypeSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::DictionaryType,
+                             {
+                               TokenSyntax::missingToken(tok::l_square, "["),
+                               RawSyntax::missing(SyntaxKind::MissingType),
+                               TokenSyntax::missingToken(tok::colon, ":"),
+                               RawSyntax::missing(SyntaxKind::MissingType),
+                               TokenSyntax::missingToken(tok::r_square, "]"),
+                             },
+                             SourcePresence::Present);
+  return make<DictionaryTypeSyntax>(Raw);
 }
-
-RC<DictionaryTypeSyntaxData>
-DictionaryTypeSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::DictionaryType,
-                              {
-                                TokenSyntax::missingToken(tok::l_square, "["),
-                                RawSyntax::missing(SyntaxKind::MissingType),
-                                TokenSyntax::missingToken(tok::colon, ":"),
-                                RawSyntax::missing(SyntaxKind::MissingType),
-                                TokenSyntax::missingToken(tok::r_square, "]"),
-                              },
-                              SourcePresence::Present));
-}
-
-#pragma mark - dictionary-type API
-
-DictionaryTypeSyntax::DictionaryTypeSyntax(RC<SyntaxData> Root,
-                                           const DictionaryTypeSyntaxData *Data)
-  : TypeSyntax(Root, Data) {}
 
 DictionaryTypeSyntax DictionaryTypeSyntax::
 withLeftSquareBracketToken(RC<TokenSyntax> NewLeftSquareBracketToken) const {
@@ -831,25 +619,11 @@ withRightSquareBracketToken(RC<TokenSyntax> NewRightSquareBracketToken) const {
   return Data->replaceSelf<DictionaryTypeSyntax>(NewRaw);
 }
 
-#pragma mark - function-type-argument Data
+#pragma mark - function-type-argument API
 
-FunctionTypeArgumentSyntaxData::
-FunctionTypeArgumentSyntaxData(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent,
-                               CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {}
+void FunctionTypeArgumentSyntax::validate() const {}
 
-RC<FunctionTypeArgumentSyntaxData>
-FunctionTypeArgumentSyntaxData::make(RC<RawSyntax> Raw,
-                                     const SyntaxData *Parent,
-                                     CursorIndex IndexInParent) {
-  return RC<FunctionTypeArgumentSyntaxData> {
-    new FunctionTypeArgumentSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<FunctionTypeArgumentSyntaxData>
-FunctionTypeArgumentSyntaxData::makeBlank() {
+FunctionTypeArgumentSyntax FunctionTypeArgumentSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionTypeArgument,
                              {
                                TokenSyntax::missingToken(tok::identifier, ""),
@@ -857,22 +631,13 @@ FunctionTypeArgumentSyntaxData::makeBlank() {
                                TokenSyntax::missingToken(tok::colon, ","),
                              },
                              SourcePresence::Present);
-  return make(Raw);
+  return make<FunctionTypeArgumentSyntax>(Raw);
 }
 
-#pragma mark - function-type-argument API
+#pragma mark - function-type API
 
-FunctionTypeArgumentSyntax::
-FunctionTypeArgumentSyntax(RC<SyntaxData> Root,
-                           const FunctionTypeArgumentSyntaxData *Data)
-  : Syntax(Root, Data) {}
-
-#pragma mark - function-type Data
-
-FunctionTypeSyntaxData::FunctionTypeSyntaxData(RC<RawSyntax> Raw,
-                                               const SyntaxData *Parent,
-                                               CursorIndex IndexInParent)
-  : TypeSyntaxData(Raw, Parent, IndexInParent) {
+void FunctionTypeSyntax::validate() const {
+  auto Raw = Data->Raw;
   assert(Raw->Kind == SyntaxKind::FunctionType);
   syntax_assert_child_kind(Raw, FunctionTypeSyntax::Cursor::TypeAttributes,
                            SyntaxKind::TypeAttributes);
@@ -896,17 +661,8 @@ FunctionTypeSyntaxData::FunctionTypeSyntaxData(RC<RawSyntax> Raw,
   assert(Raw->getChild(FunctionTypeSyntax::Cursor::ReturnType)->isType());
 }
 
-RC<FunctionTypeSyntaxData>
-FunctionTypeSyntaxData::make(RC<RawSyntax> Raw,
-                             const SyntaxData *Parent,
-                             CursorIndex IndexInParent) {
-  return RC<FunctionTypeSyntaxData> {
-    new FunctionTypeSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<FunctionTypeSyntaxData> FunctionTypeSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::FunctionType,
+FunctionTypeSyntax FunctionTypeSyntax::makeBlank() {
+  return make<FunctionTypeSyntax>(RawSyntax::make(SyntaxKind::FunctionType,
     {
       RawSyntax::missing(SyntaxKind::TypeAttributes),
       TokenSyntax::missingToken(tok::l_paren, "("),
@@ -918,12 +674,6 @@ RC<FunctionTypeSyntaxData> FunctionTypeSyntaxData::makeBlank() {
     },
     SourcePresence::Present));
 }
-
-#pragma mark - function-type API
-
-FunctionTypeSyntax::FunctionTypeSyntax(RC<SyntaxData> Root,
-                                       const FunctionTypeSyntaxData *Data)
-  : TypeSyntax(Root, Data) {}
 
 FunctionTypeSyntax FunctionTypeSyntax::
 withTypeAttributes(TypeAttributesSyntax NewAttributes) const {
@@ -1080,6 +830,5 @@ FunctionTypeSyntaxBuilder::useReturnTypeSyntax(TypeSyntax NewReturnType) {
 FunctionTypeSyntax FunctionTypeSyntaxBuilder::build() const {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionType, FunctionTypeLayout,
                              SourcePresence::Present);
-  auto Data = FunctionTypeSyntaxData::make(Raw);
-  return { Data, Data.get() };
+  return make<FunctionTypeSyntax>(Raw);
 }

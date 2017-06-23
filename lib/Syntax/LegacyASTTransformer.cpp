@@ -150,7 +150,7 @@ RC<SyntaxData> LegacyASTTransformer::getUnknownSyntax(SourceRange SR) {
   auto Raw = RawSyntax::make(SyntaxKind::Unknown,
                              Layout,
                              SourcePresence::Present);
-  return UnknownSyntaxData::make(Raw);
+  return SyntaxData::make(Raw);
 }
 
 RC<SyntaxData> LegacyASTTransformer::getUnknownDecl(Decl *D) {
@@ -164,7 +164,7 @@ RC<SyntaxData> LegacyASTTransformer::getUnknownDecl(Decl *D) {
   auto Raw = RawSyntax::make(SyntaxKind::UnknownDecl,
                              Layout,
                              SourcePresence::Present);
-  return UnknownDeclSyntaxData::make(Raw);
+  return SyntaxData::make(Raw);
 }
 
 RC<SyntaxData> LegacyASTTransformer::getUnknownStmt(Stmt *S) {
@@ -178,7 +178,7 @@ RC<SyntaxData> LegacyASTTransformer::getUnknownStmt(Stmt *S) {
   auto Raw = RawSyntax::make(SyntaxKind::UnknownStmt,
                              Layout,
                              SourcePresence::Present);
-  return UnknownStmtSyntaxData::make(Raw);
+  return SyntaxData::make(Raw);
 }
 
 RC<SyntaxData> LegacyASTTransformer::getUnknownExpr(Expr *E) {
@@ -192,7 +192,7 @@ RC<SyntaxData> LegacyASTTransformer::getUnknownExpr(Expr *E) {
   auto Raw = RawSyntax::make(SyntaxKind::UnknownExpr,
                              Layout,
                              SourcePresence::Present);
-  return UnknownExprSyntaxData::make(Raw);
+  return SyntaxData::make(Raw);
 }
 
 #pragma mark - Declarations

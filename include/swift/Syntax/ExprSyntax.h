@@ -23,7 +23,6 @@
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/SyntaxCollection.h"
-#include "swift/Syntax/SyntaxCollectionData.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/UnknownSyntax.h"
 
@@ -32,99 +31,49 @@ using llvm::Optional;
 namespace swift {
 namespace syntax {
 
-class GenericArgumentClauseSyntax;
-class GenericArgumentClauseSyntaxData;
 
-class ExprSyntaxData : public SyntaxData {
-protected:
-  ExprSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                 CursorIndex IndexInParent = 0)
-    : SyntaxData(Raw, Parent, IndexInParent) {
-    assert(Raw->isExpr());
-  }
-public:
-  static RC<ExprSyntaxData> make(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent = nullptr,
-                                 CursorIndex IndexInParent = 0);
-  static RC<ExprSyntaxData> makeBlank();
-  static bool classof(const SyntaxData *S) {
-    return S->isExpr();
-  }
-};
+#pragma mark - function-call-argument-list API
+
+class FunctionCallArgumentSyntax;
+
+class GenericArgumentClauseSyntax;
 
 class ExprSyntax : public Syntax {
   friend class FunctionParameterSyntax;
-public:
-  using DataType = ExprSyntaxData;
 
-  ExprSyntax(const RC<SyntaxData> Root, const ExprSyntaxData *Data);
+protected:
+  virtual void validate() const override {}
+
+public:
+  static ExprSyntax makeBlank();
+  ExprSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
   static bool classof(const Syntax *S) {
     return S->isExpr();
-  }
-};
-
-#pragma mark - unknown-expression Data
-
-class UnknownExprSyntaxData : public UnknownSyntaxData {
-  UnknownExprSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                        CursorIndex IndexInParent = 0);
-public:
-  static RC<UnknownExprSyntaxData> make(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent = nullptr,
-                                 CursorIndex IndexInParent = 0);
-
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::UnknownExpr;
   }
 };
 
 #pragma mark - unknown-expression API
 
 class UnknownExprSyntax : public UnknownSyntax {
-  friend class SyntaxData;
-  friend class UnknownExprSyntaxData;
   friend class LegacyASTTransformer;
 
-  using DataType = UnknownExprSyntaxData;
-
+  virtual void validate() const override;
 public:
-  UnknownExprSyntax(const RC<SyntaxData> Root,
-                    const UnknownExprSyntaxData *Data);
-
+  static UnknownExprSyntax makeBlank();
+  UnknownExprSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : UnknownSyntax(Root, Data) {}
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::UnknownExpr;
-  }
-};
-
-#pragma mark - integer-literal-expression Data
-
-class IntegerLiteralExprSyntaxData : public ExprSyntaxData {
-  friend struct SyntaxFactory;
-  friend class SyntaxData;
-
-  IntegerLiteralExprSyntaxData(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent = nullptr,
-                               CursorIndex IndexInParent = 0);
-  static RC<IntegerLiteralExprSyntaxData> make(RC<RawSyntax> Raw,
-                                       const SyntaxData *Parent = nullptr,
-                                       CursorIndex IndexInParent = 0);
-  static RC<IntegerLiteralExprSyntaxData> makeBlank();
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::IntegerLiteralExpr;
   }
 };
 
 #pragma mark - integer-literal-expression API
 
 class IntegerLiteralExprSyntax : public ExprSyntax {
-  using DataType = IntegerLiteralExprSyntaxData;
-  friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class IntegerLiteralExprSyntaxData;
-
-  IntegerLiteralExprSyntax(const RC<SyntaxData> Root,
-                           const IntegerLiteralExprSyntaxData *Data);
+    friend struct SyntaxFactory;
+  
+  virtual void validate() const override;
 
   enum class Cursor : CursorIndex {
     Sign,
@@ -132,6 +81,10 @@ class IntegerLiteralExprSyntax : public ExprSyntax {
   };
 
 public:
+
+  static IntegerLiteralExprSyntax makeBlank();
+  IntegerLiteralExprSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : ExprSyntax(Root, Data) {}
 
   /// Get the '+' or '-' associated with this integer literal expression.
   RC<TokenSyntax> getSign() const;
@@ -149,31 +102,8 @@ public:
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::IntegerLiteralExpr;
   }
-};
 
-#pragma mark - symbolic-reference Data
-
-class SymbolicReferenceExprSyntaxData : public ExprSyntaxData {
-  friend class SymbolicReferenceExprSyntax;
-  friend class SyntaxData;
-  friend struct SyntaxFactory;
-
-  RC<GenericArgumentClauseSyntaxData> CachedGenericArgClause;
-
-  SymbolicReferenceExprSyntaxData(RC<RawSyntax> Raw,
-                                  const SyntaxData *Parent = nullptr,
-                                  CursorIndex IndexInParent = 0);
-
-  static RC<SymbolicReferenceExprSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-
-  static RC<SymbolicReferenceExprSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::SymbolicReferenceExpr;
-  }
+  virtual ~IntegerLiteralExprSyntax() {}
 };
 
 #pragma mark - symbolic-reference API
@@ -184,23 +114,21 @@ public:
 /// in the grammar. It can be just an identifier referring to some
 /// declaration, or it could perhaps be a constructor call to `Array<Int>`.
 class SymbolicReferenceExprSyntax : public ExprSyntax {
-
-  using DataType = SymbolicReferenceExprSyntaxData;
-
   friend struct SyntaxFactory;
-  friend class SyntaxData;
   friend class Syntax;
-  friend class SymbolicReferenceExprSyntaxData;
 
   enum class Cursor : CursorIndex {
     Identifier,
     GenericArgumentClause
   };
 
-  SymbolicReferenceExprSyntax(const RC<SyntaxData> Root,
-                              const DataType *Data);
+  virtual void validate() const override;
 
 public:
+  static SymbolicReferenceExprSyntax makeBlank();
+  SymbolicReferenceExprSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : ExprSyntax(Root, Data) {}
+
 
   /// Get the identifier for the symbol to which this expression refers.
   RC<TokenSyntax> getIdentifier() const;
@@ -222,44 +150,13 @@ public:
   }
 };
 
-#pragma mark - function-call-argument Data
-
-class FunctionCallArgumentSyntaxData : public SyntaxData {
-  friend struct SyntaxFactory;
-  friend class FunctionCallArgumentSyntax;
-  friend class SyntaxData;
-
-  RC<ExprSyntaxData> CachedExpression;
-
-  FunctionCallArgumentSyntaxData(RC<RawSyntax> Raw,
-                           const SyntaxData *Parent = nullptr,
-                           CursorIndex IndexInParent = 0);
-
-  static RC<FunctionCallArgumentSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-
-  static RC<FunctionCallArgumentSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::FunctionCallArgument;
-  }
-};
-
 #pragma mark - function-call-argument API
 
 /// function-call-argument -> label? ':'? (expression | operator) ','?
 class FunctionCallArgumentSyntax : public Syntax {
-  using DataType = FunctionCallArgumentSyntaxData;
 
   friend struct SyntaxFactory;
-  friend class SyntaxData;
   friend class Syntax;
-  friend class FunctionCallArgumentSyntaxData;
-  friend class FunctionCallArgumentListSyntax;
-  friend class SyntaxCollectionData<SyntaxKind::FunctionCallArgumentList,
-                                    FunctionCallArgumentSyntax>;
   friend class SyntaxCollection<SyntaxKind::FunctionCallArgumentList,
                                 FunctionCallArgumentSyntax>;
 
@@ -270,10 +167,13 @@ class FunctionCallArgumentSyntax : public Syntax {
     Comma,
   };
 
-  FunctionCallArgumentSyntax(const RC<SyntaxData> Root,
-                             const DataType *Data);
+  virtual void validate() const override;
 
 public:
+
+  static FunctionCallArgumentSyntax makeBlank();
+  FunctionCallArgumentSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
 
   /// Return the label identifier for this argument, if it has one.
   RC<TokenSyntax> getLabel() const;
@@ -309,72 +209,13 @@ public:
   }
 };
 
-#pragma mark - function-call-argument-list Data
-
-using FunctionCallArgumentListSyntaxData =
-  SyntaxCollectionData<SyntaxKind::FunctionCallArgumentList,
-    FunctionCallArgumentSyntax>;
-
-#pragma mark - function-call-argument-list API
-
-/// function-call-argument-list -> function-call-argument
-///                                function-call-argument-list?
-class FunctionCallArgumentListSyntax
-  : public SyntaxCollection<SyntaxKind::FunctionCallArgumentList,
-                            FunctionCallArgumentSyntax> {
-  friend struct SyntaxFactory;
-  friend class FunctionCallExprSyntax;
-  friend class Syntax;
-  friend class SyntaxData;
-
-  using DataType = FunctionCallArgumentListSyntaxData;
-
-  FunctionCallArgumentListSyntax(const RC<SyntaxData> Root,
-                                 const DataType *Data);
-
-public:
-  static bool classof(const Syntax *S) {
-    return S->getKind() == SyntaxKind::FunctionCallArgumentList;
-  }
-};
-
-#pragma mark - function-call-expression Data
-
-class FunctionCallExprSyntaxData : public ExprSyntaxData {
-  friend struct SyntaxFactory;
-  friend class FunctionCallExprSyntax;
-  friend class FunctionCallExprSyntaxBuilder;
-  friend class SyntaxData;
-
-  RC<ExprSyntaxData> CachedCalledExpression;
-  RC<FunctionCallArgumentListSyntaxData> CachedArgumentList;
-
-  FunctionCallExprSyntaxData(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent = nullptr,
-                                 CursorIndex IndexInParent = 0);
-
-  static RC<FunctionCallExprSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-
-  static RC<FunctionCallExprSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::FunctionCallExpr;
-  }
-};
-
 #pragma mark - function-call-expression API
 
 class FunctionCallExprSyntax : public ExprSyntax {
-  using DataType = FunctionCallExprSyntaxData;
   friend struct SyntaxFactory;
-  friend class FunctionCallExprSyntaxData;
   friend class FunctionCallExprSyntaxBuilder;
   friend class Syntax;
-  friend class SyntaxData;
-
+  
   enum class Cursor: CursorIndex {
     CalledExpression,
     LeftParen,
@@ -382,9 +223,12 @@ class FunctionCallExprSyntax : public ExprSyntax {
     RightParen,
   };
 
-  FunctionCallExprSyntax(const RC<SyntaxData> Root, const DataType *Data);
+  virtual void validate() const override;
 
 public:
+  static FunctionCallExprSyntax makeBlank();
+  FunctionCallExprSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : ExprSyntax(Root, Data) {}
 
   /// Get the base expression getting called.
   ExprSyntax getCalledExpression() const;
