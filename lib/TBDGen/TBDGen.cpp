@@ -285,9 +285,9 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     Mangle::ASTMangler mangler;
     addSymbol(mangler.mangleEntity(VD, false));
 
-    // Variables in the main file don't get accessors, despite otherwise looking
-    // like globals.
-    if (!FileHasEntryPoint)
+    // Top-level variables (*not* statics) in the main file don't get accessors,
+    // despite otherwise looking like globals.
+    if (!FileHasEntryPoint || VD->isStatic())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
 
     // In this case, the members of the VarDecl don't also appear as top-level
