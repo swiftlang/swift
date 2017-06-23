@@ -171,9 +171,14 @@ struct RuntimeErrorDetails {
   Thread *threads;
 };
 
+enum: uintptr_t {
+  RuntimeErrorFlagNone = 0,
+  RuntimeErrorFlagFatal = 1 << 0
+};
+
 /// Debugger hook. Calling this stops the debugger with a message and details
 /// about the issues.
-void reportToDebugger(bool isFatal, const char *message,
+void reportToDebugger(uintptr_t flags, const char *message,
                       RuntimeErrorDetails *details = nullptr);
 
 // namespace swift

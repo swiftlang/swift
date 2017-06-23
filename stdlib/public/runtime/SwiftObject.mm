@@ -1440,8 +1440,10 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
     .errorType = "implicit-objc-entrypoint",
     .framesToSkip = 1
   };
-  bool isFatal = reporter == swift::fatalError;
-  reportToDebugger(isFatal, message, &details);
+  uintptr_t runtime_error_flags = RuntimeErrorFlagNone;
+  if (reporter == swift::fatalError)
+    runtime_error_flags = RuntimeErrorFlagFatal;
+  reportToDebugger(runtime_error_flags, message, &details);
 
   reporter(flags,
            "*** %s:%zu:%zu: %s; add explicit '@objc' to the declaration to "
