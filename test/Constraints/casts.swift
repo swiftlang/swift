@@ -221,3 +221,22 @@ func process(p: Any?) {
 
 func compare<T>(_: T, _: T) {}
 func compare<T>(_: T?, _: T?) {}
+
+
+// <rdar://problem/32651746> [SR-5164]: Incorrect warning in swift4 cast
+protocol Proto {}
+class ArgBase {}
+class Other : ArgBase, Proto {}
+class TypeParam: ArgBase, Proto {}
+
+class U {}
+
+class Generic<T> : U where T : ArgBase, T : Proto {
+  func result() -> U {
+    return Generic<TypeParam>()
+  }
+
+  func test() {
+    _ = result() as! Generic<T> // no warning about always-failing cast
+  }
+}
