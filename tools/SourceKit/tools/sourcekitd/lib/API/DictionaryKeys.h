@@ -19,7 +19,7 @@ namespace SourceKit {
 
 namespace sourcekitd {
 
-#define KEY(NAME, CONTENT) extern SourceKit::UIdent NAME;
+#define KEY(NAME, CONTENT) extern SourceKit::UIdent Key##NAME;
 #include "SourceKit/Core/Keys.def"
 
 /// \brief Used for determining the printing order of dictionary keys.

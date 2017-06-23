@@ -64,7 +64,7 @@ public:
 };
 } // anonymous namespace
 
-#define REQUEST(NAME, CONTENT) static LazySKDUID NAME(CONTENT);
+#define REQUEST(NAME, CONTENT) static LazySKDUID Request##NAME(CONTENT);
 #include "SourceKit/Core/Keys.def"
 
 static LazySKDUID KindExpr("source.lang.swift.expr");

@@ -32,13 +32,13 @@ using llvm::ArrayRef;
 using llvm::StringRef;
 using llvm::raw_ostream;
 
-#define KEY(NAME, CONTENT) UIdent sourcekitd::NAME(CONTENT);
+#define KEY(NAME, CONTENT) UIdent sourcekitd::Key##NAME(CONTENT);
 #include "SourceKit/Core/Keys.def"
 
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.
 static UIdent *OrderedKeys[] = {
-#define KEY(NAME, CONTENT) &NAME,
+#define KEY(NAME, CONTENT) &Key##NAME,
 #include "SourceKit/Core/Keys.def"
 };
 
