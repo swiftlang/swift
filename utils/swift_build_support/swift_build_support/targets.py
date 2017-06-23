@@ -92,7 +92,7 @@ class StdlibDeploymentTarget(object):
 
     iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64"],
                          sdk_name="IOS")
-    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["x86_64"],
+    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64"],
                                   sdk_name="IOS_SIMULATOR",
                                   is_simulator=True)
 
