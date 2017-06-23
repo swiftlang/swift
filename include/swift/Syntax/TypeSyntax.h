@@ -36,8 +36,7 @@ class GenericParameterClauseSyntax;
 ///                  | Any punctuation except (, ), [, ], {, or }
 class BalancedTokensSyntax final : public Syntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   virtual void validate() const override;
 
 public:
@@ -61,8 +60,7 @@ public:
 /// attribute-argument-clause -> '(' balanced-tokens ')'
 class TypeAttributeSyntax final : public Syntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   enum class Cursor : CursorIndex {
     AtSignToken,
     Identifier,
@@ -131,8 +129,7 @@ public:
 ///       | 'Any'
 ///       | 'Self'
 class TypeSyntax : public Syntax {
-  friend class SyntaxData;
-  friend class FunctionParameterSyntax;
+    friend class FunctionParameterSyntax;
   friend class FunctionSignatureSyntax;
 protected:
   virtual void validate() const override {}
@@ -152,8 +149,7 @@ public:
 ///                  | type-name generic-argument-clause '.' type-identifier
 class TypeIdentifierSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
 private:
   enum class Cursor {
     Identifier,
@@ -197,8 +193,7 @@ public:
 /// a type without a label.
 class TupleTypeElementSyntax final : public Syntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   enum class Cursor : CursorIndex {
     Label,
     ColonToken,
@@ -265,8 +260,7 @@ public:
 /// tuple-type -> '(' tuple-type-element-list ')'
 class TupleTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class TupleTypeSyntaxBuilder;
+    friend class TupleTypeSyntaxBuilder;
 
   enum class Cursor : CursorIndex {
     LeftParenToken,
@@ -335,8 +329,7 @@ public:
 ///                | type '.' 'Protocol'
 class MetatypeTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   enum class Cursor : CursorIndex {
     BaseType,
     DotToken,
@@ -377,8 +370,7 @@ public:
 /// optional-type -> type '?'
 class OptionalTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   enum class Cursor : CursorIndex {
     BaseType,
     QuestionToken
@@ -413,8 +405,7 @@ public:
 /// implicitly-unwrapped-optional-type -> type '!'
 class ImplicitlyUnwrappedOptionalTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   enum class Cursor : CursorIndex { Type, ExclaimToken };
 
   virtual void validate() const override;
@@ -453,8 +444,7 @@ public:
 // array-type -> '[' type ']'
 class ArrayTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   enum class Cursor : CursorIndex {
     LeftSquareBracketToken,
     Type,
@@ -497,8 +487,7 @@ public:
 // dictionary-type -> '[' type ':' type ']'
 class DictionaryTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   enum class Cursor : CursorIndex {
     LeftSquareBracketToken,
     KeyType,
@@ -558,8 +547,7 @@ public:
 
 class FunctionTypeArgumentSyntax final : public Syntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   enum class Cursor : CursorIndex {
     ExternalParameterName,
     LocalParameterName,
@@ -589,8 +577,7 @@ public:
 class FunctionTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
   friend class FunctionTypeSyntaxBuilder;
-  friend class SyntaxData;
-
+  
   enum class Cursor : CursorIndex {
     TypeAttributes,
     LeftParen,

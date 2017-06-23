@@ -52,8 +52,7 @@ struct SyntaxCollectionIterator {
 template <SyntaxKind CollectionKind, typename Element>
 class SyntaxCollection : public Syntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class Syntax;
+    friend class Syntax;
 
 private:
   static RC<SyntaxData>

@@ -56,8 +56,7 @@ public:
 #pragma mark - unknown-expression API
 
 class UnknownExprSyntax : public UnknownSyntax {
-  friend class SyntaxData;
-  friend class LegacyASTTransformer;
+    friend class LegacyASTTransformer;
 
   virtual void validate() const override;
 public:
@@ -73,8 +72,7 @@ public:
 
 class IntegerLiteralExprSyntax : public ExprSyntax {
     friend struct SyntaxFactory;
-  friend class SyntaxData;
-
+  
   virtual void validate() const override;
 
   enum class Cursor : CursorIndex {
@@ -117,8 +115,7 @@ public:
 /// declaration, or it could perhaps be a constructor call to `Array<Int>`.
 class SymbolicReferenceExprSyntax : public ExprSyntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class Syntax;
+    friend class Syntax;
 
   enum class Cursor : CursorIndex {
     Identifier,
@@ -159,8 +156,7 @@ public:
 class FunctionCallArgumentSyntax : public Syntax {
 
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class Syntax;
+    friend class Syntax;
   friend class SyntaxCollection<SyntaxKind::FunctionCallArgumentList,
                                 FunctionCallArgumentSyntax>;
 
@@ -219,8 +215,7 @@ class FunctionCallExprSyntax : public ExprSyntax {
   friend struct SyntaxFactory;
   friend class FunctionCallExprSyntaxBuilder;
   friend class Syntax;
-  friend class SyntaxData;
-
+  
   enum class Cursor: CursorIndex {
     CalledExpression,
     LeftParen,

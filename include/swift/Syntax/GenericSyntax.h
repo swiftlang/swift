@@ -33,8 +33,7 @@ class TypeIdentifierSyntax;
 
 class GenericRequirementSyntax : public Syntax {
   friend class Syntax;
-  friend class SyntaxData;
-
+  
 protected:
   virtual void validate() const override {}
 public:
@@ -53,8 +52,7 @@ public:
 /// conformance-requirement -> type-identifier : type-identifier
 class ConformanceRequirementSyntax final : public GenericRequirementSyntax {
 
-  friend class SyntaxData;
-  friend class Syntax;
+    friend class Syntax;
 
   enum Cursor : CursorIndex {
     LeftTypeIdentifier,
@@ -107,8 +105,7 @@ public:
 class SameTypeRequirementSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class Syntax;
-  friend class SyntaxData;
-  enum Cursor : CursorIndex {
+    enum Cursor : CursorIndex {
     LeftTypeIdentifier,
     EqualityToken,
     RightType,
@@ -282,8 +279,7 @@ class GenericArgumentClauseSyntax : public Syntax {
   friend struct SyntaxFactory;
   friend class GenericArgumentClauseBuilder;
   friend class SymbolicReferenceExprSyntax;
-  friend class SyntaxData;
-  friend class Syntax;
+    friend class Syntax;
 
     enum class Cursor : CursorIndex {
     LeftAngleBracketToken,
@@ -357,8 +353,7 @@ public:
 class GenericWhereClauseSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class Syntax;
-  friend class SyntaxData;
-  enum class Cursor : CursorIndex {
+    enum class Cursor : CursorIndex {
     WhereKeyword,
     RequirementList,
   };

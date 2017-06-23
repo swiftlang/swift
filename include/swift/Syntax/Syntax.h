@@ -54,8 +54,7 @@ const auto NoParent = llvm::None;
 /// their children.
 class Syntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class LegacyASTTransformer;
+    friend class LegacyASTTransformer;
   friend class sema::Semantics;
 
 #define SYNTAX(Id, Parent) friend class Id##Syntax;
