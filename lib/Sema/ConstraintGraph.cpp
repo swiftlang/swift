@@ -467,8 +467,8 @@ void ConstraintGraph::gatherConstraints(
        TypeVariableType *typeVar,
        SmallVectorImpl<Constraint *> &constraints,
        GatheringKind kind) {
-  auto &node = (*this)[CS.getRepresentative(typeVar)];
-  auto equivClass = node.getEquivalenceClass();
+  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
+  auto equivClass = reprNode.getEquivalenceClass();
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
   for (auto typeVar : equivClass) {
     if (!typeVars.insert(typeVar).second)
@@ -476,38 +476,40 @@ void ConstraintGraph::gatherConstraints(
 
     for (auto constraint : (*this)[typeVar].getConstraints())
       constraints.push_back(constraint);
-  }
 
-  // Retrieve the constraints from adjacent bindings.
-  for (auto adjTypeVar : node.getAdjacencies()) {
-    switch (kind) {
-    case GatheringKind::EquivalenceClass:
-      if (!node.getAdjacency(adjTypeVar).FixedBinding)
-        continue;
-      break;
+    auto &node = (*this)[typeVar];
 
-    case GatheringKind::AllMentions:
-      break;
-    }
+    // Retrieve the constraints from adjacent bindings.
+    for (auto adjTypeVar : node.getAdjacencies()) {
+      switch (kind) {
+      case GatheringKind::EquivalenceClass:
+        if (!node.getAdjacency(adjTypeVar).FixedBinding)
+          continue;
+        break;
 
-    ArrayRef<TypeVariableType *> adjTypeVarsToVisit;
-    switch (kind) {
-    case GatheringKind::EquivalenceClass:
-      adjTypeVarsToVisit = adjTypeVar;
-      break;
+      case GatheringKind::AllMentions:
+        break;
+      }
 
-    case GatheringKind::AllMentions:
-      adjTypeVarsToVisit
-        = (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
-      break;
-    }
+      ArrayRef<TypeVariableType *> adjTypeVarsToVisit;
+      switch (kind) {
+      case GatheringKind::EquivalenceClass:
+        adjTypeVarsToVisit = adjTypeVar;
+        break;
 
-    for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
-      if (!typeVars.insert(adjTypeVarEquiv).second)
-        continue;
+      case GatheringKind::AllMentions:
+        adjTypeVarsToVisit
+          = (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
+        break;
+      }
 
-      for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints())
-        constraints.push_back(constraint);
+      for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
+        if (!typeVars.insert(adjTypeVarEquiv).second)
+          continue;
+
+        for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints())
+          constraints.push_back(constraint);
+      }
     }
   }
 }
