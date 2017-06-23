@@ -1,6 +1,13 @@
 [
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@FooComparisonResult@FooOrderedAscending",
+    "OldPrintedName": "FooOrderedAscending",
+    "NewPrintedName": "orderedAscending",
+    "NewTypeName": "FooComparisonResult"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@SA@SomeItemSet",
     "OldPrintedName": "SomeItemSet",
     "NewPrintedName": "some",
