@@ -129,7 +129,7 @@ public:
 ///       | 'Any'
 ///       | 'Self'
 class TypeSyntax : public Syntax {
-    friend class FunctionParameterSyntax;
+  friend class FunctionParameterSyntax;
   friend class FunctionSignatureSyntax;
 protected:
   virtual void validate() const override {}
@@ -260,7 +260,7 @@ public:
 /// tuple-type -> '(' tuple-type-element-list ')'
 class TupleTypeSyntax final : public TypeSyntax {
   friend struct SyntaxFactory;
-    friend class TupleTypeSyntaxBuilder;
+  friend class TupleTypeSyntaxBuilder;
 
   enum class Cursor : CursorIndex {
     LeftParenToken,

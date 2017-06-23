@@ -58,7 +58,7 @@ public:
 #pragma mark - unknown-statement API
 
 class UnknownStmtSyntax : public UnknownSyntax {
-    friend class LegacyASTTransformer;
+  friend class LegacyASTTransformer;
 
   virtual void validate() const override;
 public:
@@ -157,7 +157,6 @@ public:
 /// label-name -> identifier
 class BreakStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-  
 
   enum class Cursor : CursorIndex {
     BreakKeyword,
@@ -195,7 +194,7 @@ public:
 /// label-name -> identifier
 class ContinueStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-  
+
   enum class Cursor : CursorIndex {
     ContinueKeyword,
     Label
@@ -231,7 +230,7 @@ public:
 /// return-statement -> 'return' expression? ';'?
 class ReturnStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-    friend class Syntax;
+  friend class Syntax;
 
   enum class Cursor : CursorIndex {
     ReturnKeyword,

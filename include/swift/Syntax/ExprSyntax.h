@@ -56,7 +56,7 @@ public:
 #pragma mark - unknown-expression API
 
 class UnknownExprSyntax : public UnknownSyntax {
-    friend class LegacyASTTransformer;
+  friend class LegacyASTTransformer;
 
   virtual void validate() const override;
 public:
@@ -115,7 +115,7 @@ public:
 /// declaration, or it could perhaps be a constructor call to `Array<Int>`.
 class SymbolicReferenceExprSyntax : public ExprSyntax {
   friend struct SyntaxFactory;
-    friend class Syntax;
+  friend class Syntax;
 
   enum class Cursor : CursorIndex {
     Identifier,
@@ -156,7 +156,7 @@ public:
 class FunctionCallArgumentSyntax : public Syntax {
 
   friend struct SyntaxFactory;
-    friend class Syntax;
+  friend class Syntax;
   friend class SyntaxCollection<SyntaxKind::FunctionCallArgumentList,
                                 FunctionCallArgumentSyntax>;
 
