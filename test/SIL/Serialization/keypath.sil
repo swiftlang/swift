@@ -96,12 +96,24 @@ entry:
   return undef : $()
 }
 
+// CHECK-LABEL: sil shared @optional
+sil shared @optional : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Optional<Int>, Optional<Int>>, (root $Optional<Int>; optional_chain : $Int; optional_wrap : $Optional<Int>)
+  %a = keypath $KeyPath<Optional<Int>, Optional<Int>>, (root $Optional<Int>; optional_chain : $Int; optional_wrap : $Optional<Int>)
+  // CHECK: keypath $KeyPath<Optional<Int>, Int>, (root $Optional<Int>; optional_force : $Int)
+  %b = keypath $KeyPath<Optional<Int>, Int>, (root $Optional<Int>; optional_force : $Int)
+
+  return undef : $()
+}
+
 sil @serialize_all : $@convention(thin) () -> () {
 entry:
   %0 = function_ref @stored_properties : $@convention(thin) () -> ()
   %1 = function_ref @stored_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
   %2 = function_ref @computed_properties : $@convention(thin) () -> ()
   %3 = function_ref @computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+  %4 = function_ref @optional : $@convention(thin) () -> ()
 
   unreachable
 }

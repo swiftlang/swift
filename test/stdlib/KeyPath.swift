@@ -346,4 +346,63 @@ keyPath.test("dynamically-typed application") {
   }
 }
 
+struct TestOptional {
+  var origin: Point?
+  var questionableCanary: LifetimeTracked? = LifetimeTracked(123)
+
+  init(origin: Point?) {
+    self.origin = origin
+  }
+}
+
+keyPath.test("optional force-unwrapping") {
+  let origin_x = \TestOptional.origin!.x
+  let canary = \TestOptional.questionableCanary!
+
+  var value = TestOptional(origin: Point(x: 3, y: 4))
+
+  expectEqual(value[keyPath: origin_x], 3)
+  expectEqual(value.origin!.x, 3)
+
+  value[keyPath: origin_x] = 5
+
+  expectEqual(value[keyPath: origin_x], 5)
+  expectEqual(value.origin!.x, 5)
+
+  expectTrue(value[keyPath: canary] === value.questionableCanary)
+  let newCanary = LifetimeTracked(456)
+  value[keyPath: canary] = newCanary
+  expectTrue(value[keyPath: canary] === newCanary)
+  expectTrue(value.questionableCanary === newCanary)
+}
+
+keyPath.test("optional force-unwrapping trap") {
+  let origin_x = \TestOptional.origin!.x
+  var value = TestOptional(origin: nil)
+
+  expectCrashLater()
+  _ = value[keyPath: origin_x]
+}
+
+struct TestOptional2 {
+  var optional: TestOptional?
+}
+
+keyPath.test("optional chaining") {
+  let origin_x = \TestOptional.origin?.x
+  let canary = \TestOptional.questionableCanary?.value
+  
+  let withPoint = TestOptional(origin: Point(x: 3, y: 4))
+  expectEqual(withPoint[keyPath: origin_x]!, 3)
+  expectEqual(withPoint[keyPath: canary]!, 123)
+
+  let withoutPoint = TestOptional(origin: nil)
+  expectNil(withoutPoint[keyPath: origin_x])
+
+  let optional2: TestOptional2? = TestOptional2(optional: withPoint)
+  let optional2_optional = \TestOptional2?.?.optional
+  expectEqual(optional2[keyPath: optional2_optional]!.origin!.x, 3)
+  expectEqual(optional2[keyPath: optional2_optional]!.origin!.y, 4)
+}
+
 runAllTests()
