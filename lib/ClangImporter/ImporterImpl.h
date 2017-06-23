@@ -375,7 +375,8 @@ public:
   /// Multiple macro definitions can map to the same declaration if the
   /// macros are identically defined.
   llvm::DenseMap<Identifier,
-                 SmallVector<std::pair<clang::MacroInfo *, ValueDecl *>, 2>>
+                 SmallVector<std::pair<const clang::MacroInfo *, ValueDecl *>,
+                             2>>
     ImportedMacros;
 
   // Mapping from macro to value for macros that expand to constant values.
@@ -606,10 +607,7 @@ public:
   ///
   /// The returned module may be null (but not \c None) if \p MI comes from
   /// an imported header.
-  Optional<clang::Module *>
-  getClangSubmoduleForMacro(const clang::MacroInfo *MI);
-
-  ClangModuleUnit *getClangModuleForMacro(const clang::MacroInfo *MI);
+  const clang::Module *getClangOwningModule(ClangNode Node) const;
 
   /// Whether NSUInteger can be imported as Int in certain contexts. If false,
   /// should always be imported as UInt.
@@ -667,9 +665,11 @@ public:
 
   /// \brief Import the given Clang preprocessor macro as a Swift value decl.
   ///
+  /// \p macroNode must be a MacroInfo or a ModuleMacro.
+  ///
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
-  ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
+  ValueDecl *importMacro(Identifier name, ClangNode macroNode);
 
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
