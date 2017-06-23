@@ -520,17 +520,6 @@ fileprivate struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T 
     self.value = value
   }
 
-  func encode(to encoder: Encoder) throws {
-    var container = encoder.unkeyedContainer()
-    try container.encode(value)
-  }
-
-  init(from decoder: Decoder) throws {
-    var container = try decoder.unkeyedContainer()
-    value = try container.decode(T.self)
-    assert(container.isAtEnd)
-  }
-
   static func ==(_ lhs: TopLevelWrapper<T>, _ rhs: TopLevelWrapper<T>) -> Bool {
     return lhs.value == rhs.value
   }
