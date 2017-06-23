@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name=test -DENCODE -o %t/encode
 // RUN: %target-build-swift %s -module-name=test -o %t/decode
 // RUN: %target-run %t/encode %t/test.arc

@@ -1,5 +1,6 @@
 // REQUIRES: objc_interop
-// RUN: rm -rf %t && mkdir -p %t/tmp
+// RUN: %empty-directory(%t)
+// RUN: mkdir -p %t/tmp
 
 // First test the explicit frontend-based bridging PCH generation and use works
 // RUN: %target-swift-frontend -emit-pch -o %t/sdk-bridging-header.pch %S/Inputs/sdk-bridging-header.h

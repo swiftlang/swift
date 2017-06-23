@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/extension_types.swift -module-name ExtensionTypes -emit-module -emit-module-path %t/ExtensionTypes.swiftmodule
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t %s
 
