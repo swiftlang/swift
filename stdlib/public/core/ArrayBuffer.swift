@@ -592,4 +592,59 @@ extension _ArrayBuffer {
     }
   }
 }
+
+extension _ArrayBuffer : Sequence {
+  @_versioned
+  struct Iterator : IteratorProtocol {
+    enum _Buffer {
+    case contiguous(UnsafePointer<Element>, UnsafePointer<Element>)
+    case cocoa(Int, Int)
+    }
+    
+    var _buffer: _Buffer
+    var _owner: AnyObject
+
+    mutating func next() -> Element? {
+      switch _buffer {
+      case .contiguous(let start, let end):
+        _onFastPath()
+        guard _fastPath(start != end) else { return nil }
+        _buffer = .contiguous(start + 1, end)
+        return start.pointee
+        
+      case .cocoa(let start, let end):
+        guard _fastPath(start != end) else { return nil }
+        _buffer = .cocoa(start + 1, end)
+        let r = unsafeBitCast(_owner, to: _NSArrayCore.self).objectAt(start)
+        return unsafeBitCast(r, to: Element.self)
+      }
+    }
+
+    init(_ b: _ArrayBuffer) {
+      if _fastPath(b._isNative) {
+        _owner = b._native._storage
+        let start = b._native.firstElementAddress
+        _buffer = .contiguous(start, start + b.count)
+      }
+      else {
+        _owner = b._nonNative
+        let c = _CocoaArrayWrapper(b._nonNative)
+        if let start = c.contiguousStorage(0..<b.count) {
+          _buffer = start.withMemoryRebound(
+            to: Element.self, capacity: b.count) {
+            .contiguous($0, $0 + b.count)
+          }
+        }
+        else {
+          _buffer = .cocoa(0, b.count)
+        }
+      }
+    }
+  }
+  
+  func makeIterator() -> Iterator {
+    return Iterator(self)
+  }
+}
+
 #endif
