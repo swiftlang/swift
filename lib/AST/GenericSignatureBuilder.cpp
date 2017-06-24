@@ -1350,6 +1350,7 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
                      concrete, proto->getName());
     }
 
+    paEquivClass->invalidConcreteType = true;
     return nullptr;
   }
 
@@ -1754,7 +1755,8 @@ static void concretizeNestedTypeFromConcreteParent(
     }
   }
 
-  // Error condition: parent did not conform to this protocol, so they
+  // Error condition: parent did not conform to this protocol, so there is no
+  // way to resolve the nested type via concrete conformance.
   if (!parentConcreteSource) return;
 
   auto source = parentConcreteSource->viaParent(builder, assocType);
@@ -2440,7 +2442,8 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
 
 #pragma mark Equivalence classes
 EquivalenceClass::EquivalenceClass(PotentialArchetype *representative)
-  : recursiveConcreteType(false), recursiveSuperclassType(false)
+  : recursiveConcreteType(false), invalidConcreteType(false),
+    recursiveSuperclassType(false)
 {
   members.push_back(representative);
 }
@@ -3367,6 +3370,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
                                    SameTypeConflictCheckedLater());
     } else {
       equivClass->concreteType = equivClass2->concreteType;
+      equivClass->invalidConcreteType = equivClass2->invalidConcreteType;
     }
 
     equivClass->concreteTypeConstraints.insert(
@@ -5263,8 +5267,9 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
             ? knownAnchor->concreteTypeSource
             : RequirementSource::forAbstract(archetype);
 
-        // Drop recursive concrete-type constraints.
-        if (equivClass->recursiveConcreteType)
+        // Drop recursive and invalid concrete-type constraints.
+        if (equivClass->recursiveConcreteType ||
+            equivClass->invalidConcreteType)
           continue;
 
         f(RequirementKind::SameType, archetype, concreteType, source);
