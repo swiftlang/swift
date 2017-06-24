@@ -1415,6 +1415,7 @@ extension Sequence {
 
 extension IteratorProtocol {
   @_inlineable
+  @inline(__always)
   public mutating func _initialize(
     _ memory: UnsafeMutableBufferPointer<Element>
   ) -> Int {
