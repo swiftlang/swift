@@ -29,18 +29,7 @@ public func _log(_ message: @autoclosure () -> String) {
   // print(message())
 }
 
-extension FixedWidthInteger {
-  @discardableResult
-  // @_transparent
-  public mutating func replaceUWord(_ n: Int, with newBits: UInt) -> Bool {
-    let flippedBits = _word(at: n) ^ newBits
-    self ^= Self(_truncatingBits: flippedBits) << (${word_bits} * n)
-    if _word(at: n) != newBits {
-      _log("###### overflow replacing word \(n) with \(newBits.hex)")
-    }
-    return _word(at: n) == newBits
-  }
-
+extension FixedWidthInteger where Words : Collection {
   /// a hex representation of every bit in the number
   func hexBits(_ bitWidth: Int) -> String {
     let hexDigits: [Unicode.Scalar] = [
@@ -54,12 +43,11 @@ extension FixedWidthInteger {
       if nibbles % 4 == 0 && nibbles != 0 {
         result.insert("_", at: result.startIndex)
       }
-      let lowUWord = x._word(at: 0)
+      let lowUWord = x.words.first ?? 0
       result.insert(
         hexDigits[Int(lowUWord._value) & 0xF],
         at: result.startIndex
       )
-      x.replaceUWord(0, with: lowUWord & ~0xF)
       x /= 16
       nibbles += 1
     }
@@ -84,7 +72,7 @@ func expectEqual<T : FixedWidthInteger>(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
-) {
+) where T.Words : Collection {
   if expected != actual {
     expectationFailure(
       "expected: \(String(reflecting: expected))"
@@ -493,26 +481,45 @@ tests.test("Basics") {
   expectEqual(32, Int32.bitWidth)
 }
 
-tests.test("word") {
-  let x = UDWord(Int.max)
-  expectEqual(Int.max._lowUWord, x._word(at: 0))
-  expectEqual(0, x._word(at: 1))
-
-  let y = DWord(Int.min)
-  expectEqual(Int.min._lowUWord, y._word(at: 0))
-  expectEqual(~0, y._word(at: 1))
-
-  let z = UInt(~Int.min) + 1
-  expectEqual(Int.min._lowUWord, z._word(at: 0))
-  expectEqual(0, z._word(at: 1))
-}
-
 tests.test("words") {
+  expectEqualSequence([UInt.max], UInt.max.words)
+  expectEqualSequence([0xFF as UInt], UInt8.max.words)
+  expectEqualSequence([0xFFFF as UInt], UInt16.max.words)
+  expectEqualSequence([0xFFFFFFFF as UInt], UInt32.max.words)
+
+  expectEqualSequence([0 as UInt], UInt.min.words)
+  expectEqualSequence([0 as UInt], UInt8.min.words)
+  expectEqualSequence([0 as UInt], UInt16.min.words)
+  expectEqualSequence([0 as UInt], UInt32.min.words)
+
+  expectEqualSequence([UInt.max >> 1], Int.max.words)
+  expectEqualSequence([0x7F as UInt], Int8.max.words)
+  expectEqualSequence([0x7FFF as UInt], Int16.max.words)
+  expectEqualSequence([0x7FFFFFFF as UInt], Int32.max.words)
+
+  expectEqualSequence([UInt.max << (Int.bitWidth - 1)], Int.min.words)
+  expectEqualSequence([UInt.max << 7], Int8.min.words)
+  expectEqualSequence([UInt.max << 15], Int16.min.words)
+  expectEqualSequence([UInt.max << 31], Int32.min.words)
+  
   expectEqualSequence([UInt.max], (-1 as Int).words)
   expectEqualSequence([UInt.max], (-1 as Int8).words)
   expectEqualSequence([UInt.max], (-1 as Int16).words)
   expectEqualSequence([UInt.max], (-1 as Int32).words)
+
+% if int(WORD_BITS) == 64:
+  expectEqualSequence([UInt.max], UInt64.max.words)
+  expectEqualSequence([0 as UInt], UInt64.min.words)
+  expectEqualSequence([UInt.max >> 1], Int64.max.words)
+  expectEqualSequence([(1 as UInt) << 63], Int64.min.words)
   expectEqualSequence([UInt.max], (-1 as Int64).words)
+% else:
+  expectEqualSequence([UInt.max, UInt.max], Int64.max.words)
+  expectEqualSequence([0 as UInt, 0], UInt64.min.words)
+  expectEqualSequence([UInt.max, UInt.max >> 1], Int64.max.words)
+  expectEqualSequence([0 as UInt, 1 << 31], Int64.min.words)
+  expectEqualSequence([UInt.max, UInt.max], (-1 as Int64).words)
+% end
 
   expectEqualSequence([1], 1.words)
   expectEqualSequence([0], 0.words)
@@ -848,6 +855,23 @@ dwTests.test("Conversions/UnsignedMax+1") {
 dwTests.test("Conversions/Unsigned-1") {
   expectCrashLater()
   _ = DWU16(-1)
+}
+
+dwTests.test("Words") {
+  expectEqualSequence((0 as DoubleWidth<Int8>).words, [0])
+  expectEqualSequence((1 as DoubleWidth<Int8>).words, [1])
+  expectEqualSequence((-1 as DoubleWidth<Int8>).words, [UInt.max])
+  expectEqualSequence((256 as DoubleWidth<Int8>).words, [256])
+  expectEqualSequence((-256 as DoubleWidth<Int8>).words, [UInt.max - 255])
+  expectEqualSequence(DoubleWidth<Int8>.max.words, [32767])
+  expectEqualSequence(DoubleWidth<Int8>.min.words, [UInt.max - 32767])
+
+  expectEqualSequence((0 as Int1024).words, 
+    repeatElement(0 as UInt, count: 1024 / UInt.bitWidth))
+  expectEqualSequence((-1 as Int1024).words,
+    repeatElement(UInt.max, count: 1024 / UInt.bitWidth))
+  expectEqualSequence((1 as Int1024).words, 
+      [1] + Array(repeating: 0, count: 1024 / UInt.bitWidth - 1))
 }
 
 runAllTests()
