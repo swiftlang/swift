@@ -1,6 +1,4 @@
-// RUN: not --crash %target-swift-frontend -emit-ir -primary-file %s
-
-// REQUIRES: asserts
+// RUN: not %target-swift-frontend -emit-ir -primary-file %s
 
 struct Version {
 }

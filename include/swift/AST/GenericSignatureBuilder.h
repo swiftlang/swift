@@ -182,6 +182,9 @@ public:
     /// the concrete type.
     unsigned recursiveConcreteType : 1;
 
+    /// Whether we have an invalid concrete type.
+    unsigned invalidConcreteType : 1;
+
     /// Whether we have detected recursion during the substitution of
     /// the superclass type.
     unsigned recursiveSuperclassType : 1;
