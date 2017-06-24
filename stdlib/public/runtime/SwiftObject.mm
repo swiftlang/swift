@@ -79,6 +79,34 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 #endif
 }
 
+/// \brief Fetch the type metadata associated with the formal dynamic
+/// type of the given (possibly Objective-C) object.  The formal
+/// dynamic type ignores dynamic subclasses such as those introduced
+/// by KVO.
+///
+/// The object pointer may be a tagged pointer, but cannot be null.
+const Metadata *swift::swift_getObjectType(HeapObject *object) {
+  auto classAsMetadata = _swift_getClass(object);
+
+  // Walk up the superclass chain skipping over artifical Swift classes.
+  // If we find a non-Swift class use the result of [object class] instead.
+
+  while (classAsMetadata && classAsMetadata->isTypeMetadata()) {
+    if (!classAsMetadata->isArtificialSubclass())
+      return classAsMetadata;
+    classAsMetadata = classAsMetadata->SuperClass;
+  }
+
+#if SWIFT_OBJC_INTEROP
+  Class objcClass = [reinterpret_cast<id>(object) class];
+  classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
+  return swift_getObjCClassMetadata(classAsMetadata);
+#else
+  fatalError(/* flags = */ 0,
+             "swift_getObjectType: object has no Swift superclass");
+#endif
+}
+
 #if SWIFT_OBJC_INTEROP
 static SwiftObject *_allocHelper(Class cls) {
   // XXX FIXME
