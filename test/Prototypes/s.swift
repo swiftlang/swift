@@ -312,9 +312,8 @@ extension String._XContent {
     case .inline8(let x): return x.copiedToUnsafeBuffer(in: &scratch)
     case .latin1(let x): return x.withUnsafeBufferPointer { return $0 }
     case .unowned8(let x): return x.unsafeBuffer
-    case .nsString(let x):
-      return nil
       /*
+    case .nsString(let x):
       return x._fastCStringContents(false).map {
         UnsafeBufferPointer(start: x, count: x.length())
       }
@@ -751,7 +750,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       
     case .utf16(let x) where knownMutable || _dynamicStorageIsMutable != false:
       x._withMutableCapacity { buf in
-        var availableCapacity = UnsafeMutableBufferPointer(
+        let availableCapacity = UnsafeMutableBufferPointer(
           start: buf.baseAddress._unsafelyUnwrappedUnchecked + x.count,
           count: buf.count - x.count)
         let (newSource, copiedCount) = source._copyContents(
