@@ -1921,7 +1921,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
     auto overrideInterfaceFnTy = overrideInterfaceTy->castTo<FunctionType>();
     overrideInterfaceTy =
         GenericFunctionType::get(derivedInterfaceFnTy->getGenericSignature(),
-                                 overrideInterfaceFnTy->getInput(),
+                                 overrideInterfaceFnTy->getParams(),
                                  overrideInterfaceFnTy->getResult(),
                                  overrideInterfaceFnTy->getExtInfo());
   }
@@ -2218,14 +2218,6 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   llvm_unreachable("bad SILDeclRef kind");
 }
 
-static CanType createProductType(CanType type1, CanType type2,
-                                 ASTContext &Context) {
-  if (auto tupleType = dyn_cast<TupleType>(type1))
-    if (tupleType->getNumElements() == 0)
-      return type2;
-  return CanType(TupleType::get({type1, type2}, Context));
-}
-
 CanAnyFunctionType
 TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
                                          unsigned uncurryLevel,
@@ -2252,14 +2244,21 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
         // Can't be polymorphic
         assert(isa<FunctionType>(fnType));
         auto resultFnType = cast<FunctionType>(fnType.getResult());
-
-        CanType inputType = createProductType(resultFnType.getInput(),
-                                              fnType.getInput(),
-                                              Context);
+        
+        ArrayRef<AnyFunctionType::Param> inputParams = {
+          AnyFunctionType::Param(
+            AnyFunctionType::composeInput(Context, resultFnType.getParams(),
+                                          /*canonicalVararg*/true)),
+          AnyFunctionType::Param(
+            AnyFunctionType::composeInput(Context, fnType.getParams(),
+                                          /*canonicalVararg*/true))
+        };
         CanType resultType = resultFnType.getResult();
-
+        if (resultFnType.getParams().empty()) {
+          inputParams = fnType.getParams();
+        }
         // Rebuild the uncurried accessor type.
-        fnType = CanFunctionType::get(inputType, resultType, extInfo);
+        fnType = CanFunctionType::get(inputParams, resultType, extInfo);
 
         // Hit the fast path below.
         uncurryLevel = 0;
@@ -2305,11 +2304,11 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   }
 
   // The uncurried input types.
-  SmallVector<TupleTypeElt, 4> inputs;
+  SmallVector<AnyFunctionType::Param, 4> inputs;
 
   // Merge inputs and generic parameters from the uncurry levels.
   for (;;) {
-    inputs.push_back(TupleTypeElt(fnType->getInput()->getCanonicalType()));
+    inputs.push_back(AnyFunctionType::Param(fnType->getInput()->getCanonicalType()));
 
     // The uncurried function calls all of the intermediate function
     // levels and so throws if any of them do.
@@ -2397,11 +2396,10 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   std::reverse(inputs.begin(), inputs.end());
 
   // Create the new function type.
-  CanType inputType = TupleType::get(inputs, Context)->getCanonicalType();
   if (genericSig) {
     return CanGenericFunctionType::get(genericSig,
-                                       inputType, resultType, extInfo);
+                                       inputs, resultType, extInfo);
   } else {
-    return CanFunctionType::get(inputType, resultType, extInfo);
+    return CanFunctionType::get(inputs, resultType, extInfo);
   }
 }

@@ -2860,9 +2860,16 @@ GenericFunctionType::substGenericArgs(SubstitutionList args) {
 
 FunctionType *
 GenericFunctionType::substGenericArgs(const SubstitutionMap &subs) {
-  Type input = getInput().subst(subs);
+  SmallVector<AnyFunctionType::Param, 4> sparams;
+  auto params = getParams();
+  sparams.reserve(params.size());
+  for (auto &p : params) {
+    auto substTy = p.getType().subst(subs);
+    sparams.push_back(AnyFunctionType::Param(substTy, p.getLabel(),
+                                             p.getParameterFlags()));
+  }
   Type result = getResult().subst(subs);
-  return FunctionType::get(input, result, getExtInfo());
+  return FunctionType::get(sparams, result, getExtInfo());
 }
 
 FunctionType *

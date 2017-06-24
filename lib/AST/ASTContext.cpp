@@ -2695,7 +2695,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
     return ParenType::get(C, Fields[0].getType(),
                           Fields[0].getParameterFlags());
-
+  
   RecursiveTypeProperties properties;
   bool hasInOut = false;
   for (const TupleTypeElt &Elt : Fields) {
@@ -2740,11 +2740,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
 
 TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
                            ParameterTypeFlags fl)
-: Name(name), ElementType(ty), Flags(fl.withInOut(ty->is<InOutType>())) {
-  // FIXME: Re-enable this assertion and hunt down the callers that aren't
-  // setting parameter bits correctly.
-  // assert((ty->is<InOutType>() && fl.isInOut()) && "caller did not set flags");
-}
+  : Name(name), ElementType(ty), Flags(fl.withInOut(ty->is<InOutType>())) {}
 
 void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
                                  GenericTypeDecl *TheDecl, Type Parent) {
@@ -3148,6 +3144,11 @@ ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
   default:
     llvm_unreachable("Undefined function type");
   }
+}
+
+AnyFunctionType::Param AnyFunctionType::Param::getWithType(Type ty) const {
+  auto flags = getParameterFlags().withInOut(ty->is<InOutType>());
+  return AnyFunctionType::Param(ty, getLabel(), flags);
 }
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
