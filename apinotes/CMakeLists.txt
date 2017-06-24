@@ -39,6 +39,7 @@ set(SWIFT_API_NOTES_INPUTS
   QuickLook
   SafariServices
   SceneKit
+  ScreenSaver
   ScriptingBridge
   SpriteKit
   StoreKit
