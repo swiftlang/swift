@@ -164,7 +164,7 @@ func for_loops1(_ x: Int, c: Bool) {
 // CHECK-LABEL: sil hidden @{{.*}}for_loops2
 func for_loops2() {
   // rdar://problem/19316670
-  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_T0s16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_T0Sa8IteratorV4next{{[_0-9a-zA-Z]*}}F
   // CHECK-NEXT: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
   // CHECK-NEXT: apply [[NEXT]]<[MyClass]>

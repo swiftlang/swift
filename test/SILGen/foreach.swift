@@ -51,7 +51,7 @@ protocol GenericCollection : Collection {
 
 // CHECK-LABEL: sil hidden @_T07foreach13trivialStructySaySiGF : $@convention(thin) (@owned Array<Int>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : $Array<Int>):
-// CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<Int>> }, var, name "$x$generator"
+// CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var Array<Int>.Iterator }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
@@ -107,7 +107,7 @@ func trivialStructBreak(_ xx: [Int]) {
 
 // CHECK-LABEL: sil hidden @_T07foreach26trivialStructContinueBreakySaySiGF : $@convention(thin) (@owned Array<Int>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : $Array<Int>):
-// CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<Int>> }, var, name "$x$generator"
+// CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var Array<Int>.Iterator }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @_T0s10CollectionPssAARzs16IndexingIteratorVyxG0C0RtzlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
 // CHECK:   [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
@@ -119,7 +119,7 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next7ElementQzSgyF : $@convention(method)
 // CHECK:   [[GET_ELT_STACK:%.*]] = alloc_stack $Optional<Int>
-// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<Int>>
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*Array<Int>.Iterator
 // CHECK:   apply [[FUNC_REF]]<[Int]>([[GET_ELT_STACK]], [[WRITE]])
 // CHECK:   [[IND_VAR:%.*]] = load [trivial] [[GET_ELT_STACK]]
 // CHECK:   switch_enum [[IND_VAR]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
@@ -152,7 +152,7 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   br [[CONT_BLOCK]]
 //
 // CHECK: [[CONT_BLOCK]]
-// CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<Int>> }
+// CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var Array<Int>.Iterator }
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
 // CHECK:   destroy_value [[ARRAY]]

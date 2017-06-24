@@ -216,7 +216,7 @@ func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
 }
 
 func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}
-// expected-note@-1 {{requirement specified as 'A.Element' == 'B.Element' [with A = IndexingIterator<[Int]>, B = IndexingIterator<[Double]>]}}
+// expected-note@-1 {{requirement specified as 'A.Element' == 'B.Element' [with A = Array<Int>.Iterator, B = Array<Double>.Iterator]}}
 func compareIterators() {
   var a: [Int] = []
   var b: [Double] = []

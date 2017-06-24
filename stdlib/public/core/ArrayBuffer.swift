@@ -595,7 +595,7 @@ extension _ArrayBuffer {
 
 extension _ArrayBuffer : Sequence {
   @_versioned
-  struct Iterator : IteratorProtocol {
+  struct Iterator {
     enum _Buffer {
     case contiguous(UnsafePointer<Element>, UnsafePointer<Element>)
     case cocoa(Int, Int)
@@ -605,54 +605,95 @@ extension _ArrayBuffer : Sequence {
     var _buffer: _Buffer
     @_versioned
     var _owner: AnyObject
+  }
 
-    @_versioned
-    @inline(__always)
-    mutating func next() -> Element? {
-      switch _buffer {
-      case .contiguous(let start, let end):
-        _onFastPath()
-        guard _fastPath(start != end) else { return nil }
-        _buffer = .contiguous(start + 1, end)
-        return start.pointee
-        
-      case .cocoa(let start, let end):
-        if _canBeClass(Element.self) == 0 { Builtin.unreachable() }
-        
-        guard _fastPath(start != end) else { return nil }
-        _buffer = .cocoa(start + 1, end)
-        let r = unsafeBitCast(_owner, to: _NSArrayCore.self).objectAt(start)
-        return unsafeBitCast(r, to: Element.self)
-      }
+  @_versioned
+  @_inlineable
+  func makeIterator() -> Iterator {
+    return Iterator(self)
+  }
+}
+
+extension _ArrayBuffer.Iterator : IteratorProtocol, Sequence {
+  @_versioned
+  @inline(__always)
+  mutating func next() -> Element? {
+    switch _buffer {
+    case .contiguous(let start, let end):
+      _onFastPath()
+      guard _fastPath(start != end) else { return nil }
+      _buffer = .contiguous(start + 1, end)
+      return start.pointee
+      
+    case .cocoa(let start, let end):
+      if _canBeClass(Element.self) == 0 { Builtin.unreachable() }
+      
+      guard _fastPath(start != end) else { return nil }
+      _buffer = .cocoa(start + 1, end)
+      let r = unsafeBitCast(_owner, to: _NSArrayCore.self).objectAt(start)
+      return unsafeBitCast(r, to: Element.self)
     }
+  }
 
-    @_versioned
-    @inline(__always)
-    init(_ b: _ArrayBuffer) {
-      if _fastPath(b._isNative) {
-        _owner = b._native._storage
-        let start = b._native.firstElementAddress
-        _buffer = .contiguous(start, start + b.count)
+  @_versioned
+  @inline(__always)
+  init(_ b: _ArrayBuffer) {
+    if _fastPath(b._isNative) {
+      _owner = b._native._storage
+      let start = b._native.firstElementAddress
+      _buffer = .contiguous(start, start + b.count)
+    }
+    else {
+      if _canBeClass(Element.self) == 0 { Builtin.unreachable() }
+      _owner = b._nonNative
+      let c = _CocoaArrayWrapper(b._nonNative)
+      if let start = c.contiguousStorage(0..<b.count) {
+        _buffer = start.withMemoryRebound(
+          to: Element.self, capacity: b.count) {
+          .contiguous($0, $0 + b.count)
+        }
       }
       else {
-        if _canBeClass(Element.self) == 0 { Builtin.unreachable() }
-        _owner = b._nonNative
-        let c = _CocoaArrayWrapper(b._nonNative)
-        if let start = c.contiguousStorage(0..<b.count) {
-          _buffer = start.withMemoryRebound(
-            to: Element.self, capacity: b.count) {
-            .contiguous($0, $0 + b.count)
-          }
-        }
-        else {
-          _buffer = .cocoa(0, b.count)
-        }
+        _buffer = .cocoa(0, b.count)
       }
     }
   }
-  
-  func makeIterator() -> Iterator {
-    return Iterator(self)
+
+  @_versioned
+  @inline(__always)
+  mutating func _initialize(
+    _ memory: UnsafeMutableBufferPointer<Element>
+  ) -> Int {
+    guard _fastPath(memory.count != 0) else { return 0 }
+    let target = memory.baseAddress._unsafelyUnwrappedUnchecked
+    
+    switch _buffer {
+    case .contiguous(let start, let end):
+      _onFastPath()
+      let n = Swift.min(end - start, memory.count)
+      target.initialize(from: start, count: n)
+      _buffer = .contiguous(start + n, end)
+      return n
+      
+    case .cocoa(let start, let end):
+      if _canBeClass(Element.self) == 0 { Builtin.unreachable() }
+
+      let n = Swift.min(end - start, memory.count)
+      let r = SwiftShims._SwiftNSRange(location: start, length: n)
+      let source = unsafeBitCast(_owner, to: _NSArrayCore.self)
+      let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
+        to: AnyObject.self)
+      
+      // Copies the references out of the NSArray without retaining them
+      source.getObjects(rawTarget, range: r)
+      
+      // Make another pass to retain the copied objects
+      // FIXME: do this without re-writing memory?
+      for p in target..<(target + n) {
+        p.initialize(to: p.pointee)
+      }
+      return n
+    }
   }
 }
 

@@ -462,8 +462,33 @@ public struct ${Self}<Element>
 {
 
   public typealias Index = Int
-  public typealias Iterator = IndexingIterator<${Self}>
 
+  public struct Iterator : IteratorProtocol, Sequence {
+    internal typealias _Base = _Buffer.Iterator
+
+    @_versioned
+    internal var _base: _Base
+
+    @_versioned
+    @_inlineable
+    internal init(_ elements: ${Self}) {
+      _base = elements._buffer.makeIterator()
+    }
+
+    @_inlineable
+    public mutating func next() -> Element? { return _base.next() }
+    
+    @inline(__always)
+    public mutating func _initialize(
+      _ memory: UnsafeMutableBufferPointer<Element>
+    ) -> Int {
+      return _base._initialize(memory)
+    }
+  }
+
+  @_inlineable
+  public func makeIterator() -> Iterator { return Iterator(self) }
+  
 %if Self == 'ArraySlice':
   /// The position of the first element in a nonempty array.
   ///
@@ -1763,37 +1788,6 @@ extension ${Self} {
 
     // Invoke the body.
     return try body(&inoutBufferPointer)
-  }
-
-  @_inlineable
-  public func _copyContents(
-    initializing buffer: UnsafeMutableBufferPointer<Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
-
-    guard !self.isEmpty else { return (makeIterator(),buffer.startIndex) }
-
-    // It is not OK for there to be no pointer/not enough space, as this is
-    // a precondition and Array never lies about its count.
-    guard var p = buffer.baseAddress
-      else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
-    _precondition(self.count <= buffer.count, 
-      "Insufficient space allocated to copy array contents")
-
-    if let s = _baseAddressIfContiguous {
-      p.initialize(from: s, count: self.count)
-      // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
-      // and all uses of the pointer it returns:
-      _fixLifetime(self._owner)
-    } else {
-      for x in self {
-        p.initialize(to: x)
-        p += 1
-      }
-    }
-
-    var it = IndexingIterator(_elements: self)
-    it._position = endIndex
-    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
   }
 }
 %end
