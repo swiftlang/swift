@@ -206,6 +206,10 @@ public protocol IteratorProtocol {
   /// - Returns: The next element in the underlying sequence, if a next element
   ///   exists; otherwise, `nil`.
   mutating func next() -> Element?
+
+  /// Initializes `memory`, returning the number of elements consumed.
+  mutating func _initialize(
+    _ memory: UnsafeMutableBufferPointer<Element>) -> Int
 }
 
 /// A type that provides sequential, iterated access to its elements.
@@ -1409,6 +1413,22 @@ extension Sequence {
   public func dropLast() -> SubSequence  { return dropLast(1) }
 }
 
+extension IteratorProtocol {
+  @_inlineable
+  public mutating func _initialize(
+    _ memory: UnsafeMutableBufferPointer<Element>
+  ) -> Int {
+    guard var ptr = memory.baseAddress else { return 0 }
+    let start = ptr
+    let end = start + memory.count
+    while ptr != end, let x = next() {
+      ptr.initialize(to: x)
+      ptr += 1
+    }
+    return ptr - start
+  }
+}
+
 extension Sequence {
   /// Copies `self` into the supplied buffer.
   ///
@@ -1420,18 +1440,11 @@ extension Sequence {
   @_inlineable
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
-      var it = self.makeIterator()
-      guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
-      for idx in buffer.startIndex..<buffer.count {
-        guard let x = it.next() else {
-          return (it, idx)
-        }
-        ptr.initialize(to: x)
-        ptr += 1
-      }
-      return (it,buffer.endIndex)
-    }
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    var i = self.makeIterator()
+    let n = i._initialize(buffer)
+    return (i, n)
+  }
 }
 
 // FIXME(ABI)#182
