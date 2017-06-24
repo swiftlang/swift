@@ -617,6 +617,8 @@ extension _ArrayBuffer : Sequence {
         return start.pointee
         
       case .cocoa(let start, let end):
+        if _canBeClass(Element.self) == 0 { Builtin.unreachable() }
+        
         guard _fastPath(start != end) else { return nil }
         _buffer = .cocoa(start + 1, end)
         let r = unsafeBitCast(_owner, to: _NSArrayCore.self).objectAt(start)
@@ -633,6 +635,7 @@ extension _ArrayBuffer : Sequence {
         _buffer = .contiguous(start, start + b.count)
       }
       else {
+        if _canBeClass(Element.self) == 0 { Builtin.unreachable() }
         _owner = b._nonNative
         let c = _CocoaArrayWrapper(b._nonNative)
         if let start = c.contiguousStorage(0..<b.count) {
