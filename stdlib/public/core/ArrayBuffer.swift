@@ -600,10 +600,14 @@ extension _ArrayBuffer : Sequence {
     case contiguous(UnsafePointer<Element>, UnsafePointer<Element>)
     case cocoa(Int, Int)
     }
-    
+
+    @_versioned
     var _buffer: _Buffer
+    @_versioned
     var _owner: AnyObject
 
+    @_versioned
+    @inline(__always)
     mutating func next() -> Element? {
       switch _buffer {
       case .contiguous(let start, let end):
@@ -620,6 +624,8 @@ extension _ArrayBuffer : Sequence {
       }
     }
 
+    @_versioned
+    @inline(__always)
     init(_ b: _ArrayBuffer) {
       if _fastPath(b._isNative) {
         _owner = b._native._storage
