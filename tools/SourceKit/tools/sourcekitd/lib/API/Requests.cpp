@@ -64,54 +64,8 @@ public:
 };
 } // anonymous namespace
 
-static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
-
-static LazySKDUID RequestCrashWithExit("source.request.crash_exit");
-
-static LazySKDUID RequestDemangle("source.request.demangle");
-static LazySKDUID RequestMangleSimpleClass("source.request.mangle_simple_class");
-
-static LazySKDUID RequestIndex("source.request.indexsource");
-static LazySKDUID RequestDocInfo("source.request.docinfo");
-static LazySKDUID RequestCodeComplete("source.request.codecomplete");
-static LazySKDUID RequestCodeCompleteOpen("source.request.codecomplete.open");
-static LazySKDUID RequestCodeCompleteClose("source.request.codecomplete.close");
-static LazySKDUID
-    RequestCodeCompleteUpdate("source.request.codecomplete.update");
-static LazySKDUID
-    RequestCodeCompleteCacheOnDisk("source.request.codecomplete.cache.ondisk");
-static LazySKDUID RequestCodeCompleteSetPopularAPI(
-    "source.request.codecomplete.setpopularapi");
-static LazySKDUID
-    RequestCodeCompleteSetCustom("source.request.codecomplete.setcustom");
-static LazySKDUID RequestCursorInfo("source.request.cursorinfo");
-static LazySKDUID RequestRangeInfo("source.request.rangeinfo");
-static LazySKDUID RequestRelatedIdents("source.request.relatedidents");
-static LazySKDUID RequestEditorOpen("source.request.editor.open");
-static LazySKDUID RequestEditorOpenInterface(
-    "source.request.editor.open.interface");
-static LazySKDUID RequestEditorOpenHeaderInterface(
-    "source.request.editor.open.interface.header");
-static LazySKDUID RequestEditorOpenSwiftSourceInterface(
-    "source.request.editor.open.interface.swiftsource");
-static LazySKDUID RequestEditorOpenSwiftTypeInterface(
-    "source.request.editor.open.interface.swifttype");
-static LazySKDUID RequestEditorExtractTextFromComment(
-    "source.request.editor.extract.comment");
-static LazySKDUID RequestEditorClose("source.request.editor.close");
-static LazySKDUID RequestEditorReplaceText("source.request.editor.replacetext");
-static LazySKDUID RequestEditorFormatText("source.request.editor.formattext");
-static LazySKDUID RequestEditorExpandPlaceholder(
-    "source.request.editor.expand_placeholder");
-static LazySKDUID RequestEditorFindUSR("source.request.editor.find_usr");
-static LazySKDUID RequestEditorFindInterfaceDoc(
-    "source.request.editor.find_interface_doc");
-static LazySKDUID RequestBuildSettingsRegister(
-    "source.request.buildsettings.register");
-static LazySKDUID RequestModuleGroups(
-    "source.request.module.groups");
-static LazySKDUID RequestNameTranslation("source.request.name.translation");
-static LazySKDUID RequestMarkupToXML("source.request.convert.markup.xml");
+#define REQUEST(NAME, CONTENT) static LazySKDUID Request##NAME(CONTENT);
+#include "SourceKit/Core/ProtocolUIDs.def"
 
 static LazySKDUID KindExpr("source.lang.swift.expr");
 static LazySKDUID KindStmt("source.lang.swift.stmt");
