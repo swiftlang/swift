@@ -376,6 +376,88 @@ struct _TruncExt<Input: BinaryInteger, Output: FixedWidthInteger>
   }
 }
 
+extension String._XContent.UTF16View : Sequence {
+  struct Iterator : IteratorProtocol {
+    internal enum _Buffer {
+    case deep8(UnsafePointer<UInt8>, UnsafePointer<UInt8>)
+    case deep16(UnsafePointer<UInt16>, UnsafePointer<UInt16>)
+    case inline8(String._XContent._Inline<UInt8>, UInt8)
+    case inline16(String._XContent._Inline<UInt16>, UInt8)
+    case nsString(Int)
+    }
+    
+    internal var _buffer: _Buffer
+    internal var _owner: AnyObject?
+
+    init(_ content: String._XContent) {
+      switch content {
+      case .inline8(let x): _buffer = .inline8(x, 0)
+      case .inline16(let x): _buffer = .inline16(x, 0)
+      case .unowned8(let x):
+        _owner = nil
+        let b = x.unsafeBuffer
+        let s = b.baseAddress._unsafelyUnwrappedUnchecked
+        _buffer = _Buffer.deep8(s, s + b.count)
+      case .unowned16(let x):
+        _owner = nil
+        let b = x.unsafeBuffer
+        let s = b.baseAddress._unsafelyUnwrappedUnchecked
+        _buffer = _Buffer.deep16(s, s + b.count)
+      case .latin1(let x):
+        _owner = x
+        _buffer = x.withUnsafeBufferPointer {
+          let s = $0.baseAddress._unsafelyUnwrappedUnchecked
+          return .deep8(s, s + $0.count)
+        }
+      case .utf16(let x):
+        _owner = nil
+        _buffer = x.withUnsafeBufferPointer {
+          let s = $0.baseAddress._unsafelyUnwrappedUnchecked
+          return .deep16(s, s + $0.count)
+        }
+      case .nsString(let x):
+        _buffer = .nsString(0)
+        _owner = x
+      }
+    }
+
+    @inline(__always)
+    mutating func next() -> UInt16? {
+      switch _buffer {
+      case .deep8(let start, let end):
+        guard start != end else { return nil }
+        _buffer = .deep8(start + 1, end)
+        return UInt16(start.pointee)
+      case .deep16(let start, let end):
+        guard start != end else { return nil }
+        _buffer = .deep16(start + 1, end)
+        return start.pointee
+      case .inline8(var x, let i):
+        return x.withUnsafeMutableBufferPointer {
+          if i == $0.count { return nil }
+          _buffer = .inline8(x, i + 1)
+          return UInt16($0[Int(i)])
+        }
+      case .inline16(var x, let i):
+        return x.withUnsafeMutableBufferPointer {
+          if i == $0.count { return nil }
+          _buffer = .inline16(x, i + 1)
+          return $0[Int(i)]
+        }
+      case .nsString(let i):
+        let s = unsafeBitCast(_owner, to: _NSStringCore.self)
+        if i == s.length() { return nil }
+        _buffer = .nsString(i + 1)
+        return s.characterAtIndex(i)
+      }
+    }
+  }
+  
+  func makeIterator() -> Iterator {
+    return Iterator(_content)
+  }
+}
+
 extension String._XContent.UTF16View : BidirectionalCollection {
   init<C : Collection>(
     _ c: C, maxElement: UInt16? = nil, minCapacity: Int = 0
