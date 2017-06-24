@@ -1835,19 +1835,6 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   return self;
 }
 
-/// \brief Fetch the type metadata associated with the formal dynamic
-/// type of the given (possibly Objective-C) object.  The formal
-/// dynamic type ignores dynamic subclasses such as those introduced
-/// by KVO.
-///
-/// The object pointer may be a tagged pointer, but cannot be null.
-const Metadata *swift::swift_getObjectType(HeapObject *object) {
-  auto classAsMetadata = _swift_getClass(object);
-  if (classAsMetadata->isTypeMetadata()) return classAsMetadata;
-
-  return swift_getObjCClassMetadata(classAsMetadata);
-}
-
 /***************************************************************************/
 /*** Metatypes *************************************************************/
 /***************************************************************************/
