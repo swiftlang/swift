@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-large-loadable-types %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-large-loadable-types %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 public struct BigStruct {
   var i0 : Int32 = 0
@@ -129,10 +129,10 @@ public func enumCallee(_ x: LargeEnum) {
     case .Empty2: break
   }
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10enumCalleeyAA9LargeEnumOF(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable(34)) #0 {
-// CHECK: alloca %T22big_types_corner_cases9LargeEnumO05InnerF0O
-// CHECK: alloca %T22big_types_corner_cases9LargeEnumO
-// CHECK: call void @llvm.memcpy.p0i8.p0i8.i64
-// CHECK: call void @llvm.memcpy.p0i8.p0i8.i64
-// CHECK: call %swift.type* @_T0ypMa()
-// CHECK: ret void
+// CHECK-LABEL-64: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10enumCalleeyAA9LargeEnumOF(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable(34)) #0 {
+// CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO05InnerF0O
+// CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO
+// CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
+// CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
+// CHECK-64: call %swift.type* @_T0ypMa()
+// CHECK-64: ret void
