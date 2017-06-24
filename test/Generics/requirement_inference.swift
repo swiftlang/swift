@@ -224,8 +224,8 @@ struct X8 : P12 {
 
 struct X9<T: P12, U: P12> where T.B == U.B {
   // CHECK-LABEL: X9.upperSameTypeConstraint
-	// CHECK: Generic signature: <T, U, V where U : P12, T == X8, U.B == X8.B>
-  // CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_1 : P12, τ_0_0 == X8, τ_0_1.B == X7>
+	// CHECK: Generic signature: <T, U, V where T == X8, U : P12, U.B == X8.B>
+  // CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 == X8, τ_0_1 : P12, τ_0_1.B == X7>
 	func upperSameTypeConstraint<V>(_: V) where T == X8 { }
 }
 
