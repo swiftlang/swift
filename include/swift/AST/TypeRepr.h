@@ -64,6 +64,9 @@ class alignas(8) TypeRepr {
     friend class TupleTypeRepr;
     unsigned : NumTypeReprBits;
 
+    /// The number of elements contained.
+    unsigned NumElements : 16;
+
     /// Whether this tuple has '...' and its position.
     unsigned HasEllipsis : 1;
   };
@@ -599,18 +602,17 @@ class TupleTypeRepr final : public TypeRepr,
   friend TrailingObjects;
   typedef std::pair<SourceLoc, unsigned> SourceLocAndIdx;
 
-  unsigned NumElements;
   SourceRange Parens;
   
   size_t numTrailingObjects(OverloadToken<TupleTypeReprElement>) const {
-    return NumElements;
+    return TupleTypeReprBits.NumElements;
   }
 
   TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
                 SourceRange Parens, SourceLoc Ellipsis, unsigned EllipsisIdx);
 
 public:
-  unsigned getNumElements() const { return NumElements; }
+  unsigned getNumElements() const { return TupleTypeReprBits.NumElements; }
   bool hasElementNames() const {
     for (auto &Element : getElements()) {
       if (Element.NameLoc.isValid()) {
@@ -621,7 +623,8 @@ public:
   }
 
   ArrayRef<TupleTypeReprElement> getElements() const {
-    return { getTrailingObjects<TupleTypeReprElement>(), NumElements };
+    return { getTrailingObjects<TupleTypeReprElement>(),
+             TupleTypeReprBits.NumElements };
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -673,18 +676,23 @@ public:
 
   unsigned getEllipsisIndex() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].second : NumElements;
+      getTrailingObjects<SourceLocAndIdx>()[0].second :
+        TupleTypeReprBits.NumElements;
   }
 
   void removeEllipsis() {
     if (hasEllipsis()) {
       TupleTypeReprBits.HasEllipsis = false;
-      getTrailingObjects<SourceLocAndIdx>()[0] = {SourceLoc(), NumElements};
+      getTrailingObjects<SourceLocAndIdx>()[0] = {
+        SourceLoc(),
+        getNumElements()
+      };
     }
   }
 
   bool isParenType() const {
-    return NumElements == 1 && getElementNameLoc(0).isInvalid() &&
+    return TupleTypeReprBits.NumElements == 1 &&
+           getElementNameLoc(0).isInvalid() &&
            !hasEllipsis();
   }
 
