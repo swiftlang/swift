@@ -5,5 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-protocol P{typealias a}{protocol A:P{{}class a{{}}typealias a:RangeReplaceableCollection
+// REQUIRES: asserts
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol P{let c{}typealias e:RangeReplaceableCollection}extension P{typealias e:a
