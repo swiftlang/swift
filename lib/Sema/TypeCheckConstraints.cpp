@@ -1987,40 +1987,37 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
+  ExprCleaner cleaner(expr);
+
   // Construct a constraint system from this expression.
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::AllowFixes;
   options |= ConstraintSystemFlags::ReturnAllDiscoveredSolutions;
 
   ConstraintSystem cs(*this, dc, options);
-  CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  const Type originalType = expr->getType();
-  const bool needClearType = originalType && originalType->hasError();
-  const auto recoverOriginalType = [&]() {
-    if (needClearType)
-      expr->setType(originalType);
-  };
 
   // If the previous checking gives the expr error type,
   // clear the result and re-check.
-  if (needClearType)
-    expr->setType(Type());
+  {
+    CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
-  solveForExpression(expr, dc, /*convertType*/ Type(), allowFreeTypeVariables,
-                     listener, cs, viable,
-                     TypeCheckExprFlags::SuppressDiagnostics);
+    const Type originalType = expr->getType();
+    if (originalType && originalType->hasError())
+      expr->setType(Type());
+
+    solveForExpression(expr, dc, /*convertType*/ Type(), allowFreeTypeVariables,
+                       listener, cs, viable,
+                       TypeCheckExprFlags::SuppressDiagnostics);
+  }
 
   for (auto &solution : viable) {
     auto exprType = solution.simplifyType(cs.getType(expr));
     assert(exprType && !exprType->hasTypeVariable());
     types.push_back(exprType);
   }
-
-  // Recover the original type if needed.
-  recoverOriginalType();
 }
 
 bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {

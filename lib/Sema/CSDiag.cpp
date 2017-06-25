@@ -2053,11 +2053,16 @@ public:
 
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
-  bool diagnoseContextualConversionError();
+  bool diagnoseContextualConversionError(Expr *expr, Type contextualType);
 
   /// For an expression being type checked with a CTP_CalleeResult contextual
   /// type, try to diagnose a problem.
   bool diagnoseCalleeResultContextualConversionError();
+
+  /// Attempt to produce a diagnostic for a mismatch between a call's
+  /// type and its assumed contextual type.
+  bool diagnoseCallContextualConversionErrors(ApplyExpr *callEpxr,
+                                              Type contextualType);
 
 private:
   /// Validate potential contextual type for type-checking one of the
@@ -3856,10 +3861,10 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
   return true;
 }
 
-bool FailureDiagnosis::diagnoseContextualConversionError() {
+bool FailureDiagnosis::diagnoseContextualConversionError(Expr *expr,
+                                                         Type contextualType) {
   // If the constraint system has a contextual type, then we can test to see if
   // this is the problem that prevents us from solving the system.
-  Type contextualType = CS->getContextualType();
   if (!contextualType) {
     // This contextual conversion constraint doesn't install an actual type.
     if (CS->getContextualTypePurpose() == CTP_CalleeResult)
@@ -6068,7 +6073,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
     // related to function type, let's try to diagnose it.
     if (possibleTypes.empty() && contextualType &&
         !contextualType->hasUnresolvedType())
-      return diagnoseContextualConversionError();
+      return diagnoseContextualConversionError(callExpr, contextualType);
   } else {
     possibleTypes.push_back(currentType);
   }
@@ -6164,12 +6169,58 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   return false;
 }
 
+/// Check if there failure associated with expresssion is related
+/// to given contextual type.
+bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
+    ApplyExpr *callExpr, Type contextualType) {
+  if (!contextualType || contextualType->hasUnresolvedType())
+    return false;
+
+  auto &TC = CS->TC;
+  auto *DC = CS->DC;
+
+  auto typeCheckExpr = [](TypeChecker &TC, Expr *expr, DeclContext *DC,
+                          SmallVectorImpl<Type> &types,
+                          Type contextualType = Type()) {
+    CalleeListener listener(contextualType);
+    TC.getPossibleTypesOfExpressionWithoutApplying(
+        expr, DC, types, FreeTypeVariableBinding::Disallow, &listener);
+  };
+
+  // First let's type-check expression without contextual type, and
+  // see if that's going to produce a type, if so, let's type-check
+  // again, this time using given contextual type.
+  SmallVector<Type, 4> withoutContextual;
+  typeCheckExpr(TC, callExpr, DC, withoutContextual);
+
+  // If there are no types returned, it means that problem was
+  // nothing to do with contextual information, probably parameter/argument
+  // mismatch.
+  if (withoutContextual.empty())
+    return false;
+
+  SmallVector<Type, 4> withContextual;
+  typeCheckExpr(TC, callExpr, DC, withContextual, contextualType);
+  // If type-checking with contextual type didn't produce any results
+  // it means that we have a contextual mismatch.
+  if (withContextual.empty())
+    return diagnoseContextualConversionError(callExpr, contextualType);
+
+  // If call produces a single type when type-checked with contextual
+  // expression, it means that the problem is elsewhere, any other
+  // outcome is ambiguous.
+  return false;
+}
+
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // If this call involves trailing closure as an argument,
   // let's treat it specially, because re-typecheck of the
   // either function or arguments might results in diagnosing
   // of the unrelated problems due to luck of context.
   if (diagnoseTrailingClosureErrors(callExpr))
+    return true;
+
+  if (diagnoseCallContextualConversionErrors(callExpr, CS->getContextualType()))
     return true;
 
   // Type check the function subexpression to resolve a type for it if
@@ -8516,7 +8567,7 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
     return;
 
   // If this is a contextual conversion problem, dig out some information.
-  if (diagnosis.diagnoseContextualConversionError())
+  if (diagnosis.diagnoseContextualConversionError(expr, getContextualType()))
     return;
 
   // If we can diagnose a problem based on the constraints left laying around in
