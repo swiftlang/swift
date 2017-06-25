@@ -393,7 +393,7 @@ extension String {
 //   [0, 1].flatMap { x in
 //     if String(x) == "foo" { return "bar" } else { return nil }
 //   }
-// Note that the second overload is delcared on a more specific protocol.
+// Note that the second overload is declared on a more specific protocol.
 // See: test/stdlib/StringFlatMap.swift for tests.
 extension Sequence {
   @available(swift, obsoleted: 4)
