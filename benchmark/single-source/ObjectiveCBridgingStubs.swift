@@ -201,7 +201,7 @@ public func run_ObjectiveCBridgeStubDateMutation(N: Int) {
 @inline(never)
 func testObjectiveCBridgeStubURLAppendPath() {
   let startUrl = URL(string: "/")!
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 1_000 {
     var url = startUrl
     for _ in 0 ..< 10 {
       url.appendPathComponent("foo")

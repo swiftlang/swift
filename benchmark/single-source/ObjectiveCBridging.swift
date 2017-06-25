@@ -292,7 +292,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObject() {
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 
   var nativeInt : Int?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 1_000 {
     if let nativeDictionary : [NSString : NSNumber] = conditionalCast(nsDictionary) {
        nativeInt = forcedCast(nativeDictionary[nsString])
     }
