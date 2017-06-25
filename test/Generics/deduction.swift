@@ -22,7 +22,7 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
 
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
+  xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
   xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
 }
 

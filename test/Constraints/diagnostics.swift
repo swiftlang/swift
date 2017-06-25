@@ -997,3 +997,30 @@ func rdar32726044() -> Float {
   return f
 }
 
+// SR-5045 - Attempting to return result of reduce(_:_:) in a method with no return produces ambiguous error
+func sr5045() {
+  let doubles: [Double] = [1, 2, 3]
+  return doubles.reduce(0, +)
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+}
+
+// rdar://problem/32934129 - QoI: misleading diagnostic
+class L_32934129<T : Comparable> {
+  init(_ value: T) { self.value = value }
+  init(_ value: T, _ next: L_32934129<T>?) {
+    self.value = value
+    self.next = next
+  }
+
+  var value: T
+  var next: L_32934129<T>? = nil
+
+  func length() -> Int {
+    func inner(_ list: L_32934129<T>?, _ count: Int) {
+    guard let list = list else { return count } // expected-error {{unexpected non-void return value in void function}}
+      return inner(list.next, count + 1)
+    }
+
+    return inner(self, 0) // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
+  }
+}

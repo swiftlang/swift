@@ -38,11 +38,11 @@ public func testVTableBuilding(user: User) {
 } // CHECK-IR: ret void
 
 #if VERIFY
-let _: String = useAssoc(ImportedType.self) // expected-error {{cannot convert call result type '_.Assoc?' to expected type 'String'}}
+let _: String = useAssoc(ImportedType.self) // expected-error {{cannot convert value of type 'Int32?' to specified type 'String'}}
 let _: Bool? = useAssoc(ImportedType.self) // expected-error {{cannot convert value of type 'Int32?' to specified type 'Bool?'}}
 let _: Int32? = useAssoc(ImportedType.self)
 
-let _: String = useAssoc(AnotherType.self) // expected-error {{cannot convert call result type '_.Assoc?' to expected type 'String'}}
+let _: String = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'String'}}
 let _: Bool? = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'Bool?'}}
 let _: Int32? = useAssoc(AnotherType.self)
 
