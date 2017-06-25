@@ -531,7 +531,7 @@ struct Abc {
 	var value : Builtin.Word
 }
 
-// CHECK-LABEL define hidden {{.*}}@_T08builtins22assumeNonNegative_testBwAA3AbcVzF
+// CHECK-LABEL: define hidden {{.*}}@_T08builtins22assumeNonNegative_testBwAA3AbcVzF
 func assumeNonNegative_test(_ x: inout Abc) -> Builtin.Word {
   // CHECK: load {{.*}}, !range ![[R:[0-9]+]]
   return Builtin.assumeNonNegative_Word(x.value)
@@ -542,7 +542,7 @@ func return_word(_ x: Builtin.Word) -> Builtin.Word {
 	return x
 }
 
-// CHECK-LABEL define hidden {{.*}}@_T08builtins23assumeNonNegative_test2BwAA3AbcVzF
+// CHECK-LABEL: define hidden {{.*}}@_T08builtins23assumeNonNegative_test2BwBwF
 func assumeNonNegative_test2(_ x: Builtin.Word) -> Builtin.Word {
   // CHECK: call {{.*}}, !range ![[R]]
   return Builtin.assumeNonNegative_Word(return_word(x))

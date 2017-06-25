@@ -130,11 +130,11 @@ class Derived : Base {
   }
 }
 
-
 // CHECK: sil_vtable RequiredInitDerived {
 // CHECK-NEXT: #SimpleInitBase.init!initializer.1: {{.*}} : _T07vtables19RequiredInitDerivedC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NEXT  #RequiredInitDerived.init!allocator.1: {{.*}} : _TFC7vtables19RequiredInitDerivedC
-// CHECK-NEXT}
+// CHECK-NEXT: #RequiredInitDerived.init!allocator.1: {{.*}} : _T07vtables19RequiredInitDerivedC
+// CHECK-NEXT: #RequiredInitDerived.deinit!deallocator: _T07vtables19RequiredInitDerivedCfD
+// CHECK-NEXT: }
 
 class SimpleInitBase { }
 

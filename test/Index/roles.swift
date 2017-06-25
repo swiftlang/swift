@@ -226,7 +226,7 @@ protocol X {
   var reqProp: Int { get }
   // CHECK: [[@LINE-1]]:7 | instance-property/Swift | reqProp | [[reqProp_USR:.*]] | Def,RelChild | rel: 1
   // CHECK: [[@LINE-2]]:22 | instance-method/acc-get/Swift | getter:reqProp | {{.*}} | Def,Dyn,RelChild,RelAcc | rel: 1
-  // CHECK-NEXT  RelChild,RelAcc | instance-property/Swift | reqProp_USR | [[reqProp_USR]]
+  // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | reqProp | [[reqProp_USR]]
 }
 
 protocol Y {}

@@ -1341,7 +1341,7 @@ bb1:                                              // Preds: bb0
 // Make sure we were able to sink the release.
 // CHECK: strong_release
 // CHECK-NEXT: tuple ()
-// CHECK-NEXT return
+// CHECK-NEXT: return
 
 bb2:                                              // Preds: bb4 bb5
   %5 = tuple ()                                   // user: %6
