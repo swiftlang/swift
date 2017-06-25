@@ -3259,7 +3259,7 @@ bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
     return true;
   }
 
-  size_t Hash = llvm::hash_value(VD->getNameStr());
+  size_t Hash = llvm::hash_value(VD->getBaseName().userFacingName());
   return Hash % ProcessCount == ProcessId;
 #else
   return false;

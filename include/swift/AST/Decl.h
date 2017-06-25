@@ -2123,13 +2123,6 @@ public:
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
 
-  /// Returns the string for the base name, or "_" if this is unnamed.
-  StringRef getNameStr() const {
-    // TODO: Check if this function is called for special names
-    assert(!Name.isSpecial() && "Cannot get string for special names");
-    return hasName() ? Name.getBaseName().getIdentifier().str() : "_";
-  }
-
   /// Retrieve the full name of the declaration.
   /// TODO: Rename to getName?
   DeclName getFullName() const { return Name; }
@@ -2357,6 +2350,12 @@ protected:
 
 public:
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
+  /// Returns the string for the base name, or "_" if this is unnamed.
+  StringRef getNameStr() const {
+    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    return hasName() ? getBaseName().getIdentifier().str() : "_";
+  }
 
   /// The type of this declaration's values. For the type of the
   /// declaration itself, use getInterfaceType(), which returns a
@@ -4356,6 +4355,12 @@ public:
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
+  /// Returns the string for the base name, or "_" if this is unnamed.
+  StringRef getNameStr() const {
+    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    return hasName() ? getBaseName().getIdentifier().str() : "_";
+  }
+
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
 
@@ -4826,6 +4831,12 @@ protected:
 
 public:
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
+  /// Returns the string for the base name, or "_" if this is unnamed.
+  StringRef getNameStr() const {
+    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    return hasName() ? getBaseName().getIdentifier().str() : "_";
+  }
 
   /// \brief Should this declaration be treated as if annotated with transparent
   /// attribute.
@@ -5457,6 +5468,12 @@ public:
   }
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
+  /// Returns the string for the base name, or "_" if this is unnamed.
+  StringRef getNameStr() const {
+    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    return hasName() ? getBaseName().getIdentifier().str() : "_";
+  }
 
   /// \returns false if there was an error during the computation rendering the
   /// EnumElementDecl invalid, true otherwise.

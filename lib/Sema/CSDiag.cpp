@@ -1528,7 +1528,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
     auto decl = declRefExpr->getDecl();
     candidates.push_back({ decl, getCalleeLevel(decl) });
-    declName = decl->getNameStr().str();
+    declName = decl->getBaseName().userFacingName();
     return;
   }
 
@@ -1549,7 +1549,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     }
 
     if (!candidates.empty())
-      declName = candidates[0].getDecl()->getNameStr().str();
+      declName = candidates[0].getDecl()->getBaseName().userFacingName();
     return;
   }
 
@@ -1682,7 +1682,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     if (candidates.empty()) continue;
     
     if (declName.empty())
-      declName = candidates[0].getDecl()->getNameStr().str();
+      declName = candidates[0].getDecl()->getBaseName().userFacingName();
     return;
   }
   
@@ -1813,7 +1813,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
   }
 
   if (!candidates.empty())
-    declName = candidates[0].getDecl()->getNameStr().str();
+    declName = candidates[0].getDecl()->getBaseName().userFacingName();
 }
 
 

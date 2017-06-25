@@ -2026,7 +2026,9 @@ class DarwinBlacklistDeclConsumer : public swift::VisibleDeclConsumer {
       return false;
 
     if (clangModule->Name == "MacTypes") {
-      return llvm::StringSwitch<bool>(VD->getNameStr())
+      if (!VD->hasName() || VD->getBaseName().isSpecial())
+        return true;
+      return llvm::StringSwitch<bool>(VD->getBaseName().getIdentifier().str())
           .Cases("OSErr", "OSStatus", "OptionBits", false)
           .Cases("FourCharCode", "OSType", false)
           .Case("Boolean", false)

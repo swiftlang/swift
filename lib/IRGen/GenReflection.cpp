@@ -340,7 +340,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
-      auto fieldName = IGM.getAddrOfFieldName(value->getNameStr());
+      auto name = value->getBaseName().getIdentifier().str();
+      auto fieldName = IGM.getAddrOfFieldName(name);
       B.addRelativeAddress(fieldName);
     } else {
       B.addInt32(0);
