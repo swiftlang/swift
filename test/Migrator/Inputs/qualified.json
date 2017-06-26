@@ -22,5 +22,13 @@
     "OldTypeName": "FooComparisonResult",
     "NewPrintedName": "NewFooOrderedSame",
     "NewTypeName": "NewFooComparisonResult"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6CitiesAAC8CityKindV4TownSivZ",
+    "OldPrintedName": "town",
+    "OldTypeName": "Cities.CityKind",
+    "NewPrintedName": "NewTown",
+    "NewTypeName": "NewCityKind"
   }
 ]
