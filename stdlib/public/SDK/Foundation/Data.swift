@@ -351,11 +351,11 @@ public final class _DataStorage {
     
     // fast-path for appending directly from another data storage
     @inline(__always)
-    public func append(_ otherData: _DataStorage, startingAt start: Int) {
+    public func append(_ otherData: _DataStorage, startingAt start: Int, endingAt end: Int) {
         let otherLength = otherData.length
         if otherLength == 0 { return }
         if let bytes = otherData.bytes {
-            append(bytes.advanced(by: start), length: otherLength)
+            append(bytes.advanced(by: start), length: end - start)
         }
     }
     
@@ -1095,7 +1095,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     @_versioned
     internal func _validateRange<R: RangeExpression>(_ range: R) where R.Bound == Int {
-        let r = range.relative(to: 0..<R.Bound.max)
+        let lower = R.Bound(_sliceRange.lowerBound)
+        let upper = R.Bound(_sliceRange.upperBound)
+        let r = range.relative(to: lower..<upper)
         precondition(r.lowerBound >= _sliceRange.lowerBound && r.lowerBound <= _sliceRange.upperBound, "Range \(r) is out of bounds of range \(_sliceRange)")
         precondition(r.upperBound >= _sliceRange.lowerBound && r.upperBound <= _sliceRange.upperBound, "Range \(r) is out of bounds of range \(_sliceRange)")
     }
@@ -1189,13 +1191,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         
         let copyRange : Range<Index>
         if let r = range {
-            guard !r.isEmpty else { return 0 }            
+            guard !r.isEmpty else { return 0 }
             copyRange = r.lowerBound..<(r.lowerBound + Swift.min(buffer.count * MemoryLayout<DestinationType>.stride, r.count))
         } else {
             copyRange = 0..<Swift.min(buffer.count * MemoryLayout<DestinationType>.stride, cnt)
         }
         _validateRange(copyRange)
-
+        
         guard !copyRange.isEmpty else { return 0 }
         
         let nsRange = NSMakeRange(copyRange.lowerBound, copyRange.upperBound - copyRange.lowerBound)
@@ -1291,7 +1293,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
         }
-        _backing.append(other._backing, startingAt: other._sliceRange.lowerBound)
+        _backing.append(other._backing, startingAt: other._sliceRange.lowerBound, endingAt: other._sliceRange.upperBound)
         _sliceRange = _sliceRange.lowerBound..<(_sliceRange.upperBound + other.count)
     }
     
@@ -1561,7 +1563,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
         @inline(__always)
         get {
-            let range = rangeExpression.relative(to: 0..<R.Bound.max)
+            let lower = R.Bound(_sliceRange.lowerBound)
+            let upper = R.Bound(_sliceRange.upperBound)
+            let range = rangeExpression.relative(to: lower..<upper)
             let start: Int = numericCast(range.lowerBound)
             let end: Int = numericCast(range.upperBound)
             let r: Range<Int> = start..<end
@@ -1570,7 +1574,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
         @inline(__always)
         set {
-            let range = rangeExpression.relative(to: 0..<R.Bound.max)
+            let lower = R.Bound(_sliceRange.lowerBound)
+            let upper = R.Bound(_sliceRange.upperBound)
+            let range = rangeExpression.relative(to: lower..<upper)
             let start: Int = numericCast(range.lowerBound)
             let end: Int = numericCast(range.upperBound)
             let r: Range<Int> = start..<end
@@ -1820,3 +1826,4 @@ extension Data : Codable {
         }
     }
 }
+
