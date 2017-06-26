@@ -511,7 +511,7 @@ bb0(%0 : $boo):
 // CHECK-LABEL: sil [serialized] [thunk] [always_inline] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error Error) {
 // CHECK: function_ref @_T041owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error Error)
 // CHECK: bb1
-// CHECK-NOT retain_value
+// CHECK-NOT: retain_value
 // CHECK: bb2
 sil [serialized] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error Error) {
 bb0(%0 : $boo):

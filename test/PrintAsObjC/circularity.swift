@@ -86,9 +86,9 @@ class E2: ProtoImpl {}
 // CHECK-LABEL: @interface F1 : ProtoImpl
 class F1: ProtoImpl {
 } // CHECK: @end
-// CHECK-LABEL @interface F2 : ProtoImpl
+// CHECK-LABEL: @interface F2 : ProtoImpl
 // CHECK: @end
-// CHECK-LABEL @interface F1 (SWIFT_EXTENSION(circularity))
+// CHECK-LABEL: @interface F1 (SWIFT_EXTENSION(circularity))
 extension F1 {
   // CHECK: - (void)test:
   func test(_: NeedsProto<F2>) {}
@@ -99,9 +99,9 @@ class F2: ProtoImpl {}
 // CHECK-LABEL: @interface G1 : ProtoImpl
 class G1: ProtoImpl {
 } // CHECK: @end
-// CHECK-LABEL @protocol G2 <Proto>
+// CHECK-LABEL: @protocol G2 <Proto>
 // CHECK: @end
-// CHECK-LABEL @interface G1 (SWIFT_EXTENSION(circularity))
+// CHECK-LABEL: @interface G1 (SWIFT_EXTENSION(circularity))
 extension G1 {
   // CHECK: - (void)test:
   func test(_: NeedsProto<G2>) {}

@@ -83,7 +83,7 @@ public class BigClass {
   }
 }
 
-// CHECK-LABEL define{{( protected)?}} hidden swiftcc void @_T022big_types_corner_cases8BigClassC03useE6StructyAA0eH0V0aH0_tF(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself) #0 {
+// CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @_T022big_types_corner_cases8BigClassC03useE6StructyAA0eH0V0aH0_tF(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself) #0 {
 // CHECK: getelementptr inbounds %T22big_types_corner_cases8BigClassC, %T22big_types_corner_cases8BigClassC*
 // CHECK: call void @_T0SqWy
 // CHECK: [[BITCAST:%.*]] = bitcast i8* {{.*}} to void (%T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*

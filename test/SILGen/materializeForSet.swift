@@ -445,7 +445,7 @@ struct GenericSubscriptWitness : GenericSubscriptProtocol {
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RESULT]] : $()
 
-// CHECK-LABEL sil hidden [transparent] [thunk] @_T017materializeForSet23GenericSubscriptWitnessVAA0dE8ProtocolA2aDP9subscriptqd__qd__clufmTW : $@convention(witness_method) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in τ_0_0, @inout GenericSubscriptWitness) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet23GenericSubscriptWitnessV9subscriptxxclufm : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in T, @inout GenericSubscriptWitness) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK:      bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*T, %3 : $*GenericSubscriptWitness):
 // CHECK-NEXT:   [[BUFFER:%.*]] = alloc_value_buffer $T in %1 : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:   copy_addr %2 to [initialization] [[BUFFER]] : $*T
