@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -O -primary-file %s
-// RUN: %target-swift-frontend -emit-ir -primary-file %s
+// RUN: %target-swift-frontend -emit-sil -O -primary-file %s > /dev/null
+// RUN: %target-swift-frontend -emit-ir -primary-file %s > /dev/null
 
 extension Array where Element == Int {
   // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlESaySiGyt1x_tcfC : $@convention(method) (@thin Array<Int>.Type) -> @owned Array<Int>
