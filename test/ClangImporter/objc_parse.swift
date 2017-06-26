@@ -492,7 +492,7 @@ class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-e
 
 func testNullarySelectorPieces(_ obj: AnyObject) {
   obj.foo(1, bar: 2, 3) // no-warning
-  obj.foo(1, 2, bar: 3) // expected-error{{cannot call value of non-function type 'Any?!'}}
+  obj.foo(1, 2, bar: 3) // expected-error{{cannot invoke 'foo' with an argument list of type '(Int, Int, bar: Int)'}}
 }
 
 func testFactoryMethodAvailability() {
