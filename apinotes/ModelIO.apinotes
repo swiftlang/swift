@@ -1,0 +1,43 @@
+---
+Name: ModelIO
+Classes:
+- Name: MDLAnimatedScalar
+  Methods:
+  - Selector: 'floatAtTime:'
+    MethodKind: Instance
+    SwiftName: 'floatValue(atTime:)'
+  - Selector: 'doubleAtTime:'
+    MethodKind: Instance
+    SwiftName: 'doubleValue(atTime:)'
+- Name: MDLAnimatedVector2
+  Methods:
+  - Selector: 'float2AtTime:'
+    MethodKind: Instance
+    SwiftName: 'float2Value(atTime:)'
+  - Selector: 'double2AtTime:'
+    MethodKind: Instance
+    SwiftName: 'double2Value(atTime:)'
+- Name: MDLAnimatedVector3
+  Methods:
+  - Selector: 'float3AtTime:'
+    MethodKind: Instance
+    SwiftName: 'float3Value(atTime:)'
+  - Selector: 'double3AtTime:'
+    MethodKind: Instance
+    SwiftName: 'double3Value(atTime:)'
+- Name: MDLAnimatedVector4
+  Methods:
+  - Selector: 'float4AtTime:'
+    MethodKind: Instance
+    SwiftName: 'float4Value(atTime:)'
+  - Selector: 'double4AtTime:'
+    MethodKind: Instance
+    SwiftName: 'double4Value(atTime:)'
+- Name: MDLAnimatedMatrix4x4
+  Methods:
+  - Selector: 'float4x4AtTime:'
+    MethodKind: Instance
+    SwiftName: 'float4x4Value(atTime:)'
+  - Selector: 'double4x4AtTime:'
+    MethodKind: Instance
+    SwiftName: 'double4x4Value(atTime:)'
