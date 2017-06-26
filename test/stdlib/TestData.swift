@@ -1116,6 +1116,26 @@ class TestData : TestDataSuper {
         
         expectEqual(expectedSlice[expectedSlice.startIndex], slice[slice.startIndex])
     }
+
+    func test_sliceOfSliceViaRangeExpression() {
+        let data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+        let slice = data[2..<7]
+
+        let sliceOfSlice1 = slice[..<(slice.startIndex + 2)] // this triggers the range expression
+        let sliceOfSlice2 = slice[(slice.startIndex + 2)...] // also triggers range expression
+
+        expectEqual(Data(bytes: [2, 3]), sliceOfSlice1)
+        expectEqual(Data(bytes: [4, 5, 6]), sliceOfSlice2)
+    }
+
+    func test_appendingSlices() {
+        let d1 = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let slice = d1[1..<2]
+        var d2 = Data()
+        d2.append(slice)
+        expectEqual(Data(bytes: [1]), slice)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1176,6 +1196,9 @@ DataTests.test("test_dropFirst") { TestData().test_dropFirst() }
 DataTests.test("test_dropFirst2") { TestData().test_dropFirst2() }
 DataTests.test("test_copyBytes1") { TestData().test_copyBytes1() }
 DataTests.test("test_copyBytes2") { TestData().test_copyBytes2() }
+DataTests.test("test_sliceOfSliceViaRangeExpression") { TestData().test_sliceOfSliceViaRangeExpression() }
+DataTests.test("test_appendingSlices") { TestData().test_appendingSlices() }
+
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
