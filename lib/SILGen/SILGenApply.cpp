@@ -632,6 +632,7 @@ public:
     SelfApplyExpr = theSelfApplyExpr;
     SelfType = theSelfApplyExpr->getType();
   }
+
   void setSelfParam(ArgumentSource &&theSelfParam, Type selfType) {
     assert(!SelfParam && "already set this!");
     SelfParam = std::move(theSelfParam);
