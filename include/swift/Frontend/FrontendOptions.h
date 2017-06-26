@@ -245,11 +245,6 @@ public:
   /// by the Clang importer as part of semantic analysis.
   bool SerializeBridgingHeader = false;
 
-  /// Enables the "fully fragile" resilience strategy.
-  ///
-  /// \see ResilienceStrategy::Fragile
-  bool SILSerializeAll = false;
-
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
   bool PrintStats = false;

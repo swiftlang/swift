@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-debuginfo -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-debuginfo -emit-silgen -sil-serialize-witness-tables %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation

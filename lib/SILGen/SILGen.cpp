@@ -38,9 +38,9 @@ using namespace Lowering;
 // SILGenModule Class implementation
 //===----------------------------------------------------------------------===//
 
-SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM, bool makeModuleFragile)
+SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
-    Profiler(nullptr), makeModuleFragile(makeModuleFragile) {
+    Profiler(nullptr) {
 }
 
 SILGenModule::~SILGenModule() {
@@ -451,7 +451,7 @@ SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
       if (isAvailableExternally(F->getLinkage())) {
         F->setLinkage(constant.getLinkage(ForDefinition));
       }
-      if (makeModuleFragile) {
+      if (isMakeModuleFragile()) {
         F->setSerialized(IsSerialized);
       }
     }
@@ -498,7 +498,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   assert(F && "SILFunction should have been defined");
 
-  if (makeModuleFragile) {
+  if (isMakeModuleFragile()) {
     SILLinkage linkage = constant.getLinkage(forDefinition);
     if (linkage != SILLinkage::PublicExternal) {
       F->setSerialized(IsSerialized);
@@ -981,7 +981,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
       M.createFunction(SILLinkage::Private,
                        funcName, initSILType, nullptr,
                        SILLocation(binding), IsNotBare, IsNotTransparent,
-                       makeModuleFragile
+                       isMakeModuleFragile()
                            ? IsSerialized
                            : IsNotSerialized);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
@@ -1397,7 +1397,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
-                        Optional<unsigned> startElem, bool makeModuleFragile,
+                        Optional<unsigned> startElem,
                         bool isWholeModule) {
   SharedTimer timer("SILGen");
   const DeclContext *DC;
@@ -1413,8 +1413,8 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
   }
 
   std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, isWholeModule, makeModuleFragile));
-  SILGenModule SGM(*M, mod, makeModuleFragile);
+      new SILModule(mod, options, DC, isWholeModule));
+  SILGenModule SGM(*M, mod);
 
   if (SF) {
     if (auto *file = dyn_cast<SourceFile>(SF)) {
@@ -1472,16 +1472,14 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
 std::unique_ptr<SILModule>
 swift::performSILGeneration(ModuleDecl *mod,
                             SILOptions &options,
-                            bool makeModuleFragile,
                             bool wholeModuleCompilation) {
-  return SILModule::constructSIL(mod, options, nullptr, None, makeModuleFragile,
+  return SILModule::constructSIL(mod, options, nullptr, None,
                                  wholeModuleCompilation);
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, SILOptions &options,
-                            Optional<unsigned> startElem,
-                            bool makeModuleFragile) {
+                            Optional<unsigned> startElem) {
   return SILModule::constructSIL(sf.getParentModule(), options, &sf, startElem,
-                                 makeModuleFragile, false);
+                                 false);
 }

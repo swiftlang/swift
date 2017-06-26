@@ -55,8 +55,7 @@ std::string CompilerInvocation::getPCHHash() const {
 void CompilerInstance::createSILModule(bool WholeModule) {
   assert(MainModule && "main module not created yet");
   TheSILModule = SILModule::createEmptyModule(
-      getMainModule(), Invocation.getSILOptions(), WholeModule,
-      Invocation.getFrontendOptions().SILSerializeAll);
+    getMainModule(), Invocation.getSILOptions(), WholeModule);
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
@@ -250,7 +249,7 @@ ModuleDecl *CompilerInstance::getMainModule() {
 
     if (Invocation.getFrontendOptions().EnableResilience)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-    else if (Invocation.getFrontendOptions().SILSerializeAll)
+    else if (Invocation.getSILOptions().SILSerializeAll)
       MainModule->setResilienceStrategy(ResilienceStrategy::Fragile);
   }
   return MainModule;
