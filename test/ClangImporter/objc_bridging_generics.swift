@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -verify -swift-version 4 %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -verify -swift-version 4 -I %S/Inputs/custom-modules %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 import objc_generics
+import ObjCBridgeNonconforming
 
 func testNSArrayBridging(_ hive: Hive) {
   _ = hive.bees as [Bee]
@@ -391,4 +392,9 @@ let third: Third! = Third()
 
 func useThird() {
   _ = third.description
+}
+
+
+func testNonconforming(bnc: ObjCBridgeNonconforming) {
+  let _: Int = bnc.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
 }
