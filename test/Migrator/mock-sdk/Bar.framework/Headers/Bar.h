@@ -25,6 +25,7 @@ enum BarForwardDeclaredEnum {
 - (int) field;
 - (int * _Nullable) field2;
 - (void) setField:(int)info;
+- (void) setURL:(int)url;
 + (int) fieldPlus;
 + (void) methodPlus:(int)info;
 + (void) methodPlus;
