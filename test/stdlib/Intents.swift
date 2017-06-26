@@ -21,4 +21,21 @@ if #available(OSX 10.12, iOS 10.0, *) {
   }
 }
 
+#if os(iOS)
+if #available(iOS 11.0, *) {
+
+  IntentsTestSuite.test("INParameter KeyPath") {
+    let param = INParameter(keyPath: \INRequestRideIntent.pickupLocation)
+    expectEqual("pickupLocation", param?.parameterKeyPath)
+    if let typ = param?.parameterClass {
+      expectEqual(INRequestRideIntent.self, typ)
+    }
+    else {
+      expectUnreachable()
+    }
+  }
+}
+
+#endif
+
 runAllTests()
