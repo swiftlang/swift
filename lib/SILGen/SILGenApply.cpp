@@ -672,40 +672,48 @@ public:
     visit(e->getFn());
   }
 
+  /// Idempotently convert a metatype to an objc metatype.
+  std::pair<ManagedValue, SILType> convertToObjCMetatype(ManagedValue selfMeta,
+                                                         SILLocation loc) {
+    auto metaType = selfMeta.getType().castTo<AnyMetatypeType>();
+    CanType instanceType = metaType.getInstanceType();
+
+    // If we are already objc, just return.
+    if (metaType->getRepresentation() == MetatypeRepresentation::ObjC) {
+      return {selfMeta, SGF.SGM.getLoweredType(instanceType)};
+    }
+
+    CanAnyMetatypeType objcMetaType;
+    if (isa<MetatypeType>(metaType)) {
+      objcMetaType =
+          CanMetatypeType::get(instanceType, MetatypeRepresentation::ObjC);
+    } else {
+      objcMetaType = CanExistentialMetatypeType::get(
+          instanceType, MetatypeRepresentation::ObjC);
+    }
+    // ObjC metatypes are trivial and thus do not have a cleanup. Only if we
+    // convert them to an object do they become non-trivial.
+    assert(!selfMeta.hasCleanup());
+    auto result = ManagedValue::forUnmanaged(SGF.B.emitThickToObjCMetatype(
+        loc, selfMeta.getValue(), SGF.SGM.getLoweredType(objcMetaType)));
+    return {result, SGF.SGM.getLoweredType(instanceType)};
+  }
+
   /// Given a metatype value for the type, allocate an Objective-C
   /// object (with alloc_ref_dynamic) of that type.
   ///
   /// \returns the self object.
   ManagedValue allocateObjCObject(ManagedValue selfMeta, SILLocation loc) {
-    auto metaType = selfMeta.getType().castTo<AnyMetatypeType>();
-    CanType type = metaType.getInstanceType();
-
     // Convert to an Objective-C metatype representation, if needed.
     ManagedValue selfMetaObjC;
-    if (metaType->getRepresentation() == MetatypeRepresentation::ObjC) {
-      selfMetaObjC = selfMeta;
-    } else {
-      CanAnyMetatypeType objcMetaType;
-      if (isa<MetatypeType>(metaType)) {
-        objcMetaType = CanMetatypeType::get(type, MetatypeRepresentation::ObjC);
-      } else {
-        objcMetaType = CanExistentialMetatypeType::get(type,
-                                                  MetatypeRepresentation::ObjC);
-      }
-      // ObjC metatypes are trivial and thus do not have a cleanup. Only if we
-      // convert them to an object do they become non-trivial.
-      assert(!selfMeta.hasCleanup());
-      selfMetaObjC = ManagedValue::forUnmanaged(SGF.B.emitThickToObjCMetatype(
-          loc, selfMeta.getValue(), SGF.SGM.getLoweredType(objcMetaType)));
-    }
+    SILType instanceType;
+    std::tie(selfMetaObjC, instanceType) = convertToObjCMetatype(selfMeta, loc);
 
     // Allocate the object.
-    return ManagedValue(SGF.B.createAllocRefDynamic(
-                          loc,
-                          selfMetaObjC.getValue(),
-                          SGF.SGM.getLoweredType(type),
-                          /*objc=*/true, {}, {}),
-                          selfMetaObjC.getCleanup());
+    return ManagedValue(
+        SGF.B.createAllocRefDynamic(loc, selfMetaObjC.getValue(), instanceType,
+                                    /*objc=*/true, {}, {}),
+        selfMetaObjC.getCleanup());
   }
 
   //
