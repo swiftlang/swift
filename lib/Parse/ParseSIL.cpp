@@ -2472,6 +2472,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
             if (!P.consumeIf(tok::comma))
               break;
           }
+          
           if ((idFn == nullptr && idDecl.isNull() && idProperty == nullptr)
               || getter == nullptr
               || (isSettable && setter == nullptr)) {
@@ -2509,6 +2510,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
                 KeyPathPatternComponent::forComputedGettableProperty(
                                    id, getter, {}, componentTy));
           }
+        } else if (componentKind.str() == "optional_wrap"
+                     || componentKind.str() == "optional_chain"
+                     || componentKind.str() == "optional_force") {
+          CanType ty;
+          if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+              || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
+              || parseASTType(ty, patternEnv))
+            return true;
+          KeyPathPatternComponent::Kind kind;
+          
+          if (componentKind.str() == "optional_wrap") {
+            kind = KeyPathPatternComponent::Kind::OptionalWrap;
+          } else if (componentKind.str() == "optional_chain") {
+            kind = KeyPathPatternComponent::Kind::OptionalChain;
+          } else if (componentKind.str() == "optional_force") {
+            kind = KeyPathPatternComponent::Kind::OptionalForce;
+          } else {
+            llvm_unreachable("unpossible");
+          }
+          
+          components.push_back(KeyPathPatternComponent::forOptional(kind, ty));
         } else {
           P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
                      componentKind);

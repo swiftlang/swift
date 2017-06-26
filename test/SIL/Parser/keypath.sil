@@ -90,3 +90,14 @@ entry:
 
   return undef : $()
 }
+
+// CHECK-LABEL: sil @optional
+sil @optional : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Optional<Int>, Optional<Int>>, (root $Optional<Int>; optional_chain : $Int; optional_wrap : $Optional<Int>)
+  %a = keypath $KeyPath<Optional<Int>, Optional<Int>>, (root $Optional<Int>; optional_chain : $Int; optional_wrap : $Optional<Int>)
+  // CHECK: keypath $KeyPath<Optional<Int>, Int>, (root $Optional<Int>; optional_force : $Int)
+  %b = keypath $KeyPath<Optional<Int>, Int>, (root $Optional<Int>; optional_force : $Int)
+
+  return undef : $()
+}

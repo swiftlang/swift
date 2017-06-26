@@ -2143,6 +2143,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                                {}, type));
         break;
       }
+      case KeyPathComponentKindEncoding::OptionalChain:
+        components.push_back(KeyPathPatternComponent::forOptional(
+            KeyPathPatternComponent::Kind::OptionalChain, type));
+        break;
+      case KeyPathComponentKindEncoding::OptionalForce:
+        components.push_back(KeyPathPatternComponent::forOptional(
+            KeyPathPatternComponent::Kind::OptionalForce, type));
+        break;
+      case KeyPathComponentKindEncoding::OptionalWrap:
+        components.push_back(KeyPathPatternComponent::forOptional(
+            KeyPathPatternComponent::Kind::OptionalWrap, type));
+        break;
       }
     }
     
