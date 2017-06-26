@@ -11,5 +11,6 @@ New()
 
 func foo(_ a : PropertyUserInterface) {
   a.field = 1
+  a.url = 1
   _ = a.field
 }
