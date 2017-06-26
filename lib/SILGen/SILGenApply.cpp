@@ -661,12 +661,14 @@ public:
   void visitApplyExpr(ApplyExpr *e) {
     if (e->isSuper()) {
       applySuper(e);
-    } else if (applyInitDelegation(e)) {
-      // Already done
-    } else {
-      CallSites.push_back(e);
-      visit(e->getFn());
+      return;
     }
+
+    if (applyInitDelegation(e))
+      return;
+
+    CallSites.push_back(e);
+    visit(e->getFn());
   }
 
   /// Given a metatype value for the type, allocate an Objective-C
