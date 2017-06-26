@@ -428,7 +428,9 @@ public func checkOneLevelOf${Traversal}Collection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    // FIXME: Work around ambiguity in collection.indices paired with Array initializer.
+    let indices = collection.indices
+    var allIndices = Array(indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {

@@ -1079,6 +1079,8 @@ extension RangeReplaceableCollection {
   public func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Self {
-    return try Self(self.lazy.filter(isIncluded))
+    // FIXME: Work around ambiguity in chained lazy.filter() by splitting the expression up.
+    let lazy = self.lazy
+    return try Self(lazy.filter(isIncluded))
   }
 }
