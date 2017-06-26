@@ -3708,7 +3708,7 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
                                              ModuleDecl *inferForModule) {
   auto subst = [&](Type t) {
     if (subMap)
-      return t.subst(*subMap);
+      return t.subst(*subMap, SubstFlags::UseErrorType);
 
     return t;
   };

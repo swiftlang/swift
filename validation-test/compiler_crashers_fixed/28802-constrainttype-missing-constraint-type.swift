@@ -6,7 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-class a<a{
-protocol A{{}typealias e where f=A
-protocol A
+// RUN: not %target-swift-frontend %s -emit-ir
+class a<a{protocol A{protocol A{}typealias e where f:A
