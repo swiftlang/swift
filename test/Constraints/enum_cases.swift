@@ -89,3 +89,16 @@ enum Foo {
 
 func foo<T>(_: T, _: T) {}
 foo(Foo.a, Foo.b) // Ok in Swift 4 because we strip labels from the arguments
+
+// rdar://problem/32551313 - Useless SE-0110 diagnostic
+
+enum E_32551313<L, R> {
+  case Left(L)
+  case Right(R)
+}
+
+struct Foo_32551313 {
+  static func bar() -> E_32551313<(String, Foo_32551313?), (String, String)>? {
+    return E_32551313.Left("", Foo_32551313()) // expected-error {{extra argument in call}}
+  }
+}
