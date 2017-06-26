@@ -2,6 +2,7 @@
 // RUN: %env-TSAN_OPTIONS=ignore_interceptors_accesses=1:halt_on_error=1 %t_binary
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
+// REQUIRES: objc_interop
 
 // Check that TSan does not report spurious races in witness table lookup.
 
