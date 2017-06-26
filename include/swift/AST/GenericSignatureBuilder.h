@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
@@ -74,6 +75,11 @@ enum class ArchetypeResolutionKind {
   /// Only create a new potential archetype to describe this dependent type
   /// if it is already known.
   AlreadyKnown,
+
+  /// Only create a potential archetype when it is well-formed (i.e., we know
+  /// that there is a nested type with that name), but (unlike \c AlreadyKnown)
+  /// allow the creation of a new potential archetype.
+  WellFormed,
 };
 
 /// \brief Collects a set of requirements of generic parameters, both explicitly
@@ -175,6 +181,9 @@ public:
     /// Whether we have detected recursion during the substitution of
     /// the concrete type.
     unsigned recursiveConcreteType : 1;
+
+    /// Whether we have an invalid concrete type.
+    unsigned invalidConcreteType : 1;
 
     /// Whether we have detected recursion during the substitution of
     /// the superclass type.
@@ -281,6 +290,15 @@ private:
                                    FloatingRequirementSource source,
                                    UnresolvedHandlingKind unresolvedHandling);
 
+  /// Resolve the conformance of the given potential archetype to
+  /// the given protocol when the potential archetype is known to be equivalent
+  /// to a concrete type.
+  ///
+  /// \returns the requirement source for the resolved conformance, or nullptr
+  /// if the conformance could not be resolved.
+  const RequirementSource *resolveConcreteConformance(PotentialArchetype *pa,
+                                                      ProtocolDecl *proto);
+
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
   ///
@@ -288,9 +306,8 @@ private:
   /// queried.
   ///
   /// \param proto The protocol to which we are establishing conformance.
-  const RequirementSource *resolveSuperConformance(
-                            GenericSignatureBuilder::PotentialArchetype *pa,
-                            ProtocolDecl *proto);
+  const RequirementSource *resolveSuperConformance(PotentialArchetype *pa,
+                                                   ProtocolDecl *proto);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
@@ -315,15 +332,6 @@ public:
                          ResolvedType paOrT1, ResolvedType paOrT2,
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
-
-  /// \brief Add a new same-type requirement between two fully resolved types
-  /// (output of GenericSignatureBuilder::resolve).
-  ///
-  /// The two types must not be incompatible concrete types.
-  ConstraintResult addSameTypeRequirementDirect(
-                                            ResolvedType paOrT1,
-                                            ResolvedType paOrT2,
-                                            FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
@@ -770,7 +778,7 @@ public:
 
     /// A requirement that was resolved via a superclass requirement.
     ///
-    /// This stores the \c ProtocolConformance* used to resolve the
+    /// This stores the \c ProtocolConformanceRef used to resolve the
     /// requirement.
     Superclass,
 
@@ -784,6 +792,10 @@ public:
     /// This stores the \c ProtocolConformance* used to resolve the
     /// requirement.
     Concrete,
+
+    /// A requirement that was resolved based on structural derivation from
+    /// another requirement.
+    Derived,
   };
 
   /// The kind of requirement source.
@@ -792,6 +804,7 @@ public:
 private:
   /// The kind of storage we have.
   enum class StorageKind : uint8_t {
+    None,
     RootArchetype,
     StoredType,
     ProtocolConformance,
@@ -816,7 +829,7 @@ private:
     TypeBase *type;
 
     /// A protocol conformance used to satisfy the requirement.
-    ProtocolConformance *conformance;
+    void *conformance;
 
     /// An associated type to which a requirement is being applied.
     AssociatedTypeDecl *assocType;
@@ -839,6 +852,7 @@ private:
     case Superclass:
     case Parent:
     case Concrete:
+    case Derived:
       return 0;
     }
 
@@ -882,6 +896,7 @@ private:
     case Superclass:
     case Parent:
     case Concrete:
+    case Derived:
       return false;
     }
 
@@ -931,7 +946,7 @@ public:
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                    ProtocolConformance *conformance)
+                    ProtocolConformanceRef conformance)
     : kind(kind), storageKind(StorageKind::ProtocolConformance),
       hasTrailingWrittenRequirementLoc(false),
       usesRequirementSignature(false), parent(parent) {
@@ -940,7 +955,7 @@ public:
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
-    storage.conformance = conformance;
+    storage.conformance = conformance.getOpaqueValue();
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
@@ -954,6 +969,16 @@ public:
            "RequirementSource kind/storageKind mismatch");
 
     storage.assocType = assocType;
+  }
+
+  RequirementSource(Kind kind, const RequirementSource *parent)
+    : kind(kind), storageKind(StorageKind::None),
+      hasTrailingWrittenRequirementLoc(false),
+      usesRequirementSignature(false), parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
   }
 
 public:
@@ -997,13 +1022,14 @@ public:
   /// A requirement source that describes that a requirement that is resolved
   /// via a superclass requirement.
   const RequirementSource *viaSuperclass(
-                                        GenericSignatureBuilder &builder,
-                                        ProtocolConformance *conformance) const;
+                                    GenericSignatureBuilder &builder,
+                                    ProtocolConformanceRef conformance) const;
 
   /// A requirement source that describes that a requirement that is resolved
   /// via a same-type-to-concrete requirement.
-  const RequirementSource *viaConcrete(GenericSignatureBuilder &builder,
-                                       ProtocolConformance *conformance) const;
+  const RequirementSource *viaConcrete(
+                                     GenericSignatureBuilder &builder,
+                                     ProtocolConformanceRef conformance) const;
 
   /// A constraint source that describes that a constraint that is resolved
   /// for a nested type via a constraint on its parent.
@@ -1011,6 +1037,10 @@ public:
   /// \param assocType the associated type that
   const RequirementSource *viaParent(GenericSignatureBuilder &builder,
                                      AssociatedTypeDecl *assocType) const;
+
+  /// A constraint source that describes a constraint that is structurally
+  /// derived from another constraint but does not require further information.
+  const RequirementSource *viaDerived(GenericSignatureBuilder &builder) const;
 
   /// Retrieve the root requirement source.
   const RequirementSource *getRoot() const;
@@ -1100,9 +1130,9 @@ public:
   ProtocolDecl *getProtocolDecl() const;
 
   /// Retrieve the protocol conformance for this requirement, if there is one.
-  ProtocolConformance *getProtocolConformance() const {
-    if (storageKind != StorageKind::ProtocolConformance) return nullptr;
-    return storage.conformance;
+  ProtocolConformanceRef getProtocolConformance() const {
+    assert(storageKind == StorageKind::ProtocolConformance);
+    return ProtocolConformanceRef::getFromOpaqueValue(storage.conformance);
   }
 
   /// Retrieve the associated type declaration for this requirement, if there
@@ -1577,18 +1607,6 @@ public:
   PotentialArchetype *getNestedType(TypeDecl *concreteDecl,
                                     GenericSignatureBuilder &builder);
 
-  /// Describes the kind of update that is performed.
-  enum class NestedTypeUpdate {
-    /// Resolve an existing potential archetype, but don't create a new
-    /// one if not present.
-    ResolveExisting,
-    /// If this potential archetype is missing, create it.
-    AddIfMissing,
-    /// If this potential archetype is missing and would be a better anchor,
-    /// create it.
-    AddIfBetterAnchor,
-  };
-
   /// \brief Retrieve (or create) a nested type that is the current best
   /// nested archetype anchor (locally) with the given name.
   ///
@@ -1597,7 +1615,7 @@ public:
   PotentialArchetype *getNestedArchetypeAnchor(
                        Identifier name,
                        GenericSignatureBuilder &builder,
-                       NestedTypeUpdate kind = NestedTypeUpdate::AddIfMissing);
+                       ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
@@ -1607,7 +1625,7 @@ public:
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
                       PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
-                      NestedTypeUpdate kind);
+                      ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
@@ -1618,7 +1636,7 @@ public:
   PotentialArchetype *updateNestedTypeForConformance(
                         Identifier name,
                         ProtocolDecl *protocol,
-                        NestedTypeUpdate kind);
+                        ArchetypeResolutionKind kind);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype within the given generic environment.
