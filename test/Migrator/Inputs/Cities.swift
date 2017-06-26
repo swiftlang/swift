@@ -9,6 +9,9 @@ open class Cities {
   open func buderim() -> Cities? { return Cities(x: 1) }
   open func noosa() -> [[String : Cities]?] { return [] }
   open func maroochy(x: Int?, y: Int?) {}
+  public struct CityKind {
+    static public let Town = 1
+  }
 }
 
 public protocol ExtraCities {
