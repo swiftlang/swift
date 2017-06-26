@@ -335,6 +335,34 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     _testRoundTrip(of: TopLevelWrapper(url), expectedJSON: expectedJSON)
   }
 
+  // FIXME: Move this test into the standard library; this is not JSON-specific behavior.
+  // Can do with 32567771.
+  func testCodingKeyDictionary() {
+    // PowersOfTwo encodes as a dictionary whose key type is CodingKey and whose value is Codable.
+    _testRoundTrip(of: PowersOfTwo.testValue)
+
+    // We should also be able to decode a dictionary if there are extraneous keys in the payload.
+    let data = """
+    {
+      "zero": 1,
+      "one": 2,
+      "two": 4,
+      "three": 8,
+      "four": 16,
+      "five": 32,
+      "six": 64
+    }
+    """.data(using: .utf8)!
+
+    let decoder = JSONDecoder()
+    do {
+      let decoded = try decoder.decode(PowersOfTwo.self, from: data)
+      expectEqual(decoded, PowersOfTwo.testValue)
+    } catch {
+      expectUnreachable("Failed to decode [CodingKey : Int] from JSON: \(error)")
+    }
+  }
+
   // MARK: - Helper Functions
   private var _jsonEmptyDictionary: Data {
     return "{}".data(using: .utf8)!
@@ -650,6 +678,44 @@ fileprivate struct Company : Codable, Equatable {
   }
 }
 
+/// A type which encodes as a dictionary whose key type is a non-Codable CodingKey.
+fileprivate struct PowersOfTwo : Codable, Equatable {
+  private enum Key : String, CodingKey, Equatable {
+    case one, two, three, four, five
+  }
+
+  private let values: [Key : Int]
+
+  init() {
+    // Warning: changing these might destabilize the rest of the universe.
+    self.values = [
+      .one : 2,
+      .two : 4,
+      .three : 8,
+      .four : 16,
+      .five : 32
+    ]
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    values = try container.decode([Key : Int].self)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(values)
+  }
+
+  static func ==(_ lhs: PowersOfTwo, _ rhs: PowersOfTwo) -> Bool {
+    return lhs.values == rhs.values
+  }
+
+  static var testValue: PowersOfTwo {
+    return PowersOfTwo()
+  }
+}
+
 // MARK: - Helper Types
 
 /// Wraps a type T so that it can be encoded at the top level of a payload.
@@ -888,5 +954,6 @@ JSONEncoderTests.test("testNestedContainerCodingPaths") { TestJSONEncoder().test
 JSONEncoderTests.test("testSuperEncoderCodingPaths") { TestJSONEncoder().testSuperEncoderCodingPaths() }
 JSONEncoderTests.test("testInterceptDecimal") { TestJSONEncoder().testInterceptDecimal() }
 JSONEncoderTests.test("testInterceptURL") { TestJSONEncoder().testInterceptURL() }
+JSONEncoderTests.test("testCodingKeyDictionary") { TestJSONEncoder().testCodingKeyDictionary() }
 runAllTests()
 #endif
