@@ -1,8 +1,6 @@
 // RUN: %target-build-swift -sanitize=thread %s -o %t_binary
-// RUN: TSAN_OPTIONS=ignore_interceptors_accesses=1:halt_on_error=1 %t_binary
+// RUN: %env-TSAN_OPTIONS=ignore_interceptors_accesses=1:halt_on_error=1 %t_binary
 // REQUIRES: executable_test
-// REQUIRES: CPU=x86_64
-// REQUIRES: OS=macosx
 // REQUIRES: tsan_runtime
 
 // Check that TSan does not report spurious races in witness table lookup.
