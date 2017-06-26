@@ -175,3 +175,7 @@ module MacrosRedefB {
 module IndirectFields {
   header "IndirectFields.h"
 }
+
+module ObjCBridgeNonconforming {
+  header "ObjCBridgeNonconforming.h"
+}
