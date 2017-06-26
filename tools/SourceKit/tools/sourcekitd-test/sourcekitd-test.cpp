@@ -87,17 +87,13 @@ static void notification_receiver(sourcekitd_response_t resp);
 static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 
 #define KEY(NAME, CONTENT) static sourcekitd_uid_t Key##NAME;
-#include "SourceKit/Core/ProtocolUIDs.def"
-
 #define REQUEST(NAME, CONTENT) static sourcekitd_uid_t Request##NAME;
+#define KIND(NAME, CONTENT) static sourcekitd_uid_t Kind##NAME;
 #include "SourceKit/Core/ProtocolUIDs.def"
 
 static sourcekitd_uid_t SemaDiagnosticStage;
 
 static sourcekitd_uid_t NoteDocUpdate;
-
-static sourcekitd_uid_t KindNameObjc;
-static sourcekitd_uid_t KindNameSwift;
 
 static SourceKit::Semaphore semaSemaphore(0);
 static sourcekitd_response_t semaResponse;
@@ -143,10 +139,8 @@ static int skt_main(int argc, const char **argv) {
   NoteDocUpdate = sourcekitd_uid_get_from_cstr("source.notification.editor.documentupdate");
 
 #define REQUEST(NAME, CONTENT) Request##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
+#define KIND(NAME, CONTENT) Kind##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
-
-  KindNameObjc = sourcekitd_uid_get_from_cstr("source.lang.name.kind.objc");
-  KindNameSwift = sourcekitd_uid_get_from_cstr("source.lang.name.kind.swift");
 
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
