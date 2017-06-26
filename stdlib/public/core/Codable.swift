@@ -3363,14 +3363,31 @@ internal struct _DictionaryCodingKey : CodingKey {
         self.stringValue = "\(intValue)"
         self.intValue = intValue
     }
+
+    init(other key: CodingKey) {
+        self.stringValue = key.stringValue
+        self.intValue = key.intValue
+    }
 }
 
 extension Dictionary : Encodable /* where Key : Encodable, Value : Encodable */ {
     public func encode(to encoder: Encoder) throws {
-        assertTypeIsEncodable(Key.self, in: type(of: self))
+        // Normally, both Key and Value need to be Encodable here.
+        // However, if Key is CodingKey, we don't require it be Encodable.
+        if !(Key.self is CodingKey.Type) {
+            assertTypeIsEncodable(Key.self, in: type(of: self))
+        }
         assertTypeIsEncodable(Value.self, in: type(of: self))
 
-        if Key.self == String.self {
+        if Key.self is CodingKey.Type {
+            // Since the keys are already CodingKeys, we can use them as keys directly.
+            var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
+            for (key, value) in self {
+                let codingKey = _DictionaryCodingKey(other: key as! CodingKey)
+                let valueEncoder = container.superEncoder(forKey: codingKey)
+                try (value as! Encodable).encode(to: valueEncoder)
+            }
+        } else if Key.self == String.self {
             // Since the keys are already Strings, we can use them as keys directly.
             var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
             for (key, value) in self {
@@ -3407,10 +3424,39 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
     public init(from decoder: Decoder) throws {
         // Initialize self here so we can print type(of: self).
         self.init()
-        assertTypeIsDecodable(Key.self, in: type(of: self))
+
+        // Normally, both Key and Value need to be Decodable here.
+        // However, if Key is CodingKey, we don't require it be Decodable.
+        if !(Key.self is CodingKey.Type) {
+            assertTypeIsDecodable(Key.self, in: type(of: self))
+        }
         assertTypeIsDecodable(Value.self, in: type(of: self))
 
-        if Key.self == String.self {
+        if Key.self is CodingKey.Type {
+            // The keys are CodingKeys, so we should be able to expect a keyed container.
+            let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
+            let keyMetaType = Key.self as! CodingKey.Type
+            let valueMetaType = Value.self as! Decodable.Type
+            for key in container.allKeys {
+                let convertedKey: Key
+
+                // We've got a generic _DictionaryCodingKey that we need to turn into Key.
+                // It's less likely that the key has an intValue, but let's attempt that first.
+                if let intValue = key.intValue,
+                   let newKey = keyMetaType.init(intValue: intValue) {
+                    convertedKey = (newKey as! Key)
+                } else if let newKey = keyMetaType.init(stringValue: key.stringValue) {
+                    convertedKey = (newKey as! Key)
+                } else {
+                    // We cannot map the generic key to Key. Skip this entry.
+                    continue
+                }
+
+                let valueDecoder = try container.superDecoder(forKey: key)
+                let value = try valueMetaType.init(from: valueDecoder)
+                self[convertedKey] = (value as! Value)
+            }
+        } else if Key.self == String.self {
             // The keys are Strings, so we should be able to expect a keyed container.
             let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
             let valueMetaType = Value.self as! Decodable.Type
