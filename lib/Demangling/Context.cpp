@@ -36,14 +36,9 @@ void Context::clear() {
 }
 
 NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
-#ifndef NO_NEW_DEMANGLING
-  if (MangledName.startswith(MANGLING_PREFIX_STR)
-      // Also accept the future mangling prefix.
-      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
-      || MangledName.startswith("_S")) {
+  if (isMangledName(MangledName.data())) {
     return D->demangleSymbol(MangledName);
   }
-#endif
   return demangleOldSymbolAsNode(MangledName, *D);
 }
 
@@ -74,10 +69,7 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
 }
 
 bool Context::isThunkSymbol(llvm::StringRef MangledName) {
-  if (MangledName.startswith(MANGLING_PREFIX_STR)
-      // Also accept the future mangling prefix.
-      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
-      || MangledName.startswith("_S")) {
+  if (isMangledName(MangledName)) {
     // First do a quick check
     if (MangledName.endswith("TA") ||  // partial application forwarder
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
@@ -126,11 +118,7 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
   if (!isThunkSymbol(MangledName))
     return std::string();
 
-  if (MangledName.startswith(MANGLING_PREFIX_STR)
-      // Also accept the future mangling prefix.
-      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
-      || MangledName.startswith("_S")) {
-
+  if (isMangledName(MangledName)) {
     // The targets of those thunks not derivable from the mangling.
     if (MangledName.endswith("TR") ||
         MangledName.endswith("Tr") ||

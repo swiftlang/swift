@@ -2199,23 +2199,6 @@ private:
 };
 } // end anonymous namespace
 
-
-bool
-swift::Demangle::isSwiftSymbol(const char *mangledName) {
-  // The old mangling.
-  if (mangledName[0] == '_'
-      // Also accept the future mangling prefix.
-      && (mangledName[1] == 'T' || mangledName[1] == 'S'))
-    return true;
-
-  // The new mangling.
-  for (unsigned i = 0; i < sizeof(MANGLING_PREFIX_STR) - 1; i++) {
-    if (mangledName[i] != MANGLING_PREFIX_STR[i])
-      return false;
-  }
-  return true;
-}
-
 NodePointer
 swift::Demangle::demangleOldSymbolAsNode(StringRef MangledName,
                                          NodeFactory &Factory) {
