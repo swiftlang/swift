@@ -3391,12 +3391,13 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
     else
       source2 = equivClass2->superclassConstraints.front().source;
 
-    (void)updateSuperclass(T1, equivClass2->superclass, source2);
-
+    // Add the superclass constraints from the second equivalence class.
     equivClass->superclassConstraints.insert(
                                    equivClass->superclassConstraints.end(),
                                    equivClass2->superclassConstraints.begin(),
                                    equivClass2->superclassConstraints.end());
+
+    (void)updateSuperclass(T1, equivClass2->superclass, source2);
   }
 
   // Add all of the protocol conformance requirements of T2 to T1.
