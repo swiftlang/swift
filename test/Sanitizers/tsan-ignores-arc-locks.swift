@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -sanitize=thread %s -o %t_binary
+// RUN: %target-build-swift -target %sanitizers-target-triple -sanitize=thread %s -o %t_binary
 // RUN: %env-TSAN_OPTIONS=ignore_interceptors_accesses=1:halt_on_error=1 %t_binary
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
