@@ -1,0 +1,4 @@
+Name: ImportAsMemberSubmodules
+Tags:
+- Name: IAMInner
+  SwiftName: IAMOuter.Inner
