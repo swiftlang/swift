@@ -984,13 +984,12 @@ namespace {
               return Type();
 
             // The first type argument for Dictionary or Set needs
-            // to be Hashable. Everything that inherits NSObject has a
-            // -hash code in ObjC, but if something isn't NSObject, fall back
+            // to be Hashable. If something isn't Hashable, fall back
             // to AnyHashable as a key type.
             if (unboundDecl == Impl.SwiftContext.getDictionaryDecl() ||
                 unboundDecl == Impl.SwiftContext.getSetDecl()) {
               auto &keyType = importedTypeArgs[0];
-              if (!Impl.matchesNSObjectBound(keyType)) {
+              if (!Impl.matchesHashableBound(keyType)) {
                 if (auto anyHashable = Impl.SwiftContext.getAnyHashableDecl())
                   keyType = anyHashable->getDeclaredType();
                 else
@@ -2413,7 +2412,7 @@ Type ClangImporter::Implementation::getNSObjectType() {
   return Type();
 }
 
-bool ClangImporter::Implementation::matchesNSObjectBound(Type type) {
+bool ClangImporter::Implementation::matchesHashableBound(Type type) {
   Type NSObjectType = getNSObjectType();
   if (!NSObjectType)
     return false;
@@ -2425,8 +2424,14 @@ bool ClangImporter::Implementation::matchesNSObjectBound(Type type) {
   // Struct or enum type must have been bridged.
   // TODO: Check that the bridged type is Hashable?
   if (type->getStructOrBoundGenericStruct() ||
-      type->getEnumOrBoundGenericEnum())
-    return true;
+      type->getEnumOrBoundGenericEnum()) {
+    auto nominal = type->getAnyNominal();
+    auto hashable = SwiftContext.getProtocol(KnownProtocolKind::Hashable);
+    SmallVector<ProtocolConformance *, 2> conformances;
+    return hashable &&
+      nominal->lookupConformance(nominal->getParentModule(), hashable,
+                                 conformances);
+  }
 
   return false;
 }
