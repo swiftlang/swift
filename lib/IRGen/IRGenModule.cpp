@@ -44,6 +44,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "GenEnum.h"
 #include "GenType.h"
@@ -1042,6 +1043,31 @@ void IRGenModule::emitAutolinkInfo() {
   }
 }
 
+void IRGenModule::emitEnableReportErrorsToDebugger() {
+  if (!Context.LangOpts.ReportErrorsToDebugger)
+    return;
+
+  if (!getSwiftModule()->hasEntryPoint())
+    return;
+
+  llvm::Function *NewFn = llvm::Function::Create(
+      llvm::FunctionType::get(VoidTy, false), llvm::GlobalValue::PrivateLinkage,
+      "_swift_enable_report_errors_to_debugger");
+  IRGenFunction NewIGF(*this, NewFn);
+  NewFn->setAttributes(constructInitialAttributes());
+  Module.getFunctionList().push_back(NewFn);
+  NewFn->setCallingConv(DefaultCC);
+
+  llvm::Value *addr =
+      Module.getOrInsertGlobal("_swift_reportFatalErrorsToDebugger", Int1Ty);
+  llvm::Value *one = llvm::ConstantInt::get(Int1Ty, 1);
+
+  NewIGF.Builder.CreateStore(one, addr, Alignment(1));
+  NewIGF.Builder.CreateRetVoid();
+
+  llvm::appendToGlobalCtors(Module, NewFn, 0, nullptr);
+}
+
 void IRGenModule::cleanupClangCodeGenMetadata() {
   // Remove llvm.ident that ClangCodeGen might have left in the module.
   auto *LLVMIdent = Module.getNamedMetadata("llvm.ident");
@@ -1110,6 +1136,7 @@ bool IRGenModule::finalize() {
     return false;
 
   emitAutolinkInfo();
+  emitEnableReportErrorsToDebugger();
   emitGlobalLists();
   if (DebugInfo)
     DebugInfo->finalize();
