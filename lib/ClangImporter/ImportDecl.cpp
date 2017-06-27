@@ -7872,8 +7872,9 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
       auto decl = entry.get<clang::NamedDecl *>();
 
-      // Only continue members in the same submodule as this extension.
-      if (decl->getImportedOwningModule() != submodule) continue;
+      // Only include members in the same submodule as this extension.
+      if (getClangSubmoduleForDecl(decl) != submodule)
+        continue;
 
       forEachDistinctName(decl, [&](ImportedName newName,
                                     ImportNameVersion nameVersion) {
