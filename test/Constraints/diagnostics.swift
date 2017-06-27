@@ -1029,3 +1029,34 @@ class L_32934129<T : Comparable> {
     return inner(self, 0) // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
   }
 }
+
+// rdar://problem/31671195 - QoI: erroneous diagnostic - cannot call value of non-function type
+
+class C_31671195 {
+  var name: Int { fatalError() }
+  func name(_: Int) { fatalError() }
+}
+C_31671195().name(UInt(0))
+// expected-error@-1 {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+
+
+// rdar://problem/28456467 - QoI: erroneous diagnostic - cannot call value of non-function type
+
+class AST_28456467 {
+  var hasStateDef: Bool { return false }
+}
+
+protocol Expr_28456467 {}
+
+class ListExpr_28456467 : AST_28456467, Expr_28456467 {
+  let elems: [Expr_28456467]
+
+  init(_ elems:[Expr_28456467] ) {
+    self.elems = elems
+  }
+
+  override var hasStateDef: Bool {
+    return elems.first(where: { $0.hasStateDef }) != nil
+    // expected-error@-1 {{value of type 'Expr_28456467' has no member 'hasStateDef'}}
+  }
+}

@@ -89,3 +89,16 @@ enum Foo {
 func foo<T>(_: T, _: T) {}
 foo(Foo.a, Foo.b) // expected-error {{cannot invoke 'foo' with an argument list of type '((Int) -> Foo, (Int) -> Foo)}}
 // expected-note@-1 {{expected an argument list of type '(T, T)'}}
+
+// rdar://problem/32551313 - Useless SE-0110 diagnostic (only in Swift 4 mode)
+
+enum E_32551313<L, R> {
+  case Left(L)
+  case Right(R)
+}
+
+struct Foo_32551313 {
+  static func bar() -> E_32551313<(String, Foo_32551313?), (String, String)>? {
+    return E_32551313.Left("", Foo_32551313()) // Ok
+  }
+}
