@@ -12,6 +12,7 @@
 
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Index/Utils.h"
@@ -605,8 +606,12 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                                           Arg->getStartLoc().getAdvancedLoc(1));
 
           // Replace "x.getY(" with "x.Y =".
-          Editor.replace(ReplaceRange, (llvm::Twine(Walker.Result.str().
-                                                   substr(3)) + " = ").str());
+          auto Replacement = (llvm::Twine(Walker.Result.str()
+                                          .substr(3)) + " = ").str();
+          SmallString<64> Scratch;
+          Editor.replace(ReplaceRange,
+                         camel_case::toLowercaseInitialisms(Replacement, Scratch));
+
           // Remove ")"
           Editor.remove(CharSourceRange(SM, Arg->getEndLoc(), Arg->getEndLoc().
                                         getAdvancedLoc(1)));
