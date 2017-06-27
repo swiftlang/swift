@@ -1,5 +1,5 @@
-// RUN: %target-swiftc_driver %s -g -sanitize=thread -o %t_tsan-binary
-// RUN: not env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
+// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=thread -o %t_tsan-binary
+// RUN: not env %env-TSAN_OPTIONS="abort_on_error=0" %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
