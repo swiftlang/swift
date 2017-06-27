@@ -829,7 +829,7 @@ static bool isDefaultInitializable(TypeRepr *typeRepr) {
       return false;
 
     for (auto elt : tuple->getElements()) {
-      if (!isDefaultInitializable(elt))
+      if (!isDefaultInitializable(elt.Type))
         return false;
     }
 
@@ -4931,7 +4931,7 @@ public:
     // Look through parentheses.
     if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
       if (!parenRepr->isParenType()) return false;
-      return checkDynamicSelfReturn(func, parenRepr->getElement(0),
+      return checkDynamicSelfReturn(func, parenRepr->getElementType(0),
                                     optionalDepth);
     }
 
