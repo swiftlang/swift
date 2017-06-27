@@ -1,10 +1,8 @@
 // RUN: %target-swiftc_driver %s -g -sanitize=thread -o %t_tsan-binary
-// RUN: env TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=1 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
+// RUN: env %env-TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=1 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// REQUIRES: CPU=x86_64
 // REQUIRES: tsan_runtime
-// XFAIL: linux
 
 // Test that we do not report a race on block release operation.
 import Foundation

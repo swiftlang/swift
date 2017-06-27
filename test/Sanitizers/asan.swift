@@ -1,9 +1,8 @@
-// RUN: %target-swiftc_driver %s -g -sanitize=address -o %t_tsan-binary
-// RUN: not env ASAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
+// RUN: %target-swiftc_driver %s -g -sanitize=address -o %t_asan-binary
+// RUN: not env %env-ASAN_OPTIONS=abort_on_error=0 %target-run %t_asan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: asan_runtime
-// XFAIL: linux
 
 // Make sure we can handle swifterror. LLVM's address sanitizer pass needs to
 // ignore swifterror addresses.
