@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)#70 : The character string view should have a custom iterator type to
-// allow performance optimizations of linear traversals.
+// FIXME(ABI)#70 : The character string view should have a custom iterator type
+// to allow performance optimizations of linear traversals.
 
 /// CR and LF are common special cases in grapheme breaking logic
 @_versioned internal var _CR: UInt8 { return 0x0d }
@@ -102,7 +102,8 @@ extension String {
   /// of the string.
   ///
   ///     var str = "All this happened, more or less."
-  ///     let afterSpace = str.withMutableCharacters { chars -> String.CharacterView in
+  ///     let afterSpace = str.withMutableCharacters {
+  ///         chars -> String.CharacterView in
   ///         if let i = chars.index(of: " ") {
   ///             let result = chars[chars.index(after: i)...]
   ///             chars.removeSubrange(i...)
