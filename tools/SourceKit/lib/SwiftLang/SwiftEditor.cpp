@@ -257,223 +257,110 @@ void mergeSplitRanges(unsigned Off1, unsigned Len1, unsigned Off2, unsigned Len2
   }
 }
 
-struct SwiftEditorCharRange {
-  size_t Offset;
-  size_t Length;
-  size_t endOffset() const { return Offset + Length; }
-  bool isEmpty() const { return !Length; }
-};
 
 struct SwiftSyntaxToken {
-  unsigned Offset;
+  unsigned Column;
   unsigned Length:24;
   SyntaxNodeKind Kind:8;
 
-  SwiftSyntaxToken(unsigned Offset, unsigned Length, SyntaxNodeKind Kind)
-    : Offset(Offset), Length(Length), Kind(Kind) {}
-
-  unsigned endOffset() const {
-    return Offset + Length;
-  }
-
-  bool operator==(const SwiftSyntaxToken &Other) const {
-    return Offset == Other.Offset && Length == Other.Length &&
-      Kind == Other.Kind;
-  }
+  SwiftSyntaxToken(unsigned Column, unsigned Length,
+                   SyntaxNodeKind Kind)
+    :Column(Column), Length(Length), Kind(Kind) { }
 };
 
-/// Represents a the syntax highlighted token ranges in a source file
-struct SwiftSyntaxMap {
-  std::vector<SwiftSyntaxToken> Tokens;
+class SwiftSyntaxMap {
+  typedef std::vector<SwiftSyntaxToken> SwiftSyntaxLineMap;
+  std::vector<SwiftSyntaxLineMap> Lines;
 
-  SwiftSyntaxMap(unsigned Capacity = 0) {
-    if (Capacity)
-      Tokens.reserve(Capacity);
-  }
-
-  void addToken(const SwiftSyntaxToken &Token) {
-    assert(Tokens.empty() || Token.Offset >= Tokens.back().Offset);
-    Tokens.push_back(Token);
-  }
-
-  /// Merge this nested token into the last token that was added
-  void mergeToken(const SwiftSyntaxToken &Token) {
-    if (Tokens.empty()) {
-      Tokens.push_back(Token);
-      return;
-    }
-    auto &LastTok = Tokens.back();
-    mergeSplitRanges(LastTok.Offset, LastTok.Length, Token.Offset, Token.Length,
-                     [&](unsigned BeforeOff, unsigned BeforeLen,
-                         unsigned AfterOff, unsigned AfterLen) {
-                       auto LastKind = LastTok.Kind;
-                       Tokens.pop_back();
-                       if (BeforeLen)
-                         Tokens.emplace_back(BeforeOff, BeforeLen, LastKind);
-                       Tokens.push_back(Token);
-                       if (AfterLen)
-                         Tokens.emplace_back(AfterOff, AfterLen, LastKind);
-                     });
-  }
-
-  /// Adjusts the token offsets and lengths in this syntax map to account for
-  /// replacing Len bytes at the given Offset with NewLen bytes. Tokens before
-  /// the replacement stay the same, tokens after it are shifted, and tokens
-  /// that intersect it have their length set to 0. It also currently expands
-  /// the start and end of the Affected range to at least the line boundaires of
-  /// the replacement range to support an assumption in existing clients.
-  ///
-  /// Returns the affected range (the range of the new bytes + any intersected
-  /// tokens) in the new buffer.
-  SwiftEditorCharRange
-  adjustForReplacement(unsigned Offset, unsigned Len, unsigned NewLen, StringRef NewText) {
-    // Extend the affected range to its nearest line boundaries in the old text,
-    // based on the line boundaries of the new text
-    unsigned AffectedStart = getPrevLineBoundary(NewText, Offset);
-    unsigned NewEndLineBoundary =
-      getNextLineBoundary(NewText, Offset + NewLen, /*hasLength=*/NewLen > 0);
-    unsigned AffectedEnd = NewEndLineBoundary - NewLen + Len;
-
-    // Adjust the tokens
-    auto Token = Tokens.begin();
-    while (Token != Tokens.end() && Token->endOffset() <= AffectedStart)
-      ++Token; // Completely before the affected range - no change
-
-    while (Token != Tokens.end() && Token->Offset < AffectedEnd) {
-      // This token intersects – extend the affected range if we need to
-      if (Token->Offset < AffectedStart)
-        AffectedStart = Token->Offset;
-      if (Token->endOffset() > AffectedEnd)
-        AffectedEnd = Token->endOffset();
-
-      // Set length to 0 to force a mismatch in forEachChanged below
-      Token->Length = 0;
-      ++Token;
-    }
-
-    while (Token != Tokens.end()) {
-      Token->Offset += NewLen - Len; // Completely after - shift
-      ++Token;
-    }
-
-    // Adjust the AffectedEnd to its position in the NewText
-    AffectedEnd += NewLen - Len;
-
-    // Return the Affected range in NewText
-    return {AffectedStart, AffectedEnd - AffectedStart};
-  }
-
-  /// Passes each token in this SwiftSyntaxMap to the given EditorConsumer
-  void forEach(EditorConsumer &Consumer) {
-    for (auto &Token: Tokens) {
-      auto Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Token.Kind);
-      Consumer.handleSyntaxMap(Token.Offset, Token.Length, Kind);
-    }
-  }
-
-  /// Finds the delta between the given SwiftSyntaxMap, Prev, and this one.
-  /// It passes each token not in Prev to the given EditorConsumer and also
-  /// expands the given Affected range (if needed) to include all non-matching
-  /// tokens in the two lists. It also ensures the start and end of the Affected
-  /// range fall on line boundaires to support an assumption in existing clients.
-  ///
-  /// Returns true if this SwiftSyntaxMap is different to Prev.
-  bool forEachChanged(SwiftSyntaxMap &Prev,
-                      SwiftEditorCharRange &Affected,
-                      StringRef BufferText,
-                      EditorConsumer &Consumer) const {
-    unsigned AffectedStart = Affected.Offset, AffectedEnd = Affected.endOffset();
-
-    // Find the first pair of tokens that don't match
-    auto Start = std::make_pair(Tokens.begin(), Prev.Tokens.begin());
-    while (Start.first != Tokens.end() && Start.second != Prev.Tokens.end() &&
-           *Start.first == *Start.second)
-      ++Start.first, ++Start.second;
-
-    if (Start.first == Tokens.end() && Start.second == Prev.Tokens.end()) {
-      // We hit the end of both token lists without a mismatch – no-op.
+public:
+  bool matchesFirstTokenOnLine(unsigned Line,
+                               const SwiftSyntaxToken &Token) const {
+    assert(Line > 0);
+    if (Lines.size() < Line)
       return false;
+
+    unsigned LineOffset = Line - 1;
+    const SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
+    if (LineMap.empty())
+      return false;
+
+    const SwiftSyntaxToken &Tok = LineMap.front();
+    if (Tok.Column == Token.Column && Tok.Length == Token.Length
+        && Tok.Kind == Token.Kind) {
+      return true;
     }
 
-    // Adjust the affected bounds to include the mismatched tokens
-    if (Start.first != Tokens.end())
-      AffectedStart = std::min(Start.first->Offset, AffectedStart);
-    if (Start.second != Prev.Tokens.end())
-      AffectedStart = std::min(Start.second->Offset, AffectedStart);
-
-    // Find the last tokens that don't match
-    auto End = std::make_pair(Tokens.rbegin(), Prev.Tokens.rbegin());
-    while (End.first != Tokens.rend() && End.second != Prev.Tokens.rend() &&
-           *End.first == *End.second)
-      ++End.first, ++End.second;
-
-    // Adjust the affected bounds to include the mismtached tokens
-    if (End.first != Tokens.rend())
-      AffectedEnd = std::max(End.first->endOffset(), AffectedEnd);
-    if (End.second != Prev.Tokens.rend())
-      AffectedEnd = std::max(End.second->endOffset(), AffectedEnd);
-
-    assert(AffectedEnd >= AffectedStart);
-
-    auto From = Start.first; // The first mismatched token in this syntax map
-    auto To = End.first; // The last mismatched token in this syntax map
-
-    // Extend the affected range to line boundaries
-    AffectedStart = getPrevLineBoundary(BufferText, AffectedStart);
-    AffectedEnd = getNextLineBoundary(BufferText, AffectedEnd,
-                                    /*hasLength=*/AffectedStart < AffectedEnd);
-
-    // Extend From/To to the outermost tokens in the Affected range
-    while (From != Tokens.begin()) {
-      auto Prev = From - 1;
-      while (Prev != Tokens.begin() && Prev->Offset >= AffectedStart)
-        From = Prev--;
-      if (Prev->endOffset() <= AffectedStart)
-        break;
-      // Multi-line token – extend Affected to this token's start line
-      AffectedStart = getPrevLineBoundary(BufferText, Prev->Offset);
-      From = Prev;
-    };
-
-    while (To != Tokens.rbegin()) {
-      auto Prev = To - 1;
-      while (Prev != Tokens.rbegin() && Prev->endOffset() <= AffectedEnd)
-        To = Prev--;
-      if (Prev->Offset >= AffectedEnd)
-        break;
-      // Multi-line token – extend Affected to this token's end line
-      AffectedEnd = getNextLineBoundary(BufferText, Prev->endOffset(), true);
-      To = Prev;
-    }
-
-    // Report tokens from From -> To to the given EditorConsumer
-    for (; From < To.base(); ++From) {
-      auto Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(From->Kind);
-      Consumer.handleSyntaxMap(From->Offset, From->Length, Kind);
-    }
-
-    // Write back the final Affected range
-    Affected.Offset = AffectedStart;
-    Affected.Length = AffectedEnd - AffectedStart;
-    return true;
+    return false;
   }
 
-private:
-  static size_t getPrevLineBoundary(StringRef Text, size_t Offset) {
-    auto Bound = Text.rfind('\n', Offset);
-    if (Bound == StringRef::npos)
-      return 0;
-    return Bound + 1;
+  void addTokenForLine(unsigned Line, const SwiftSyntaxToken &Token) {
+    assert(Line > 0);
+    if (Lines.size() < Line) {
+      Lines.resize(Line);
+    }
+    unsigned LineOffset = Line - 1;
+    SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
+    // FIXME: Assert this token is after the last one
+    LineMap.push_back(Token);
   }
 
-  /// Gets the offset after the next '\n'. If HasLength is true, it will start
-  /// looking one character before the given offset. This is to handle line
-  /// comments and other tokens that include a terminating '\n'.
-  static size_t getNextLineBoundary(StringRef Text, size_t Offset, bool HasLength) {
-    auto Bound = Text.find('\n', HasLength? Offset - 1 : Offset);
-    if (Bound == StringRef::npos)
-      return Text.size();
-    return Bound + 1;
+  void mergeTokenForLine(unsigned Line, const SwiftSyntaxToken &Token) {
+    assert(Line > 0);
+    if (Lines.size() < Line) {
+      Lines.resize(Line);
+    }
+    unsigned LineOffset = Line - 1;
+    SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
+    if (!LineMap.empty()) {
+      auto &LastTok = LineMap.back();
+      mergeSplitRanges(LastTok.Column, LastTok.Length,
+                       Token.Column, Token.Length,
+                       [&](unsigned BeforeOff, unsigned BeforeLen,
+                           unsigned AfterOff, unsigned AfterLen) {
+        auto LastKind = LastTok.Kind;
+        LineMap.pop_back();
+        if (BeforeLen)
+          LineMap.emplace_back(BeforeOff, BeforeLen, LastKind);
+        LineMap.push_back(Token);
+        if (AfterLen)
+          LineMap.emplace_back(AfterOff, AfterLen, LastKind);
+      });
+    }
+    else {
+      // Not overlapping, just add the new token to the end
+      LineMap.push_back(Token);
+    }
+  }
+
+  void clearLineRange(unsigned StartLine, unsigned Length) {
+    assert(StartLine > 0);
+    unsigned LineOffset = StartLine - 1;
+    for (unsigned Line = LineOffset; Line < LineOffset + Length
+                                    && Line < Lines.size(); ++Line) {
+      Lines[Line].clear();
+    }
+  }
+
+  void removeLineRange(unsigned StartLine, unsigned Length) {
+    assert(StartLine > 0 && Length > 0);
+
+    if (StartLine < Lines.size()) {
+      unsigned EndLine = StartLine + Length - 1;
+      // Delete all syntax map data from start line through end line
+      Lines.erase(Lines.begin() + StartLine - 1,
+                  EndLine >= Lines.size() ? Lines.end()
+                                          : Lines.begin() + EndLine);
+    }
+  }
+
+  void insertLineRange(unsigned StartLine, unsigned Length) {
+    Lines.insert(StartLine <= Lines.size() ? Lines.begin() + StartLine - 1
+                                           : Lines.end(),
+                 Length, SwiftSyntaxLineMap());
+  }
+
+  void reset() {
+    Lines.clear();
   }
 };
 
@@ -484,6 +371,8 @@ struct EditorConsumerSyntaxMapEntry {
   EditorConsumerSyntaxMapEntry(unsigned Offset, unsigned Length, UIdent Kind)
     :Offset(Offset), Length(Length), Kind(Kind) { }
 };
+
+typedef std::pair<unsigned, unsigned> SwiftEditorCharRange;
 
 struct SwiftSemanticToken {
   unsigned ByteOffset;
@@ -959,12 +848,9 @@ struct SwiftEditorDocument::Implementation {
   const std::string FilePath;
   EditableTextBufferRef EditableBuffer;
 
-  /// The list of syntax highlighted token offsets and ranges in the document
   SwiftSyntaxMap SyntaxMap;
-  /// The minimal range of syntax highlighted tokens affected by the last edit
+  LineRange EditedLineRange;
   SwiftEditorCharRange AffectedRange;
-  /// Whether the last operation was an edit rather than a document open
-  bool Edited;
 
   std::vector<DiagnosticEntryInfo> ParserDiagnostics;
   RefPtr<SwiftDocumentSemanticInfo> SemanticInfo;
@@ -1264,39 +1150,121 @@ public:
   }
 };
 
-/// Walks the syntax model to populate a given SwiftSyntaxMap with the token
-/// ranges to highlight and pass document structure information to the given
-/// EditorConsumer.
 class SwiftEditorSyntaxWalker: public ide::SyntaxModelWalker {
-  /// The syntax map to populate
   SwiftSyntaxMap &SyntaxMap;
+  LineRange EditedLineRange;
+  SwiftEditorCharRange &AffectedRange;
   SourceManager &SrcManager;
+  EditorConsumer &Consumer;
   unsigned BufferID;
   SwiftDocumentStructureWalker DocStructureWalker;
-  /// The current token nesting level (e.g. for a field in a doc comment)
+  std::vector<EditorConsumerSyntaxMapEntry> ConsumerSyntaxMap;
   unsigned NestingLevel = 0;
 public:
   SwiftEditorSyntaxWalker(SwiftSyntaxMap &SyntaxMap,
+                          LineRange EditedLineRange,
+                          SwiftEditorCharRange &AffectedRange,
                           SourceManager &SrcManager, EditorConsumer &Consumer,
                           unsigned BufferID)
-    : SyntaxMap(SyntaxMap), SrcManager(SrcManager), BufferID(BufferID),
+    : SyntaxMap(SyntaxMap), EditedLineRange(EditedLineRange),
+      AffectedRange(AffectedRange), SrcManager(SrcManager), Consumer(Consumer),
+      BufferID(BufferID),
       DocStructureWalker(SrcManager, BufferID, Consumer) { }
 
   bool walkToNodePre(SyntaxNode Node) override {
     if (Node.Kind == SyntaxNodeKind::CommentMarker)
       return DocStructureWalker.walkToNodePre(Node);
+
     ++NestingLevel;
+    SourceLoc StartLoc = Node.Range.getStart();
+    auto StartLineAndColumn = SrcManager.getLineAndColumn(StartLoc);
+    auto EndLineAndColumn = SrcManager.getLineAndColumn(Node.Range.getEnd());
+    unsigned StartLine = StartLineAndColumn.first;
+    unsigned EndLine = EndLineAndColumn.second > 1 ? EndLineAndColumn.first
+                                                   : EndLineAndColumn.first - 1;
+    unsigned Offset = SrcManager.getByteDistance(
+                           SrcManager.getLocForBufferStart(BufferID), StartLoc);
+    // Note that the length can span multiple lines.
+    unsigned Length = Node.Range.getByteLength();
 
-    auto End = SrcManager.getLocOffsetInBuffer(Node.Range.getEnd(), BufferID),
-      Start = SrcManager.getLocOffsetInBuffer(Node.Range.getStart(), BufferID);
+    SwiftSyntaxToken Token(StartLineAndColumn.second, Length,
+                           Node.Kind);
+    if (EditedLineRange.isValid()) {
+      if (StartLine < EditedLineRange.startLine()) {
+        if (EndLine < EditedLineRange.startLine()) {
+          // We're entirely before the edited range, no update needed.
+          return true;
+        }
 
-    if (NestingLevel > 1) {
-      // We're nested inside the previously reported token - merge
-      SyntaxMap.mergeToken({Start, End - Start, Node.Kind});
-    } else {
-      // We're a top-level token, add it after the previous one
-      SyntaxMap.addToken({Start, End - Start, Node.Kind});
+        // This token starts before the edited range, but doesn't end before it,
+        // we need to adjust edited line range and clear the affected syntax map
+        // line range.
+        unsigned AdjLineCount = EditedLineRange.startLine() - StartLine;
+        EditedLineRange.setRange(StartLine, AdjLineCount
+                                            + EditedLineRange.lineCount());
+        SyntaxMap.clearLineRange(StartLine, AdjLineCount);
+
+        // Also adjust the affected char range accordingly.
+        unsigned AdjCharCount = AffectedRange.first - Offset;
+        AffectedRange.first -= AdjCharCount;
+        AffectedRange.second += AdjCharCount;
+      }
+      else if (Offset > AffectedRange.first + AffectedRange.second) {
+        // We're passed the affected range and already synced up, just return.
+        return true;
+      }
+      else if (StartLine > EditedLineRange.endLine()) {
+        // We're after the edited line range, let's test if we're synced up.
+        if (SyntaxMap.matchesFirstTokenOnLine(StartLine, Token)) {
+          // We're synced up, mark the affected range and return.
+          AffectedRange.second =
+                 Offset - (StartLineAndColumn.second - 1) - AffectedRange.first;
+          return true;
+        }
+
+        // We're not synced up, continue replacing syntax map data on this line.
+        SyntaxMap.clearLineRange(StartLine, 1);
+        EditedLineRange.extendToIncludeLine(StartLine);
+      }
+
+      if (EndLine > StartLine) {
+        // The token spans multiple lines, make sure to replace syntax map data
+        // for affected lines.
+        EditedLineRange.extendToIncludeLine(EndLine);
+
+        unsigned LineCount = EndLine - StartLine + 1;
+        SyntaxMap.clearLineRange(StartLine, LineCount);
+      }
+
     }
+
+    // Add the syntax map token.
+    if (NestingLevel > 1)
+      SyntaxMap.mergeTokenForLine(StartLine, Token);
+    else
+      SyntaxMap.addTokenForLine(StartLine, Token);
+
+    // Add consumer entry.
+    unsigned ByteOffset = SrcManager.getLocOffsetInBuffer(Node.Range.getStart(),
+                                                          BufferID);
+    UIdent Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Node.Kind);
+    if (NestingLevel > 1) {
+      assert(!ConsumerSyntaxMap.empty());
+      auto &Last = ConsumerSyntaxMap.back();
+      mergeSplitRanges(Last.Offset, Last.Length, ByteOffset, Length,
+                       [&](unsigned BeforeOff, unsigned BeforeLen,
+                           unsigned AfterOff, unsigned AfterLen) {
+        auto LastKind = Last.Kind;
+        ConsumerSyntaxMap.pop_back();
+        if (BeforeLen)
+          ConsumerSyntaxMap.emplace_back(BeforeOff, BeforeLen, LastKind);
+        ConsumerSyntaxMap.emplace_back(ByteOffset, Length, Kind);
+        if (AfterLen)
+          ConsumerSyntaxMap.emplace_back(AfterOff, AfterLen, LastKind);
+      });
+    }
+    else
+      ConsumerSyntaxMap.emplace_back(ByteOffset, Length, Kind);
 
     return true;
   }
@@ -1304,7 +1272,14 @@ public:
   bool walkToNodePost(SyntaxNode Node) override {
     if (Node.Kind == SyntaxNodeKind::CommentMarker)
       return DocStructureWalker.walkToNodePost(Node);
-    --NestingLevel;
+
+    if (--NestingLevel == 0) {
+      // We've unwound to the top level, so inform the consumer and drain
+      // the consumer syntax map queue.
+      for (auto &Entry: ConsumerSyntaxMap)
+        Consumer.handleSyntaxMap(Entry.Offset, Entry.Length, Entry.Kind);
+      ConsumerSyntaxMap.clear();
+    }
 
     return true;
   }
@@ -1581,14 +1556,11 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
-  Impl.Edited = false;
   Impl.EditableBuffer =
       new EditableTextBuffer(Impl.FilePath, Buf->getBuffer());
-
-  // Reset the syntax map data and affected range
-  Impl.SyntaxMap.Tokens.clear();
-  Impl.AffectedRange = {0, Buf->getBufferSize()};
-
+  Impl.SyntaxMap.reset();
+  Impl.EditedLineRange.setRange(0,0);
+  Impl.AffectedRange = std::make_pair(0, Buf->getBufferSize());
   Impl.SemanticInfo =
       new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.LangSupport);
   Impl.SemanticInfo->setCompilerArgs(Args);
@@ -1601,10 +1573,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
-  Impl.Edited = true;
   llvm::StringRef Str = Buf->getBuffer();
-
-  // Update the buffer itself
   ImmutableTextSnapshotRef Snapshot =
       Impl.EditableBuffer->replace(Offset, Length, Str);
 
@@ -1630,10 +1599,37 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
     }
   }
 
-  // Update the old syntax map offsets to account for the replaced range
-  Impl.AffectedRange =
-    Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size(),
-                                        Snapshot->getBuffer()->getText());
+  SourceManager &SrcManager = Impl.SyntaxInfo->getSourceManager();
+  unsigned BufID = Impl.SyntaxInfo->getBufferID();
+  SourceLoc StartLoc = SrcManager.getLocForBufferStart(BufID).getAdvancedLoc(
+                                                                        Offset);
+  unsigned StartLine = SrcManager.getLineAndColumn(StartLoc).first;
+  unsigned EndLine = SrcManager.getLineAndColumn(
+                                         StartLoc.getAdvancedLoc(Length)).first;
+
+  // Delete all syntax map data from start line through end line.
+  unsigned OldLineCount = EndLine - StartLine + 1;
+  Impl.SyntaxMap.removeLineRange(StartLine, OldLineCount);
+
+  // Insert empty syntax map data for replaced lines.
+  unsigned NewLineCount = Str.count('\n') + 1;
+  Impl.SyntaxMap.insertLineRange(StartLine, NewLineCount);
+
+  // Update the edited line range.
+  Impl.EditedLineRange.setRange(StartLine, NewLineCount);
+
+  ImmutableTextBufferRef ImmBuf = Snapshot->getBuffer();
+
+  // The affected range starts from the previous newline.
+  if (Offset > 0) {
+    auto AffectedRangeOffset = ImmBuf->getText().rfind('\n', Offset);
+    Impl.AffectedRange.first =
+      AffectedRangeOffset != StringRef::npos ? AffectedRangeOffset + 1 : 0;
+  }
+  else
+    Impl.AffectedRange.first = 0;
+
+  Impl.AffectedRange.second = ImmBuf->getText().size() - Impl.AffectedRange.first;
 
   return Snapshot;
 }
@@ -1686,35 +1682,17 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
   ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
 
-  SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
-
-  SwiftEditorSyntaxWalker SyntaxWalker(NewMap,
+  SwiftEditorSyntaxWalker SyntaxWalker(Impl.SyntaxMap,
+                                       Impl.EditedLineRange,
+                                       Impl.AffectedRange,
                                        Impl.SyntaxInfo->getSourceManager(),
                                        Consumer,
                                        Impl.SyntaxInfo->getBufferID());
+
   ModelContext.walk(SyntaxWalker);
 
-  bool SawChanges = true;
-  if (Impl.Edited) {
-    // We're ansering an edit request. Report all highlighted token ranges not
-    // in the previous syntax map (and any other tokens on the same lines) to
-    // the Consumer and update the affected range to contain them.
-    auto Text = Impl.EditableBuffer->getBuffer()->getText();
-    SawChanges = NewMap.forEachChanged(Impl.SyntaxMap, Impl.AffectedRange, Text,
-                                       Consumer);
-  } else {
-    // The is an open/initialise. Report all highlighted token ranges to the
-    // Consumer.
-    NewMap.forEach(Consumer);
-  }
-  Impl.SyntaxMap = std::move(NewMap);
-
-  // Recording an affected length of 0 still results in the client updating its
-  // copy of the syntax map (by clearning all tokens on the line of the affected
-  // offset). We need to not record it at all to signal a no-op.
-  if (SawChanges)
-    Consumer.recordAffectedRange(Impl.AffectedRange.Offset,
-                                 Impl.AffectedRange.Length);
+  Consumer.recordAffectedRange(Impl.AffectedRange.first,
+                               Impl.AffectedRange.second);
 }
 
 void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
