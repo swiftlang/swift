@@ -368,20 +368,26 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
   bool handleQualifiedReplacement(Expr* Call) {
-    if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(Call)) {
-      if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
-        for (auto *I :getRelatedDiffItems(FD)) {
-          if (auto *Item = dyn_cast<TypeMemberDiffItem>(I)) {
-            if (Item->Subkind == TypeMemberDiffItemSubKind::
-                QualifiedReplacement) {
-              Editor.replace(Call->getSourceRange(),
-                (llvm::Twine(Item->newTypeName) + "." +
-                  Item->getNewName().base()).str());
-              return true;
-            }
+    auto handleDecl = [&](ValueDecl *VD, SourceRange ToReplace) {
+      for (auto *I: getRelatedDiffItems(VD)) {
+        if (auto *Item = dyn_cast<TypeMemberDiffItem>(I)) {
+          if (Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement) {
+            Editor.replace(ToReplace, (llvm::Twine(Item->newTypeName) + "." +
+              Item->getNewName().base()).str());
+            return true;
           }
         }
       }
+      return false;
+    };
+    if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(Call)) {
+      if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
+        if (handleDecl(FD, Call->getSourceRange()))
+          return true;
+      }
+    } else if (auto MRE = dyn_cast<MemberRefExpr>(Call)) {
+      if (handleDecl(MRE->getReferencedDecl().getDecl(), MRE->getSourceRange()))
+        return true;
     }
     return false;
   }
