@@ -130,6 +130,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "SetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)PropertyUserInterface(im)setURL:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "bar"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "2",
     "LeftUsr": "s:6CitiesAAC10mooloolabayAB1x_ABSg1ytF",
