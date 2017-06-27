@@ -2329,6 +2329,10 @@ public:
     
   public:
     Type getType() const { return Ty; }
+    CanType getCanType() const {
+      assert(Ty->isCanonical());
+      return CanType(Ty);
+    }
     
     Identifier getLabel() const { return Label; }
     
@@ -2342,6 +2346,9 @@ public:
     
     /// Whether the parameter is marked '@escaping'
     bool isEscaping() const { return Flags.isEscaping(); }
+    
+    /// Whether the parameter is marked 'inout'
+    bool isInOut() const { return Flags.isInOut(); }
   };
   
   /// \brief A class which abstracts out some details necessary for
@@ -2552,6 +2559,10 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
   CanType getInput() const {
     return getPointer()->getInput()->getCanonicalType();
+  }
+  
+  ArrayRef<AnyFunctionType::Param> getParams() const {
+    return getPointer()->getParams();
   }
 
   PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)

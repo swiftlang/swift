@@ -2664,7 +2664,8 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
 }
 
 ParenType *ParenType::get(const ASTContext &C, Type underlying,
-                          ParameterTypeFlags flags) {
+                          ParameterTypeFlags fl) {
+  auto flags = fl.withInOut(underlying->is<InOutType>());
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
   ParenType *&Result =
@@ -2739,7 +2740,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
 
 TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
                            ParameterTypeFlags fl)
-: Name(name), ElementType(ty), Flags(fl) {
+: Name(name), ElementType(ty), Flags(fl.withInOut(ty->is<InOutType>())) {
   // FIXME: Re-enable this assertion and hunt down the callers that aren't
   // setting parameter bits correctly.
   // assert((ty->is<InOutType>() && fl.isInOut()) && "caller did not set flags");
