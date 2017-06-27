@@ -53,21 +53,17 @@ func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> =
 
 // Incompatible concrete typealias types are flagged as such
 protocol P3 {
-    typealias T = Int // expected-error{{type alias 'T' requires types 'Q3.T' (aka 'Float') and 'Int' to be the same}}
+    typealias T = Int
 }
-protocol Q3: P3 {
+protocol Q3: P3 { // expected-error{{generic signature requires types 'Int'}}
     typealias T = Float
 }
 
 protocol P3_1 {
-    typealias T = Float // expected-error{{type alias 'T' requires types 'P3.T' (aka 'Int') and 'Float' to be the same}}
+    typealias T = Float
 }
 protocol Q3_1: P3, P3_1 {} // expected-error{{generic signature requires types 'Float'}}
 
-// FIXME: these shouldn't be necessary to trigger the errors above, but are, due to
-// the 'recursive decl validation' FIXME in GenericSignatureBuilder.cpp.
-func useTypealias<T: Q3>(_: T, _: T.T) {}
-func useTypealias1<T: Q3_1>(_: T, _: T.T) {}
 
 // Subprotocols can force associated types in their parents to be concrete, and
 // this should be understood for types constrained by the subprotocols.
@@ -112,5 +108,13 @@ func getP6_2_B<T: P6_2>(_: T.Type) -> T.B.Type { return T.B.self }
 
 func checkQ6<T: Q6>(x: T.Type) {
     sameType(getP6_1_A(x), getP6_2_B(x))
+}
+
+protocol P7 {
+  typealias A = Int
+}
+
+protocol P7a : P7 {
+  associatedtype A   // expected-warning{{associated type 'A' is redundant with type 'A' declared in inherited protocol 'P7'}}
 }
 
