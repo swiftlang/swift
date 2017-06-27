@@ -29,7 +29,7 @@ FallthroughStmtSyntax FallthroughStmtSyntax::makeBlank() {
   return make<FallthroughStmtSyntax>(
     RawSyntax::make(SyntaxKind::FallthroughStmt,
     {
-      TokenSyntax::missingToken(tok::kw_fallthrough, "fallthrough"),
+      RawTokenSyntax::missingToken(tok::kw_fallthrough, "fallthrough"),
     },
     SourcePresence::Present));
 }
@@ -41,16 +41,16 @@ void FallthroughStmtSyntax::validate() const {
                                  tok::kw_fallthrough, "fallthrough");
 }
 
-RC<TokenSyntax> FallthroughStmtSyntax::getFallthroughKeyword() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::FallthroughKeyword));
+TokenSyntax FallthroughStmtSyntax::getFallthroughKeyword() const {
+  return { Root, Data->getChild(Cursor::FallthroughKeyword).get() };
 }
 
 FallthroughStmtSyntax FallthroughStmtSyntax::
-withFallthroughKeyword(RC<TokenSyntax> NewFallthroughKeyword) const {
+withFallthroughKeyword(TokenSyntax NewFallthroughKeyword) const {
   syntax_assert_token_is(NewFallthroughKeyword, tok::kw_fallthrough,
                          "fallthrough");
-  return Data->replaceChild<FallthroughStmtSyntax>(NewFallthroughKeyword,
-                                                   Cursor::FallthroughKeyword);
+  return Data->replaceChild<FallthroughStmtSyntax>(
+                 NewFallthroughKeyword.getRaw(), Cursor::FallthroughKeyword);
 }
 
 #pragma mark code-block API
@@ -59,9 +59,9 @@ CodeBlockStmtSyntax
 CodeBlockStmtSyntax::makeBlank() {
   return make<CodeBlockStmtSyntax>(RawSyntax::make(SyntaxKind::CodeBlockStmt,
                               {
-                                TokenSyntax::missingToken(tok::l_brace, "{"),
+                                RawTokenSyntax::missingToken(tok::l_brace, "{"),
                                 RawSyntax::missing(SyntaxKind::StmtList),
-                                TokenSyntax::missingToken(tok::r_brace, "}"),
+                                RawTokenSyntax::missingToken(tok::r_brace, "}"),
                               },
                               SourcePresence::Present));
 }
@@ -89,39 +89,39 @@ void BreakStmtSyntax::validate() const {
 BreakStmtSyntax BreakStmtSyntax::makeBlank() {
   return make<BreakStmtSyntax>(RawSyntax::make(SyntaxKind::BreakStmt,
                                {
-                                 TokenSyntax::missingToken(tok::kw_break,
+                                 RawTokenSyntax::missingToken(tok::kw_break,
                                                            "break"),
-                                 TokenSyntax::missingToken(tok::identifier, ""),
+                                 RawTokenSyntax::missingToken(tok::identifier, ""),
                                },
                                SourcePresence::Present));
 }
 
-RC<TokenSyntax> BreakStmtSyntax::getBreakKeyword() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::BreakKeyword));
+TokenSyntax BreakStmtSyntax::getBreakKeyword() const {
+  return { Root, Data->getChild(Cursor::BreakKeyword).get() };
 }
 
 BreakStmtSyntax
-BreakStmtSyntax::withBreakKeyword(RC<TokenSyntax> NewBreakKeyword) const {
+BreakStmtSyntax::withBreakKeyword(TokenSyntax NewBreakKeyword) const {
   syntax_assert_token_is(NewBreakKeyword, tok::kw_break, "break");
-  return Data->replaceChild<BreakStmtSyntax>(NewBreakKeyword,
+  return Data->replaceChild<BreakStmtSyntax>(NewBreakKeyword.getRaw(),
                                              Cursor::BreakKeyword);
 }
 
-RC<TokenSyntax> BreakStmtSyntax::getLabel() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Label));
+TokenSyntax BreakStmtSyntax::getLabel() const {
+  return { Root, Data->getChild(Cursor::Label).get() };
 }
 
-BreakStmtSyntax BreakStmtSyntax::withLabel(RC<TokenSyntax> NewLabel) const {
-  assert(NewLabel->getTokenKind() == tok::identifier);
-  return Data->replaceChild<BreakStmtSyntax>(NewLabel, Cursor::Label);
+BreakStmtSyntax BreakStmtSyntax::withLabel(TokenSyntax NewLabel) const {
+  assert(NewLabel.getTokenKind() == tok::identifier);
+  return Data->replaceChild<BreakStmtSyntax>(NewLabel.getRaw(), Cursor::Label);
 }
 
 ContinueStmtSyntax ContinueStmtSyntax::makeBlank() {
   return make<ContinueStmtSyntax>(
             RawSyntax::make(SyntaxKind::ContinueStmt,
             {
-              TokenSyntax::missingToken(tok::kw_continue, "continue"),
-              TokenSyntax::missingToken(tok::identifier, ""),
+              RawTokenSyntax::missingToken(tok::kw_continue, "continue"),
+              RawTokenSyntax::missingToken(tok::identifier, ""),
             },
             SourcePresence::Present));
 }
@@ -137,25 +137,25 @@ void ContinueStmtSyntax::validate() const {
                             tok::identifier);
 }
 
-RC<TokenSyntax> ContinueStmtSyntax::getContinueKeyword() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::ContinueKeyword));
+TokenSyntax ContinueStmtSyntax::getContinueKeyword() const {
+  return { Root, Data->getChild(Cursor::ContinueKeyword).get() };
 }
 
 ContinueStmtSyntax ContinueStmtSyntax::
-withContinueKeyword(RC<TokenSyntax> NewContinueKeyword) const {
+withContinueKeyword(TokenSyntax NewContinueKeyword) const {
   syntax_assert_token_is(NewContinueKeyword, tok::kw_continue, "continue");
-  return Data->replaceChild<ContinueStmtSyntax>(NewContinueKeyword,
+  return Data->replaceChild<ContinueStmtSyntax>(NewContinueKeyword.getRaw(),
                                                 Cursor::ContinueKeyword);
 }
 
-RC<TokenSyntax> ContinueStmtSyntax::getLabel() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Label));
+TokenSyntax ContinueStmtSyntax::getLabel() const {
+  return { Root, Data->getChild(Cursor::Label).get() };
 }
 
 ContinueStmtSyntax
-ContinueStmtSyntax::withLabel(RC<TokenSyntax> NewLabel) const {
-  assert(NewLabel->getTokenKind() == tok::identifier);
-  return Data->replaceChild<ContinueStmtSyntax>(NewLabel, Cursor::Label);
+ContinueStmtSyntax::withLabel(TokenSyntax NewLabel) const {
+  assert(NewLabel.getTokenKind() == tok::identifier);
+  return Data->replaceChild<ContinueStmtSyntax>(NewLabel.getRaw(), Cursor::Label);
 }
 
 #pragma mark - return-statement API
@@ -171,7 +171,7 @@ void ReturnStmtSyntax::validate() const {
 ReturnStmtSyntax ReturnStmtSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::ReturnStmt,
                              {
-                               TokenSyntax::missingToken(tok::kw_return,
+                               RawTokenSyntax::missingToken(tok::kw_return,
                                                          "return"),
                                RawSyntax::missing(SyntaxKind::MissingExpr),
                              },
@@ -179,14 +179,14 @@ ReturnStmtSyntax ReturnStmtSyntax::makeBlank() {
   return make<ReturnStmtSyntax>(Raw);
 }
 
-RC<TokenSyntax> ReturnStmtSyntax::getReturnKeyword() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::ReturnKeyword));
+TokenSyntax ReturnStmtSyntax::getReturnKeyword() const {
+  return { Root, Data->getChild(Cursor::ReturnKeyword).get() };
 }
 
 ReturnStmtSyntax ReturnStmtSyntax::
-withReturnKeyword(RC<TokenSyntax> NewReturnKeyword) const {
+withReturnKeyword(TokenSyntax NewReturnKeyword) const {
   syntax_assert_token_is(NewReturnKeyword, tok::kw_return, "return");
-  return Data->replaceChild<ReturnStmtSyntax>(NewReturnKeyword,
+  return Data->replaceChild<ReturnStmtSyntax>(NewReturnKeyword.getRaw(),
                                               Cursor::ReturnKeyword);
 }
 

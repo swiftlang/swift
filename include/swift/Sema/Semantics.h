@@ -18,7 +18,7 @@
 #define SWIFT_SEMA_SEMANTICMODEL_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/Syntax/SyntaxData.h"
+#include "swift/Syntax/Syntax.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 

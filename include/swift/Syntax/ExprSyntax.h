@@ -87,17 +87,17 @@ public:
     : ExprSyntax(Root, Data) {}
 
   /// Get the '+' or '-' associated with this integer literal expression.
-  RC<TokenSyntax> getSign() const;
+  TokenSyntax getSign() const;
 
   /// Return a new IntegerLiteralExprSyntax with the given '+' or '-' sign.
-  IntegerLiteralExprSyntax withSign(RC<TokenSyntax> NewSign) const;
+  IntegerLiteralExprSyntax withSign(TokenSyntax NewSign) const;
 
   /// Return the string of digits comprising the number part of the integer
   /// literal expression.
-  RC<TokenSyntax> getDigits() const;
+  TokenSyntax getDigits() const;
 
   /// Return a new IntegerLiteralExprSyntax with the given string of digits.
-  IntegerLiteralExprSyntax withDigits(RC<TokenSyntax> NewDigits) const;
+  IntegerLiteralExprSyntax withDigits(TokenSyntax NewDigits) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::IntegerLiteralExpr;
@@ -131,11 +131,11 @@ public:
 
 
   /// Get the identifier for the symbol to which this expression refers.
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   /// Return a new `SymbolicReferenceExprSyntax` with the given identifier.
   SymbolicReferenceExprSyntax
-  withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  withIdentifier(TokenSyntax NewIdentifier) const;
 
   /// Return the generic arguments this symbolic reference has, if it has one.
   llvm::Optional<GenericArgumentClauseSyntax> getGenericArgumentClause() const;
@@ -176,17 +176,17 @@ public:
     : Syntax(Root, Data) {}
 
   /// Return the label identifier for this argument, if it has one.
-  RC<TokenSyntax> getLabel() const;
+  TokenSyntax getLabel() const;
 
   /// Return a new `FunctionCallArgumentSyntax` with the given label.
-  FunctionCallArgumentSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+  FunctionCallArgumentSyntax withLabel(TokenSyntax NewLabel) const;
 
   /// Get the colon ':' token in between the label and argument,
   /// if there is one.
-  RC<TokenSyntax> getColonToken() const;
+  TokenSyntax getColonToken() const;
 
   /// Return a new `FunctionCallArgumentSyntax` with the given colon ':' token.
-  FunctionCallArgumentSyntax withColonToken(RC<TokenSyntax> NewColon) const;
+  FunctionCallArgumentSyntax withColonToken(TokenSyntax NewColon) const;
 
   /// Returns the expression of the argument.
   llvm::Optional<ExprSyntax> getExpression() const;
@@ -197,12 +197,12 @@ public:
 
   /// Get the comma ',' token immediately following this argument, if there
   /// is one.
-  RC<TokenSyntax> getTrailingComma() const;
+  TokenSyntax getTrailingComma() const;
 
   /// Return a new `FunctionCallArgumentSyntax` with the given comma attached
   /// to the end of the argument.
   FunctionCallArgumentSyntax
-  withTrailingComma(RC<TokenSyntax> NewTrailingComma) const;
+  withTrailingComma(TokenSyntax NewTrailingComma) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FunctionCallArgument;
@@ -239,11 +239,11 @@ public:
   withCalledExpression(ExprSyntax NewBaseExpression) const;
 
   /// Return the left parenthesis '(' token in this call.
-  RC<TokenSyntax> getLeftParen() const;
+  TokenSyntax getLeftParen() const;
 
   /// Return a new `FunctionCallExprSyntax` with the given left parenthesis '('
   /// token.
-  FunctionCallExprSyntax withLeftParen(RC<TokenSyntax> NewLeftParen) const;
+  FunctionCallExprSyntax withLeftParen(TokenSyntax NewLeftParen) const;
 
   /// Get the list of arguments in this call expression.
   FunctionCallArgumentListSyntax getArgumentList() const;
@@ -253,11 +253,11 @@ public:
   withArgumentList(FunctionCallArgumentListSyntax NewArgumentList) const;
 
   /// Return the right parenthesis ')' token in this call.
-  RC<TokenSyntax> getRightParen() const;
+  TokenSyntax getRightParen() const;
 
   /// Return a new `FunctionCallExprSyntax` with the given right parenthesis ')'
   /// token.
-  FunctionCallExprSyntax withRightParen(RC<TokenSyntax> NewLeftParen) const;
+  FunctionCallExprSyntax withRightParen(TokenSyntax NewLeftParen) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FunctionCallExpr;
@@ -278,14 +278,14 @@ public:
   useCalledExpression(ExprSyntax CalledExpression);
 
   /// Use the given left parenthesis '(' token in the function call.
-  FunctionCallExprSyntaxBuilder &useLeftParen(RC<TokenSyntax> LeftParen);
+  FunctionCallExprSyntaxBuilder &useLeftParen(TokenSyntax LeftParen);
 
   /// Add an additional argument to the layout.
   FunctionCallExprSyntaxBuilder &
   appendArgument(FunctionCallArgumentSyntax AdditionalArgument);
 
   /// Use the given right parenthesis ')' token in the function call.
-  FunctionCallExprSyntaxBuilder &useRightParen(RC<TokenSyntax> RightParen);
+  FunctionCallExprSyntaxBuilder &useRightParen(TokenSyntax RightParen);
 
   /// Return a `FunctionCallExprSyntax` with the arguments added so far.
   FunctionCallExprSyntax build() const;

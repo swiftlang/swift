@@ -193,7 +193,7 @@ struct ObjectTraits<RC<syntax::RawSyntax>> {
     auto kind = value->Kind;
     switch (kind) {
     case syntax::SyntaxKind::Token: {
-      auto Tok = cast<syntax::TokenSyntax>(value);
+      auto Tok = cast<syntax::RawTokenSyntax>(value);
       auto tokenKind = Tok->getTokenKind();
       auto text = Tok->getText();
       auto description = TokenDescription { tokenKind, text };

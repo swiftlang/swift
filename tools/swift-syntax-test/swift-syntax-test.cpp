@@ -37,7 +37,7 @@ using namespace swift;
 using llvm::StringRef;
 
 enum class ActionType {
-  DumpTokenSyntax,
+  DumpRawTokenSyntax,
   FullLexRoundTrip,
   FullParseRoundTrip,
   SerializeRawTree,
@@ -49,7 +49,7 @@ static llvm::cl::opt<ActionType>
 Action(llvm::cl::desc("Action (required):"),
        llvm::cl::init(ActionType::None),
        llvm::cl::values(
-        clEnumValN(ActionType::DumpTokenSyntax,
+        clEnumValN(ActionType::DumpRawTokenSyntax,
                    "dump-full-tokens",
                    "Lex the source file and dump the tokens "
                    "and their absolute line/column locations"),
@@ -75,7 +75,7 @@ int getTokensFromFile(unsigned BufferID,
                       LangOptions &LangOpts,
                       SourceManager &SourceMgr,
                       DiagnosticEngine &Diags,
-                      std::vector<std::pair<RC<syntax::TokenSyntax>,
+                      std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                       syntax::AbsolutePosition>> &Tokens) {
   Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID);
   return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -87,7 +87,7 @@ getTokensFromFile(const StringRef InputFilename,
                   LangOptions &LangOpts,
                   SourceManager &SourceMgr,
                   DiagnosticEngine &Diags,
-                  std::vector<std::pair<RC<syntax::TokenSyntax>,
+                  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                                         syntax::AbsolutePosition>> &Tokens) {
   auto Buffer = llvm::MemoryBuffer::getFile(InputFilename);
   if (!Buffer) {
@@ -106,7 +106,7 @@ int getSyntaxTree(const char *MainExecutablePath,
                   const StringRef InputFilename,
                   CompilerInstance &Instance,
                   llvm::SmallVectorImpl<syntax::Syntax> &TopLevelDecls,
-                  std::vector<std::pair<RC<syntax::TokenSyntax>,
+                  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                               syntax::AbsolutePosition>> &Tokens) {
   CompilerInvocation Invocation;
   Invocation.addInputFilename(InputFilename);
@@ -175,7 +175,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-  std::vector<std::pair<RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                                    syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
                         Diags, Tokens) == EXIT_FAILURE) {
@@ -189,14 +189,14 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
-int doDumpTokenSyntax(const StringRef InputFilename) {
+int doDumpRawTokenSyntax(const StringRef InputFilename) {
   LangOptions LangOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags(SourceMgr);
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-  std::vector<std::pair<RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
                         Diags, Tokens) == EXIT_FAILURE) {
@@ -217,7 +217,7 @@ int doFullParseRoundTrip(const char *MainExecutablePath,
                          const StringRef InputFilename) {
 
   llvm::SmallVector<syntax::Syntax, 10> TopLevelDecls;
-  std::vector<std::pair<RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   CompilerInstance Instance;
 
@@ -239,7 +239,7 @@ int doSerializeRawTree(const char *MainExecutablePath,
                        const StringRef InputFilename) {
 
   llvm::SmallVector<syntax::Syntax, 10> TopLevelDecls;
-  std::vector<std::pair<RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   CompilerInstance Instance;
 
@@ -275,8 +275,8 @@ int main(int argc, char *argv[]) {
   }
 
   switch (options::Action) {
-  case ActionType::DumpTokenSyntax:
-    ExitCode = doDumpTokenSyntax(options::InputSourceFilename);
+  case ActionType::DumpRawTokenSyntax:
+    ExitCode = doDumpRawTokenSyntax(options::InputSourceFilename);
     break;
   case ActionType::FullLexRoundTrip:
     ExitCode = doFullLexRoundTrip(options::InputSourceFilename);

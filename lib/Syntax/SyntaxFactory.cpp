@@ -24,9 +24,11 @@ using namespace swift;
 using namespace swift::syntax;
 
 UnknownSyntax
-SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<RC<TokenSyntax>> Tokens) {
+SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
   RawSyntax::LayoutList Layout;
-  std::copy(Tokens.begin(), Tokens.end(), std::back_inserter(Layout));
+  for (auto &Token : Tokens) {
+    Layout.push_back(Token.getRaw());
+  }
   auto Raw = RawSyntax::make(SyntaxKind::Unknown, Layout,
                              SourcePresence::Present);
   return make<UnknownSyntax>(Raw);
@@ -36,16 +38,16 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<RC<TokenSyntax>> Tokens) {
 
 #pragma mark - declaration-modifier
 
-DeclModifierSyntax SyntaxFactory::makeDeclModifier(RC<TokenSyntax> Name,
-                                                   RC<TokenSyntax> LeftParen,
-                                                   RC<TokenSyntax> Argument,
-                                                   RC<TokenSyntax> RightParen) {
+DeclModifierSyntax SyntaxFactory::makeDeclModifier(TokenSyntax Name,
+                                                   TokenSyntax LeftParen,
+                                                   TokenSyntax Argument,
+                                                   TokenSyntax RightParen) {
   auto Raw = RawSyntax::make(SyntaxKind::DeclModifier,
                              {
-                               Name,
-                               LeftParen,
-                               Argument,
-                               RightParen,
+                               Name.getRaw(),
+                               LeftParen.getRaw(),
+                               Argument.getRaw(),
+                               RightParen.getRaw(),
                              },
                              SourcePresence::Present);
   return make<DeclModifierSyntax>(Raw);
@@ -76,20 +78,20 @@ DeclModifierListSyntax SyntaxFactory::makeBlankDeclModifierList() {
 #pragma mark - struct-declaration
 
 StructDeclSyntax
-SyntaxFactory::makeStructDecl(RC<TokenSyntax> StructToken,
-                              RC<TokenSyntax> Identifier,
+SyntaxFactory::makeStructDecl(TokenSyntax StructToken,
+                              TokenSyntax Identifier,
                               Syntax GenericParameters,
-                              Syntax WhereClause, RC<TokenSyntax> LeftBrace,
-                              Syntax DeclMembers, RC<TokenSyntax> RightBrace) {
+                              Syntax WhereClause, TokenSyntax LeftBrace,
+                              Syntax DeclMembers, TokenSyntax RightBrace) {
   auto Raw = RawSyntax::make(SyntaxKind::StructDecl,
                              {
-                               StructToken,
-                               Identifier,
+                               StructToken.getRaw(),
+                               Identifier.getRaw(),
                                GenericParameters.getRaw(),
                                WhereClause.getRaw(),
-                               LeftBrace,
+                               LeftBrace.getRaw(),
                                DeclMembers.getRaw(),
-                               RightBrace
+                               RightBrace.getRaw()
                              },
                              SourcePresence::Present);
   return make<StructDeclSyntax>(Raw);
@@ -102,12 +104,17 @@ StructDeclSyntax SyntaxFactory::makeBlankStructDecl() {
 #pragma mark - type-alias-declaration
 
 TypeAliasDeclSyntax SyntaxFactory::makeTypealiasDecl(
-    RC<TokenSyntax> TypealiasToken, RC<TokenSyntax> Identifier,
-    GenericParameterClauseSyntax GenericParams, RC<TokenSyntax> AssignmentToken,
+    TokenSyntax TypealiasToken, TokenSyntax Identifier,
+    GenericParameterClauseSyntax GenericParams, TokenSyntax AssignmentToken,
     TypeSyntax Type) {
   auto Raw = RawSyntax::make(SyntaxKind::TypeAliasDecl,
-                             {TypealiasToken, Identifier, GenericParams.getRaw(),
-                              AssignmentToken, Type.getRaw()},
+                             {
+                               TypealiasToken.getRaw(),
+                               Identifier.getRaw(),
+                               GenericParams.getRaw(),
+                               AssignmentToken.getRaw(),
+                               Type.getRaw()
+                             },
                              SourcePresence::Present);
   return make<TypeAliasDeclSyntax>(Raw);
 }
@@ -123,28 +130,28 @@ DeclMembersSyntax SyntaxFactory::makeBlankDeclMembers() {
 #pragma mark - function-parameter
 
 FunctionParameterSyntax SyntaxFactory::
-makeFunctionParameter(RC<TokenSyntax> ExternalName,
-                      RC<TokenSyntax> LocalName,
-                      RC<TokenSyntax> Colon,
+makeFunctionParameter(TokenSyntax ExternalName,
+                      TokenSyntax LocalName,
+                      TokenSyntax Colon,
                       llvm::Optional<TypeSyntax> ParameterTypeSyntax,
-                      RC<TokenSyntax> Ellipsis,
-                      RC<TokenSyntax> Equal,
+                      TokenSyntax Ellipsis,
+                      TokenSyntax Equal,
                       llvm::Optional<ExprSyntax> DefaultValue,
-                      RC<TokenSyntax> TrailingComma) {
+                      TokenSyntax TrailingComma) {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionParameter,
                              {
-                               ExternalName,
-                               LocalName,
-                               Colon,
+                               ExternalName.getRaw(),
+                               LocalName.getRaw(),
+                               Colon.getRaw(),
                                ParameterTypeSyntax.hasValue()
                                  ? ParameterTypeSyntax.getValue().getRaw()
                                  : RawSyntax::missing(SyntaxKind::MissingType),
-                               Ellipsis,
-                               Equal,
+                               Ellipsis.getRaw(),
+                               Equal.getRaw(),
                                DefaultValue.hasValue()
                                  ? DefaultValue.getValue().getRaw()
                                  : RawSyntax::missing(SyntaxKind::MissingExpr),
-                               TrailingComma,
+                               TrailingComma.getRaw(),
                              },
                              SourcePresence::Present);
   return make<FunctionParameterSyntax>(Raw);
@@ -169,20 +176,20 @@ FunctionParameterListSyntax SyntaxFactory::makeBlankFunctionParameterList() {
 #pragma mark - function-signature
 
 FunctionSignatureSyntax
-SyntaxFactory::makeFunctionSignature(RC<TokenSyntax> LeftParen,
+SyntaxFactory::makeFunctionSignature(TokenSyntax LeftParen,
                                      FunctionParameterListSyntax ParameterList,
-                                     RC<TokenSyntax> RightParen,
-                                     RC<TokenSyntax> ThrowsOrRethrows,
-                                     RC<TokenSyntax> Arrow,
+                                     TokenSyntax RightParen,
+                                     TokenSyntax ThrowsOrRethrows,
+                                     TokenSyntax Arrow,
                                      TypeAttributesSyntax ReturnTypeAttributes,
                                      TypeSyntax ReturnTypeSyntax) {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionSignature,
                              {
-                               LeftParen,
+                               LeftParen.getRaw(),
                                ParameterList.getRaw(),
-                               RightParen,
-                               ThrowsOrRethrows,
-                               Arrow,
+                               RightParen.getRaw(),
+                               ThrowsOrRethrows.getRaw(),
+                               Arrow.getRaw(),
                                ReturnTypeAttributes.getRaw(),
                                ReturnTypeSyntax.getRaw()
                              },
@@ -199,8 +206,8 @@ FunctionSignatureSyntax SyntaxFactory::makeBlankFunctionSignature() {
 FunctionDeclSyntax SyntaxFactory::
 makeFunctionDecl(TypeAttributesSyntax Attributes,
                  DeclModifierListSyntax Modifiers,
-                 RC<TokenSyntax> FuncKeyword,
-                 RC<TokenSyntax> Identifier,
+                 TokenSyntax FuncKeyword,
+                 TokenSyntax Identifier,
                  llvm::Optional<GenericParameterClauseSyntax> GenericParams,
                  FunctionSignatureSyntax Signature,
                  llvm::Optional<GenericWhereClauseSyntax> GenericWhereClause,
@@ -209,8 +216,8 @@ makeFunctionDecl(TypeAttributesSyntax Attributes,
     {
       Attributes.getRaw(),
       Modifiers.getRaw(),
-      FuncKeyword,
-      Identifier,
+      FuncKeyword.getRaw(),
+      Identifier.getRaw(),
       GenericParams.hasValue()
        ? GenericParams.getValue().getRaw()
        : SyntaxFactory::makeBlankGenericParameterClause().getRaw(),
@@ -233,14 +240,14 @@ FunctionDeclSyntax SyntaxFactory::makeBlankFunctionDecl() {
 #pragma mark - Statements
 
 CodeBlockStmtSyntax
-SyntaxFactory::makeCodeBlock(RC<TokenSyntax> LeftBraceToken,
+SyntaxFactory::makeCodeBlock(TokenSyntax LeftBraceToken,
                              StmtListSyntax Elements,
-                             RC<TokenSyntax> RightBraceToken) {
+                             TokenSyntax RightBraceToken) {
   auto Raw = RawSyntax::make(SyntaxKind::CodeBlockStmt,
                              {
-                               LeftBraceToken,
+                               LeftBraceToken.getRaw(),
                                Elements.getRaw(),
-                               RightBraceToken
+                               RightBraceToken.getRaw()
                              }, SourcePresence::Present);
   return make<CodeBlockStmtSyntax>(Raw);
 }
@@ -250,9 +257,9 @@ CodeBlockStmtSyntax SyntaxFactory::makeBlankCodeBlock() {
 }
 
 FallthroughStmtSyntax
-SyntaxFactory::makeFallthroughStmt(RC<TokenSyntax> FallthroughKeyword) {
+SyntaxFactory::makeFallthroughStmt(TokenSyntax FallthroughKeyword) {
   auto Raw = RawSyntax::make(SyntaxKind::FallthroughStmt, {
-    FallthroughKeyword
+    FallthroughKeyword.getRaw()
   }, SourcePresence::Present);
   return make<FallthroughStmtSyntax>(Raw);
 }
@@ -266,12 +273,12 @@ FallthroughStmtSyntax SyntaxFactory::makeBlankFallthroughStmt() {
 /// Make a break statement with the give `break` keyword and
 /// destination label.
 BreakStmtSyntax
-SyntaxFactory::makeBreakStmt(RC<TokenSyntax> BreakKeyword,
-                               RC<TokenSyntax> Label) {
+SyntaxFactory::makeBreakStmt(TokenSyntax BreakKeyword,
+                               TokenSyntax Label) {
   auto Raw = RawSyntax::make(SyntaxKind::BreakStmt,
                              {
-                               BreakKeyword,
-                               Label,
+                               BreakKeyword.getRaw(),
+                               Label.getRaw(),
                              },
                              SourcePresence::Present);
   return make<BreakStmtSyntax>(Raw);
@@ -286,12 +293,12 @@ BreakStmtSyntax SyntaxFactory::makeBlankBreakStmtSyntax() {
 #pragma mark - continue-statement
 
 ContinueStmtSyntax
-SyntaxFactory::makeContinueStmt(RC<TokenSyntax> ContinueKeyword,
-                                RC<TokenSyntax> Label) {
+SyntaxFactory::makeContinueStmt(TokenSyntax ContinueKeyword,
+                                TokenSyntax Label) {
   auto Raw = RawSyntax::make(SyntaxKind::BreakStmt,
                              {
-                               ContinueKeyword,
-                               Label,
+                               ContinueKeyword.getRaw(),
+                               Label.getRaw(),
                              },
                              SourcePresence::Present);
   return make<ContinueStmtSyntax>(Raw);
@@ -308,11 +315,11 @@ ContinueStmtSyntax SyntaxFactory::makeBlankContinueStmtSyntax() {
 /// Make a return statement with the given `return` keyword and returned
 /// expression.
 ReturnStmtSyntax
-SyntaxFactory::makeReturnStmt(RC<TokenSyntax> ReturnKeyword,
+SyntaxFactory::makeReturnStmt(TokenSyntax ReturnKeyword,
                               ExprSyntax ReturnedExpression) {
   auto Raw = RawSyntax::make(SyntaxKind::ReturnStmt,
                              {
-                               ReturnKeyword,
+                               ReturnKeyword.getRaw(),
                                ReturnedExpression.getRaw(),
                              },
                              SourcePresence::Present);
@@ -322,7 +329,7 @@ SyntaxFactory::makeReturnStmt(RC<TokenSyntax> ReturnKeyword,
 ReturnStmtSyntax SyntaxFactory::makeBlankReturnStmt() {
   auto Raw = RawSyntax::make(SyntaxKind::ReturnStmt,
     {
-     TokenSyntax::missingToken(tok::kw_return, "return"),
+     RawTokenSyntax::missingToken(tok::kw_return, "return"),
      RawSyntax::missing(SyntaxKind::MissingExpr),
     },
     SourcePresence::Present);
@@ -353,12 +360,12 @@ StmtListSyntax SyntaxFactory::makeBlankStmtList() {
 #pragma mark - integer-literal-expression
 
 IntegerLiteralExprSyntax
-SyntaxFactory::makeIntegerLiteralExpr(RC<TokenSyntax> Sign,
-                                      RC<TokenSyntax> Digits) {
+SyntaxFactory::makeIntegerLiteralExpr(TokenSyntax Sign,
+                                      TokenSyntax Digits) {
   auto Raw = RawSyntax::make(SyntaxKind::IntegerLiteralExpr,
                              {
-                               Sign,
-                               Digits,
+                               Sign.getRaw(),
+                               Digits.getRaw(),
                              },
                              SourcePresence::Present);
   return make<IntegerLiteralExprSyntax>(Raw);
@@ -367,8 +374,8 @@ SyntaxFactory::makeIntegerLiteralExpr(RC<TokenSyntax> Sign,
 IntegerLiteralExprSyntax SyntaxFactory::makeBlankIntegerLiteralExpr() {
   auto Raw = RawSyntax::make(SyntaxKind::IntegerLiteralExpr,
     {
-     TokenSyntax::missingToken(tok::oper_prefix, "-"),
-     TokenSyntax::missingToken(tok::integer_literal, ""),
+     RawTokenSyntax::missingToken(tok::oper_prefix, "-"),
+     RawTokenSyntax::missingToken(tok::integer_literal, ""),
     },
     SourcePresence::Present);
   return make<IntegerLiteralExprSyntax>(Raw);
@@ -377,11 +384,11 @@ IntegerLiteralExprSyntax SyntaxFactory::makeBlankIntegerLiteralExpr() {
 #pragma mark - symbolic-reference
 
 SymbolicReferenceExprSyntax
-SyntaxFactory::makeSymbolicReferenceExpr(RC<TokenSyntax> Identifier,
+SyntaxFactory::makeSymbolicReferenceExpr(TokenSyntax Identifier,
   llvm::Optional<GenericArgumentClauseSyntax> GenericArgs) {
   auto Raw = RawSyntax::make(SyntaxKind::SymbolicReferenceExpr,
     {
-      Identifier,
+      Identifier.getRaw(),
       GenericArgs.hasValue()
         ? GenericArgs.getValue().getRaw()
         : RawSyntax::missing(SyntaxKind::GenericArgumentClause)
@@ -401,16 +408,16 @@ FunctionCallArgumentSyntax SyntaxFactory::makeBlankFunctionCallArgument() {
 }
 
 FunctionCallArgumentSyntax
-SyntaxFactory::makeFunctionCallArgument(RC<TokenSyntax> Label,
-                                        RC<TokenSyntax> Colon,
+SyntaxFactory::makeFunctionCallArgument(TokenSyntax Label,
+                                        TokenSyntax Colon,
                                         ExprSyntax ExpressionArgument,
-                                        RC<TokenSyntax> TrailingComma) {
+                                        TokenSyntax TrailingComma) {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionCallArgument,
                              {
-                               Label,
-                               Colon,
+                               Label.getRaw(),
+                               Colon.getRaw(),
                                ExpressionArgument.getRaw(),
-                               TrailingComma
+                               TrailingComma.getRaw()
                              },
                              SourcePresence::Present);
   return make<FunctionCallArgumentSyntax>(Raw);
@@ -442,15 +449,15 @@ SyntaxFactory::makeBlankFunctionCallArgumentList() {
 
 FunctionCallExprSyntax
 SyntaxFactory::makeFunctionCallExpr(ExprSyntax CalledExpr,
-                                    RC<TokenSyntax> LeftParen,
+                                    TokenSyntax LeftParen,
                                     FunctionCallArgumentListSyntax Arguments,
-                                    RC<TokenSyntax> RightParen) {
+                                    TokenSyntax RightParen) {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionCallExpr,
                              {
                                CalledExpr.getRaw(),
-                               LeftParen,
+                               LeftParen.getRaw(),
                                Arguments.getRaw(),
-                               RightParen
+                               RightParen.getRaw()
                              },
                              SourcePresence::Present);
   return make<FunctionCallExprSyntax>(Raw);
@@ -463,323 +470,241 @@ FunctionCallExprSyntax SyntaxFactory::makeBlankFunctionCallExpr() {
 
 #pragma mark - Tokens
 
-RC<TokenSyntax>
+TokenSyntax
+SyntaxFactory::makeToken(tok Kind, OwnedString Text, SourcePresence Presence,
+                         const Trivia &LeadingTrivia,
+                         const Trivia &TrailingTrivia) {
+  return make<TokenSyntax>(RawTokenSyntax::make(Kind, Text, Presence,
+                                                LeadingTrivia, TrailingTrivia));
+}
+
+TokenSyntax
 SyntaxFactory::makeStaticKeyword(const Trivia &LeadingTrivia,
                                  const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::kw_static, "static",
-                           SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+
+  return makeToken(tok::kw_static, "static", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makePublicKeyword(const Trivia &LeadingTrivia,
                                  const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::kw_public, "public",
-                           SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::kw_public, "public", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeFuncKeyword(const Trivia &LeadingTrivia,
                                       const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::kw_func, "func",
-                           SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::kw_func, "func", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeFallthroughKeyword(const Trivia &LeadingTrivia,
                                       const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::kw_fallthrough, "fallthrough",
-                           SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::kw_fallthrough, "fallthrough", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeAtSignToken(const Trivia &LeadingTrivia,
                                const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::at_sign, "@", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::at_sign, "@", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeBreakKeyword(const swift::syntax::Trivia &LeadingTrivia,
                                 const swift::syntax::Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::kw_break, "break", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::kw_break, "break", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::
+TokenSyntax SyntaxFactory::
 makeContinueKeyword(const swift::syntax::Trivia &LeadingTrivia,
                     const swift::syntax::Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::kw_continue, "continue",
-                           SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::kw_continue, "continue", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::
+TokenSyntax SyntaxFactory::
 makeReturnKeyword(const swift::syntax::Trivia &LeadingTrivia,
                   const swift::syntax::Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::kw_return, "return",
-                           SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::kw_return, "return", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeLeftAngleToken(const Trivia &LeadingTrivia,
                                   const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::l_angle, "<", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::l_angle, "<", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeRightAngleToken(const Trivia &LeadingTrivia,
                                    const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::r_angle, ">", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::r_angle, ">", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeLeftParenToken(const Trivia &LeadingTrivia,
                                   const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::l_paren, "(", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::l_paren, "(", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeRightParenToken(const Trivia &LeadingTrivia,
                                    const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::r_paren, ")", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::r_paren, ")", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeLeftBraceToken(const Trivia &LeadingTrivia,
                                   const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::l_brace, "{", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::l_brace, "{", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeRightBraceToken(const Trivia &LeadingTrivia,
                                    const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::r_brace, "}", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::r_brace, "}", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeLeftSquareBracketToken(const Trivia &LeadingTrivia,
                                           const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::l_square, "[", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::l_square, "[", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeRightSquareBracketToken(const Trivia &LeadingTrivia,
                                            const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::r_square, "]", SourcePresence::Present,
-                           LeadingTrivia, TrailingTrivia);
+  return makeToken(tok::r_square, "]", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeQuestionPostfixToken(const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::question_postfix, "?", SourcePresence::Present,
-                           {}, TrailingTrivia);
+  return makeToken(tok::question_postfix, "?", SourcePresence::Present,
+                   {}, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeExclaimPostfixToken(const Trivia &TrailingTrivia) {
-  return TokenSyntax::make(tok::exclaim_postfix, "!", SourcePresence::Present,
-                           {}, TrailingTrivia);
+  return makeToken(tok::exclaim_postfix, "!", SourcePresence::Present,
+                   {}, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::makeIdentifier(OwnedString Name,
+TokenSyntax SyntaxFactory::makeIdentifier(OwnedString Name,
                                            const Trivia &LeadingTrivia,
                                            const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax>{
-    new TokenSyntax {
-      tok::identifier, Name,
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::identifier, Name, SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::makeCommaToken(const Trivia &LeadingTrivia,
+TokenSyntax SyntaxFactory::makeCommaToken(const Trivia &LeadingTrivia,
                                              const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax>{
-    new TokenSyntax{tok::comma, ",",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::comma, ",", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::makeColonToken(const Trivia &LeadingTrivia,
+TokenSyntax SyntaxFactory::makeColonToken(const Trivia &LeadingTrivia,
                                              const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax{tok::colon, ":",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::colon, ":", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::makeDotToken(const Trivia &LeadingTrivia,
+TokenSyntax SyntaxFactory::makeDotToken(const Trivia &LeadingTrivia,
                                            const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax {
-      tok::period, ".",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia,
-    }
-  };
+  return makeToken(tok::period, ".", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::makeStructKeyword(const Trivia &LeadingTrivia,
+TokenSyntax SyntaxFactory::makeStructKeyword(const Trivia &LeadingTrivia,
                                                  const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax{tok::kw_struct, "struct",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::kw_struct, "struct", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::makeWhereKeyword(const Trivia &LeadingTrivia,
+TokenSyntax SyntaxFactory::makeWhereKeyword(const Trivia &LeadingTrivia,
                                                 const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax{tok::kw_where, "where",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::kw_where, "where", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::makeInoutKeyword(const Trivia &LeadingTrivia,
+TokenSyntax SyntaxFactory::makeInoutKeyword(const Trivia &LeadingTrivia,
                                                 const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax{tok::kw_inout, "inout",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::kw_inout, "inout", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeThrowsKeyword(const Trivia &LeadingTrivia,
                                  const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax {
-      tok::kw_throws, "throws",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::kw_throws, "throws", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeRethrowsKeyword(const Trivia &LeadingTrivia,
                                    const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax {
-      tok::kw_rethrows, "rethrows",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::kw_rethrows, "rethrows", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeTypealiasKeyword(const Trivia &LeadingTrivia,
                                     const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax {
-      tok::kw_typealias, "typealias",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::kw_typealias, "typealias", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeEqualToken(const Trivia &LeadingTrivia,
                               const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax{tok::equal, "=",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::equal, "=", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::makeArrow(const Trivia &LeadingTrivia,
+TokenSyntax SyntaxFactory::makeArrow(const Trivia &LeadingTrivia,
                                       const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax{tok::arrow, "->",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::arrow, "->", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeEqualityOperator(const Trivia &LeadingTrivia,
                                     const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax {
-      tok::oper_binary_spaced, "==",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::oper_binary_spaced, "==", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax> SyntaxFactory::makeTypeToken(const Trivia &LeadingTrivia,
+TokenSyntax SyntaxFactory::makeTypeToken(const Trivia &LeadingTrivia,
                                           const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax {
-      tok::identifier, "Type",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::identifier, "Type", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeProtocolToken(const Trivia &LeadingTrivia,
                                  const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax{tok::identifier, "Protocol",
-      SourcePresence::Present,
-      LeadingTrivia,
-      TrailingTrivia
-    }
-  };
+  return makeToken(tok::identifier, "Protocol", SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makeIntegerLiteralToken(OwnedString Digits,
                                        const Trivia &LeadingTrivia,
                                        const Trivia &TrailingTrivia) {
-  return RC<TokenSyntax> {
-    new TokenSyntax(tok::integer_literal, Digits, SourcePresence::Present,
-                    LeadingTrivia,
-                    TrailingTrivia)
-  };
+  return makeToken(tok::integer_literal, Digits, SourcePresence::Present,
+                   LeadingTrivia, TrailingTrivia);
 }
 
 #pragma mark - Generics
@@ -804,10 +729,12 @@ SyntaxFactory::makeGenericParameter(OwnedString TypeName,
                                     const Trivia &TrailingTrivia) {
   auto Raw = RawSyntax::make(SyntaxKind::GenericParameter,
                              {
-                               SyntaxFactory::makeIdentifier(TypeName,
-                                                             LeadingTrivia,
-                                                             TrailingTrivia),
-                               TokenSyntax::missingToken(tok::colon, ":"),
+                               RawTokenSyntax::make(tok::identifier,
+                                                    TypeName,
+                                                    SourcePresence::Present,
+                                                    LeadingTrivia,
+                                                    TrailingTrivia),
+                               RawTokenSyntax::missingToken(tok::colon, ":"),
                                RawSyntax::missing(SyntaxKind::TypeIdentifier),
                              },
                              SourcePresence::Present);
@@ -816,12 +743,12 @@ SyntaxFactory::makeGenericParameter(OwnedString TypeName,
 
 SameTypeRequirementSyntax SyntaxFactory::
 makeSameTypeRequirement( TypeIdentifierSyntax LeftTypeIdentifier,
-                        RC<TokenSyntax> EqualityToken,
+                        TokenSyntax EqualityToken,
                         TypeSyntax RightType) {
   auto Raw = RawSyntax::make(SyntaxKind::SameTypeRequirement,
                              {
                                LeftTypeIdentifier.getRaw(),
-                               EqualityToken,
+                               EqualityToken.getRaw(),
                                RightType.getRaw()
                              },
                              SourcePresence::Present);
@@ -850,11 +777,11 @@ GenericRequirementListSyntax SyntaxFactory::makeBlankGenericRequirementList() {
 #pragma mark - Operators
 
 /// Make a prefix operator with the given text.
-RC<TokenSyntax>
+TokenSyntax
 SyntaxFactory::makePrefixOperator(OwnedString Name,
                                    const Trivia &LeadingTrivia) {
-  return TokenSyntax::make(tok::oper_prefix, Name,
-                           SourcePresence::Present, LeadingTrivia, {});
+  return makeToken(tok::oper_prefix, Name,
+                   SourcePresence::Present, LeadingTrivia, {});
 }
 
 #pragma mark - Types
@@ -862,18 +789,18 @@ SyntaxFactory::makePrefixOperator(OwnedString Name,
 #pragma mark - type-attribute
 
 TypeAttributeSyntax
-SyntaxFactory::makeTypeAttribute(RC<TokenSyntax> AtSignToken,
-                                RC<TokenSyntax> Identifier,
-                                RC<TokenSyntax> LeftParen,
+SyntaxFactory::makeTypeAttribute(TokenSyntax AtSignToken,
+                                TokenSyntax Identifier,
+                                TokenSyntax LeftParen,
                                 BalancedTokensSyntax BalancedTokens,
-                                RC<TokenSyntax> RightParen) {
+                                TokenSyntax RightParen) {
   auto Raw = RawSyntax::make(SyntaxKind::TypeAttribute,
                              {
-                               AtSignToken,
-                               Identifier,
-                               LeftParen,
+                               AtSignToken.getRaw(),
+                               Identifier.getRaw(),
+                               LeftParen.getRaw(),
                                BalancedTokens.getRaw(),
-                               RightParen,
+                               RightParen.getRaw(),
                              },
                              SourcePresence::Present);
   return make<TypeAttributeSyntax>(Raw);
@@ -888,9 +815,13 @@ TypeAttributeSyntax SyntaxFactory::makeBlankTypeAttribute() {
 #pragma mark - balanced-tokens
 
 BalancedTokensSyntax
-SyntaxFactory::makeBalancedTokens(RawSyntax::LayoutList Tokens) {
+SyntaxFactory::makeBalancedTokens(llvm::ArrayRef<TokenSyntax> Tokens) {
+  RawSyntax::LayoutList RawTokens;
+  for (auto &Tok : Tokens) {
+    RawTokens.push_back(Tok.getRaw());
+  }
   auto Raw = RawSyntax::make(SyntaxKind::BalancedTokens,
-                             Tokens,
+                             RawTokens,
                              SourcePresence::Present);
   return make<BalancedTokensSyntax>(Raw);
 }
@@ -908,9 +839,13 @@ SyntaxFactory::makeTypeIdentifier(OwnedString Name,
   auto Raw = RawSyntax::make(
                              SyntaxKind::TypeIdentifier,
                              {
-                               SyntaxFactory::makeIdentifier(Name, LeadingTrivia, TrailingTrivia),
+                               RawTokenSyntax::make(tok::identifier,
+                                                    Name,
+                                                    SourcePresence::Present,
+                                                    LeadingTrivia,
+                                                    TrailingTrivia),
                                RawSyntax::missing(SyntaxKind::GenericArgumentClause),
-                               TokenSyntax::missingToken(tok::period, "."),
+                               RawTokenSyntax::missingToken(tok::period, "."),
                                RawSyntax::missing(SyntaxKind::TypeIdentifier),
                              },
                              SourcePresence::Present);
@@ -928,12 +863,12 @@ TypeIdentifierSyntax SyntaxFactory::makeSelfTypeIdentifier() {
 }
 
 TypeIdentifierSyntax
-SyntaxFactory::makeTypeIdentifier(RC<TokenSyntax> Identifier,
+SyntaxFactory::makeTypeIdentifier(TokenSyntax Identifier,
                                   GenericArgumentClauseSyntax GenericArgs) {
   auto Raw = RawSyntax::make(SyntaxKind::TypeIdentifier,
                              {
-                               Identifier, GenericArgs.getRaw(),
-                               TokenSyntax::missingToken(tok::period, "."),
+                               Identifier.getRaw(), GenericArgs.getRaw(),
+                               RawTokenSyntax::missingToken(tok::period, "."),
                                RawSyntax::missing(SyntaxKind::TypeIdentifier),
                              },
                              SourcePresence::Present);
@@ -945,35 +880,33 @@ SyntaxFactory::makeTypeIdentifier(RC<TokenSyntax> Identifier,
 TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
     {
-      SyntaxFactory::makeLeftParenToken({}, {}),
+      SyntaxFactory::makeLeftParenToken({}, {}).getRaw(),
       RawSyntax::missing(SyntaxKind::TupleTypeElementList),
-      SyntaxFactory::makeRightParenToken({}, {}),
+      SyntaxFactory::makeRightParenToken({}, {}).getRaw(),
     },
     SourcePresence::Present);
   return make<TupleTypeSyntax>(Raw);
 }
 
 TupleTypeSyntax
-SyntaxFactory::makeTupleType(RC<TokenSyntax> LParen,
+SyntaxFactory::makeTupleType(TokenSyntax LParen,
                              TupleTypeElementListSyntax Elements,
-                             RC<TokenSyntax> RParen) {
+                             TokenSyntax RParen) {
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
-                             { LParen, Elements.getRaw(), RParen },
+                             { LParen.getRaw(),
+                               Elements.getRaw(),
+                               RParen.getRaw() },
                              SourcePresence::Present);
   return make<TupleTypeSyntax>(Raw);
 }
 
 TupleTypeElementSyntax
-SyntaxFactory::makeTupleTypeElement(RC<TokenSyntax> Name,
-                                    RC<TokenSyntax> Colon,
+SyntaxFactory::makeTupleTypeElement(TokenSyntax Name,
+                                    TokenSyntax Colon,
                                     TypeSyntax ElementTypeSyntax,
-                                    Optional<RC<TokenSyntax>> MaybeComma) {
-  RC<TokenSyntax> Comma;
-  if (MaybeComma.hasValue()) {
-    Comma = MaybeComma.getValue();
-  } else {
-    Comma = TokenSyntax::missingToken(tok::comma, ",");
-  }
+                                    Optional<TokenSyntax> MaybeComma) {
+  TokenSyntax Comma = MaybeComma.getValueOr(
+                        TokenSyntax::missingToken(tok::comma, ","));
   return TupleTypeElementSyntax::makeBlank()
     .withLabel(Name)
     .withColonToken(Colon)
@@ -984,13 +917,9 @@ SyntaxFactory::makeTupleTypeElement(RC<TokenSyntax> Name,
 
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(TypeSyntax ElementType,
-                                    Optional<RC<TokenSyntax>> MaybeComma) {
-  RC<TokenSyntax> Comma;
-  if (MaybeComma.hasValue()) {
-    Comma = MaybeComma.getValue();
-  } else {
-    Comma = TokenSyntax::missingToken(tok::comma, ",");
-  }
+                                    Optional<TokenSyntax> MaybeComma) {
+  TokenSyntax Comma = MaybeComma.getValueOr(
+                        TokenSyntax::missingToken(tok::comma, ","));
   return TupleTypeElementSyntax::makeBlank()
     .withTypeSyntax(ElementType)
     .withCommaToken(Comma);
@@ -1011,7 +940,7 @@ SyntaxFactory::makeOptionalType(TypeSyntax BaseType,
   auto Raw = RawSyntax::make(SyntaxKind::OptionalType,
   {
     BaseType.getRaw(),
-    SyntaxFactory::makeQuestionPostfixToken(TrailingTrivia),
+    SyntaxFactory::makeQuestionPostfixToken(TrailingTrivia).getRaw(),
   },
   SourcePresence::Present);
 
@@ -1030,7 +959,7 @@ makeImplicitlyUnwrappedOptionalType(TypeSyntax BaseType,
   auto Raw = RawSyntax::make(SyntaxKind::ImplicitlyUnwrappedOptionalType,
     {
       BaseType.getRaw(),
-      SyntaxFactory::makeExclaimPostfixToken(TrailingTrivia),
+      SyntaxFactory::makeExclaimPostfixToken(TrailingTrivia).getRaw(),
     },
     SourcePresence::Present);
   return make<ImplicitlyUnwrappedOptionalTypeSyntax>(Raw);
@@ -1044,13 +973,13 @@ SyntaxFactory::makeBlankImplicitlyUnwrappedOptionalType() {
 #pragma mark - metatype-type
 
 MetatypeTypeSyntax SyntaxFactory::makeMetatypeType(TypeSyntax BaseType,
-                                                   RC<TokenSyntax> DotToken,
-                                                   RC<TokenSyntax> TypeToken) {
+                                                   TokenSyntax DotToken,
+                                                   TokenSyntax TypeToken) {
   auto Raw = RawSyntax::make(SyntaxKind::MetatypeType,
                              {
                                BaseType.getRaw(),
-                               DotToken,
-                               TypeToken
+                               DotToken.getRaw(),
+                               TypeToken.getRaw()
                              },
                              SourcePresence::Present);
   return make<MetatypeTypeSyntax>(Raw);
@@ -1063,19 +992,19 @@ MetatypeTypeSyntax SyntaxFactory::makeBlankMetatypeType() {
 #pragma mark - function-type
 
 FunctionTypeSyntax SyntaxFactory::makeFunctionType(
-    TypeAttributesSyntax TypeAttributes, RC<TokenSyntax> LeftParen,
-    FunctionParameterListSyntax ArgumentList, RC<TokenSyntax> RightParen,
-    RC<TokenSyntax> ThrowsOrRethrows, RC<TokenSyntax> Arrow,
+    TypeAttributesSyntax TypeAttributes, TokenSyntax LeftParen,
+    FunctionParameterListSyntax ArgumentList, TokenSyntax RightParen,
+    TokenSyntax ThrowsOrRethrows, TokenSyntax Arrow,
     TypeSyntax ReturnType) {
   auto Raw =
       RawSyntax::make(SyntaxKind::FunctionType,
                       {
                         TypeAttributes.getRaw(),
-                        LeftParen,
+                        LeftParen.getRaw(),
                         ArgumentList.getRaw(),
-                        RightParen,
-                        ThrowsOrRethrows,
-                        Arrow,
+                        RightParen.getRaw(),
+                        ThrowsOrRethrows.getRaw(),
+                        Arrow.getRaw(),
                         ReturnType.getRaw()
                       },
                       SourcePresence::Present);
@@ -1089,35 +1018,37 @@ FunctionTypeSyntax SyntaxFactory::makeBlankFunctionType() {
 #pragma mark - function-type-argument
 
 FunctionTypeArgumentSyntax SyntaxFactory::
-makeFunctionTypeArgument(RC<TokenSyntax> ExternalParameterName,
-                         RC<TokenSyntax> LocalParameterName,
+makeFunctionTypeArgument(TokenSyntax ExternalParameterName,
+                         TokenSyntax LocalParameterName,
                          TypeAttributesSyntax TypeAttributes,
-                         RC<TokenSyntax> InoutKeyword,
-                         RC<TokenSyntax> ColonToken,
+                         TokenSyntax InoutKeyword,
+                         TokenSyntax ColonToken,
                          TypeSyntax ParameterTypeSyntax) {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionTypeArgument,
                              {
-                               ExternalParameterName,
-                               LocalParameterName,
+                               ExternalParameterName.getRaw(),
+                               LocalParameterName.getRaw(),
                                TypeAttributes.getRaw(),
-                               InoutKeyword,
-                               ColonToken,
+                               InoutKeyword.getRaw(),
+                               ColonToken.getRaw(),
                                ParameterTypeSyntax.getRaw()
                              }, SourcePresence::Present);
   return make<FunctionTypeArgumentSyntax>(Raw);
 }
 
 FunctionTypeArgumentSyntax SyntaxFactory::
-makeFunctionTypeArgument(RC<TokenSyntax> LocalParameterName,
-                         RC<TokenSyntax> ColonToken,
+makeFunctionTypeArgument(TokenSyntax LocalParameterName,
+                         TokenSyntax ColonToken,
                          swift::syntax::TypeSyntax TypeArgument) {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionTypeArgument,
                              {
-                               TokenSyntax::missingToken(tok::identifier, ""),
-                               LocalParameterName,
+                               RawTokenSyntax::missingToken(tok::identifier,
+                                                            ""),
+                               LocalParameterName.getRaw(),
                                RawSyntax::missing(SyntaxKind::TypeAttributes),
-                               TokenSyntax::missingToken(tok::kw_inout, "inout"),
-                               ColonToken,
+                               RawTokenSyntax::missingToken(tok::kw_inout,
+                                                            "inout"),
+                               ColonToken.getRaw(),
                                TypeArgument.getRaw()
                              }, SourcePresence::Present);
   return make<FunctionTypeArgumentSyntax>(Raw);
@@ -1127,11 +1058,11 @@ FunctionTypeArgumentSyntax
 SyntaxFactory::makeFunctionTypeArgument(TypeSyntax TypeArgument) {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionTypeArgument,
     {
-      TokenSyntax::missingToken(tok::identifier, ""),
-      TokenSyntax::missingToken(tok::identifier, ""),
+      RawTokenSyntax::missingToken(tok::identifier, ""),
+      RawTokenSyntax::missingToken(tok::identifier, ""),
       RawSyntax::missing(SyntaxKind::TypeAttributes),
-      TokenSyntax::missingToken(tok::kw_inout, "inout"),
-      TokenSyntax::missingToken(tok::colon, ":"),
+      RawTokenSyntax::missingToken(tok::kw_inout, "inout"),
+      RawTokenSyntax::missingToken(tok::colon, ":"),
       TypeArgument.getRaw()
     }, SourcePresence::Present);
   return make<FunctionTypeArgumentSyntax>(Raw);
@@ -1151,14 +1082,14 @@ TupleTypeElementListSyntax SyntaxFactory::makeBlankTupleTypeElementList() {
 #pragma mark - array-type
 
 ArrayTypeSyntax
-SyntaxFactory::makeArrayType(RC<TokenSyntax> LeftSquareBracket,
+SyntaxFactory::makeArrayType(TokenSyntax LeftSquareBracket,
                              TypeSyntax ElementType,
-                             RC<TokenSyntax> RightSquareBracket) {
+                             TokenSyntax RightSquareBracket) {
   auto Raw = RawSyntax::make(SyntaxKind::ArrayType,
                              {
-                               LeftSquareBracket,
+                               LeftSquareBracket.getRaw(),
                                ElementType.getRaw(),
-                               RightSquareBracket
+                               RightSquareBracket.getRaw()
                              },
                              SourcePresence::Present);
   return make<ArrayTypeSyntax>(Raw);
@@ -1171,18 +1102,18 @@ ArrayTypeSyntax SyntaxFactory::makeBlankArrayType() {
 #pragma mark - dictionary-type
 
 DictionaryTypeSyntax
-SyntaxFactory::makeDictionaryType(RC<TokenSyntax> LeftSquareBracket,
+SyntaxFactory::makeDictionaryType(TokenSyntax LeftSquareBracket,
                                   TypeSyntax KeyType,
-                                  RC<TokenSyntax> Colon,
+                                  TokenSyntax Colon,
                                   TypeSyntax ValueType,
-                                  RC<TokenSyntax> RightSquareBracket) {
+                                  TokenSyntax RightSquareBracket) {
   auto Raw = RawSyntax::make(SyntaxKind::DictionaryType,
                              {
-                               LeftSquareBracket,
+                               LeftSquareBracket.getRaw(),
                                KeyType.getRaw(),
-                               Colon,
+                               Colon.getRaw(),
                                ValueType.getRaw(),
-                               RightSquareBracket
+                               RightSquareBracket.getRaw()
                              },
                              SourcePresence::Present);
   return make<DictionaryTypeSyntax>(Raw);

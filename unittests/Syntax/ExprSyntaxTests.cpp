@@ -72,7 +72,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
 
     auto Ref = SyntaxFactory::makeSymbolicReferenceExpr(Array, GenericArgs);
 
-    ASSERT_EQ(Ref.getIdentifier(), Array);
+    ASSERT_EQ(Ref.getIdentifier().getRaw(), Array.getRaw());
 
     auto GottenArgs = Ref.getGenericArgumentClause().getValue();
     auto GottenArgs2 = Ref.getGenericArgumentClause().getValue();
@@ -172,8 +172,8 @@ TEST(ExprSyntaxTests, FunctionCallArgumentGetAPIs) {
     auto Arg = SyntaxFactory::makeFunctionCallArgument(X, Colon, SymbolicRef,
                                                        Comma);
 
-    ASSERT_EQ(X, Arg.getLabel());
-    ASSERT_EQ(Colon, Arg.getColonToken());
+    ASSERT_EQ(X.getRaw(), Arg.getLabel().getRaw());
+    ASSERT_EQ(Colon.getRaw(), Arg.getColonToken().getRaw());
 
     auto GottenExpr = Arg.getExpression().getValue();
     auto GottenExpr2 = Arg.getExpression().getValue();
@@ -183,7 +183,7 @@ TEST(ExprSyntaxTests, FunctionCallArgumentGetAPIs) {
     GottenExpr.print(OS);
     ASSERT_EQ("foo", OS.str().str());
 
-    ASSERT_EQ(Comma, Arg.getTrailingComma());
+    ASSERT_EQ(Comma.getRaw(), Arg.getTrailingComma().getRaw());
   }
 }
 
@@ -407,8 +407,8 @@ TEST(ExprSyntaxTests, FunctionCallExprGetAPIs) {
     ASSERT_EQ(OS.str().str(), "foo");
   }
 
-  ASSERT_EQ(LeftParen, Call.getLeftParen());
-  ASSERT_EQ(RightParen, Call.getRightParen());
+  ASSERT_EQ(LeftParen.getRaw(), Call.getLeftParen().getRaw());
+  ASSERT_EQ(RightParen.getRaw(), Call.getRightParen().getRaw());
 
   {
     auto GottenArgs1 = Call.getArgumentList();

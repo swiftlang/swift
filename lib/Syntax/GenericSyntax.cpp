@@ -39,7 +39,7 @@ ConformanceRequirementSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::ConformanceRequirement,
                              {
                                RawSyntax::missing(SyntaxKind::TypeIdentifier),
-                               TokenSyntax::missingToken(tok::colon, ":"),
+                               RawTokenSyntax::missingToken(tok::colon, ":"),
                                RawSyntax::missing(SyntaxKind::TypeIdentifier),
                              },
                              SourcePresence::Present);
@@ -55,8 +55,8 @@ void GenericParameterSyntax::validate() const {
 GenericParameterSyntax GenericParameterSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::GenericParameter,
                              {
-                               TokenSyntax::missingToken(tok::identifier, ""),
-                               TokenSyntax::missingToken(tok::colon, ":"),
+                               RawTokenSyntax::missingToken(tok::identifier, ""),
+                               RawTokenSyntax::missingToken(tok::colon, ":"),
                                RawSyntax::missing(SyntaxKind::MissingType),
                              },
                              SourcePresence::Present);
@@ -83,9 +83,9 @@ GenericParameterClauseSyntax::makeBlank() {
   auto Raw = RawSyntax::make(
                SyntaxKind::GenericParameterClause,
                {
-                 TokenSyntax::missingToken(tok::l_angle, "<"),
+                 RawTokenSyntax::missingToken(tok::l_angle, "<"),
                  RawSyntax::missing(SyntaxKind::GenericParameterList),
-                 TokenSyntax::missingToken(tok::r_angle, ">"),
+                 RawTokenSyntax::missingToken(tok::r_angle, ">"),
                },
                SourcePresence::Present);
   return make<GenericParameterClauseSyntax>(Raw);
@@ -94,35 +94,36 @@ GenericParameterClauseSyntax::makeBlank() {
 #pragma mark - generic-parameter-clause Builder
 
 GenericParameterClauseBuilder::GenericParameterClauseBuilder()
-  : LeftAngleToken(TokenSyntax::missingToken(tok::l_angle, "<")),
+  : LeftAngleToken(RawTokenSyntax::missingToken(tok::l_angle, "<")),
     ParameterListLayout(RawSyntax::missing(SyntaxKind::GenericParameterList)
                           ->Layout),
-    RightAngleToken(TokenSyntax::missingToken(tok::r_angle, ">")) {}
+    RightAngleToken(RawTokenSyntax::missingToken(tok::r_angle, ">")) {}
 
 GenericParameterClauseBuilder &GenericParameterClauseBuilder::
-useLeftAngleBracket(RC<TokenSyntax> LeftAngle) {
+useLeftAngleBracket(TokenSyntax LeftAngle) {
   syntax_assert_token_is(LeftAngle, tok::l_angle, "<");
-  LeftAngleToken = LeftAngle;
+  LeftAngleToken = LeftAngle.getRawToken();
   return *this;
 }
 
 GenericParameterClauseBuilder &GenericParameterClauseBuilder::
-addParameter(llvm::Optional<RC<TokenSyntax>> MaybeComma,
+addParameter(llvm::Optional<TokenSyntax> MaybeComma,
              GenericParameterSyntax Parameter) {
   if (MaybeComma.hasValue()) {
     syntax_assert_token_is(MaybeComma.getValue(), tok::comma, ",");
-    ParameterListLayout.push_back(MaybeComma.getValue());
+    ParameterListLayout.push_back(MaybeComma->getRaw());
   } else {
-    ParameterListLayout.push_back(TokenSyntax::missingToken(tok::comma, ","));
+    ParameterListLayout.push_back(
+                            RawTokenSyntax::missingToken(tok::comma, ","));
   }
   ParameterListLayout.push_back(Parameter.getRaw());
   return *this;
 }
 
 GenericParameterClauseBuilder &GenericParameterClauseBuilder::
-useRightAngleBracket(RC<TokenSyntax> RightAngle) {
+useRightAngleBracket(TokenSyntax RightAngle) {
   syntax_assert_token_is(RightAngle, tok::r_angle, ">");
-  RightAngleToken = RightAngle;
+  RightAngleToken = RightAngle.getRawToken();
   return *this;
 }
 
@@ -156,7 +157,7 @@ GenericWhereClauseSyntax GenericWhereClauseSyntax::makeBlank() {
   auto Raw = RawSyntax::make(
                SyntaxKind::GenericWhereClause,
                {
-                 TokenSyntax::missingToken(tok::kw_where, "where"),
+                 RawTokenSyntax::missingToken(tok::kw_where, "where"),
                  RawSyntax::missing(SyntaxKind::GenericRequirementList),
                },
                SourcePresence::Present);
@@ -164,9 +165,9 @@ GenericWhereClauseSyntax GenericWhereClauseSyntax::makeBlank() {
 }
 
 GenericWhereClauseSyntax GenericWhereClauseSyntax::
-withWhereKeyword(RC<TokenSyntax> NewWhereKeyword) const {
+withWhereKeyword(TokenSyntax NewWhereKeyword) const {
   syntax_assert_token_is(NewWhereKeyword, tok::kw_where, "where");
-  return Data->replaceChild<GenericWhereClauseSyntax>(NewWhereKeyword,
+  return Data->replaceChild<GenericWhereClauseSyntax>(NewWhereKeyword.getRaw(),
                                                       Cursor::WhereKeyword);
 }
 
@@ -193,7 +194,7 @@ SameTypeRequirementSyntax SameTypeRequirementSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::SameTypeRequirement,
                              {
                                RawSyntax::missing(SyntaxKind::TypeIdentifier),
-                               TokenSyntax::missingToken(tok::equal, "="),
+                               RawTokenSyntax::missingToken(tok::equal, "="),
                                RawSyntax::missing(SyntaxKind::MissingType),
                              },
                              SourcePresence::Present);
@@ -206,9 +207,9 @@ GenericArgumentClauseSyntax
 GenericArgumentClauseSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::GenericArgumentClause,
                              {
-                               TokenSyntax::missingToken(tok::l_angle, "<"),
+                               RawTokenSyntax::missingToken(tok::l_angle, "<"),
                                RawSyntax::missing(SyntaxKind::GenericArgumentList),
-                               TokenSyntax::missingToken(tok::r_angle, ">"),
+                               RawTokenSyntax::missingToken(tok::r_angle, ">"),
                              },
                              SourcePresence::Present);
   return make<GenericArgumentClauseSyntax>(Raw);
@@ -216,19 +217,19 @@ GenericArgumentClauseSyntax::makeBlank() {
 
 
 GenericArgumentClauseSyntax GenericArgumentClauseSyntax::
-withLeftAngleBracket(RC<TokenSyntax> NewLeftAngleBracket) const {
+withLeftAngleBracket(TokenSyntax NewLeftAngleBracket) const {
   syntax_assert_token_is(NewLeftAngleBracket, tok::l_angle, "<");
   return Data->replaceChild<GenericArgumentClauseSyntax>(
-    NewLeftAngleBracket, Cursor::LeftAngleBracketToken);
+    NewLeftAngleBracket.getRaw(), Cursor::LeftAngleBracketToken);
 }
 
 
 
 GenericArgumentClauseSyntax GenericArgumentClauseSyntax::
-withRightAngleBracket(RC<TokenSyntax> NewRightAngleBracket) const {
+withRightAngleBracket(TokenSyntax NewRightAngleBracket) const {
   syntax_assert_token_is(NewRightAngleBracket, tok::r_angle, ">");
   return Data->replaceChild<GenericArgumentClauseSyntax>(
-    NewRightAngleBracket, Cursor::RightAngleBracketToken);
+    NewRightAngleBracket.getRaw(), Cursor::RightAngleBracketToken);
 }
 
 #pragma mark - generic-argument-clause Builder
@@ -238,29 +239,30 @@ GenericArgumentClauseBuilder::GenericArgumentClauseBuilder()
       SyntaxFactory::makeBlankGenericArgumentClause().getRaw()->Layout) {}
 
 GenericArgumentClauseBuilder &GenericArgumentClauseBuilder::
-useLeftAngleBracket(RC<TokenSyntax> LeftAngle) {
+useLeftAngleBracket(TokenSyntax LeftAngle) {
   syntax_assert_token_is(LeftAngle, tok::l_angle, "<");
-  LeftAngleToken = LeftAngle;
+  LeftAngleToken = LeftAngle.getRawToken();
   return *this;
 }
 
 GenericArgumentClauseBuilder &GenericArgumentClauseBuilder::
-addGenericArgument(llvm::Optional<RC<TokenSyntax>> MaybeComma,
+addGenericArgument(llvm::Optional<TokenSyntax> MaybeComma,
                    TypeSyntax ArgumentTypeSyntax) {
   if (MaybeComma.hasValue()) {
     syntax_assert_token_is(MaybeComma.getValue(), tok::comma, ",");
-    ArgumentListLayout.push_back(MaybeComma.getValue());
+    ArgumentListLayout.push_back(MaybeComma->getRaw());
   } else {
-    ArgumentListLayout.push_back(TokenSyntax::missingToken(tok::comma, ","));
+    ArgumentListLayout.push_back(
+       RawTokenSyntax::missingToken(tok::comma, ","));
   }
   ArgumentListLayout.push_back(ArgumentTypeSyntax.getRaw());
   return *this;
 }
 
 GenericArgumentClauseBuilder &GenericArgumentClauseBuilder::
-useRightAngleBracket(RC<TokenSyntax> RightAngle) {
+useRightAngleBracket(TokenSyntax RightAngle) {
   syntax_assert_token_is(RightAngle, tok::r_angle, ">");
-  RightAngleToken = RightAngle;
+  RightAngleToken = RightAngle.getRawToken();
   return *this;
 }
 

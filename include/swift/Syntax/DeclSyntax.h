@@ -82,34 +82,34 @@ public:
     : Syntax(Root, Data) {}
 
   /// Return the name of the modifier.
-  RC<TokenSyntax> getName() const;
+  TokenSyntax getName() const;
 
   /// Return a DeclModifierSyntax with the given name.
-  DeclModifierSyntax withName(RC<TokenSyntax> NewName) const;
+  DeclModifierSyntax withName(TokenSyntax NewName) const;
 
   /// Return the left parenthesis '(' token as a part of the argument clause,
   /// if there is one.
-  RC<TokenSyntax> getLeftParenToken() const;
+  TokenSyntax getLeftParenToken() const;
 
   /// Return a DeclModifierSyntax with the given left parenthesis '(' token.
-  DeclModifierSyntax withLeftParenToken(RC<TokenSyntax> NewLeftParen) const;
+  DeclModifierSyntax withLeftParenToken(TokenSyntax NewLeftParen) const;
 
   /// Get the argument to the declaration modifier.
   ///
   /// This is either:
   /// - 'set' for the access modifiers such as 'private' or 'public', or
   /// - 'safe' / 'unsafe' for the 'unowned' modifier.
-  RC<TokenSyntax> getArgument() const;
+  TokenSyntax getArgument() const;
 
   /// Return a DeclModifierSyntax with the given argument.
-  DeclModifierSyntax withArgument(RC<TokenSyntax> NewArgument) const;
+  DeclModifierSyntax withArgument(TokenSyntax NewArgument) const;
 
   /// Return the right parenthesis ')' token as a part of the argument clause,
   /// if there is one.
-  RC<TokenSyntax> getRightParenToken() const;
+  TokenSyntax getRightParenToken() const;
 
   /// Return a DeclModifierSyntax with the given right parenthesis ')' token.
-  DeclModifierSyntax withRightParenToken(RC<TokenSyntax> NewRightParen) const;
+  DeclModifierSyntax withRightParenToken(TokenSyntax NewRightParen) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::DeclModifier;
@@ -218,16 +218,16 @@ public:
     : DeclSyntax(Root, Data) {}
 
   /// Return the 'struct' keyword attached to the declaration.
-  RC<TokenSyntax> getStructKeyword() const;
+  TokenSyntax getStructKeyword() const;
 
   /// Return a StructDeclSyntax with the given 'struct' keyword.
-  StructDeclSyntax withStructKeyword(RC<TokenSyntax> NewStructKeyword) const;
+  StructDeclSyntax withStructKeyword(TokenSyntax NewStructKeyword) const;
 
   /// Return the identifier of the struct.
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   /// Return a StructDeclSyntax with the given identifier.
-  StructDeclSyntax withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  StructDeclSyntax withIdentifier(TokenSyntax NewIdentifier) const;
 
   /// Return the generic parameter clause of the struct declaration.
   GenericParameterClauseSyntax getGenericParameterClause() const;
@@ -245,10 +245,10 @@ public:
   withWhereClause(GenericWhereClauseSyntax NewWhereClause) const;
 
   /// Return the left brace '{' token of the struct declaration.
-  RC<TokenSyntax> getLeftBraceToken() const;
+  TokenSyntax getLeftBraceToken() const;
 
   /// Return a StructDeclSyntax with the given left brace '{' token.
-  StructDeclSyntax withLeftBrace(RC<TokenSyntax> NewLeftBrace) const;
+  StructDeclSyntax withLeftBrace(TokenSyntax NewLeftBrace) const;
 
   /// Return the members' syntax of the struct.
   DeclMembersSyntax getMembers() const;
@@ -257,10 +257,10 @@ public:
   StructDeclSyntax withMembers(DeclMembersSyntax NewMembers) const;
 
   /// Return the right brace '}' token of the struct declaration.
-  RC<TokenSyntax> getRightBraceToken() const;
+  TokenSyntax getRightBraceToken() const;
 
   /// Return a StructDeclSyntax with the given right brace '}' token.
-  StructDeclSyntax withRightBrace(RC<TokenSyntax> NewRightBrace) const;
+  StructDeclSyntax withRightBrace(TokenSyntax NewRightBrace) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::StructDecl;
@@ -273,9 +273,9 @@ class StructDeclSyntaxBuilder final {
   RawSyntax::LayoutList StructLayout;
 public:
   StructDeclSyntaxBuilder();
-  StructDeclSyntaxBuilder &useStructKeyword(RC<TokenSyntax> StructKeyword);
-  StructDeclSyntaxBuilder &useIdentifier(RC<TokenSyntax> Identifier);
-  StructDeclSyntaxBuilder &useLeftBrace(RC<TokenSyntax> LeftBrace);
+  StructDeclSyntaxBuilder &useStructKeyword(TokenSyntax StructKeyword);
+  StructDeclSyntaxBuilder &useIdentifier(TokenSyntax Identifier);
+  StructDeclSyntaxBuilder &useLeftBrace(TokenSyntax LeftBrace);
 
   StructDeclSyntaxBuilder &
   useGenericParameterClause(GenericParameterClauseSyntax GenericParams);
@@ -284,7 +284,7 @@ public:
   useGenericWhereClause(GenericWhereClauseSyntax GenericWhereClause);
 
   StructDeclSyntaxBuilder &useMembers(DeclMembersSyntax Members);
-  StructDeclSyntaxBuilder &useRightBrace(RC<TokenSyntax> RightBrace);
+  StructDeclSyntaxBuilder &useRightBrace(TokenSyntax RightBrace);
   StructDeclSyntax build() const;
 };
 
@@ -314,19 +314,19 @@ public:
     : DeclSyntax(Root, Data) {}
 
   /// Return the 'typealias' keyword for the declaration.
-  RC<TokenSyntax> getTypealiasKeyword() const {
-    return cast<TokenSyntax>(getRaw()->getChild(Cursor::TypeAliasKeyword));
+  TokenSyntax getTypealiasKeyword() const {
+    return { Root, Data->getChild(Cursor::TypeAliasKeyword).get() };
   }
 
   /// Return a TypeAliasDeclSyntax with the given 'typealias' keyword.
   TypeAliasDeclSyntax
-  withTypeAliasKeyword(RC<TokenSyntax> NewTypeAliasKeyword) const;
+  withTypeAliasKeyword(TokenSyntax NewTypeAliasKeyword) const;
 
   /// Return the identifier for the declaration.
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   /// Return a TypeAliasDeclSyntax with the given identifier.
-  TypeAliasDeclSyntax withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  TypeAliasDeclSyntax withIdentifier(TokenSyntax NewIdentifier) const;
 
   /// Return the generic parameter clause of the declaration.
   GenericParameterClauseSyntax getGenericParameterClause() const;
@@ -337,11 +337,11 @@ public:
   const;
 
   /// Return the equal '=' token from the declaration.
-  RC<TokenSyntax> getEqualToken() const;
+  TokenSyntax getEqualToken() const;
 
   /// Return a TypeAliasDeclSyntax with the given equal '=' token.
   TypeAliasDeclSyntax
-  withEqualToken(RC<TokenSyntax> NewEqualToken) const;
+  withEqualToken(TokenSyntax NewEqualToken) const;
 
   /// Return the type syntax to which the type alias is assigned.
   TypeSyntax getTypeSyntax() const;
@@ -362,14 +362,14 @@ public:
   TypeAliasDeclSyntaxBuilder();
 
   TypeAliasDeclSyntaxBuilder &
-  useTypeAliasKeyword(RC<TokenSyntax> TypeAliasKeyword);
+  useTypeAliasKeyword(TokenSyntax TypeAliasKeyword);
 
-  TypeAliasDeclSyntaxBuilder &useIdentifier(RC<TokenSyntax> Identifier);
+  TypeAliasDeclSyntaxBuilder &useIdentifier(TokenSyntax Identifier);
 
   TypeAliasDeclSyntaxBuilder &
   useGenericParameterClause(GenericParameterClauseSyntax GenericParams);
 
-  TypeAliasDeclSyntaxBuilder &useEqualToken(RC<TokenSyntax> EqualToken);
+  TypeAliasDeclSyntaxBuilder &useEqualToken(TokenSyntax EqualToken);
 
   TypeAliasDeclSyntaxBuilder &useType(TypeSyntax ReferentType);
 
@@ -406,27 +406,27 @@ public:
     : Syntax(Root, Data) {}
 
   /// Get the external name of the parameter, if there is one.
-  RC<TokenSyntax> getExternalName() const;
+  TokenSyntax getExternalName() const;
 
   /// Return a FunctionParameterSyntax with the given external name.
   FunctionParameterSyntax
-  withExternalName(RC<TokenSyntax> NewExternalName) const;
+  withExternalName(TokenSyntax NewExternalName) const;
 
   /// Return the local name of the parameter.
-  RC<TokenSyntax> getLocalName() const;
+  TokenSyntax getLocalName() const;
 
   /// Return a FunctionParameterSyntax with the given local name.
   FunctionParameterSyntax
-  withLocalName(RC<TokenSyntax> NewLocalName) const;
+  withLocalName(TokenSyntax NewLocalName) const;
 
   /// Return the colon ':' token between the local name and type of the
   /// parameter.
-  RC<TokenSyntax> getColonToken() const;
+  TokenSyntax getColonToken() const;
 
   /// Return a FunctionParameterSyntax with the given colon token between
   /// the local name and type.
   FunctionParameterSyntax
-  withColonToken(RC<TokenSyntax> NewColonToken) const;
+  withColonToken(TokenSyntax NewColonToken) const;
 
   /// Return the syntax for the type of this parameter.
   llvm::Optional<TypeSyntax> getTypeSyntax() const;
@@ -437,11 +437,11 @@ public:
 
   /// Return the equal '=' token in between the parameter type and the default
   /// value, if there is one.
-  RC<TokenSyntax> getEqualToken() const;
+  TokenSyntax getEqualToken() const;
 
   /// Return a FunctionParameterSyntax with the given equal '=' token in
   /// between the parameter type and the default value.
-  FunctionParameterSyntax withEqualToken(RC<TokenSyntax> NewEqualToken) const;
+  FunctionParameterSyntax withEqualToken(TokenSyntax NewEqualToken) const;
 
   /// Return the expression for the default value of the parameter, if there
   /// is one.
@@ -453,11 +453,11 @@ public:
   withDefaultValue(llvm::Optional<ExprSyntax> NewDefaultValue) const;
 
   /// Return the trailing comma on the parameter, if there is one.
-  RC<TokenSyntax> getTrailingComma() const;
+  TokenSyntax getTrailingComma() const;
 
   /// Return a FunctionParameterSyntax with the given trailing comma.
   FunctionParameterSyntax
-  withTrailingComma(RC<TokenSyntax> NewTrailingComma) const;
+  withTrailingComma(TokenSyntax NewTrailingComma) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FunctionParameter;
@@ -498,12 +498,12 @@ public:
     : Syntax(Root, Data) {}
 
   /// Return the left parenthesis '(' token enclosing the parameter list.
-  RC<TokenSyntax> getLeftParenToken() const;
+  TokenSyntax getLeftParenToken() const;
 
   /// Return a FunctionSignatureSyntax with the given left parenthesis '(' token
   /// enclosing the parameter list.
   FunctionSignatureSyntax
-  withLeftParenToken(RC<TokenSyntax> NewLeftParen) const;
+  withLeftParenToken(TokenSyntax NewLeftParen) const;
 
   /// Return the parameter list for this signature.
   FunctionParameterListSyntax getParameterList() const;
@@ -513,31 +513,31 @@ public:
   withParameterList(FunctionParameterListSyntax NewParameterList) const;
 
   /// Return the right parenthesis ')' token enclosing the parameter list.
-  RC<TokenSyntax> getRightParenToken() const;
+  TokenSyntax getRightParenToken() const;
 
   /// Return a FunctionSignatureSyntax with the given right parenthesis ')' token
   /// enclosing the parameter list.
   FunctionSignatureSyntax
-  withRightParenToken(RC<TokenSyntax> NewRightParen) const;
+  withRightParenToken(TokenSyntax NewRightParen) const;
 
   /// Return the 'throws' token in this signature if it exists.
-  RC<TokenSyntax> getThrowsToken() const;
+  TokenSyntax getThrowsToken() const;
 
   /// Return a FunctionSignatureSyntax with the given 'throws' token.
-  FunctionSignatureSyntax withThrowsToken(RC<TokenSyntax> NewThrowsToken) const;
+  FunctionSignatureSyntax withThrowsToken(TokenSyntax NewThrowsToken) const;
 
   /// Return the 'rethrows' token in this signature if it exists;
-  RC<TokenSyntax> getRethrowsToken() const;
+  TokenSyntax getRethrowsToken() const;
 
   /// Return a FunctionSignatureSyntax with the given 'rethrows' token.
   FunctionSignatureSyntax
-  withRethrowsToken(RC<TokenSyntax> NewRethrowsToken) const;
+  withRethrowsToken(TokenSyntax NewRethrowsToken) const;
 
   /// Return the arrow '->' token for the signature.
-  RC<TokenSyntax> getArrowToken() const;
+  TokenSyntax getArrowToken() const;
 
   /// Return a FunctionSignatureSyntax with the given arrow token
-  FunctionSignatureSyntax withArrowToken(RC<TokenSyntax> NewArrowToken) const;
+  FunctionSignatureSyntax withArrowToken(TokenSyntax NewArrowToken) const;
 
   /// Return the return type attributes for the signature.
   TypeAttributesSyntax getReturnTypeAttributes() const;
@@ -595,16 +595,16 @@ public:
   FunctionDeclSyntax withModifiers(DeclModifierListSyntax NewModifiers) const;
 
   /// Return the 'func' keyword of this function declaration.
-  RC<TokenSyntax> getFuncKeyword() const;
+  TokenSyntax getFuncKeyword() const;
 
   /// Return a FunctionDeclSyntax with the given 'func' keyword.
-  FunctionDeclSyntax withFuncKeyword(RC<TokenSyntax> NewFuncKeyword) const;
+  FunctionDeclSyntax withFuncKeyword(TokenSyntax NewFuncKeyword) const;
 
   /// Return the identifier of the function declaration.
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   /// Return a FunctionDeclSyntax with the given identifier.
-  FunctionDeclSyntax withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  FunctionDeclSyntax withIdentifier(TokenSyntax NewIdentifier) const;
 
   /// Return the generic parameter clause of the function declaration, if
   /// there is one. Otherwise, return llvm::None.

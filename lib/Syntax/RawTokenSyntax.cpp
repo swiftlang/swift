@@ -1,4 +1,4 @@
-//===--- TokenSyntax.cpp - Swift Token Syntax Implementation --------------===//
+//===--- RawTokenSyntax.cpp - Swift Token Syntax Implementation -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,28 +16,28 @@
 using namespace swift;
 using namespace swift::syntax;
 
-TokenSyntax::TokenSyntax()
+RawTokenSyntax::RawTokenSyntax()
   : RawSyntax(SyntaxKind::Token, {}, SourcePresence::Missing),
     TokenKind(tok::NUM_TOKENS), Text(OwnedString()),
     LeadingTrivia({}), TrailingTrivia({}) {}
 
-TokenSyntax::TokenSyntax(tok TokenKind, OwnedString Text,
-                     const SourcePresence Presence)
+RawTokenSyntax::RawTokenSyntax(tok TokenKind, OwnedString Text,
+                               const SourcePresence Presence)
   : RawSyntax(SyntaxKind::Token, {}, Presence),
     TokenKind(TokenKind),
     Text(Text),
     LeadingTrivia({}), TrailingTrivia({}) {}
 
-TokenSyntax::TokenSyntax(tok TokenKind, OwnedString Text,
-                     const SourcePresence Presence,
-                     const Trivia &LeadingTrivia,
-                     const Trivia &TrailingTrivia)
+RawTokenSyntax::RawTokenSyntax(tok TokenKind, OwnedString Text,
+                               const SourcePresence Presence,
+                               const Trivia &LeadingTrivia,
+                               const Trivia &TrailingTrivia)
     : RawSyntax(SyntaxKind::Token, {}, Presence),
                 TokenKind(TokenKind), Text(Text),
                 LeadingTrivia(LeadingTrivia), TrailingTrivia(TrailingTrivia) {}
 
 AbsolutePosition
-TokenSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
+RawTokenSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
   for (auto Leader : LeadingTrivia) {
     Leader.accumulateAbsolutePosition(Pos);
   }
@@ -53,7 +53,7 @@ TokenSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
   return Start;
 }
 
-void TokenSyntax::dumpKind(llvm::raw_ostream &OS) const {
+void RawTokenSyntax::dumpKind(llvm::raw_ostream &OS) const {
   switch (getTokenKind()) {
   case tok::unknown:
     OS << "unknown";
@@ -116,7 +116,7 @@ void TokenSyntax::dumpKind(llvm::raw_ostream &OS) const {
   }
 }
 
-void TokenSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
+void RawTokenSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   auto indent = [&](unsigned Amount) {
     for (decltype(Amount) i = 0; i < Amount; ++i) {
       OS << ' ';
