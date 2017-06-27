@@ -47,7 +47,7 @@ open class PropertyListEncoder {
     ///
     /// - parameter value: The value to encode.
     /// - returns: A new `Data` value containing the encoded property list data.
-    /// - throws: `EncodingError.invalidValue` if a non-comforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
+    /// - throws: `EncodingError.invalidValue` if a non-conforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
     /// - throws: An error if any value throws an error during encoding.
     open func encode<Value : Encodable>(_ value: Value) throws -> Data {
         let encoder = _PlistEncoder(options: self.options)
