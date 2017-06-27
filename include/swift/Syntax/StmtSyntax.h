@@ -91,10 +91,10 @@ public:
     : StmtSyntax(Root, Data) {}
 
   /// Returns the left brace of the code block.
-  RC<TokenSyntax> getLeftBraceToken() const;
+  TokenSyntax getLeftBraceToken() const;
 
   /// Returns a new `CodeBlockSyntax` with the specified left brace token.
-  CodeBlockStmtSyntax withLeftBraceToken(RC<TokenSyntax> NewLeftBrace) const;
+  CodeBlockStmtSyntax withLeftBraceToken(TokenSyntax NewLeftBrace) const;
 
   /// Return the n-th element in the code block.
   Syntax getElement(size_t n) const;
@@ -109,10 +109,10 @@ public:
   withElements(const std::vector<Syntax> NewElements) const;
 
   /// Returns the right brace of the code block.
-  RC<TokenSyntax> getRightBraceToken() const;
+  TokenSyntax getRightBraceToken() const;
 
   /// Returns a new `CodeBlockSyntax` with the specified right brace token.
-  CodeBlockStmtSyntax withRightBraceToken(RC<TokenSyntax> NewRightBraces) const;
+  CodeBlockStmtSyntax withRightBraceToken(TokenSyntax NewRightBraces) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::CodeBlockStmt;
@@ -139,12 +139,12 @@ public:
 
   /// Get the 'fallthrough' keyword associated comprising this
   /// fallthrough statement.
-  RC<TokenSyntax> getFallthroughKeyword() const;
+  TokenSyntax getFallthroughKeyword() const;
 
   /// Return a new FallthroughStmtSyntax with the given fallthrough
   /// keyword.
   FallthroughStmtSyntax
-  withFallthroughKeyword(RC<TokenSyntax> NewFallthroughKeyword) const;
+  withFallthroughKeyword(TokenSyntax NewFallthroughKeyword) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FallthroughStmt;
@@ -171,17 +171,17 @@ public:
     : StmtSyntax(Root, Data) {}
 
   /// Return the 'break' keyword associated with this break statement.
-  RC<TokenSyntax> getBreakKeyword() const;
+  TokenSyntax getBreakKeyword() const;
 
   /// Return a new `BreakStmtSyntax` with the given 'break' keyword.
-  BreakStmtSyntax withBreakKeyword(RC<TokenSyntax> NewBreakKeyword) const;
+  BreakStmtSyntax withBreakKeyword(TokenSyntax NewBreakKeyword) const;
 
   /// Return the destination label of this break statement. If it doesn't
   /// have one, the token is marked as missing.
-  RC<TokenSyntax> getLabel() const;
+  TokenSyntax getLabel() const;
 
   /// Return a new `BreakStmtSyntax` with the given destination label.
-  BreakStmtSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+  BreakStmtSyntax withLabel(TokenSyntax NewLabel) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::BreakStmt;
@@ -208,17 +208,17 @@ public:
     : StmtSyntax(Root, Data) {}
 
   /// Return the 'continue' keyword associated with this continue statement.
-  RC<TokenSyntax> getContinueKeyword() const;
+  TokenSyntax getContinueKeyword() const;
 
   /// Return a new `ContinueStmtSyntax` with the given 'continue' keyword.
-  ContinueStmtSyntax withContinueKeyword(RC<TokenSyntax> NewBreakKeyword) const;
+  ContinueStmtSyntax withContinueKeyword(TokenSyntax NewBreakKeyword) const;
 
   /// Return the destination label of this break statement. If it doesn't
   /// have one, the token is marked as continue.
-  RC<TokenSyntax> getLabel() const;
+  TokenSyntax getLabel() const;
 
   /// Return a new `ContinueStmtSyntax` with the given destination label.
-  ContinueStmtSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+  ContinueStmtSyntax withLabel(TokenSyntax NewLabel) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::ContinueStmt;
@@ -245,10 +245,10 @@ public:
     : StmtSyntax(Root, Data) {}
 
   /// Return the 'return' keyword associated with this return statement.
-  RC<TokenSyntax> getReturnKeyword() const;
+  TokenSyntax getReturnKeyword() const;
 
   /// Return a new `ReturnStmtSyntax` with the given 'return' keyword.
-  ReturnStmtSyntax withReturnKeyword(RC<TokenSyntax> NewReturnKeyword) const;
+  ReturnStmtSyntax withReturnKeyword(TokenSyntax NewReturnKeyword) const;
 
   /// Return the expression of this return statement.
   Optional<ExprSyntax> getExpression() const;

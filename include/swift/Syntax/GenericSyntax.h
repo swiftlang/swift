@@ -75,14 +75,14 @@ public:
   /// Return a new ConformanceRequirementSyntax with the given conforming
   /// "left-hand" type identifier.
   ConformanceRequirementSyntax
-  withConformingTypeIdentifier(RC<TokenSyntax> NewTypeIdentifier) const;
+  withConformingTypeIdentifier(TokenSyntax NewTypeIdentifier) const;
 
   /// Return the colon token in the conformance requirement.
-  RC<TokenSyntax> getColonToken() const;
+  TokenSyntax getColonToken() const;
 
   /// Return a new ConformanceRequirementSyntax with the given colon token.
   ConformanceRequirementSyntax
-  withColonToken(RC<TokenSyntax> NewColonToken);
+  withColonToken(TokenSyntax NewColonToken);
 
   /// Return the "right-hand" inherited type from the conformance requirement.
   TypeIdentifierSyntax getInheritedType() const;
@@ -128,10 +128,10 @@ public:
   withLeftTypeIdentifier(TypeIdentifierSyntax NewLeftTypeIdentifier) const;
 
   /// Return the equality '==' operator token from the same-type requirement.
-  RC<TokenSyntax> getEqualityToken() const;
+  TokenSyntax getEqualityToken() const;
 
   SameTypeRequirementSyntax
-  withEqualityToken(RC<TokenSyntax> NewEqualityToken) const;
+  withEqualityToken(TokenSyntax NewEqualityToken) const;
 
   /// Return the type syntax from the right side of the same-type requirement.
   TypeSyntax getRightType() const;
@@ -169,19 +169,19 @@ public:
     : Syntax(Root, Data) {}
 
   /// Return the name of the generic parameter.
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   /// Returns a GenericParameterSyntax with the given parameter identifier
   GenericParameterSyntax
-  withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  withIdentifier(TokenSyntax NewIdentifier) const;
 
   /// Return the colon token before the inherited type, if applicable.
-  RC<TokenSyntax> getColonToken() const;
+  TokenSyntax getColonToken() const;
 
   /// Return a GenericParameterSyntax with the given colon token before the
   /// inherited type.
   GenericParameterSyntax
-  withColonToken(RC<TokenSyntax> NewColonToken) const;
+  withColonToken(TokenSyntax NewColonToken) const;
 
   /// Return the inherited type or protocol composition to which the
   /// parameter conforms, if applicable.
@@ -222,12 +222,12 @@ public:
                                const SyntaxData *Data)
     : Syntax(Root, Data) {}
   /// Return the left angle bracket '<' token on the generic parameter clause.
-  RC<TokenSyntax> getLeftAngleBracket() const;
+  TokenSyntax getLeftAngleBracket() const;
 
   /// Return a new GenericParameterClauseSyntax with the given left angle
   /// bracket '<' token.
   GenericParameterClauseSyntax
-  withLeftAngleBracket(RC<TokenSyntax> NewLeftAngleBracketToken) const;
+  withLeftAngleBracket(TokenSyntax NewLeftAngleBracketToken) const;
 
   /// Return the GenericParameterListSyntax inside the angle bracket tokens.
   GenericParameterListSyntax getGenericParameterList() const;
@@ -238,12 +238,12 @@ public:
   withGenericParams(GenericParameterListSyntax NewGenericParams) const;
 
   /// Return the right angle bracket '>' token on the generic parameter clause.
-  RC<TokenSyntax> getRightAngleBracket() const;
+  TokenSyntax getRightAngleBracket() const;
 
   /// Return a GenericParameterClauseSyntax with the given right angle
   /// bracket '>' token.
   GenericParameterClauseSyntax
-  withRightAngleBracket(RC<TokenSyntax> NewRightAngleBracketToken) const;
+  withRightAngleBracket(TokenSyntax NewRightAngleBracketToken) const;
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::GenericParameterClause;
   }
@@ -252,22 +252,22 @@ public:
 #pragma mark - generic-parameter-clause Builder
 
 class GenericParameterClauseBuilder {
-  RC<TokenSyntax> LeftAngleToken;
+  RC<RawTokenSyntax> LeftAngleToken;
   RawSyntax::LayoutList ParameterListLayout;
-  RC<TokenSyntax> RightAngleToken;
+  RC<RawTokenSyntax> RightAngleToken;
 
 public:
   GenericParameterClauseBuilder();
 
   GenericParameterClauseBuilder &
-  useLeftAngleBracket(RC<TokenSyntax> LeftAngleBracket);
+  useLeftAngleBracket(TokenSyntax LeftAngleBracket);
 
   GenericParameterClauseBuilder &
-  addParameter(llvm::Optional<RC<TokenSyntax>> MaybeComma,
+  addParameter(llvm::Optional<TokenSyntax> MaybeComma,
                GenericParameterSyntax Parameter);
 
   GenericParameterClauseBuilder &
-  useRightAngleBracket(RC<TokenSyntax> RightAngleBracket);
+  useRightAngleBracket(TokenSyntax RightAngleBracket);
 
   GenericParameterClauseSyntax build() const;
 };
@@ -297,12 +297,12 @@ public:
     : Syntax(Root, Data) {}
 
   /// Return the left angle bracket '<' token on the generic argument clause.
-  RC<TokenSyntax> getLeftAngleBracket() const;
+  TokenSyntax getLeftAngleBracket() const;
 
   /// Return a new GenericArgumentClauseSyntax with the given left angle
   /// bracket '<' token.
   GenericArgumentClauseSyntax
-  withLeftAngleBracket(RC<TokenSyntax> NewLeftAngleBracket) const;
+  withLeftAngleBracket(TokenSyntax NewLeftAngleBracket) const;
 
   /// Return the GenericArgumentClauseSyntax inside the angle bracket tokens.
   GenericArgumentListSyntax getGenericParameterList() const;
@@ -313,12 +313,12 @@ public:
   withGenericParams(GenericParameterListSyntax NewGenericParams) const;
 
   /// Return the right angle bracket '>' token on the generic argument clause.
-  RC<TokenSyntax> getRightAngleBracket() const;
+  TokenSyntax getRightAngleBracket() const;
 
   /// Return a new GenericArgumentClauseSyntax with the given right angle
   /// bracket '>' token.
   GenericArgumentClauseSyntax
-  withRightAngleBracket(RC<TokenSyntax> NewRightAngleBracket) const;
+  withRightAngleBracket(TokenSyntax NewRightAngleBracket) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::GenericArgumentClause;
@@ -328,21 +328,21 @@ public:
 #pragma mark - generic-argument-clause Builder
 
 class GenericArgumentClauseBuilder {
-  RC<TokenSyntax> LeftAngleToken;
+  RC<RawTokenSyntax> LeftAngleToken;
   RawSyntax::LayoutList ArgumentListLayout;
-  RC<TokenSyntax> RightAngleToken;
+  RC<RawTokenSyntax> RightAngleToken;
 public:
   GenericArgumentClauseBuilder();
 
   GenericArgumentClauseBuilder &
-  useLeftAngleBracket(RC<TokenSyntax> LeftAngleBracket);
+  useLeftAngleBracket(TokenSyntax LeftAngleBracket);
 
   GenericArgumentClauseBuilder &
-  addGenericArgument(llvm::Optional<RC<TokenSyntax>> MaybeComma,
+  addGenericArgument(llvm::Optional<TokenSyntax> MaybeComma,
                      TypeSyntax ArgumentTypeSyntax);
 
   GenericArgumentClauseBuilder &
-  useRightAngleBracket(RC<TokenSyntax> RightAngleBracket);
+  useRightAngleBracket(TokenSyntax RightAngleBracket);
 
   GenericArgumentClauseSyntax build() const;
 };
@@ -367,11 +367,11 @@ public:
     : Syntax(Root, Data) {}
 
   /// Return the 'where' keyword in the generic where clause.
-  RC<TokenSyntax> getWhereKeyword() const;
+  TokenSyntax getWhereKeyword() const;
 
   /// Return a GenericWhereClauseSyntax with the given 'where' keyword.
   GenericWhereClauseSyntax
-  withWhereKeyword(RC<TokenSyntax> NewWhereKeyword) const;
+  withWhereKeyword(TokenSyntax NewWhereKeyword) const;
 
   /// Return the requirement list from the where clause.
   GenericRequirementListSyntax getRequirementList() const;

@@ -49,8 +49,6 @@
 namespace swift {
 namespace syntax {
 
-class Syntax;
-
 /// The class for holding parented syntax.
 ///
 /// This structure should not contain significant public
@@ -211,7 +209,7 @@ public:
   ///
   /// SyntaxData = {
   ///   RC<RawSyntax> Raw = {
-  ///     RC<RawTokenSyntax { SyntaxKind::Token, tok::return_kw, "return" },
+  ///     RC<RawTokenSyntax> { SyntaxKind::Token, tok::return_kw, "return" },
   ///     RC<RawSyntax> { SyntaxKind::SomeExpression, ... }
   ///   }
   ///   llvm::SmallVector<AtomicCache<SyntaxData>, 10> Children {

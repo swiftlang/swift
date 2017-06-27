@@ -236,7 +236,7 @@ tokens, represented by the `TokenSyntax` class.
 - `RawSyntax` store no parental relationships and can therefore be shared
    among syntax nodes if they have identical content.
 
-### TokenSyntax
+### RawTokenSyntax
 
 These are special cases of `RawSyntax` and represent all terminals in the
 grammar. Aside from the token kind and the text, they have two very important
@@ -245,12 +245,12 @@ pieces of information for full-fidelity source: leading and trailing source
 
 #### TokenSyntax summary
 
-- `TokenSyntax` are `RawSyntax` and represent the terminals in the Swift
+- `RawTokenSyntax` are `RawSyntax` and represent the terminals in the Swift
   grammar.
-- Like `RawSyntax`, `TokenSyntax` are immutable.
-- `TokenSyntax` do not have pointer equality, as they can be shared among syntax
+- Like `RawSyntax`, `RawTokenSyntax` are immutable.
+- `RawTokenSyntax` do have pointer equality, but they can be shared among syntax
   nodes.
-- `TokenSyntax` have *leading-* and *trailing trivia*, the purely syntactic
+- `RawTokenSyntax` have *leading-* and *trailing trivia*, the purely syntactic
   formatting information like whitespace and comments.
 
 ### Trivia
@@ -447,7 +447,7 @@ auto Block = SyntaxFactory::makeBlankCodeBlockStmt()
 
 // Returns a new ReturnStmtSyntax with the root set to the Block
 // above, and the parent set to the StmtListSyntax.
-auto MyReturn = Block.getStatement(0).castTo<ReturnStmt>;
+auto MyReturn = Block.getStatement(0).castTo<ReturnStmt>();
 ```
 
 Here's what the corresponding object diagram would look like starting with
@@ -456,7 +456,7 @@ Here's what the corresponding object diagram would look like starting with
 ![Syntax Example](.doc/SyntaxExample.png)
 
 Legend:
-- Green: `RawSyntax` types (`TokenSyntax` is a `RawSyntax`)
+- Green: `RawSyntax` types (`RawTokenSyntax` is a `RawSyntax`)
 - Red: `SyntaxData` types
 - Blue: `Syntax` types
 - Gray: `Trivia`

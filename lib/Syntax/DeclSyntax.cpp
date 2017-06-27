@@ -31,54 +31,55 @@ DeclModifierSyntax DeclModifierSyntax::makeBlank() {
   return make<DeclModifierSyntax>(
             RawSyntax::make(SyntaxKind::DeclModifier,
                             {
-                              TokenSyntax::missingToken(tok::identifier, ""),
-                              TokenSyntax::missingToken(tok::l_paren, "("),
-                              TokenSyntax::missingToken(tok::identifier, ""),
-                              TokenSyntax::missingToken(tok::r_paren, ")"),
+                              RawTokenSyntax::missingToken(tok::identifier, ""),
+                              RawTokenSyntax::missingToken(tok::l_paren, "("),
+                              RawTokenSyntax::missingToken(tok::identifier, ""),
+                              RawTokenSyntax::missingToken(tok::r_paren, ")"),
                             },
                             SourcePresence::Present));
 }
 
 #pragma mark - declaration-modifier API
 
-RC<TokenSyntax> DeclModifierSyntax::getName() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Name));
+TokenSyntax DeclModifierSyntax::getName() const {
+  return { Root, Data->getChild(Cursor::Name).get() };
 }
 
-DeclModifierSyntax DeclModifierSyntax::withName(RC<TokenSyntax> NewName) const {
-  assert(NewName->getTokenKind() == tok::identifier);
-  return Data->replaceChild<DeclModifierSyntax>(NewName, Cursor::Name);
+DeclModifierSyntax DeclModifierSyntax::withName(TokenSyntax NewName) const {
+  assert(NewName.getTokenKind() == tok::identifier);
+  return Data->replaceChild<DeclModifierSyntax>(NewName.getRaw(), Cursor::Name);
 }
 
-RC<TokenSyntax> DeclModifierSyntax::getLeftParenToken() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::LeftParen));
+TokenSyntax DeclModifierSyntax::getLeftParenToken() const {
+  return { Root, Data->getChild(Cursor::LeftParen).get() };
 }
 
 DeclModifierSyntax
-DeclModifierSyntax::withLeftParenToken(RC<TokenSyntax> NewLeftParen) const {
+DeclModifierSyntax::withLeftParenToken(TokenSyntax NewLeftParen) const {
   syntax_assert_token_is(NewLeftParen, tok::l_paren, "(");
-  return Data->replaceChild<DeclModifierSyntax>(NewLeftParen,
+  return Data->replaceChild<DeclModifierSyntax>(NewLeftParen.getRaw(),
                                                 Cursor::LeftParen);
 }
 
-RC<TokenSyntax> DeclModifierSyntax::getArgument() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Argument));
+TokenSyntax DeclModifierSyntax::getArgument() const {
+  return { Root, Data->getChild(Cursor::Argument).get() };
 }
 
 DeclModifierSyntax
-DeclModifierSyntax::withArgument(RC<TokenSyntax> NewArgument) const {
-  assert(NewArgument->getTokenKind() == tok::identifier);
-  return Data->replaceChild<DeclModifierSyntax>(NewArgument, Cursor::Argument);
+DeclModifierSyntax::withArgument(TokenSyntax NewArgument) const {
+  assert(NewArgument.getTokenKind() == tok::identifier);
+  return Data->replaceChild<DeclModifierSyntax>(NewArgument.getRaw(),
+                                                Cursor::Argument);
 }
 
-RC<TokenSyntax> DeclModifierSyntax::getRightParenToken() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::RightParen));
+TokenSyntax DeclModifierSyntax::getRightParenToken() const {
+  return { Root, Data->getChild(Cursor::RightParen).get() };
 }
 
 DeclModifierSyntax
-DeclModifierSyntax::withRightParenToken(RC<TokenSyntax> NewRightParen) const {
+DeclModifierSyntax::withRightParenToken(TokenSyntax NewRightParen) const {
   syntax_assert_token_is(NewRightParen, tok::r_paren, ")");
-  return Data->replaceChild<DeclModifierSyntax>(NewRightParen,
+  return Data->replaceChild<DeclModifierSyntax>(NewRightParen.getRaw(),
                                                 Cursor::RightParen);
 }
 
@@ -137,40 +138,40 @@ void StructDeclSyntax::validate() const {
 StructDeclSyntax StructDeclSyntax::makeBlank() {
   return make<StructDeclSyntax>(RawSyntax::make(SyntaxKind::StructDecl,
     {
-      TokenSyntax::missingToken(tok::kw_struct, "struct"),
-      TokenSyntax::missingToken(tok::identifier, ""),
+      RawTokenSyntax::missingToken(tok::kw_struct, "struct"),
+      RawTokenSyntax::missingToken(tok::identifier, ""),
       RawSyntax::missing(SyntaxKind::GenericParameterClause),
       RawSyntax::missing(SyntaxKind::GenericWhereClause),
-      TokenSyntax::missingToken(tok::l_brace, "{"),
+      RawTokenSyntax::missingToken(tok::l_brace, "{"),
       RawSyntax::missing(SyntaxKind::DeclMembers),
-      TokenSyntax::missingToken(tok::r_brace, "}"),
+      RawTokenSyntax::missingToken(tok::r_brace, "}"),
     },
     SourcePresence::Present));
 }
 
 #pragma mark - struct-declaration API
 
-RC<TokenSyntax> StructDeclSyntax::getStructKeyword() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::StructKeyword));
+TokenSyntax StructDeclSyntax::getStructKeyword() const {
+  return { Root, Data->getChild(Cursor::StructKeyword).get() };
 }
 
 StructDeclSyntax
-StructDeclSyntax::withStructKeyword(RC<TokenSyntax> NewStructKeyword)
+StructDeclSyntax::withStructKeyword(TokenSyntax NewStructKeyword)
 const {
   syntax_assert_token_is(NewStructKeyword, tok::kw_struct, "struct");
-  return Data->replaceChild<StructDeclSyntax>(NewStructKeyword,
+  return Data->replaceChild<StructDeclSyntax>(NewStructKeyword.getRaw(),
                                               Cursor::StructKeyword);
 }
 
 StructDeclSyntax
-StructDeclSyntax::withLeftBrace(RC<TokenSyntax> NewLeftBrace) const {
+StructDeclSyntax::withLeftBrace(TokenSyntax NewLeftBrace) const {
   syntax_assert_token_is(NewLeftBrace, tok::l_brace, "{");
-  return Data->replaceChild<StructDeclSyntax>(NewLeftBrace,
+  return Data->replaceChild<StructDeclSyntax>(NewLeftBrace.getRaw(),
                                               Cursor::LeftBrace);
 }
 
-RC<TokenSyntax> StructDeclSyntax::getLeftBraceToken() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::LeftBrace));
+TokenSyntax StructDeclSyntax::getLeftBraceToken() const {
+  return { Root, Data->getChild(Cursor::LeftBrace).get() };
 }
 
 StructDeclSyntax
@@ -189,26 +190,26 @@ StructDeclSyntaxBuilder::StructDeclSyntaxBuilder()
   : StructLayout(SyntaxFactory::makeBlankStructDecl().getRaw()->Layout) {}
 
 StructDeclSyntaxBuilder &
-StructDeclSyntaxBuilder::useStructKeyword(RC<TokenSyntax> StructKeyword) {
+StructDeclSyntaxBuilder::useStructKeyword(TokenSyntax StructKeyword) {
   syntax_assert_token_is(StructKeyword, tok::kw_struct, "struct");
   auto Index = cursorIndex(StructDeclSyntax::Cursor::StructKeyword);
-  StructLayout[Index] = StructKeyword;
+  StructLayout[Index] = StructKeyword.getRaw();
   return *this;
 }
 
 StructDeclSyntaxBuilder &
-StructDeclSyntaxBuilder::useIdentifier(RC<TokenSyntax> Identifier) {
-  assert(Identifier->getTokenKind() == tok::identifier);
+StructDeclSyntaxBuilder::useIdentifier(TokenSyntax Identifier) {
+  assert(Identifier.getTokenKind() == tok::identifier);
   auto Index = cursorIndex(StructDeclSyntax::Cursor::Identifier);
-  StructLayout[Index] = Identifier;
+  StructLayout[Index] = Identifier.getRaw();
   return *this;
 }
 
 StructDeclSyntaxBuilder &
-StructDeclSyntaxBuilder::useLeftBrace(RC<TokenSyntax> LeftBrace) {
+StructDeclSyntaxBuilder::useLeftBrace(TokenSyntax LeftBrace) {
   syntax_assert_token_is(LeftBrace, tok::l_brace, "{");
   auto Index = cursorIndex(StructDeclSyntax::Cursor::LeftBrace);
-  StructLayout[Index] = LeftBrace;
+  StructLayout[Index] = LeftBrace.getRaw();
   return *this;
 }
 
@@ -220,10 +221,10 @@ StructDeclSyntaxBuilder::useMembers(DeclMembersSyntax Members) {
 }
 
 StructDeclSyntaxBuilder &
-StructDeclSyntaxBuilder::useRightBrace(RC<TokenSyntax> RightBrace) {
+StructDeclSyntaxBuilder::useRightBrace(TokenSyntax RightBrace) {
   syntax_assert_token_is(RightBrace, tok::r_brace, "}");
   auto Index = cursorIndex(StructDeclSyntax::Cursor::RightBrace);
-  StructLayout[Index] = RightBrace;
+  StructLayout[Index] = RightBrace.getRaw();
   return *this;
 }
 
@@ -238,10 +239,10 @@ TypeAliasDeclSyntax
 TypeAliasDeclSyntax::makeBlank() {
   return make<TypeAliasDeclSyntax>(RawSyntax::make(SyntaxKind::TypeAliasDecl,
     {
-      TokenSyntax::missingToken(tok::kw_typealias, "typealias"),
-      TokenSyntax::missingToken(tok::identifier, ""),
+      RawTokenSyntax::missingToken(tok::kw_typealias, "typealias"),
+      RawTokenSyntax::missingToken(tok::identifier, ""),
       RawSyntax::missing(SyntaxKind::GenericParameterClause),
-      TokenSyntax::missingToken(tok::equal, "="),
+      RawTokenSyntax::missingToken(tok::equal, "="),
       RawSyntax::missing(SyntaxKind::MissingType),
     },
     SourcePresence::Present));
@@ -250,16 +251,16 @@ TypeAliasDeclSyntax::makeBlank() {
 #pragma mark - type-alias API
 
 TypeAliasDeclSyntax TypeAliasDeclSyntax::
-withTypeAliasKeyword(RC<TokenSyntax> NewTypeAliasKeyword) const {
+withTypeAliasKeyword(TokenSyntax NewTypeAliasKeyword) const {
   syntax_assert_token_is(NewTypeAliasKeyword, tok::kw_typealias, "typealias");
-  return Data->replaceChild<TypeAliasDeclSyntax>(NewTypeAliasKeyword,
+  return Data->replaceChild<TypeAliasDeclSyntax>(NewTypeAliasKeyword.getRaw(),
                                                  Cursor::TypeAliasKeyword);
 }
 
 TypeAliasDeclSyntax
-TypeAliasDeclSyntax::withIdentifier(RC<TokenSyntax> NewIdentifier) const {
-  assert(NewIdentifier->getTokenKind() == tok::identifier);
-  return Data->replaceChild<TypeAliasDeclSyntax>(NewIdentifier,
+TypeAliasDeclSyntax::withIdentifier(TokenSyntax NewIdentifier) const {
+  assert(NewIdentifier.getTokenKind() == tok::identifier);
+  return Data->replaceChild<TypeAliasDeclSyntax>(NewIdentifier.getRaw(),
                                                  Cursor::Identifier);
 }
 
@@ -271,9 +272,9 @@ const {
 }
 
 TypeAliasDeclSyntax
-TypeAliasDeclSyntax::withEqualToken(RC<TokenSyntax> NewEqualToken) const {
+TypeAliasDeclSyntax::withEqualToken(TokenSyntax NewEqualToken) const {
   syntax_assert_token_is(NewEqualToken, tok::equal, "=");
-  return Data->replaceChild<TypeAliasDeclSyntax>(NewEqualToken,
+  return Data->replaceChild<TypeAliasDeclSyntax>(NewEqualToken.getRaw(),
                                                  Cursor::EqualToken);
 }
 
@@ -290,18 +291,18 @@ TypeAliasDeclSyntaxBuilder::TypeAliasDeclSyntaxBuilder()
   {}
 
 TypeAliasDeclSyntaxBuilder &TypeAliasDeclSyntaxBuilder::
-useTypeAliasKeyword(RC<TokenSyntax> TypeAliasKeyword) {
+useTypeAliasKeyword(TokenSyntax TypeAliasKeyword) {
   syntax_assert_token_is(TypeAliasKeyword, tok::kw_typealias, "typealias");
   auto Index = cursorIndex(TypeAliasDeclSyntax::Cursor::TypeAliasKeyword);
-  TypeAliasLayout[Index] = TypeAliasKeyword;
+  TypeAliasLayout[Index] = TypeAliasKeyword.getRaw();
   return *this;
 }
 
 TypeAliasDeclSyntaxBuilder &
-TypeAliasDeclSyntaxBuilder::useIdentifier(RC<TokenSyntax> Identifier) {
-  assert(Identifier->getTokenKind() == tok::identifier);
+TypeAliasDeclSyntaxBuilder::useIdentifier(TokenSyntax Identifier) {
+  assert(Identifier.getTokenKind() == tok::identifier);
   auto Index = cursorIndex(TypeAliasDeclSyntax::Cursor::Identifier);
-  TypeAliasLayout[Index] = Identifier;
+  TypeAliasLayout[Index] = Identifier.getRaw();
   return *this;
 }
 
@@ -313,9 +314,9 @@ useGenericParameterClause(GenericParameterClauseSyntax GenericParams) {
 }
 
 TypeAliasDeclSyntaxBuilder &
-TypeAliasDeclSyntaxBuilder::useEqualToken(RC<TokenSyntax> EqualToken) {
+TypeAliasDeclSyntaxBuilder::useEqualToken(TokenSyntax EqualToken) {
   auto Index = cursorIndex(TypeAliasDeclSyntax::Cursor::EqualToken);
-  TypeAliasLayout[Index] = EqualToken;
+  TypeAliasLayout[Index] = EqualToken.getRaw();
   return *this;
 }
 
@@ -353,14 +354,14 @@ void FunctionParameterSyntax::validate() const {
 FunctionParameterSyntax FunctionParameterSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionParameter,
   {
-    TokenSyntax::missingToken(tok::identifier, ""),
-    TokenSyntax::missingToken(tok::identifier, ""),
-    TokenSyntax::missingToken(tok::colon, ":"),
+    RawTokenSyntax::missingToken(tok::identifier, ""),
+    RawTokenSyntax::missingToken(tok::identifier, ""),
+    RawTokenSyntax::missingToken(tok::colon, ":"),
     RawSyntax::missing(SyntaxKind::MissingType),
-    TokenSyntax::missingToken(tok::identifier, "..."),
-    TokenSyntax::missingToken(tok::equal, "="),
+    RawTokenSyntax::missingToken(tok::identifier, "..."),
+    RawTokenSyntax::missingToken(tok::equal, "="),
     RawSyntax::missing(SyntaxKind::MissingExpr),
-    TokenSyntax::missingToken(tok::comma, ","),
+    RawTokenSyntax::missingToken(tok::comma, ","),
   },
   SourcePresence::Present);
   return make<FunctionParameterSyntax>(Raw);
@@ -369,36 +370,36 @@ FunctionParameterSyntax FunctionParameterSyntax::makeBlank() {
 
 #pragma mark - function-parameter API
 
-RC<TokenSyntax> FunctionParameterSyntax::getExternalName() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::ExternalName));
+TokenSyntax FunctionParameterSyntax::getExternalName() const {
+  return { Root, Data->getChild(Cursor::ExternalName).get() };
 }
 
 FunctionParameterSyntax FunctionParameterSyntax::
-withExternalName(RC<TokenSyntax> NewExternalName) const {
-  assert(NewExternalName->getTokenKind() == tok::identifier);
-  return Data->replaceChild<FunctionParameterSyntax>(NewExternalName,
+withExternalName(TokenSyntax NewExternalName) const {
+  assert(NewExternalName.getTokenKind() == tok::identifier);
+  return Data->replaceChild<FunctionParameterSyntax>(NewExternalName.getRaw(),
                                                      Cursor::ExternalName);
 }
 
-RC<TokenSyntax> FunctionParameterSyntax::getLocalName() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::LocalName));
+TokenSyntax FunctionParameterSyntax::getLocalName() const {
+  return { Root, Data->getChild(Cursor::LocalName).get() };
 }
 
 FunctionParameterSyntax FunctionParameterSyntax::
-withLocalName(RC<TokenSyntax> NewLocalName) const {
-  assert(NewLocalName->getTokenKind() == tok::identifier);
-  return Data->replaceChild<FunctionParameterSyntax>(NewLocalName,
+withLocalName(TokenSyntax NewLocalName) const {
+  assert(NewLocalName.getTokenKind() == tok::identifier);
+  return Data->replaceChild<FunctionParameterSyntax>(NewLocalName.getRaw(),
                                                      Cursor::LocalName);
 }
 
-RC<TokenSyntax> FunctionParameterSyntax::getColonToken() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Colon));
+TokenSyntax FunctionParameterSyntax::getColonToken() const {
+  return { Root, Data->getChild(Cursor::Colon).get() };
 }
 
 FunctionParameterSyntax FunctionParameterSyntax::
-withColonToken(RC<TokenSyntax> NewColonToken) const {
+withColonToken(TokenSyntax NewColonToken) const {
   syntax_assert_token_is(NewColonToken, tok::colon, ":");
-  return Data->replaceChild<FunctionParameterSyntax>(NewColonToken,
+  return Data->replaceChild<FunctionParameterSyntax>(NewColonToken.getRaw(),
                                                      Cursor::Colon);
 }
 
@@ -422,14 +423,14 @@ withTypeSyntax(llvm::Optional<TypeSyntax> NewType) const {
     NewType.getValue().getRaw(), Cursor::Type);
 }
 
-RC<TokenSyntax> FunctionParameterSyntax::getEqualToken() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::DefaultEqual));
+TokenSyntax FunctionParameterSyntax::getEqualToken() const {
+  return { Root, Data->getChild(Cursor::DefaultEqual).get() };
 }
 
 FunctionParameterSyntax FunctionParameterSyntax::
-withEqualToken(RC<TokenSyntax> NewEqualToken) const {
-  assert(NewEqualToken->getTokenKind() == tok::equal);
-  return Data->replaceChild<FunctionParameterSyntax>(NewEqualToken,
+withEqualToken(TokenSyntax NewEqualToken) const {
+  assert(NewEqualToken.getTokenKind() == tok::equal);
+  return Data->replaceChild<FunctionParameterSyntax>(NewEqualToken.getRaw(),
                                                      Cursor::DefaultEqual);
 }
 
@@ -454,14 +455,14 @@ withDefaultValue(llvm::Optional<ExprSyntax> NewDefaultValue) const {
     NewDefaultValue.getValue().getRaw(), Cursor::DefaultExpression);
 }
 
-RC<TokenSyntax> FunctionParameterSyntax::getTrailingComma() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::TrailingComma));
+TokenSyntax FunctionParameterSyntax::getTrailingComma() const {
+  return { Root, Data->getChild(Cursor::TrailingComma).get() };
 }
 
 FunctionParameterSyntax FunctionParameterSyntax::
-withTrailingComma(RC<TokenSyntax> NewTrailingComma) const {
+withTrailingComma(TokenSyntax NewTrailingComma) const {
   syntax_assert_token_is(NewTrailingComma, tok::comma, ",");
-  return Data->replaceChild<FunctionParameterSyntax>(NewTrailingComma,
+  return Data->replaceChild<FunctionParameterSyntax>(NewTrailingComma.getRaw(),
                                                      Cursor::TrailingComma);
 }
 
@@ -481,10 +482,10 @@ void FunctionSignatureSyntax::validate() const {
                                  Cursor::RightParen,
                                  tok::r_paren, ")");
 #ifndef NDEBUG
-  auto ThrowsRethrows = cast<TokenSyntax>(
+  auto ThrowsRethrows = cast<RawTokenSyntax>(
     Raw->getChild(Cursor::ThrowsOrRethrows));
-  assert(cast<TokenSyntax>(ThrowsRethrows)->getTokenKind() == tok::kw_throws ||
-         cast<TokenSyntax>(ThrowsRethrows)->getTokenKind() == tok::kw_rethrows);
+  assert(ThrowsRethrows->getTokenKind() == tok::kw_throws ||
+         ThrowsRethrows->getTokenKind() == tok::kw_rethrows);
 #endif
   syntax_assert_child_token_text(Raw, Cursor::Arrow,
                                  tok::arrow, "->");
@@ -497,11 +498,11 @@ void FunctionSignatureSyntax::validate() const {
 FunctionSignatureSyntax FunctionSignatureSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionSignature,
   {
-    TokenSyntax::missingToken(tok::l_paren, "("),
+    RawTokenSyntax::missingToken(tok::l_paren, "("),
     RawSyntax::missing(SyntaxKind::FunctionParameterList),
-    TokenSyntax::missingToken(tok::r_paren, ")"),
-    TokenSyntax::missingToken(tok::kw_throws, "throws"),
-    TokenSyntax::missingToken(tok::arrow, "->"),
+    RawTokenSyntax::missingToken(tok::r_paren, ")"),
+    RawTokenSyntax::missingToken(tok::kw_throws, "throws"),
+    RawTokenSyntax::missingToken(tok::arrow, "->"),
     RawSyntax::missing(SyntaxKind::TypeAttributes),
     RawSyntax::missing(SyntaxKind::MissingType),
   },
@@ -511,14 +512,14 @@ FunctionSignatureSyntax FunctionSignatureSyntax::makeBlank() {
 
 #pragma mark - function-signature API
 
-RC<TokenSyntax> FunctionSignatureSyntax::getLeftParenToken() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::LeftParen));
+TokenSyntax FunctionSignatureSyntax::getLeftParenToken() const {
+  return { Root, Data->getChild(Cursor::LeftParen).get() };
 }
 
 FunctionSignatureSyntax FunctionSignatureSyntax::
-withLeftParenToken(RC<TokenSyntax> NewLeftParen) const {
+withLeftParenToken(TokenSyntax NewLeftParen) const {
   syntax_assert_token_is(NewLeftParen, tok::l_paren, "(");
-  return Data->replaceChild<FunctionSignatureSyntax>(NewLeftParen,
+  return Data->replaceChild<FunctionSignatureSyntax>(NewLeftParen.getRaw(),
                                                      Cursor::LeftParen);
 }
 
@@ -535,56 +536,57 @@ withParameterList(FunctionParameterListSyntax NewParameterList) const {
                                                      Cursor::ParameterList);
 }
 
-RC<TokenSyntax> FunctionSignatureSyntax::getRightParenToken() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::RightParen));
+TokenSyntax FunctionSignatureSyntax::getRightParenToken() const {
+  return { Root, Data->getChild(Cursor::RightParen).get() };
 }
 
 FunctionSignatureSyntax FunctionSignatureSyntax::
-withRightParenToken(RC<TokenSyntax> NewRightParen) const {
+withRightParenToken(TokenSyntax NewRightParen) const {
   syntax_assert_token_is(NewRightParen, tok::r_paren, ")");
-  return Data->replaceChild<FunctionSignatureSyntax>(NewRightParen,
+  return Data->replaceChild<FunctionSignatureSyntax>(NewRightParen.getRaw(),
                                                      Cursor::RightParen);
 }
 
-RC<TokenSyntax> FunctionSignatureSyntax::getThrowsToken() const {
-  auto Throw = cast<TokenSyntax>(getRaw()->getChild(Cursor::ThrowsOrRethrows));
-  if (Throw->getTokenKind() != tok::kw_throws) {
+TokenSyntax FunctionSignatureSyntax::getThrowsToken() const {
+  auto Throw = cast<RawTokenSyntax>(
+    getRaw()->getChild(Cursor::ThrowsOrRethrows));
+  if (Throw->isNot(tok::kw_throws)) {
     return TokenSyntax::missingToken(tok::kw_throws, "throws");
   }
-  return Throw;
+  return { Root, Data->getChild(Cursor::ThrowsOrRethrows).get() };
 }
 
 FunctionSignatureSyntax FunctionSignatureSyntax::
-withThrowsToken(RC<TokenSyntax> NewThrowsToken) const {
+withThrowsToken(TokenSyntax NewThrowsToken) const {
   syntax_assert_token_is(NewThrowsToken, tok::kw_throws, "throws");
-  return Data->replaceChild<FunctionSignatureSyntax>(NewThrowsToken,
+  return Data->replaceChild<FunctionSignatureSyntax>(NewThrowsToken.getRaw(),
                                                      Cursor::ThrowsOrRethrows);
 }
 
-RC<TokenSyntax> FunctionSignatureSyntax::getRethrowsToken() const {
-  auto Rethrow = cast<TokenSyntax>(
+TokenSyntax FunctionSignatureSyntax::getRethrowsToken() const {
+  auto Rethrow = cast<RawTokenSyntax>(
     getRaw()->getChild(Cursor::ThrowsOrRethrows));
-  if (Rethrow->getTokenKind() != tok::kw_rethrows) {
+  if (Rethrow->isNot(tok::kw_rethrows)) {
     return TokenSyntax::missingToken(tok::kw_rethrows, "rethrows");
   }
-  return Rethrow;
+  return { Root, Data->getChild(Cursor::ThrowsOrRethrows).get() };
 }
 
 FunctionSignatureSyntax FunctionSignatureSyntax::
-withRethrowsToken(RC<TokenSyntax> NewRethrowsToken) const {
+withRethrowsToken(TokenSyntax NewRethrowsToken) const {
   syntax_assert_token_is(NewRethrowsToken, tok::kw_rethrows, "rethrows");
-  return Data->replaceChild<FunctionSignatureSyntax>(NewRethrowsToken,
+  return Data->replaceChild<FunctionSignatureSyntax>(NewRethrowsToken.getRaw(),
                                                      Cursor::ThrowsOrRethrows);
 }
 
-RC<TokenSyntax> FunctionSignatureSyntax::getArrowToken() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Arrow));
+TokenSyntax FunctionSignatureSyntax::getArrowToken() const {
+  return { Root, Data->getChild(Cursor::Arrow).get() };
 }
 
 FunctionSignatureSyntax FunctionSignatureSyntax::
-withArrowToken(RC<TokenSyntax> NewArrowToken) const {
+withArrowToken(TokenSyntax NewArrowToken) const {
   syntax_assert_token_is(NewArrowToken, tok::arrow, "->");
-  return Data->replaceChild<FunctionSignatureSyntax>(NewArrowToken,
+  return Data->replaceChild<FunctionSignatureSyntax>(NewArrowToken.getRaw(),
                                                      Cursor::Arrow);
 }
 
@@ -644,8 +646,8 @@ FunctionDeclSyntax FunctionDeclSyntax::makeBlank() {
     {
       RawSyntax::missing(SyntaxKind::TypeAttributes),
       RawSyntax::missing(SyntaxKind::DeclModifierList),
-      TokenSyntax::missingToken(tok::kw_func, "func"),
-      TokenSyntax::missingToken(tok::identifier, ""),
+      RawTokenSyntax::missingToken(tok::kw_func, "func"),
+      RawTokenSyntax::missingToken(tok::identifier, ""),
       RawSyntax::missing(SyntaxKind::GenericParameterClause),
       RawSyntax::missing(SyntaxKind::FunctionSignature),
       RawSyntax::missing(SyntaxKind::GenericWhereClause),
@@ -677,26 +679,25 @@ FunctionDeclSyntax::withModifiers(DeclModifierListSyntax NewModifiers) const {
                                                 Cursor::Modifiers);
 }
 
-RC<TokenSyntax> FunctionDeclSyntax::getFuncKeyword() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::FuncKeyword));
+TokenSyntax FunctionDeclSyntax::getFuncKeyword() const {
+  return { Root, Data->getChild(Cursor::FuncKeyword).get() };
 }
 
 FunctionDeclSyntax
-FunctionDeclSyntax::withFuncKeyword(RC<TokenSyntax> NewFuncKeyword) const {
+FunctionDeclSyntax::withFuncKeyword(TokenSyntax NewFuncKeyword) const {
   syntax_assert_token_is(NewFuncKeyword, tok::kw_func, "func");
-  return Data->replaceChild<FunctionDeclSyntax>(NewFuncKeyword,
+  return Data->replaceChild<FunctionDeclSyntax>(NewFuncKeyword.getRaw(),
                                                 Cursor::FuncKeyword);
-
 }
 
-RC<TokenSyntax> FunctionDeclSyntax::getIdentifier() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Identifier));
+TokenSyntax FunctionDeclSyntax::getIdentifier() const {
+  return { Root, Data->getChild(Cursor::Identifier).get() };
 }
 
 FunctionDeclSyntax
-FunctionDeclSyntax::withIdentifier(RC<TokenSyntax> NewIdentifier) const {
-  assert(NewIdentifier->getTokenKind() == tok::identifier);
-  return Data->replaceChild<FunctionDeclSyntax>(NewIdentifier,
+FunctionDeclSyntax::withIdentifier(TokenSyntax NewIdentifier) const {
+  assert(NewIdentifier.getTokenKind() == tok::identifier);
+  return Data->replaceChild<FunctionDeclSyntax>(NewIdentifier.getRaw(),
                                                 Cursor::Identifier);
 }
 

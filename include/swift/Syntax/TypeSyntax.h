@@ -47,7 +47,7 @@ public:
   // TODO: TODO: BalancedTokensSyntax::getBalancedToken
 
   BalancedTokensSyntax
-  addBalancedToken(RC<TokenSyntax> NewBalancedToken) const;
+  addBalancedToken(TokenSyntax NewBalancedToken) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::BalancedTokens;
@@ -77,23 +77,23 @@ public:
     : Syntax(Root, Data) {}
 
   /// Return the '@' token associated with the type attribute.
-  RC<TokenSyntax> getAtSignToken() const;
+  TokenSyntax getAtSignToken() const;
 
   /// Return a new TypeAttributeSyntax with the given '@' token.
-  TypeAttributeSyntax withAtSignToken(RC<TokenSyntax> NewAtSignToken) const;
+  TypeAttributeSyntax withAtSignToken(TokenSyntax NewAtSignToken) const;
 
   /// Return the name of the type attribute.
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   /// Return a new TypeAttributeSyntax with the given name.
-  TypeAttributeSyntax withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  TypeAttributeSyntax withIdentifier(TokenSyntax NewIdentifier) const;
 
   /// Return the left parenthesis '(' token attached to the type attribute.
-  RC<TokenSyntax> getLeftParenToken() const;
+  TokenSyntax getLeftParenToken() const;
 
   /// Return a TypeAttributeSyntax with the given left parenthesis '(' token.
   TypeAttributeSyntax
-  withLeftParenToken(RC<TokenSyntax> NewLeftParenToken) const;
+  withLeftParenToken(TokenSyntax NewLeftParenToken) const;
 
   /// Return the "balanced tokens" of the type attributes; the arguments.
   BalancedTokensSyntax getBalancedTokens() const;
@@ -104,11 +104,11 @@ public:
   withBalancedTokens(BalancedTokensSyntax NewBalancedTokens) const;
 
   /// Return the right parenthesis ')' token attached to the type attribute.
-  RC<TokenSyntax> getRightParenToken() const;
+  TokenSyntax getRightParenToken() const;
 
   /// Return a TypeAttributeSyntax with the given right parenthesis ')' token.
   TypeAttributeSyntax
-  withRightParenToken(RC<TokenSyntax> NewRightParenToken) const;
+  withRightParenToken(TokenSyntax NewRightParenToken) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::TypeAttribute;
@@ -165,17 +165,17 @@ public:
   TypeIdentifierSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
     : TypeSyntax(Root, Data) {}
 
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   TypeIdentifierSyntax
-  withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  withIdentifier(TokenSyntax NewIdentifier) const;
 
   GenericArgumentClauseSyntax getGenericArgumentClause() const;
   TypeIdentifierSyntax
   withGenericArgumentClause(GenericArgumentClauseSyntax NewGenericArgs) const;
 
-  RC<TokenSyntax> getDotToken() const;
-  TypeIdentifierSyntax withDotToken(RC<TokenSyntax> NewIdentifier) const;
+  TokenSyntax getDotToken() const;
+  TypeIdentifierSyntax withDotToken(TokenSyntax NewIdentifier) const;
 
   TypeIdentifierSyntax getChildType() const;
   TypeIdentifierSyntax addChildType(TypeIdentifierSyntax ChildType) const;
@@ -211,26 +211,26 @@ public:
     : Syntax(Root, Data) {}
   
   /// Return the label of the tuple type element.
-  RC<TokenSyntax> getLabel() const;
+  TokenSyntax getLabel() const;
 
   /// Return a new named tuple type element with the specified identifier.
-  TupleTypeElementSyntax withLabel(RC<TokenSyntax> NewIdentifier) const;
+  TupleTypeElementSyntax withLabel(TokenSyntax NewIdentifier) const;
 
   /// Return the colon token of the tuple type element.
-  RC<TokenSyntax> getColonToken() const;
+  TokenSyntax getColonToken() const;
 
   /// Return a new named tuple type element with a colon token replacement
   /// using the specified leading and trailing trivia.
   TupleTypeElementSyntax
-  withColonToken(RC<TokenSyntax> NewColonToken) const;
+  withColonToken(TokenSyntax NewColonToken) const;
 
   /// Return the comma token of the tuple type element.
-  RC<TokenSyntax> getCommaToken() const;
+  TokenSyntax getCommaToken() const;
 
   /// Return a new named tuple type element with a comma token replacement
   /// using the specified leading and trailing trivia.
   TupleTypeElementSyntax
-  withCommaToken(RC<TokenSyntax> NewCommaToken) const;
+  withCommaToken(TokenSyntax NewCommaToken) const;
 
   /// Return the type attributes for the tuple type element.
   TypeAttributesSyntax getTypeAttributes() const;
@@ -240,10 +240,10 @@ public:
   withTypeAttributes(TypeAttributesSyntax NewTypeAttributes) const;
 
   /// Return the 'inout' token of the tuple type element.
-  RC<TokenSyntax> getInoutToken() const;
+  TokenSyntax getInoutToken() const;
 
   /// Return a new named tuple type element with the 'inout' keyword added.
-  TupleTypeElementSyntax withInoutToken(RC<TokenSyntax> NewInoutToken) const;
+  TupleTypeElementSyntax withInoutToken(TokenSyntax NewInoutToken) const;
 
   TypeSyntax getTypeSyntax() const;
 
@@ -276,8 +276,8 @@ public:
     : TypeSyntax(Root, Data) {}
 
   /// Return the left paren '(' token surrounding the tuple type syntax.
-  RC<TokenSyntax> getLeftParen() const;
-  TupleTypeSyntax withLeftParen(RC<TokenSyntax> NewLeftParen) const;
+  TokenSyntax getLeftParen() const;
+  TupleTypeSyntax withLeftParen(TokenSyntax NewLeftParen) const;
 
   /// Get the type argument list inside the tuple type syntax.
   TupleTypeElementListSyntax getTypeElementList() const;
@@ -287,8 +287,8 @@ public:
   withTypeElementList(TupleTypeElementListSyntax NewTypeElementList) const;
 
   /// Return the right paren ')' token surrounding the tuple type syntax.
-  RC<TokenSyntax> getRightParen() const;
-  TupleTypeSyntax withRightParen(RC<TokenSyntax> NewRightParen) const;
+  TokenSyntax getRightParen() const;
+  TupleTypeSyntax withRightParen(TokenSyntax NewRightParen) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::TupleType;
@@ -307,14 +307,14 @@ public:
   TupleTypeSyntaxBuilder();
 
   /// Use the given left paren '(' token when building the tuple type syntax.
-  TupleTypeSyntaxBuilder &useLeftParen(RC<TokenSyntax> LeftParen);
+  TupleTypeSyntaxBuilder &useLeftParen(TokenSyntax LeftParen);
 
   /// Add an element type to the eventual tuple type syntax.
   TupleTypeSyntaxBuilder &
   addElementTypeSyntax(TupleTypeElementSyntax ElementTypeSyntax);
 
   /// Use the given left paren '(' token when building the tuple type syntax.
-  TupleTypeSyntaxBuilder &useRightParen(RC<TokenSyntax> RightParen);
+  TupleTypeSyntaxBuilder &useRightParen(TokenSyntax RightParen);
 
   /// Build a TupleTypeSyntax from the elements seen so far.
   ///
@@ -348,17 +348,17 @@ public:
   MetatypeTypeSyntax withBaseTypeSyntax(TypeSyntax NewBaseType) const;
 
   /// Return the dot token.
-  RC<TokenSyntax> getDotToken() const;
+  TokenSyntax getDotToken() const;
 
   /// Return a new metatype type with the given dot token.
-  MetatypeTypeSyntax withDotToken(RC<TokenSyntax> NewDotToken) const;
+  MetatypeTypeSyntax withDotToken(TokenSyntax NewDotToken) const;
 
   /// Return the child type - either the identifiers `Type` or `Protocol`.
-  RC<TokenSyntax> getTypeToken() const;
+  TokenSyntax getTypeToken() const;
 
   /// Return a new metatype type with the given child type - either the
   /// identifiers: `Type` or `Protocol`.
-  MetatypeTypeSyntax withTypeToken(RC<TokenSyntax> NewTypeToken) const;
+  MetatypeTypeSyntax withTypeToken(TokenSyntax NewTypeToken) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::MetatypeType;
@@ -389,11 +389,11 @@ public:
   OptionalTypeSyntax withBaseTypeSyntax(TypeSyntax NewBaseType) const;
 
   /// Return the question-mark '?' token attached to this optional type syntax.
-  RC<TokenSyntax> getQuestionToken() const;
+  TokenSyntax getQuestionToken() const;
 
   /// Return a new optional type with the given question-mark token.
   OptionalTypeSyntax
-  withQuestionToken(RC<TokenSyntax> NewQuestionToken) const;
+  withQuestionToken(TokenSyntax NewQuestionToken) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::OptionalType;
@@ -427,12 +427,12 @@ public:
 
   /// Return the exclamation-mark '!' token attached to the end of this
   /// implicitly unwrapped optional type syntax.
-  RC<TokenSyntax> getExclaimToken() const;
+  TokenSyntax getExclaimToken() const;
 
   /// Return a new implicitly unwrapped optional type with the given
   /// exclamation-mark '!' token.
   ImplicitlyUnwrappedOptionalTypeSyntax
-  withExclaimToken(RC<TokenSyntax> NewExclaimToken) const;
+  withExclaimToken(TokenSyntax NewExclaimToken) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::OptionalType;
@@ -460,22 +460,22 @@ public:
 
   /// Return the left square bracket '[' token surrounding the array
   /// type syntax.
-  RC<TokenSyntax> getLeftSquareBracketToken() const;
+  TokenSyntax getLeftSquareBracketToken() const;
 
   /// Return a new array type with the given left square bracket token.
   ArrayTypeSyntax
-  withLeftSquareBracketToken(RC<TokenSyntax> NewLeftSquareBracketToken) const;
+  withLeftSquareBracketToken(TokenSyntax NewLeftSquareBracketToken) const;
 
   /// Return a new array type with the given element type.
   ArrayTypeSyntax withType(TypeSyntax NewType) const;
 
   /// Return the right square bracket ']' token surrounding the array
   /// type syntax.
-  RC<TokenSyntax> getRightSquareBracketToken() const;
+  TokenSyntax getRightSquareBracketToken() const;
 
   /// Return a new array type with the given right square bracket token.
   ArrayTypeSyntax
-  withRightSquareBracketToken(RC<TokenSyntax> NewRightSquareBracketToken) const;
+  withRightSquareBracketToken(TokenSyntax NewRightSquareBracketToken) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::ArrayType;
@@ -506,11 +506,11 @@ public:
 
   /// Return the left square bracket '[' token surrounding the dictionary
   /// type syntax.
-  RC<TokenSyntax> getLeftSquareBracketToken() const;
+  TokenSyntax getLeftSquareBracketToken() const;
 
   /// Return a new dictionary type with the given left square bracket token.
   DictionaryTypeSyntax
-  withLeftSquareBracketToken(RC<TokenSyntax> NewLeftSquareBracketToken) const;
+  withLeftSquareBracketToken(TokenSyntax NewLeftSquareBracketToken) const;
 
   /// Return the key type syntax for this dictionary type.
   TypeSyntax getKeyTypeSyntax() const;
@@ -519,10 +519,10 @@ public:
   DictionaryTypeSyntax withKeyTypeSyntax(TypeSyntax NewKeyType) const;
 
   /// Get the colon token in the dictionary type syntax.
-  RC<TokenSyntax> getColonToken() const;
+  TokenSyntax getColonToken() const;
 
   /// Return a new dictionary type with the given colon token.
-  DictionaryTypeSyntax withColon(RC<TokenSyntax> NewColonToken) const;
+  DictionaryTypeSyntax withColon(TokenSyntax NewColonToken) const;
 
   /// Return the value type syntax for this dictionary type.
   TypeSyntax getValueTypeSyntax() const;
@@ -532,11 +532,11 @@ public:
 
   /// Return the right square bracket ']' token surrounding the dictionary
   /// type syntax.
-  RC<TokenSyntax> getRightSquareBracketToken() const;
+  TokenSyntax getRightSquareBracketToken() const;
 
   /// Return a new dictionary type with the given right square bracket token.
   DictionaryTypeSyntax
-  withRightSquareBracketToken(RC<TokenSyntax> NewRightSquareBracketToken) const;
+  withRightSquareBracketToken(TokenSyntax NewRightSquareBracketToken) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::DictionaryType;
@@ -602,17 +602,17 @@ public:
   withTypeAttributes(TypeAttributesSyntax NewAttributes) const;
 
   /// Return the left parenthesis '(' token surrounding the argument type.
-  RC<TokenSyntax> getLeftArgumentsParen() const;
+  TokenSyntax getLeftArgumentsParen() const;
 
   /// Return a new function type with the given left parenthesis on the type
   /// argument list.
   FunctionTypeSyntax
-  withLeftArgumentsParen(RC<TokenSyntax> NewLeftParen) const;
+  withLeftArgumentsParen(TokenSyntax NewLeftParen) const;
 
   /// Return a new function type with the additional argument type and
   /// optionally a preceding comma token.
   FunctionTypeSyntax
-  addTypeArgument(llvm::Optional<RC<TokenSyntax>> MaybeComma,
+  addTypeArgument(llvm::Optional<TokenSyntax> MaybeComma,
                   FunctionTypeArgumentSyntax NewArgument) const;
 
   /// Return the type arguments list for this function type syntax.
@@ -625,32 +625,32 @@ public:
   withTypeElementList(TupleTypeElementListSyntax NewArgumentList) const;
 
   /// Return the right parenthesis ')' token surrounding the argument type.
-  RC<TokenSyntax> getRightArgumentsParen() const;
+  TokenSyntax getRightArgumentsParen() const;
 
   /// Return a new function type with the given right parenthesis ')'
   /// on the type argument list.
   FunctionTypeSyntax
-  withRightArgumentsParen(RC<TokenSyntax> NewRightParen) const;
+  withRightArgumentsParen(TokenSyntax NewRightParen) const;
 
   /// Return the 'throws' or 'rethrows' keyword on the function type syntax.
-  RC<TokenSyntax> getThrowsOrRethrowsKeyword() const;
+  TokenSyntax getThrowsOrRethrowsKeyword() const;
 
   /// Return a new function type with the given `throws` keyword.
   ///
   /// This fills the same slot held by the `rethrows` keyword.
-  FunctionTypeSyntax withThrowsKeyword(RC<TokenSyntax> NewThrowsKeyword) const;
+  FunctionTypeSyntax withThrowsKeyword(TokenSyntax NewThrowsKeyword) const;
 
   /// Return a new function type with the given `rethrows` keyword.
   ///
   /// This fills the same slot held by the `throws` keyword.
   FunctionTypeSyntax
-  withRethrowsKeyword(RC<TokenSyntax> NewThrowsKeyword) const;
+  withRethrowsKeyword(TokenSyntax NewThrowsKeyword) const;
 
   /// Return the arrow token in the function type syntax.
-  RC<TokenSyntax> getArrow() const;
+  TokenSyntax getArrow() const;
 
   /// Return a new function type with the given arrow token.
-  FunctionTypeSyntax withArrow(RC<TokenSyntax> NewArrow) const;
+  FunctionTypeSyntax withArrow(TokenSyntax NewArrow) const;
 
   // Return the return type syntax for the function type.
   TypeSyntax getReturnTypeSyntax() const;
@@ -677,22 +677,22 @@ public:
   useTypeAttributes(TypeAttributeSyntax NewAttributes);
 
   /// Use the given left paren '(' token on the argument type syntax.
-  FunctionTypeSyntaxBuilder &useLeftArgumentsParen(RC<TokenSyntax> LeftParen);
+  FunctionTypeSyntaxBuilder &useLeftArgumentsParen(TokenSyntax LeftParen);
 
   FunctionTypeSyntaxBuilder &
-  addArgumentTypeSyntax(llvm::Optional<RC<TokenSyntax>> MaybeComma,
+  addArgumentTypeSyntax(llvm::Optional<TokenSyntax> MaybeComma,
                         FunctionTypeArgumentSyntax Argument);
 
   /// Use the given right paren ')' token on the argument type syntax.
-  FunctionTypeSyntaxBuilder &useRightArgumentsParen(RC<TokenSyntax> RightParen);
+  FunctionTypeSyntaxBuilder &useRightArgumentsParen(TokenSyntax RightParen);
 
   /// Use the given 'throws' keyword in the function type syntax.
-  FunctionTypeSyntaxBuilder &useThrowsKeyword(RC<TokenSyntax> ThrowsKeyword);
+  FunctionTypeSyntaxBuilder &useThrowsKeyword(TokenSyntax ThrowsKeyword);
 
   FunctionTypeSyntaxBuilder &
-  useRethrowsKeyword(RC<TokenSyntax> RethrowsKeyword);
+  useRethrowsKeyword(TokenSyntax RethrowsKeyword);
 
-  FunctionTypeSyntaxBuilder &useArrow(RC<TokenSyntax> Arrow);
+  FunctionTypeSyntaxBuilder &useArrow(TokenSyntax Arrow);
   FunctionTypeSyntaxBuilder &useReturnTypeSyntax(TypeSyntax ReturnType);
 
   FunctionTypeSyntax build() const;

@@ -26,16 +26,17 @@ using namespace swift::syntax;
 namespace {
   bool
   tokenContainsOffset(unsigned Offset,
-                      const std::pair<RC<TokenSyntax>,
-                      AbsolutePosition> &TokAndPos) {
+                      const std::pair<RC<RawTokenSyntax>,
+                                      AbsolutePosition> &TokAndPos) {
     auto Start = TokAndPos.second.getOffset();
     auto End = Start + TokAndPos.first->getText().size();
     return Offset >= Start && Offset < End;
   }
-  std::vector<RC<TokenSyntax>>
-  getTokenSyntaxsInRange(SourceRange Range, SourceManager &SourceMgr,
-                       unsigned BufferID,
-                       const TokenPositionList &Tokens) {
+
+  std::vector<RC<RawTokenSyntax>>
+  getRawTokenSyntaxesInRange(SourceRange Range, SourceManager &SourceMgr,
+                             unsigned BufferID,
+                             const TokenPositionList &Tokens) {
     auto StartOffset = SourceMgr.getLocOffsetInBuffer(Range.Start, BufferID);
     auto EndOffset = SourceMgr.getLocOffsetInBuffer(Range.End, BufferID);
 
@@ -60,7 +61,7 @@ namespace {
     assert(End.base() != Tokens.end());
     assert(Start <= End.base());
 
-    std::vector<RC<TokenSyntax>> TokensInRange;
+    std::vector<RC<RawTokenSyntax>> TokensInRange;
 
     while (Start < End.base()) {
       TokensInRange.push_back(Start->first);
@@ -141,7 +142,7 @@ SourceLoc LegacyASTTransformer::getEndLocForExpr(const Expr *E) const {
 }
 
 RC<SyntaxData> LegacyASTTransformer::getUnknownSyntax(SourceRange SR) {
-  auto ComprisingTokens = getTokenSyntaxsInRange(SR, SourceMgr,
+  auto ComprisingTokens = getRawTokenSyntaxesInRange(SR, SourceMgr,
                                                  BufferID, Tokens);
   RawSyntax::LayoutList Layout;
   std::copy(ComprisingTokens.begin(),
@@ -155,7 +156,7 @@ RC<SyntaxData> LegacyASTTransformer::getUnknownSyntax(SourceRange SR) {
 
 RC<SyntaxData> LegacyASTTransformer::getUnknownDecl(Decl *D) {
   SourceRange SR {getStartLocForDecl(D),getEndLocForDecl(D)};
-  auto ComprisingTokens = getTokenSyntaxsInRange(SR, SourceMgr,
+  auto ComprisingTokens = getRawTokenSyntaxesInRange(SR, SourceMgr,
                                                  BufferID, Tokens);
   RawSyntax::LayoutList Layout;
   std::copy(ComprisingTokens.begin(),
@@ -169,7 +170,7 @@ RC<SyntaxData> LegacyASTTransformer::getUnknownDecl(Decl *D) {
 
 RC<SyntaxData> LegacyASTTransformer::getUnknownStmt(Stmt *S) {
   SourceRange SR { S->getStartLoc(), getEndLocForStmt(S) };
-  auto ComprisingTokens = getTokenSyntaxsInRange(SR, SourceMgr,
+  auto ComprisingTokens = getRawTokenSyntaxesInRange(SR, SourceMgr,
                                                  BufferID, Tokens);
   RawSyntax::LayoutList Layout;
   std::copy(ComprisingTokens.begin(),
@@ -183,7 +184,7 @@ RC<SyntaxData> LegacyASTTransformer::getUnknownStmt(Stmt *S) {
 
 RC<SyntaxData> LegacyASTTransformer::getUnknownExpr(Expr *E) {
   SourceRange SR { E->getStartLoc(), getEndLocForExpr(E) };
-  auto ComprisingTokens = getTokenSyntaxsInRange(SR, SourceMgr,
+  auto ComprisingTokens = getRawTokenSyntaxesInRange(SR, SourceMgr,
                                                  BufferID, Tokens);
   RawSyntax::LayoutList Layout;
   std::copy(ComprisingTokens.begin(),
@@ -1296,7 +1297,7 @@ LegacyASTTransformer::visitKeyPathDotExpr(KeyPathDotExpr *E,
   return getUnknownExpr(E);
 }
 
-RC<TokenSyntax>
+TokenSyntax
 syntax::findTokenSyntax(tok ExpectedKind,
                         OwnedString ExpectedText,
                         SourceManager &SourceMgr,
@@ -1319,7 +1320,7 @@ syntax::findTokenSyntax(tok ExpectedKind,
     if (Offset == TokStart) {
       if (Tok->getTokenKind() == ExpectedKind &&
           (ExpectedText.empty() || Tok->getText() == ExpectedText.str())) {
-        return Tok;
+        return make<TokenSyntax>(Tok);
       } else {
         return TokenSyntax::missingToken(ExpectedKind, ExpectedText);
       }
