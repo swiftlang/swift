@@ -508,3 +508,12 @@ if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
 		expectTrue(result == .success)
 	}
 }
+
+#if swift(>=4.0)
+DispatchAPI.test("DispatchTimeInterval.never.equals") {
+	expectTrue(DispatchTimeInterval.never == DispatchTimeInterval.never)
+	expectTrue(DispatchTimeInterval.seconds(10) != DispatchTimeInterval.never);
+	expectTrue(DispatchTimeInterval.never != DispatchTimeInterval.seconds(10));
+	expectTrue(DispatchTimeInterval.seconds(10) == DispatchTimeInterval.seconds(10));
+}
+#endif
