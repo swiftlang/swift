@@ -147,6 +147,11 @@ class HostSpecificConfiguration(object):
                     test = False
 
             name = deployment_target.name
+
+            for skip_test_arch in invocation.platforms_archs_to_skip_test:
+                if deployment_target.name == skip_test_arch.name:
+                    test = False
+
             if build:
                 # Validation and long tests require building the full standard
                 # library, whereas the other targets can build a slightly
@@ -499,6 +504,7 @@ class BuildScriptInvocation(object):
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
 
         self.platforms_to_skip_test = set()
+        self.platforms_archs_to_skip_test = set()
         if args.skip_test_linux:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
         if args.skip_test_freebsd:
@@ -515,6 +521,9 @@ class BuildScriptInvocation(object):
         if args.skip_test_ios_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator)
+        if args.skip_test_ios_32bit_simulator:
+            self.platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.iOSSimulator.i386)
         if args.skip_test_tvos_host:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
         else:
@@ -780,6 +789,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-ios-host"]
         if args.skip_test_ios_simulator:
             impl_args += ["--skip-test-ios-simulator"]
+        if args.skip_test_ios_32bit_simulator:
+            impl_args += ["--skip-test-ios-32bit-simulator"]
         if args.skip_test_tvos_host:
             impl_args += ["--skip-test-tvos-host"]
         if args.skip_test_tvos_simulator:
@@ -1787,6 +1798,10 @@ iterations with -O",
     skip_test_group.add_argument(
         "--skip-test-ios-simulator",
         help="skip testing iOS simulator targets",
+        action=arguments.action.optional_bool)
+    skip_test_group.add_argument(
+        "--skip-test-ios-32bit-simulator",
+        help="skip testing iOS 32 bit simulator targets",
         action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-ios-host",

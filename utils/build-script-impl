@@ -142,6 +142,7 @@ KNOWN_SETTINGS=(
     skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OS X"
+    skip-test-ios-32bit-simulator     ""         "set to skip testing Swift stdlibs for iOS 32bit simulators"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
     skip-test-ios-host          ""               "set to skip testing the host parts of the iOS toolchain"
     skip-test-tvos-simulator    ""               "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
@@ -1355,10 +1356,18 @@ function calculate_targets_for_host() {
                     build_benchmark_this_target=
                 fi
                 ;;
-            iphonesimulator-*)
+            iphonesimulator-x86_64)
                 swift_sdk="IOS_SIMULATOR"
                 build_for_this_target=$(not ${SKIP_BUILD_IOS_SIMULATOR})
                 test_this_target=$(not ${SKIP_TEST_IOS_SIMULATOR})
+                ;;
+            iphonesimulator-i386)
+                swift_sdk="IOS_SIMULATOR"
+                build_for_this_target=$(not ${SKIP_BUILD_IOS_SIMULATOR})
+                if [[ "${SKIP_TEST_IOS_SIMULATOR}" == "1" ]] ; then
+                    SKIP_TEST_IOS_32BIT_SIMULATOR="${SKIP_TEST_IOS_SIMULATOR}"
+                fi
+                test_this_target=$(not ${SKIP_TEST_IOS_32BIT_SIMULATOR})
                 ;;
             appletvos-*)
                 swift_sdk="TVOS"
@@ -1439,6 +1448,7 @@ function calculate_targets_for_host() {
                     test_subset_target_suffix="-only_long"
                 fi
             fi
+
             SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}${test_target_suffix}-${stdlib_deployment_target}")
             if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
                 SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize-${stdlib_deployment_target}")
