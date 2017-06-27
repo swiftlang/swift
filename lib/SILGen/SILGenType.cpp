@@ -314,20 +314,14 @@ public:
     Serialized = IsNotSerialized;
 
     // Serialize the witness table if we're serializing everything with
-    // -sil-serialize-all.
+    // -sil-serialize-all...
     if (SGM.isMakeModuleFragile())
       Serialized = IsSerialized;
 
-    auto *nominal = Conformance->getType()->getAnyNominal();
-    // Serialize the witness table if the conformance itself thinks it should be
-    // and resilience is explicitly enabled for this compilaiton or if we serialize
-    // all eligible witness tables.
-    if ((SGM.M.getSwiftModule()->getResilienceStrategy() ==
-             ResilienceStrategy::Resilient ||
-         SGM.M.getOptions().SILSerializeWitnessTables) &&
-        nominal->hasFixedLayout() &&
-        proto->getEffectiveAccess() >= Accessibility::Public &&
-        nominal->getEffectiveAccess() >= Accessibility::Public)
+    // ... or if the conformance itself thinks it should be.
+    if (SILWitnessTable::conformanceIsSerialized(
+            Conformance, SGM.M.getSwiftModule()->getResilienceStrategy(),
+            SGM.M.getOptions().SILSerializeWitnessTables))
       Serialized = IsSerialized;
 
     // Not all protocols use witness tables; in this case we just skip
@@ -427,15 +421,7 @@ public:
     auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
     auto witnessSerialized = Serialized;
     if (witnessSerialized &&
-        !hasPublicVisibility(witnessLinkage) &&
-        !hasSharedVisibility(witnessLinkage)) {
-      // FIXME: This should not happen, but it looks like visibility rules
-      // for extension members are slightly bogus.
-      //
-      // We allow a 'public' member of an extension to witness a public
-      // protocol requirement, even if the extended type is not public;
-      // then SILGen gives the member private linkage, ignoring the more
-      // visible accessibility it was given in the AST.
+        fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
       witnessLinkage = SILLinkage::Public;
       witnessSerialized = (SGM.isMakeModuleFragile()
                            ? IsSerialized

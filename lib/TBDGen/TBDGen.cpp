@@ -24,6 +24,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -41,6 +42,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   bool FileHasEntryPoint;
+  bool SILSerializeWitnessTables;
 
   void addSymbol(StringRef name) {
     auto isNewValue = Symbols.insert(name).second;
@@ -62,29 +64,16 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
       addSymbol(linkage.getName());
   }
 
-  void addConformances(DeclContext *DC) {
-    for (auto conformance : DC->getLocalConformances()) {
-      auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
-          conformance->getProtocol());
-      if (!needsWTable)
-        continue;
-
-      // Only normal conformances get symbols; the others get any public symbols
-      // from their parent normal conformance.
-      if (conformance->getKind() != ProtocolConformanceKind::Normal)
-        continue;
-
-      addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
-      addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
-    }
-  }
+  void addConformances(DeclContext *DC);
 
 public:
   TBDGenVisitor(StringSet &symbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, bool fileHasEntryPoint)
+                ModuleDecl *swiftModule, bool fileHasEntryPoint,
+                bool silSerializeWitnessTables)
       : Symbols(symbols), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule), FileHasEntryPoint(fileHasEntryPoint) {}
+        SwiftModule(swiftModule), FileHasEntryPoint(fileHasEntryPoint),
+        SILSerializeWitnessTables(silSerializeWitnessTables) {}
 
   void visitMembers(Decl *D) {
     SmallVector<Decl *, 4> members;
@@ -96,6 +85,8 @@ public:
       addMembers(ED->getMembers());
     else if (auto NTD = dyn_cast<NominalTypeDecl>(D))
       addMembers(NTD->getMembers());
+    else if (auto VD = dyn_cast<VarDecl>(D))
+      VD->getAllAccessorFunctions(members);
 
     for (auto member : members) {
       ASTVisitor::visit(member);
@@ -160,10 +151,6 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
   // currently need to refer to them by symbol for their own vtable.
   switch (declRef.getSubclassScope()) {
   case SubclassScope::External:
-    // Allocating constructors retain their normal linkage behavior.
-    if (declRef.kind == SILDeclRef::Kind::Allocator)
-      break;
-
     // Unlike the "truly" public things, private things have public symbols
     // unconditionally, even if they're theoretically SIL only.
     if (isPrivate) {
@@ -184,6 +171,83 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
     return;
 
   addSymbol(declRef.mangle());
+}
+
+void TBDGenVisitor::addConformances(DeclContext *DC) {
+  for (auto conformance : DC->getLocalConformances()) {
+    auto protocol = conformance->getProtocol();
+    auto needsWTable =
+        Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
+    if (!needsWTable)
+      continue;
+
+    // Only normal conformances get symbols; the others get any public symbols
+    // from their parent normal conformance.
+    auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
+    if (!normalConformance)
+      continue;
+
+    addSymbol(LinkEntity::forDirectProtocolWitnessTable(normalConformance));
+    addSymbol(
+        LinkEntity::forProtocolWitnessTableAccessFunction(normalConformance));
+
+    // FIXME: the logic around visibility in extensions is confusing, and
+    // sometimes witness thunks need to be manually made public.
+
+    auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
+        normalConformance, SwiftModule->getResilienceStrategy(),
+        SILSerializeWitnessTables);
+    auto addSymbolIfNecessary = [&](ValueDecl *valueReq,
+                                    SILLinkage witnessLinkage) {
+      if (conformanceIsFixed &&
+          fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
+        Mangle::ASTMangler Mangler;
+        addSymbol(Mangler.mangleWitnessThunk(normalConformance, valueReq));
+      }
+    };
+    normalConformance->forEachValueWitness(nullptr, [&](ValueDecl *valueReq,
+                                                        Witness witness) {
+      if (isa<AbstractFunctionDecl>(valueReq)) {
+        auto witnessLinkage =
+            SILDeclRef(witness.getDecl()).getLinkage(ForDefinition);
+        addSymbolIfNecessary(valueReq, witnessLinkage);
+      } else if (auto VD = dyn_cast<AbstractStorageDecl>(valueReq)) {
+        // A var or subscript decl needs extra special handling: the things that
+        // end up in the witness table are the accessors, but the compiler only
+        // talks about the actual storage decl in the conformance, so we have to
+        // manually walk over the members, having pulled out something that will
+        // have the right linkage.
+        auto witnessVD = cast<AbstractStorageDecl>(witness.getDecl());
+
+        SmallVector<Decl *, 4> members;
+        VD->getAllAccessorFunctions(members);
+
+        // Grab one of the accessors, and then use that to pull out which of the
+        // getter or setter will have the appropriate linkage.
+        FuncDecl *witnessWithRelevantLinkage;
+        switch (cast<FuncDecl>(members[0])->getAccessorKind()) {
+        case AccessorKind::NotAccessor:
+          llvm_unreachable("must be an accessor");
+        case AccessorKind::IsGetter:
+        case AccessorKind::IsAddressor:
+          witnessWithRelevantLinkage = witnessVD->getGetter();
+          break;
+        case AccessorKind::IsSetter:
+        case AccessorKind::IsWillSet:
+        case AccessorKind::IsDidSet:
+        case AccessorKind::IsMaterializeForSet:
+        case AccessorKind::IsMutableAddressor:
+          witnessWithRelevantLinkage = witnessVD->getSetter();
+          break;
+        }
+        auto witnessLinkage =
+            SILDeclRef(witnessWithRelevantLinkage).getLinkage(ForDefinition);
+        for (auto member : members) {
+          addSymbolIfNecessary(cast<ValueDecl>(member), witnessLinkage);
+        }
+      }
+    });
+  }
 }
 
 void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
@@ -225,9 +289,11 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     // like globals.
     if (!FileHasEntryPoint)
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
-  }
 
-  visitMembers(VD);
+    // In this case, the members of the VarDecl don't also appear as top-level
+    // decls, so we need to explicitly walk them.
+    visitMembers(VD);
+  }
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
@@ -281,9 +347,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     auto hasFieldOffset =
         !isGeneric && var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {
-      // Field are only direct if the class's internals are completely known.
-      auto isIndirect = !CD->hasFixedLayout();
-      addSymbol(LinkEntity::forFieldOffset(var, isIndirect));
+      // FIXME: a field only has one sort of offset, but it is moderately
+      // non-trivial to compute which one. Including both is less painful than
+      // missing the correct one (for now), so we do that.
+      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
+      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/true));
     }
 
     // The non-allocating forms of the constructors and destructors.
@@ -328,7 +396,8 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
                                    bool hasMultipleIRGenThreads,
-                                   bool isWholeModule) {
+                                   bool isWholeModule,
+                                   bool silSerializeWitnessTables) {
   UniversalLinkageInfo linkInfo(file->getASTContext().LangOpts.Target,
                                 hasMultipleIRGenThreads, isWholeModule);
 
@@ -338,7 +407,7 @@ void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
   auto hasEntryPoint = file->hasEntryPoint();
 
   TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule(),
-                        hasEntryPoint);
+                        hasEntryPoint, silSerializeWitnessTables);
   for (auto d : decls)
     visitor.visit(d);
 
