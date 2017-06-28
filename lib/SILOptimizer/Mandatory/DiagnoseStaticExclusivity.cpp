@@ -652,8 +652,7 @@ static std::string getPathDescription(DeclName BaseName, SILType BaseType,
   for (unsigned Index : reversed(ReversedIndices)) {
     os << ".";
 
-    if (ContainingType.getAs<StructType>()) {
-      NominalTypeDecl *D = ContainingType.getNominalOrBoundGenericNominal();
+    if (StructDecl *D = ContainingType.getStructOrBoundGenericStruct()) {
       auto Iter = D->getStoredProperties().begin();
       std::advance(Iter, Index);
       VarDecl *VD = *Iter;
