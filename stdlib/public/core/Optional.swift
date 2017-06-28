@@ -675,6 +675,17 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
   }
 }
 
+@_transparent
+public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> Never)
+    rethrows -> T {
+  switch optional {
+  case .some(let value):
+    return value
+  case .none:
+    try defaultValue()
+  }
+}
+
 extension Optional {
 
   @available(*, unavailable, renamed: "none")
