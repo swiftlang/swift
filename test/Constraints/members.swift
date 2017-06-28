@@ -390,3 +390,30 @@ func r25341015_inner() {
   func r25341015_local() {}
   r25341015_local(x: 1, y: 2) // expected-error {{argument passed to call that takes no arguments}}
 }
+
+// rdar://problem/32854314 - Emit shadowing diagnostics even if argument types do not much completely
+
+func foo_32854314() -> Double {
+  return 42
+}
+
+func bar_32854314() -> Int {
+  return 0
+}
+
+extension Array where Element == Int {
+  func foo() {
+    let _ = min(foo_32854314(), bar_32854314()) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
+    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+  }
+
+  func foo(_ x: Int, _ y: Double) {
+    let _ = min(x, y) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
+    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+  }
+
+  func bar() {
+    let _ = min(1.0, 2) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
+    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+  }
+}

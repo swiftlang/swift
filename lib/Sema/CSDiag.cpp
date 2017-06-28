@@ -4706,16 +4706,39 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
                                    base);
 
     calleeInfo.filterList(argType, argLabels);
-    if (calleeInfo.closeness != CC_ExactMatch)
+
+    auto diagnostic = diag::member_shadows_global_function_near_match;
+    switch (calleeInfo.closeness) {
+    case CC_Unavailable:
+    case CC_Inaccessible:
+    case CC_SelfMismatch:
+    case CC_ArgumentLabelMismatch:
+    case CC_ArgumentCountMismatch:
+    case CC_GeneralMismatch:
       return false;
+
+    case CC_NonLValueInOut:
+    case CC_OneArgumentNearMismatch:
+    case CC_OneArgumentMismatch:
+    case CC_OneGenericArgumentNearMismatch:
+    case CC_OneGenericArgumentMismatch:
+    case CC_ArgumentNearMismatch:
+    case CC_ArgumentMismatch:
+    case CC_GenericNonsubstitutableMismatch:
+      break; // Near match cases
+
+    case CC_ExactMatch:
+      diagnostic = diag::member_shadows_global_function;
+      break;
+    }
 
     auto choice = calleeInfo.candidates[0].getDecl();
     auto baseKind = getBaseKind(base);
     auto baseName = getBaseName(choice->getDeclContext());
 
     auto origCandidate = CCI[0].getDecl();
-    TC.diagnose(UDE->getLoc(), diag::member_shadows_global_function,
-                UDE->getName(), origCandidate->getDescriptiveKind(),
+    TC.diagnose(UDE->getLoc(), diagnostic, UDE->getName(),
+                origCandidate->getDescriptiveKind(),
                 origCandidate->getFullName(), choice->getDescriptiveKind(),
                 choice->getFullName(), baseKind, baseName);
 
