@@ -7,6 +7,7 @@ import Bar
 
 func foo(_ a : PropertyUserInterface) {
   a.setField(1)
+  a.setURL(1)
   _ = a.field()
 }
 

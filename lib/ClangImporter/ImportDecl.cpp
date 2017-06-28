@@ -7016,6 +7016,41 @@ void ClangImporter::Implementation::importAttributes(
                                           PlatformAgnostic, /*Implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
+
+      // For enum cases introduced in the 2017 SDKs, add
+      // @_downgrade_exhaustivity_check in Swift 3.
+      if (C.LangOpts.isSwiftVersion3() && isa<EnumElementDecl>(MappedDecl)) {
+        bool downgradeExhaustivity = false;
+        switch (*platformK) {
+        case PlatformKind::OSX:
+        case PlatformKind::OSXApplicationExtension:
+          downgradeExhaustivity = (introduced.getMajor() == 10 &&
+                                   introduced.getMinor() &&
+                                   *introduced.getMinor() == 13);
+          break;
+
+        case PlatformKind::iOS:
+        case PlatformKind::iOSApplicationExtension:
+        case PlatformKind::tvOS:
+        case PlatformKind::tvOSApplicationExtension:
+          downgradeExhaustivity = (introduced.getMajor() == 11);
+          break;
+
+        case PlatformKind::watchOS:
+        case PlatformKind::watchOSApplicationExtension:
+          downgradeExhaustivity = (introduced.getMajor() == 4);
+          break;
+
+        case PlatformKind::none:
+          break;
+        }
+
+        if (downgradeExhaustivity) {
+          auto attr =
+            new (C) DowngradeExhaustivityCheckAttr(/*isImplicit=*/true);
+          MappedDecl->getAttrs().add(attr);
+        }
+      }
     }
   }
 
@@ -7872,8 +7907,9 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
       auto decl = entry.get<clang::NamedDecl *>();
 
-      // Only continue members in the same submodule as this extension.
-      if (decl->getImportedOwningModule() != submodule) continue;
+      // Only include members in the same submodule as this extension.
+      if (getClangSubmoduleForDecl(decl) != submodule)
+        continue;
 
       forEachDistinctName(decl, [&](ImportedName newName,
                                     ImportNameVersion nameVersion) {
