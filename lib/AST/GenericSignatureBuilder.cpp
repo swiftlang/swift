@@ -2501,22 +2501,8 @@ PotentialArchetype *GenericSignatureBuilder::resolveArchetype(
       return base->updateNestedTypeForConformance(assocType, resolutionKind);
 
     // Resolve based on name alone.
-    // FIXME: Pass through the resolution kind?
     auto name = dependentMember->getName();
-    switch (resolutionKind) {
-    case ArchetypeResolutionKind::AlreadyKnown: {
-      auto known = base->NestedTypes.find(name);
-      if (known == base->NestedTypes.end())
-        return nullptr;
-
-      return known->second.front();
-    }
-
-    case ArchetypeResolutionKind::AlwaysPartial:
-    case ArchetypeResolutionKind::CompleteWellFormed:
-    case ArchetypeResolutionKind::WellFormed:
-      return base->getNestedArchetypeAnchor(name, *this, resolutionKind);
-    }
+    return base->getNestedArchetypeAnchor(name, *this, resolutionKind);
   }
 
   return nullptr;
