@@ -4159,12 +4159,12 @@ namespace {
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       result->setCheckedInheritanceClause();
 
-      auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
-      result->setGenericEnvironment(env);
-
       // Compute the requirement signature.
       if (!result->isRequirementSignatureComputed())
         result->computeRequirementSignature();
+
+      auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
+      result->setGenericEnvironment(env);
 
       result->setMemberLoader(&Impl, 0);
 
