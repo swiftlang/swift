@@ -304,3 +304,12 @@ func inoutSamePropertyInSameTuple() {
   // expected-error@-1{{overlapping accesses to 't.name2.f1', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}
 }
+
+struct MyStruct<T> {
+  var prop = 7
+  mutating func inoutBoundGenericStruct() {
+    takesTwoInouts(&prop, &prop)
+    // expected-error@-1{{overlapping accesses to 'self.prop', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-note@-2{{conflicting access is here}}
+  }
+}
