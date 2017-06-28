@@ -959,9 +959,9 @@ void IRGenerator::emitEagerClassInitialization() {
                                 llvm::FunctionType::get(IGM->VoidTy, false),
                                 llvm::GlobalValue::PrivateLinkage,
                                 "_swift_eager_class_initialization");
+  IGM->Module.getFunctionList().push_back(RegisterFn);
   IRGenFunction RegisterIGF(*IGM, RegisterFn);
   RegisterFn->setAttributes(IGM->constructInitialAttributes());
-  IGM->Module.getFunctionList().push_back(RegisterFn);
   RegisterFn->setCallingConv(IGM->DefaultCC);
 
   for (ClassDecl *CD : ClassesForEagerInitialization) {
