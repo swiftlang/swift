@@ -909,6 +909,10 @@ ERROR(member_shadows_global_function,none,
       "use of %0 refers to %1 %2 rather than %3 %4 in %5 %6",
       (DeclName, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
        DescriptiveDeclKind, DeclName))
+ERROR(member_shadows_global_function_near_match,none,
+      "use of %0 nearly matches %3 %4 in %5 %6 rather than %1 %2",
+      (DeclName, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
+      DescriptiveDeclKind, DeclName))
 
 ERROR(instance_member_use_on_type,none,
       "instance member %1 cannot be used on type %0; "
