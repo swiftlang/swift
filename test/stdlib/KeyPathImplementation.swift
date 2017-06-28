@@ -106,6 +106,27 @@ class Crate<T> {
   static var value_offset: Int { return align(classHeaderSize, to: T.self) }
 }
 
+struct ComputedArgumentWitnesses {
+  typealias Destroy = @convention(thin)
+    (_ instanceArguments: UnsafeMutableRawPointer, _ size: Int) -> ()
+  typealias Copy = @convention(thin)
+    (_ srcInstanceArguments: UnsafeRawPointer,
+     _ destInstanceArguments: UnsafeMutableRawPointer,
+     _ size: Int) -> ()
+  typealias Equals = @convention(thin)
+    (_ xInstanceArguments: UnsafeRawPointer,
+     _ yInstanceArguments: UnsafeRawPointer,
+     _ size: Int) -> Bool
+  typealias Hash = @convention(thin)
+    (_ instanceArguments: UnsafeRawPointer,
+     _ size: Int) -> Int
+
+  let destroy: Destroy?
+  let copy: Copy
+  let equals: Equals
+  let hash: Hash
+}
+
 // Helper to build keypaths with specific layouts
 struct TestKeyPathBuilder {
   var buffer: UnsafeMutableRawBufferPointer
@@ -139,17 +160,21 @@ struct TestKeyPathBuilder {
     buffer = .init(start: buffer.baseAddress! + 4, count: buffer.count - 4)
   }
   mutating func push(_ value: Any.Type) {
+    pushWord(value)
+  }
+  mutating func pushWord<T>(_ value: T) {
+    precondition(_isPOD(T.self) && MemoryLayout<T>.size == MemoryLayout<Int>.size)
     var misalign = Int(bitPattern: buffer.baseAddress) % MemoryLayout<Int>.alignment
     if misalign != 0 {
       misalign = MemoryLayout<Int>.alignment - misalign
       buffer = .init(start: buffer.baseAddress! + misalign,
                      count: buffer.count - misalign)
     }
-    buffer.storeBytes(of: value, as: Any.Type.self)
+    buffer.storeBytes(of: value, as: T.self)
     buffer = .init(start: buffer.baseAddress! + MemoryLayout<Int>.size,
                    count: buffer.count - MemoryLayout<Int>.size)
   }
-  
+
   mutating func addHeader(trivial: Bool, hasReferencePrefix: Bool) {
     assert(state == .header, "not expecting a header")
     let size = buffer.count - MemoryLayout<Int>.size
@@ -203,6 +228,31 @@ struct TestKeyPathBuilder {
     addOffsetComponent(offset: offset, kindMask: 0x4000_0000,
                        forceOverflow: forceOverflow,
                        endsReferencePrefix: endsReferencePrefix)
+  }
+
+  mutating func addGetterComponent(
+    id: UnsafeRawPointer,
+    getter: UnsafeRawPointer,
+    witnesses: UnsafePointer<ComputedArgumentWitnesses>,
+    args: UnsafeRawBufferPointer,
+    endsReferencePrefix: Bool = false
+  ) {
+    assert(state == .component, "not expecting a component")
+    push(0x2100_0000 | (endsReferencePrefix ? 0x8000_0000 : 0))
+    pushWord(id)
+    pushWord(getter)
+    pushWord(args.count)
+    pushWord(witnesses)
+
+    buffer.copyBytes(from: args)
+    buffer = .init(start: buffer.baseAddress! + args.count,
+                   count: buffer.count - args.count)
+
+    if endsReferencePrefix {
+      assert(hasReferencePrefix, "ending nonexistent reference prefix")
+      hasReferencePrefix = false
+    }
+    state.advance()
   }
   
   mutating func addType(_ type: Any.Type) {
@@ -891,6 +941,165 @@ keyPathImpl.test("appending") {
               cratePair_left_value_c_z_p_y)
   expectEqual(cratePair_left_value_c_z_p_y_manual.hashValue,
               cratePair_left_value_c_z_p_y.hashValue)
+}
+
+var numberOfDestroyOperations = 0
+func testDestroy(_ data: UnsafeMutableRawPointer, _ count: Int) {
+  numberOfDestroyOperations += 1
+}
+
+var numberOfCopyOperations = 0
+func testCopy(from: UnsafeRawPointer,
+              to: UnsafeMutableRawPointer,
+              count: Int) {
+  numberOfCopyOperations += 1
+  to.copyBytes(from: from, count: count)
+}
+
+var numberOfEqualsOperations = 0
+func testEquals(_ a: UnsafeRawPointer,
+                _ b: UnsafeRawPointer,
+                _ count: Int) -> Bool {
+  numberOfEqualsOperations += 1
+  return UnsafeRawBufferPointer(start: a, count: count)
+    .elementsEqual(UnsafeRawBufferPointer(start: b, count: count))
+}
+
+var numberOfHashOperations = 0
+func testHash(_ a: UnsafeRawPointer, _ count: Int) -> Int {
+  numberOfHashOperations += 1
+  // Don't use this hash function at home
+  return count
+}
+
+var testWitnesses = ComputedArgumentWitnesses(
+  destroy: testDestroy,
+  copy: testCopy,
+  equals: testEquals,
+  hash: testHash)
+
+protocol IntP { var int: Int { get } }
+extension Int: IntP { var int: Int { return self } }
+struct TestGetter {
+  // Hack: force address-only-ness so that the type is passed and returned
+  // indirectly, compatible with key path runtime
+  var value: IntP
+}
+
+func testGet(_ x: TestGetter, _ args: UnsafeRawPointer) -> TestGetter {
+  return TestGetter(value: x.value.int
+    + args.load(as: Int.self)
+    + args.load(fromByteOffset: MemoryLayout<Int>.size, as: Int.self))
+}
+
+keyPathImpl.test("computed property arguments") {
+  let testGetPtr: @convention(thin) (TestGetter, UnsafeRawPointer) -> TestGetter
+    = testGet
+  
+  numberOfDestroyOperations = 0
+  do {
+    let getter1a = KeyPath<TestGetter, TestGetter>
+      .build(capacityInBytes: MemoryLayout<Int>.size * 8) { b in
+        b.addHeader(trivial: false, hasReferencePrefix: false)
+        [0x1111_1111, 0x1111_1111].withUnsafeBytes { argData in
+          b.addGetterComponent(id: UnsafeRawPointer(bitPattern: 0x1)!,
+                               getter: unsafeBitCast(testGetPtr, to: UnsafeRawPointer.self),
+                               witnesses: &testWitnesses,
+                               args: argData)
+        }
+      }
+
+    let getter1b = KeyPath<TestGetter, TestGetter>
+      .build(capacityInBytes: MemoryLayout<Int>.size * 8) { b in
+        b.addHeader(trivial: false, hasReferencePrefix: false)
+        [0x1111_1111, 0x1111_1111].withUnsafeBytes { argData in
+          b.addGetterComponent(id: UnsafeRawPointer(bitPattern: 0x1)!,
+                                getter: unsafeBitCast(testGetPtr, to: UnsafeRawPointer.self),
+                                witnesses: &testWitnesses,
+                                args: argData)
+        }
+      }
+
+    let getter2 = KeyPath<TestGetter, TestGetter>
+      .build(capacityInBytes: MemoryLayout<Int>.size * 8) { b in
+        b.addHeader(trivial: false, hasReferencePrefix: false)
+        [0x2222_2222, 0x2222_2222].withUnsafeBytes { argData in
+          b.addGetterComponent(id: UnsafeRawPointer(bitPattern: 0x1)!,
+                                getter: unsafeBitCast(testGetPtr, to: UnsafeRawPointer.self),
+                                witnesses: &testWitnesses,
+                                args: argData)
+        }
+      }
+
+    // Should be equal, same getter ID and arguments compare equal
+    numberOfEqualsOperations = 0
+    expectEqual(getter1a, getter1b)
+    expectEqual(numberOfEqualsOperations, 1)
+
+    numberOfHashOperations = 0
+    expectEqual(getter1a.hashValue, getter1b.hashValue)
+    expectEqual(numberOfHashOperations, 2)
+
+    // Should be unequal, same getter ID but arguments don't compare equal
+    expectNotEqual(getter1a, getter2)
+    expectEqual(numberOfEqualsOperations, 2)
+
+    numberOfCopyOperations = 0
+    let getter1a1a = getter1a.appending(path: getter1a)
+    expectEqual(numberOfCopyOperations, 2)
+    let getter1a1b = getter1a.appending(path: getter1b)
+    expectEqual(numberOfCopyOperations, 4)
+    let getter1b1a = getter1b.appending(path: getter1a)
+    expectEqual(numberOfCopyOperations, 6)
+    let getter1b1b = getter1b.appending(path: getter1b)
+    expectEqual(numberOfCopyOperations, 8)
+
+    expectEqual(getter1a1a, getter1a1b)
+    expectEqual(getter1a1a.hashValue, getter1a1b.hashValue)
+    expectEqual(getter1a1b, getter1b1a)
+    expectEqual(getter1a1b.hashValue, getter1b1a.hashValue)
+    expectEqual(getter1b1a, getter1b1b)
+    expectEqual(getter1b1a.hashValue, getter1b1b.hashValue)
+
+    expectNotEqual(getter1a, getter1a1a)
+    expectNotEqual(getter1b, getter1a1a)
+
+    let getter1a2 = getter1a.appending(path: getter2)
+    expectNotEqual(getter1a1a, getter1a2)
+    let getter21a = getter2.appending(path: getter1a)
+    expectNotEqual(getter1a1a, getter21a)
+
+    let value = TestGetter(value: 0x1111_1111)
+
+    // Getter adds first two words from the argument area
+    expectEqual(value[keyPath: getter1a].value.int,
+                0x1111_1111 + 0x1111_1111 + 0x1111_1111)
+    expectEqual(value[keyPath: getter2].value.int,
+                0x1111_1111 + 0x2222_2222 + 0x2222_2222)
+    expectEqual(value[keyPath: getter1a2].value.int,
+                0x1111_1111 + 0x1111_1111 + 0x1111_1111
+                            + 0x2222_2222 + 0x2222_2222)
+  }
+  // Should have destroyed three original components and all copies
+  expectEqual(numberOfDestroyOperations, 3 + numberOfCopyOperations)
+
+  numberOfDestroyOperations = 0
+  do {
+    let getter1a_trivial = KeyPath<TestGetter, TestGetter>
+      .build(capacityInBytes: MemoryLayout<Int>.size * 8) { b in
+        b.addHeader(trivial: true, hasReferencePrefix: false)
+        [0x1111_1111, 0x1111_1111].withUnsafeBytes { argData in
+          b.addGetterComponent(id: UnsafeRawPointer(bitPattern: 0x1)!,
+                                getter: unsafeBitCast(testGetPtr, to: UnsafeRawPointer.self),
+                                witnesses: &testWitnesses,
+                                args: argData)
+        }
+      }
+  }
+
+  // Should not have run the destructor this time, since key path was tagged
+  // trivial
+  expectEqual(numberOfDestroyOperations, 0)
 }
 
 runAllTests()
