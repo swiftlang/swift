@@ -1052,8 +1052,8 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
     }
 
     private func _superDecoder(forKey key: CodingKey) throws -> Decoder {
-        return try self.decoder.with(pushedKey: key) {
-            let value = self.container[key.stringValue]
+        return self.decoder.with(pushedKey: key) {
+            let value: Any = self.container[key.stringValue] ?? NSNull()
             return _PlistDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
         }
     }
@@ -1730,13 +1730,13 @@ extension _PlistDecoder {
     }
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
-        if let string = value as? String, string == _plistNull { return nil }
-
         let decoded: T
         if T.self == Date.self {
-            decoded = (try self.unbox(value, as: Date.self) as! T)
+            guard let date = try self.unbox(value, as: Date.self) else { return nil }
+            decoded = date as! T
         } else if T.self == Data.self {
-            decoded = (try self.unbox(value, as: Data.self) as! T)
+            guard let data = try self.unbox(value, as: Data.self) else { return nil }
+            decoded = data as! T
         } else {
             self.storage.push(container: value)
             decoded = try T(from: self)

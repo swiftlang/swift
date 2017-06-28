@@ -1280,8 +1280,8 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     }
 
     private func _superDecoder(forKey key: CodingKey) throws -> Decoder {
-        return try self.decoder.with(pushedKey: key) {
-            let value = self.container[key.stringValue]
+        return self.decoder.with(pushedKey: key) {
+            let value: Any = self.container[key.stringValue] ?? NSNull()
             return _JSONDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
         }
     }
@@ -2069,13 +2069,13 @@ extension _JSONDecoder {
     }
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
-        guard !(value is NSNull) else { return nil }
-
         let decoded: T
         if T.self == Date.self {
-            decoded = (try self.unbox(value, as: Date.self) as! T)
+            guard let date = try self.unbox(value, as: Date.self) else { return nil }
+            decoded = date as! T
         } else if T.self == Data.self {
-            decoded = (try self.unbox(value, as: Data.self) as! T)
+            guard let data = try self.unbox(value, as: Data.self) else { return nil }
+            decoded = data as! T
         } else if T.self == URL.self {
             guard let urlString = try self.unbox(value, as: String.self) else {
                 return nil
@@ -2088,7 +2088,8 @@ extension _JSONDecoder {
 
             decoded = (url as! T)
         } else if T.self == Decimal.self {
-            decoded = (try self.unbox(value, as: Decimal.self) as! T)
+            guard let decimal = try self.unbox(value, as: Decimal.self) else { return nil }
+            decoded = decimal as! T
         } else {
             self.storage.push(container: value)
             decoded = try T(from: self)
