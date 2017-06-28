@@ -88,7 +88,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                               indexPat, nullptr, funcDecl);
 
   unsigned index = 0;
-  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     // generate: case .<Case>:
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),

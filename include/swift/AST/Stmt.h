@@ -932,7 +932,7 @@ public:
 
 /// Switch statement.
 class SwitchStmt final : public LabeledStmt,
-    private llvm::TrailingObjects<SwitchStmt, CaseStmt *> {
+    private llvm::TrailingObjects<SwitchStmt, ASTNode> {
   friend TrailingObjects;
 
   SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
@@ -953,7 +953,7 @@ public:
   static SwitchStmt *create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                             Expr *SubjectExpr,
                             SourceLoc LBraceLoc,
-                            ArrayRef<CaseStmt*> Cases,
+                            ArrayRef<ASTNode> Cases,
                             SourceLoc RBraceLoc,
                             ASTContext &C);
   
@@ -972,10 +972,28 @@ public:
   /// Get the subject expression of the switch.
   Expr *getSubjectExpr() const { return SubjectExpr; }
   void setSubjectExpr(Expr *e) { SubjectExpr = e; }
+
+  ArrayRef<ASTNode> getRawCases() const {
+    return {getTrailingObjects<ASTNode>(), CaseCount};
+  }
+
+private:
+  struct AsCaseStmtWithSkippingIfConfig {
+    AsCaseStmtWithSkippingIfConfig() {}
+    Optional<CaseStmt*> operator()(const ASTNode &N) const {
+      if (auto *CS = llvm::dyn_cast_or_null<CaseStmt>(N.dyn_cast<Stmt*>()))
+        return CS;
+      return None;
+    }
+  };
+
+public:
+  using AsCaseStmtRange = OptionalTransformRange<ArrayRef<ASTNode>,
+                                                AsCaseStmtWithSkippingIfConfig>;
   
   /// Get the list of case clauses.
-  ArrayRef<CaseStmt*> getCases() const {
-    return {getTrailingObjects<CaseStmt*>(), CaseCount};
+  AsCaseStmtRange getCases() const {
+    return AsCaseStmtRange(getRawCases(), AsCaseStmtWithSkippingIfConfig());
   }
   
   static bool classof(const Stmt *S) {

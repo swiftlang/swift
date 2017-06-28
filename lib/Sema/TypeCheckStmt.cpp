@@ -863,11 +863,12 @@ public:
     AddSwitchNest switchNest(*this);
     AddLabeledStmt labelNest(*this, S);
 
-    for (unsigned i = 0, e = S->getCases().size(); i < e; ++i) {
-      auto *caseBlock = S->getCases()[i];
+    auto cases = S->getCases();
+    for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
+      auto *caseBlock = *i;
       // Fallthrough transfers control to the next case block. In the
       // final case block, it is invalid.
-      FallthroughDest = i+1 == e ? nullptr : S->getCases()[i+1];
+      FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
 
       for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
         // Resolve the pattern in the label.
