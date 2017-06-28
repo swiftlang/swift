@@ -1162,6 +1162,13 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
 
   prepareGenericParamList(gp, typeDecl);
 
+  // For a protocol, compute the requirement signature first. It will be used
+  // by clients of the protocol.
+  if (auto proto = dyn_cast<ProtocolDecl>(typeDecl)) {
+    if (!proto->isRequirementSignatureComputed())
+      proto->computeRequirementSignature();
+  }
+
   auto *env = checkGenericEnvironment(gp, dc, dc->getGenericSignatureOfContext(),
                                       /*allowConcreteGenericParams=*/false);
   typeDecl->setGenericEnvironment(env);

@@ -5,5 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-class a<a:{a {}extension{P{}protocol A:a{P{}var f
+// REQUIRES: asserts
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol A:A{struct B{{}var a{class a{class ss:a
