@@ -123,7 +123,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
 
   // MARK: - Date Strategy Tests
   func testEncodingDate() {
-    // We can't encode a top-level Date, so it'll be wrapped in an array.
+    // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     _testRoundTrip(of: TopLevelWrapper(Date()))
   }
 
@@ -132,7 +132,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let seconds = 1000.0
     let expectedJSON = "{\"value\":1000}".data(using: .utf8)!
 
-    // We can't encode a top-level Date, so it'll be wrapped in an array.
+    // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     _testRoundTrip(of: TopLevelWrapper(Date(timeIntervalSince1970: seconds)),
                    expectedJSON: expectedJSON,
                    dateEncodingStrategy: .secondsSince1970,
@@ -144,7 +144,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let seconds = 1000.0
     let expectedJSON = "{\"value\":1000000}".data(using: .utf8)!
 
-    // We can't encode a top-level Date, so it'll be wrapped in an array.
+    // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     _testRoundTrip(of: TopLevelWrapper(Date(timeIntervalSince1970: seconds)),
                    expectedJSON: expectedJSON,
                    dateEncodingStrategy: .millisecondsSince1970,
@@ -159,7 +159,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       let timestamp = Date(timeIntervalSince1970: 1000)
       let expectedJSON = "{\"value\":\"\(formatter.string(from: timestamp))\"}".data(using: .utf8)!
 
-      // We can't encode a top-level Date, so it'll be wrapped in an array.
+      // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
       _testRoundTrip(of: TopLevelWrapper(timestamp),
                      expectedJSON: expectedJSON,
                      dateEncodingStrategy: .iso8601,
@@ -175,7 +175,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let timestamp = Date(timeIntervalSince1970: 1000)
     let expectedJSON = "{\"value\":\"\(formatter.string(from: timestamp))\"}".data(using: .utf8)!
 
-    // We can't encode a top-level Date, so it'll be wrapped in an array.
+    // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     _testRoundTrip(of: TopLevelWrapper(timestamp),
                    expectedJSON: expectedJSON,
                    dateEncodingStrategy: .formatted(formatter),
@@ -192,7 +192,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     }
     let decode = { (_: Decoder) throws -> Date in return timestamp }
 
-    // We can't encode a top-level Date, so it'll be wrapped in an array.
+    // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     let expectedJSON = "{\"value\":42}".data(using: .utf8)!
     _testRoundTrip(of: TopLevelWrapper(timestamp),
                    expectedJSON: expectedJSON,
@@ -207,7 +207,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let encode = { (_: Date, _: Encoder) throws -> Void in }
     let decode = { (_: Decoder) throws -> Date in return timestamp }
 
-    // We can't encode a top-level Date, so it'll be wrapped in an array.
+    // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     let expectedJSON = "{\"value\":{}}".data(using: .utf8)!
     _testRoundTrip(of: TopLevelWrapper(timestamp),
                    expectedJSON: expectedJSON,
@@ -216,10 +216,21 @@ class TestJSONEncoder : TestJSONEncoderSuper {
   }
 
   // MARK: - Data Strategy Tests
+  func testEncodingData() {
+    let data = Data(bytes: [0xDE, 0xAD, 0xBE, 0xEF])
+
+    // We can't encode a top-level Data, so it'll be wrapped in a dictionary.
+    let expectedJSON = "{\"value\":[222,173,190,239]}".data(using: .utf8)!
+    _testRoundTrip(of: TopLevelWrapper(data),
+                   expectedJSON: expectedJSON,
+                   dataEncodingStrategy: .deferredToData,
+                   dataDecodingStrategy: .deferredToData)
+  }
+
   func testEncodingBase64Data() {
     let data = Data(bytes: [0xDE, 0xAD, 0xBE, 0xEF])
 
-    // We can't encode a top-level Data, so it'll be wrapped in an array.
+    // We can't encode a top-level Data, so it'll be wrapped in a dictionary.
     let expectedJSON = "{\"value\":\"3q2+7w==\"}".data(using: .utf8)!
     _testRoundTrip(of: TopLevelWrapper(data), expectedJSON: expectedJSON)
   }
@@ -232,7 +243,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     }
     let decode = { (_: Decoder) throws -> Data in return Data() }
 
-    // We can't encode a top-level Data, so it'll be wrapped in an array.
+    // We can't encode a top-level Data, so it'll be wrapped in a dictionary.
     let expectedJSON = "{\"value\":42}".data(using: .utf8)!
     _testRoundTrip(of: TopLevelWrapper(Data()),
                    expectedJSON: expectedJSON,
@@ -245,7 +256,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let encode = { (_: Data, _: Encoder) throws -> Void in }
     let decode = { (_: Decoder) throws -> Data in return Data() }
 
-    // We can't encode a top-level Data, so it'll be wrapped in an array.
+    // We can't encode a top-level Data, so it'll be wrapped in a dictionary.
     let expectedJSON = "{\"value\":{}}".data(using: .utf8)!
     _testRoundTrip(of: TopLevelWrapper(Data()),
                    expectedJSON: expectedJSON,
@@ -352,8 +363,8 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                                  outputFormatting: JSONEncoder.OutputFormatting = [],
                                  dateEncodingStrategy: JSONEncoder.DateEncodingStrategy = .deferredToDate,
                                  dateDecodingStrategy: JSONDecoder.DateDecodingStrategy = .deferredToDate,
-                                 dataEncodingStrategy: JSONEncoder.DataEncodingStrategy = .base64Encode,
-                                 dataDecodingStrategy: JSONDecoder.DataDecodingStrategy = .base64Decode,
+                                 dataEncodingStrategy: JSONEncoder.DataEncodingStrategy = .base64,
+                                 dataDecodingStrategy: JSONDecoder.DataDecodingStrategy = .base64,
                                  nonConformingFloatEncodingStrategy: JSONEncoder.NonConformingFloatEncodingStrategy = .throw,
                                  nonConformingFloatDecodingStrategy: JSONDecoder.NonConformingFloatDecodingStrategy = .throw) where T : Codable, T : Equatable {
     var payload: Data! = nil
@@ -879,6 +890,7 @@ JSONEncoderTests.test("testEncodingDateISO8601") { TestJSONEncoder().testEncodin
 JSONEncoderTests.test("testEncodingDateFormatted") { TestJSONEncoder().testEncodingDateFormatted() }
 JSONEncoderTests.test("testEncodingDateCustom") { TestJSONEncoder().testEncodingDateCustom() }
 JSONEncoderTests.test("testEncodingDateCustomEmpty") { TestJSONEncoder().testEncodingDateCustomEmpty() }
+JSONEncoderTests.test("testEncodingData") { TestJSONEncoder().testEncodingData() }
 JSONEncoderTests.test("testEncodingBase64Data") { TestJSONEncoder().testEncodingBase64Data() }
 JSONEncoderTests.test("testEncodingCustomData") { TestJSONEncoder().testEncodingCustomData() }
 JSONEncoderTests.test("testEncodingCustomDataEmpty") { TestJSONEncoder().testEncodingCustomDataEmpty() }
