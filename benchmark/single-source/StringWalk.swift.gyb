@@ -92,6 +92,7 @@ let unicodeScalarsMultiplier = baseMultiplier
 let charactersMultiplier = baseMultiplier / 5
 
 % for Name in ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian"]:
+
 %   for Kind in ["unicodeScalars", "characters"]:
 
 @inline(never)
@@ -108,5 +109,58 @@ public func run_StringWalk_${Name}_${Kind}_Backwards(_ N: Int) {
   }
 }
 
+
+
 %   end
+
+let ${Name}Characters = Array(${Name})
+
+@inline(never)
+public func run_CharIteration_${Name}_unicodeScalars(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    for c in ${Name}Characters {
+      for u in c.unicodeScalars {
+        count |= Int(u.value)
+      }
+    }
+  }
+}
+
+@inline(never)
+public func run_CharIteration_${Name}_unicodeScalars_Backwards(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    for c in ${Name}Characters {
+      for u in c.unicodeScalars.reversed() {
+        count |= Int(u.value)
+      }
+    }
+  }
+}
+
+@inline(never)
+public func run_CharIndexing_${Name}_unicodeScalars(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    for c in ${Name}Characters {
+      let s = c.unicodeScalars
+      for i in s.indices {
+        count |= Int(s[i].value)
+      }
+    }
+  }
+}
+
+@inline(never)
+public func run_CharIndexing_${Name}_unicodeScalars_Backwards(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    for c in ${Name}Characters {
+      let s = c.unicodeScalars
+      for i in s.indices.reversed() {
+        count |= Int(s[i].value)
+      }
+    }
+  }
+}
+
+
+
 % end
