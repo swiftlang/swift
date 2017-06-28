@@ -59,9 +59,6 @@ function(handle_swift_sources
   if (NOT SWIFTSOURCES_IS_MAIN)
     list(APPEND swift_compile_flags "-module-link-name" "${name}")
   endif()
-  if("${SWIFTSOURCES_SDK}" STREQUAL "CYGWIN")
-    list(APPEND swift_compile_flags -DCYGWIN)
-  endif()
 
   if(swift_sources)
     compute_library_subdir(SWIFTSOURCES_LIBRARY_SUBDIR
