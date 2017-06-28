@@ -2040,6 +2040,31 @@ public enum EncodingError : Error {
     ///
     /// Contains the attempted value, along with context for debugging.
     case invalidValue(Any, Context)
+
+    // MARK: - Bridging
+
+    // CustomNSError bridging applies only when the CustomNSError conformance is applied in the same module as the declared error type.
+    // Since we cannot access CustomNSError (which is defined in Foundation) from here, we can use the "hidden" entry points.
+
+    public var _domain: String {
+        return "NSCocoaErrorDomain"
+    }
+
+    public var _code: Int {
+        switch self {
+        case .invalidValue(_, _): return 4866
+        }
+    }
+
+    public var _userInfo: AnyObject? {
+        let context: Context
+        switch self {
+        case .invalidValue(_, let c): context = c
+        }
+
+        return ["NSCodingPath": context.codingPath,
+                "NSDebugDescription": context.debugDescription] as AnyObject
+    }
 }
 
 /// An error that occurs during the decoding of a value.
@@ -2081,6 +2106,38 @@ public enum DecodingError : Error {
     ///
     /// Contains context for debugging.
     case dataCorrupted(Context)
+
+    // MARK: - Bridging
+
+    // CustomNSError bridging applies only when the CustomNSError conformance is applied in the same module as the declared error type.
+    // Since we cannot access CustomNSError (which is defined in Foundation) from here, we can use the "hidden" entry points.
+
+    public var _domain: String {
+        return "NSCocoaErrorDomain"
+    }
+
+    public var _code: Int {
+        switch self {
+        case .valueNotFound(_, _): fallthrough
+        case .keyNotFound(_, _):   return 4865
+
+        case .typeMismatch(_, _): fallthrough
+        case .dataCorrupted(_):   return 4864
+        }
+    }
+
+    public var _userInfo: AnyObject? {
+        let context: Context
+        switch self {
+        case .typeMismatch(_, let c): context = c
+        case .valueNotFound(_, let c): context = c
+        case .keyNotFound(_, let c): context = c
+        case .dataCorrupted(let c): context  = c
+        }
+
+        return ["NSCodingPath": context.codingPath,
+                "NSDebugDescription": context.debugDescription] as AnyObject
+    }
 }
 
 //===----------------------------------------------------------------------===//
