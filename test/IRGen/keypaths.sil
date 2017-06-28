@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: rm -rf %t && mkdir -p %t
+// -- Convert <i32 0x...> constants to decimal constants that LLVM will print
+// RUN: %utils/chex.py < %s > %t/keypaths.sil
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/keypaths.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 sil_stage canonical
 import Swift
@@ -27,8 +30,9 @@ sil_vtable C {}
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//               -- 0x8000_0018 - instantiable in-line, size 4
-// CHECK-SAME: i32 -2147483644,
+//               -- instantiable in-line, size 4
+// CHECK-SAME: <i32 0x8000_0004>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- offset of S.x
 // CHECK-SAME: i32 0 }>
 
@@ -37,8 +41,9 @@ sil_vtable C {}
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//               -- 0x8000_0018 - instantiable in-line, size 4
-// CHECK-SAME: i32 -2147483644,
+//               -- instantiable in-line, size 4
+// CHECK-SAME: <i32 0x8000_0004>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- offset of S.y
 // CHECK-32-SAME: i32 4 }>
 // CHECK-64-SAME: i32 8 }>
@@ -48,8 +53,9 @@ sil_vtable C {}
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//               -- 0x8000_0018 - instantiable in-line, size 4
-// CHECK-SAME: i32 -2147483644,
+//               -- instantiable in-line, size 4
+// CHECK-SAME: <i32 0x8000_0004>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- offset of S.z
 // CHECK-32-SAME: i32 16 }>
 // CHECK-64-SAME: i32 32 }>
@@ -59,63 +65,70 @@ sil_vtable C {}
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//               -- 0x8000_0018 - instantiable in-line, size 4
-// CHECK-SAME: i32 -2147483644,
+//               -- instantiable in-line, size 4
+// CHECK-SAME: <i32 0x8000_0004>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: i32 1073741836 }>
-// CHECK-64-SAME: i32 1073741840 }>
+// CHECK-32-SAME: <i32 0x4000_000c> }>
+// CHECK-64-SAME: <i32 0x4000_0010> }>
 
 // -- %e: C.y
 // CHECK: [[KP_E:@keypath.*]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//               -- 0x8000_0018 - instantiable in-line, size 4
-// CHECK-SAME: i32 -2147483644,
+//               -- instantiable in-line, size 4
+// CHECK-SAME: <i32 0x8000_0004>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.y
-// CHECK-32-SAME: i32 1073741840 }>
-// CHECK-64-SAME: i32 1073741848 }>
+// CHECK-32-SAME: <i32 0x4000_0010> }>
+// CHECK-64-SAME: <i32 0x4000_0018> }>
 
 // -- %f: C.z
 // CHECK: [[KP_F:@keypath.*]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//               -- 0x8000_0018 - instantiable in-line, size 4
-// CHECK-SAME: i32 -2147483644,
+//               -- instantiable in-line, size 4
+// CHECK-SAME: <i32 0x8000_0004>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: i32 1073741852 }>
-// CHECK-64-SAME: i32 1073741872 }>
+// CHECK-32-SAME: <i32 0x4000_001c> }>
+// CHECK-64-SAME: <i32 0x4000_0030> }>
 
 // -- %g: S.z.x
 // CHECK: [[KP_G:@keypath.*]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//                  -- 0x8000_0010 - instantiable in-line, size 12
-// CHECK-32-SAME: i32 -2147483636,
-//                  -- 0x8000_0018 - instantiable in-line, size 16
-// CHECK-64-SAME: i32 -2147483632,
+//                  -- instantiable in-line, size 12
+// CHECK-32-SAME: <i32 0x8000_000c>,
+//                  -- instantiable in-line, size 20
+// CHECK-64-SAME: <i32 0x8000_0014>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- offset of S.z
 // CHECK-32-SAME: i32 16,
 // CHECK-64-SAME: i32 32,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
 // -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: i32 1073741836 }>
-// CHECK-64-SAME: i32 1073741840 }>
+// CHECK-32-SAME: <i32 0x4000_000c> }>
+// CHECK-64-SAME: <i32 0x4000_0010> }>
 
 // -- %h: C.z.x
 // CHECK: [[KP_H:@keypath.*]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//                  -- 0x8000_0010 - instantiable in-line, size 12
-// CHECK-32-SAME: i32 -2147483636,
-//                  -- 0x8000_0018 - instantiable in-line, size 16
-// CHECK-64-SAME: i32 -2147483632,
+//                  -- instantiable in-line, size 12
+// CHECK-32-SAME: <i32 0x8000_000c>,
+//                  -- instantiable in-line, size 20
+// CHECK-64-SAME: <i32 0x8000_0014>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: i32 1073741852,
-// CHECK-64-SAME: i32 1073741872,
+// CHECK-32-SAME: <i32 0x4000_001c>,
+// CHECK-64-SAME: <i32 0x4000_0030>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
 // -- offset of S.x
 // CHECK-SAME: i32 0 }>
@@ -125,12 +138,14 @@ sil_vtable C {}
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//              -- 0x8000_0014 - instantiable in-line, size 20
-// CHECK-64-SAME: i32 -2147483628,
-//              -- 0x8000_000c - instantiable in-line, size 12
-// CHECK-32-SAME: i32 -2147483636,
-// -- 0x2000_0000 - computed, get-only, identified by function pointer, no args
-// CHECK-SAME: i32 536870912,
+//              -- instantiable in-line, size 24
+// CHECK-64-SAME: <i32 0x8000_0018>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
+//              -- instantiable in-line, size 12
+// CHECK-32-SAME: <i32 0x8000_000c>,
+// -- computed, get-only, identified by function pointer, no args
+// CHECK-SAME: <i32 0x2000_0000>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK-SAME: void ()* @k_id,
 // CHECK-SAME: void (%TSi*, %T8keypaths1SV*)* @k_get }>
 
@@ -139,12 +154,14 @@ sil_vtable C {}
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//              -- 0x8000_001c - instantiable in-line, size 28
-// CHECK-64-SAME: i32 -2147483620,
-//              -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483632,
-// -- 0x2a00_0000 - computed, settable, nonmutating, identified by vtable, no args
-// CHECK-SAME: i32 704643072,
+//              -- instantiable in-line, size 32
+// CHECK-64-SAME: <i32 0x8000_0020>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
+//              -- instantiable in-line, size 16
+// CHECK-32-SAME: <i32 0x8000_0010>,
+// -- computed, settable, nonmutating, identified by vtable, no args
+// CHECK-SAME: <i32 0x2a00_0000>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK-SAME: [[WORD]]
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_get,
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_set }>
@@ -154,12 +171,14 @@ sil_vtable C {}
 // CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* (i8*)*
 // CHECK-SAME: %swift.type* (i8*)*
-//              -- 0x8000_001c - instantiable in-line, size 28
-// CHECK-64-SAME: i32 -2147483620,
-//              -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483632,
-// -- 0x3c00_0000 - computed, settable, nonmutating, identified by property offset, no args
-// CHECK-SAME: i32 1006632960,
+//              -- instantiable in-line, size 32
+// CHECK-64-SAME: <i32 0x8000_0020>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
+//              -- instantiable in-line, size 16
+// CHECK-32-SAME: <i32 0x8000_0010>,
+// -- computed, settable, nonmutating, identified by property offset, no args
+// CHECK-SAME: <i32 0x3c00_0000>,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK-SAME: [[WORD]]
 // CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_get,
 // CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_set }>
@@ -172,8 +191,9 @@ sil_vtable C {}
 // CHECK-SAME: %swift.type* (i8*)* [[I_GET_A:@[a-z_.0-9]+]],
 //             -- size 8
 // CHECK-SAME: i32 8,
-//             -- 0x1ffffffe - struct with runtime-resolved offset
-// CHECK-SAME: i32 536870910,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
+//             -- struct with runtime-resolved offset
+// CHECK-SAME: <i32 0x1ffffffe>,
 // CHECK-32-SAME: i32 12 }>
 // CHECK-64-SAME: i32 24 }>
 
@@ -184,8 +204,9 @@ sil_vtable C {}
 // CHECK-SAME: %swift.type* (i8*)* [[J_GET_A:@[a-z_.0-9]+]],
 //             -- size 8
 // CHECK-SAME: i32 8,
-//             -- 0x1ffffffe - struct with runtime-resolved offset
-// CHECK-SAME: i32 536870910,
+// CHECK-64-SAME: [4 x i8] zeroinitializer,
+//             -- struct with runtime-resolved offset
+// CHECK-SAME: <i32 0x1ffffffe>,
 // CHECK-32-SAME: i32 16 }>
 // CHECK-64-SAME: i32 32 }>
 

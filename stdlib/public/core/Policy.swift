@@ -104,7 +104,7 @@ public typealias StringLiteralType = String
 // IEEE Binary64, and we need 1 bit to represent the sign.  Instead of using
 // 1025, we use the next round number -- 2048.
 public typealias _MaxBuiltinIntegerType = Builtin.Int2048
-#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE80
 #else
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64

@@ -76,6 +76,9 @@ namespace {
     private:
       SpaceKind Kind;
       llvm::PointerIntPair<Type, 1, bool> TypeAndVal;
+
+      // In type space, we reuse HEAD to help us print meaningful name, e.g.,
+      // tuple element name in fixits.
       Identifier Head;
       std::forward_list<Space> Spaces;
 
@@ -134,8 +137,8 @@ namespace {
       }
       
     public:
-      explicit Space(Type T)
-        : Kind(SpaceKind::Type), TypeAndVal(T, false), Head(Identifier()),
+      explicit Space(Type T, Identifier NameForPrinting)
+        : Kind(SpaceKind::Type), TypeAndVal(T, false), Head(NameForPrinting),
           Spaces({}){}
       explicit Space(Type T, Identifier H, bool downgrade,
                      SmallVectorImpl<Space> &SP)
@@ -186,6 +189,12 @@ namespace {
       Identifier getHead() const {
         assert(getKind() == SpaceKind::Constructor
                && "Wrong kind of space tried to access head");
+        return Head;
+      }
+
+      Identifier getPrintingName() const {
+        assert(getKind() == SpaceKind::Type
+               && "Wrong kind of space tried to access printing name");
         return Head;
       }
 
@@ -750,7 +759,11 @@ namespace {
           if (!forDisplay) {
             getType()->print(buffer);
           }
-          buffer << "_";
+          Identifier Name = getPrintingName();
+          if (Name.empty())
+            buffer << "_";
+          else
+            buffer << tok::kw_let << " " << Name.str();
           break;
         }
       }
@@ -865,10 +878,11 @@ namespace {
                                TTy->getElements().end(),
                                std::back_inserter(constElemSpaces),
                                [&](TupleTypeElt ty){
-                                 return Space(ty.getType());
+                                 return Space(ty.getType(), ty.getName());
                                });
               } else if (auto *TTy = dyn_cast<ParenType>(eedTy.getPointer())) {
-                constElemSpaces.push_back(Space(TTy->getUnderlyingType()));
+                constElemSpaces.push_back(Space(TTy->getUnderlyingType(),
+                                                Identifier()));
               }
             }
             return Space(tp, eed->getName(),
@@ -882,7 +896,7 @@ namespace {
           std::transform(TTy->getElements().begin(), TTy->getElements().end(),
                          std::back_inserter(constElemSpaces),
                          [&](TupleTypeElt ty){
-            return Space(ty.getType());
+            return Space(ty.getType(), ty.getName());
           });
           // Create an empty constructor head for the tuple space.
           arr.push_back(Space(tp, Identifier(), /*canDowngrade*/false,
@@ -917,8 +931,7 @@ namespace {
       bool sawDowngradablePattern = false;
       bool sawRedundantPattern = false;
       SmallVector<Space, 4> spaces;
-      for (unsigned i = 0, e = Switch->getCases().size(); i < e; ++i) {
-        auto *caseBlock = Switch->getCases()[i];
+      for (auto *caseBlock : Switch->getCases()) {
         for (auto &caseItem : caseBlock->getCaseLabelItems()) {
           // 'where'-clauses on cases mean the case does not contribute to
           // the exhaustiveness of the pattern.
@@ -943,7 +956,7 @@ namespace {
         }
       }
       
-      Space totalSpace(Switch->getSubjectExpr()->getType());
+      Space totalSpace(Switch->getSubjectExpr()->getType(), Identifier());
       Space coveredSpace(spaces);
       size_t totalSpaceSize = totalSpace.getSize(TC);
       if (totalSpaceSize > Space::getMaximumSize()) {
@@ -1090,7 +1103,7 @@ namespace {
           }
         }
 
-        TC.diagnose(startLoc, diag::non_exhaustive_switch);
+        TC.diagnose(startLoc, mainDiagType);
         TC.diagnose(startLoc, diag::missing_several_cases, false)
           .fixItInsert(endLoc, buffer.str());
       } else {
@@ -1218,8 +1231,9 @@ namespace {
                                 bool &sawDowngradablePattern) {
       switch (item->getKind()) {
       case PatternKind::Any:
+        return Space(item->getType(), Identifier());
       case PatternKind::Named:
-        return Space(item->getType());
+        return Space(item->getType(), cast<NamedPattern>(item)->getBoundName());
       case PatternKind::Bool: {
         return Space(cast<BoolPattern>(item)->getValue());
       }
@@ -1231,7 +1245,7 @@ namespace {
           // These coercions are irrefutable.  Project with the original type
           // instead of the cast's target type to maintain consistency with the
           // scrutinee's type.
-          return Space(IP->getType());
+          return Space(IP->getType(), Identifier());
         case CheckedCastKind::Unresolved:
         case CheckedCastKind::ValueCast:
         case CheckedCastKind::ArrayDowncast:
@@ -1316,7 +1330,7 @@ namespace {
               || SP->getKind() == PatternKind::Tuple) {
             if (auto *TTy = SP->getType()->getAs<TupleType>()) {
               for (auto ty : TTy->getElements()) {
-                conArgSpace.push_back(Space(ty.getType()));
+                conArgSpace.push_back(Space(ty.getType(), ty.getName()));
               }
             } else {
               conArgSpace.push_back(projectPattern(TC, SP,

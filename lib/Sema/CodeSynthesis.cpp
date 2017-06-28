@@ -352,18 +352,15 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
       params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
-  bool isStatic = storage->isStatic();
-
   // Open-code the setMutating() calculation since we might run before
-  // the setter has been type checked. Also as a hack, always mark the
-  // setter mutating if we're inside a protocol, because it seems some
-  // things break otherwise -- the root cause should be fixed eventually.
+  // the setter has been type checked.
+  Type contextTy = DC->getDeclaredInterfaceType();
   materializeForSet->setMutating(
-      storage->getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
-      (!setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
-       !storage->isSetterNonMutating()));
+      contextTy && !contextTy->hasReferenceSemantics() &&
+      !setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
+      !storage->isSetterNonMutating());
 
-  materializeForSet->setStatic(isStatic);
+  materializeForSet->setStatic(storage->isStatic());
 
   // materializeForSet is final if the storage is.
   if (storage->isFinal())

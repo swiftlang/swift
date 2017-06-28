@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
@@ -74,6 +75,11 @@ enum class ArchetypeResolutionKind {
   /// Only create a new potential archetype to describe this dependent type
   /// if it is already known.
   AlreadyKnown,
+
+  /// Only create a potential archetype when it is well-formed (i.e., we know
+  /// that there is a nested type with that name), but (unlike \c AlreadyKnown)
+  /// allow the creation of a new potential archetype.
+  WellFormed,
 };
 
 /// \brief Collects a set of requirements of generic parameters, both explicitly
@@ -176,6 +182,9 @@ public:
     /// the concrete type.
     unsigned recursiveConcreteType : 1;
 
+    /// Whether we have an invalid concrete type.
+    unsigned invalidConcreteType : 1;
+
     /// Whether we have detected recursion during the substitution of
     /// the superclass type.
     unsigned recursiveSuperclassType : 1;
@@ -265,6 +274,10 @@ private:
   GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
   GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
 
+  /// Record that the given potential archetype is unresolved, so we know to
+  /// resolve it later.
+  void recordUnresolvedType(PotentialArchetype *unresolvedPA);
+
   /// When a particular requirement cannot be resolved due to, e.g., a
   /// currently-unresolvable or nested type, this routine should be
   /// called to cope with the unresolved requirement.
@@ -277,6 +290,15 @@ private:
                                    FloatingRequirementSource source,
                                    UnresolvedHandlingKind unresolvedHandling);
 
+  /// Resolve the conformance of the given potential archetype to
+  /// the given protocol when the potential archetype is known to be equivalent
+  /// to a concrete type.
+  ///
+  /// \returns the requirement source for the resolved conformance, or nullptr
+  /// if the conformance could not be resolved.
+  const RequirementSource *resolveConcreteConformance(PotentialArchetype *pa,
+                                                      ProtocolDecl *proto);
+
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
   ///
@@ -284,15 +306,18 @@ private:
   /// queried.
   ///
   /// \param proto The protocol to which we are establishing conformance.
-  const RequirementSource *resolveSuperConformance(
-                            GenericSignatureBuilder::PotentialArchetype *pa,
-                            ProtocolDecl *proto);
+  const RequirementSource *resolveSuperConformance(PotentialArchetype *pa,
+                                                   ProtocolDecl *proto);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
   ConstraintResult addConformanceRequirement(PotentialArchetype *T,
                                              ProtocolDecl *Proto,
                                              const RequirementSource *Source);
+
+  /// Try to resolve the given unresolved potential archetype.
+  ConstraintResult resolveUnresolvedType(PotentialArchetype *pa,
+                                         bool allowTypoCorrection);
 
 public:
   /// \brief Add a new same-type requirement between two fully resolved types
@@ -307,15 +332,6 @@ public:
                          ResolvedType paOrT1, ResolvedType paOrT2,
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
-
-  /// \brief Add a new same-type requirement between two fully resolved types
-  /// (output of GenericSignatureBuilder::resolve).
-  ///
-  /// The two types must not be incompatible concrete types.
-  ConstraintResult addSameTypeRequirementDirect(
-                                            ResolvedType paOrT1,
-                                            ResolvedType paOrT2,
-                                            FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
@@ -722,6 +738,16 @@ public:
     /// \c TypeRepr.
     Inferred,
 
+    /// A requirement inferred from part of the signature of a declaration
+    /// but for which we don't want to produce warnings, e.g., the result
+    /// type of a generic function:
+    ///
+    /// func f<T>() -> Set<T> { ... } // infers T: Hashable, but don't warn
+    ///
+    /// This is a root requirement source, which can be described by a
+    /// \c TypeRepr.
+    QuietlyInferred,
+
     /// A requirement for the creation of the requirement signature of a
     /// protocol.
     ///
@@ -752,7 +778,7 @@ public:
 
     /// A requirement that was resolved via a superclass requirement.
     ///
-    /// This stores the \c ProtocolConformance* used to resolve the
+    /// This stores the \c ProtocolConformanceRef used to resolve the
     /// requirement.
     Superclass,
 
@@ -766,6 +792,10 @@ public:
     /// This stores the \c ProtocolConformance* used to resolve the
     /// requirement.
     Concrete,
+
+    /// A requirement that was resolved based on structural derivation from
+    /// another requirement.
+    Derived,
   };
 
   /// The kind of requirement source.
@@ -774,6 +804,7 @@ public:
 private:
   /// The kind of storage we have.
   enum class StorageKind : uint8_t {
+    None,
     RootArchetype,
     StoredType,
     ProtocolConformance,
@@ -798,7 +829,7 @@ private:
     TypeBase *type;
 
     /// A protocol conformance used to satisfy the requirement.
-    ProtocolConformance *conformance;
+    void *conformance;
 
     /// An associated type to which a requirement is being applied.
     AssociatedTypeDecl *assocType;
@@ -816,10 +847,12 @@ private:
 
     case Explicit:
     case Inferred:
+    case QuietlyInferred:
     case NestedTypeNameMatch:
     case Superclass:
     case Parent:
     case Concrete:
+    case Derived:
       return 0;
     }
 
@@ -853,6 +886,7 @@ private:
     switch (kind) {
     case Explicit:
     case Inferred:
+    case QuietlyInferred:
     case RequirementSignatureSelf:
     case NestedTypeNameMatch:
       return true;
@@ -862,6 +896,7 @@ private:
     case Superclass:
     case Parent:
     case Concrete:
+    case Derived:
       return false;
     }
 
@@ -911,7 +946,7 @@ public:
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                    ProtocolConformance *conformance)
+                    ProtocolConformanceRef conformance)
     : kind(kind), storageKind(StorageKind::ProtocolConformance),
       hasTrailingWrittenRequirementLoc(false),
       usesRequirementSignature(false), parent(parent) {
@@ -920,7 +955,7 @@ public:
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
-    storage.conformance = conformance;
+    storage.conformance = conformance.getOpaqueValue();
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
@@ -936,6 +971,16 @@ public:
     storage.assocType = assocType;
   }
 
+  RequirementSource(Kind kind, const RequirementSource *parent)
+    : kind(kind), storageKind(StorageKind::None),
+      hasTrailingWrittenRequirementLoc(false),
+      usesRequirementSignature(false), parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
+  }
+
 public:
   /// Retrieve an abstract requirement source.
   static const RequirementSource *forAbstract(PotentialArchetype *root);
@@ -949,7 +994,8 @@ public:
   /// inferred from some part of a generic declaration's signature, e.g., the
   /// parameter or result type of a generic function.
   static const RequirementSource *forInferred(PotentialArchetype *root,
-                                              const TypeRepr *typeRepr);
+                                              const TypeRepr *typeRepr,
+                                              bool quietly);
 
   /// Retrieve a requirement source representing the requirement signature
   /// computation for a protocol.
@@ -976,13 +1022,14 @@ public:
   /// A requirement source that describes that a requirement that is resolved
   /// via a superclass requirement.
   const RequirementSource *viaSuperclass(
-                                        GenericSignatureBuilder &builder,
-                                        ProtocolConformance *conformance) const;
+                                    GenericSignatureBuilder &builder,
+                                    ProtocolConformanceRef conformance) const;
 
   /// A requirement source that describes that a requirement that is resolved
   /// via a same-type-to-concrete requirement.
-  const RequirementSource *viaConcrete(GenericSignatureBuilder &builder,
-                                       ProtocolConformance *conformance) const;
+  const RequirementSource *viaConcrete(
+                                     GenericSignatureBuilder &builder,
+                                     ProtocolConformanceRef conformance) const;
 
   /// A constraint source that describes that a constraint that is resolved
   /// for a nested type via a constraint on its parent.
@@ -990,6 +1037,10 @@ public:
   /// \param assocType the associated type that
   const RequirementSource *viaParent(GenericSignatureBuilder &builder,
                                      AssociatedTypeDecl *assocType) const;
+
+  /// A constraint source that describes a constraint that is structurally
+  /// derived from another constraint but does not require further information.
+  const RequirementSource *viaDerived(GenericSignatureBuilder &builder) const;
 
   /// Retrieve the root requirement source.
   const RequirementSource *getRoot() const;
@@ -1021,7 +1072,7 @@ public:
 
   /// Whether the requirement is inferred or derived from an inferred
   /// requirement.
-  bool isInferredRequirement() const;
+  bool isInferredRequirement(bool includeQuietInferred) const;
 
   /// Classify the kind of this source for diagnostic purposes.
   unsigned classifyDiagKind() const;
@@ -1079,9 +1130,9 @@ public:
   ProtocolDecl *getProtocolDecl() const;
 
   /// Retrieve the protocol conformance for this requirement, if there is one.
-  ProtocolConformance *getProtocolConformance() const {
-    if (storageKind != StorageKind::ProtocolConformance) return nullptr;
-    return storage.conformance;
+  ProtocolConformanceRef getProtocolConformance() const {
+    assert(storageKind == StorageKind::ProtocolConformance);
+    return ProtocolConformanceRef::getFromOpaqueValue(storage.conformance);
   }
 
   /// Retrieve the associated type declaration for this requirement, if there
@@ -1135,6 +1186,8 @@ class GenericSignatureBuilder::FloatingRequirementSource {
     Explicit,
     /// An inferred requirement source lacking a root.
     Inferred,
+    /// A quietly inferred requirement source lacking a root.
+    QuietlyInferred,
     /// A requirement source augmented by an abstract protocol requirement
     AbstractProtocol,
     /// A requirement source for a nested-type-name match introduced by
@@ -1180,8 +1233,9 @@ public:
     return { Explicit, requirementRepr };
   }
 
-  static FloatingRequirementSource forInferred(const TypeRepr *typeRepr) {
-    return { Inferred, typeRepr };
+  static FloatingRequirementSource forInferred(const TypeRepr *typeRepr,
+                                               bool quietly) {
+    return { quietly? QuietlyInferred : Inferred, typeRepr };
   }
 
   static FloatingRequirementSource viaProtocolRequirement(
@@ -1325,13 +1379,7 @@ class GenericSignatureBuilder::PotentialArchetype {
 
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
-  PotentialArchetype(PotentialArchetype *parent, Identifier name)
-    : parentOrBuilder(parent), identifier(name), isUnresolvedNestedType(true),
-      IsRecursive(false), Invalid(false),
-      DiagnosedRename(false)
-  { 
-    assert(parent != nullptr && "Not an associated type?");
-  }
+  PotentialArchetype(PotentialArchetype *parent, Identifier name);
 
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
@@ -1548,6 +1596,7 @@ public:
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
+                                    ArchetypeResolutionKind kind,
                                     GenericSignatureBuilder &builder);
 
   /// \brief Retrieve (or create) a nested type with a known associated type.
@@ -1559,18 +1608,6 @@ public:
   PotentialArchetype *getNestedType(TypeDecl *concreteDecl,
                                     GenericSignatureBuilder &builder);
 
-  /// Describes the kind of update that is performed.
-  enum class NestedTypeUpdate {
-    /// Resolve an existing potential archetype, but don't create a new
-    /// one if not present.
-    ResolveExisting,
-    /// If this potential archetype is missing, create it.
-    AddIfMissing,
-    /// If this potential archetype is missing and would be a better anchor,
-    /// create it.
-    AddIfBetterAnchor,
-  };
-
   /// \brief Retrieve (or create) a nested type that is the current best
   /// nested archetype anchor (locally) with the given name.
   ///
@@ -1579,7 +1616,7 @@ public:
   PotentialArchetype *getNestedArchetypeAnchor(
                        Identifier name,
                        GenericSignatureBuilder &builder,
-                       NestedTypeUpdate kind = NestedTypeUpdate::AddIfMissing);
+                       ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
@@ -1589,7 +1626,7 @@ public:
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
                       PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
-                      NestedTypeUpdate kind);
+                      ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
@@ -1600,7 +1637,7 @@ public:
   PotentialArchetype *updateNestedTypeForConformance(
                         Identifier name,
                         ProtocolDecl *protocol,
-                        NestedTypeUpdate kind);
+                        ArchetypeResolutionKind kind);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype within the given generic environment.
@@ -1678,7 +1715,22 @@ public:
 /// Describes a requirement whose processing has been delayed for some reason.
 class GenericSignatureBuilder::DelayedRequirement {
 public:
-  RequirementKind kind;
+  enum Kind {
+    /// A type requirement, which may be a conformance or a superclass
+    /// requirement.
+    Type,
+
+    /// A layout requirement.
+    Layout,
+
+    /// A same-type requirement.
+    SameType,
+
+    /// An unresolved potential archetype.
+    Unresolved,
+  };
+
+  Kind kind;
   UnresolvedType lhs;
   RequirementRHS rhs;
   FloatingRequirementSource source;

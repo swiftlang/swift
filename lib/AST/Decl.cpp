@@ -457,7 +457,8 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
     return false;
 
   // If the name has leading underscore then it's a private symbol.
-  if (VD->getNameStr().startswith("_"))
+  if (!VD->getBaseName().isSpecial() &&
+      VD->getBaseName().getIdentifier().str().startswith("_"))
     return true;
 
   return false;
@@ -1609,47 +1610,21 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   }
 
   auto funcTy = type->castTo<AnyFunctionType>();
-  auto argTy = funcTy->getInput();
+  SmallVector<AnyFunctionType::Param, 4> newParams;
+  for (const auto &param : funcTy->getParams()) {
+    auto newParamType = mapSignatureParamType(ctx, param.getType());
+    ParameterTypeFlags newFlags = param.getParameterFlags().withEscaping(false);
 
-  if (auto tupleTy = argTy->getAs<TupleType>()) {
-    SmallVector<TupleTypeElt, 4> elements;
-    bool anyChanged = false;
-    unsigned idx = 0;
-    // Remap our parameters, and make sure to strip off @escaping
-    for (const auto &elt : tupleTy->getElements()) {
-      auto newEltTy = mapSignatureParamType(ctx, elt.getType());
-      auto newParamFlags = elt.getParameterFlags().withEscaping(false);
-      bool exactlyTheSame = newParamFlags == elt.getParameterFlags() &&
-                            newEltTy.getPointer() == elt.getType().getPointer();
-
-      // Don't build up anything if we never see any difference
-      if (!anyChanged && exactlyTheSame) {
-        ++idx;
-        continue;
-      }
-
-      // First time we see a diff, copy over all the prior
-      if (!anyChanged && !exactlyTheSame) {
-        elements.append(tupleTy->getElements().begin(),
-                        tupleTy->getElements().begin() + idx);
-        anyChanged = true;
-      }
-
-      elements.emplace_back(newEltTy, elt.getName(), newParamFlags);
-    }
-    if (anyChanged) {
-      argTy = TupleType::get(elements, ctx);
-    }
-  } else {
-    argTy = mapSignatureParamType(ctx, argTy);
-
+    // For the 'self' of a method, strip off 'inout'.
     if (isMethod) {
-      // In methods, strip the 'inout' off of 'self' so that mutating and
-      // non-mutating methods have the same self parameter type.
-      if (auto inoutTy = argTy->getAs<InOutType>()) {
-        argTy = inoutTy->getObjectType();
-      }
+      if (auto inoutType = newParamType->getAs<InOutType>())
+        newParamType = inoutType->getObjectType();
+
+      newFlags = newFlags.withInOut(false);
     }
+
+    AnyFunctionType::Param newParam(newParamType, param.getLabel(), newFlags);
+    newParams.push_back(newParam);
   }
 
   // Map the result type.
@@ -1665,9 +1640,9 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   // Rebuild the resulting function type.
   if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
     return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
-                                    argTy, resultTy, info);
+                                    newParams, resultTy, info);
 
-  return FunctionType::get(argTy, resultTy, info);
+  return FunctionType::get(newParams, resultTy, info);
 }
 
 OverloadSignature ValueDecl::getOverloadSignature() const {
@@ -2905,10 +2880,13 @@ ProtocolDecl::getInheritedProtocols() const {
         // Only protocols can appear in the inheritance clause
         // of a protocol -- anything else should get diagnosed
         // elsewhere.
-        if (auto *protoTy = type->getAs<ProtocolType>()) {
-          auto *protoDecl = protoTy->getDecl();
-          if (known.insert(protoDecl).second)
-            result.push_back(protoDecl);
+        if (type->isExistentialType()) {
+          auto layout = type->getExistentialLayout();
+          for (auto protoTy : layout.getProtocols()) {
+            auto *protoDecl = protoTy->getDecl();
+            if (known.insert(protoDecl).second)
+              result.push_back(protoDecl);
+          }
         }
       }
     }
@@ -3395,7 +3373,9 @@ bool AbstractStorageDecl::isSetterNonMutating() const {
   switch (getStorageKind()) {
   case AbstractStorageDecl::Stored:
   case AbstractStorageDecl::StoredWithTrivialAccessors:
-    return false;
+    // Instance member setters are mutating; static property setters and
+    // top-level setters are not.
+    return !isInstanceMember();
     
   case AbstractStorageDecl::StoredWithObservers:
   case AbstractStorageDecl::InheritedWithObservers:
@@ -3425,6 +3405,28 @@ FuncDecl *AbstractStorageDecl::getAccessorFunction(AccessorKind kind) const {
   case AccessorKind::NotAccessor: llvm_unreachable("called with NotAccessor");
   }
   llvm_unreachable("bad accessor kind!");
+}
+
+void AbstractStorageDecl::getAllAccessorFunctions(
+    SmallVectorImpl<Decl *> &decls) const {
+  auto tryPush = [&](Decl *decl) {
+    if (decl)
+      decls.push_back(decl);
+  };
+
+  tryPush(getGetter());
+  tryPush(getSetter());
+  tryPush(getMaterializeForSetFunc());
+
+  if (hasObservers()) {
+    tryPush(getDidSetFunc());
+    tryPush(getWillSetFunc());
+  }
+
+  if (hasAddressors()) {
+    tryPush(getAddressor());
+    tryPush(getMutableAddressor());
+  }
 }
 
 void AbstractStorageDecl::configureGetSetRecord(GetSetRecord *getSetInfo,

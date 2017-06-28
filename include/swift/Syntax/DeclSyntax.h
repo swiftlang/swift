@@ -33,40 +33,8 @@ namespace swift {
 namespace syntax {
 
 class ExprSyntax;
-class ExprSyntaxData;
 class CodeBlockStmtSyntax;
-class CodeBlockStmtSyntaxData;
-class TypeAttributesSyntax;
-class TypeAttributesSyntaxData;
-class DeclModifierListSyntax;
 class GenericWhereClauseSyntax;
-class GenericWhereClauseSyntaxData;
-class GenericParameterListSyntax;
-class GenericParameterListSyntaxData;
-
-#pragma mark declaration-modifier Data
-
-class DeclModifierSyntaxData final : public SyntaxData {
-  friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class Syntax;
-  friend class DeclModifierSyntax;
-
-  DeclModifierSyntaxData(const RC<RawSyntax> Raw,
-                         const SyntaxData *Parent = nullptr,
-                         const CursorIndex IndexInParent = 0);
-
-  static RC<DeclModifierSyntaxData> make(const RC<RawSyntax> Raw,
-                                         const SyntaxData *Parent = nullptr,
-                                         const CursorIndex IndexInParent = 0);
-
-  static RC<DeclModifierSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::DeclModifier;
-  }
-};
 
 #pragma mark declaration-modifier API
 
@@ -98,7 +66,6 @@ class DeclModifierSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
-  friend class DeclModifierSyntaxData;
 
   enum class Cursor : CursorIndex {
     Name,
@@ -107,147 +74,78 @@ class DeclModifierSyntax final : public Syntax {
     RightParen
   };
 
-  DeclModifierSyntax(const RC<SyntaxData> Root, const DataType *Data)
-    : Syntax(Root, Data) {}
+  virtual void validate() const override;
 
 public:
-  using DataType = DeclModifierSyntaxData;
+  static DeclModifierSyntax makeBlank();
+  DeclModifierSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
 
   /// Return the name of the modifier.
-  RC<TokenSyntax> getName() const;
+  TokenSyntax getName() const;
 
   /// Return a DeclModifierSyntax with the given name.
-  DeclModifierSyntax withName(RC<TokenSyntax> NewName) const;
+  DeclModifierSyntax withName(TokenSyntax NewName) const;
 
   /// Return the left parenthesis '(' token as a part of the argument clause,
   /// if there is one.
-  RC<TokenSyntax> getLeftParenToken() const;
+  TokenSyntax getLeftParenToken() const;
 
   /// Return a DeclModifierSyntax with the given left parenthesis '(' token.
-  DeclModifierSyntax withLeftParenToken(RC<TokenSyntax> NewLeftParen) const;
+  DeclModifierSyntax withLeftParenToken(TokenSyntax NewLeftParen) const;
 
   /// Get the argument to the declaration modifier.
   ///
   /// This is either:
   /// - 'set' for the access modifiers such as 'private' or 'public', or
   /// - 'safe' / 'unsafe' for the 'unowned' modifier.
-  RC<TokenSyntax> getArgument() const;
+  TokenSyntax getArgument() const;
 
   /// Return a DeclModifierSyntax with the given argument.
-  DeclModifierSyntax withArgument(RC<TokenSyntax> NewArgument) const;
+  DeclModifierSyntax withArgument(TokenSyntax NewArgument) const;
 
   /// Return the right parenthesis ')' token as a part of the argument clause,
   /// if there is one.
-  RC<TokenSyntax> getRightParenToken() const;
+  TokenSyntax getRightParenToken() const;
 
   /// Return a DeclModifierSyntax with the given right parenthesis ')' token.
-  DeclModifierSyntax withRightParenToken(RC<TokenSyntax> NewRightParen) const;
+  DeclModifierSyntax withRightParenToken(TokenSyntax NewRightParen) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::DeclModifier;
   }
 };
 
-#pragma mark declaration-modifiers Data
-
-using DeclModifierListSyntaxData =
-  SyntaxCollectionData<SyntaxKind::DeclModifierList, DeclModifierSyntax>;
-
-#pragma mark declaration-modifiers API
-
-class DeclModifierListSyntax final :
-  public SyntaxCollection<SyntaxKind::DeclModifierList, DeclModifierSyntax> {
-
-  friend struct SyntaxFactory;
-  friend class Syntax;
-  friend class SyntaxData;
-  friend class FunctionDeclSyntax;
-
-  using DataType = DeclModifierListSyntaxData;
-
-  DeclModifierListSyntax(const RC<SyntaxData> Root, const DataType *Data)
-    : SyntaxCollection(Root, Data) {}
-
-public:
-  static bool classof(const Syntax *S) {
-    return S->getKind() == SyntaxKind::DeclModifierList;
-  }
-};
-
-#pragma mark declaration Data
-
-class DeclSyntaxData : public SyntaxData {
-protected:
-  DeclSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                 CursorIndex IndexInParent = 0);
-
-public:
-  static bool classof(const SyntaxData *S) { return S->isDecl(); }
-};
-
 #pragma mark declaration API
 
 class DeclSyntax : public Syntax {
   friend class Syntax;
-  using DataType = DeclSyntaxData;
 protected:
-  DeclSyntax(const RC<SyntaxData> Root, const DeclSyntaxData *Data);
+  virtual void validate() const override {}
 
 public:
+  static DeclSyntax makeBlank();
+  DeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
+
   static bool classof(const SyntaxData *S) { return S->isDecl(); }
-};
-
-#pragma mark - unknown-declaration Data
-
-class UnknownDeclSyntaxData : public UnknownSyntaxData {
-  UnknownDeclSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                        CursorIndex IndexInParent = 0);
-public:
-  static RC<UnknownDeclSyntaxData> make(RC<RawSyntax> Raw,
-                                        const SyntaxData *Parent = nullptr,
-                                        CursorIndex IndexInParent = 0);
-
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::UnknownDecl;
-  }
 };
 
 #pragma mark - unknown-declaration API
 
 class UnknownDeclSyntax : public UnknownSyntax {
   friend class SyntaxData;
-  friend class UnknownStmtSyntaxData;
   friend class LegacyASTTransformer;
 
-  using DataType = UnknownDeclSyntaxData;
-
-  UnknownDeclSyntax(const RC<SyntaxData> Root,
-                    const UnknownDeclSyntaxData *Data);
+  virtual void validate() const override;
 
 public:
+  static UnknownDeclSyntax makeBlank();
+  UnknownDeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : UnknownSyntax(Root, Data)  {}
+
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::UnknownDecl;
-  }
-};
-
-#pragma mark declaration-members Data
-
-class DeclMembersSyntaxData final : public SyntaxData {
-  friend class SyntaxData;
-  friend class DeclMembersSyntaxBuilder;
-  friend struct SyntaxFactory;
-
-  DeclMembersSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                        CursorIndex IndexInParent = 0);
-
-public:
-  static RC<DeclMembersSyntaxData> make(RC<RawSyntax> Raw,
-                                        const SyntaxData *Parent = nullptr,
-                                        CursorIndex IndexInParent = 0);
-  static RC<DeclMembersSyntaxData> makeBlank();
-
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::DeclMembers;
   }
 };
 
@@ -255,16 +153,18 @@ public:
 #pragma mark declaration-members API
 
 class DeclMembersSyntax final : public Syntax {
-  using DataType = DeclMembersSyntaxData;
   friend struct SyntaxFactory;
   friend class SyntaxData;
   friend class Syntax;
   friend class DeclMembersSyntaxBuilder;
   friend class StructDeclSyntax;
 
-  DeclMembersSyntax(RC<SyntaxData> Root,
-                    const DeclMembersSyntaxData *Data);
+  virtual void validate() const override {}
+
 public:
+  static DeclMembersSyntax makeBlank();
+  DeclMembersSyntax(RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::DeclMembers;
   }
@@ -281,31 +181,6 @@ public:
 };
 
 #pragma mark -
-#pragma mark struct-declaration Data
-
-class StructDeclSyntaxData final : public DeclSyntaxData {
-  friend class SyntaxData;
-  friend class StructDeclSyntax;
-  friend class StructDeclSyntaxBuilder;
-  friend struct SyntaxFactory;
-
-  RC<GenericWhereClauseSyntaxData> CachedWhereClause;
-  RC<GenericParameterClauseSyntaxData> CachedGenericParams;
-  RC<DeclMembersSyntaxData> CachedMembers;
-
-  StructDeclSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                       CursorIndex IndexInParent = 0);
-
-  static RC<StructDeclSyntaxData> make(RC<RawSyntax> Raw,
-                                       const SyntaxData *Parent = nullptr,
-                                       CursorIndex IndexInParent = 0);
-  static RC<StructDeclSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::StructDecl;
-  }
-};
 
 #pragma mark - struct-declaration API
 
@@ -318,11 +193,9 @@ public:
 /// struct-members -> struct-member struct-members?
 /// struct-member -> declaration | compiler-control-statement
 class StructDeclSyntax final : public DeclSyntax {
-  using DataType = StructDeclSyntaxData;
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
-  friend class StructDeclSyntaxData;
   friend class StructDeclSyntaxBuilder;
 
   enum class Cursor : CursorIndex {
@@ -337,24 +210,24 @@ class StructDeclSyntax final : public DeclSyntax {
     Last = RightBrace,
   };
 
-  StructDeclSyntax(const RC<SyntaxData> Root, const StructDeclSyntaxData *Data);
-
-  const StructDeclSyntaxData *getData() const {
-    return cast<StructDeclSyntaxData>(Data);
-  }
+  virtual void validate() const override;
 
 public:
+  static StructDeclSyntax makeBlank();
+  StructDeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : DeclSyntax(Root, Data) {}
+
   /// Return the 'struct' keyword attached to the declaration.
-  RC<TokenSyntax> getStructKeyword() const;
+  TokenSyntax getStructKeyword() const;
 
   /// Return a StructDeclSyntax with the given 'struct' keyword.
-  StructDeclSyntax withStructKeyword(RC<TokenSyntax> NewStructKeyword) const;
+  StructDeclSyntax withStructKeyword(TokenSyntax NewStructKeyword) const;
 
   /// Return the identifier of the struct.
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   /// Return a StructDeclSyntax with the given identifier.
-  StructDeclSyntax withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  StructDeclSyntax withIdentifier(TokenSyntax NewIdentifier) const;
 
   /// Return the generic parameter clause of the struct declaration.
   GenericParameterClauseSyntax getGenericParameterClause() const;
@@ -372,10 +245,10 @@ public:
   withWhereClause(GenericWhereClauseSyntax NewWhereClause) const;
 
   /// Return the left brace '{' token of the struct declaration.
-  RC<TokenSyntax> getLeftBraceToken() const;
+  TokenSyntax getLeftBraceToken() const;
 
   /// Return a StructDeclSyntax with the given left brace '{' token.
-  StructDeclSyntax withLeftBrace(RC<TokenSyntax> NewLeftBrace) const;
+  StructDeclSyntax withLeftBrace(TokenSyntax NewLeftBrace) const;
 
   /// Return the members' syntax of the struct.
   DeclMembersSyntax getMembers() const;
@@ -384,10 +257,10 @@ public:
   StructDeclSyntax withMembers(DeclMembersSyntax NewMembers) const;
 
   /// Return the right brace '}' token of the struct declaration.
-  RC<TokenSyntax> getRightBraceToken() const;
+  TokenSyntax getRightBraceToken() const;
 
   /// Return a StructDeclSyntax with the given right brace '}' token.
-  StructDeclSyntax withRightBrace(RC<TokenSyntax> NewRightBrace) const;
+  StructDeclSyntax withRightBrace(TokenSyntax NewRightBrace) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::StructDecl;
@@ -400,9 +273,9 @@ class StructDeclSyntaxBuilder final {
   RawSyntax::LayoutList StructLayout;
 public:
   StructDeclSyntaxBuilder();
-  StructDeclSyntaxBuilder &useStructKeyword(RC<TokenSyntax> StructKeyword);
-  StructDeclSyntaxBuilder &useIdentifier(RC<TokenSyntax> Identifier);
-  StructDeclSyntaxBuilder &useLeftBrace(RC<TokenSyntax> LeftBrace);
+  StructDeclSyntaxBuilder &useStructKeyword(TokenSyntax StructKeyword);
+  StructDeclSyntaxBuilder &useIdentifier(TokenSyntax Identifier);
+  StructDeclSyntaxBuilder &useLeftBrace(TokenSyntax LeftBrace);
 
   StructDeclSyntaxBuilder &
   useGenericParameterClause(GenericParameterClauseSyntax GenericParams);
@@ -411,31 +284,11 @@ public:
   useGenericWhereClause(GenericWhereClauseSyntax GenericWhereClause);
 
   StructDeclSyntaxBuilder &useMembers(DeclMembersSyntax Members);
-  StructDeclSyntaxBuilder &useRightBrace(RC<TokenSyntax> RightBrace);
+  StructDeclSyntaxBuilder &useRightBrace(TokenSyntax RightBrace);
   StructDeclSyntax build() const;
 };
 
 #pragma mark -
-#pragma mark - type-alias Data
-
-class TypeAliasDeclSyntaxData final : public DeclSyntaxData {
-  friend class SyntaxData;
-  friend struct SyntaxFactory;
-  friend class TypeAliasDeclSyntaxBuilder;
-
-  TypeAliasDeclSyntaxData(RC<RawSyntax> Raw,
-                          const SyntaxData *Parent = nullptr,
-                          CursorIndex IndexInParent = 0);
-  static RC<TypeAliasDeclSyntaxData> make(RC<RawSyntax> Raw,
-                                          const SyntaxData *Parent = nullptr,
-                                          CursorIndex IndexInParent = 0);
-  static RC<TypeAliasDeclSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::TypeAliasDecl;
-  }
-};
 
 #pragma mark -
 #pragma mark - type-alias API
@@ -443,10 +296,7 @@ public:
 class TypeAliasDeclSyntax final : public DeclSyntax {
   friend struct SyntaxFactory;
   friend class SyntaxData;
-  friend class TypeAliasDeclSyntaxData;
   friend class TypeAliasDeclSyntaxBuilder;
-
-  using DataType = TypeAliasDeclSyntaxData;
 
   enum Cursor : CursorIndex {
     TypeAliasKeyword,
@@ -456,23 +306,27 @@ class TypeAliasDeclSyntax final : public DeclSyntax {
     Type
   };
 
-  TypeAliasDeclSyntax(RC<SyntaxData> Root, const TypeAliasDeclSyntaxData *Data);
+  virtual void validate() const override {}
 
 public:
+  static TypeAliasDeclSyntax makeBlank();
+  TypeAliasDeclSyntax(RC<SyntaxData> Root, const SyntaxData *Data)
+    : DeclSyntax(Root, Data) {}
+
   /// Return the 'typealias' keyword for the declaration.
-  RC<TokenSyntax> getTypealiasKeyword() const {
-    return cast<TokenSyntax>(getRaw()->getChild(Cursor::TypeAliasKeyword));
+  TokenSyntax getTypealiasKeyword() const {
+    return { Root, Data->getChild(Cursor::TypeAliasKeyword).get() };
   }
 
   /// Return a TypeAliasDeclSyntax with the given 'typealias' keyword.
   TypeAliasDeclSyntax
-  withTypeAliasKeyword(RC<TokenSyntax> NewTypeAliasKeyword) const;
+  withTypeAliasKeyword(TokenSyntax NewTypeAliasKeyword) const;
 
   /// Return the identifier for the declaration.
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   /// Return a TypeAliasDeclSyntax with the given identifier.
-  TypeAliasDeclSyntax withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  TypeAliasDeclSyntax withIdentifier(TokenSyntax NewIdentifier) const;
 
   /// Return the generic parameter clause of the declaration.
   GenericParameterClauseSyntax getGenericParameterClause() const;
@@ -483,11 +337,11 @@ public:
   const;
 
   /// Return the equal '=' token from the declaration.
-  RC<TokenSyntax> getEqualToken() const;
+  TokenSyntax getEqualToken() const;
 
   /// Return a TypeAliasDeclSyntax with the given equal '=' token.
   TypeAliasDeclSyntax
-  withEqualToken(RC<TokenSyntax> NewEqualToken) const;
+  withEqualToken(TokenSyntax NewEqualToken) const;
 
   /// Return the type syntax to which the type alias is assigned.
   TypeSyntax getTypeSyntax() const;
@@ -508,44 +362,18 @@ public:
   TypeAliasDeclSyntaxBuilder();
 
   TypeAliasDeclSyntaxBuilder &
-  useTypeAliasKeyword(RC<TokenSyntax> TypeAliasKeyword);
+  useTypeAliasKeyword(TokenSyntax TypeAliasKeyword);
 
-  TypeAliasDeclSyntaxBuilder &useIdentifier(RC<TokenSyntax> Identifier);
+  TypeAliasDeclSyntaxBuilder &useIdentifier(TokenSyntax Identifier);
 
   TypeAliasDeclSyntaxBuilder &
   useGenericParameterClause(GenericParameterClauseSyntax GenericParams);
 
-  TypeAliasDeclSyntaxBuilder &useEqualToken(RC<TokenSyntax> EqualToken);
+  TypeAliasDeclSyntaxBuilder &useEqualToken(TokenSyntax EqualToken);
 
   TypeAliasDeclSyntaxBuilder &useType(TypeSyntax ReferentType);
 
   TypeAliasDeclSyntax build() const;
-};
-
-#pragma mark - function-parameter Data
-
-class FunctionParameterSyntaxData final : public SyntaxData {
-
-  friend struct SyntaxFactory;
-  friend class Syntax;
-  friend class SyntaxData;
-  friend class FunctionParameterSyntax;
-
-  RC<TypeSyntaxData> CachedTypeSyntax;
-  RC<ExprSyntaxData> CachedDefaultValue;
-
-  FunctionParameterSyntaxData(RC<RawSyntax> Raw,
-                              const SyntaxData *Parent = nullptr,
-                              CursorIndex IndexInParent = 0);
-  static RC<FunctionParameterSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-  static RC<FunctionParameterSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::FunctionParameter;
-  }
 };
 
 #pragma mark - function-parameter API
@@ -557,7 +385,6 @@ class FunctionParameterSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
-  friend class FunctionParameterSyntaxData;
 
   enum class Cursor : CursorIndex {
     ExternalName,
@@ -570,34 +397,36 @@ class FunctionParameterSyntax final : public Syntax {
     TrailingComma,
   };
 
-public:
-  using DataType = FunctionParameterSyntaxData;
+  virtual void validate() const override;
 
-  FunctionParameterSyntax(const RC<SyntaxData> Root, const DataType *Data)
+public:
+  static FunctionParameterSyntax makeBlank();
+
+  FunctionParameterSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
     : Syntax(Root, Data) {}
 
   /// Get the external name of the parameter, if there is one.
-  RC<TokenSyntax> getExternalName() const;
+  TokenSyntax getExternalName() const;
 
   /// Return a FunctionParameterSyntax with the given external name.
   FunctionParameterSyntax
-  withExternalName(RC<TokenSyntax> NewExternalName) const;
+  withExternalName(TokenSyntax NewExternalName) const;
 
   /// Return the local name of the parameter.
-  RC<TokenSyntax> getLocalName() const;
+  TokenSyntax getLocalName() const;
 
   /// Return a FunctionParameterSyntax with the given local name.
   FunctionParameterSyntax
-  withLocalName(RC<TokenSyntax> NewLocalName) const;
+  withLocalName(TokenSyntax NewLocalName) const;
 
   /// Return the colon ':' token between the local name and type of the
   /// parameter.
-  RC<TokenSyntax> getColonToken() const;
+  TokenSyntax getColonToken() const;
 
   /// Return a FunctionParameterSyntax with the given colon token between
   /// the local name and type.
   FunctionParameterSyntax
-  withColonToken(RC<TokenSyntax> NewColonToken) const;
+  withColonToken(TokenSyntax NewColonToken) const;
 
   /// Return the syntax for the type of this parameter.
   llvm::Optional<TypeSyntax> getTypeSyntax() const;
@@ -608,11 +437,11 @@ public:
 
   /// Return the equal '=' token in between the parameter type and the default
   /// value, if there is one.
-  RC<TokenSyntax> getEqualToken() const;
+  TokenSyntax getEqualToken() const;
 
   /// Return a FunctionParameterSyntax with the given equal '=' token in
   /// between the parameter type and the default value.
-  FunctionParameterSyntax withEqualToken(RC<TokenSyntax> NewEqualToken) const;
+  FunctionParameterSyntax withEqualToken(TokenSyntax NewEqualToken) const;
 
   /// Return the expression for the default value of the parameter, if there
   /// is one.
@@ -624,11 +453,11 @@ public:
   withDefaultValue(llvm::Optional<ExprSyntax> NewDefaultValue) const;
 
   /// Return the trailing comma on the parameter, if there is one.
-  RC<TokenSyntax> getTrailingComma() const;
+  TokenSyntax getTrailingComma() const;
 
   /// Return a FunctionParameterSyntax with the given trailing comma.
   FunctionParameterSyntax
-  withTrailingComma(RC<TokenSyntax> NewTrailingComma) const;
+  withTrailingComma(TokenSyntax NewTrailingComma) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FunctionParameter;
@@ -638,50 +467,8 @@ public:
 #pragma mark - function-parameter-list API
 
 /// parameter-list -> parameter | parameter ',' parameter-list
-class FunctionParameterListSyntax final : public
-  SyntaxCollection<SyntaxKind::FunctionParameterList, FunctionParameterSyntax> {
-  friend struct SyntaxFactory;
-  friend class Syntax;
-  friend class SyntaxData;
-  friend class FunctionSignatureSyntax;
-
-  using DataType = FunctionParameterListSyntaxData;
-
-  FunctionParameterListSyntax(const RC<SyntaxData> Root,
-                              const DataType *Data)
-    : SyntaxCollection(Root, Data) {}
-
-public:
-  static bool classof(const Syntax *S) {
-    return S->getKind() == SyntaxKind::FunctionParameterList;
-  }
-};
-
-#pragma mark - function-signature Data
-
-class FunctionSignatureSyntaxData final : public SyntaxData {
-  friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class FunctionSignatureSyntax;
-
-  RC<FunctionParameterListSyntaxData> CachedParameterList;
-  RC<TypeAttributesSyntaxData> CachedReturnTypeAttributes;
-  RC<TypeSyntaxData> CachedReturnTypeSyntax;
-
-  FunctionSignatureSyntaxData(const RC<RawSyntax> Raw,
-                              const SyntaxData *Parent = nullptr,
-                              const CursorIndex IndexInParent = 0);
-
-  static RC<FunctionSignatureSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-  static RC<FunctionSignatureSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::FunctionSignature;
-  }
-};
+using FunctionParameterListSyntax =
+  SyntaxCollection<SyntaxKind::FunctionParameterList, FunctionParameterSyntax>;
 
 #pragma mark - function-signature API
 
@@ -691,7 +478,6 @@ class FunctionSignatureSyntax final : public Syntax {
   friend struct SyntaxBuilder;
   friend class Syntax;
   friend class SyntaxData;
-  friend class FunctionSignatureSyntaxData;
 
   enum class Cursor : CursorIndex {
     LeftParen,
@@ -703,19 +489,21 @@ class FunctionSignatureSyntax final : public Syntax {
     ReturnType,
   };
 
-public:
-  using DataType = FunctionSignatureSyntaxData;
+  virtual void validate() const override;
 
-  FunctionSignatureSyntax(const RC<SyntaxData> Root, const DataType *Data)
+public:
+  static FunctionSignatureSyntax makeBlank();
+
+  FunctionSignatureSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
     : Syntax(Root, Data) {}
 
   /// Return the left parenthesis '(' token enclosing the parameter list.
-  RC<TokenSyntax> getLeftParenToken() const;
+  TokenSyntax getLeftParenToken() const;
 
   /// Return a FunctionSignatureSyntax with the given left parenthesis '(' token
   /// enclosing the parameter list.
   FunctionSignatureSyntax
-  withLeftParenToken(RC<TokenSyntax> NewLeftParen) const;
+  withLeftParenToken(TokenSyntax NewLeftParen) const;
 
   /// Return the parameter list for this signature.
   FunctionParameterListSyntax getParameterList() const;
@@ -725,31 +513,31 @@ public:
   withParameterList(FunctionParameterListSyntax NewParameterList) const;
 
   /// Return the right parenthesis ')' token enclosing the parameter list.
-  RC<TokenSyntax> getRightParenToken() const;
+  TokenSyntax getRightParenToken() const;
 
   /// Return a FunctionSignatureSyntax with the given right parenthesis ')' token
   /// enclosing the parameter list.
   FunctionSignatureSyntax
-  withRightParenToken(RC<TokenSyntax> NewRightParen) const;
+  withRightParenToken(TokenSyntax NewRightParen) const;
 
   /// Return the 'throws' token in this signature if it exists.
-  RC<TokenSyntax> getThrowsToken() const;
+  TokenSyntax getThrowsToken() const;
 
   /// Return a FunctionSignatureSyntax with the given 'throws' token.
-  FunctionSignatureSyntax withThrowsToken(RC<TokenSyntax> NewThrowsToken) const;
+  FunctionSignatureSyntax withThrowsToken(TokenSyntax NewThrowsToken) const;
 
   /// Return the 'rethrows' token in this signature if it exists;
-  RC<TokenSyntax> getRethrowsToken() const;
+  TokenSyntax getRethrowsToken() const;
 
   /// Return a FunctionSignatureSyntax with the given 'rethrows' token.
   FunctionSignatureSyntax
-  withRethrowsToken(RC<TokenSyntax> NewRethrowsToken) const;
+  withRethrowsToken(TokenSyntax NewRethrowsToken) const;
 
   /// Return the arrow '->' token for the signature.
-  RC<TokenSyntax> getArrowToken() const;
+  TokenSyntax getArrowToken() const;
 
   /// Return a FunctionSignatureSyntax with the given arrow token
-  FunctionSignatureSyntax withArrowToken(RC<TokenSyntax> NewArrowToken) const;
+  FunctionSignatureSyntax withArrowToken(TokenSyntax NewArrowToken) const;
 
   /// Return the return type attributes for the signature.
   TypeAttributesSyntax getReturnTypeAttributes() const;
@@ -769,42 +557,12 @@ public:
   }
 };
 
-#pragma mark - function-declaration Data
-
-class FunctionDeclSyntaxData final : public SyntaxData {
-  friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class FunctionDeclSyntax;
-
-  RC<TypeAttributesSyntaxData> CachedAttributes;
-  RC<DeclModifierListSyntaxData> CachedModifiers;
-  RC<GenericParameterClauseSyntaxData> CachedGenericParams;
-  RC<FunctionSignatureSyntaxData> CachedSignature;
-  RC<GenericWhereClauseSyntaxData> CachedGenericWhereClause;
-  RC<CodeBlockStmtSyntaxData> CachedBody;
-
-  FunctionDeclSyntaxData(const RC<RawSyntax> Raw,
-                         const SyntaxData *Parent = nullptr,
-                         const CursorIndex IndexInParent = 0);
-
-  static RC<FunctionDeclSyntaxData> make(const RC<RawSyntax> Raw,
-                                         const SyntaxData *Parent = nullptr,
-                                         const CursorIndex IndexInParent = 0);
-  static RC<FunctionDeclSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::FunctionDecl;
-  }
-};
-
 #pragma mark - function-declaration API
 
-class FunctionDeclSyntax final : public Syntax {
+class FunctionDeclSyntax final : public DeclSyntax {
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
-  friend class FunctionDeclSyntaxData;
 
   enum class Cursor : CursorIndex {
     Attributes,
@@ -817,12 +575,13 @@ class FunctionDeclSyntax final : public Syntax {
     Body
   };
 
-  using DataType = FunctionDeclSyntaxData;
-
-  FunctionDeclSyntax(const RC<SyntaxData> Root, const DataType *Data)
-    : Syntax(Root, Data) {}
+  virtual void validate() const override;
 
 public:
+  static FunctionDeclSyntax makeBlank();
+  FunctionDeclSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : DeclSyntax(Root, Data) {}
+
   /// Get the attributes of this function declaration.
   TypeAttributesSyntax getAttributes() const;
 
@@ -836,16 +595,16 @@ public:
   FunctionDeclSyntax withModifiers(DeclModifierListSyntax NewModifiers) const;
 
   /// Return the 'func' keyword of this function declaration.
-  RC<TokenSyntax> getFuncKeyword() const;
+  TokenSyntax getFuncKeyword() const;
 
   /// Return a FunctionDeclSyntax with the given 'func' keyword.
-  FunctionDeclSyntax withFuncKeyword(RC<TokenSyntax> NewFuncKeyword) const;
+  FunctionDeclSyntax withFuncKeyword(TokenSyntax NewFuncKeyword) const;
 
   /// Return the identifier of the function declaration.
-  RC<TokenSyntax> getIdentifier() const;
+  TokenSyntax getIdentifier() const;
 
   /// Return a FunctionDeclSyntax with the given identifier.
-  FunctionDeclSyntax withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+  FunctionDeclSyntax withIdentifier(TokenSyntax NewIdentifier) const;
 
   /// Return the generic parameter clause of the function declaration, if
   /// there is one. Otherwise, return llvm::None.

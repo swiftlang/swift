@@ -243,7 +243,7 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
 }
 
 void TypeChecker::validateWhereClauses(ProtocolDecl *protocol) {
-  ProtocolRequirementTypeResolver resolver(protocol);
+  ProtocolRequirementTypeResolver resolver;
   TypeResolutionOptions options;
 
   if (auto whereClause = protocol->getTrailingWhereClause()) {
@@ -829,7 +829,7 @@ static bool isDefaultInitializable(TypeRepr *typeRepr) {
       return false;
 
     for (auto elt : tuple->getElements()) {
-      if (!isDefaultInitializable(elt))
+      if (!isDefaultInitializable(elt.Type))
         return false;
     }
 
@@ -1245,12 +1245,14 @@ static void validatePatternBindingEntries(TypeChecker &tc,
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isFinal()) {
+    assert(!D->isDynamic());
     D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
   }
 }
 
 void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isDynamic()) {
+    assert(!D->isFinal());
     D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
   }
 }
@@ -1751,11 +1753,12 @@ static void checkTypeAccessibility(
 
   AccessScope contextAccessScope = context->getFormalAccessScope();
   checkTypeAccessibilityImpl(TC, TL, contextAccessScope, DC,
-                             [=](AccessScope requiredAccessScope,
-                                 const TypeRepr *offendingTR,
-                                 DowngradeToWarning downgradeToWarning) {
+                             [=, &TC](AccessScope requiredAccessScope,
+                                      const TypeRepr *offendingTR,
+                                      DowngradeToWarning downgradeToWarning) {
     if (!contextAccessScope.isPublic() &&
-        !isa<ModuleDecl>(contextAccessScope.getDeclContext())) {
+        !isa<ModuleDecl>(contextAccessScope.getDeclContext()) &&
+        TC.getLangOpts().isSwiftVersion3()) {
       // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
       // access scope represented a private or fileprivate level.
       downgradeToWarning = DowngradeToWarning::Yes;
@@ -1868,10 +1871,10 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
 
   // Swift 3.0.0 mistakenly didn't diagnose any issues when the context access
   // scope represented a private or fileprivate level.
-  // FIXME: Conditionalize this on Swift 3 mode.
   if (downgradeToWarning == DowngradeToWarning::No) {
     if (!accessScope.isPublic() &&
-        !isa<ModuleDecl>(accessScope.getDeclContext())) {
+        !isa<ModuleDecl>(accessScope.getDeclContext()) &&
+        TC.getLangOpts().isSwiftVersion3()) {
       downgradeToWarning = DowngradeToWarning::Yes;
     }
   }
@@ -2555,14 +2558,28 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
 
   // Variables declared with 'let' cannot be 'dynamic'.
   if (auto VD = dyn_cast<VarDecl>(D)) {
-    if (VD->isLet() && !isNSManaged) return;
+    auto staticSpelling = VD->getParentPatternBinding()->getStaticSpelling();
+
+    // The presence of 'static' blocks the inference of 'dynamic'.
+    if (staticSpelling == StaticSpellingKind::KeywordStatic)
+      return;
+
+    if (VD->isLet() && !isNSManaged)
+      return;
   }
 
   // Accessors should not infer 'dynamic' on their own; they can get it from
   // their storage decls.
-  if (auto FD = dyn_cast<FuncDecl>(D))
+  if (auto FD = dyn_cast<FuncDecl>(D)) {
     if (FD->isAccessor())
       return;
+
+    auto staticSpelling = FD->getStaticSpelling();
+
+    // The presence of 'static' bocks the inference of 'dynamic'.
+    if (staticSpelling == StaticSpellingKind::KeywordStatic)
+      return;
+  }
 
   // The presence of 'final' on a class prevents 'dynamic'.
   auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
@@ -3882,9 +3899,10 @@ public:
           VD->getNameLoc().isValid() &&
           Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
         TC.diagnose(VD->getNameLoc(), diag::reserved_member_name,
-                    VD->getFullName(), VD->getNameStr());
+                    VD->getFullName(), VD->getBaseName().getIdentifier().str());
         TC.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
-          .fixItReplace(VD->getNameLoc(), "`"+VD->getNameStr().str()+"`");
+            .fixItReplace(VD->getNameLoc(),
+                          "`" + VD->getBaseName().userFacingName().str() + "`");
       }
     }
 
@@ -4913,7 +4931,7 @@ public:
     // Look through parentheses.
     if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
       if (!parenRepr->isParenType()) return false;
-      return checkDynamicSelfReturn(func, parenRepr->getElement(0),
+      return checkDynamicSelfReturn(func, parenRepr->getElementType(0),
                                     optionalDepth);
     }
 
@@ -5036,6 +5054,12 @@ public:
       FD->setMutating(true);
     else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
       FD->setMutating(false);
+
+    if (FD->isMutating()) {
+      Type contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
+      if (contextTy->hasReferenceSemantics())
+        FD->setMutating(false);
+    }
 
     // Check whether the return type is dynamic 'Self'.
     if (checkDynamicSelfReturn(FD))
@@ -5169,8 +5193,7 @@ public:
 
         // If the storage is dynamic or final, propagate to this accessor.
         if (isObjC &&
-            storage->isDynamic() &&
-            !storage->isFinal())
+            storage->isDynamic())
           makeDynamic(TC.Context, FD);
 
         if (storage->isFinal())
@@ -7054,6 +7077,27 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
   return None;
 }
 
+/// Validate the underlying type of the given typealias.
+static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
+  TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
+  if (typeAlias->getFormalAccess() <= Accessibility::FilePrivate)
+    options |= TR_KnownNonCascadingDependency;
+
+  if (typeAlias->getDeclContext()->isModuleScopeContext() &&
+      typeAlias->getGenericParams() == nullptr) {
+    IterativeTypeChecker ITC(tc);
+    ITC.satisfy(requestResolveTypeDecl(typeAlias));
+  } else {
+    if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
+                        typeAlias, options)) {
+      typeAlias->setInvalid();
+      typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
+    }
+
+    typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
+  }
+}
+
 void TypeChecker::validateDecl(ValueDecl *D) {
   // Generic parameters are validated as part of their context.
   if (isa<GenericTypeParamDecl>(D))
@@ -7161,25 +7205,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     SWIFT_DEFER { typeAlias->setIsBeingValidated(false); };
 
     validateGenericTypeSignature(typeAlias);
-
-    TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
-    if (typeAlias->getFormalAccess() <= Accessibility::FilePrivate)
-      options |= TR_KnownNonCascadingDependency;
-
-    if (typeAlias->getDeclContext()->isModuleScopeContext() &&
-        typeAlias->getGenericParams() == nullptr) {
-      IterativeTypeChecker ITC(*this);
-      ITC.satisfy(requestResolveTypeDecl(typeAlias));
-    } else {
-      if (validateType(typeAlias->getUnderlyingTypeLoc(),
-                       typeAlias, options)) {
-        typeAlias->setInvalid();
-        typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
-      }
-
-      typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
-    }
-
+    validateTypealiasType(*this, typeAlias);
     break;
   }
 
@@ -7246,8 +7272,28 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // FIXME: Hopefully this can all go away with the ITC.
     for (auto member : proto->getMembers()) {
       if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
-        if (!aliasDecl->isGeneric())
+        if (!aliasDecl->isGeneric()) {
           aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
+
+          // If the underlying alias declaration has a type parameter,
+          // we have unresolved dependent member types we will need to deal
+          // with. Wipe out the types and validate them again.
+          // FIXME: We never should have recorded such a type in the first
+          // place.
+          if (!aliasDecl->getUnderlyingTypeLoc().getType() ||
+              aliasDecl->getUnderlyingTypeLoc().getType()
+                ->findUnresolvedDependentMemberType()) {
+            aliasDecl->getUnderlyingTypeLoc().setType(Type(),
+                                                      /*validated=*/false);
+            validateAccessibility(aliasDecl);
+
+            // Check generic parameters, if needed.
+            aliasDecl->setIsBeingValidated();
+            SWIFT_DEFER { aliasDecl->setIsBeingValidated(false); };
+
+            validateTypealiasType(*this, aliasDecl);
+          }
+        }
       }
     }
 
@@ -7497,9 +7543,9 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       return;
 
     // Perform earlier validation of typealiases in protocols.
-    if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+    if (isa<ProtocolDecl>(dc)) {
       if (!typealias->getGenericParams()) {
-        ProtocolRequirementTypeResolver resolver(proto);
+        ProtocolRequirementTypeResolver resolver;
         TypeResolutionOptions options;
 
         if (typealias->isBeingValidated()) return;
@@ -7683,7 +7729,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   // Local function used to infer requirements from the extended type.
   auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
     auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
+      GenericSignatureBuilder::FloatingRequirementSource::forInferred(
+                                          nullptr, /*quietly=*/false);
 
     builder.inferRequirements(*ext->getModuleContext(),
                               TypeLoc::withoutLoc(extInterfaceType),
@@ -7777,18 +7824,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // FIXME: Probably the above comes up elsewhere, perhaps getAs<>()
   // should be fixed.
   if (auto proto = extendedType->getCanonicalType()->getAs<ProtocolType>()) {
-    if (!isa<ProtocolType>(extendedType.getPointer()) &&
-        proto->getDecl()->getParentModule() == ext->getParentModule()) {
-      // Protocols in the same module cannot be extended via a typealias;
-      // we could end up being unable to resolve the generic signature.
-      diagnose(ext->getLoc(), diag::extension_protocol_via_typealias, proto)
-        .fixItReplace(ext->getExtendedTypeLoc().getSourceRange(),
-                      proto->getDecl()->getName().str());
-      ext->setInvalid();
-      ext->getExtendedTypeLoc().setInvalidType(Context);
-      return;
-    }
-
     GenericEnvironment *env;
     std::tie(env, extendedType) =
         checkExtensionGenericParams(*this, ext, proto, ext->getGenericParams());

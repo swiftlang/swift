@@ -632,6 +632,7 @@ public:
     SelfApplyExpr = theSelfApplyExpr;
     SelfType = theSelfApplyExpr->getType();
   }
+
   void setSelfParam(ArgumentSource &&theSelfParam, Type selfType) {
     assert(!SelfParam && "already set this!");
     SelfParam = std::move(theSelfParam);
@@ -661,12 +662,41 @@ public:
   void visitApplyExpr(ApplyExpr *e) {
     if (e->isSuper()) {
       applySuper(e);
-    } else if (applyInitDelegation(e)) {
-      // Already done
-    } else {
-      CallSites.push_back(e);
-      visit(e->getFn());
+      return;
     }
+
+    if (applyInitDelegation(e))
+      return;
+
+    CallSites.push_back(e);
+    visit(e->getFn());
+  }
+
+  /// Idempotently convert a metatype to an objc metatype.
+  std::pair<ManagedValue, SILType> convertToObjCMetatype(ManagedValue selfMeta,
+                                                         SILLocation loc) {
+    auto metaType = selfMeta.getType().castTo<AnyMetatypeType>();
+    CanType instanceType = metaType.getInstanceType();
+
+    // If we are already objc, just return.
+    if (metaType->getRepresentation() == MetatypeRepresentation::ObjC) {
+      return {selfMeta, SGF.SGM.getLoweredType(instanceType)};
+    }
+
+    CanAnyMetatypeType objcMetaType;
+    if (isa<MetatypeType>(metaType)) {
+      objcMetaType =
+          CanMetatypeType::get(instanceType, MetatypeRepresentation::ObjC);
+    } else {
+      objcMetaType = CanExistentialMetatypeType::get(
+          instanceType, MetatypeRepresentation::ObjC);
+    }
+    // ObjC metatypes are trivial and thus do not have a cleanup. Only if we
+    // convert them to an object do they become non-trivial.
+    assert(!selfMeta.hasCleanup());
+    auto result = ManagedValue::forUnmanaged(SGF.B.emitThickToObjCMetatype(
+        loc, selfMeta.getValue(), SGF.SGM.getLoweredType(objcMetaType)));
+    return {result, SGF.SGM.getLoweredType(instanceType)};
   }
 
   /// Given a metatype value for the type, allocate an Objective-C
@@ -674,35 +704,167 @@ public:
   ///
   /// \returns the self object.
   ManagedValue allocateObjCObject(ManagedValue selfMeta, SILLocation loc) {
-    auto metaType = selfMeta.getType().castTo<AnyMetatypeType>();
-    CanType type = metaType.getInstanceType();
-
     // Convert to an Objective-C metatype representation, if needed.
     ManagedValue selfMetaObjC;
-    if (metaType->getRepresentation() == MetatypeRepresentation::ObjC) {
-      selfMetaObjC = selfMeta;
-    } else {
-      CanAnyMetatypeType objcMetaType;
-      if (isa<MetatypeType>(metaType)) {
-        objcMetaType = CanMetatypeType::get(type, MetatypeRepresentation::ObjC);
-      } else {
-        objcMetaType = CanExistentialMetatypeType::get(type,
-                                                  MetatypeRepresentation::ObjC);
-      }
-      // ObjC metatypes are trivial and thus do not have a cleanup. Only if we
-      // convert them to an object do they become non-trivial.
-      assert(!selfMeta.hasCleanup());
-      selfMetaObjC = ManagedValue::forUnmanaged(SGF.B.emitThickToObjCMetatype(
-          loc, selfMeta.getValue(), SGF.SGM.getLoweredType(objcMetaType)));
-    }
+    SILType instanceType;
+    std::tie(selfMetaObjC, instanceType) = convertToObjCMetatype(selfMeta, loc);
 
     // Allocate the object.
-    return ManagedValue(SGF.B.createAllocRefDynamic(
-                          loc,
-                          selfMetaObjC.getValue(),
-                          SGF.SGM.getLoweredType(type),
-                          /*objc=*/true, {}, {}),
-                          selfMetaObjC.getCleanup());
+    return ManagedValue(
+        SGF.B.createAllocRefDynamic(loc, selfMetaObjC.getValue(), instanceType,
+                                    /*objc=*/true, {}, {}),
+        selfMetaObjC.getCleanup());
+  }
+
+  void processProtocolDecl(DeclRefExpr *e, AbstractFunctionDecl *afd,
+                           ProtocolDecl *proto) {
+    assert(!CallSites.empty());
+    ApplyExpr *thisCallSite = CallSites.back();
+    CallSites.pop_back();
+
+    ArgumentSource selfValue = thisCallSite->getArg();
+
+    SubstitutionList subs = e->getDeclRef().getSubstitutions();
+
+    SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
+    if (isa<ConstructorDecl>(afd)) {
+      if (proto->isObjC()) {
+        SILLocation loc = thisCallSite->getArg();
+
+        // For Objective-C initializers, we only have an initializing
+        // initializer. We need to allocate the object ourselves.
+        kind = SILDeclRef::Kind::Initializer;
+
+        auto metatype = std::move(selfValue).getAsSingleValue(SGF);
+        auto allocated = allocateObjCObject(metatype, loc);
+        auto allocatedType = allocated.getType().getSwiftRValueType();
+        selfValue =
+            ArgumentSource(loc, RValue(SGF, loc, allocatedType, allocated));
+      } else {
+        // For non-Objective-C initializers, we have an allocating
+        // initializer to call.
+        kind = SILDeclRef::Kind::Allocator;
+      }
+    }
+
+    SILDeclRef constant = SILDeclRef(afd, kind);
+
+    // Prepare the callee.  This can modify both selfValue and subs.
+    Callee theCallee = Callee::forArchetype(SGF, selfValue.getSubstRValueType(),
+                                            constant, subs, e);
+    AssumedPlusZeroSelf =
+        selfValue.isRValue() &&
+        selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
+
+    setSelfParam(std::move(selfValue), thisCallSite);
+    setCallee(std::move(theCallee));
+  }
+
+  bool processAbstractFunctionDecl(DeclRefExpr *e, AbstractFunctionDecl *afd) {
+    // We have four cases to deal with here:
+    //
+    //  1) for a "static" / "type" method, the base is a metatype.
+    //  2) for a classbound protocol, the base is a class-bound protocol
+    //  rvalue,
+    //     which is loadable.
+    //  3) for a mutating method, the base has inout type.
+    //  4) for a nonmutating method, the base is a general archetype
+    //     rvalue, which is address-only.  The base is passed at +0, so it
+    //     isn't
+    //     consumed.
+    //
+    // In the last case, the AST has this call typed as being applied
+    // to an rvalue, but the witness is actually expecting a pointer
+    // to the +0 value in memory.  We just pass in the address since
+    // archetypes are address-only.
+
+    if (auto *proto = dyn_cast<ProtocolDecl>(afd->getDeclContext())) {
+      processProtocolDecl(e, afd, proto);
+      return true;
+    }
+
+    Optional<SILDeclRef::Kind> kind;
+    bool isDynamicallyDispatched;
+    bool requiresAllocRefDynamic = false;
+
+    // Determine whether the method is dynamically dispatched.
+    if (e->getAccessSemantics() != AccessSemantics::Ordinary) {
+      isDynamicallyDispatched = false;
+    } else {
+      switch (getMethodDispatch(afd)) {
+      case MethodDispatch::Class:
+        isDynamicallyDispatched = true;
+        break;
+      case MethodDispatch::Static:
+        isDynamicallyDispatched = false;
+        break;
+      }
+    }
+
+    if (isa<FuncDecl>(afd) && isDynamicallyDispatched) {
+      kind = SILDeclRef::Kind::Func;
+    } else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
+      ApplyExpr *thisCallSite = CallSites.back();
+      // Required constructors are dynamically dispatched when the 'self'
+      // value is not statically derived.
+      if (ctor->isRequired() &&
+          thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
+          !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
+        if (requiresForeignEntryPoint(afd)) {
+          // When we're performing Objective-C dispatch, we don't have an
+          // allocating constructor to call. So, perform an alloc_ref_dynamic
+          // and pass that along to the initializer.
+          requiresAllocRefDynamic = true;
+          kind = SILDeclRef::Kind::Initializer;
+        } else {
+          kind = SILDeclRef::Kind::Allocator;
+        }
+      } else {
+        isDynamicallyDispatched = false;
+      }
+    }
+
+    if (!isDynamicallyDispatched)
+      return false;
+
+    // At this point, we know for sure that we are actually dynamically
+    // dispatched.
+    ApplyExpr *thisCallSite = CallSites.back();
+    CallSites.pop_back();
+
+    // Emit the rvalue for self, allowing for guaranteed plus zero if we
+    // have a func.
+    bool AllowPlusZero = kind && *kind == SILDeclRef::Kind::Func;
+    RValue self = SGF.emitRValue(
+        thisCallSite->getArg(),
+        AllowPlusZero ? SGFContext::AllowGuaranteedPlusZero : SGFContext());
+
+    // If we allowed for PlusZero and we *did* get the value back at +0,
+    // then we assumed that self could be passed at +0. We will check later
+    // if the actual callee passes self at +1 later when we know its actual
+    // type.
+    AssumedPlusZeroSelf =
+        AllowPlusZero && self.peekIsPlusZeroRValueOrTrivial();
+
+    // If we require a dynamic allocation of the object here, do so now.
+    if (requiresAllocRefDynamic) {
+      SILLocation loc = thisCallSite->getArg();
+      auto selfValue =
+          allocateObjCObject(std::move(self).getAsSingleValue(SGF, loc), loc);
+      self = RValue(SGF, loc, selfValue.getType().getSwiftRValueType(),
+                    selfValue);
+    }
+
+    auto selfValue = self.peekScalarValue();
+
+    setSelfParam(ArgumentSource(thisCallSite->getArg(), std::move(self)),
+                 thisCallSite);
+    auto constant = SILDeclRef(afd, kind.getValue())
+                        .asForeign(requiresForeignEntryPoint(afd));
+
+    auto subs = e->getDeclRef().getSubstitutions();
+    setCallee(Callee::forClassMethod(SGF, selfValue, constant, subs, e));
+    return true;
   }
 
   //
@@ -711,146 +873,10 @@ public:
   void visitDeclRefExpr(DeclRefExpr *e) {
     // If we need to perform dynamic dispatch for the given function,
     // emit class_method to do so.
-    if (auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl())) {
-      Optional<SILDeclRef::Kind> kind;
-      bool isDynamicallyDispatched;
-      bool requiresAllocRefDynamic = false;
-
-      // Determine whether the method is dynamically dispatched.
-      if (auto *proto = dyn_cast<ProtocolDecl>(afd->getDeclContext())) {
-        // We have four cases to deal with here:
-        //
-        //  1) for a "static" / "type" method, the base is a metatype.
-        //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
-        //     which is loadable.
-        //  3) for a mutating method, the base has inout type.
-        //  4) for a nonmutating method, the base is a general archetype
-        //     rvalue, which is address-only.  The base is passed at +0, so it isn't
-        //     consumed.
-        //
-        // In the last case, the AST has this call typed as being applied
-        // to an rvalue, but the witness is actually expecting a pointer
-        // to the +0 value in memory.  We just pass in the address since
-        // archetypes are address-only.
-
-        assert(!CallSites.empty());
-        ApplyExpr *thisCallSite = CallSites.back();
-        CallSites.pop_back();
-
-        ArgumentSource selfValue = thisCallSite->getArg();
-
-        SubstitutionList subs = e->getDeclRef().getSubstitutions();
-
-        SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
-        if (isa<ConstructorDecl>(afd)) {
-          if (proto->isObjC()) {
-            SILLocation loc = thisCallSite->getArg();
-
-            // For Objective-C initializers, we only have an initializing
-            // initializer. We need to allocate the object ourselves.
-            kind = SILDeclRef::Kind::Initializer;
-
-            auto metatype = std::move(selfValue).getAsSingleValue(SGF);
-            auto allocated = allocateObjCObject(metatype, loc);
-            auto allocatedType = allocated.getType().getSwiftRValueType();
-            selfValue = ArgumentSource(loc, RValue(SGF, loc,
-                                                   allocatedType, allocated));
-          } else {
-            // For non-Objective-C initializers, we have an allocating
-            // initializer to call.
-            kind = SILDeclRef::Kind::Allocator;
-          }
-        }
-
-        SILDeclRef constant = SILDeclRef(afd, kind);
-
-        // Prepare the callee.  This can modify both selfValue and subs.
-        Callee theCallee = Callee::forArchetype(SGF,
-                                                selfValue.getSubstRValueType(),
-                                                constant, subs, e);
-        AssumedPlusZeroSelf = selfValue.isRValue()
-          && selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
-
-        setSelfParam(std::move(selfValue), thisCallSite);
-        setCallee(std::move(theCallee));
-
-        return;
-      }
-
-      if (e->getAccessSemantics() != AccessSemantics::Ordinary) {
-        isDynamicallyDispatched = false;
-      } else {
-        switch (getMethodDispatch(afd)) {
-        case MethodDispatch::Class:
-          isDynamicallyDispatched = true;
-          break;
-        case MethodDispatch::Static:
-          isDynamicallyDispatched = false;
-          break;
-        }
-      }
-
-      if (isa<FuncDecl>(afd) && isDynamicallyDispatched) {
-        kind = SILDeclRef::Kind::Func;
-      } else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
-        ApplyExpr *thisCallSite = CallSites.back();
-        // Required constructors are dynamically dispatched when the 'self'
-        // value is not statically derived.
-        if (ctor->isRequired() &&
-            thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
-            !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
-          if (requiresForeignEntryPoint(afd)) {
-            // When we're performing Objective-C dispatch, we don't have an
-            // allocating constructor to call. So, perform an alloc_ref_dynamic
-            // and pass that along to the initializer.
-            requiresAllocRefDynamic = true;
-            kind = SILDeclRef::Kind::Initializer;
-          } else {
-            kind = SILDeclRef::Kind::Allocator;
-          }
-        } else {
-          isDynamicallyDispatched = false;
-        }
-      }
-
-      if (isDynamicallyDispatched) {
-        ApplyExpr *thisCallSite = CallSites.back();
-        CallSites.pop_back();
-
-        // Emit the rvalue for self, allowing for guaranteed plus zero if we
-        // have a func.
-        bool AllowPlusZero = kind && *kind == SILDeclRef::Kind::Func;
-        RValue self =
-          SGF.emitRValue(thisCallSite->getArg(),
-                         AllowPlusZero ? SGFContext::AllowGuaranteedPlusZero :
-                                         SGFContext());
-
-        // If we allowed for PlusZero and we *did* get the value back at +0,
-        // then we assumed that self could be passed at +0. We will check later
-        // if the actual callee passes self at +1 later when we know its actual
-        // type.
-        AssumedPlusZeroSelf =
-          AllowPlusZero && self.peekIsPlusZeroRValueOrTrivial();
-
-        // If we require a dynamic allocation of the object here, do so now.
-        if (requiresAllocRefDynamic) {
-          SILLocation loc = thisCallSite->getArg();
-          auto selfValue = allocateObjCObject(
-                             std::move(self).getAsSingleValue(SGF, loc),
-                             loc);
-          self = RValue(SGF, loc, selfValue.getType().getSwiftRValueType(),
-                        selfValue);
-        }
-
-        auto selfValue = self.peekScalarValue();
-
-        setSelfParam(ArgumentSource(thisCallSite->getArg(), std::move(self)),
-                     thisCallSite);
-        auto constant = SILDeclRef(afd, kind.getValue())
-          .asForeign(requiresForeignEntryPoint(afd));
-
-        auto subs = e->getDeclRef().getSubstitutions();
-        setCallee(Callee::forClassMethod(SGF, selfValue, constant, subs, e));
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(e->getDecl())) {
+      // If after processing the abstract function decl, we do not have any more
+      // work, just return.
+      if (processAbstractFunctionDecl(e, afd)) {
         return;
       }
     }

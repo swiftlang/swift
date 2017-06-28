@@ -200,6 +200,59 @@ bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
   return %8 : $()
 }
 
+
+sil @takesAutoClosureReturningGeneric : $@convention(thin) <T where T : Equatable> (@owned @callee_owned () -> (@out T, @error Error)) -> ()
+sil @thunkForAutoClosure : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
+
+// CHECK-LABEL: @readsAndThrows
+// CHECK-NEXT: (read)
+sil private  @readsAndThrows : $@convention(thin) (@inout_aliasable Int) -> (Int, @error Error) {
+bb0(%0 : $*Int):
+  %3 = begin_access [read] [unknown] %0 : $*Int
+  %4 = load %3 : $*Int
+  end_access %3 : $*Int
+  return %4 : $Int
+}
+
+// CHECK-LABEL: @passPartialApplyAsArgumentToPartialApply
+// CHECK-NEXT: (read)
+sil hidden @passPartialApplyAsArgumentToPartialApply : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %2 = function_ref @takesAutoClosureReturningGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> ()
+  %3 = function_ref @readsAndThrows : $@convention(thin) (@inout_aliasable Int) -> (Int, @error Error)
+  %4 = partial_apply %3(%0) : $@convention(thin) (@inout_aliasable Int) -> (Int, @error Error)
+  %5 = function_ref @thunkForAutoClosure : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
+  %6 = partial_apply %5(%4) : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
+  %7 = apply %2<Int>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @reads
+// CHECK-NEXT: (read)
+sil private  @reads : $@convention(thin) (@inout_aliasable Int) -> Int {
+bb0(%0 : $*Int):
+  %3 = begin_access [read] [unknown] %0 : $*Int
+  %4 = load %3 : $*Int
+  end_access %3 : $*Int
+  return %4 : $Int
+}
+
+// CHECK-LABEL: @convertPartialApplyAndPassToPartialApply
+// CHECK-NEXT: (read)
+sil hidden @convertPartialApplyAndPassToPartialApply : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %2 = function_ref @takesAutoClosureReturningGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> ()
+  %3 = function_ref @reads : $@convention(thin) (@inout_aliasable Int) -> Int
+  %4 = partial_apply %3(%0) : $@convention(thin) (@inout_aliasable Int) -> Int
+  %5 = convert_function %4 : $@callee_owned () -> Int to $@callee_owned () -> (Int, @error Error)
+  %6 = function_ref @thunkForAutoClosure : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
+  %7 = partial_apply %6(%5) : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
+  %8 = apply %2<Int>(%7) : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> ()
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // CHECK-LABEL: @selfRecursion
 // CHECK-NEXT: (modify, none)
 sil private @selfRecursion : $@convention(thin) (@inout_aliasable Int, Int) -> () {

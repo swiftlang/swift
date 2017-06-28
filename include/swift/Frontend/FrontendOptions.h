@@ -144,6 +144,11 @@ public:
   /// Intended for debugging purposes only.
   unsigned WarnLongExpressionTypeChecking = 0;
 
+  /// If non-zero, overrides the default threshold for how long we let
+  /// the expression type checker run before we consider an expression
+  /// too complex.
+  unsigned SolverExpressionTimeThreshold = 0;
+
   enum ActionType {
     NoneAction, ///< No specific action
     Parse, ///< Parse only
@@ -239,11 +244,6 @@ public:
   /// If set, the header provided in ImplicitObjCHeaderPath will be rewritten
   /// by the Clang importer as part of semantic analysis.
   bool SerializeBridgingHeader = false;
-
-  /// Enables the "fully fragile" resilience strategy.
-  ///
-  /// \see ResilienceStrategy::Fragile
-  bool SILSerializeAll = false;
 
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.

@@ -102,22 +102,67 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       processFullApply(info, argumentIndex, cast<TryApplyInst>(user), operand,
                        order);
       break;
-    case ValueKind::CopyAddrInst:
-    case ValueKind::ExistentialMetatypeInst:
-    case ValueKind::LoadInst:
-    case ValueKind::OpenExistentialAddrInst:
-    case ValueKind::ProjectBlockStorageInst:
-      // These likely represent scenarios in which we're not generating
+    default:
+      // FIXME: These likely represent scenarios in which we're not generating
       // begin access markers. Ignore these for now. But we really should
       // add SIL verification to ensure all loads and stores have associated
-      // access markers.
+      // access markers. Once SIL verification is implemented, enable the
+      // following assert to verify that the whitelist above is comprehensive,
+      // which guarnatees that exclusivity enforcement is complete.
+      //   assert(false && "Unrecognized argument use");
       break;
-    default:
-      // TODO: These requirements should be checked for in the SIL verifier.
-      llvm_unreachable("Unrecognized argument use");
     }
   }
 }
+
+#ifndef NDEBUG
+/// Sanity check to make sure that a noescape partial apply is
+/// only ultimately used by an apply, a try_apply or as an argument (but not
+/// the called function) in a partial_apply.
+///
+/// FIXME: This needs to be checked in the SILVerifier.
+static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
+  SILInstruction *user = partialApplyUse->getUser();
+
+  // It is fine to call the partial apply
+  switch (user->getKind()) {
+  case ValueKind::ApplyInst:
+  case ValueKind::TryApplyInst:
+    return true;
+
+  case ValueKind::ConvertFunctionInst:
+    return llvm::all_of(user->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
+
+  case ValueKind::PartialApplyInst:
+    return partialApplyUse->get() != cast<PartialApplyInst>(user)->getCallee();
+
+  case ValueKind::StoreInst:
+  case ValueKind::DestroyValueInst:
+    // @block_storage is passed by storing it to the stack. We know this is
+    // still nonescaping simply because our original argument convention is
+    // @inout_aliasable. In this SIL, both store and destroy_value are users
+    // of %closure:
+    //
+    // %closure = partial_apply %f1(%arg)
+    //   : $@convention(thin) (@inout_aliasable T) -> ()
+    // %storage = alloc_stack $@block_storage @callee_owned () -> ()
+    // %block_addr = project_block_storage %storage
+    //   : $*@block_storage @callee_owned () -> ()
+    // store %closure to [init] %block_addr : $*@callee_owned () -> ()
+    // %block = init_block_storage_header %storage
+    //     : $*@block_storage @callee_owned () -> (),
+    //   invoke %f2 : $@convention(c)
+    //     (@inout_aliasable @block_storage @callee_owned () -> ()) -> (),
+    //   type $@convention(block) () -> ()
+    // %copy = copy_block %block : $@convention(block) () -> ()
+    // destroy_value %storage : $@callee_owned () -> ()
+    return true;
+  default:
+    return false;
+  }
+}
+#endif
 
 void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
                                                 unsigned callerArgumentIndex,
@@ -133,29 +178,16 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
   assert(isa<FunctionRefInst>(apply->getCallee()) &&
          "Noescape partial apply of non-functionref?");
 
-  // Make sure the partial_apply is used by an apply and not another
-  // partial_apply
-  SILInstruction *user = apply->getSingleUse()->getUser();
-  assert((isa<ApplyInst>(user) || isa<TryApplyInst>(user) ||
-          isa<ConvertFunctionInst>(user)) &&
-         "noescape partial_apply has non-apply use!");
-  (void)user;
-
-  // The arguments to partial_apply are a suffix of the arguments to the
-  // the actually-called function. Translate the index of the argument to
-  // the partial_apply into to the corresponding index into the arguments of
-  // the called function.
-
-  // The first operand to partial_apply is the called function, so adjust the
-  // operand number to get the argument.
-  unsigned partialApplyArgumentIndex =
-      applyArgumentOperand->getOperandNumber() - 1;
+  assert(llvm::all_of(apply->getUses(),
+                      hasExpectedUsesOfNoEscapePartialApply) &&
+         "noescape partial_apply has unexpected use!");
 
   // The argument index in the called function.
-  unsigned argumentIndex = calleeFunction->getArguments().size() -
-                           apply->getNumArguments() + partialApplyArgumentIndex;
-  processCall(callerInfo, callerArgumentIndex, calleeFunction, argumentIndex,
-              order);
+  ApplySite site(apply);
+  unsigned calleeArgumentIndex = site.getCalleeArgIndex(*applyArgumentOperand);
+
+  processCall(callerInfo, callerArgumentIndex, calleeFunction,
+              calleeArgumentIndex, order);
 }
 
 void AccessSummaryAnalysis::processFullApply(FunctionInfo *callerInfo,
@@ -301,6 +333,8 @@ AccessSummaryAnalysis::getOrCreateSummary(SILFunction *fn) {
 void AccessSummaryAnalysis::AccessSummaryAnalysis::invalidate() {
   FunctionInfos.clear();
   Allocator.DestroyAll();
+  delete SubPathTrie;
+  SubPathTrie = new IndexTrieNode();
 }
 
 void AccessSummaryAnalysis::invalidate(SILFunction *F, InvalidationKind K) {

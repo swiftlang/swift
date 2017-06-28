@@ -42,7 +42,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Format.h"
-#include "llvm/Support/Timer.h"
 #include <iterator>
 #include <map>
 #include <memory>
@@ -498,12 +497,28 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
 
+  // If we have an unambiguous reference to a type decl, form a TypeExpr.
+  if (Lookup.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
+      isa<TypeDecl>(Lookup[0].Decl)) {
+    auto *D = cast<TypeDecl>(Lookup[0].Decl);
+    // FIXME: This is odd.
+    if (isa<ModuleDecl>(D)) {
+      return new (Context) DeclRefExpr(D, UDRE->getNameLoc(),
+                                       /*Implicit=*/false,
+                                       AccessSemantics::Ordinary,
+                                       D->getInterfaceType());
+    }
+
+    return TypeExpr::createForDecl(Loc, D,
+                                   UDRE->isImplicit());
+  }
+
   bool AllDeclRefs = true;
   SmallVector<ValueDecl*, 4> ResultValues;
   for (auto Result : Lookup) {
     // If we find a member, then all of the results aren't non-members.
     bool IsMember = Result.Base && !isa<ModuleDecl>(Result.Base);
-    if (IsMember && !isa<TypeDecl>(Result.Decl)) {
+    if (IsMember) {
       AllDeclRefs = false;
       break;
     }
@@ -531,21 +546,6 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
     if (matchesDeclRefKind(D, UDRE->getRefKind()))
       ResultValues.push_back(D);
-  }
-
-  // If we have an unambiguous reference to a type decl, form a TypeExpr.
-  if (ResultValues.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
-      isa<TypeDecl>(ResultValues[0])) {
-    // FIXME: This is odd.
-    if (isa<ModuleDecl>(ResultValues[0])) {
-      return new (Context) DeclRefExpr(ResultValues[0], UDRE->getNameLoc(),
-                                       /*Implicit=*/false,
-                                       AccessSemantics::Ordinary,
-                                       ResultValues[0]->getInterfaceType());
-    }
-
-    return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]),
-                                   UDRE->isImplicit());
   }
   
   if (AllDeclRefs) {
@@ -607,7 +607,11 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
   if (AllMemberRefs) {
     Expr *BaseExpr;
-    if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
+    if (auto PD = dyn_cast<ProtocolDecl>(Base)) {
+      BaseExpr = TypeExpr::createForDecl(Loc,
+                                         PD->getGenericParams()->getParams().front(),
+                                         /*isImplicit=*/true);
+    } else if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
       BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*isImplicit=*/true);
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
@@ -1036,7 +1040,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (!UDE->getName().isSimpleName())
     return nullptr;
 
-  auto Name = UDE->getName().getBaseName();
+  auto Name = UDE->getName().getBaseIdentifier();
   auto NameLoc = UDE->getNameLoc().getBaseNameLoc();
 
   // Qualified type lookup with a module base is represented as a DeclRefExpr
@@ -1211,12 +1215,13 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto *TyExpr = dyn_cast<TypeExpr>(PE->getSubExpr());
     if (!TyExpr) return nullptr;
     
-    TypeRepr *InnerTypeRepr[] = { TyExpr->getTypeRepr() };
-    assert(!TyExpr->isImplicit() && InnerTypeRepr[0] &&
+    TupleTypeReprElement InnerTypeRepr[] = { TyExpr->getTypeRepr() };
+    assert(!TyExpr->isImplicit() && InnerTypeRepr[0].Type &&
            "SubscriptExpr doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
     
-    auto *NewTypeRepr = TupleTypeRepr::create(TC.Context, InnerTypeRepr,
+    auto *NewTypeRepr = TupleTypeRepr::create(TC.Context,
+                                              InnerTypeRepr,
                                               PE->getSourceRange());
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
@@ -1228,35 +1233,29 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         TE->getNumElements() == 0)
       return nullptr;
 
-    SmallVector<TypeRepr *, 4> Elts;
-    SmallVector<Identifier, 4> EltNames;
-    SmallVector<SourceLoc, 4> EltNameLocs;
+    SmallVector<TupleTypeReprElement, 4> Elts;
     unsigned EltNo = 0;
     for (auto Elt : TE->getElements()) {
       auto *eltTE = dyn_cast<TypeExpr>(Elt);
       if (!eltTE) return nullptr;
+      TupleTypeReprElement elt;
       assert(eltTE->getTypeRepr() && !eltTE->isImplicit() &&
              "This doesn't work on implicit TypeExpr's, the "
              "TypeExpr should have been built correctly in the first place");
 
       // If the tuple element has a label, propagate it.
-      auto *eltTR = eltTE->getTypeRepr();
+      elt.Type = eltTE->getTypeRepr();
       Identifier name = TE->getElementName(EltNo);
       if (!name.empty()) {
-        if (EltNames.empty()) {
-          EltNames.resize(TE->getNumElements());
-          EltNameLocs.resize(TE->getNumElements());
-        }
-        EltNames[EltNo] = name;
-        EltNameLocs[EltNo] = TE->getElementNameLoc(EltNo);
+        elt.Name = name;
+        elt.NameLoc = TE->getElementNameLoc(EltNo);
       }
 
-      Elts.push_back(eltTR);
-     ++EltNo;
+      Elts.push_back(elt);
+      ++EltNo;
     }
     auto *NewTypeRepr = TupleTypeRepr::create(TC.Context, Elts,
                                               TE->getSourceRange(),
-                                              EltNames, EltNameLocs, {},
                                               SourceLoc(), Elts.size());
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
@@ -1304,13 +1303,13 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       auto *TRE = dyn_cast_or_null<TupleTypeRepr>(TE->getTypeRepr());
       if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
       while (TRE->isParenType()) {
-        TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElement(0));
+        TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElementType(0));
         if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
       }
 
       assert(TRE->getElements().size() == 2);
-      keyTypeRepr = TRE->getElement(0);
-      valueTypeRepr = TRE->getElement(1);
+      keyTypeRepr = TRE->getElementType(0);
+      valueTypeRepr = TRE->getElementType(1);
     }
 
     auto *NewTypeRepr =
@@ -1470,23 +1469,12 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
         expr = SE->getBase();
       } else if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
-        if (!TC.Context.LangOpts.EnableExperimentalKeyPathComponents) {
-          TC.diagnose(BOE->getLoc(),
-                      diag::expr_swift_keypath_unimplemented_component,
-                      "optional chaining");
-        }
-
         // .? or ?
         components.push_back(KeyPathExpr::Component::forUnresolvedOptionalChain(
             BOE->getQuestionLoc()));
 
         expr = BOE->getSubExpr();
       } else if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
-        if (!TC.Context.LangOpts.EnableExperimentalKeyPathComponents) {
-          TC.diagnose(FVE->getLoc(),
-                      diag::expr_swift_keypath_unimplemented_component,
-                      "optional force-unwrapping");
-        }
         // .! or !
         components.push_back(KeyPathExpr::Component::forUnresolvedOptionalForce(
             FVE->getExclaimLoc()));
@@ -1772,41 +1760,6 @@ namespace {
       }
     }
   };
-
-  class ExpressionTimer {
-    Expr* E;
-    unsigned WarnLimit;
-    bool ShouldDump;
-    ASTContext &Context;
-    llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
-
-  public:
-    ExpressionTimer(Expr *E, bool shouldDump, unsigned warnLimit,
-                    ASTContext &Context)
-        : E(E), WarnLimit(warnLimit), ShouldDump(shouldDump), Context(Context) {
-    }
-
-    ~ExpressionTimer() {
-      llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
-
-      auto elapsed = endTime.getProcessTime() - StartTime.getProcessTime();
-      unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
-
-      if (ShouldDump) {
-        // Round up to the nearest 100th of a millisecond.
-        llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100)
-                     << "ms\t";
-        E->getLoc().print(llvm::errs(), Context.SourceMgr);
-        llvm::errs() << "\n";
-      }
-
-      if (WarnLimit != 0 && elapsedMS >= WarnLimit && E->getLoc().isValid())
-        Context.Diags.diagnose(E->getLoc(), diag::debug_long_expression,
-                               elapsedMS, WarnLimit)
-          .highlight(E->getSourceRange());
-    }
-  };
-
 } // end anonymous namespace
 
 #pragma mark High-level entry points
@@ -1816,11 +1769,6 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
-  Optional<ExpressionTimer> timer;
-  if (DebugTimeExpressions || WarnLongExpressionTypeChecking)
-    timer.emplace(expr, DebugTimeExpressions, WarnLongExpressionTypeChecking,
-                  Context);
-
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
@@ -2015,6 +1963,45 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // Recover the original type if needed.
   recoverOriginalType();
   return exprType;
+}
+
+void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
+    Expr *&expr, DeclContext *dc, SmallVectorImpl<Type> &types,
+    FreeTypeVariableBinding allowFreeTypeVariables,
+    ExprTypeCheckListener *listener) {
+  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+
+  ExprCleaner cleaner(expr);
+
+  // Construct a constraint system from this expression.
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::AllowFixes;
+  options |= ConstraintSystemFlags::ReturnAllDiscoveredSolutions;
+
+  ConstraintSystem cs(*this, dc, options);
+
+  // Attempt to solve the constraint system.
+  SmallVector<Solution, 4> viable;
+
+  // If the previous checking gives the expr error type,
+  // clear the result and re-check.
+  {
+    CleanupIllFormedExpressionRAII cleanup(Context, expr);
+
+    const Type originalType = expr->getType();
+    if (originalType && originalType->hasError())
+      expr->setType(Type());
+
+    solveForExpression(expr, dc, /*convertType*/ Type(), allowFreeTypeVariables,
+                       listener, cs, viable,
+                       TypeCheckExprFlags::SuppressDiagnostics);
+  }
+
+  for (auto &solution : viable) {
+    auto exprType = solution.simplifyType(cs.getType(expr));
+    assert(exprType && !exprType->hasTypeVariable());
+    types.push_back(exprType);
+  }
 }
 
 bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
@@ -3114,6 +3101,19 @@ void Solution::dump(raw_ostream &out) const {
       fix.first.print(out, &getConstraintSystem());
       out << " @ ";
       fix.second->dump(sm, out);
+      out << "\n";
+    }
+  }
+
+  if (!Conformances.empty()) {
+    out << "\nConformances:\n";
+    auto &cs = getConstraintSystem();
+    for (auto &e : Conformances) {
+      out.indent(2);
+      out << "At ";
+      e.first->dump(&cs.getASTContext().SourceMgr, out);
+      out << "\n";
+      e.second.dump(out);
       out << "\n";
     }
   }

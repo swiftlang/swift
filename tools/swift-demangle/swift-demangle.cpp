@@ -102,12 +102,15 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       remangled = name;
     } else {
       remangled = swift::Demangle::mangleNode(pointer);
-      // Also accept the future mangling prefix.
-      // TODO: remove the special "_S" handling as soon as MANGLING_PREFIX_STR
-      // gets "_S".
-      if (name.startswith("_S")) {
-        assert(remangled.find(MANGLING_PREFIX_STR) == 0);
-        remangled = "_S" + remangled.substr(3);
+      unsigned prefixLen = swift::Demangle::getManglingPrefixLength(remangled.data());
+      assert(prefixLen > 0);
+      // Replace the prefix if we remangled with a different prefix.
+      if (!name.startswith(remangled.substr(0, prefixLen))) {
+        unsigned namePrefixLen =
+          swift::Demangle::getManglingPrefixLength(name.data());
+        assert(namePrefixLen > 0);
+        remangled = name.take_front(namePrefixLen).str() +
+                      remangled.substr(prefixLen);
       }
       if (name != remangled) {
         llvm::errs() << "\nError: re-mangled name \n  " << remangled
@@ -163,7 +166,7 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   // Also accept the future mangling prefix.
   // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
-  llvm::Regex maybeSymbol("(_T|_S|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
+  llvm::Regex maybeSymbol("(_T|_*\\$S|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$.]+");
 
   swift::Demangle::Context DCtx;
   for (std::string mangled; std::getline(std::cin, mangled);) {

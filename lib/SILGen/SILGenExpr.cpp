@@ -546,9 +546,24 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
       : loc(loc), lvalueAddress(lvalueAddress), value(value) {}
 
   void emit(SILGenFunction &gen, CleanupLocation) override {
-    gen.emitSemanticStore(loc, value, lvalueAddress,
-                          gen.getTypeLowering(lvalueAddress->getType()),
-                          IsInitialization);
+    SILValue valueToStore = value;
+    SILType lvalueObjTy = lvalueAddress->getType().getObjectType();
+
+    // If we calling a super.init and thus upcasted self, when we store self
+    // back into the self slot, we need to perform a downcast from the upcasted
+    // store value to the derived type of our lvalueAddress.
+    if (valueToStore->getType() != lvalueObjTy) {
+      if (!valueToStore->getType().isExactSuperclassOf(lvalueObjTy)) {
+        llvm_unreachable("Invalid usage of delegate init self writeback");
+      }
+
+      valueToStore = gen.B.createUncheckedRefCast(loc, valueToStore,
+                                                  lvalueObjTy);
+    }
+
+    auto &lowering = gen.B.getTypeLowering(lvalueAddress->getType());
+    lowering.emitStore(gen.B, loc, valueToStore, lvalueAddress,
+                       StoreOwnershipQualifier::Init);
   }
 
   void dump(SILGenFunction &gen) const override {
@@ -1468,8 +1483,6 @@ ManagedValue emitCFunctionPointer(SILGenFunction &gen,
     // in the metatype.
     assert(!declRef.getDecl()->getDeclContext()->isTypeContext()
            && "c pointers to static methods not implemented");
-    assert(declRef.getSubstitutions().empty()
-           && "c pointers to generics not implemented");
     loc = declRef.getDecl();
   };
   
@@ -2780,7 +2793,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   auto baseTy = rootTy;
   
   for (auto &component : E->getComponents()) {
-    switch (component.getKind()) {
+    switch (auto kind = component.getKind()) {
     case KeyPathExpr::Component::Kind::Property: {
       auto decl = cast<VarDecl>(component.getDeclRef().getDecl());
       auto oldBaseTy = baseTy;
@@ -2842,12 +2855,34 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       break;
     }
         
-    case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalForce:
-    case KeyPathExpr::Component::Kind::OptionalWrap:
-      return unsupported("non-property key path component");
-      
+    case KeyPathExpr::Component::Kind::OptionalWrap: {
+      KeyPathPatternComponent::Kind loweredKind;
+      switch (kind) {
+      case KeyPathExpr::Component::Kind::OptionalChain:
+        loweredKind = KeyPathPatternComponent::Kind::OptionalChain;
+        baseTy = baseTy->getAnyOptionalObjectType()->getCanonicalType();
+        break;
+      case KeyPathExpr::Component::Kind::OptionalForce:
+        loweredKind = KeyPathPatternComponent::Kind::OptionalForce;
+        baseTy = baseTy->getAnyOptionalObjectType()->getCanonicalType();
+        break;
+      case KeyPathExpr::Component::Kind::OptionalWrap:
+        loweredKind = KeyPathPatternComponent::Kind::OptionalWrap;
+        baseTy = OptionalType::get(baseTy)->getCanonicalType();
+        break;
+      default:
+        llvm_unreachable("out of sync");
+      }
+      loweredComponents.push_back(
+                    KeyPathPatternComponent::forOptional(loweredKind, baseTy));
+      break;
+    }
+        
+    case KeyPathExpr::Component::Kind::Subscript:
+      return unsupported("subscript key path component");
+        
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
@@ -2967,7 +3002,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     auto DSOGlobal = SGF.SGM.M.lookUpGlobalVariable("__dso_handle");
     if (!DSOGlobal)
       DSOGlobal = SILGlobalVariable::create(SGF.SGM.M,
-                                            SILLinkage::HiddenExternal,
+                                            SILLinkage::PublicExternal,
                                             IsNotSerialized, "__dso_handle",
                                             BuiltinRawPtrTy);
     auto DSOAddr = SGF.B.createGlobalAddr(SILLoc, DSOGlobal);

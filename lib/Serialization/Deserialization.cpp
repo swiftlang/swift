@@ -3805,17 +3805,17 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   case decls_block::PAREN_TYPE: {
     TypeID underlyingID;
-    bool isVariadic, isAutoClosure, isEscaping;
+    bool isVariadic, isAutoClosure, isEscaping, isInOut;
     decls_block::ParenTypeLayout::readRecord(scratch, underlyingID, isVariadic,
-                                             isAutoClosure, isEscaping);
+                                             isAutoClosure, isEscaping, isInOut);
 
     auto underlyingTy = getTypeChecked(underlyingID);
     if (!underlyingTy)
       return underlyingTy.takeError();
-
+    
     typeOrOffset = ParenType::get(
         ctx, underlyingTy.get(),
-        ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping));
+        ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping, isInOut));
     break;
   }
 
@@ -3835,17 +3835,17 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isEscaping;
+      bool isVariadic, isAutoClosure, isEscaping, isInOut;
       decls_block::TupleTypeEltLayout::readRecord(
-          scratch, nameID, typeID, isVariadic, isAutoClosure, isEscaping);
+          scratch, nameID, typeID, isVariadic, isAutoClosure, isEscaping, isInOut);
 
       auto elementTy = getTypeChecked(typeID);
       if (!elementTy)
         return elementTy.takeError();
-
+      
       elements.emplace_back(
           elementTy.get(), getIdentifier(nameID),
-          ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping));
+          ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping, isInOut));
     }
 
     typeOrOffset = TupleType::get(elements, ctx);

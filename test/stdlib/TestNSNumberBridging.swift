@@ -18,6 +18,58 @@ import StdlibUnittest
 import Foundation
 import CoreGraphics
 
+extension Float {
+    init?(reasonably value: Float) {
+        self = value
+    }
+
+    init?(reasonably value: Double) {
+        guard !value.isNaN else {
+            self = Float.nan
+            return
+        }
+
+        guard !value.isInfinite else {
+            if value.sign == .minus {
+                self = -Float.infinity
+            } else {
+                self = Float.infinity
+            }
+            return
+        }
+
+        guard abs(value) <= Double(Float.greatestFiniteMagnitude) else {
+            return nil
+        }
+        
+        self = Float(value)
+    }
+}
+
+extension Double {
+    init?(reasonably value: Float) {
+        guard !value.isNaN else {
+            self = Double.nan
+            return
+        }
+
+        guard !value.isInfinite else {
+            if value.sign == .minus {
+                self = -Double.infinity
+            } else {
+                self = Double.infinity
+            }
+            return
+        }
+
+        self = Double(value)
+    }
+
+    init?(reasonably value: Double) {
+        self = value
+    }
+}
+
 var nsNumberBridging = TestSuite("NSNumberBridging")
 
 func testFloat(_ lhs: Float?, _ rhs: Float?, file: String = #file, line: UInt = #line) {
@@ -645,7 +697,7 @@ func testNSNumberBridgeFromFloat() {
             expectEqual(UInt(exactly: interestingValue), uint)
 
             let float = (number!) as? Float
-            let expectedFloat = Float(exactly: interestingValue)
+            let expectedFloat = Float(reasonably: interestingValue)
             testFloat(expectedFloat, float)
             
             let double = (number!) as? Double
@@ -685,7 +737,7 @@ func testNSNumberBridgeFromDouble() {
             expectEqual(UInt(exactly: interestingValue), uint)
 
             let float = (number!) as? Float
-            let expectedFloat = Float(exactly: interestingValue)
+            let expectedFloat = Float(reasonably: interestingValue)
             testFloat(expectedFloat, float)
             
             let double = (number!) as? Double
@@ -725,7 +777,7 @@ func testNSNumberBridgeFromCGFloat() {
             expectEqual(UInt(exactly: interestingValue.native), uint)
             
             let float = (number!) as? Float
-            let expectedFloat = Float(exactly: interestingValue.native)
+            let expectedFloat = Float(reasonably: interestingValue.native)
             testFloat(expectedFloat, float)
             
             let double = (number!) as? Double

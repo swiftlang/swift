@@ -12,6 +12,7 @@
 
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Index/Utils.h"
@@ -168,9 +169,11 @@ public:
     // as their own index level
     if (T->getNumElements() == 1) {
       ParentIsOptional = false;
-      return visit(T->getElement(0));
+      return visit(T->getElementType(0));
     }
-    return handleParent(T, T->getElements());
+    llvm::SmallVector<TypeRepr *, 8> Children;
+    T->getElementTypes(Children);
+    return handleParent(T, ArrayRef<TypeRepr *>(Children));
   }
 
   FoundResult visitFunctionTypeRepr(FunctionTypeRepr *T) {
@@ -367,20 +370,26 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
   bool handleQualifiedReplacement(Expr* Call) {
-    if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(Call)) {
-      if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
-        for (auto *I :getRelatedDiffItems(FD)) {
-          if (auto *Item = dyn_cast<TypeMemberDiffItem>(I)) {
-            if (Item->Subkind == TypeMemberDiffItemSubKind::
-                QualifiedReplacement) {
-              Editor.replace(Call->getSourceRange(),
-                (llvm::Twine(Item->newTypeName) + "." +
-                  Item->getNewName().base()).str());
-              return true;
-            }
+    auto handleDecl = [&](ValueDecl *VD, SourceRange ToReplace) {
+      for (auto *I: getRelatedDiffItems(VD)) {
+        if (auto *Item = dyn_cast<TypeMemberDiffItem>(I)) {
+          if (Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement) {
+            Editor.replace(ToReplace, (llvm::Twine(Item->newTypeName) + "." +
+              Item->getNewName().base()).str());
+            return true;
           }
         }
       }
+      return false;
+    };
+    if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(Call)) {
+      if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
+        if (handleDecl(FD, Call->getSourceRange()))
+          return true;
+      }
+    } else if (auto MRE = dyn_cast<MemberRefExpr>(Call)) {
+      if (handleDecl(MRE->getReferencedDecl().getDecl(), MRE->getSourceRange()))
+        return true;
     }
     return false;
   }
@@ -605,8 +614,12 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                                           Arg->getStartLoc().getAdvancedLoc(1));
 
           // Replace "x.getY(" with "x.Y =".
-          Editor.replace(ReplaceRange, (llvm::Twine(Walker.Result.str().
-                                                   substr(3)) + " = ").str());
+          auto Replacement = (llvm::Twine(Walker.Result.str()
+                                          .substr(3)) + " = ").str();
+          SmallString<64> Scratch;
+          Editor.replace(ReplaceRange,
+                         camel_case::toLowercaseInitialisms(Replacement, Scratch));
+
           // Remove ")"
           Editor.remove(CharSourceRange(SM, Arg->getEndLoc(), Arg->getEndLoc().
                                         getAdvancedLoc(1)));

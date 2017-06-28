@@ -44,6 +44,7 @@ namespace swift {
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
+  struct ASTNode;
   class ASTPrinter;
   class ASTWalker;
   class ConstructorDecl;
@@ -2027,34 +2028,33 @@ public:
   }
 };
 
-/// IfConfigDecl - This class represents the declaration-side representation of
-/// #if/#else/#endif blocks. Active and inactive block members are stored
-/// separately, with the intention being that active members will be handed
-/// back to the enclosing declaration.
+/// IfConfigDecl - This class represents #if/#else/#endif blocks.
+/// Active and inactive block members are stored separately, with the intention
+/// being that active members will be handed back to the enclosing context.
 class IfConfigDecl : public Decl {
   /// An array of clauses controlling each of the #if/#elseif/#else conditions.
   /// The array is ASTContext allocated.
-  ArrayRef<IfConfigClause<Decl *>> Clauses;
+  ArrayRef<IfConfigClause> Clauses;
   SourceLoc EndLoc;
 public:
   
-  IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigClause<Decl *>> Clauses,
+  IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigClause> Clauses,
                SourceLoc EndLoc, bool HadMissingEnd)
     : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc)
   {
     IfConfigDeclBits.HadMissingEnd = HadMissingEnd;
   }
 
-  ArrayRef<IfConfigClause<Decl *>> getClauses() const { return Clauses; }
+  ArrayRef<IfConfigClause> getClauses() const { return Clauses; }
 
   /// Return the active clause, or null if there is no active one.
-  const IfConfigClause<Decl *> *getActiveClause() const {
+  const IfConfigClause *getActiveClause() const {
     for (auto &Clause : Clauses)
       if (Clause.isActive) return &Clause;
     return nullptr;
   }
 
-  const ArrayRef<Decl*> getActiveMembers() const {
+  const ArrayRef<ASTNode> getActiveClauseElements() const {
     if (auto *Clause = getActiveClause())
       return Clause->Elements;
     return {};
@@ -2121,14 +2121,7 @@ public:
   }
 
   bool hasName() const { return bool(Name); }
-  /// TODO: Rename to getSimpleName?
-  Identifier getName() const { return Name.getBaseName(); }
   bool isOperator() const { return Name.isOperator(); }
-
-  /// Returns the string for the base name, or "_" if this is unnamed.
-  StringRef getNameStr() const {
-    return hasName() ? getName().str() : "_";
-  }
 
   /// Retrieve the full name of the declaration.
   /// TODO: Rename to getName?
@@ -2356,6 +2349,14 @@ protected:
   }
 
 public:
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
+  /// Returns the string for the base name, or "_" if this is unnamed.
+  StringRef getNameStr() const {
+    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    return hasName() ? getBaseName().getIdentifier().str() : "_";
+  }
+
   /// The type of this declaration's values. For the type of the
   /// declaration itself, use getInterfaceType(), which returns a
   /// metatype.
@@ -4097,6 +4098,10 @@ public:
 
   FuncDecl *getAccessorFunction(AccessorKind accessor) const;
 
+  /// \brief Push all of the accessor functions associated with this VarDecl
+  /// onto `decls`.
+  void getAllAccessorFunctions(SmallVectorImpl<Decl *> &decls) const;
+
   /// \brief Turn this into a computed variable, providing a getter and setter.
   void makeComputed(SourceLoc LBraceLoc, FuncDecl *Get, FuncDecl *Set,
                     FuncDecl *MaterializeForSet, SourceLoc RBraceLoc);
@@ -4347,6 +4352,14 @@ public:
               DC) {}
 
   SourceRange getSourceRange() const;
+
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
+  /// Returns the string for the base name, or "_" if this is unnamed.
+  StringRef getNameStr() const {
+    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    return hasName() ? getBaseName().getIdentifier().str() : "_";
+  }
 
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
@@ -4817,6 +4830,14 @@ protected:
   }
 
 public:
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
+  /// Returns the string for the base name, or "_" if this is unnamed.
+  StringRef getNameStr() const {
+    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    return hasName() ? getBaseName().getIdentifier().str() : "_";
+  }
+
   /// \brief Should this declaration be treated as if annotated with transparent
   /// attribute.
   bool isTransparent() const;
@@ -5444,6 +5465,14 @@ public:
     EnumElementDeclBits.Recursiveness =
         static_cast<unsigned>(ElementRecursiveness::NotRecursive);
     EnumElementDeclBits.HasArgumentType = HasArgumentType;
+  }
+
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
+  /// Returns the string for the base name, or "_" if this is unnamed.
+  StringRef getNameStr() const {
+    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
   /// \returns false if there was an error during the computation rendering the

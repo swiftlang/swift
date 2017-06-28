@@ -947,6 +947,7 @@ chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
   for (unsigned c = 0; c != numColumns; ++c) {
     unsigned constructorPrefix = getConstructorPrefix(matrix, firstRow, c);
     if (constructorPrefix > longestConstructorPrefix) {
+      longestConstructorPrefix = constructorPrefix;
       bestColumn = c;
     }
   }
@@ -2616,7 +2617,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   // We use std::vector because it supports emplace_back; moving a ClauseRow is
   // expensive.
   std::vector<ClauseRow> clauseRows;
-  clauseRows.reserve(S->getCases().size());
+  clauseRows.reserve(S->getRawCases().size());
   bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
     for (auto &labelItem : caseBlock->getCaseLabelItems()) {

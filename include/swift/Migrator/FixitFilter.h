@@ -113,7 +113,6 @@ struct FixitFilter {
         Info.ID == diag::parameter_extraneous_double_up.ID ||
         Info.ID == diag::attr_decl_attr_now_on_type.ID ||
         Info.ID == diag::noescape_parameter.ID ||
-        Info.ID == diag::noescape_autoclosure.ID ||
         Info.ID == diag::where_inside_brackets.ID ||
         Info.ID == diag::selector_construction_suggest.ID ||
         Info.ID == diag::selector_literal_deprecated_suggest.ID ||

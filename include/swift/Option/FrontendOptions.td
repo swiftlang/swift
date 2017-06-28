@@ -326,6 +326,8 @@ def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-t
 def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
   Alias<warn_long_expression_type_checking>;
 
+def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
@@ -365,6 +367,9 @@ def sil_link_all : Flag<["-"], "sil-link-all">,
 
 def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
   HelpText<"Serialize all generated SIL">;
+
+def sil_serialize_witness_tables : Flag<["-"], "sil-serialize-witness-tables">,
+  HelpText<"Serialize eligible SIL witness tables">;
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;

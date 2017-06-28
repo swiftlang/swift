@@ -23,6 +23,7 @@
 #ifndef SWIFT_SYNTAX_SYNTAX_H
 #define SWIFT_SYNTAX_SYNTAX_H
 
+#include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/Trivia.h"
@@ -36,9 +37,13 @@ namespace sema {
 }
 namespace syntax {
 
-const auto NoParent = llvm::None;
+template <typename SyntaxNode>
+SyntaxNode make(RC<RawSyntax> Raw) {
+  auto Data = SyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
 
-class SyntaxData;
+const auto NoParent = llvm::None;
 
 /// The main handle for syntax nodes - subclasses contain all public
 /// structured editing APIs.
@@ -49,7 +54,6 @@ class SyntaxData;
 /// their children.
 class Syntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
   friend class LegacyASTTransformer;
   friend class sema::Semantics;
 
@@ -67,16 +71,16 @@ protected:
   /// lazily created.
   mutable const SyntaxData *Data;
 
-  template <typename SyntaxNode>
-  typename SyntaxNode::DataType *getUnsafeData() const {
-    auto Casted = cast<typename SyntaxNode::DataType>(Data);
-    return const_cast<typename SyntaxNode::DataType *>(Casted);
-  }
+  /// Subclasses override this to ensure their structure matches expectations.
+  virtual void validate() const {};
 
 public:
-  using DataType = SyntaxData;
+  Syntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+  : Root(Root), Data(Data) {
+    this->validate();
+  }
 
-  Syntax(const RC<SyntaxData> Root, const SyntaxData *Data);
+  virtual ~Syntax() {}
 
   /// Get the kind of syntax.
   SyntaxKind getKind() const;
@@ -91,10 +95,8 @@ public:
   }
 
   /// Get the Data for this Syntax node.
-  template <typename T>
-  typename T::DataType &getData() const {
-    assert(is<T>() && "getData<T>() node of incompatible type!");
-    return *reinterpret_cast<typename T::DataType *>(Data);
+  const SyntaxData &getData() const {
+    return *Data;
   }
 
   const SyntaxData *getDataPointer() const {
@@ -106,7 +108,7 @@ public:
   template <typename T>
   T castTo() const {
     assert(is<T>() && "castTo<T>() node of incompatible type!");
-    return T { Root, reinterpret_cast<const typename T::DataType *>(Data) };
+    return T { Root, Data };
   }
 
   /// If this Syntax node is of the right kind, cast and return it,

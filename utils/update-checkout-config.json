@@ -130,17 +130,17 @@
                 "ninja": "release"
             }
         },
-         "swift-4.0-branch-06-02-2017" : {
-            "aliases": ["swift-4.0-branch-06-02-2017"],
+         "swift-4.0-branch-06-23-2017" : {
+            "aliases": ["swift-4.0-branch-06-23-2017"],
             "repos": {
-                "llvm": "swift-4.0-branch-06-02-2017",
-                "clang": "swift-4.0-branch-06-02-2017",
-                "swift": "swift-4.0-branch-06-02-2017",
-                "lldb": "swift-4.0-branch-06-02-2017",
+                "llvm": "swift-4.0-branch-06-23-2017",
+                "clang": "swift-4.0-branch-06-23-2017",
+                "swift": "swift-4.0-branch-06-23-2017",
+                "lldb": "swift-4.0-branch-06-23-2017",
                 "cmark": "swift-4.0-branch",
                 "llbuild": "swift-4.0-branch",
                 "swiftpm": "swift-4.0-branch",
-                "compiler-rt": "swift-4.0-branch-06-02-2017",
+                "compiler-rt": "swift-4.0-branch-06-23-2017",
                 "swift-corelibs-xctest": "swift-4.0-branch",
                 "swift-corelibs-foundation": "swift-4.0-branch",
                 "swift-corelibs-libdispatch": "swift-4.0-branch",

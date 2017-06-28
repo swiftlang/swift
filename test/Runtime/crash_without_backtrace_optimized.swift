@@ -6,6 +6,7 @@
 // UNSUPPORTED: OS=watchos
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
+// REQUIRES: OS=macosx
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: executable_test
 

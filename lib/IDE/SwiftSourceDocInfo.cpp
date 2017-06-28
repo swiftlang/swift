@@ -108,6 +108,14 @@ bool SemaLocResolver::tryResolve(Stmt *St) {
   return false;
 }
 
+bool SemaLocResolver::tryResolve(Expr *Exp) {
+  if (!Exp->isImplicit() && Exp->getStartLoc() == LocToResolve) {
+    SemaTok = { Exp };
+    return true;
+  }
+  return false;
+}
+
 bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
@@ -187,6 +195,12 @@ bool SemaLocResolver::walkToExprPre(Expr *E) {
     }
   }
   return true;
+}
+
+bool SemaLocResolver::walkToExprPost(Expr *E) {
+  if (isDone())
+    return false;
+  return !tryResolve(E);
 }
 
 bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,
@@ -277,7 +291,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   }
 
   for (auto &VD : DeclaredDecls) {
-    OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>";
+    OS << "<Declared>" << VD.VD->getBaseName() << "</Declared>";
     OS << "<OutscopeReference>";
     if (VD.ReferredAfterRange)
       OS << "true";
@@ -286,7 +300,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     OS << "</OutscopeReference>\n";
   }
   for (auto &RD : ReferencedDecls) {
-    OS << "<Referenced>" << RD.VD->getNameStr() << "</Referenced>";
+    OS << "<Referenced>" << RD.VD->getBaseName() << "</Referenced>";
     OS << "<Type>";
     RD.Ty->print(OS);
     OS << "</Type>\n";
@@ -1009,8 +1023,7 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
       NameLen = getCharLength(SM, R);
     } else {
       if (VD->hasName()) {
-        // TODO: Handle special names
-        NameLen = VD->getBaseName().getIdentifier().getLength();
+        NameLen = VD->getBaseName().userFacingName().size();
       } else {
         NameLen = getCharLength(SM, VD->getLoc());
       }

@@ -192,9 +192,14 @@ class ErrorHandlingWalker : public ASTWalker {
   Impl &asImpl() { return *static_cast<Impl*>(this); }
 public:
   bool walkToDeclPre(Decl *D) override {
+    ShouldRecurse_t recurse = ShouldRecurse;
     // Skip the implementations of all local declarations... except
     // PBD.  We should really just have a PatternBindingStmt.
-    return isa<PatternBindingDecl>(D);
+    if (auto ic = dyn_cast<IfConfigDecl>(D))
+      recurse = asImpl().checkIfConfig(ic);
+    else if (!isa<PatternBindingDecl>(D))
+      recurse = ShouldNotRecurse;
+    return bool(recurse);
   }
 
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
@@ -230,8 +235,6 @@ public:
       recurse = asImpl().checkDoCatch(doCatch);
     } else if (auto thr = dyn_cast<ThrowStmt>(S)) {
       recurse = asImpl().checkThrow(thr);
-    } else if (auto ic = dyn_cast<IfConfigStmt>(S)) {
-      recurse = asImpl().checkIfConfig(ic);
     } else {
       assert(!isa<CatchStmt>(S));
     }
@@ -606,7 +609,7 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkIfConfig(IfConfigStmt *S) {
+    ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {
       return ShouldRecurse;
     }
 
@@ -1431,7 +1434,7 @@ private:
     return !type || type->hasError() ? ShouldNotRecurse : ShouldRecurse;
   }
 
-  ShouldRecurse_t checkIfConfig(IfConfigStmt *S) {
+  ShouldRecurse_t checkIfConfig(IfConfigDecl *ICD) {
     // Check the inactive regions of a #if block to disable warnings that may
     // be due to platform specific code.
     struct ConservativeThrowChecker : public ASTWalker {
@@ -1452,7 +1455,7 @@ private:
       }
     };
 
-    for (auto &clause : S->getClauses()) {
+    for (auto &clause : ICD->getClauses()) {
       // Active clauses are handled by the normal AST walk.
       if (clause.isActive) continue;
       

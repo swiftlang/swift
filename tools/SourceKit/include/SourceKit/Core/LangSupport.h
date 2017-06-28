@@ -153,6 +153,7 @@ struct FilterRule {
     Literal,
     CustomCompletion,
     Identifier,
+    Description,
   };
   Kind kind;
   bool hide;

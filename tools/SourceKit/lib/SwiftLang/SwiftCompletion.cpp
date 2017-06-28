@@ -887,7 +887,12 @@ static void translateFilterRules(ArrayRef<FilterRule> rawFilterRules,
         // Note: name is null-terminated.
         if (canonicalizeFilterName(name.data(), canonName))
           continue;
-        filterRules.hideByName[canonName] = rule.hide;
+        filterRules.hideByFilterName[canonName] = rule.hide;
+      }
+      break;
+    case FilterRule::Description:
+      for (auto name : rule.names) {
+        filterRules.hideByDescription[name] = rule.hide;
       }
       break;
     case FilterRule::Module:
@@ -955,13 +960,19 @@ filterInnerResults(ArrayRef<Result *> results, bool includeInner,
     if (!includeInnerOperators && result->isOperator())
       continue;
 
-    llvm::SmallString<64> name;
+    llvm::SmallString<64> filterName;
     {
-      llvm::raw_svector_ostream OSS(name);
+      llvm::raw_svector_ostream OSS(filterName);
       CodeCompletion::CompletionBuilder::getFilterName(
           result->getCompletionString(), OSS);
     }
-    if (rules.hideCompletion(result, name))
+    llvm::SmallString<64> description;
+    {
+      llvm::raw_svector_ostream OSS(description);
+      CodeCompletion::CompletionBuilder::getDescription(
+          result, OSS, /*leadingPunctuation=*/false);
+    }
+    if (rules.hideCompletion(result, filterName, description))
       continue;
 
     bool inner = checkInnerResult(result, hasDot, hasQDot, hasInit);
@@ -1040,11 +1051,11 @@ static void transformAndForwardResults(
                            options.addInnerOperators, hasDot, hasQDot, hasInit,
                            rules);
     if (options.addInnerOperators) {
-      if (hasInit && !rules.hideName("("))
+      if (hasInit && !rules.hideFilterName("("))
         innerResults.insert(innerResults.begin(), buildParen());
-      if (hasDot && !rules.hideName("."))
+      if (hasDot && !rules.hideFilterName("."))
         innerResults.insert(innerResults.begin(), buildDot());
-      if (hasQDot && !rules.hideName("?."))
+      if (hasQDot && !rules.hideFilterName("?."))
         innerResults.insert(innerResults.begin(), buildQDot());
     }
 
@@ -1095,11 +1106,11 @@ static void transformAndForwardResults(
     }
 
     if (options.addInnerOperators) {
-      if (hasInit && !rules.hideName("("))
+      if (hasInit && !rules.hideFilterName("("))
         innerResults.insert(innerResults.begin(), buildParen());
-      if (hasDot && !rules.hideName("."))
+      if (hasDot && !rules.hideFilterName("."))
         innerResults.insert(innerResults.begin(), buildDot());
-      if (hasQDot && !rules.hideName("?."))
+      if (hasQDot && !rules.hideFilterName("?."))
         innerResults.insert(innerResults.begin(), buildQDot());
     }
 

@@ -210,7 +210,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
 
         // Verify noescape parameter uses.
-        checkNoEscapeParameterUse(DRE, nullptr);
+        checkNoEscapeParameterUse(DRE, nullptr, OperandKind::None);
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
@@ -239,7 +239,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (auto MakeEsc = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
         if (auto DRE =
               dyn_cast<DeclRefExpr>(MakeEsc->getNonescapingClosureValue()))
-          checkNoEscapeParameterUse(DRE, MakeEsc);
+          checkNoEscapeParameterUse(DRE, MakeEsc, OperandKind::MakeEscapable);
       }
 
       // Check function calls, looking through implicit conversions on the
@@ -263,33 +263,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(Base))
           Base = ignoredBase->getRHS();
         if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
-          checkNoEscapeParameterUse(DRE, Call);
+          checkNoEscapeParameterUse(DRE, Call, OperandKind::Callee);
           checkForSuspiciousBitCasts(DRE, Call);
         }
 
-        auto *Arg = Call->getArg();
-
-        // The argument could be shuffled if it includes default arguments,
-        // label differences, or other exciting things like that.
-        if (auto *TSE = dyn_cast<TupleShuffleExpr>(Arg))
-          Arg = TSE->getSubExpr();
-
-        // The argument is either a ParenExpr or TupleExpr.
-        ArrayRef<Expr*> arguments;
-        SmallVector<Expr *, 1> Scratch;
-        if (auto *TE = dyn_cast<TupleExpr>(Arg))
-          arguments = TE->getElements();
-        else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
-          Scratch.push_back(PE->getSubExpr());
-          arguments = makeArrayRef(Scratch);
-        }
-        else {
-          Scratch.push_back(Call->getArg());
-          arguments = makeArrayRef(Scratch);
-        }
-
-        // Check each argument.
-        for (auto arg : arguments) {
+        visitArguments(Call, [&](Expr *arg) {
           // InOutExpr's are allowed in argument lists directly.
           if (auto *IOE = dyn_cast<InOutExpr>(arg)) {
             if (isa<CallExpr>(Call))
@@ -307,18 +285,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                 AcceptableInOutExprs.insert(IOE);
           }
 
-          while (1) {
-            if (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
-              arg = conv->getSubExpr();
-            else if (auto *PE = dyn_cast<ParenExpr>(arg))
-              arg = PE->getSubExpr();
-            else
-              break;
-          }
+          // Also give special treatment to noescape function arguments.
+          arg = lookThroughArgument(arg);
 
           if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
-            checkNoEscapeParameterUse(DRE, Call);
-        }
+            checkNoEscapeParameterUse(DRE, Call, OperandKind::Argument);
+        });
       }
       
       // If we have an assignment expression, scout ahead for acceptable _'s.
@@ -357,6 +329,38 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
 
       return { true, E };
+    }
+
+    static void visitArguments(ApplyExpr *apply,
+                               llvm::function_ref<void(Expr*)> fn) {
+      auto *arg = apply->getArg();
+
+      // The argument could be shuffled if it includes default arguments,
+      // label differences, or other exciting things like that.
+      if (auto *TSE = dyn_cast<TupleShuffleExpr>(arg))
+        arg = TSE->getSubExpr();
+
+      // The argument is either a ParenExpr or TupleExpr.
+      if (auto *TE = dyn_cast<TupleExpr>(arg)) {
+        for (auto elt : TE->getElements())
+          fn(elt);
+      } else if (auto *PE = dyn_cast<ParenExpr>(arg)) {
+        fn(PE->getSubExpr());
+      } else {
+        fn(arg);
+      }
+    }
+
+    static Expr *lookThroughArgument(Expr *arg) {
+      while (1) {
+        if (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
+          arg = conv->getSubExpr();
+        else if (auto *PE = dyn_cast<ParenExpr>(arg))
+          arg = PE->getSubExpr();
+        else
+          break;
+      }
+      return arg;
     }
 
     Expr *walkToExprPost(Expr *E) override {
@@ -446,9 +450,118 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       TC.diagnose(E->getStartLoc(), diag::value_of_module_type);
     }
 
+    class NoEscapeArgument {
+      llvm::PointerIntPair<ParamDecl*, 1, bool> ParamAndIsCapture;
+    public:
+      NoEscapeArgument() {}
+      NoEscapeArgument(ParamDecl *param, bool isCapture)
+          : ParamAndIsCapture(param, isCapture) {
+        assert(param);
+      }
+
+      explicit operator bool() const {
+        return ParamAndIsCapture.getPointer() != nullptr;
+      }
+
+      ParamDecl *getDecl() const { return ParamAndIsCapture.getPointer(); }
+      bool isDeclACapture() const { return ParamAndIsCapture.getInt(); }
+
+      static NoEscapeArgument find(TypeChecker &tc, ValueDecl *decl,
+                                   bool isCapture) {
+        if (auto param = dyn_cast<ParamDecl>(decl)) {
+          if (auto fnType =
+                param->getInterfaceType()->getAs<AnyFunctionType>()) {
+            if (fnType->isNoEscape())
+              return { param, isCapture };
+          }
+          return {};
+        }
+
+        if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+          if (fn->getDeclContext()->isLocalContext()) {
+            return findInCaptures(tc, fn);
+          }
+          return {};
+        }
+
+        // FIXME: captures of computed local vars?  Can these be non-escaping?
+        return {};
+      }
+
+      static NoEscapeArgument findInCaptures(TypeChecker &tc,
+                                             AnyFunctionRef fn) {
+        // Ensure we have accurate capture information for the function.
+        tc.computeCaptures(fn);
+
+        for (const auto &capture : fn.getCaptureInfo().getCaptures()) {
+          if (capture.isDynamicSelfMetadata()) continue;
+          if (auto param = find(tc, capture.getDecl(), true))
+            return param;
+        }
+        return {};
+      }
+    };
+
+    /// Enforce the exclusivity rule against calling a non-escaping
+    /// function parameter with another non-escaping function parameter
+    /// as an argument.
+    void checkNoEscapeParameterCall(ApplyExpr *apply) {
+      NoEscapeArgument noescapeArgument;
+      Expr *problematicArg = nullptr;
+
+      visitArguments(apply, [&](Expr *arg) {
+        // Just find the first problematic argument.
+        if (noescapeArgument) return;
+
+        // Remember the expression which used the argument.
+        problematicArg = arg;
+
+        // Look through the same set of nodes that we look through when
+        // checking for no-escape functions.
+        arg = lookThroughArgument(arg);
+
+        // If the argument isn't noescape, ignore it.
+        auto fnType = arg->getType()->getAs<AnyFunctionType>();
+        if (!fnType || !fnType->isNoEscape())
+          return;
+
+        // Okay, it should be a closure or a decl ref.
+        if (auto declRef = dyn_cast<DeclRefExpr>(arg)) {
+          noescapeArgument =
+            NoEscapeArgument::find(TC, declRef->getDecl(), false);
+        } else if (auto closure = dyn_cast<AbstractClosureExpr>(arg)) {
+          noescapeArgument =
+            NoEscapeArgument::findInCaptures(TC, closure);
+        } else {
+          // This can happen with withoutActuallyEscaping.
+          assert(isa<OpaqueValueExpr>(arg) &&
+                 "unexpected expression yielding noescape closure");
+        }
+      });
+
+      if (!noescapeArgument) return;
+
+      // In Swift 3, this is just a warning.
+      TC.diagnose(apply->getLoc(),
+                  TC.Context.isSwiftVersion3()
+                    ? diag::warn_noescape_param_call
+                    : diag::err_noescape_param_call,
+                  noescapeArgument.getDecl()->getName(),
+                  noescapeArgument.isDeclACapture())
+        .highlight(problematicArg->getSourceRange());
+    }
+
+    enum class OperandKind {
+      None,
+      Callee,
+      Argument,
+      MakeEscapable,
+    };
+
     /// The DRE argument is a reference to a noescape parameter.  Verify that
     /// its uses are ok.
-    void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
+    void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *parent,
+                                   OperandKind useKind) {
       // This only cares about declarations of noescape function type.
       auto AFT = DRE->getDecl()->getInterfaceType()->getAs<AnyFunctionType>();
       if (!AFT || !AFT->isNoEscape())
@@ -463,10 +576,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // either as the callee or as an argument (in which case, the typechecker
       // validates that the noescape bit didn't get stripped off), or as
       // a special case, in the binding of a withoutActuallyEscaping block.
-      if (ParentExpr
-          && (isa<ApplyExpr>(ParentExpr) // param()
-              || isa<MakeTemporarilyEscapableExpr>(ParentExpr)))
-        return;
+      if (parent) {
+        if (auto apply = dyn_cast<ApplyExpr>(parent)) {
+          if (isa<ParamDecl>(DRE->getDecl()) && useKind == OperandKind::Callee)
+            checkNoEscapeParameterCall(apply);
+          return;
+        } else if (isa<MakeTemporarilyEscapableExpr>(parent)) {
+          return;
+        }
+      }
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
                   cast<VarDecl>(DRE->getDecl())->getName(),
@@ -474,16 +592,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(DRE->getDecl());
-      auto isAutoClosure = AFT->isAutoClosure();
-      if (paramDecl && !isAutoClosure) {
+      if (paramDecl) {
         TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
                     paramDecl->getName())
             .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
                          "@escaping ");
-      } else if (isAutoClosure)
-        // TODO: add in a fixit for autoclosure
-        TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
-                    paramDecl->getName());
+      }
     }
 
     // Swift 3 mode produces a warning + Fix-It for the missing ".self"
@@ -2005,6 +2119,11 @@ public:
     if (isa<TypeDecl>(D))
       return false;
       
+    // The body of #if clauses are not walked into, we need custom processing
+    // for them.
+    if (auto *ICD = dyn_cast<IfConfigDecl>(D))
+      handleIfConfig(ICD);
+      
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D))
       if (shouldTrackVarDecl(vd)) {
@@ -2075,15 +2194,10 @@ public:
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
 
   /// handle #if directives.
-  void handleIfConfig(IfConfigStmt *ICS);
+  void handleIfConfig(IfConfigDecl *ICD);
 
   /// Custom handling for statements.
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    // The body of #if statements are not walked into, we need custom processing
-    // for them.
-    if (auto *ICS = dyn_cast<IfConfigStmt>(S))
-      handleIfConfig(ICS);
-      
     // Keep track of an association between vardecls and the StmtCondition that
     // they are bound in for IfStmt, GuardStmt, WhileStmt, etc.
     if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
@@ -2365,6 +2479,17 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     return;
   }
   
+  // Likewise for key path applications. An application of a WritableKeyPath
+  // reads and writes its base.
+  if (auto *KPA = dyn_cast<KeyPathApplicationExpr>(E)) {
+    auto &C = KPA->getType()->getASTContext();
+    KPA->getKeyPath()->walk(*this);
+    if (KPA->getKeyPath()->getType()->getAnyNominal()
+          == C.getWritableKeyPathDecl())
+      markStoredOrInOutExpr(KPA->getBase(), RK_Written|RK_Read);
+    return;
+  }
+  
   if (auto *ioe = dyn_cast<InOutExpr>(E))
     return markStoredOrInOutExpr(ioe->getSubExpr(), RK_Written|RK_Read);
   
@@ -2440,7 +2565,7 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
 /// handle #if directives.  All of the active clauses are already walked by the
 /// AST walker, but we also want to handle the inactive ones to avoid false
 /// positives.
-void VarDeclUsageChecker::handleIfConfig(IfConfigStmt *ICS) {
+void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
   struct ConservativeDeclMarker : public ASTWalker {
     VarDeclUsageChecker &VDUC;
     ConservativeDeclMarker(VarDeclUsageChecker &VDUC) : VDUC(VDUC) {}
@@ -2455,7 +2580,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigStmt *ICS) {
     }
   };
 
-  for (auto &clause : ICS->getClauses()) {
+  for (auto &clause : ICD->getClauses()) {
     // Active clauses are handled by the normal AST walk.
     if (clause.isActive) continue;
 
@@ -2514,7 +2639,7 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
     return nullptr;
 
   // Verify that the condition is a simple != or < comparison to the loop variable.
-  auto comparisonOpName = binaryFuncExpr->getDecl()->getNameStr();
+  auto comparisonOpName = binaryFuncExpr->getDecl()->getBaseName();
   if (comparisonOpName == "!=")
     OpKind = OperatorKind::NotEqual;
   else if (comparisonOpName == "<")
@@ -2556,7 +2681,7 @@ static bool unaryOperatorCheckForConvertingCStyleForLoop(const ForStmt *FS,
   auto unaryFuncExpr = dyn_cast<DeclRefExpr>(unaryExpr->getFn());
   if (!unaryFuncExpr)
     return false;
-  if (unaryFuncExpr->getDecl()->getNameStr() != OpName)
+  if (unaryFuncExpr->getDecl()->getBaseName() != OpName)
     return false;
   return incrementDeclRefExpr->getDecl() == loopVar;
 }
@@ -2585,7 +2710,7 @@ static bool binaryOperatorCheckForConvertingCStyleForLoop(TypeChecker &TC,
   auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
   if (!binaryFuncExpr)
     return false;
-  if (binaryFuncExpr->getDecl()->getNameStr() != OpName)
+  if (binaryFuncExpr->getDecl()->getBaseName() != OpName)
     return false;
   auto argTupleExpr = dyn_cast<TupleExpr>(binaryExpr->getArg());
   if (!argTupleExpr)

@@ -2,7 +2,7 @@ add_swift_library(swiftSyntax STATIC
   DeclSyntax.cpp
   ExprSyntax.cpp
   Format.cpp
-  TokenSyntax.cpp
+  RawTokenSyntax.cpp
   GenericSyntax.cpp
   LegacyASTTransformer.cpp
   Trivia.cpp

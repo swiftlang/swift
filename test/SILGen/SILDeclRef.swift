@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -sil-serialize-witness-tables %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -sil-serialize-witness-tables %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
 
 // Check that all SILDeclRefs are represented in the text form with a signature.
 // This allows to avoid ambiguities which sometimes arise e.g. when a

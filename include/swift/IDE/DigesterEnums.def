@@ -88,6 +88,7 @@ KEY(typeAttributes)
 KEY(declAttributes)
 KEY(declKind)
 KEY(ownership)
+KEY(superclassUsr)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)

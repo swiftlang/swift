@@ -1071,8 +1071,8 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
     
   case (.some(let base), .some(let filter)):
     // CHECK: bb2(%10 : $Int):
-    // CHECK-NEXT: debug_value %10 : $Int, let, name "base"
-    // CHECK-NEXT: debug_value %8 : $Int, let, name "filter"
+    // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
+    // CHECK-NEXT: debug_value %10 : $Int, let, name "filter"
     print("both: \(base), \(filter)")
   case (.some(let base), .none), (.none, .some(let base)):
     // CHECK: bb3:

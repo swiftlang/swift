@@ -257,7 +257,8 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     }
                 case .single(let index):
                     switch (range.lowerBound, range.upperBound) {
-                    case (0, 0):
+                    case (0, 0): fallthrough
+                    case (1, 1):
                         return .empty
                     case (0, 1):
                         return .single(index)
@@ -289,9 +290,9 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     case 0:
                         return .empty
                     case 1:
-                        return .single(slice[0])
+                        return .single(slice.first!)
                     case 2:
-                        return .pair(slice[0], slice[1])
+                        return .pair(slice.first!, slice.last!)
                     default:
                         return .array(Array<Int>(slice))
                     }

@@ -233,9 +233,12 @@ public:
   StructLayoutBuilder(IRGenModule &IGM) : IGM(IGM) {}
 
   /// Add a swift heap header to the layout.  This must be the first
-  /// call to the layout.
+  /// thing added to the layout.
   void addHeapHeader();
-
+  /// Add the NSObject object header to the layout. This must be the first
+  /// thing added to the layout.
+  void addNSObjectHeader();
+  
   /// Add a number of fields to the layout.  The field layouts need
   /// only have the TypeInfo set; the rest will be filled out.
   ///

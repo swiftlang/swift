@@ -55,9 +55,12 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalTag
   = 3;
   
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_MaximumOffsetPayload
+  = 0x1FFFFFFCU;
+  
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload
   = 0x1FFFFFFDU;
-
-static const __swift_uint32_t _SwiftKeyPathComponentHeader_UnresolvedOffsetPayload
+  
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload
   = 0x1FFFFFFEU;
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
@@ -87,8 +90,6 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDResolutionM
   = 0x0000000FU;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDResolved
   = 0x00000000U;
-static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFieldOffset
-  = 0x00000001U;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
   = 0x00000002U;
 

@@ -30,6 +30,7 @@ set(SWIFT_API_NOTES_INPUTS
   MediaPlayer
   MessageUI
   Metal
+  ModelIO
   MultipeerConnectivity
   NetworkExtension
   NotificationCenter
@@ -39,6 +40,7 @@ set(SWIFT_API_NOTES_INPUTS
   QuickLook
   SafariServices
   SceneKit
+  ScreenSaver
   ScriptingBridge
   SpriteKit
   StoreKit

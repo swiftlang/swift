@@ -7,6 +7,6 @@ func foo(_ oc: [String]) {
   var args: [String] = []
   let dictionary: [String: String] = [:]
   args.append(contentsOf: oc.map { orderedColumn in
-    dictionary.first { let (column, value) = $0; return true }!.value
+    dictionary.first { (column, value) in true }!.value
   })
 }

@@ -86,28 +86,29 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   auto fn = dyn_cast<AbstractFunctionDecl>(decl);
   if (!fn) return true;
   assert(parameterDepth < fn->getNumParameterLists());
-
-  ParameterList &params = *fn->getParameterList(parameterDepth);
-
-  SmallVector<CallArgParam, 8> argInfos;
+  
+  auto *fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
+  
+  SmallVector<AnyFunctionType::Param, 8> argInfos;
   for (auto argLabel : labels) {
-    argInfos.push_back(CallArgParam());
-    argInfos.back().Label = argLabel;
+    argInfos.push_back(AnyFunctionType::Param(Type(), argLabel, {}));
   }
 
-  SmallVector<CallArgParam, 8> paramInfos;
-  for (auto param : params) {
-    paramInfos.push_back(CallArgParam());
-    paramInfos.back().Label = param->getArgumentName();
-    paramInfos.back().HasDefaultArgument = param->isDefaultArgument();
-    paramInfos.back().parameterFlags = ParameterTypeFlags::fromParameterType(
-        param->getInterfaceType(), param->isVariadic());
+  const AnyFunctionType *levelTy = fTy;
+  for (auto level = parameterDepth; level != 0; --level) {
+    levelTy = levelTy->getResult()->getAs<AnyFunctionType>();
+    assert(levelTy && "Parameter list curry level does not match type");
   }
-
+  
+  auto params = levelTy->getParams();
+  SmallVector<bool, 4> defaultMap;
+  computeDefaultMap(levelTy->getInput(), decl, parameterDepth, defaultMap);
+  
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
-  return !matchCallArguments(argInfos, paramInfos, hasTrailingClosure,
+  return !matchCallArguments(argInfos, params, defaultMap,
+                             hasTrailingClosure,
                              /*allow fixes*/ false,
                              listener, unusedParamBindings);
 }
@@ -120,12 +121,15 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 }
 
 bool constraints::
-matchCallArguments(ArrayRef<CallArgParam> args,
-                   ArrayRef<CallArgParam> params,
+matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
+                   ArrayRef<AnyFunctionType::Param> params,
+                   const SmallVectorImpl<bool> &defaultMap,
                    bool hasTrailingClosure,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
+  assert(params.size() == defaultMap.size() && "Default map does not match");
+  
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
   unsigned paramIdx, numParams = params.size();
@@ -154,7 +158,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argNumber] = expectedName;
-    } else if (args[argNumber].Label != expectedName && !ignoreNameClash) {
+    } else if (args[argNumber].getLabel() != expectedName && !ignoreNameClash) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
@@ -164,7 +168,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
         bool firstArg = true;
 
         for (auto argIdx : parameterBindings[i]) {
-          actualArgNames[argIdx] = firstArg ? param.Label : Identifier();
+          actualArgNames[argIdx] = firstArg ? param.getLabel() : Identifier();
           firstArg = false;
         }
       }
@@ -201,7 +205,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       // Nothing to claim.
       if (nextArgIdx == numArgs ||
           claimedArgs[nextArgIdx] ||
-          (args[nextArgIdx].hasLabel() && !ignoreNameMismatch))
+          (!(args[nextArgIdx].getLabel().empty() || ignoreNameMismatch)))
         return None;
 
       return claim(name, nextArgIdx);
@@ -209,7 +213,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
 
     // If the name matches, claim this argument.
     if (nextArgIdx != numArgs &&
-        (ignoreNameMismatch || args[nextArgIdx].Label == name)) {
+        (ignoreNameMismatch || args[nextArgIdx].getLabel() == name)) {
       return claim(name, nextArgIdx);
     }
 
@@ -218,7 +222,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       // Skip arguments where the name doesn't match.
-      if (args[i].Label != name)
+      if (args[i].getLabel() != name)
         continue;
 
       // Skip claimed arguments.
@@ -258,7 +262,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     }
 
     // Missing a keyword argument name.
-    if (nextArgIdx != numArgs && !args[nextArgIdx].hasLabel() &&
+    if (nextArgIdx != numArgs && args[nextArgIdx].getLabel().empty() &&
        ignoreNameMismatch) {
       // Claim the next argument.
       return claim(name, nextArgIdx);
@@ -277,7 +281,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     // Handle variadic parameters.
     if (param.isVariadic()) {
       // Claim the next argument with the name of this parameter.
-      auto claimed = claimNextNamed(param.Label, ignoreNameMismatch);
+      auto claimed = claimNextNamed(param.getLabel(), ignoreNameMismatch);
 
       // If there was no such argument, leave the argument unf
       if (!claimed) {
@@ -298,7 +302,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     }
 
     // Try to claim an argument for this parameter.
-    if (auto claimed = claimNextNamed(param.Label, ignoreNameMismatch)) {
+    if (auto claimed = claimNextNamed(param.getLabel(), ignoreNameMismatch)) {
       parameterBindings[paramIdx].push_back(*claimed);
       skipClaimedArgs();
       return;
@@ -328,7 +332,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
     for (nextArgIdx = 0; skipClaimedArgs(), nextArgIdx != numArgs;
          ++nextArgIdx) {
-      if (args[nextArgIdx].hasLabel())
+      if (!args[nextArgIdx].getLabel().empty())
         unclaimedNamedArgs.push_back(nextArgIdx);
     }
 
@@ -338,10 +342,10 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       bool hasUnfulfilledUnnamedParams = false;
       for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
         if (parameterBindings[paramIdx].empty()) {
-          if (params[paramIdx].hasLabel())
-            unfulfilledNamedParams.push_back(paramIdx);
-          else
+          if (params[paramIdx].getLabel().empty())
             hasUnfulfilledUnnamedParams = true;
+          else
+            unfulfilledNamedParams.push_back(paramIdx);
         }
       }
 
@@ -350,14 +354,14 @@ matchCallArguments(ArrayRef<CallArgParam> args,
         // FIXME: There is undoubtedly a good dynamic-programming algorithm
         // to find the best assignment here.
         for (auto argIdx : unclaimedNamedArgs) {
-          auto argName = args[argIdx].Label;
+          auto argName = args[argIdx].getLabel();
 
           // Find the closest matching unfulfilled named parameter.
           unsigned bestScore = 0;
           unsigned best = 0;
           for (unsigned i = 0, n = unfulfilledNamedParams.size(); i != n; ++i) {
             unsigned param = unfulfilledNamedParams[i];
-            auto paramName = params[param].Label;
+            auto paramName = params[param].getLabel();
 
             if (auto score = scoreParamAndArgNameTypo(paramName.str(),
                                                       argName.str(),
@@ -434,7 +438,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
         continue;
 
       // Parameters with defaults can be unfulfilled.
-      if (param.HasDefaultArgument)
+      if (defaultMap[paramIdx])
         continue;
 
       listener.missingArgument(paramIdx);
@@ -473,20 +477,20 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       // doesn't provide either, problem is going to be identified as
       // out-of-order argument instead of label mismatch.
       auto &parameter = params[prevArgIdx];
-      if (parameter.hasLabel()) {
-        auto expectedLabel = parameter.Label;
-        auto argumentLabel = args[argIdx].Label;
-
+      if (!parameter.getLabel().empty()) {
+        auto expectedLabel = parameter.getLabel();
+        auto argumentLabel = args[argIdx].getLabel();
+        
         // If there is a label but it's incorrect it can only mean
         // situation like this: expected (x, _ y) got (y, _ x).
         if (argumentLabel.empty() ||
             (expectedLabel.compare(argumentLabel) != 0 &&
-             args[prevArgIdx].Label.empty())) {
+             args[prevArgIdx].getLabel().empty())) {
           listener.missingLabel(prevArgIdx);
           return true;
         }
       }
-
+      
       listener.outOfOrderArgument(argIdx, prevArgIdx);
       return true;
     }
@@ -654,8 +658,13 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   bool hasTrailingClosure = false;
   std::tie(callee, calleeLevel, argLabels, hasTrailingClosure) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
-  auto params = decomposeParamType(paramType, callee, calleeLevel);
-
+  
+  SmallVector<AnyFunctionType::Param, 4> params;
+  AnyFunctionType::decomposeInput(paramType, params);
+  
+  SmallVector<bool, 4> defaultMap;
+  computeDefaultMap(paramType, callee, calleeLevel, defaultMap);
+  
   if (callee && cs.getASTContext().isSwiftVersion3()
       && argType->is<TupleType>()) {
     // Hack: In Swift 3 mode, accept `foo(x, y)` for `foo((x, y))` when the
@@ -673,11 +682,13 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
 
   // Extract the arguments.
   auto args = decomposeArgType(argType, argLabels);
-
+  
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
-  if (constraints::matchCallArguments(args, params, hasTrailingClosure,
+  if (constraints::matchCallArguments(args, params,
+                                      defaultMap,
+                                      hasTrailingClosure,
                                       cs.shouldAttemptFixes(), listener,
                                       parameterBindings))
     return ConstraintSystem::SolutionKind::Error;
@@ -735,14 +746,14 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
 
     // Determine the parameter type.
     const auto &param = params[paramIdx];
-    auto paramTy = param.Ty;
+    auto paramTy = param.getType();
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
-      auto argTy = args[argIdx].Ty;
+      auto argTy = args[argIdx].getType();
 
       if (!haveOneNonUserConversion) {
         subflags |= ConstraintSystem::TMF_ApplyingOperatorParameter;
@@ -1042,11 +1053,28 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   increaseScore(ScoreKind::SK_FunctionConversion);
 
+  // Add a very narrow exception to SE-0110 by allowing functions that
+  // take multiple arguments to be passed as an argument in places
+  // that expect a function that takes a single tuple (of the same
+  // arity).
+  auto func1Input = func1->getInput();
+  auto func2Input = func2->getInput();
+  if (!getASTContext().isSwiftVersion3()) {
+    if (auto elt = locator.last()) {
+      if (elt->getKind() == ConstraintLocator::ApplyArgToParam) {
+        if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer())) {
+          func2Input = paren2->getUnderlyingType();
+          if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer()))
+            func1Input = paren1->getUnderlyingType();
+        }
+      }
+    }
+  }
+
   // Input types can be contravariant (or equal).
-  SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
-                                   subKind, subflags,
-                                   locator.withPathElement(
-                                     ConstraintLocator::FunctionArgument));
+  SolutionKind result =
+      matchTypes(func2Input, func1Input, subKind, subflags,
+                 locator.withPathElement(ConstraintLocator::FunctionArgument));
   if (result == SolutionKind::Error)
     return SolutionKind::Error;
 
@@ -1355,7 +1383,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
 
     // If the types are obviously equivalent, we're done.
-    if (type1.getPointer() == type2.getPointer())
+    if (isa<ParenType>(type1.getPointer()) ==
+          isa<ParenType>(type2.getPointer()) &&
+        type1->isEqual(type2))
       return SolutionKind::Solved;
   } else {
     typeVar1 = desugar1->getAs<TypeVariableType>();
@@ -2473,17 +2503,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // separately.
   switch (kind) {
   case ConstraintKind::SelfObjectOfProtocol:
-    if (TC.containsProtocol(type, protocol, DC,
-                            ConformanceCheckFlags::InExpression))
+    if (auto conformance =
+          TC.containsProtocol(type, protocol, DC,
+                              ConformanceCheckFlags::InExpression)) {
+      CheckedConformances.push_back({getConstraintLocator(locator),
+                                     *conformance});
       return SolutionKind::Solved;
+    }
     break;
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::LiteralConformsTo: {
     // Check whether this type conforms to the protocol.
-    if (TC.conformsToProtocol(type, protocol, DC,
-                              ConformanceCheckFlags::InExpression))
+    if (auto conformance =
+          TC.conformsToProtocol(type, protocol, DC,
+                                ConformanceCheckFlags::InExpression)) {
+      CheckedConformances.push_back({getConstraintLocator(locator),
+                                     *conformance});
       return SolutionKind::Solved;
+    }
     break;
+  }
+
   default:
     llvm_unreachable("bad constraint kind");
   }

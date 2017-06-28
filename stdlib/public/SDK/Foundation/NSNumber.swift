@@ -14,7 +14,7 @@
 import CoreGraphics
 
 extension Int8 : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.int8Value
     }
@@ -55,7 +55,7 @@ extension Int8 : _ObjectiveCBridgeable {
 }
 
 extension UInt8 : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.uint8Value
     }
@@ -96,7 +96,7 @@ extension UInt8 : _ObjectiveCBridgeable {
 }
 
 extension Int16 : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.int16Value
     }
@@ -137,7 +137,7 @@ extension Int16 : _ObjectiveCBridgeable {
 }
 
 extension UInt16 : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.uint16Value
     }
@@ -178,7 +178,7 @@ extension UInt16 : _ObjectiveCBridgeable {
 }
 
 extension Int32 : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.int32Value
     }
@@ -219,7 +219,7 @@ extension Int32 : _ObjectiveCBridgeable {
 }
 
 extension UInt32 : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.uint32Value
     }
@@ -260,7 +260,7 @@ extension UInt32 : _ObjectiveCBridgeable {
 }
 
 extension Int64 : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.int64Value
     }
@@ -301,7 +301,7 @@ extension Int64 : _ObjectiveCBridgeable {
 }
 
 extension UInt64 : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.uint64Value
     }
@@ -342,7 +342,7 @@ extension UInt64 : _ObjectiveCBridgeable {
 }
 
 extension Int : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.intValue
     }
@@ -383,7 +383,7 @@ extension Int : _ObjectiveCBridgeable {
 }
 
 extension UInt : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.uintValue
     }
@@ -424,7 +424,7 @@ extension UInt : _ObjectiveCBridgeable {
 }
 
 extension Float : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.floatValue
     }
@@ -451,8 +451,24 @@ extension Float : _ObjectiveCBridgeable {
     }
     
     public static func _conditionallyBridgeFromObjectiveC(_ x: NSNumber, result: inout Float?) -> Bool {
-        guard let value = Float(exactly: x) else { return false }
-        result = value
+        guard let value = Double(exactly: x) else { return false }
+        guard !value.isNaN else {
+            result = Float.nan
+            return true
+        }
+        guard !value.isInfinite else {
+            if value.sign == .minus {
+                result = -Float.infinity
+            } else {
+                result = Float.infinity
+            }
+            return true
+        }
+        guard Swift.abs(value) <= Double(Float.greatestFiniteMagnitude) else {
+            return false
+        }
+        
+        result = Float(value)
         return true
     }
     
@@ -465,7 +481,7 @@ extension Float : _ObjectiveCBridgeable {
 }
 
 extension Double : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.doubleValue
     }
@@ -513,7 +529,7 @@ extension Double : _ObjectiveCBridgeable {
 }
 
 extension Bool : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         self = number.boolValue
     }
@@ -564,7 +580,7 @@ extension Bool : _ObjectiveCBridgeable {
 }
 
 extension CGFloat : _ObjectiveCBridgeable {
-    @available(swift, deprecated: 4)
+    @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
         native = CGFloat.NativeType(truncating: number)
     }

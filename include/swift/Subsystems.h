@@ -132,9 +132,9 @@ namespace swift {
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
-  /// \brief Lex and return a vector of `RC<TokenSyntax>` tokens, which include
+  /// \brief Lex and return a vector of `TokenSyntax` tokens, which include
   /// leading and trailing trivia.
-  std::vector<std::pair<RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                                    syntax::AbsolutePosition>>
   tokenizeWithTrivia(const LangOptions &LangOpts,
                      const SourceManager &SM,
@@ -192,7 +192,8 @@ namespace swift {
                            OptionSet<TypeCheckingFlags> Options,
                            unsigned StartElem = 0,
                            unsigned WarnLongFunctionBodies = 0,
-                           unsigned WarnLongExpressionTypeChecking = 0);
+                           unsigned WarnLongExpressionTypeChecking = 0,
+                           unsigned ExpressionTimeoutThreshold = 0);
 
   /// Once type checking is complete, this walks protocol requirements
   /// to resolve default witnesses.
@@ -242,25 +243,19 @@ namespace swift {
   ///
   /// The module must contain source files.
   ///
-  /// If \p makeModuleFragile is true, all functions and global variables of
-  /// the module are marked as fragile. This is used for compiling the stdlib.
   /// if \p wholeModuleCompilation is true, the optimizer assumes that the SIL
   /// of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
   performSILGeneration(ModuleDecl *M, SILOptions &options,
-                       bool makeModuleFragile = false,
                        bool wholeModuleCompilation = false);
 
   /// Turn a source file into SIL IR.
   ///
   /// If \p StartElem is provided, the module is assumed to be only part of the
   /// SourceFile, and any optimizations should take that into account.
-  /// If \p makeModuleFragile is true, all functions and global variables of
-  /// the module are marked as fragile. This is used for compiling the stdlib.
   std::unique_ptr<SILModule>
   performSILGeneration(FileUnit &SF, SILOptions &options,
-                       Optional<unsigned> StartElem = None,
-                       bool makeModuleFragile = false);
+                       Optional<unsigned> StartElem = None);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 

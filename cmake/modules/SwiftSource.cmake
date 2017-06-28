@@ -59,9 +59,6 @@ function(handle_swift_sources
   if (NOT SWIFTSOURCES_IS_MAIN)
     list(APPEND swift_compile_flags "-module-link-name" "${name}")
   endif()
-  if("${SWIFTSOURCES_SDK}" STREQUAL "CYGWIN")
-    list(APPEND swift_compile_flags -DCYGWIN)
-  endif()
 
   if(swift_sources)
     compute_library_subdir(SWIFTSOURCES_LIBRARY_SUBDIR
@@ -475,7 +472,7 @@ function(_compile_swift_files
       OUTPUT ${standard_outputs}
       DEPENDS
         ${swift_compiler_tool_dep}
-        ${source_files} ${SWIFTFILE_DEPENDS}
+        ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency} ${api_notes_dependency_target}
         ${obj_dirs_dependency_target}
       COMMENT "Compiling ${first_output}")

@@ -48,6 +48,7 @@ namespace irgen {
   enum class ReferenceCounting : unsigned char;
   enum class IsaEncoding : unsigned char;
   enum class ClassDeallocationKind : unsigned char;
+  enum class FieldAccess : uint8_t;
   
   OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                  llvm::Value *base,
@@ -138,6 +139,14 @@ namespace irgen {
   tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
                                                   SILType baseType,
                                                   VarDecl *field);
+                                                  
+  unsigned getClassFieldIndex(IRGenModule &IGM,
+                              SILType baseType,
+                              VarDecl *field);
+    
+  FieldAccess getClassFieldAccess(IRGenModule &IGM,
+                                  SILType baseType,
+                                  VarDecl *field);
 
   /// What reference counting mechanism does a class-like type use?
   ReferenceCounting getReferenceCountingForType(IRGenModule &IGM,

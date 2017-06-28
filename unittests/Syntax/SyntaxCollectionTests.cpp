@@ -15,7 +15,7 @@ FunctionCallArgumentSyntax getCannedArgument() {
   auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
-  auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
+  auto NoComma = RawTokenSyntax::missingToken(tok::comma, ",");
 
   return SyntaxFactory::makeFunctionCallArgument(X, Colon, SymbolicRef, Comma);
 }

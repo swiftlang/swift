@@ -93,7 +93,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
 
   Type enumType = parentDC->getDeclaredTypeInContext();
 
-  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                           SourceLoc(), SourceLoc(),
@@ -198,7 +198,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
 
   auto selfDecl = cast<ConstructorDecl>(initDecl)->getImplicitSelfDecl();
   
-  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
     auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,

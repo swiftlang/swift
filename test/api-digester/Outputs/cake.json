@@ -5,6 +5,33 @@
   "children": [
     {
       "kind": "TypeDecl",
+      "name": "C0",
+      "printedName": "C0",
+      "declKind": "Class",
+      "usr": "s:4cake2C0C",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "declKind": "Constructor",
+          "usr": "s:4cake2C0CACycfc",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "C0",
+              "printedName": "C0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
       "name": "S1",
       "printedName": "S1",
       "declKind": "Struct",
@@ -95,6 +122,7 @@
       "usr": "s:4cake2C1C",
       "location": "",
       "moduleName": "cake",
+      "superclassUsr": "s:4cake2C0C",
       "children": [
         {
           "kind": "Function",

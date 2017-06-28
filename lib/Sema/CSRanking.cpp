@@ -85,6 +85,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
+  if (retainAllSolutions())
+    return false;
+
   if (!solverState || !solverState->BestScore ||
       CurrentScore <= *solverState->BestScore)
     return false;
@@ -679,12 +682,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         // second type's inputs, i.e., can we forward the arguments?
         auto funcTy1 = openedType1->castTo<FunctionType>();
         auto funcTy2 = openedType2->castTo<FunctionType>();
-        SmallVector<CallArgParam, 4> params1 =
-          decomposeParamType(funcTy1->getInput(), decl1,
-                             outerDC1->isTypeContext());
-        SmallVector<CallArgParam, 4> params2 =
-          decomposeParamType(funcTy2->getInput(), decl2,
-                             outerDC2->isTypeContext());
+        auto params1 = funcTy1->getParams();
+        auto params2 = funcTy2->getParams();
+        SmallVector<bool, 4> defaultMapType2;
+        computeDefaultMap(funcTy2->getInput(), decl2,
+                          outerDC2->isTypeContext(),
+                          defaultMapType2);
 
         unsigned numParams1 = params1.size();
         unsigned numParams2 = params2.size();
@@ -694,8 +697,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         bool compareTrailingClosureParamsSeparately = false;
         if (!tc.getLangOpts().isSwiftVersion3()) {
           if (numParams1 > 0 && numParams2 > 0 &&
-              params1.back().Ty->is<AnyFunctionType>() &&
-              params2.back().Ty->is<AnyFunctionType>()) {
+              params1.back().getType()->is<AnyFunctionType>() &&
+              params2.back().getType()->is<AnyFunctionType>()) {
             compareTrailingClosureParamsSeparately = true;
             --numParams1;
             --numParams2;
@@ -703,7 +706,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         }
 
         auto maybeAddSubtypeConstraint =
-            [&](const CallArgParam &param1, const CallArgParam &param2) -> bool{
+            [&](const AnyFunctionType::Param &param1,
+                const AnyFunctionType::Param &param2) -> bool {
           // If one parameter is variadic and the other is not...
           if (param1.isVariadic() != param2.isVariadic()) {
             // If the first parameter is the variadic one, it's not
@@ -714,8 +718,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           }
 
           // Check whether the first parameter is a subtype of the second.
-          cs.addConstraint(ConstraintKind::Subtype, param1.Ty, param2.Ty,
-                           locator);
+          cs.addConstraint(ConstraintKind::Subtype,
+                           param1.getType(), param2.getType(), locator);
           return true;
         };
 
@@ -726,7 +730,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             // We need either a default argument or a variadic
             // argument for the first declaration to be more
             // specialized.
-            if (!params2[i].HasDefaultArgument &&
+            if (!defaultMapType2[i] &&
                 !params2[i].isVariadic())
               return false;
 

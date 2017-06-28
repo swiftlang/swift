@@ -737,12 +737,12 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
   return false;
 }
 
-RC<syntax::TokenSyntax> Lexer::fullLex() {
+RC<syntax::RawTokenSyntax> Lexer::fullLex() {
   if (NextToken.isEscapedIdentifier()) {
     LeadingTrivia.push_back(syntax::TriviaPiece::backtick());
     TrailingTrivia.push_front(syntax::TriviaPiece::backtick());
   }
-  auto Result = syntax::TokenSyntax::make(NextToken.getKind(),
+  auto Result = syntax::RawTokenSyntax::make(NextToken.getKind(),
                                         OwnedString(NextToken.getText()).copy(),
                                         syntax::SourcePresence::Present,
                                         {LeadingTrivia}, {TrailingTrivia});

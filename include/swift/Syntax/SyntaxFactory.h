@@ -42,13 +42,18 @@ class DeclSyntax;
 class ExprSyntax;
 class StmtSyntax;
 class UnknownSyntax;
-struct TokenSyntax;
+struct RawTokenSyntax;
 
-/// The Syntax builder - the one-stop shop for making new Syntax nodes.
+/// The Syntax factory - the one-stop shop for making new Syntax nodes.
 struct SyntaxFactory {
+  /// Make any kind of token.
+  static TokenSyntax
+  makeToken(tok Kind, OwnedString Text, SourcePresence Presence,
+            const Trivia &LeadingTrivia, const Trivia &TrailingTrivia);
+
   /// Collect a list of tokens into a piece of "unknown" syntax.
   static UnknownSyntax
-  makeUnknownSyntax(llvm::ArrayRef<RC<TokenSyntax>> Tokens);
+  makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens);
 
 #pragma mark - Declarations
 
@@ -56,8 +61,8 @@ struct SyntaxFactory {
 
   /// Make a declaration modifier with the specified elements.
   static DeclModifierSyntax
-  makeDeclModifier(RC<TokenSyntax> Name, RC<TokenSyntax> LeftParen,
-                   RC<TokenSyntax> Argument, RC<TokenSyntax> RightParen);
+  makeDeclModifier(TokenSyntax Name, TokenSyntax LeftParen,
+                   TokenSyntax Argument, TokenSyntax RightParen);
 
   /// Make a declaration modifier with all missing elements.
   static DeclModifierSyntax makeBlankDeclModifier();
@@ -73,19 +78,19 @@ struct SyntaxFactory {
 
   /// Make a struct declaration with the specified elements.
   static StructDeclSyntax
-  makeStructDecl(RC<TokenSyntax> StructToken, RC<TokenSyntax> Identifier,
+  makeStructDecl(TokenSyntax StructToken, TokenSyntax Identifier,
                  Syntax GenericParameters, Syntax WhereClause,
-                 RC<TokenSyntax> LeftBrace, Syntax DeclMembers,
-                 RC<TokenSyntax> RightBrace);
+                 TokenSyntax LeftBrace, Syntax DeclMembers,
+                 TokenSyntax RightBrace);
 
   /// Make a struct declaration with all missing elements.
   static StructDeclSyntax makeBlankStructDecl();
 
   /// Make a typealias declaration with the specified elements.
   static TypeAliasDeclSyntax
-  makeTypealiasDecl(RC<TokenSyntax> TypealiasToken, RC<TokenSyntax> Identifier,
+  makeTypealiasDecl(TokenSyntax TypealiasToken, TokenSyntax Identifier,
                     GenericParameterClauseSyntax GenericParams,
-                    RC<TokenSyntax> AssignmentToken, TypeSyntax Type);
+                    TokenSyntax AssignmentToken, TypeSyntax Type);
 
   /// Make a typealias declaration with all missing elements.
   static TypeAliasDeclSyntax makeBlankTypealiasDecl();
@@ -97,8 +102,8 @@ struct SyntaxFactory {
   static FunctionDeclSyntax
   makeFunctionDecl(TypeAttributesSyntax Attributes,
                    DeclModifierListSyntax Modifiers,
-                   RC<TokenSyntax> FuncKeyword,
-                   RC<TokenSyntax> Identifier,
+                   TokenSyntax FuncKeyword,
+                   TokenSyntax Identifier,
                    llvm::Optional<GenericParameterClauseSyntax> GenericParams,
                    FunctionSignatureSyntax Signature,
                    llvm::Optional<GenericWhereClauseSyntax> GenericWhereClause,
@@ -111,13 +116,13 @@ struct SyntaxFactory {
 
   /// Make a function parameter with the given elements.
   static FunctionParameterSyntax
-  makeFunctionParameter(RC<TokenSyntax> ExternalName, RC<TokenSyntax> LocalName,
-                        RC<TokenSyntax> Colon,
+  makeFunctionParameter(TokenSyntax ExternalName, TokenSyntax LocalName,
+                        TokenSyntax Colon,
                         llvm::Optional<TypeSyntax> ParameterTypeSyntax,
-                        RC<TokenSyntax> Ellipsis,
-                        RC<TokenSyntax> Equal,
+                        TokenSyntax Ellipsis,
+                        TokenSyntax Equal,
                         llvm::Optional<ExprSyntax> DefaultValue,
-                        RC<TokenSyntax> TrailingComma);
+                        TokenSyntax TrailingComma);
 
   /// Make a function parameter with all elements marked as missing.
   static FunctionParameterSyntax makeBlankFunctionParameter();
@@ -135,11 +140,11 @@ struct SyntaxFactory {
 
   /// Make a function signature with the given elements.
   static FunctionSignatureSyntax
-  makeFunctionSignature(RC<TokenSyntax> LeftParen,
+  makeFunctionSignature(TokenSyntax LeftParen,
                         FunctionParameterListSyntax ParameterList,
-                        RC<TokenSyntax> RightParen,
-                        RC<TokenSyntax> ThrowsOrRethrows,
-                        RC<TokenSyntax> Arrow,
+                        TokenSyntax RightParen,
+                        TokenSyntax ThrowsOrRethrows,
+                        TokenSyntax Arrow,
                         TypeAttributesSyntax ReturnTypeAttributes,
                         TypeSyntax ReturnTypeSyntax);
 
@@ -156,16 +161,16 @@ struct SyntaxFactory {
 
   /// Make a code block with the specified elements.
   static CodeBlockStmtSyntax
-  makeCodeBlock(RC<TokenSyntax> LeftBraceToken,
+  makeCodeBlock(TokenSyntax LeftBraceToken,
                 StmtListSyntax Elements,
-                RC<TokenSyntax> RightBraceToken);
+                TokenSyntax RightBraceToken);
 
   /// Make a code block with all missing elements.
   static CodeBlockStmtSyntax makeBlankCodeBlock();
 
   /// Make a fallthrough statement with the give `fallthrough` keyword.
   static FallthroughStmtSyntax
-  makeFallthroughStmt(RC<TokenSyntax> FallthroughKeyword);
+  makeFallthroughStmt(TokenSyntax FallthroughKeyword);
 
   /// Make a fallthrough statement with the `fallthrough` keyword
   /// marked as missing.
@@ -174,7 +179,7 @@ struct SyntaxFactory {
   /// Make a break statement with the give `break` keyword and
   /// destination label.
   static BreakStmtSyntax
-  makeBreakStmt(RC<TokenSyntax> BreakKeyword, RC<TokenSyntax> Label);
+  makeBreakStmt(TokenSyntax BreakKeyword, TokenSyntax Label);
 
   /// Make a break statement with the `break` keyword
   /// and destination label marked as missing.
@@ -183,7 +188,7 @@ struct SyntaxFactory {
   /// Make a continue statement with the given `continue` keyword and
   /// destination label.
   static ContinueStmtSyntax
-  makeContinueStmt(RC<TokenSyntax> ContinueKeyword, RC<TokenSyntax> Label);
+  makeContinueStmt(TokenSyntax ContinueKeyword, TokenSyntax Label);
 
   /// Make a continue statement with the `continue` keyword
   /// and destination label marked as missing.
@@ -192,7 +197,7 @@ struct SyntaxFactory {
   /// Make a return statement with the given `return` keyword and returned
   /// expression.
   static ReturnStmtSyntax
-  makeReturnStmt(RC<TokenSyntax> ReturnKeyword, ExprSyntax ReturnedExpression);
+  makeReturnStmt(TokenSyntax ReturnKeyword, ExprSyntax ReturnedExpression);
 
   /// Make a return statement with the `return` keyword and return expression
   /// marked as missing.
@@ -208,7 +213,7 @@ struct SyntaxFactory {
 
   /// Make an integer literal with the given '+'/'-' sign and string of digits.
   static IntegerLiteralExprSyntax
-  makeIntegerLiteralExpr(RC<TokenSyntax> Sign, RC<TokenSyntax> Digits);
+  makeIntegerLiteralExpr(TokenSyntax Sign, TokenSyntax Digits);
 
   /// Make an integer literal with the sign and string of digits marked
   /// as missing.
@@ -217,7 +222,7 @@ struct SyntaxFactory {
   /// Make a symbolic reference with the given identifier and optionally a
   /// generic argument clause.
   static SymbolicReferenceExprSyntax
-  makeSymbolicReferenceExpr(RC<TokenSyntax> Identifier,
+  makeSymbolicReferenceExpr(TokenSyntax Identifier,
     llvm::Optional<GenericArgumentClauseSyntax> GenericArgs);
 
   /// Make a symbolic reference expression with the identifier and
@@ -230,9 +235,9 @@ struct SyntaxFactory {
   /// Make a function call argument based on an expression with the
   /// given elements.
   static FunctionCallArgumentSyntax
-  makeFunctionCallArgument(RC<TokenSyntax> Label, RC<TokenSyntax> Colon,
+  makeFunctionCallArgument(TokenSyntax Label, TokenSyntax Colon,
                            ExprSyntax ExpressionArgument,
-                           RC<TokenSyntax> TrailingComma);
+                           TokenSyntax TrailingComma);
 
   /// Make a function call argument list with the given arguments.
   static FunctionCallArgumentListSyntax
@@ -244,9 +249,9 @@ struct SyntaxFactory {
 
   /// Make a function call expression with the given elements.
   static FunctionCallExprSyntax
-  makeFunctionCallExpr(ExprSyntax CalledExpr, RC<TokenSyntax> LeftParen,
+  makeFunctionCallExpr(ExprSyntax CalledExpr, TokenSyntax LeftParen,
                        FunctionCallArgumentListSyntax Arguments,
-                       RC<TokenSyntax> RightParen);
+                       TokenSyntax RightParen);
 
   /// Make a function call expression with all elements marked as missing.
   static FunctionCallExprSyntax makeBlankFunctionCallExpr();
@@ -254,173 +259,173 @@ struct SyntaxFactory {
 #pragma mark - Tokens
 
   /// Make a 'static' keyword with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeStaticKeyword(const Trivia &LeadingTrivia,
-                                           const Trivia &TrailingTrivia);
+  static TokenSyntax makeStaticKeyword(const Trivia &LeadingTrivia,
+                                       const Trivia &TrailingTrivia);
 
 
   /// Make a 'public' keyword with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makePublicKeyword(const Trivia &LeadingTrivia,
-                                           const Trivia &TrailingTrivia);
+  static TokenSyntax makePublicKeyword(const Trivia &LeadingTrivia,
+                                       const Trivia &TrailingTrivia);
 
   /// Make a 'func' keyword with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeFuncKeyword(const Trivia &LeadingTrivia,
-                                         const Trivia &TrailingTrivia);
+  static TokenSyntax makeFuncKeyword(const Trivia &LeadingTrivia,
+                                     const Trivia &TrailingTrivia);
 
   /// Make a 'fallthrough' keyword with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeFallthroughKeyword(const Trivia &LeadingTrivia,
-                                                const Trivia &TrailingTrivia);
+  static TokenSyntax makeFallthroughKeyword(const Trivia &LeadingTrivia,
+                                            const Trivia &TrailingTrivia);
 
   /// Make an at-sign '@' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeAtSignToken(const Trivia &LeadingTrivia,
-                                         const Trivia &TrailingTrivia);
+  static TokenSyntax makeAtSignToken(const Trivia &LeadingTrivia,
+                                     const Trivia &TrailingTrivia);
 
   /// Make a 'break' keyword with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeBreakKeyword(const Trivia &LeadingTrivia,
-                                          const Trivia &TrailingTrivia);
+  static TokenSyntax makeBreakKeyword(const Trivia &LeadingTrivia,
+                                      const Trivia &TrailingTrivia);
 
   /// Make a 'continue' keyword with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeContinueKeyword(const Trivia &LeadingTrivia,
-                                             const Trivia &TrailingTrivia);
+  static TokenSyntax makeContinueKeyword(const Trivia &LeadingTrivia,
+                                         const Trivia &TrailingTrivia);
 
   /// Make a 'return' keyword with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeReturnKeyword(const Trivia &LeadingTrivia,
-                                           const Trivia &TrailingTrivia);
+  static TokenSyntax makeReturnKeyword(const Trivia &LeadingTrivia,
+                                       const Trivia &TrailingTrivia);
 
   /// Make a left angle '<' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeLeftAngleToken(const Trivia &LeadingTrivia,
-                                            const Trivia &TrailingTrivia);
+  static TokenSyntax makeLeftAngleToken(const Trivia &LeadingTrivia,
+                                        const Trivia &TrailingTrivia);
 
   /// Make a right angle '>' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeRightAngleToken(const Trivia &LeadingTrivia,
-                                             const Trivia &TrailingTrivia);
+  static TokenSyntax makeRightAngleToken(const Trivia &LeadingTrivia,
+                                         const Trivia &TrailingTrivia);
 
   /// Make a left parenthesis '(' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeLeftParenToken(const Trivia &LeadingTrivia,
-                                            const Trivia &TrailingTrivia);
+  static TokenSyntax makeLeftParenToken(const Trivia &LeadingTrivia,
+                                        const Trivia &TrailingTrivia);
 
   /// Make a right parenthesis ')' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeRightParenToken(const Trivia &LeadingTrivia,
-                                            const Trivia &TrailingTrivia);
+  static TokenSyntax makeRightParenToken(const Trivia &LeadingTrivia,
+                                        const Trivia &TrailingTrivia);
 
   /// Make a left brace '{' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeLeftBraceToken(const Trivia &LeadingTrivia,
-                                            const Trivia &TrailingTrivia);
+  static TokenSyntax makeLeftBraceToken(const Trivia &LeadingTrivia,
+                                        const Trivia &TrailingTrivia);
 
   /// Make a right brace '}' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeRightBraceToken(const Trivia &LeadingTrivia,
-                                             const Trivia &TrailingTrivia);
+  static TokenSyntax makeRightBraceToken(const Trivia &LeadingTrivia,
+                                         const Trivia &TrailingTrivia);
 
 
   /// Make a left square bracket '[' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax>
+  static TokenSyntax
   makeLeftSquareBracketToken(const Trivia &LeadingTrivia,
                              const Trivia &TrailingTrivia);
 
   /// Make a right square bracket ']' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax>
+  static TokenSyntax
   makeRightSquareBracketToken(const Trivia &LeadingTrivia,
                               const Trivia &TrailingTrivia);
 
   /// Make a postfix question '?' token with the specified trailing trivia.
   /// The leading trivia is assumed to be of zero width.
-  static RC<TokenSyntax>
+  static TokenSyntax
   makeQuestionPostfixToken(const Trivia &TrailingTrivia);
 
   /// Make an exclamation '!' token with the specified trailing trivia.
   /// The leading trivia is assumed to be of zero width.
-  static RC<TokenSyntax> makeExclaimPostfixToken(const Trivia &TrailingTrivia);
+  static TokenSyntax makeExclaimPostfixToken(const Trivia &TrailingTrivia);
 
   /// Make an identifier token with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeIdentifier(OwnedString Name,
+  static TokenSyntax makeIdentifier(OwnedString Name,
                                         const Trivia &LeadingTrivia,
                                         const Trivia &TrailingTrivia);
 
   /// Make a comma ',' token with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeCommaToken(const Trivia &LeadingTrivia,
-                                        const Trivia &TrailingTrivia);
+  static TokenSyntax makeCommaToken(const Trivia &LeadingTrivia,
+                                    const Trivia &TrailingTrivia);
 
   /// Make a colon ':' token with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeColonToken(const Trivia &LeadingTrivia,
-                                        const Trivia &TrailingTrivia);
+  static TokenSyntax makeColonToken(const Trivia &LeadingTrivia,
+                                    const Trivia &TrailingTrivia);
 
   /// Make a dot '.' token with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeDotToken(const Trivia &LeadingTrivia,
-                                      const Trivia &TrailingTrivia);
+  static TokenSyntax makeDotToken(const Trivia &LeadingTrivia,
+                                  const Trivia &TrailingTrivia);
 
   /// Make a 'struct' keyword with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeStructKeyword(const Trivia &LeadingTrivia,
-                                           const Trivia &TrailingTrivia);
+  static TokenSyntax makeStructKeyword(const Trivia &LeadingTrivia,
+                                       const Trivia &TrailingTrivia);
 
   /// Make a 'where' keyword with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeWhereKeyword(const Trivia &LeadingTrivia,
-                                          const Trivia &TrailingTrivia);
+  static TokenSyntax makeWhereKeyword(const Trivia &LeadingTrivia,
+                                      const Trivia &TrailingTrivia);
 
   /// Make a 'inout' keyword with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeInoutKeyword(const Trivia &LeadingTrivia,
-                                          const Trivia &TrailingTrivia);
+  static TokenSyntax makeInoutKeyword(const Trivia &LeadingTrivia,
+                                      const Trivia &TrailingTrivia);
 
   /// Make a 'throws' keyword with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeThrowsKeyword(const Trivia &LeadingTrivia,
-                                           const Trivia &TrailingTrivia);
+  static TokenSyntax makeThrowsKeyword(const Trivia &LeadingTrivia,
+                                       const Trivia &TrailingTrivia);
 
   /// Make a 'rethrows' keyword with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeRethrowsKeyword(const Trivia &LeadingTrivia,
-                                             const Trivia &TrailingTrivia);
+  static TokenSyntax makeRethrowsKeyword(const Trivia &LeadingTrivia,
+                                         const Trivia &TrailingTrivia);
 
   /// Make a 'typealias' keyword with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeTypealiasKeyword(const Trivia &LeadingTrivia,
-                                              const Trivia &TrailingTrivia);
+  static TokenSyntax makeTypealiasKeyword(const Trivia &LeadingTrivia,
+                                          const Trivia &TrailingTrivia);
 
   /// Make an equal '=' token with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeEqualToken(const Trivia &LeadingTrivia,
-                                        const Trivia &TrailingTrivia);
+  static TokenSyntax makeEqualToken(const Trivia &LeadingTrivia,
+                                    const Trivia &TrailingTrivia);
 
   /// Make an arrow '->' token with the specified leading and trailing trivia.
-  static RC<TokenSyntax> makeArrow(const Trivia &LeadingTrivia,
-                                   const Trivia &TrailingTrivia);
+  static TokenSyntax makeArrow(const Trivia &LeadingTrivia,
+                               const Trivia &TrailingTrivia);
 
   /// Make an equality '==' binary operator with the specified leading and
   /// trailing trivia.
-  static RC<TokenSyntax> makeEqualityOperator(const Trivia &LeadingTrivia,
-                                           const Trivia &TrailingTrivia);
+  static TokenSyntax makeEqualityOperator(const Trivia &LeadingTrivia,
+                                          const Trivia &TrailingTrivia);
 
   /// Make the terminal identifier token `Type`
-  static RC<TokenSyntax> makeTypeToken(const Trivia &LeadingTrivia,
-                                       const Trivia &TrailingTrivia);
+  static TokenSyntax makeTypeToken(const Trivia &LeadingTrivia,
+                                   const Trivia &TrailingTrivia);
 
   /// Make the terminal identifier token `Protocol`
-  static RC<TokenSyntax> makeProtocolToken(const Trivia &LeadingTrivia,
-                                           const Trivia &TrailingTrivia);
+  static TokenSyntax makeProtocolToken(const Trivia &LeadingTrivia,
+                                       const Trivia &TrailingTrivia);
 
   /// Make a token representing the digits of an integer literal.
   ///
   /// Note: This is not a stand-in for the expression, which can contain
   /// a minus sign.
-  static RC<TokenSyntax> makeIntegerLiteralToken(OwnedString Digits,
-                                                 const Trivia &LeadingTrivia,
-                                                 const Trivia &TrailingTrivia);
+  static TokenSyntax makeIntegerLiteralToken(OwnedString Digits,
+                                             const Trivia &LeadingTrivia,
+                                             const Trivia &TrailingTrivia);
 
 #pragma mark - Operators
 
   /// Make a prefix operator with the given text.
-  static RC<TokenSyntax> makePrefixOperator(OwnedString Name,
-                                             const Trivia &LeadingTrivia);
+  static TokenSyntax makePrefixOperator(OwnedString Name,
+                                        const Trivia &LeadingTrivia);
 
 #pragma mark - Types
 
@@ -428,11 +433,11 @@ struct SyntaxFactory {
 
   /// Make a type attribute with the specified elements.
   static TypeAttributeSyntax
-  makeTypeAttribute(RC<TokenSyntax> AtSignToken,
-                    RC<TokenSyntax> Identifier,
-                    RC<TokenSyntax> LeftParen,
+  makeTypeAttribute(TokenSyntax AtSignToken,
+                    TokenSyntax Identifier,
+                    TokenSyntax LeftParen,
                     BalancedTokensSyntax BalancedTokens,
-                    RC<TokenSyntax> RightParen);
+                    TokenSyntax RightParen);
 
   /// Make a type attribute with all elements marked as missing.
   static TypeAttributeSyntax makeBlankTypeAttribute();
@@ -446,7 +451,7 @@ struct SyntaxFactory {
 
   /// Make a list of balanced tokens.
   static BalancedTokensSyntax
-  makeBalancedTokens(RawSyntax::LayoutList Tokens);
+  makeBalancedTokens(llvm::ArrayRef<TokenSyntax> Tokens);
 
   /// Make an empty list of balanced tokens.
   static BalancedTokensSyntax makeBlankBalancedTokens();
@@ -460,7 +465,7 @@ struct SyntaxFactory {
 
   /// Make a generic type identifier.
   static TypeIdentifierSyntax
-  makeTypeIdentifier(RC<TokenSyntax> Identifier,
+  makeTypeIdentifier(TokenSyntax Identifier,
                      GenericArgumentClauseSyntax GenericArgs);
 
   /// Make a bare "Any" type.
@@ -477,20 +482,20 @@ struct SyntaxFactory {
   /// Make a tuple type from a type element list and the provided left/right
   /// paren tokens.
   static TupleTypeSyntax
-  makeTupleType(RC<TokenSyntax> LParen,
+  makeTupleType(TokenSyntax LParen,
                 TupleTypeElementListSyntax Elements,
-                RC<TokenSyntax> RParen);
+                TokenSyntax RParen);
 
   /// Make a tuple type element of the form 'Name: ElementType'
   static TupleTypeElementSyntax
-  makeTupleTypeElement(RC<TokenSyntax> Name, RC<TokenSyntax> Colon,
+  makeTupleTypeElement(TokenSyntax Name, TokenSyntax Colon,
                        TypeSyntax ElementType,
-                       llvm::Optional<RC<TokenSyntax>> MaybeComma = llvm::None);
+                       llvm::Optional<TokenSyntax> MaybeComma = llvm::None);
 
   /// Make a tuple type element without a label.
   static TupleTypeElementSyntax
   makeTupleTypeElement(TypeSyntax ElementType,
-                       llvm::Optional<RC<TokenSyntax>> MaybeComma = llvm::None);
+                       llvm::Optional<TokenSyntax> MaybeComma = llvm::None);
 
   /// Make a tuple type element list.
   static TupleTypeElementListSyntax
@@ -520,8 +525,8 @@ struct SyntaxFactory {
   /// Make a metatype type, as in `T.Type`
   /// `Type` is a terminal token here, not a placeholder for something else.
   static MetatypeTypeSyntax makeMetatypeType(TypeSyntax BaseType,
-                                             RC<TokenSyntax> DotToken,
-                                             RC<TokenSyntax> TypeToken);
+                                             TokenSyntax DotToken,
+                                             TokenSyntax TypeToken);
 
   /// Make a metatype type with all elements marked as missing.
   static MetatypeTypeSyntax makeBlankMetatypeType();
@@ -529,9 +534,9 @@ struct SyntaxFactory {
 #pragma mark - array-type
 
   /// Make a sugared Array type, as in `[MyType]`.
-  static ArrayTypeSyntax makeArrayType(RC<TokenSyntax> LeftSquareBracket,
+  static ArrayTypeSyntax makeArrayType(TokenSyntax LeftSquareBracket,
                                        TypeSyntax ElementType,
-                                       RC<TokenSyntax> RightSquareBracket);
+                                       TokenSyntax RightSquareBracket);
 
   /// Make an array type with all elements marked as missing.
   static ArrayTypeSyntax makeBlankArrayType();
@@ -540,9 +545,9 @@ struct SyntaxFactory {
 
   /// Make a Dictionary type, as in `[Key : Value]`.
   static DictionaryTypeSyntax
-  makeDictionaryType(RC<TokenSyntax> LeftSquareBracket, TypeSyntax KeyType,
-                     RC<TokenSyntax> Colon, TypeSyntax ValueType,
-                     RC<TokenSyntax> RightSquareBracket);
+  makeDictionaryType(TokenSyntax LeftSquareBracket, TypeSyntax KeyType,
+                     TokenSyntax Colon, TypeSyntax ValueType,
+                     TokenSyntax RightSquareBracket);
 
   /// Make an a dictionary type with all elements marked as missing.
   static DictionaryTypeSyntax makeBlankDictionaryType();
@@ -551,18 +556,18 @@ struct SyntaxFactory {
 
   /// Make a function argument type syntax with the specified elements.
   static FunctionTypeArgumentSyntax
-  makeFunctionTypeArgument(RC<TokenSyntax> ExternalParameterName,
-                           RC<TokenSyntax> LocalParameterName,
+  makeFunctionTypeArgument(TokenSyntax ExternalParameterName,
+                           TokenSyntax LocalParameterName,
                            TypeAttributesSyntax TypeAttributes,
-                           RC<TokenSyntax> InoutKeyword,
-                           RC<TokenSyntax> ColonToken,
+                           TokenSyntax InoutKeyword,
+                           TokenSyntax ColonToken,
                            TypeSyntax ParameterTypeSyntax);
 
   /// Make a simple function type argument syntax with the given label and
   /// simple type name.
   static FunctionTypeArgumentSyntax
-  makeFunctionTypeArgument(RC<TokenSyntax> LocalParameterName,
-                           RC<TokenSyntax> ColonToken,
+  makeFunctionTypeArgument(TokenSyntax LocalParameterName,
+                           TokenSyntax ColonToken,
                            TypeSyntax ParameterType);
 
   /// Make a simple function type argument syntax with the given simple
@@ -578,10 +583,10 @@ struct SyntaxFactory {
   /// Make a function type, for example, `(Int, Int) throws -> Int`
   static FunctionTypeSyntax
   makeFunctionType(TypeAttributesSyntax TypeAttributes,
-                   RC<TokenSyntax> LeftParen,
+                   TokenSyntax LeftParen,
                    FunctionParameterListSyntax ArgumentList,
-                   RC<TokenSyntax> RightParen, RC<TokenSyntax> ThrowsOrRethrows,
-                   RC<TokenSyntax> Arrow, TypeSyntax ReturnType);
+                   TokenSyntax RightParen, TokenSyntax ThrowsOrRethrows,
+                   TokenSyntax Arrow, TypeSyntax ReturnType);
 
   /// Make a function type with all elements marked as missing.
   static FunctionTypeSyntax makeBlankFunctionType();
@@ -608,7 +613,7 @@ struct SyntaxFactory {
   /// Any elements are allowed to be marked as missing.
   static SameTypeRequirementSyntax
   makeSameTypeRequirement(TypeIdentifierSyntax LeftTypeIdentifier,
-                          RC<TokenSyntax> EqualityToken, TypeSyntax RightType);
+                          TokenSyntax EqualityToken, TypeSyntax RightType);
 
   /// Make a list of generic requirements with the given loosely collected
   /// requirements/

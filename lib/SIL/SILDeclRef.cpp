@@ -430,6 +430,33 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isClangImported())
     return SILLinkage::Shared;
 
+  // Stored property initializers get the linkage of their containing type.
+  if (isStoredPropertyInitializer()) {
+    // If the property is public, the initializer needs to be public, because
+    // it might be referenced from an inlineable initializer.
+    //
+    // Note that we don't serialize the presence of an initializer, so there's
+    // no way to reference one from another module except for this case.
+    //
+    // This is silly, and we need a proper resilience story here.
+    if (d->getEffectiveAccess() == Accessibility::Public)
+      return maybeAddExternal(SILLinkage::Public);
+
+    d = cast<NominalTypeDecl>(d->getDeclContext());
+
+    // Otherwise, use the visibility of the type itself, because even if the
+    // property is private, we might reference the initializer from another
+    // file.
+    switch (d->getEffectiveAccess()) {
+    case Accessibility::Private:
+    case Accessibility::FilePrivate:
+      return maybeAddExternal(SILLinkage::Private);
+
+    default:
+      return maybeAddExternal(SILLinkage::Hidden);
+    }
+  }
+
   // Otherwise, we have external linkage.
   switch (d->getEffectiveAccess()) {
     case Accessibility::Private:

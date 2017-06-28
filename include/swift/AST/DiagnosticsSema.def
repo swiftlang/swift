@@ -267,6 +267,18 @@ ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
 
+// FIXME: make this an error when we've fixed the Dispatch problem.
+WARNING(err_noescape_param_call,none,
+      "passing a %select{|closure which captures a }1non-escaping function "
+      "parameter %0 to a call to a non-escaping function parameter can allow "
+      "re-entrant modification of a variable",
+      (DeclName, unsigned))
+WARNING(warn_noescape_param_call,none,
+      "passing a %select{|closure which captures a }1non-escaping function "
+      "parameter %0 to a call to a non-escaping function parameter can allow "
+      "re-entrant modification of a variable and will be illegal in Swift 4",
+      (DeclName, unsigned))
+
 ERROR(cannot_call_function_value,none,
       "cannot invoke value of function type with argument list '%0'",
       (StringRef))
@@ -897,6 +909,10 @@ ERROR(member_shadows_global_function,none,
       "use of %0 refers to %1 %2 rather than %3 %4 in %5 %6",
       (DeclName, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
        DescriptiveDeclKind, DeclName))
+ERROR(member_shadows_global_function_near_match,none,
+      "use of %0 nearly matches %3 %4 in %5 %6 rather than %1 %2",
+      (DeclName, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
+      DescriptiveDeclKind, DeclName))
 
 ERROR(instance_member_use_on_type,none,
       "instance member %1 cannot be used on type %0; "
@@ -1194,7 +1210,8 @@ ERROR(pattern_type_access,none,
       "%select{%select{variable|constant}0|property}1 "
       "%select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
-      "|cannot be declared %select{%error|fileprivate|internal|public|open}3}2 "
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}3}2 "
       "because its type uses "
       "%select{a private|a fileprivate|an internal|%error|%error}5 type",
       (bool, bool, bool, Accessibility, bool, Accessibility))
@@ -1209,7 +1226,8 @@ ERROR(pattern_type_access_inferred,none,
       "%select{%select{variable|constant}0|property}1 "
       "%select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
-      "|cannot be declared %select{%error|fileprivate|internal|public|open}3}2 "
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}3}2 "
       "because its type %6 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}5 type",
       (bool, bool, bool, Accessibility, bool, Accessibility, Type))
@@ -1261,14 +1279,16 @@ ERROR(unsupported_nested_protocol,none,
 ERROR(type_alias_underlying_type_access,none,
       "type alias %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
-      "|cannot be declared %select{%error|fileprivate|internal|public|open}1}0 "
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its underlying type uses "
       "%select{a private|a fileprivate|an internal|%error|%error}2 type",
       (bool, Accessibility, Accessibility, bool))
 WARNING(type_alias_underlying_type_access_warn,none,
         "type alias %select{should be declared "
         "%select{private|fileprivate|internal|%error|%error}2"
-        "|should not be declared %select{%error|fileprivate|internal|public|open}1}0 "
+        "|should not be declared "
+        "%select{in this context|fileprivate|internal|public|open}1}0 "
         "because its underlying type uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
         (bool, Accessibility, Accessibility, bool))
@@ -1277,7 +1297,8 @@ WARNING(type_alias_underlying_type_access_warn,none,
 ERROR(subscript_type_access,none,
       "subscript %select{must be declared "
       "%select{private|fileprivate|internal|%error|%error}1"
-      "|cannot be declared %select{%error|fileprivate|internal|public|open}1}0 "
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its %select{index|element type}3 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}2 type",
       (bool, Accessibility, Accessibility, bool))
@@ -1294,7 +1315,8 @@ ERROR(function_type_access,none,
       "%select{function|method|initializer}4 "
       "%select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}1|private or fileprivate}2"
-      "|cannot be declared %select{%error|fileprivate|internal|public|open}1}0 "
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its %select{parameter|result}5 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}3 type",
       (bool, Accessibility, bool, Accessibility, unsigned, bool))
@@ -1329,9 +1351,6 @@ ERROR(extension_constrained_inheritance,none,
       "inheritance clause", (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
-ERROR(extension_protocol_via_typealias,none,
-      "protocol %0 in the module being compiled cannot be extended via a "
-      "type alias", (Type))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())
@@ -1414,11 +1433,6 @@ ERROR(witness_self_same_type,none,
       " (in protocol %5) due to same-type requirement involving 'Self'",
       (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
        DeclName, Type))
-WARNING(witness_self_same_type_warn,none,
-      "%0 %1 in non-final class %2 cannot be used to satisfy requirement %3 %4"
-      " (in protocol %5) due to same-type requirement involving 'Self'",
-      (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
-       DeclName, Type))
 NOTE(witness_self_weaken_same_type,none,
       "consider weakening the same-type requirement %0 == %1 to a superclass "
       "requirement", (Type, Type))
@@ -1452,8 +1466,9 @@ ERROR(protocol_refine_access,none,
       "%select{protocol must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2"
       "|private or fileprivate}3 because it refines"
-      "|%select{%error|fileprivate|internal|public|%error}1 protocol cannot "
-      "refine}0 %select{a private|a fileprivate|an internal|%error|%error}2 protocol",
+      "|%select{in this context|fileprivate|internal|public|%error}1 "
+      "protocol cannot refine}0 "
+      "%select{a private|a fileprivate|an internal|%error|%error}2 protocol",
       (bool, Accessibility, Accessibility, bool))
 WARNING(protocol_refine_access_warn,none,
         "%select{protocol should be declared "
@@ -1492,7 +1507,8 @@ NOTE(default_associated_type_req_fail,none,
      (Type, DeclName, Type, Type, bool))
 ERROR(associated_type_access,none,
       "associated type in "
-      "%select{%error|a fileprivate|an internal|a public|%error}0 protocol uses "
+      "%select{a private|a fileprivate|an internal|a public|%error}0 protocol "
+      "uses "
       "%select{a private|a fileprivate|an internal|%error|%error}1 type in its "
       "%select{default definition|requirement}2 ",
       (Accessibility, Accessibility, unsigned))
@@ -1668,9 +1684,6 @@ ERROR(requires_generic_param_same_type_does_not_conform,none,
       (Type, Identifier))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
-ERROR(protocol_typealias_conflict, none,
-      "type alias %0 requires types %1 and %2 to be the same",
-      (Identifier, Type, Type))
 WARNING(redundant_conformance_constraint,none,
         "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
 NOTE(redundant_conformance_here,none,
@@ -1678,6 +1691,9 @@ NOTE(redundant_conformance_here,none,
      "inferred from type here}0",
      (unsigned, Type, ProtocolDecl *))
 
+ERROR(same_type_conflict,none,
+      "%select{generic parameter |protocol |}0%1 cannot be equal to both "
+      "%2 and %3", (unsigned, Type, Type, Type))
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,
@@ -1718,11 +1734,15 @@ WARNING(inherited_associated_type_redecl,none,
 WARNING(typealias_override_associated_type,none,
         "typealias overriding associated type %0 from protocol %1 is better "
         "expressed as same-type constraint on the protocol", (DeclName, Type))
+WARNING(associated_type_override_typealias,none,
+        "associated type %0 is redundant with type %0 declared in inherited "
+        "%1 %2", (DeclName, DescriptiveDeclKind, Type))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
-      "|cannot be declared %select{%error|fileprivate|internal|public|open}2}1 "
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}2}1 "
       "because its generic %select{parameter|requirement}5 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}3 type",
       (DescriptiveDeclKind, bool, Accessibility, Accessibility, bool, bool))
@@ -1944,7 +1964,7 @@ WARNING(class_inherits_anyobject,none,
 
 // Enums
 ERROR(enum_case_access,none,
-      "enum case in %select{%error|a fileprivate|an internal|a public|%error}0 enum "
+      "enum case in %select{a private|a fileprivate|an internal|a public|%error}0 enum "
       "uses %select{a private|a fileprivate|an internal|%error|%error}1 type",
       (Accessibility, Accessibility))
 WARNING(enum_case_access_warn,none,
@@ -1975,7 +1995,8 @@ NOTE(enum_declares_rawrep_with_raw_type,none,
 ERROR(enum_raw_type_access,none,
       "enum %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
-      "|cannot be declared %select{%error|fileprivate|internal|public|open}1}0 "
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its raw type uses "
       "%select{a private|a fileprivate|an internal|%error|%error}2 type",
       (bool, Accessibility, Accessibility, bool))
@@ -2044,7 +2065,7 @@ ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
 
 NOTE(codable_extraneous_codingkey_case_here,none,
-     "CodingKey case %0 does match any stored properties", (Identifier))
+     "CodingKey case %0 does not match any stored properties", (Identifier))
 NOTE(codable_non_conforming_property_here,none,
      "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Type))
 NOTE(codable_non_decoded_property_here,none,
@@ -2696,9 +2717,6 @@ NOTE(silence_optional_in_interpolation_segment_call,none,
 ERROR(invalid_noescape_use,none,
       "non-escaping %select{value|parameter}1 %0 may only be called",
       (Identifier, bool))
-NOTE(noescape_autoclosure,none,
-    "parameter %0 is implicitly non-escaping because it was declared @autoclosure",
-     (Identifier))
 NOTE(noescape_parameter,none,
     "parameter %0 is implicitly non-escaping",
      (Identifier))
@@ -3026,7 +3044,8 @@ ERROR(bool_intrinsics_not_found,none,
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
-      "|cannot be declared %select{%error|fileprivate|internal|public|open}1}0 "
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its superclass is "
       "%select{private|fileprivate|internal|%error|%error}2",
       (bool, Accessibility, Accessibility, bool))
@@ -3597,6 +3616,9 @@ ERROR(resilience_decl_unavailable,
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here,
+     none, "%0 %1 is not public", (DescriptiveDeclKind, DeclName))
+
+NOTE(resilience_decl_declared_here_versioned,
      none, "%0 %1 is not '@_versioned' or public", (DescriptiveDeclKind, DeclName))
 
 ERROR(designated_init_in_extension_resilient,none,

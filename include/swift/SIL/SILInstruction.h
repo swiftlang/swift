@@ -996,9 +996,7 @@ class ApplyInstBase;
 // partial specialization for full applies inherits from this.
 template <class Impl, class Base>
 class ApplyInstBase<Impl, Base, false> : public Base {
-  enum {
-    Callee
-  };
+  enum { Callee, NumStaticOperands };
 
   /// The type of the callee with our substitutions applied.
   SILType SubstCalleeType;
@@ -1015,7 +1013,7 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   unsigned NumCallArguments;
 
   /// The fixed operand is the callee;  the rest are arguments.
-  TailAllocatedOperandList<1> Operands;
+  TailAllocatedOperandList<NumStaticOperands> Operands;
 
   Substitution *getSubstitutionsStorage() {
     return reinterpret_cast<Substitution*>(Operands.asArray().end());
@@ -1116,6 +1114,8 @@ public:
   SubstitutionList getSubstitutions() const {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
+
+  static unsigned getOperandIndexOfFirstArgument() { return NumStaticOperands; }
 
   /// The arguments passed to this instruction.
   MutableArrayRef<Operand> getArgumentOperands() {
@@ -1459,6 +1459,11 @@ public:
     StoredProperty,
     GettableProperty,
     SettableProperty,
+    Last_Packed = SettableProperty, // Last enum value that can be packed in
+                                    // a PointerIntPair
+    OptionalChain,
+    OptionalForce,
+    OptionalWrap,
   };
   
   // The pair of a captured index value and its Hashable conformance for a
@@ -1469,40 +1474,63 @@ public:
   };
   
 private:
-  // Value is the VarDecl* for StoredProperty, and the SILFunction* of the
-  // Getter for computed properties
-  llvm::PointerIntPair<void *, 2, Kind> ValueAndKind;
+  static constexpr const unsigned KindPackingBits = 2;
+  static constexpr const unsigned UnpackedKind = (1u << KindPackingBits) - 1;
+  static_assert((unsigned)Kind::Last_Packed < UnpackedKind,
+                "too many kinds to pack");
+                
+  // Value is the VarDecl* for StoredProperty, the SILFunction* of the
+  // Getter for computed properties, or the Kind for other kinds
+  llvm::PointerIntPair<void *, KindPackingBits, unsigned> ValueAndKind;
   // false if id is a SILFunction*; true if id is a SILDeclRef
-  llvm::PointerIntPair<SILFunction *, 2, ComputedPropertyId::KindType>
+  llvm::PointerIntPair<SILFunction *, 2,
+                       ComputedPropertyId::KindType>
     SetterAndIdKind;
   ComputedPropertyId::ValueType IdValue;
   ArrayRef<IndexPair> Indices;
   CanType ComponentType;
-
+  
+  unsigned kindForPacking(Kind k) {
+    auto value = (unsigned)k;
+    assert(value <= (unsigned)Kind::Last_Packed);
+    return value;
+  }
+  
+  KeyPathPatternComponent(Kind kind, CanType ComponentType)
+    : ValueAndKind((void*)((uintptr_t)kind << KindPackingBits), UnpackedKind),
+      ComponentType(ComponentType)
+  {
+    assert(kind > Kind::Last_Packed && "wrong initializer");
+  }
+  
   KeyPathPatternComponent(VarDecl *storedProp, Kind kind,
                           CanType ComponentType)
-    : ValueAndKind(storedProp, kind), ComponentType(ComponentType) {}
+    : ValueAndKind(storedProp, kindForPacking(kind)),
+      ComponentType(ComponentType) {}
 
   KeyPathPatternComponent(ComputedPropertyId id, Kind kind,
                           SILFunction *getter,
                           SILFunction *setter,
                           ArrayRef<IndexPair> indices,
                           CanType ComponentType)
-    : ValueAndKind(getter, kind),
+    : ValueAndKind(getter, kindForPacking(kind)),
       SetterAndIdKind(setter, id.Kind),
       IdValue(id.Value),
       Indices(indices),
       ComponentType(ComponentType) {}
 
 public:
-  KeyPathPatternComponent() : ValueAndKind(nullptr, (Kind)0) {}
+  KeyPathPatternComponent() : ValueAndKind(nullptr, 0) {}
 
   bool isNull() const {
     return ValueAndKind.getPointer() == nullptr;
   }
 
   Kind getKind() const {
-    return ValueAndKind.getInt();
+    auto packedKind = ValueAndKind.getInt();
+    if (packedKind != UnpackedKind)
+      return (Kind)packedKind;
+    return (Kind)((uintptr_t)ValueAndKind.getPointer() >> KindPackingBits);
   }
   
   CanType getComponentType() const {
@@ -1515,6 +1543,9 @@ public:
       return static_cast<VarDecl*>(ValueAndKind.getPointer());
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
       llvm_unreachable("not a stored property");
     }
     llvm_unreachable("unhandled kind");
@@ -1523,6 +1554,9 @@ public:
   ComputedPropertyId getComputedPropertyId() const {
     switch (getKind()) {
     case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -1534,6 +1568,9 @@ public:
   SILFunction *getComputedPropertyGetter() const {
     switch (getKind()) {
     case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -1546,6 +1583,9 @@ public:
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::GettableProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
       return SetterAndIdKind.getPointer();
@@ -1556,6 +1596,9 @@ public:
   ArrayRef<IndexPair> getComputedPropertyIndices() const {
     switch (getKind()) {
     case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -1587,6 +1630,24 @@ public:
                               CanType ty) {
     return KeyPathPatternComponent(identifier, Kind::SettableProperty,
                                    getter, setter, indices, ty);
+  }
+  
+  static KeyPathPatternComponent
+  forOptional(Kind kind, CanType ty) {
+    switch (kind) {
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+      break;
+    case Kind::OptionalWrap:
+      assert(ty->getAnyOptionalObjectType()
+             && "optional wrap didn't form optional?!");
+      break;
+    case Kind::StoredProperty:
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      llvm_unreachable("not an optional kind");
+    }
+    return KeyPathPatternComponent(kind, ty);
   }
   
   void incrementRefCounts() const;
@@ -6371,6 +6432,12 @@ public:
     FOREACH_IMPL_RETURN(getNumCallArguments());
   }
 
+  unsigned getOperandIndexOfFirstArgument() {
+    FOREACH_IMPL_RETURN(getOperandIndexOfFirstArgument());
+  }
+
+#undef FOREACH_IMPL_RETURN
+
   /// The arguments passed to this instruction, without self.
   OperandValueArrayRef getArgumentsWithoutSelf() const {
     switch (Inst->getKind()) {
@@ -6394,10 +6461,24 @@ public:
     case ValueKind::TryApplyInst:
       return 0;
     case ValueKind::PartialApplyInst:
+      // The arguments to partial_apply are a suffix of the arguments to the
+      // the actually-called function.
       return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
     default:
       llvm_unreachable("not implemented for this instruction!");
     }
+  }
+
+  // Translate the index of the argument to the full apply or partial_apply into
+  // to the corresponding index into the arguments of the called function.
+  unsigned getCalleeArgIndex(Operand &oper) {
+    assert(oper.getUser() == Inst);
+    assert(oper.getOperandNumber() >= getOperandIndexOfFirstArgument());
+
+    unsigned appliedArgIdx =
+        oper.getOperandNumber() - getOperandIndexOfFirstArgument();
+
+    return getCalleeArgIndexOfFirstAppliedArg() + appliedArgIdx;
   }
 
   Operand &getArgumentRef(unsigned i) const { return getArgumentOperands()[i]; }
@@ -6445,8 +6526,6 @@ public:
       llvm_unreachable("not implemented for this instruction!");
     }
   }
-
-#undef FOREACH_IMPL_RETURN
 
   SILArgumentConvention getArgumentConvention(unsigned index) const {
     return getSubstCalleeConv().getSILArgumentConvention(index);

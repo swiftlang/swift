@@ -550,21 +550,20 @@ static bool isVersionIfConfigCondition(Expr *Condition) {
 
 } // end anonymous namespace
 
-/// Parse and populate a list of #if/#elseif/#else/#endif clauses.
+/// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
-template <typename ElemTy, unsigned N>
-static ParserStatus parseIfConfig(
-    Parser &P, SmallVectorImpl<IfConfigClause<ElemTy>> &Clauses,
-    SourceLoc &EndLoc, bool HadMissingEnd,
-    llvm::function_ref<void(SmallVectorImpl<ElemTy> &, bool)> parseElements) {
+ParserResult<IfConfigDecl> Parser::parseIfConfig(
+    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
+
+  SmallVector<IfConfigClause, 4> Clauses;
   Parser::StructureMarkerRAII ParsingDecl(
-      P, P.Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
+      *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
   bool foundActive = false;
   bool isVersionCondition = false;
   while (1) {
-    bool isElse = P.Tok.is(tok::pound_else);
-    SourceLoc ClauseLoc = P.consumeToken();
+    bool isElse = Tok.is(tok::pound_else);
+    SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     bool isActive = false;
 
@@ -572,110 +571,56 @@ static ParserStatus parseIfConfig(
     if (isElse) {
       isActive = !foundActive;
     } else {
-      llvm::SaveAndRestore<bool> S(P.InPoundIfEnvironment, true);
-      ParserResult<Expr> Result = P.parseExprSequence(diag::expected_expr,
+      llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
+      ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                       /*isBasic*/true,
                                                       /*isForDirective*/true);
       if (Result.isNull())
         return makeParserError();
       Condition = Result.get();
-      if (validateIfConfigCondition(Condition, P.Context, P.Diags)) {
+      if (validateIfConfigCondition(Condition, Context, Diags)) {
         // Error in the condition;
         isActive = false;
         isVersionCondition = false;
       } else if (!foundActive) {
         // Evaludate the condition only if we haven't found any active one.
-        isActive = evaluateIfConfigCondition(Condition, P.Context);
+        isActive = evaluateIfConfigCondition(Condition, Context);
         isVersionCondition = isVersionIfConfigCondition(Condition);
       }
     }
 
     foundActive |= isActive;
 
-    if (!P.Tok.isAtStartOfLine() && P.Tok.isNot(tok::eof)) {
-      P.diagnose(P.Tok.getLoc(),
-                 diag::extra_tokens_conditional_compilation_directive);
+    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
+      diagnose(Tok.getLoc(),
+               diag::extra_tokens_conditional_compilation_directive);
     }
 
     // Parse elements
-    SmallVector<ElemTy, N> Elements;
+    SmallVector<ASTNode, 16> Elements;
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
     } else {
-      DiagnosticTransaction DT(P.Diags);
-      P.skipUntilConditionalBlockClose();
+      DiagnosticTransaction DT(Diags);
+      skipUntilConditionalBlockClose();
       DT.abort();
     }
 
-    Clauses.push_back(IfConfigClause<ElemTy>(ClauseLoc, Condition,
-                                             P.Context.AllocateCopy(Elements),
-                                             isActive));
+    Clauses.emplace_back(ClauseLoc, Condition,
+                         Context.AllocateCopy(Elements), isActive);
 
-    if (P.Tok.isNot(tok::pound_elseif, tok::pound_else))
+    if (Tok.isNot(tok::pound_elseif, tok::pound_else))
       break;
 
     if (isElse)
-      P.diagnose(P.Tok, diag::expected_close_after_else_directive);
+      diagnose(Tok, diag::expected_close_after_else_directive);
   }
 
-  HadMissingEnd = P.parseEndIfDirective(EndLoc);
-  return makeParserSuccess();
-}
-
-/// Parse #if ... #endif in declarations position.
-ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
-  SmallVector<IfConfigClause<Decl *>, 4> Clauses;
   SourceLoc EndLoc;
-  bool HadMissingEnd = false;
-  auto Status = parseIfConfig<Decl *, 8>(
-      *this, Clauses, EndLoc, HadMissingEnd,
-      [&](SmallVectorImpl<Decl *> &Decls, bool IsActive) {
-    Optional<Scope> scope;
-    if (!IsActive)
-      scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
-                    /*inactiveConfigBlock=*/true);
+  bool HadMissingEnd = parseEndIfDirective(EndLoc);
 
-    ParserStatus Status;
-    bool PreviousHadSemi = true;
-    while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
-                      tok::eof)) {
-      if (Tok.is(tok::r_brace)) {
-        diagnose(Tok.getLoc(),
-                  diag::unexpected_rbrace_in_conditional_compilation_block);
-        // If we see '}', following declarations don't look like belong to
-        // the current decl context; skip them.
-        skipUntilConditionalBlockClose();
-        break;
-      }
-      Status |= parseDeclItem(PreviousHadSemi, Flags,
-                              [&](Decl *D) {Decls.push_back(D);});
-    }
-  });
-  if (Status.isError())
-    return makeParserErrorResult<IfConfigDecl>();
-
-  IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
-                                                 Context.AllocateCopy(Clauses),
-                                                 EndLoc, HadMissingEnd);
-  return makeParserResult(ICD);
-}
-
-/// Parse #if ... #endif in statements position.
-ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
-  SmallVector<IfConfigClause<ASTNode>, 4> Clauses;
-  SourceLoc EndLoc;
-  bool HadMissingEnd = false;
-  auto Status = parseIfConfig<ASTNode, 16>(
-      *this, Clauses, EndLoc, HadMissingEnd,
-      [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
-    parseBraceItems(Elements, Kind, IsActive
-                      ? BraceItemListKind::ActiveConditionalBlock
-                      : BraceItemListKind::InactiveConditionalBlock);
-  });
-  if (Status.isError())
-    return makeParserErrorResult<Stmt>();
-
-  auto *ICS = new (Context) IfConfigStmt(Context.AllocateCopy(Clauses),
+  auto *ICD = new (Context) IfConfigDecl(CurDeclContext,
+                                         Context.AllocateCopy(Clauses),
                                          EndLoc, HadMissingEnd);
-  return makeParserResult(ICS);
+  return makeParserResult(ICD);
 }

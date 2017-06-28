@@ -134,6 +134,82 @@ void dumpStackTraceEntry(unsigned index, void *framePC,
 LLVM_ATTRIBUTE_NOINLINE
 void printCurrentBacktrace(unsigned framesToSkip = 1);
 
+/// Debugger breakpoint ABI. This structure is passed to the debugger (and needs
+/// to be stable) and describes extra information about a fatal error or a
+/// non-fatal warning, which should be logged as a runtime issue. Please keep
+/// all integer values pointer-sized.
+struct RuntimeErrorDetails {
+  static const uintptr_t currentVersion = 2;
+
+  // ABI version, needs to be set to "currentVersion".
+  uintptr_t version;
+
+  // A short hyphenated string describing the type of the issue, e.g.
+  // "precondition-failed" or "exclusivity-violation".
+  const char *errorType;
+
+  // Description of the current thread's stack position.
+  const char *currentStackDescription;
+
+  // Number of frames in the current stack that should be ignored when reporting
+  // the issue (exluding the reportToDebugger/_swift_runtime_on_report frame).
+  // The remaining top frame should point to user's code where the bug is.
+  uintptr_t framesToSkip;
+
+  // Address of some associated object (if there's any).
+  void *memoryAddress;
+
+  // A structure describing an extra thread (and its stack) that is related.
+  struct Thread {
+    const char *description;
+    uint64_t threadID;
+    uintptr_t numFrames;
+    void **frames;
+  };
+
+  // Number of extra threads (excluding the current thread) that are related,
+  // and the pointer to the array of extra threads.
+  uintptr_t numExtraThreads;
+  Thread *threads;
+
+  // Describes a suggested fix-it. Text in [startLine:startColumn,
+  // endLine:endColumn) is to be replaced with replacementText.
+  struct FixIt {
+    const char *filename;
+    uintptr_t startLine;
+    uintptr_t startColumn;
+    uintptr_t endLine;
+    uintptr_t endColumn;
+    const char *replacementText;
+  };
+
+  // Describes some extra information, possible with fix-its, about the current
+  // runtime issue.
+  struct Note {
+    const char *description;
+    uintptr_t numFixIts;
+    FixIt *fixIts;
+  };
+
+  // Number of suggested fix-its, and the pointer to the array of them.
+  uintptr_t numFixIts;
+  FixIt *fixIts;
+
+  // Number of related notes, and the pointer to the array of them.
+  uintptr_t numNotes;
+  Note *notes;
+};
+
+enum: uintptr_t {
+  RuntimeErrorFlagNone = 0,
+  RuntimeErrorFlagFatal = 1 << 0
+};
+
+/// Debugger hook. Calling this stops the debugger with a message and details
+/// about the issues.
+void reportToDebugger(uintptr_t flags, const char *message,
+                      RuntimeErrorDetails *details = nullptr);
+
 // namespace swift
 }
 

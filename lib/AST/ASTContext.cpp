@@ -2664,7 +2664,8 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
 }
 
 ParenType *ParenType::get(const ASTContext &C, Type underlying,
-                          ParameterTypeFlags flags) {
+                          ParameterTypeFlags fl) {
+  auto flags = fl.withInOut(underlying->is<InOutType>());
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
   ParenType *&Result =
@@ -2735,6 +2736,14 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
                                properties, hasInOut);
   C.Impl.getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
+}
+
+TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
+                           ParameterTypeFlags fl)
+: Name(name), ElementType(ty), Flags(fl.withInOut(ty->is<InOutType>())) {
+  // FIXME: Re-enable this assertion and hunt down the callers that aren't
+  // setting parameter bits correctly.
+  // assert((ty->is<InOutType>() && fl.isInOut()) && "caller did not set flags");
 }
 
 void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3130,6 +3139,17 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   return properties;
 }
 
+ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getParams();
+  case TypeKind::GenericFunction:
+    return cast<GenericFunctionType>(this)->getParams();
+  default:
+    llvm_unreachable("Undefined function type");
+  }
+}
+
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
     return FunctionType::get(getInput(), getResult(), info);
@@ -3144,32 +3164,88 @@ AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   llvm_unreachable("unhandled function type");
 }
 
-FunctionType *FunctionType::get(Type Input, Type Result,
-                                const ExtInfo &Info) {
-  auto properties = getFunctionRecursiveProperties(Input, Result);
-  auto arena = getArena(properties);
-  uint16_t attrKey = Info.getFuncAttrKey();
+void AnyFunctionType::decomposeInput(
+    Type type, SmallVectorImpl<AnyFunctionType::Param> &result) {
+  switch (type->getKind()) {
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(type.getPointer());
+    for (auto &elt : tupleTy->getElements()) {
+      result.push_back(AnyFunctionType::Param(elt));
+    }
+    return;
+  }
+      
+  case TypeKind::Paren: {
+    auto ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
+    result.push_back(AnyFunctionType::Param(ty));
+    return;
+  }
+      
+  default:
+    result.push_back(AnyFunctionType::Param(type));
+    return;
+  }
+}
 
-  const ASTContext &C = Input->getASTContext();
+Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
+                                   bool canonicalVararg) {
+  SmallVector<TupleTypeElt, 4> elements;
+  for (const auto &param : params) {
+    Type eltType = param.getType();
+    if (param.isVariadic()) {
+      if (canonicalVararg)
+        eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});
+      else
+        eltType = ArraySliceType::get(eltType);
+    }
+    elements.push_back(TupleTypeElt(eltType, param.getLabel(),
+                                    param.getParameterFlags()));
+  }
+  return TupleType::get(elements, ctx);
+}
+
+FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
+                                Type result, const ExtInfo &info,
+                                bool canonicalVararg) {
+  return get(composeInput(result->getASTContext(), params, canonicalVararg),
+             result, info);
+}
+
+FunctionType *FunctionType::get(Type input, Type result,
+                                const ExtInfo &info) {
+  auto properties = getFunctionRecursiveProperties(input, result);
+  auto arena = getArena(properties);
+  uint16_t attrKey = info.getFuncAttrKey();
+
+  const ASTContext &C = input->getASTContext();
 
   FunctionType *&Entry
-    = C.Impl.getArena(arena).FunctionTypes[{Input, {Result, attrKey} }];
+    = C.Impl.getArena(arena).FunctionTypes[{input, {result, attrKey} }];
   if (Entry) return Entry;
-
-  return Entry = new (C, arena) FunctionType(Input, Result,
-                                             properties,
-                                             Info);
+  
+  SmallVector<AnyFunctionType::Param, 4> params;
+  AnyFunctionType::decomposeInput(input, params);
+  void *mem = C.Allocate(sizeof(FunctionType) +
+                           sizeof(AnyFunctionType::Param) * params.size(),
+                         alignof(FunctionType));
+  return Entry = new (mem) FunctionType(params, input, result,
+                                        properties, info);
 }
 
 // If the input and result types are canonical, then so is the result.
-FunctionType::FunctionType(Type input, Type output,
+FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
+                           Type input, Type output,
                            RecursiveTypeProperties properties,
                            const ExtInfo &Info)
     : AnyFunctionType(TypeKind::Function,
-                      (input->isCanonical() && output->isCanonical())
+                      (isCanonicalFunctionInputType(input) &&
+                       output->isCanonical())
                           ? &input->getASTContext()
                           : nullptr,
-                      input, output, properties, Info) {}
+                      input, output, properties, params.size(), Info) {
+  std::uninitialized_copy(params.begin(), params.end(),
+                          getTrailingObjects<AnyFunctionType::Param>());
+}
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature *sig,
@@ -3180,6 +3256,25 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(input.getPointer());
   ID.AddPointer(result.getPointer());
   ID.AddInteger(info.getFuncAttrKey());
+}
+
+/// If this is a ParenType, unwrap it to produce the underlying type.
+/// Otherwise, return \c type.
+static Type unwrapParenType(Type type) {
+  if (auto parenTy = dyn_cast<ParenType>(type.getPointer()))
+    return parenTy->getUnderlyingType();
+
+  return type;
+}
+
+GenericFunctionType *GenericFunctionType::get(GenericSignature *sig,
+                                              ArrayRef<Param> params,
+                                              Type result,
+                                              const ExtInfo &info,
+                                              bool canonicalVararg) {
+  return get(sig, composeInput(result->getASTContext(), params,
+                               canonicalVararg),
+             result, info);
 }
 
 GenericFunctionType *
@@ -3208,20 +3303,24 @@ GenericFunctionType::get(GenericSignature *sig,
   // point.
   auto &moduleForCanonicality = *ctx.TheBuiltinModule;
   bool isCanonical = sig->isCanonical()
-    && sig->isCanonicalTypeInContext(input, moduleForCanonicality)
+    && isCanonicalFunctionInputType(input)
+    && sig->isCanonicalTypeInContext(unwrapParenType(input),
+                                     moduleForCanonicality)
     && sig->isCanonicalTypeInContext(output, moduleForCanonicality);
 
   if (auto result
         = ctx.Impl.GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos)) {
     return result;
   }
-
-  // Allocate storage for the object.
-  void *mem = ctx.Allocate(sizeof(GenericFunctionType),
+  
+  SmallVector<AnyFunctionType::Param, 4> params;
+  AnyFunctionType::decomposeInput(input, params);
+  void *mem = ctx.Allocate(sizeof(GenericFunctionType) +
+                             sizeof(AnyFunctionType::Param) * params.size(),
                            alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(input, output);
-  auto result = new (mem) GenericFunctionType(sig, input, output, info,
+  auto result = new (mem) GenericFunctionType(sig, params, input, output, info,
                                               isCanonical ? &ctx : nullptr,
                                               properties);
 
@@ -3231,15 +3330,17 @@ GenericFunctionType::get(GenericSignature *sig,
 
 GenericFunctionType::GenericFunctionType(
                        GenericSignature *sig,
+                       ArrayRef<AnyFunctionType::Param> params,
                        Type input,
                        Type result,
                        const ExtInfo &info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)
   : AnyFunctionType(TypeKind::GenericFunction, ctx, input, result,
-                    properties, info),
-    Signature(sig)
-{}
+                    properties, params.size(), info), Signature(sig) {
+  std::uninitialized_copy(params.begin(), params.end(),
+                          getTrailingObjects<AnyFunctionType::Param>());
+}
 
 GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
                                                 const ASTContext &ctx) {

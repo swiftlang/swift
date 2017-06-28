@@ -23,6 +23,7 @@ target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 ; CHECK-IMPORTER: clang
 ; CHECK-IMPORTER: -fembed-bitcode
 ; CHECK-IMPORTER: -target
+; CHECK-IMPORTER-NOT: argument unused
 
 define i32 @f0() nounwind ssp {
        ret i32 0

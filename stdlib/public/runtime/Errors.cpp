@@ -243,11 +243,29 @@ reportNow(uint32_t flags, const char *message)
 #endif
 }
 
+LLVM_ATTRIBUTE_NOINLINE SWIFT_RUNTIME_EXPORT
+void _swift_runtime_on_report(uintptr_t flags, const char *message,
+                              RuntimeErrorDetails *details) {
+  // Do nothing. This function is meant to be used by the debugger.
+
+  // The following is necessary to avoid calls from being optimized out.
+  asm volatile("" // Do nothing.
+               : // Output list, empty.
+               : "r" (flags), "r" (message), "r" (details) // Input list.
+               : // Clobber list, empty.
+               );
+}
+
+void swift::reportToDebugger(uintptr_t flags, const char *message,
+                             RuntimeErrorDetails *details) {
+  _swift_runtime_on_report(flags, message, details);
+}
+
 /// Report a fatal error to system console, stderr, and crash logs.
 /// Does not crash by itself.
 void swift::swift_reportError(uint32_t flags,
                               const char *message) {
-#if NDEBUG
+#if defined(__APPLE__) && NDEBUG
   flags &= ~FatalErrorFlags::ReportBacktrace;
 #endif
   reportNow(flags, message);

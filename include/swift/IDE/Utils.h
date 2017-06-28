@@ -148,6 +148,7 @@ enum class SemaTokenKind {
   Invalid,
   ValueRef,
   ModuleRef,
+  ExprStart,
   StmtStart,
 };
 
@@ -164,6 +165,7 @@ struct SemaToken {
   DeclContext *DC = nullptr;
   Type ContainerType;
   Stmt *TrailingStmt = nullptr;
+  Expr *TrailingExpr = nullptr;
 
   SemaToken() = default;
   SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
@@ -175,6 +177,8 @@ struct SemaToken {
                                                Mod(Mod), Loc(Loc) { }
   SemaToken(Stmt *TrailingStmt) : Kind(SemaTokenKind::StmtStart),
                                   TrailingStmt(TrailingStmt) {}
+  SemaToken(Expr* TrailingExpr) : Kind(SemaTokenKind::ExprStart),
+                                  TrailingExpr(TrailingExpr) {}
   bool isValid() const { return !isInvalid(); }
   bool isInvalid() const { return Kind == SemaTokenKind::Invalid; }
 };
@@ -191,6 +195,7 @@ public:
   SourceManager &getSourceMgr() const;
 private:
   bool walkToExprPre(Expr *E) override;
+  bool walkToExprPost(Expr *E) override;
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
   bool walkToDeclPost(Decl *D) override;
   bool walkToStmtPre(Stmt *S) override;
@@ -211,6 +216,7 @@ private:
                   SourceLoc Loc, bool IsRef, Type Ty = Type());
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
+  bool tryResolve(Expr *Exp);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override;
 };

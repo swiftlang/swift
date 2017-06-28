@@ -233,6 +233,14 @@ public:
     return !isSpecial() && getIdentifier().isEditorPlaceholder();
   }
 
+  /// A representation of the name to be displayed to users. May be ambiguous
+  /// between identifiers and special names.
+  StringRef userFacingName() const {
+    if (empty())
+      return "_";
+    return getIdentifier().str();
+  }
+
   int compare(DeclBaseName other) const {
     // TODO: Sort special names cleverly
     return getIdentifier().compare(other.getIdentifier());
@@ -248,11 +256,6 @@ public:
 
   bool operator<(DeclBaseName RHS) const {
     return Ident.get() < RHS.Ident.get();
-  }
-
-  // TODO: Remove once migration to DeclBaseName has been completed
-  operator Identifier() {
-    return getIdentifier();
   }
 
   const void *getAsOpaquePointer() const { return Ident.get(); }

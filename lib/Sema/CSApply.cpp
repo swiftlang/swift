@@ -1227,19 +1227,15 @@ namespace {
     Expr *coerceToType(Expr *expr, Type toType,
                        ConstraintLocatorBuilder locator,
                        Optional<Pattern*> typeFromPattern = None);
-
-    using LevelTy = llvm::PointerEmbeddedInt<unsigned, 2>;
-
+    
     /// \brief Coerce the given expression (which is the argument to a call) to
     /// the given parameter type.
     ///
     /// This operation cannot fail.
     ///
     /// \param arg The argument expression.
-    /// \param paramType The parameter type.
-    /// \param applyOrLevel For function applications, the ApplyExpr that forms
-    /// the call. Otherwise, a specific level describing which parameter level
-    /// we're applying.
+    /// \param funcType The function type.
+    /// \param apply The ApplyExpr that forms the call.
     /// \param argLabels The argument labels provided for the call.
     /// \param hasTrailingClosure Whether the last argument is a trailing
     /// closure.
@@ -1247,8 +1243,8 @@ namespace {
     ///
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *
-    coerceCallArguments(Expr *arg, Type paramType,
-                        llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
+    coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
+                        ApplyExpr *apply,
                         ArrayRef<Identifier> argLabels,
                         bool hasTrailingClosure,
                         ConstraintLocatorBuilder locator);
@@ -1406,10 +1402,9 @@ namespace {
       }
 
       // Coerce the index argument.
-      index = coerceCallArguments(
-          index, indexTy, LevelTy(1), argLabels,
-          hasTrailingClosure,
-          locator.withPathElement(ConstraintLocator::SubscriptIndex));
+      index = coerceToType(index, indexTy,
+                           locator.withPathElement(
+                             ConstraintLocator::SubscriptIndex));
       if (!index)
         return nullptr;
 
@@ -4076,7 +4071,8 @@ namespace {
           baseTy &&
           !baseTy->hasUnresolvedType() &&
           !baseTy->isEqual(leafTy)) {
-        assert(leafTy->getAnyOptionalObjectType()->isEqual(baseTy));
+        assert(leafTy->getAnyOptionalObjectType()
+                     ->isEqual(baseTy->getLValueOrInOutObjectType()));
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
         baseTy = leafTy;
@@ -4751,19 +4747,16 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
   auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
-  auto shuffle =
+  return
     cs.cacheType(new (tc.Context) TupleShuffleExpr(
                      expr, mapping,
                      TupleShuffleExpr::SourceIsTuple,
                      callee,
                      tc.Context.AllocateCopy(variadicArgs),
+                     arrayType,
                      callerDefaultArgsCopy,
                      toSugarType));
-  shuffle->setVarargsArrayType(arrayType);
-  return shuffle;
 }
-
-
 
 Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                         int toScalarIdx,
@@ -4849,13 +4842,13 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
   Type destSugarTy = hasInit? toTuple
                             : TupleType::get(sugarFields, tc.Context);
-
-  return cs.cacheType(
-      new (tc.Context) TupleShuffleExpr(expr,
+                            
+  return cs.cacheType(new (tc.Context) TupleShuffleExpr(expr,
                                         tc.Context.AllocateCopy(elements),
                                         TupleShuffleExpr::SourceIsScalar,
                                         callee,
                                         tc.Context.AllocateCopy(variadicArgs),
+                                        arrayType,
                                      tc.Context.AllocateCopy(callerDefaultArgs),
                                         destSugarTy));
 }
@@ -5140,23 +5133,12 @@ static bool isReferenceToMetatypeMember(ConstraintSystem &cs, Expr *expr) {
   return false;
 }
 
-static unsigned computeCallLevel(
-    ConstraintSystem &cs, ConcreteDeclRef callee,
-    llvm::PointerUnion<ApplyExpr *, ExprRewriter::LevelTy> applyOrLevel) {
-  using LevelTy = ExprRewriter::LevelTy;
-
-  if (applyOrLevel.is<LevelTy>()) {
-    // Level specified by caller.
-    return applyOrLevel.get<LevelTy>();
-  }
-
+static unsigned computeCallLevel(ConstraintSystem &cs, ConcreteDeclRef callee,
+                                 ApplyExpr *apply) {
   // If we do not have a callee, return a level of 0.
   if (!callee) {
     return 0;
   }
-
-  // Determine the level based on the application itself.
-  auto *apply = applyOrLevel.get<ApplyExpr *>();
 
   // Only calls to members of types can have level > 0.
   auto calleeDecl = callee.getDecl();
@@ -5184,12 +5166,13 @@ static unsigned computeCallLevel(
 }
 
 Expr *ExprRewriter::coerceCallArguments(
-    Expr *arg, Type paramType,
-    llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
+    Expr *arg, AnyFunctionType *funcType,
+    ApplyExpr *apply,
     ArrayRef<Identifier> argLabels,
     bool hasTrailingClosure,
     ConstraintLocatorBuilder locator) {
-
+  
+  auto paramType = funcType->getInput();
   // Local function to produce a locator to refer to the ith element of the
   // argument tuple.
   auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
@@ -5221,6 +5204,9 @@ Expr *ExprRewriter::coerceCallArguments(
         }
       }
     }
+    
+    // Rebuild the function type.
+    funcType = FunctionType::get(paramType, funcType->getResult());
   }
 
   bool allParamsMatch = cs.getType(arg)->isEqual(paramType);
@@ -5230,10 +5216,12 @@ Expr *ExprRewriter::coerceCallArguments(
     findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine the level,
-  unsigned level = computeCallLevel(cs, callee, applyOrLevel);
+  unsigned level = computeCallLevel(cs, callee, apply);
 
   // Determine the parameter bindings.
-  auto params = decomposeParamType(paramType, callee.getDecl(), level);
+  auto params = funcType->getParams();
+  SmallVector<bool, 4> defaultMap;
+  computeDefaultMap(paramType, callee.getDecl(), level, defaultMap);
   auto args = decomposeArgType(cs.getType(arg), argLabels);
 
   // Quickly test if any further fix-ups for the argument types are necessary.
@@ -5247,7 +5235,7 @@ Expr *ExprRewriter::coerceCallArguments(
     
       for (size_t i = 0; i < params.size(); i++) {
         if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(argElts[i])) {
-          auto paramTy = params[i].Ty->getLValueOrInOutObjectType();
+          auto paramTy = params[i].getType()->getLValueOrInOutObjectType();
           auto argTy = cs.getType(dotExpr)->getLValueOrInOutObjectType();
           if (!paramTy->isEqual(argTy)) {
             allParamsMatch = false;
@@ -5262,9 +5250,9 @@ Expr *ExprRewriter::coerceCallArguments(
     return arg;
   
   MatchCallArgumentListener listener;
-  
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(args, params,
+                                                defaultMap,
                                                 hasTrailingClosure,
                                                 /*allowFixes=*/false, listener,
                                                 parameterBindings);
@@ -5322,11 +5310,11 @@ Expr *ExprRewriter::coerceCallArguments(
         return nullptr;
 
       // Record this parameter.
-      auto paramBaseType = param.Ty;
+      auto paramBaseType = param.getType();
       assert(sliceType.isNull() && "Multiple variadic parameters?");
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
       toSugarFields.push_back(
-          TupleTypeElt(sliceType, param.Label, param.parameterFlags));
+          TupleTypeElt(sliceType, param.getLabel(), param.getParameterFlags()));
       sources.push_back(TupleShuffleExpr::Variadic);
 
       // Convert the arguments.
@@ -5370,10 +5358,10 @@ Expr *ExprRewriter::coerceCallArguments(
       toSugarFields.push_back(TupleTypeElt(
                                 param.isVariadic()
                                   ? tc.getArraySliceType(arg->getLoc(),
-                                                         param.Ty)
-                                  : param.Ty,
-                                param.Label,
-                                param.parameterFlags));
+                                                         param.getType())
+                                  : param.getType(),
+                                param.getLabel(),
+                                param.getParameterFlags()));
 
       if (defArg) {
         callerDefaultArgs.push_back(defArg);
@@ -5395,12 +5383,12 @@ Expr *ExprRewriter::coerceCallArguments(
     sources.push_back(argIdx);
 
     // If the types exactly match, this is easy.
-    auto paramType = param.Ty;
+    auto paramType = param.getType();
     if (argType->isEqual(paramType)) {
       toSugarFields.push_back(
-          TupleTypeElt(argType, getArgLabel(argIdx), param.parameterFlags));
+          TupleTypeElt(argType, getArgLabel(argIdx), param.getParameterFlags()));
       fromTupleExprFields[argIdx] =
-          TupleTypeElt(paramType, getArgLabel(argIdx), param.parameterFlags);
+          TupleTypeElt(paramType, getArgLabel(argIdx), param.getParameterFlags());
       fromTupleExpr[argIdx] = arg;
       continue;
     }
@@ -5414,9 +5402,9 @@ Expr *ExprRewriter::coerceCallArguments(
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;
     fromTupleExprFields[argIdx] = TupleTypeElt(
-        cs.getType(convertedArg), getArgLabel(argIdx), param.parameterFlags);
+        cs.getType(convertedArg), getArgLabel(argIdx), param.getParameterFlags());
     toSugarFields.push_back(
-        TupleTypeElt(argType, param.Label, param.parameterFlags));
+        TupleTypeElt(argType, param.getLabel(), param.getParameterFlags()));
   }
 
   // Compute a new 'arg', from the bits we have.  We have three cases: the
@@ -5483,16 +5471,15 @@ Expr *ExprRewriter::coerceCallArguments(
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
   auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
-  auto *shuffle =
+  return
     cs.cacheType(new (tc.Context) TupleShuffleExpr(
                      arg, mapping,
                      isSourceScalar,
                      callee,
                      tc.Context.AllocateCopy(variadicArgs),
+                     sliceType,
                      callerDefaultArgsCopy,
                      paramType));
-  shuffle->setVarargsArrayType(sliceType);
-  return shuffle;
 }
 
 static ClosureExpr *getClosureLiteralExpr(Expr *expr) {
@@ -6713,7 +6700,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         SmallVector<Identifier, 2> argLabelsScratch;
 
         auto fnType = cs.getType(fn)->getAs<FunctionType>();
-        arg = coerceCallArguments(arg, fnType->getInput(),
+        arg = coerceCallArguments(arg, fnType,
                                   apply,
                                   apply->getArgumentLabels(argLabelsScratch),
                                   hasTrailingClosure,
@@ -6892,7 +6879,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   SmallVector<Identifier, 2> argLabelsScratch;
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
-    Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
+    Expr *arg = coerceCallArguments(origArg, fnType,
                                     apply,
                                     apply->getArgumentLabels(argLabelsScratch),
                                     hasTrailingClosure,
@@ -7512,6 +7499,10 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     diagnoseFailureForExpr(expr);
     return nullptr;
   }
+
+  // Mark any normal conformances used in this solution as "used".
+  for (auto &e : solution.Conformances)
+    TC.markConformanceUsed(e.second, DC);
 
   ExprRewriter rewriter(*this, solution, suppressDiagnostics, skipClosures);
   ExprWalker walker(rewriter);

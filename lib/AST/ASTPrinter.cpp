@@ -897,7 +897,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
           M, cast<ValueDecl>(Current));
       }
 
-      T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
+      T = T.subst(subMap,
+                  SubstFlags::DesugarMemberTypes | SubstFlags::UseErrorType);
     }
 
     printType(T);
@@ -2317,8 +2318,6 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 
   if (anyVar)
     printDocumentationComment(anyVar);
-  if (decl->isStatic())
-    printStaticKeyword(decl->getCorrectStaticSpelling());
 
   // FIXME: PatternBindingDecls don't have attributes themselves, so just assume
   // the variables all have the same attributes. This isn't exactly true
@@ -2326,6 +2325,12 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   if (anyVar) {
     printAttributes(anyVar);
     printAccessibility(anyVar);
+  }
+
+  if (decl->isStatic())
+    printStaticKeyword(decl->getCorrectStaticSpelling());
+
+  if (anyVar) {
     Printer << (anyVar->isSettable(anyVar->getDeclContext()) ? "var " : "let ");
   } else {
     Printer << "let ";
@@ -2360,7 +2365,21 @@ void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
 }
 
 void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
-  // FIXME: Pretty print #if decls
+  if (!Options.PrintIfConfig)
+    return;
+
+  for (auto &Clause : ICD->getClauses()) {
+    if (&Clause == &*ICD->getClauses().begin())
+      Printer << tok::pound_if << " /* condition */"; // FIXME: print condition
+    else if (Clause.Cond)
+      Printer << tok::pound_elseif << " /* condition */"; // FIXME: print condition
+    else
+      Printer << tok::pound_else;
+    printASTNodes(Clause.Elements);
+    Printer.printNewline();
+    indent();
+  }
+  Printer << tok::pound_endif;
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
@@ -3267,27 +3286,6 @@ void PrintAST::visitGuardStmt(GuardStmt *stmt) {
   visit(stmt->getBody());
 }
 
-void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
-  if (!Options.PrintIfConfig)
-    return;
-
-  for (auto &Clause : stmt->getClauses()) {
-    if (&Clause == &*stmt->getClauses().begin())
-      Printer << tok::pound_if << " "; // FIXME: print condition
-    else if (Clause.Cond)
-      Printer << tok::pound_elseif << ""; // FIXME: print condition
-    else
-      Printer << tok::pound_else;
-    Printer.printNewline();
-    if (printASTNodes(Clause.Elements)) {
-      Printer.printNewline();
-      indent();
-    }
-  }
-  Printer.printNewline();
-  Printer << tok::pound_endif;
-}
-
 void PrintAST::visitWhileStmt(WhileStmt *stmt) {
   Printer << tok::kw_while << " ";
   // FIXME: print condition
@@ -3366,8 +3364,11 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   // FIXME: print subject
   Printer << "{";
   Printer.printNewline();
-  for (CaseStmt *C : stmt->getCases()) {
-    visit(C);
+  for (auto N : stmt->getRawCases()) {
+    if (N.is<Stmt*>())
+      visit(cast<CaseStmt>(N.get<Stmt*>()));
+    else
+      visit(cast<IfConfigDecl>(N.get<Decl*>()));
   }
   Printer.printNewline();
   indent();

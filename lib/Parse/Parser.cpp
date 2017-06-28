@@ -282,7 +282,7 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
 }
 
 // TODO: Refactor into common implementation with swift::tokenize.
-std::vector<std::pair<RC<syntax::TokenSyntax>,
+std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                                  syntax::AbsolutePosition>>
 swift::tokenizeWithTrivia(const LangOptions &LangOpts,
                           const SourceManager &SM,
@@ -296,7 +296,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
           CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia,
           Offset, EndOffset);
-  std::vector<std::pair<RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   syntax::AbsolutePosition RunningPos;
   do {
@@ -770,7 +770,7 @@ void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
   assert(New != Prev && "Cannot conflict with self");
   diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
   diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
-           Prev->getName());
+           Prev->getBaseName());
 }
 
 struct ParserUnit::Implementation {

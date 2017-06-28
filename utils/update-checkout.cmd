@@ -1,1 +1,1 @@
-python update-checkout %*
+python "%~dp0\update-checkout" %*

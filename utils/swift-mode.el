@@ -20,6 +20,11 @@
     (set
      (make-local-variable 'parse-sexp-ignore-comments) t)))
 
+(unless (fboundp 'defvar-local)
+  (defmacro defvar-local (var val &optional docstring)
+    "Define VAR as a buffer-local variable with default value VAL."
+    `(make-variable-buffer-local (defvar ,var ,val ,docstring))))
+
 ;; Create mode-specific variables
 (defcustom swift-basic-offset 2
   "Default indentation width for Swift source"

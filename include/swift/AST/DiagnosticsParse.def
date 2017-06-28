@@ -182,6 +182,9 @@ ERROR(expected_decl,none,
       "expected declaration", ())
 ERROR(expected_identifier_in_decl,none,
       "expected identifier in %0 declaration", (StringRef))
+ERROR(number_cant_start_decl_name,none,
+      "%0 name can only start with a letter or underscore, not a number",
+      (StringRef))
 ERROR(expected_identifier_after_case_comma,none,
       "expected identifier after comma in enum 'case' declaration", ())
 ERROR(decl_redefinition,none,
@@ -1418,7 +1421,8 @@ WARNING(swift3_where_inside_brackets,none,
         "'where' clause next to generic parameters is deprecated "
         "and will be removed in the future version of Swift", ())
 ERROR(where_inside_brackets,none,
-        "'where' clause next to generic parameters is obsoleted", ())
+        "'where' clause next to generic parameters is obsolete, "
+        "must be written following the declaration's type", ())
 
 //------------------------------------------------------------------------------
 // Conditional compilation parsing diagnostics

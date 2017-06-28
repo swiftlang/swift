@@ -2,12 +2,13 @@
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=B1 -source-filename=%s
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=C1 -source-filename=%s
 
-// RUN: not --crash %target-swift-ide-test -code-completion -code-completion-token=A2 -source-filename=%s
-// RUN: not --crash %target-swift-ide-test -code-completion -code-completion-token=B2 -source-filename=%s
-// RUN: not --crash %target-swift-ide-test -code-completion -code-completion-token=C2 -source-filename=%s
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=A2 -source-filename=%s
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=B2 -source-filename=%s
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=C2 -source-filename=%s
 
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=A3 -source-filename=%s
 // RUN: not --crash %target-swift-ide-test -code-completion -code-completion-token=B3 -source-filename=%s
+
 // REQUIRES: asserts
 
 class a1<b#^A1^#> {}

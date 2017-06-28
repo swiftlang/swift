@@ -872,7 +872,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       auto pa =
         reqSigBuilder.resolveArchetype(
                                  storedType,
-                                 ArchetypeResolutionKind::CompleteWellFormed);
+                                 ArchetypeResolutionKind::AlwaysPartial);
       auto equivClass = pa->getOrCreateEquivalenceClass();
 
       // Find the conformance of this potential archetype to the protocol in
@@ -905,7 +905,8 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
     // We are at an explicit or inferred requirement.
     assert(source->kind == RequirementSource::Explicit ||
-           source->kind == RequirementSource::Inferred);
+           source->kind == RequirementSource::Inferred ||
+           source->kind == RequirementSource::QuietlyInferred);
 
     // Skip trivial path elements. These occur when querying a requirement
     // signature.

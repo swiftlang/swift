@@ -184,6 +184,121 @@ ExclusiveAccessTestSuite.test("PerThreadEnforcement") {
   }
 }
 
+// Helpers
+func doOne(_ f: () -> ()) { f() }
 
+func doTwo(_ f1: ()->(), _ f2: ()->()) { f1(); f2() }
+
+// No crash.
+ExclusiveAccessTestSuite.test("WriteNoescapeWrite") {
+  var x = 3
+  let c = { x = 7 }
+  // Inside may-escape closure `c`: [read] [dynamic]
+  // Inside never-escape closure: [modify] [dynamic]
+  doTwo(c, { x = 42 })
+  _blackHole(x)
+}
+
+// No crash.
+ExclusiveAccessTestSuite.test("InoutReadEscapeRead") {
+  var x = 3
+  let c = { let y = x; _blackHole(y) }
+  readAndPerform(&x, closure: c)
+  _blackHole(x)
+}
+
+ExclusiveAccessTestSuite.test("InoutReadEscapeWrite")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a read) started at")
+  .crashOutputMatches("Current access (a modification) started at")
+  .code
+{
+  var x = 3
+  let c = { x = 42 }
+  expectCrashLater()
+  readAndPerform(&x, closure: c) 
+  _blackHole(x)
+}
+
+ExclusiveAccessTestSuite.test("InoutWriteEscapeRead")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a read) started at")
+  .code
+{
+  var x = 3
+  let c = { let y = x; _blackHole(y) }
+  expectCrashLater()
+  modifyAndPerform(&x, closure: c)
+  _blackHole(x)
+}
+
+ExclusiveAccessTestSuite.test("InoutWriteEscapeWrite")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a modification) started at")
+  .code
+{
+  var x = 3
+  let c = { x = 42 }
+  expectCrashLater()
+  modifyAndPerform(&x, closure: c)
+  _blackHole(x)
+}
+
+// No crash.
+ExclusiveAccessTestSuite.test("InoutReadNoescapeRead") {
+  var x = 3
+  let c = { let y = x; _blackHole(y) }
+  doOne { readAndPerform(&x, closure: c) }
+}
+
+ExclusiveAccessTestSuite.test("InoutReadNoescapeWrite")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a read) started at")
+  .crashOutputMatches("Current access (a modification) started at")
+  .code
+{
+  var x = 3
+  let c = { x = 7 }
+  expectCrashLater()
+  doOne { readAndPerform(&x, closure: c) }
+}
+
+ExclusiveAccessTestSuite.test("InoutWriteEscapeRead")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a read) started at")
+  .code
+{
+  var x = 3
+  let c = { let y = x; _blackHole(y) }
+  expectCrashLater()
+  doOne { modifyAndPerform(&x, closure: c) }
+}
+
+ExclusiveAccessTestSuite.test("InoutWriteEscapeWrite")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a modification) started at")
+  .code
+{
+  var x = 3
+  let c = { x = 7 }
+  expectCrashLater()
+  doOne { modifyAndPerform(&x, closure: c) }
+}
 
 runAllTests()

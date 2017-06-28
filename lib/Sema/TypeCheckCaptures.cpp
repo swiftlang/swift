@@ -211,17 +211,11 @@ public:
 
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(VD);
-      bool isAutoClosure =
-          VD->getInterfaceType()->castTo<AnyFunctionType>()->isAutoClosure();
-      if (paramDecl && !isAutoClosure) {
+      if (paramDecl) {
         TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
                     paramDecl->getName())
             .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
                          "@escaping ");
-      } else if (isAutoClosure) {
-        // TODO: add in a fixit for autoclosure
-        TC.diagnose(VD->getLoc(), diag::noescape_autoclosure,
-                    paramDecl->getName());
       }
     }
   }
@@ -362,7 +356,7 @@ public:
       isNested = f->getDeclContext()->isLocalContext();
 
     if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
-      if (D->getNameStr() == "self") {
+      if (D->getBaseName() == D->getASTContext().Id_self) {
         TC.diagnose(DRE->getLoc(),
           diag::closure_implicit_capture_mutating_self);
       } else {

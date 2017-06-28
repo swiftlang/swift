@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -sil-serialize-witness-tables %s | %FileCheck %s
 
 // Check that compiler does not crash on the devirtualization of materializeForSet methods
 // and produces a correct code.

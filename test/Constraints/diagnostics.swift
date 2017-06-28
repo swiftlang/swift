@@ -983,3 +983,80 @@ let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
 for var i in 0..<10 { // expected-warning {{variable 'i' was never mutated; consider changing to 'let' constant}} {{5-9=}}
   _ = i + 1
 }
+
+// rdar://problem/32726044 - shrink reduced domains too far
+
+public protocol P_32726044 {}
+
+extension Int: P_32726044 {}
+extension Float: P_32726044 {}
+
+public func *(lhs: P_32726044, rhs: P_32726044) -> Double {
+  fatalError()
+}
+
+func rdar32726044() -> Float {
+  var f: Float = 0
+  f = Float(1) * 100 // Ok
+  let _: Float = Float(42) + 0 // Ok
+  return f
+}
+
+// SR-5045 - Attempting to return result of reduce(_:_:) in a method with no return produces ambiguous error
+func sr5045() {
+  let doubles: [Double] = [1, 2, 3]
+  return doubles.reduce(0, +)
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+}
+
+// rdar://problem/32934129 - QoI: misleading diagnostic
+class L_32934129<T : Comparable> {
+  init(_ value: T) { self.value = value }
+  init(_ value: T, _ next: L_32934129<T>?) {
+    self.value = value
+    self.next = next
+  }
+
+  var value: T
+  var next: L_32934129<T>? = nil
+
+  func length() -> Int {
+    func inner(_ list: L_32934129<T>?, _ count: Int) {
+    guard let list = list else { return count } // expected-error {{unexpected non-void return value in void function}}
+      return inner(list.next, count + 1)
+    }
+
+    return inner(self, 0) // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
+  }
+}
+
+// rdar://problem/31671195 - QoI: erroneous diagnostic - cannot call value of non-function type
+
+class C_31671195 {
+  var name: Int { fatalError() }
+  func name(_: Int) { fatalError() }
+}
+C_31671195().name(UInt(0))
+// expected-error@-1 {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+
+
+// rdar://problem/28456467 - QoI: erroneous diagnostic - cannot call value of non-function type
+
+class AST_28456467 {
+  var hasStateDef: Bool { return false }
+}
+
+protocol Expr_28456467 {}
+
+class ListExpr_28456467 : AST_28456467, Expr_28456467 {
+  let elems: [Expr_28456467]
+
+  init(_ elems:[Expr_28456467] ) {
+    self.elems = elems
+  }
+
+  override var hasStateDef: Bool {
+    return elems.first(where: { $0.hasStateDef }) != nil
+    // expected-error@-1 {{value of type 'Expr_28456467' has no member 'hasStateDef'}}
+  }
+}

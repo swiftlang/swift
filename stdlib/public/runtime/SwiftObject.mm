@@ -1425,17 +1425,48 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   
   if (filenameLength > INT_MAX)
     filenameLength = INT_MAX;
-  
-  reporter(
-    flags,
-    "*** %*s:%zu:%zu: implicit Objective-C entrypoint %c[%s %s] "
-    "is deprecated and will be removed in Swift 4; "
-    "add explicit '@objc' to the declaration to emit the Objective-C "
-    "entrypoint in Swift 4 and suppress this message\n",
-    (int)filenameLength, filename, line, column,
-    isInstanceMethod ? '-' : '+',
-    class_getName([self class]),
-    sel_getName(selector));
+
+  char *message, *nullTerminatedFilename;
+  asprintf(&message,
+           "implicit Objective-C entrypoint %c[%s %s] is deprecated and will "
+           "be removed in Swift 4",
+           isInstanceMethod ? '-' : '+',
+           class_getName([self class]),
+           sel_getName(selector));
+  asprintf(&nullTerminatedFilename, "%*s", (int)filenameLength, filename);
+
+  RuntimeErrorDetails::FixIt fixit = {
+    .filename = nullTerminatedFilename,
+    .startLine = line,
+    .endLine = line,
+    .startColumn = column,
+    .endColumn = column,
+    .replacementText = "@objc "
+  };
+  RuntimeErrorDetails::Note note = {
+    .description = "add '@objc' to expose this Swift declaration to Objective-C",
+    .numFixIts = 1,
+    .fixIts = &fixit
+  };
+  RuntimeErrorDetails details = {
+    .version = RuntimeErrorDetails::currentVersion,
+    .errorType = "implicit-objc-entrypoint",
+    .framesToSkip = 1,
+    .numNotes = 1,
+    .notes = &note
+  };
+  uintptr_t runtime_error_flags = RuntimeErrorFlagNone;
+  if (reporter == swift::fatalError)
+    runtime_error_flags = RuntimeErrorFlagFatal;
+  reportToDebugger(runtime_error_flags, message, &details);
+
+  reporter(flags,
+           "*** %s:%zu:%zu: %s; add explicit '@objc' to the declaration to "
+           "emit the Objective-C entrypoint in Swift 4 and suppress this "
+           "message\n",
+           nullTerminatedFilename, line, column, message);
+  free(message);
+  free(nullTerminatedFilename);
 }
 
 #endif

@@ -315,7 +315,6 @@ extension String.CharacterView : BidirectionalCollection {
       // others:
       //   0x3400-0xA4CF
       case 0x3400...0xa4cf: return true
-      // TODO: CJK punctuation
 
       // Repeat sub-300 check, this is beneficial for common cases of Latin
       // characters embedded within non-Latin script (e.g. newlines, spaces,
@@ -323,8 +322,6 @@ extension String.CharacterView : BidirectionalCollection {
       //
       // NOTE: CR-LF special case has already been checked.
       case 0x0000...0x02ff: return true
-
-      // TODO: general punctuation
 
       // Non-combining kana:
       //   0x3041-0x3096
@@ -343,6 +340,14 @@ extension String.CharacterView : BidirectionalCollection {
       // Precomposed Hangul syllables:
       //   0xAC00–0xD7AF
       case 0xac00...0xd7af: return true
+
+      // Common general use punctuation, excluding extenders:
+      //   0x2010-0x2029
+      case 0x2010...0x2029: return true
+
+      // CJK punctuation characters, excluding extenders:
+      //   0x3000-0x3029
+      case 0x3000...0x3029: return true
 
       default: return false
       }

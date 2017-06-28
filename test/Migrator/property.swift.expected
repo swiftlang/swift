@@ -6,7 +6,8 @@
 import Bar
 
 func foo(_ a : PropertyUserInterface) {
-  a.Field = 1
+  a.field = 1
+  a.url = 1
   _ = a.field
 }
 

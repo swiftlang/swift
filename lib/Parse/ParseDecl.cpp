@@ -2120,21 +2120,42 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
 ParserResult<Decl>
 Parser::parseDecl(ParseDeclOptions Flags,
                   llvm::function_ref<void(Decl*)> Handler) {
-  if (Tok.isAny(tok::pound_sourceLocation, tok::pound_line)) {
-    auto LineDirectiveStatus = parseLineDirective(Tok.is(tok::pound_line));
-    if (LineDirectiveStatus.isError())
-      return LineDirectiveStatus;
-    // If success, go on. line directive never produce decls.
-  }
 
   if (Tok.is(tok::pound_if)) {
-    auto IfConfigResult = parseDeclIfConfig(Flags);
+    auto IfConfigResult = parseIfConfig(
+      [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
+        Optional<Scope> scope;
+        if (!IsActive)
+          scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
+                        /*inactiveConfigBlock=*/true);
+
+        ParserStatus Status;
+        bool PreviousHadSemi = true;
+        while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
+                         tok::eof)) {
+          if (Tok.is(tok::r_brace)) {
+            diagnose(Tok.getLoc(),
+                      diag::unexpected_rbrace_in_conditional_compilation_block);
+            // If we see '}', following declarations don't look like belong to
+            // the current decl context; skip them.
+            skipUntilConditionalBlockClose();
+            break;
+          }
+          Status |= parseDeclItem(PreviousHadSemi, Flags,
+                                  [&](Decl *D) {Decls.emplace_back(D);});
+        }
+      });
+
     if (auto ICD = IfConfigResult.getPtrOrNull()) {
       // The IfConfigDecl is ahead of its members in source order.
       Handler(ICD);
       // Copy the active members into the entries list.
-      for (auto activeMember : ICD->getActiveMembers()) {
-        Handler(activeMember);
+      for (auto activeMember : ICD->getActiveClauseElements()) {
+        auto *D = activeMember.get<Decl*>();
+        if (isa<IfConfigDecl>(D))
+          // Don't hoist nested '#if'.
+          continue;
+        Handler(D);
       }
     }
     return IfConfigResult;
@@ -2739,6 +2760,23 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
 
   P.checkForInputIncomplete();
 
+  if (P.Tok.is(tok::integer_literal) || P.Tok.is(tok::floating_literal) ||
+      (P.Tok.is(tok::unknown) && isdigit(P.Tok.getText()[0]))) {
+    // Using numbers for identifiers is a common error for beginners, so it's
+    // worth handling this in a special way.
+    P.diagnose(P.Tok, diag::number_cant_start_decl_name, DeclKindName);
+
+    // Pretend this works as an identifier, which shouldn't be observable since
+    // actual uses of it will hit random other errors, e.g. `1()` won't be
+    // callable.
+    Result = P.Context.getIdentifier(P.Tok.getText());
+    Loc = P.Tok.getLoc();
+    P.consumeToken();
+
+    // We recovered, so this is a success.
+    return makeParserSuccess();
+  }
+
   if (P.Tok.isKeyword()) {
     P.diagnose(P.Tok, diag::keyword_cant_be_identifier, P.Tok.getText());
     P.diagnose(P.Tok, diag::backticks_to_escape)
@@ -2843,6 +2881,13 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
     auto endOfPrevious = getEndOfPreviousLoc();
     diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
       .fixItInsert(endOfPrevious, ";");
+  }
+
+  if (Tok.isAny(tok::pound_sourceLocation, tok::pound_line)) {
+    auto LineDirectiveStatus = parseLineDirective(Tok.is(tok::pound_line));
+    if (LineDirectiveStatus.isError())
+      skipUntilDeclRBrace(tok::semi, tok::pound_endif);
+    return LineDirectiveStatus;
   }
 
   auto Result = parseDecl(Options, handler);
@@ -3418,29 +3463,28 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
   // default to mutating.  get/address default to
   // non-mutating.
-  if (!D->isStatic()) {
-    switch (Kind) {
-    case AccessorKind::IsAddressor:
-      D->setAddressorKind(addressorKind);
-      break;
+  switch (Kind) {
+  case AccessorKind::IsAddressor:
+    D->setAddressorKind(addressorKind);
+    break;
 
-    case AccessorKind::IsGetter:
-      break;
+  case AccessorKind::IsGetter:
+    break;
 
-    case AccessorKind::IsMutableAddressor:
-      D->setAddressorKind(addressorKind);
-      LLVM_FALLTHROUGH;
+  case AccessorKind::IsMutableAddressor:
+    D->setAddressorKind(addressorKind);
+    LLVM_FALLTHROUGH;
 
-    case AccessorKind::IsSetter:
-    case AccessorKind::IsWillSet:
-    case AccessorKind::IsDidSet:
+  case AccessorKind::IsSetter:
+  case AccessorKind::IsWillSet:
+  case AccessorKind::IsDidSet:
+    if (D->isInstanceMember())
       D->setMutating();
-      break;
+    break;
 
-    case AccessorKind::IsMaterializeForSet:
-    case AccessorKind::NotAccessor:
-      llvm_unreachable("not parseable accessors");
-    }
+  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::NotAccessor:
+    llvm_unreachable("not parseable accessors");
   }
 
   return D;
@@ -4682,7 +4726,12 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   Token NameTok = Tok;
   SourceLoc NameLoc;
 
-  if (Tok.is(tok::identifier) || Tok.isKeyword()) {
+  if (Tok.isAny(tok::identifier, tok::integer_literal, tok::floating_literal,
+                tok::unknown) ||
+      Tok.isKeyword()) {
+    // This non-operator path is quite accepting of what tokens might be a name,
+    // because we're aggressive about recovering/providing good diagnostics for
+    // beginners.
     ParserStatus NameStatus =
         parseIdentifierDeclName(*this, SimpleName, NameLoc, "function",
                                 tok::l_paren, tok::arrow, tok::l_brace,

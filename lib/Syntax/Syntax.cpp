@@ -16,9 +16,6 @@
 using namespace swift;
 using namespace swift::syntax;
 
-Syntax::Syntax(const RC<SyntaxData> Root, const SyntaxData *Data)
-  : Root(Root), Data(Data) {}
-
 RC<RawSyntax> Syntax::getRaw() const {
   return Data->getRaw();
 }

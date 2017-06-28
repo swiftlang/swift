@@ -208,6 +208,20 @@ llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
   return call;
 }
 
+llvm::Value *IRGenFunction::emitAllocEmptyBoxCall() {
+  llvm::Attribute::AttrKind attrKinds[] = {
+    llvm::Attribute::NoUnwind,
+  };
+  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
+                                       llvm::AttributeSet::FunctionIndex,
+                                       attrKinds);
+  llvm::CallInst *call =
+    Builder.CreateCall(IGM.getAllocEmptyBoxFn(), {});
+  call->setCallingConv(IGM.DefaultCC);
+  call->setAttributes(attrs);
+  return call;
+}
+
 static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
                                  std::initializer_list<llvm::Value *> args) {
   auto cc = IGF.IGM.DefaultCC;

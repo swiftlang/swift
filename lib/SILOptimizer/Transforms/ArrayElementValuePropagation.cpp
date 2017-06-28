@@ -320,7 +320,14 @@ public:
     for (const ArrayAllocation::AppendContentOfReplacement &Repl : Repls) {
       ArraySemanticsCall AppendContentsOf(Repl.AppendContentOfCall);
       assert(AppendContentsOf && "Must be AppendContentsOf call");
-      
+
+      NominalTypeDecl *AppendSelfArray = AppendContentsOf.getSelf()->getType().
+        getSwiftRValueType()->getAnyNominal();
+
+      // In case if it's not an Array, but e.g. an ContiguousArray
+      if (AppendSelfArray != Ctx.getArrayDecl())
+        continue;
+
       SILType ArrayType = Repl.Array->getType();
       auto *NTD = ArrayType.getSwiftRValueType()->getAnyNominal();
       SubstitutionMap ArraySubMap = ArrayType.getSwiftRValueType()

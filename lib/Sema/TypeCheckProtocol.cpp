@@ -517,24 +517,6 @@ namespace {
   };
 } // end anonymous namespace
 
-///\ brief Decompose the given type into a set of tuple elements.
-static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
-  SmallVector<TupleTypeElt, 4> result;
-
-  if (auto tupleTy = dyn_cast<TupleType>(type.getPointer())) {
-    result.append(tupleTy->getElements().begin(), tupleTy->getElements().end());
-    return result;
-  }
-
-  if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-    result.push_back(parenTy->getUnderlyingType());
-    return result;
-  }
-
-  result.push_back(type);
-  return result;
-}
-
 /// If the given type is a direct reference to an associated type of
 /// the given protocol, return the referenced associated type.
 static AssociatedTypeDecl *
@@ -919,10 +901,8 @@ matchWitness(TypeChecker &tc,
   if (decomposeFunctionType) {
     // Decompose function types into parameters and result type.
     auto reqFnType = reqType->castTo<AnyFunctionType>();
-    auto reqInputType = reqFnType->getInput();
     auto reqResultType = reqFnType->getResult()->getRValueType();
     auto witnessFnType = witnessType->castTo<AnyFunctionType>();
-    auto witnessInputType = witnessFnType->getInput();
     auto witnessResultType = witnessFnType->getResult()->getRValueType();
 
     // Result types must match.
@@ -947,8 +927,8 @@ matchWitness(TypeChecker &tc,
     // Parameter types and kinds must match. Start by decomposing the input
     // types into sets of tuple elements.
     // Decompose the input types into parameters.
-    auto reqParams = decomposeIntoTupleElements(reqInputType);
-    auto witnessParams = decomposeIntoTupleElements(witnessInputType);
+    auto reqParams = reqFnType->getParams();
+    auto witnessParams = witnessFnType->getParams();
 
     // If the number of parameters doesn't match, we're done.
     if (reqParams.size() != witnessParams.size())
@@ -959,7 +939,7 @@ matchWitness(TypeChecker &tc,
     for (unsigned i = 0, n = reqParams.size(); i != n; ++i) {
       // Variadic bits must match.
       // FIXME: Specialize the match failure kind
-      if (reqParams[i].isVararg() != witnessParams[i].isVararg())
+      if (reqParams[i].isVariadic() != witnessParams[i].isVariadic())
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
       // Gross hack: strip a level of unchecked-optionality off both
@@ -1391,7 +1371,7 @@ bool WitnessChecker::findBestWitness(
 
       auto lookupOptions = defaultUnqualifiedLookupOptions;
       lookupOptions |= NameLookupFlags::KnownPrivate;
-      auto lookup = TC.lookupUnqualified(overlay, requirement->getName(),
+      auto lookup = TC.lookupUnqualified(overlay, requirement->getBaseName(),
                                          SourceLoc(), lookupOptions);
       for (auto candidate : lookup)
         witnesses.push_back(candidate.Decl);
@@ -2654,7 +2634,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.PrintDocumentationComments = false;
     Options.AccessibilityFilter = Accessibility::Private;
     Options.PrintAccessibility = false;
-    Options.ExcludeAttrList.push_back(DAK_Available);
+    Options.SkipAttributes = true;
     Options.FunctionBody = [](const ValueDecl *VD) { return getCodePlaceholder(); };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
@@ -3122,9 +3102,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           auto proto = Conformance->getProtocol();
           auto &diags = proto->getASTContext().Diags;
           diags.diagnose(witness->getLoc(),
-                         proto->getASTContext().LangOpts.isSwiftVersion3()
-                           ? diag::witness_self_same_type_warn
-                           : diag::witness_self_same_type,
+                         diag::witness_self_same_type,
                          witness->getDescriptiveKind(),
                          witness->getFullName(),
                          Conformance->getType(),
@@ -3291,17 +3269,17 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
   auto *moduleDecl = dc->getParentModule();
-  auto *reqtSig = assocType->getProtocol()->getRequirementSignature();
+  auto *genericSig = proto->getGenericSignature();
   auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                          assocType);
 
-  if (auto superclass = reqtSig->getSuperclassBound(depTy, *moduleDecl)) {
+  if (auto superclass = genericSig->getSuperclassBound(depTy, *moduleDecl)) {
     if (!superclass->isExactSuperclassOf(type))
       return superclass->getAnyNominal();
   }
 
   // Check protocol conformances.
-  for (auto reqProto : reqtSig->getConformsTo(depTy, *moduleDecl)) {
+  for (auto reqProto : genericSig->getConformsTo(depTy, *moduleDecl)) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
 
@@ -5471,20 +5449,8 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   }
 
   // If we're using this conformance, note that.
-  if (options.contains(ConformanceCheckFlags::Used) &&
-      lookupResult->isConcrete()) {
-    auto concrete = lookupResult->getConcrete();
-    auto normalConf = concrete->getRootNormalConformance();
-
-    // If the conformance is incomplete, queue it for completion.
-    if (normalConf->isIncomplete())
-      UsedConformances.insert(normalConf);
-
-    // Record the usage of this conformance in the enclosing source
-    // file.
-    if (auto sf = DC->getParentSourceFile()) {
-      sf->addUsedConformance(normalConf);
-    }
+  if (options.contains(ConformanceCheckFlags::Used)) {
+    markConformanceUsed(*lookupResult, DC);
   }
 
   // When requested, print the conformance access path used to find this
@@ -5545,6 +5511,24 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
   auto conformance = conformsToProtocol(T, Proto, DC, options, ComplainLoc);
   return conformance ? ConformsToProtocolResult::success(*conformance)
                      : ConformsToProtocolResult::failure();
+}
+
+void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
+                                      DeclContext *dc) {
+  if (conformance.isAbstract()) return;
+
+  auto normalConformance =
+    conformance.getConcrete()->getRootNormalConformance();
+
+  // Make sure that the type checker completes this conformance.
+  if (normalConformance->isIncomplete())
+    UsedConformances.insert(normalConformance);
+
+  // Record the usage of this conformance in the enclosing source
+  // file.
+  if (auto sf = dc->getParentSourceFile()) {
+    sf->addUsedConformance(normalConformance);
+  }
 }
 
 Optional<ProtocolConformanceRef>

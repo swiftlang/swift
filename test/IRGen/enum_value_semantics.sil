@@ -456,7 +456,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %T20enum_value_semantics22MultiPayloadNontrivialO, %T20enum_value_semantics22MultiPayloadNontrivialO* %0, i32 0, i32 1
 // CHECK-NEXT: [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i8*
 // CHECK-NEXT: [[TAG:%.*]] = load i8, i8* [[TAG_ADDR]], align 8
-// CHECK-NEXT: @_T020enum_value_semantics22MultiPayloadNontrivialOWy
+// CHECK-NEXT: @_T020enum_value_semantics22MultiPayloadNontrivialOWe
 // CHECK-NEXT: ret void
 
 
@@ -499,7 +499,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[PAYLOAD_0:%.*]] = load i64, i64* [[PAYLOAD_0_ADDR]], align 8
 // CHECK-NEXT: [[PAYLOAD_1_ADDR:%.*]] = getelementptr
 // CHECK-NEXT: [[PAYLOAD_1:%.*]] = load i64, i64* [[PAYLOAD_1_ADDR]], align 8
-// CHECK:      call void @_T020enum_value_semantics31MultiPayloadNontrivialSpareBitsOWy
+// CHECK:      call void @_T020enum_value_semantics31MultiPayloadNontrivialSpareBitsOWe
 // CHECK-NEXT: ret void
 
 

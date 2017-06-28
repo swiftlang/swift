@@ -19,7 +19,7 @@ except ImportError:
 
 import os
 
-import diagnostics
+from . import diagnostics
 
 
 HOME = os.environ.get("HOME", "/")

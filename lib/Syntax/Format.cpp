@@ -28,15 +28,15 @@ Syntax syntax::format(Syntax Tree) {
   case SyntaxKind::StructDecl: {
     auto Struct = Tree.castTo<StructDeclSyntax>();
     auto LeftBrace = Struct.getLeftBraceToken();
-    if (!LeftBrace->LeadingTrivia.contains(TriviaKind::Newline)) {
-      auto NewLeading = Trivia::newlines(1) + LeftBrace->LeadingTrivia;
+    if (!LeftBrace.getLeadingTrivia().contains(TriviaKind::Newline)) {
+      auto NewLeading = Trivia::newlines(1) + LeftBrace.getLeadingTrivia();
 
       const auto NewMembers =
         format(Struct.getMembers()).castTo<DeclMembersSyntax>();
 
-      LeftBrace = LeftBrace->withLeadingTrivia(NewLeading);
+      auto NewLeftBrace = LeftBrace.withLeadingTrivia(NewLeading);
 
-      return Struct.withMembers(NewMembers).withLeftBrace(LeftBrace);
+      return Struct.withMembers(NewMembers).withLeftBrace(NewLeftBrace);
     }
     break;
   }

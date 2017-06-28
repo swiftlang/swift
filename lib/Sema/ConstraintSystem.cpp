@@ -21,11 +21,30 @@
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Format.h"
 
 using namespace swift;
 using namespace constraints;
 
 #define DEBUG_TYPE "ConstraintSystem"
+
+ExpressionTimer::~ExpressionTimer() {
+  auto elapsed = getElapsedProcessTimeInFractionalSeconds();
+  unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
+
+  if (ShouldDump) {
+    // Round up to the nearest 100th of a millisecond.
+    llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100)
+                 << "ms\t";
+    E->getLoc().print(llvm::errs(), Context.SourceMgr);
+    llvm::errs() << "\n";
+  }
+
+  if (WarnLimit != 0 && elapsedMS >= WarnLimit && E->getLoc().isValid())
+    Context.Diags.diagnose(E->getLoc(), diag::debug_long_expression,
+                           elapsedMS, WarnLimit)
+      .highlight(E->getSourceRange());
+}
 
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
                                    ConstraintSystemOptions options)
@@ -1753,15 +1772,13 @@ Type Solution::simplifyType(Type type) const {
 }
 
 size_t Solution::getTotalMemory() const {
-  return sizeof(*this) +
-    typeBindings.getMemorySize() +
-    overloadChoices.getMemorySize() +
-    ConstraintRestrictions.getMemorySize() +
-    llvm::capacity_in_bytes(Fixes) +
-    DisjunctionChoices.getMemorySize() +
-    OpenedTypes.getMemorySize() +
-    OpenedExistentialTypes.getMemorySize() +
-    (DefaultedConstraints.size() * sizeof(void*));
+  return sizeof(*this) + typeBindings.getMemorySize() +
+         overloadChoices.getMemorySize() +
+         ConstraintRestrictions.getMemorySize() +
+         llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
+         OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
+         (DefaultedConstraints.size() * sizeof(void *)) +
+         llvm::capacity_in_bytes(Conformances);
 }
 
 DeclName OverloadChoice::getName() const {

@@ -187,9 +187,9 @@ ERROR(invalid_conditional_compilation_flag,none,
       "conditional compilation flags must be valid Swift identifiers (rather than '%0')",
       (StringRef))
 
-ERROR(cannot_assign_value_to_conditional_compilation_flag,none,
-      "conditional compilation flags do not have values in Swift; they are either present or absent"
-      " (rather than '%0')", (StringRef))
+WARNING(cannot_assign_value_to_conditional_compilation_flag,none,
+        "conditional compilation flags do not have values in Swift; they are "
+        "either present or absent (rather than '%0')", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

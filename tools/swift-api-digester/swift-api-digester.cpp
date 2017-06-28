@@ -299,11 +299,14 @@ struct SDKNodeInitInfo {
   Ownership Ownership = Ownership::Strong;
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
+  StringRef SuperclassUsr;
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
   SDKNodeInitInfo(SDKContext &Ctx, Type Ty);
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
+
+class SDKNodeRoot;
 
 class SDKNode {
   typedef std::vector<SDKNode*>::iterator ChildIt;
@@ -351,6 +354,7 @@ public:
   unsigned getChildIndex(NodePtr Child) const;
   const SDKNode* getOnlyChild() const;
   SDKContext &getSDKContext() const { return Ctx; }
+  SDKNodeRoot *getRootNode() const;
   template <typename T> const T *getAs() const;
   template <typename T> T *getAs();
 };
@@ -386,6 +390,27 @@ public:
   bool isSDKPrivate() const;
   bool isDeprecated() const;
   bool isStatic() const { return IsStatic; };
+};
+
+class SDKNodeRoot :public SDKNode {
+  /// This keeps track of all decl descendants with USRs.
+  llvm::StringMap<SDKNodeDecl*> DescendantDeclTable;
+
+public:
+  SDKNodeRoot(SDKNodeInitInfo Info) : SDKNode(Info, SDKNodeKind::Root) {}
+  static SDKNode *getInstance(SDKContext &Ctx);
+  static bool classof(const SDKNode *N);
+  void registerDescendant(SDKNode *D) {
+    if (auto DD = dyn_cast<SDKNodeDecl>(D)) {
+      assert(!DD->getUsr().empty());
+      DescendantDeclTable[DD->getUsr()] = DD;
+    }
+  }
+  Optional<SDKNodeDecl*> getDescendantByUsr(StringRef Usr) {
+    if (DescendantDeclTable.count(Usr))
+      return DescendantDeclTable[Usr];
+    return None;
+  }
 };
 
 NodePtr UpdatedNodesMap::findUpdateCounterpart(const SDKNode *Node) const {
@@ -474,9 +499,27 @@ const SDKNode* SDKNode::getOnlyChild() const {
   return *Children.begin();
 }
 
+SDKNodeRoot *SDKNode::getRootNode() const {
+  for (auto *Root = const_cast<SDKNode*>(this); ; Root = Root->getParent()) {
+    if (auto Result = dyn_cast<SDKNodeRoot>(Root))
+      return Result;
+  }
+  llvm_unreachable("Unhandled SDKNodeKind in switch.");
+}
+
 void SDKNode::addChild(SDKNode *Child) {
   Child->Parent = this;
   Children.push_back(Child);
+  if (auto *Root = dyn_cast<SDKNodeRoot>(this)) {
+    struct DeclCollector: public SDKNodeVisitor {
+      SDKNodeRoot &Root;
+      DeclCollector(SDKNodeRoot &Root): Root(Root) {}
+      void visit(NodePtr Node) override {
+        Root.registerDescendant(Node);
+      }
+    } Collector(*Root);
+    SDKNode::preorderVisit(Child, Collector);
+  }
 }
 
 ArrayRef<SDKNode*> SDKNode::getChildren() const {
@@ -601,13 +644,6 @@ bool SDKNodeType::hasTypeAttribute(TypeAttrKind DAKind) const {
     TypeAttributes.end();
 }
 
-class SDKNodeRoot : public SDKNode {
-public:
-  SDKNodeRoot(SDKNodeInitInfo Info) : SDKNode(Info, SDKNodeKind::Root) {}
-  static SDKNode *getInstance(SDKContext &Ctx);
-  static bool classof(const SDKNode *N);
-};
-
 SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   SDKNodeInitInfo Info(Ctx);
   Info.Name = Ctx.buffer("TopLevel");
@@ -683,10 +719,33 @@ SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
 }
 
 class SDKNodeTypeDecl : public SDKNodeDecl {
+  StringRef SuperclassUsr;
 public:
-  SDKNodeTypeDecl(SDKNodeInitInfo Info) : SDKNodeDecl(Info,
-                                                      SDKNodeKind::TypeDecl) {}
+  SDKNodeTypeDecl(SDKNodeInitInfo Info) : SDKNodeDecl(Info, SDKNodeKind::TypeDecl),
+                                          SuperclassUsr(Info.SuperclassUsr) {}
   static bool classof(const SDKNode *N);
+  StringRef getSuperClassUsr() const { return SuperclassUsr; }
+
+  Optional<SDKNodeTypeDecl*> getSuperclass() const {
+    if (SuperclassUsr.empty())
+      return None;
+    return (*getRootNode()->getDescendantByUsr(SuperclassUsr))->
+      getAs<SDKNodeTypeDecl>();
+  }
+
+  /// Finding the node through all children, including the inheritted ones,
+  /// whose printed name matches with the given name.
+  Optional<SDKNodeDecl*> lookupChildByPrintedName(StringRef Name) const {
+    for (auto C : getChildren()) {
+      if (C->getPrintedName() == Name)
+        return C->getAs<SDKNodeDecl>();
+    }
+    // Finding from the inheritance chain.
+    if (auto Super = getSuperclass()) {
+      return (*Super)->lookupChildByPrintedName(Name);
+    }
+    return None;
+  }
 };
 
 class SDKNodeTypeAlias : public SDKNodeDecl {
@@ -827,6 +886,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       break;
     case KeyKind::KK_moduleName:
       Info.ModuleName = GetScalarString(Pair.getValue());
+      break;
+    case KeyKind::KK_superclassUsr:
+      Info.SuperclassUsr = GetScalarString(Pair.getValue());
       break;
     case KeyKind::KK_throwing:
       Info.IsThrowing = true;
@@ -1092,6 +1154,12 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
     IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
     IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
     Ownership(getOwnership(VD)) {
+
+  // Calculate usr for its super class.
+  if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
+    if (auto *Super = CD->getSuperclassDecl())
+      SuperclassUsr = calculateUsr(Ctx, Super);
+  }
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
 }
@@ -1331,7 +1399,8 @@ public:
     llvm::array_pod_sort(ClangMacros.begin(), ClangMacros.end(),
        [](ValueDecl * const *lhs,
           ValueDecl * const *rhs) -> int {
-         return (*lhs)->getNameStr().compare((*rhs)->getNameStr());
+         return (*lhs)->getBaseName().userFacingName().compare(
+                  (*rhs)->getBaseName().userFacingName());
        });
 
     for (auto *VD : ClangMacros)
@@ -1439,6 +1508,13 @@ namespace swift {
               auto Index = F->getSelfIndex();
               out.mapRequired(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(),
                               Index);
+            }
+          }
+          if (auto *TD = dyn_cast<SDKNodeTypeDecl>(value)) {
+            auto Super = TD->getSuperClassUsr();
+            if (!Super.empty()) {
+              out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassUsr).data(),
+                              Super);
             }
           }
           auto Attributes = D->getDeclAttributes();
@@ -2666,7 +2742,8 @@ void DiagnosisEmitter::collectAddedDecls(NodePtr Root,
 SDKNodeDecl *DiagnosisEmitter::findAddedDecl(const SDKNodeDecl *Root) {
   for (auto *Added : AddedDecls) {
     if (Root->getKind() == Added->getKind() &&
-        Root->getPrintedName() == Added->getPrintedName())
+        Root->getPrintedName() == Added->getPrintedName() &&
+        Root->getUsr() == Added->getUsr())
       return Added;
   }
   return nullptr;
@@ -2776,6 +2853,22 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
         return;
       }
     }
+
+    // We should exlude those declarations that are pulled up to the super classes.
+    bool FoundInSuperclass = false;
+    if (auto PD = dyn_cast<SDKNodeDecl>(Node->getParent())) {
+      if (PD->isAnnotatedAs(NodeAnnotation::Updated)) {
+        // Get the updated counterpart of the parent decl.
+        if (auto RTD = dyn_cast<SDKNodeTypeDecl>(UpdateMap.
+            findUpdateCounterpart(PD))) {
+          // Look up by the printed name in the counterpart.
+          FoundInSuperclass =
+            RTD->lookupChildByPrintedName(Node->getPrintedName()).hasValue();
+        }
+      }
+    }
+    if (FoundInSuperclass)
+      return;
     RemovedDecls.Diags.emplace_back(Node->getDeclKind(),
                                     Node->getFullyQualifiedName(),
                                     Node->isDeprecated());

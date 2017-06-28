@@ -170,7 +170,7 @@ func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-warning{{@noesc
 
 // Autoclosure implies noescape, but produce nice diagnostics so people know
 // why noescape problems happen.
-func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping because it was declared @autoclosure}}
+func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping}}
   doesEscape { a() }  // expected-error {{closure use of non-escaping parameter 'a' may allow it to escape}}
 }
 
@@ -304,6 +304,7 @@ func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape (T) -> U) -> U
   // expected-warning@-2{{@noescape is the default and is deprecated}} {{46-56=}}
   // expected-warning@-3{{@noescape is the default and is deprecated}} {{57-66=}}
   return g(f)
+  // expected-warning@-1{{passing a non-escaping function parameter 'f' to a call to a non-escaping function parameter}}
 }
 
 // <rdar://problem/19997577> @noescape cannot be applied to locals, leading to duplication of code

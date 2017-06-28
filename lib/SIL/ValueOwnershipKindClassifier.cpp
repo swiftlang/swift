@@ -62,6 +62,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, AllocStack)
 CONSTANT_OWNERSHIP_INST(Trivial, BindMemory)
 CONSTANT_OWNERSHIP_INST(Trivial, BeginAccess)
+CONSTANT_OWNERSHIP_INST(Trivial, BeginUnpairedAccess)
 CONSTANT_OWNERSHIP_INST(Trivial, BridgeObjectToWord)
 CONSTANT_OWNERSHIP_INST(Trivial, ClassMethod)
 CONSTANT_OWNERSHIP_INST(Trivial, DynamicMethod)
@@ -144,7 +145,6 @@ CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
     assert(!I->hasValue() && "Expected an instruction without a result");      \
     llvm_unreachable("Instruction without a result can not have ownership");   \
   }
-NO_RESULT_OWNERSHIP_INST(BeginUnpairedAccess)
 NO_RESULT_OWNERSHIP_INST(DeallocStack)
 NO_RESULT_OWNERSHIP_INST(DeallocRef)
 NO_RESULT_OWNERSHIP_INST(DeallocPartialRef)

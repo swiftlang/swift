@@ -328,6 +328,12 @@ protected:
     Pos--;
   }
 
+  StringRef consumeAll() {
+    StringRef str = Text.drop_front(Pos);
+    Pos = Text.size();
+    return str;
+  }
+
   void pushNode(NodePointer Nd) {
     NodeStack.push_back(Nd, *this);
   }

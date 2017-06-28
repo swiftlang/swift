@@ -104,11 +104,11 @@ public:
   }
 
   constexpr static KeyPathComponentHeader
-  forStructComponentWithUnresolvedOffset() {
+  forStructComponentWithUnresolvedFieldOffset() {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_StructTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
-      | _SwiftKeyPathComponentHeader_UnresolvedOffsetPayload);
+      | _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload);
   }
   
   constexpr static KeyPathComponentHeader
@@ -128,11 +128,19 @@ public:
   }
   
   constexpr static KeyPathComponentHeader
-  forClassComponentWithUnresolvedOffset() {
+  forClassComponentWithUnresolvedFieldOffset() {
     return KeyPathComponentHeader(
-      (_SwiftKeyPathComponentHeader_StructTag
+      (_SwiftKeyPathComponentHeader_ClassTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
-      | _SwiftKeyPathComponentHeader_UnresolvedOffsetPayload);
+      | _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload);
+  }
+  
+  constexpr static KeyPathComponentHeader
+  forClassComponentWithUnresolvedIndirectOffset() {
+    return KeyPathComponentHeader(
+      (_SwiftKeyPathComponentHeader_ClassTag
+      << _SwiftKeyPathComponentHeader_DiscriminatorShift)
+      | _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload);
   }
   
   constexpr static KeyPathComponentHeader
@@ -165,14 +173,13 @@ public:
   
   enum ComputedPropertyIDKind {
     Pointer,
-    StoredPropertyOffset,
+    StoredPropertyIndex,
     VTableOffset,
   };
   
   constexpr static uint32_t
   getResolutionStrategy(ComputedPropertyIDKind idKind) {
     return idKind == Pointer ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
-         : idKind == StoredPropertyOffset ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFieldOffset
          : (assert("no resolution strategy implemented" && false), 0);
   }
   
@@ -188,7 +195,7 @@ public:
            ? _SwiftKeyPathComponentHeader_ComputedSettableFlag : 0)
       | (kind == SettableMutating
            ? _SwiftKeyPathComponentHeader_ComputedMutatingFlag : 0)
-      | (idKind == StoredPropertyOffset
+      | (idKind == StoredPropertyIndex
            ? _SwiftKeyPathComponentHeader_ComputedIDByStoredPropertyFlag : 0)
       | (idKind == VTableOffset
            ? _SwiftKeyPathComponentHeader_ComputedIDByVTableOffsetFlag : 0)

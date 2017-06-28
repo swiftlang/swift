@@ -30,20 +30,6 @@ namespace swift {
 namespace syntax {
 
 class ExprSyntax;
-class ExprSyntaxData;
-
-#pragma mark - statement Data
-
-class StmtSyntaxData : public SyntaxData {
-protected:
-  StmtSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                 CursorIndex IndexInParent = 0)
-    : SyntaxData(Raw, Parent, IndexInParent) {}
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->isStmt();
-  }
-};
 
 #pragma mark - statement API
 
@@ -59,64 +45,28 @@ public:
 class StmtSyntax : public Syntax {
   friend class Syntax;
 protected:
-  StmtSyntax(const RC<SyntaxData> Root, const StmtSyntaxData *Data);
+  virtual void validate() const override {}
 public:
-  using DataType = StmtSyntaxData;
-  static bool classof(const Syntax *S) {
+  static StmtSyntax makeBlank();
+  StmtSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : Syntax(Root, Data) {}
+    static bool classof(const Syntax *S) {
     return S->isStmt();
-  }
-};
-
-#pragma mark - unknown-statement Data
-
-class UnknownStmtSyntaxData : public UnknownSyntaxData {
-  UnknownStmtSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                        CursorIndex IndexInParent = 0);
-public:
-  static RC<UnknownStmtSyntaxData> make(RC<RawSyntax> Raw,
-                                        const SyntaxData *Parent = nullptr,
-                                        CursorIndex IndexInParent = 0);
-
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::UnknownStmt;
   }
 };
 
 #pragma mark - unknown-statement API
 
 class UnknownStmtSyntax : public UnknownSyntax {
-  friend class SyntaxData;
-  friend class UnknownStmtSyntaxData;
   friend class LegacyASTTransformer;
 
-  using DataType = UnknownStmtSyntaxData;
-
-  UnknownStmtSyntax(const RC<SyntaxData> Root,
-                    const UnknownStmtSyntaxData *Data);
-
+  virtual void validate() const override;
 public:
+  static UnknownStmtSyntax makeBlank();
+  UnknownStmtSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : UnknownSyntax(Root, Data) {}
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::UnknownStmt;
-  }
-};
-
-#pragma mark -
-#pragma mark code-block Data
-
-class CodeBlockStmtSyntaxData final : public StmtSyntaxData {
-  friend class SyntaxData;
-  friend class CodeBlockStmtSyntax;
-  friend struct SyntaxFactory;
-
-  CodeBlockStmtSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                          CursorIndex IndexInParent = 0);
-  static RC<CodeBlockStmtSyntaxData> make(RC<RawSyntax> Raw,
-                                          const SyntaxData *Parent = nullptr,
-                                          CursorIndex IndexInParent = 0);
-  static RC<CodeBlockStmtSyntaxData> makeBlank();
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::CodeBlockStmt;
   }
 };
 
@@ -131,17 +81,20 @@ class CodeBlockStmtSyntax : public StmtSyntax {
     RightBrace,
   };
   friend struct SyntaxFactory;
-  friend class CodeBlockStmtSyntaxData;
   friend class FunctionDeclSyntax;
 
-  CodeBlockStmtSyntax(const RC<SyntaxData> Root, CodeBlockStmtSyntaxData *Data);
-
 public:
+
+  virtual void validate() const override;
+  static CodeBlockStmtSyntax makeBlank();
+  CodeBlockStmtSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : StmtSyntax(Root, Data) {}
+
   /// Returns the left brace of the code block.
-  RC<TokenSyntax> getLeftBraceToken() const;
+  TokenSyntax getLeftBraceToken() const;
 
   /// Returns a new `CodeBlockSyntax` with the specified left brace token.
-  CodeBlockStmtSyntax withLeftBraceToken(RC<TokenSyntax> NewLeftBrace) const;
+  CodeBlockStmtSyntax withLeftBraceToken(TokenSyntax NewLeftBrace) const;
 
   /// Return the n-th element in the code block.
   Syntax getElement(size_t n) const;
@@ -156,64 +109,13 @@ public:
   withElements(const std::vector<Syntax> NewElements) const;
 
   /// Returns the right brace of the code block.
-  RC<TokenSyntax> getRightBraceToken() const;
+  TokenSyntax getRightBraceToken() const;
 
   /// Returns a new `CodeBlockSyntax` with the specified right brace token.
-  CodeBlockStmtSyntax withRightBraceToken(RC<TokenSyntax> NewRightBraces) const;
+  CodeBlockStmtSyntax withRightBraceToken(TokenSyntax NewRightBraces) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::CodeBlockStmt;
-  }
-};
-
-#pragma mark -
-#pragma mark statements Data
-
-using StmtListSyntaxData =
-  SyntaxCollectionData<SyntaxKind::StmtList, StmtSyntax>;
-
-#pragma mark -
-#pragma mark statements API
-
-/// statements -> statement
-///             | statement statements
-class StmtListSyntax final
-    : public SyntaxCollection<SyntaxKind::StmtList, StmtSyntax> {
-  friend struct SyntaxFactory;
-  friend class Syntax;
-  friend class SyntaxData;
-  friend class FunctionDeclSyntax;
-
-  using DataType = StmtListSyntaxData;
-
-  StmtListSyntax(const RC<SyntaxData> Root, const DataType *Data)
-    : SyntaxCollection(Root, Data) {}
-
-public:
-  static bool classof(const Syntax *S) {
-    return S->getKind() == SyntaxKind::StmtList;
-  }
-};
-
-#pragma mark -
-#pragma mark fallthrough-statement Data
-
-class FallthroughStmtSyntaxData final : public StmtSyntaxData {
-  friend class SyntaxData;
-  friend class FallthroughStmtSyntax;
-  friend struct SyntaxFactory;
-
-  FallthroughStmtSyntaxData(RC<RawSyntax> Raw,
-                            const SyntaxData *Parent = nullptr,
-                            CursorIndex IndexInParent = 0);
-  static RC<FallthroughStmtSyntaxData> make(RC<RawSyntax> Raw,
-                                            const SyntaxData *Parent = nullptr,
-                                            CursorIndex IndexInParent = 0);
-  static RC<FallthroughStmtSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::FallthroughStmt;
   }
 };
 
@@ -223,58 +125,30 @@ public:
 /// fallthrough-statement -> 'fallthrough'
 class FallthroughStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-  friend class SyntaxData;
-  friend class FallthroughStmtSyntaxData;
-
-  using DataType = FallthroughStmtSyntaxData;
-
+  
   enum class Cursor : CursorIndex {
     FallthroughKeyword,
   };
 
-  FallthroughStmtSyntax(const RC<SyntaxData> Root,
-                        const FallthroughStmtSyntaxData *Data);
-
-  static FallthroughStmtSyntax make(RC<RawSyntax> Raw,
-                                    const SyntaxData *Parent = nullptr,
-                                    CursorIndex IndexInParent = 0);
-  static FallthroughStmtSyntax makeBlank();
+  virtual void validate() const override;
 
 public:
+  static FallthroughStmtSyntax makeBlank();
+  FallthroughStmtSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : StmtSyntax(Root, Data) {}
 
   /// Get the 'fallthrough' keyword associated comprising this
   /// fallthrough statement.
-  RC<TokenSyntax> getFallthroughKeyword() const;
+  TokenSyntax getFallthroughKeyword() const;
 
   /// Return a new FallthroughStmtSyntax with the given fallthrough
   /// keyword.
   FallthroughStmtSyntax
-  withFallthroughKeyword(RC<TokenSyntax> NewFallthroughKeyword) const;
+  withFallthroughKeyword(TokenSyntax NewFallthroughKeyword) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FallthroughStmt;
   }
-};
-
-#pragma mark - break-statement Data
-
-class BreakStmtSyntaxData : public StmtSyntaxData {
-  friend class SyntaxData;
-  friend class BreakStmtSyntax;
-  friend struct SyntaxFactory;
-  BreakStmtSyntaxData(RC<RawSyntax> Raw,
-                            const SyntaxData *Parent = nullptr,
-                            CursorIndex IndexInParent = 0);
-  static RC<BreakStmtSyntaxData> make(RC<RawSyntax> Raw,
-                                      const SyntaxData *Parent = nullptr,
-                                      CursorIndex IndexInParent = 0);
-  static RC<BreakStmtSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::BreakStmt;
-  }
-
 };
 
 #pragma mark - break-statement API
@@ -283,62 +157,35 @@ public:
 /// label-name -> identifier
 class BreakStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-  friend class BreakStmtSyntaxData;
-  friend class SyntaxData;
-
-  using DataType = BreakStmtSyntaxData;
 
   enum class Cursor : CursorIndex {
     BreakKeyword,
     Label
   };
 
-  BreakStmtSyntax(const RC<SyntaxData> Root,
-                  BreakStmtSyntaxData *Data);
+  virtual void validate() const override;
 
-  static BreakStmtSyntax make(RC<RawSyntax> Raw,
-                                    const SyntaxData *Parent = nullptr,
-                                    CursorIndex IndexInParent = 0);
-  static BreakStmtSyntax makeBlank();
 public:
+  static BreakStmtSyntax makeBlank();
+  BreakStmtSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : StmtSyntax(Root, Data) {}
 
   /// Return the 'break' keyword associated with this break statement.
-  RC<TokenSyntax> getBreakKeyword() const;
+  TokenSyntax getBreakKeyword() const;
 
   /// Return a new `BreakStmtSyntax` with the given 'break' keyword.
-  BreakStmtSyntax withBreakKeyword(RC<TokenSyntax> NewBreakKeyword) const;
+  BreakStmtSyntax withBreakKeyword(TokenSyntax NewBreakKeyword) const;
 
   /// Return the destination label of this break statement. If it doesn't
   /// have one, the token is marked as missing.
-  RC<TokenSyntax> getLabel() const;
+  TokenSyntax getLabel() const;
 
   /// Return a new `BreakStmtSyntax` with the given destination label.
-  BreakStmtSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+  BreakStmtSyntax withLabel(TokenSyntax NewLabel) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::BreakStmt;
   }
-};
-
-#pragma mark - continue-statement Data
-
-class ContinueStmtSyntaxData : public StmtSyntaxData {
-  friend class SyntaxData;
-  friend class ContinueStmtSyntax;
-  friend struct SyntaxFactory;
-  ContinueStmtSyntaxData(RC<RawSyntax> Raw,
-                      const SyntaxData *Parent = nullptr,
-                      CursorIndex IndexInParent = 0);
-  static RC<ContinueStmtSyntaxData> make(RC<RawSyntax> Raw,
-                                      const SyntaxData *Parent = nullptr,
-                                      CursorIndex IndexInParent = 0);
-  static RC<ContinueStmtSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::ContinueStmt;
-  }
-
 };
 
 #pragma mark - continue-statement API
@@ -347,65 +194,35 @@ public:
 /// label-name -> identifier
 class ContinueStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-  friend class ContinueStmtSyntaxData;
-  friend class SyntaxData;
-
-  using DataType = ContinueStmtSyntaxData;
 
   enum class Cursor : CursorIndex {
     ContinueKeyword,
     Label
   };
 
-  ContinueStmtSyntax(const RC<SyntaxData> Root,
-                     ContinueStmtSyntaxData *Data);
+  virtual void validate() const override;
 
-  static ContinueStmtSyntax make(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent = nullptr,
-                                 CursorIndex IndexInParent = 0);
-  static ContinueStmtSyntax makeBlank();
 public:
+  static ContinueStmtSyntax makeBlank();
+  ContinueStmtSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : StmtSyntax(Root, Data) {}
 
   /// Return the 'continue' keyword associated with this continue statement.
-  RC<TokenSyntax> getContinueKeyword() const;
+  TokenSyntax getContinueKeyword() const;
 
   /// Return a new `ContinueStmtSyntax` with the given 'continue' keyword.
-  ContinueStmtSyntax withContinueKeyword(RC<TokenSyntax> NewBreakKeyword) const;
+  ContinueStmtSyntax withContinueKeyword(TokenSyntax NewBreakKeyword) const;
 
   /// Return the destination label of this break statement. If it doesn't
   /// have one, the token is marked as continue.
-  RC<TokenSyntax> getLabel() const;
+  TokenSyntax getLabel() const;
 
   /// Return a new `ContinueStmtSyntax` with the given destination label.
-  ContinueStmtSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+  ContinueStmtSyntax withLabel(TokenSyntax NewLabel) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::ContinueStmt;
   }
-};
-
-#pragma mark - return-statement Data
-
-class ReturnStmtSyntaxData : public StmtSyntaxData {
-  friend class SyntaxData;
-  friend class ReturnStmtSyntax;
-  friend struct SyntaxFactory;
-
-  RC<ExprSyntaxData> CachedExpression;
-
-  ReturnStmtSyntaxData(RC<RawSyntax> Raw,
-                       const SyntaxData *Parent = nullptr,
-                       CursorIndex IndexInParent = 0);
-  static RC<ReturnStmtSyntaxData> make(RC<RawSyntax> Raw,
-                                       const SyntaxData *Parent = nullptr,
-                                       CursorIndex IndexInParent = 0);
-  static RC<ReturnStmtSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::ReturnStmt;
-  }
-  
 };
 
 #pragma mark - return-statement API
@@ -413,31 +230,25 @@ public:
 /// return-statement -> 'return' expression? ';'?
 class ReturnStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
-  friend class ReturnStmtSyntaxData;
-  friend class SyntaxData;
   friend class Syntax;
-
-  using DataType = ReturnStmtSyntaxData;
 
   enum class Cursor : CursorIndex {
     ReturnKeyword,
     Expression
   };
 
-  ReturnStmtSyntax(const RC<SyntaxData> Root,
-                   const ReturnStmtSyntaxData *Data);
+  virtual void validate() const override;
 
-  static ReturnStmtSyntax make(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent = nullptr,
-                               CursorIndex IndexInParent = 0);
-  static ReturnStmtSyntax makeBlank();
 public:
+  static ReturnStmtSyntax makeBlank();
+  ReturnStmtSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : StmtSyntax(Root, Data) {}
 
   /// Return the 'return' keyword associated with this return statement.
-  RC<TokenSyntax> getReturnKeyword() const;
+  TokenSyntax getReturnKeyword() const;
 
   /// Return a new `ReturnStmtSyntax` with the given 'return' keyword.
-  ReturnStmtSyntax withReturnKeyword(RC<TokenSyntax> NewReturnKeyword) const;
+  ReturnStmtSyntax withReturnKeyword(TokenSyntax NewReturnKeyword) const;
 
   /// Return the expression of this return statement.
   Optional<ExprSyntax> getExpression() const;

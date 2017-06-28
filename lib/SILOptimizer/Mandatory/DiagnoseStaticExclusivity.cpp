@@ -35,6 +35,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -162,32 +163,81 @@ public:
   }
 };
 
+enum class RecordedAccessKind {
+  /// The access was for a 'begin_access' instruction in the current function
+  /// being checked.
+  BeginInstruction,
+
+  /// The access was inside noescape closure that we either
+  /// passed to function or called directly. It results from applying the
+  /// the summary of the closure to the closure's captures.
+  NoescapeClosureCapture
+};
+
 /// Records an access to an address and the single subpath of projections
 /// that was performed on the address, if such a single subpath exists.
 class RecordedAccess {
 private:
-  BeginAccessInst *Inst;
-  ProjectionPath SubPath;
+  RecordedAccessKind RecordKind;
+  union {
+   BeginAccessInst *Inst;
+    struct {
+      SILAccessKind ClosureAccessKind;
+      SILLocation ClosureAccessLoc;
+    };
+  };
 
+  const IndexTrieNode *SubPath;
 public:
-  RecordedAccess(BeginAccessInst *BAI, const ProjectionPath &SubPath)
-      : Inst(BAI), SubPath(SubPath) {}
+  RecordedAccess(BeginAccessInst *BAI, const IndexTrieNode *SubPath) :
+      RecordKind(RecordedAccessKind::BeginInstruction), Inst(BAI),
+      SubPath(SubPath) { }
 
-  BeginAccessInst *getInstruction() const { return Inst; }
+  RecordedAccess(SILAccessKind ClosureAccessKind,
+                 SILLocation ClosureAccessLoc, const IndexTrieNode *SubPath) :
+      RecordKind(RecordedAccessKind::NoescapeClosureCapture),
+      ClosureAccessKind(ClosureAccessKind), ClosureAccessLoc(ClosureAccessLoc),
+      SubPath(SubPath) { }
 
-  SILAccessKind getAccessKind() const { return Inst->getAccessKind(); }
+  RecordedAccessKind getRecordKind() const {
+    return RecordKind;
+  }
 
-  SILLocation getAccessLoc() const { return Inst->getLoc(); }
+  BeginAccessInst *getInstruction() const {
+    assert(RecordKind == RecordedAccessKind::BeginInstruction);
+    return Inst;
+  }
 
-  const ProjectionPath &getSubPath() const { return SubPath; }
+  SILAccessKind getAccessKind() const {
+    switch (RecordKind) {
+      case RecordedAccessKind::BeginInstruction:
+        return Inst->getAccessKind();
+      case RecordedAccessKind::NoescapeClosureCapture:
+        return ClosureAccessKind;
+    };
+  }
+
+  SILLocation getAccessLoc() const {
+    switch (RecordKind) {
+      case RecordedAccessKind::BeginInstruction:
+        return Inst->getLoc();
+      case RecordedAccessKind::NoescapeClosureCapture:
+        return ClosureAccessLoc;
+    };
+  }
+
+  const IndexTrieNode *getSubPath() const {
+    return SubPath;
+  }
 };
+
 
 /// Records the in-progress accesses to a given sub path.
 class SubAccessInfo {
 public:
-  SubAccessInfo(const ProjectionPath &P) : Path(P) {}
+  SubAccessInfo(const IndexTrieNode *P) : Path(P) {}
 
-  ProjectionPath Path;
+  const IndexTrieNode *Path;
 
   /// The number of in-progress 'read' accesses (that is 'begin_access [read]'
   /// instructions that have not yet had the corresponding 'end_access').
@@ -202,7 +252,7 @@ public:
 
 public:
   /// Increment the count for given access.
-  void beginAccess(BeginAccessInst *BAI, const ProjectionPath &SubPath) {
+  void beginAccess(BeginAccessInst *BAI, const IndexTrieNode *SubPath) {
     if (!FirstAccess) {
       assert(Reads == 0 && NonReads == 0);
       FirstAccess = RecordedAccess(BAI, SubPath);
@@ -250,14 +300,17 @@ public:
   }
 
   bool conflictsWithAccess(SILAccessKind Kind,
-                           const ProjectionPath &SubPath) const {
+                           const IndexTrieNode *SubPath) const {
     if (!canConflictWithAccessOfKind(Kind))
       return false;
 
-    SubSeqRelation_t Relation = Path.computeSubSeqRelation(SubPath);
-    // If the one path is a subsequence of the other (or they are the same)
-    // then access the same storage.
-    return (Relation != SubSeqRelation_t::Unknown);
+    return pathsConflict(Path, SubPath);
+  }
+
+  /// Returns true when the two subpaths access overlapping memory.
+  bool pathsConflict(const IndexTrieNode *Path1,
+                     const IndexTrieNode *Path2) const {
+    return Path1->isPrefixOf(Path2) || Path2->isPrefixOf(Path1);
   }
 };
 
@@ -271,7 +324,7 @@ class AccessInfo {
   SubAccessVector SubAccesses;
 
   /// Returns the SubAccess info for accessing at the given SubPath.
-  SubAccessInfo &findOrCreateSubAccessInfo(const ProjectionPath &SubPath) {
+  SubAccessInfo &findOrCreateSubAccessInfo(const IndexTrieNode *SubPath) {
     for (auto &Info : SubAccesses) {
       if (Info.Path == SubPath)
         return Info;
@@ -283,7 +336,7 @@ class AccessInfo {
 
   SubAccessVector::const_iterator
   findFirstSubPathWithConflict(SILAccessKind OtherKind,
-                               const ProjectionPath &OtherSubPath) const {
+                               const IndexTrieNode *OtherSubPath) const {
     // Note this iteration requires deterministic ordering for repeatable
     // diagnostics.
     for (auto I = SubAccesses.begin(), E = SubAccesses.end(); I != E; ++I) {
@@ -299,7 +352,7 @@ public:
   // Returns the previous access when beginning an access of the given Kind will
   // result in a conflict with a previous access.
   Optional<RecordedAccess>
-  conflictsWithAccess(SILAccessKind Kind, const ProjectionPath &SubPath) const {
+  conflictsWithAccess(SILAccessKind Kind, const IndexTrieNode *SubPath) const {
     auto I = findFirstSubPathWithConflict(Kind, SubPath);
     if (I == SubAccesses.end())
       return None;
@@ -326,13 +379,13 @@ public:
   }
 
   /// Increment the count for given access.
-  void beginAccess(BeginAccessInst *BAI, const ProjectionPath &SubPath) {
+  void beginAccess(BeginAccessInst *BAI, const IndexTrieNode *SubPath) {
     SubAccessInfo &SubAccess = findOrCreateSubAccessInfo(SubPath);
     SubAccess.beginAccess(BAI, SubPath);
   }
 
   /// Decrement the count for given access.
-  void endAccess(EndAccessInst *EAI, const ProjectionPath &SubPath) {
+  void endAccess(EndAccessInst *EAI, const IndexTrieNode *SubPath) {
     SubAccessInfo &SubAccess = findOrCreateSubAccessInfo(SubPath);
     SubAccess.endAccess(EAI);
   }
@@ -580,36 +633,45 @@ tryFixItWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
 /// that stored-property relaxation supports: struct stored properties
 /// and tuple elements.
 static std::string getPathDescription(DeclName BaseName, SILType BaseType,
-                                      ProjectionPath SubPath, SILModule &M) {
+                                      const IndexTrieNode *SubPath,
+                                      SILModule &M) {
+  // Walk the trie to the root to collection the sequence (in reverse order).
+  llvm::SmallVector<unsigned, 4> ReversedIndices;
+  const IndexTrieNode *I = SubPath;
+  while (!I->isRoot()) {
+    ReversedIndices.push_back(I->getIndex());
+    I = I->getParent();
+  }
+
   std::string sbuf;
   llvm::raw_string_ostream os(sbuf);
 
   os << "'" << BaseName;
 
   SILType ContainingType = BaseType;
-  for (auto &P : SubPath) {
+  for (unsigned Index : reversed(ReversedIndices)) {
     os << ".";
-    switch (P.getKind()) {
-    case ProjectionKind::Struct:
-      os << P.getVarDecl(ContainingType)->getBaseName();
-      break;
-    case ProjectionKind::Tuple: {
-      // Use the tuple element's name if present, otherwise use its index.
-      Type SwiftTy = ContainingType.getSwiftRValueType();
-      TupleType *TupleTy = SwiftTy->getAs<TupleType>();
-      assert(TupleTy && "Tuple projection on non-tuple type!?");
 
-      Identifier ElementName = TupleTy->getElement(P.getIndex()).getName();
+    if (StructDecl *D = ContainingType.getStructOrBoundGenericStruct()) {
+      auto Iter = D->getStoredProperties().begin();
+      std::advance(Iter, Index);
+      VarDecl *VD = *Iter;
+      os << VD->getBaseName();
+      ContainingType = ContainingType.getFieldType(VD, M);
+      continue;
+    }
+
+    if (auto TupleTy = ContainingType.getAs<TupleType>()) {
+      Identifier ElementName = TupleTy->getElement(Index).getName();
       if (ElementName.empty())
-        os << P.getIndex();
+        os << Index;
       else
         os << ElementName;
-      break;
+      ContainingType = ContainingType.getTupleElementType(Index);
+      continue;
     }
-    default:
-      llvm_unreachable("Unexpected projection kind in SubPath!");
-    }
-    ContainingType = P.getType(ContainingType, M);
+
+    llvm_unreachable("Unexpected type in projection SubPath!");
   }
 
   os << "'";
@@ -662,9 +724,11 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
         diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
                  PathDescription, AccessKindForMain);
     D.highlight(RangeForMain);
-    tryFixItWithCallToCollectionSwapAt(FirstAccess.getInstruction(),
-                                       SecondAccess.getInstruction(),
-                                       CallsToSwap, Ctx, D);
+    if (SecondAccess.getRecordKind() == RecordedAccessKind::BeginInstruction) {
+      tryFixItWithCallToCollectionSwapAt(FirstAccess.getInstruction(),
+                                         SecondAccess.getInstruction(),
+                                         CallsToSwap, Ctx, D);
+    }
   } else {
     auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
                          diag::exclusivity_access_required_unknown_decl_swift3 :
@@ -784,8 +848,14 @@ static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   return FD == Ctx.getSwap(nullptr);
 }
 
-static SILInstruction *getSingleAddressProjectionUser(SILInstruction *I) {
+/// If the instruction is a field or tuple projection and it has a single
+/// user return a pair of the single user and the projection index.
+/// Otherwise, return a pair with the component nullptr and the second
+/// unspecified.
+static std::pair<SILInstruction *, unsigned>
+getSingleAddressProjectionUser(SILInstruction *I) {
   SILInstruction *SingleUser = nullptr;
+  unsigned ProjectionIndex = 0;
 
   for (Operand *Use : I->getUses()) {
     SILInstruction *User = Use->getUser();
@@ -794,28 +864,43 @@ static SILInstruction *getSingleAddressProjectionUser(SILInstruction *I) {
 
     // We have more than a single user so bail.
     if (SingleUser)
-      return nullptr;
+      return std::make_pair(nullptr, 0);
 
     switch (User->getKind()) {
     case ValueKind::StructElementAddrInst:
+      ProjectionIndex = cast<StructElementAddrInst>(User)->getFieldNo();
+      SingleUser = User;
+      break;
     case ValueKind::TupleElementAddrInst:
+      ProjectionIndex = cast<TupleElementAddrInst>(User)->getFieldNo();
       SingleUser = User;
       break;
     default:
-      return nullptr;
+      return std::make_pair(nullptr, 0);
     }
   }
 
-  return SingleUser;
+  return std::make_pair(SingleUser, ProjectionIndex);
 }
 
-static ProjectionPath findSubPathAccessed(BeginAccessInst *BAI) {
-  ProjectionPath SubPath(BAI->getType(), BAI->getType());
+/// Returns an IndexTrieNode that represents the single subpath accessed from
+/// BAI or the root if no such node exists.
+static const IndexTrieNode *findSubPathAccessed(BeginAccessInst *BAI,
+                                                IndexTrieNode *Root) {
+  IndexTrieNode *SubPath = Root;
 
+  // For each single-user projection of BAI, construct or get a node
+  // from the trie representing the index of the field or tuple element
+  // accessed by that projection.
   SILInstruction *Iter = BAI;
+  while (true) {
+    std::pair<SILInstruction *, unsigned> ProjectionUser =
+        getSingleAddressProjectionUser(Iter);
+    if (!ProjectionUser.first)
+      break;
 
-  while ((Iter = getSingleAddressProjectionUser(Iter))) {
-    SubPath.push_back(Projection(Iter));
+    SubPath = SubPath->getChild(ProjectionUser.second);
+    Iter = ProjectionUser.first;
   }
 
   return SubPath;
@@ -826,14 +911,116 @@ static ProjectionPath findSubPathAccessed(BeginAccessInst *BAI) {
 /// with. Otherwise, returns None.
 Optional<RecordedAccess> shouldReportAccess(const AccessInfo &Info,
                                             swift::SILAccessKind Kind,
-                                            const ProjectionPath &SubPath) {
+                                            const IndexTrieNode *SubPath) {
   if (Info.alreadyHadConflict())
     return None;
 
   return Info.conflictsWithAccess(Kind, SubPath);
 }
 
-static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
+/// Use the summary analysis to check whether a call to the given
+/// function would conflict with any in progress accesses. The starting
+/// index indicates what index into the the callee's parameters the
+/// arguments array starts at -- this is useful for partial_apply functions,
+/// which pass only a suffix of the callee's arguments at the apply site.
+static void checkForViolationWithCall(
+    const StorageMap &Accesses, SILFunction *Callee, unsigned StartingAtIndex,
+    OperandValueArrayRef Arguments, AccessSummaryAnalysis *ASA,
+    llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses) {
+  const AccessSummaryAnalysis::FunctionSummary &FS =
+      ASA->getOrCreateSummary(Callee);
+
+  // For each argument in the suffix of the callee arguments being passed
+  // at this call site, determine whether the arguments will be accessed
+  // in a way that conflicts with any currently in progress accesses.
+  // If so, diagnose.
+  for (unsigned ArgumentIndex : indices(Arguments)) {
+    unsigned CalleeIndex = StartingAtIndex + ArgumentIndex;
+
+    const AccessSummaryAnalysis::ArgumentSummary &AS =
+        FS.getAccessForArgument(CalleeIndex);
+    Optional<SILAccessKind> Kind = AS.getAccessKind();
+    if (!Kind)
+      continue;
+
+    SILValue Argument = Arguments[ArgumentIndex];
+    assert(Argument->getType().isAddress());
+
+    const AccessedStorage &Storage = findAccessedStorage(Argument);
+    auto AccessIt = Accesses.find(Storage);
+    if (AccessIt == Accesses.end())
+      continue;
+    const AccessInfo &Info = AccessIt->getSecond();
+
+    // TODO: For now, treat a summarized access as an access to the whole
+    // address. Once the summary analysis is sensitive to stored properties,
+    // this should be updated look at the subpaths from the summary.
+    const IndexTrieNode *SubPath = ASA->getSubPathTrieRoot();
+    if (auto Conflict = shouldReportAccess(Info, *Kind, SubPath)) {
+      SILLocation AccessLoc = AS.getAccessLoc();
+      const auto &SecondAccess = RecordedAccess(*Kind, AccessLoc, SubPath);
+      ConflictingAccesses.emplace_back(Storage, *Conflict, SecondAccess);
+    }
+  }
+}
+
+/// Look through a value passed as a function argument to determine whether
+/// it is a partial_apply.
+static PartialApplyInst *lookThroughForPartialApply(SILValue V) {
+  while (true) {
+    if (auto CFI = dyn_cast<ConvertFunctionInst>(V)) {
+      V = CFI->getOperand();
+      continue;
+    }
+
+    if (auto *PAI = dyn_cast<PartialApplyInst>(V))
+      return PAI;
+
+    return nullptr;
+  }
+}
+
+/// Checks whether any of the arguments to the apply are closures and diagnoses
+/// if any of the @inout_aliasable captures passed to those closures have
+/// in-progress accesses that would conflict with any access the summary
+/// says the closure would perform.
+//
+/// TODO: We currently fail to statically diagnose non-escaping closures pased
+/// via @block_storage convention. To enforce this case, we should statically
+/// recognize when the apply takes a block argument that has been initialized to
+/// a non-escaping closure.
+static void checkForViolationsInNoEscapeClosures(
+    const StorageMap &Accesses, FullApplySite FAS, AccessSummaryAnalysis *ASA,
+    llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses) {
+
+  SILFunction *Callee = FAS.getCalleeFunction();
+  if (Callee && !Callee->empty()) {
+    // Check for violation with directly called closure
+    checkForViolationWithCall(Accesses, Callee, 0, FAS.getArguments(), ASA,
+                              ConflictingAccesses);
+  }
+
+  // Check for violation with closures passed as arguments
+  for (SILValue Argument : FAS.getArguments()) {
+    auto *PAI = lookThroughForPartialApply(Argument);
+    if (!PAI)
+      continue;
+
+    SILFunction *Closure = PAI->getCalleeFunction();
+    if (!Closure || Closure->empty())
+      continue;
+
+    // Check the closure's captures, which are a suffix of the closure's
+    // parameters.
+    unsigned StartIndex =
+        Closure->getArguments().size() - PAI->getNumCallArguments();
+    checkForViolationWithCall(Accesses, Closure, StartIndex,
+                              PAI->getArguments(), ASA, ConflictingAccesses);
+  }
+}
+
+static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
+                                   AccessSummaryAnalysis *ASA) {
   // The implementation relies on the following SIL invariants:
   //    - All incoming edges to a block must have the same in-progress
   //      accesses. This enables the analysis to not perform a data flow merge
@@ -899,7 +1086,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
         SILAccessKind Kind = BAI->getAccessKind();
         const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
         AccessInfo &Info = Accesses[Storage];
-        ProjectionPath SubPath = findSubPathAccessed(BAI);
+        const IndexTrieNode *SubPath =
+            findSubPathAccessed(BAI, ASA->getSubPathTrieRoot());
         if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
           ConflictingAccesses.emplace_back(Storage, *Conflict,
                                            RecordedAccess(BAI, SubPath));
@@ -914,7 +1102,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
         AccessInfo &Info = It->getSecond();
 
         BeginAccessInst *BAI = EAI->getBeginAccess();
-        const ProjectionPath &SubPath = findSubPathAccessed(BAI);
+        const IndexTrieNode *SubPath =
+            findSubPathAccessed(BAI, ASA->getSubPathTrieRoot());
         Info.endAccess(EAI, SubPath);
 
         // If the storage location has no more in-progress accesses, remove
@@ -928,8 +1117,17 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
         // Record calls to swap() for potential Fix-Its.
         if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
           CallsToSwap.push_back(AI);
+        else
+          checkForViolationsInNoEscapeClosures(Accesses, AI, ASA,
+                                               ConflictingAccesses);
+        continue;
       }
 
+      if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
+        checkForViolationsInNoEscapeClosures(Accesses, TAI, ASA,
+                                             ConflictingAccesses);
+        continue;
+      }
       // Sanity check to make sure entries are properly removed.
       assert((!isa<ReturnInst>(&I) || Accesses.size() == 0) &&
              "Entries were not properly removed?!");
@@ -958,7 +1156,8 @@ private:
       return;
 
     PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(Fn);
-    checkStaticExclusivity(*Fn, PO);
+    auto *ASA = getAnalysis<AccessSummaryAnalysis>();
+    checkStaticExclusivity(*Fn, PO, ASA);
   }
 };
 

@@ -177,7 +177,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitIfConfigDecl(IfConfigDecl *ICD) {
-    // By default, just visit the declarations that are actually
+    // By default, just visit the elements that are actually
     // injected into the enclosing context.
     return false;
   }
@@ -1285,14 +1285,6 @@ Stmt *Traversal::visitGuardStmt(GuardStmt *US) {
   return US;
 }
 
-
-Stmt *Traversal::visitIfConfigStmt(IfConfigStmt *ICS) {
-  // Active members are attached to the enclosing declaration, so there's no
-  // need to walk anything within.
-  
-  return ICS;
-}
-
 Stmt *Traversal::visitDoStmt(DoStmt *DS) {
   if (Stmt *S2 = doIt(DS->getBody()))
     DS->setBody(S2);
@@ -1460,12 +1452,19 @@ Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
   else
     return nullptr;
 
-  for (CaseStmt *aCase : S->getCases()) {
-    if (Stmt *aStmt = doIt(aCase)) {
-      assert(aCase == aStmt && "switch case remap not supported");
-      (void)aStmt;
-    } else
-      return nullptr;
+  for (auto N : S->getRawCases()) {
+    if (Stmt *aCase = N.dyn_cast<Stmt*>()) {
+      assert(isa<CaseStmt>(aCase));
+      if (Stmt *aStmt = doIt(aCase)) {
+        assert(aCase == aStmt && "switch case remap not supported");
+        (void)aStmt;
+      } else
+        return nullptr;
+    } else {
+      assert(isa<IfConfigDecl>(N.get<Decl*>()));
+      if (doIt(N.get<Decl*>()))
+        return nullptr;
+    }
   }
 
   return S;
@@ -1646,8 +1645,8 @@ bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOpti
 }
 
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
-  for (auto elem : T->getElements()) {
-    if (doIt(elem))
+  for (auto &elem : T->getElements()) {
+    if (doIt(elem.Type))
       return true;
   }
   return false;

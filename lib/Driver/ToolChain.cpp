@@ -149,3 +149,11 @@ ToolChain::findProgramRelativeToSwiftImpl(StringRef executableName) const {
 types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
   return types::lookupTypeForExtension(Ext);
 }
+
+bool
+ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
+                                     StringRef sanitizerName) const {
+  // Assume no sanitizers are supported by default.
+  // This method should be overriden by a platform-specific subclass.
+  return false;
+}

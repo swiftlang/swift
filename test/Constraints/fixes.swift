@@ -143,4 +143,4 @@ struct S1116 {
 }
 
 let a1116: [S1116] = []
-var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{'map' produces '[T]', not the expected contextual result type 'Set<Int>'}}
+var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{cannot convert value of type '[Int?]' to expected argument type 'Set<Int>'}}
