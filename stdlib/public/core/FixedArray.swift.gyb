@@ -1,0 +1,113 @@
+//===--- FixedArray.swift.gyb ---------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  A helper struct to provide fixed-sized array like functionality
+//
+//===----------------------------------------------------------------------===//
+
+%{
+  # The sizes to generate code for.
+  sizes = [16]
+}%
+
+% for N in sizes:
+
+internal struct _FixedArray${N}<T> {
+  // ABI TODO: The has assumptions about tuple layout in the ABI, namely that
+  // they are laid out contiguously and individually addressable (i.e. strided).
+  //
+  internal var storage: (
+    // A ${N}-wide tuple of type T
+% for i in range(0, N-1):
+    T,
+% end
+    T
+  )
+
+  static var _arraySize : Int { return ${N} }
+}
+
+extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
+  internal typealias Index = Int
+  internal typealias IndexDistance = Int
+
+  internal var startIndex : Index {
+    return 0
+  }
+
+  internal var endIndex : Index {
+    return _FixedArray${N}._arraySize
+  }
+
+  internal var count : IndexDistance { return _FixedArray${N}._arraySize }
+
+  internal subscript(i: Index) -> T {
+    @_versioned
+    @inline(__always)
+    get {
+      var copy = storage
+      let res: T = withUnsafeBytes(of: &copy) {
+        (rawPtr : UnsafeRawBufferPointer) -> T in
+        let stride = MemoryLayout<T>.stride
+        _sanityCheck(rawPtr.count == ${N}*stride, "layout mismatch?")
+        let bufPtr = UnsafeBufferPointer(
+          start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
+          count: count)
+        return bufPtr[i]
+      }
+      return res
+    }
+    @_versioned
+    @inline(__always)
+    set {
+      withUnsafeBytes(of: &storage) {
+        (rawPtr : UnsafeRawBufferPointer) -> () in
+        let rawPtr = UnsafeMutableRawBufferPointer(mutating: rawPtr)
+        let stride = MemoryLayout<T>.stride
+        _sanityCheck(rawPtr.count == ${N}*stride, "layout mismatch?")
+        let bufPtr = UnsafeMutableBufferPointer(
+          start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
+          count: count)
+        bufPtr[i] = newValue
+      }
+    }
+  }
+
+  @_versioned
+  @inline(__always)
+  internal func index(after i: Index) -> Index {
+    return i+1
+  }
+
+  @_versioned
+  @inline(__always)
+  internal func index(before i: Index) -> Index {
+    return i-1
+  }
+
+  // TODO: Any customization hooks it's profitable to override, e.g. append?
+
+}
+
+extension _FixedArray${N} where T: IntegerLiteralConvertible {
+  @inline(__always)
+  internal init(allZeros:()) {
+    self.storage = (
+% for i in range(0, N-1):
+    0,
+% end
+    0
+    )
+  }
+}
+
+% end
