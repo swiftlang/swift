@@ -229,7 +229,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   TopLevelCodeDecl *newTopLevel = new (Context) TopLevelCodeDecl(&SF);
 
   // Build function of type T->() which prints the operand.
-  auto *Arg = new (Context) ParamDecl(/*isLet=*/true, SourceLoc(),
+  auto *Arg = new (Context) ParamDecl(VarDecl::Specifier::None, SourceLoc(),
                                          SourceLoc(), Identifier(),
                                          Loc, Context.getIdentifier("arg"),
                                          E->getType(), /*DC*/ newTopLevel);
@@ -308,7 +308,8 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
 
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
-  VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+  VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false,
+                                      VarDecl::Specifier::Let,
                                       /*IsCaptureList*/false, E->getStartLoc(),
                                       name, E->getType(), &SF);
   vd->setInterfaceType(E->getType());
@@ -381,7 +382,8 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
 
     // Create the meta-variable, let the typechecker name it.
     Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
-    VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+    VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false,
+                                        VarDecl::Specifier::Let,
                                         /*IsCaptureList*/false,
                                         PBD->getStartLoc(), name,
                                         pattern->getType(), &SF);

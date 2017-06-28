@@ -460,17 +460,17 @@ static EnumDecl *lookupEvaluatedCodingKeysEnum(ASTContext &C,
 ///
 /// \param keyType The key type to bind to the container type.
 ///
-/// \param isLet Whether to declare the variable as immutable.
+/// \param spec Whether to declare the variable as immutable.
 static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
                                      NominalTypeDecl *keyedContainerDecl,
-                                     Type keyType, bool isLet) {
+                                     Type keyType, VarDecl::Specifier spec) {
   // Bind Keyed*Container to Keyed*Container<KeyType>
   Type boundType[1] = {keyType};
   auto containerType = BoundGenericType::get(keyedContainerDecl, Type(),
                                              C.AllocateCopy(boundType));
 
   // let container : Keyed*Container<KeyType>
-  auto *containerDecl = new (C) VarDecl(/*IsStatic=*/false, /*IsLet=*/isLet,
+  auto *containerDecl = new (C) VarDecl(/*IsStatic=*/false, spec,
                                         /*IsCaptureList=*/false, SourceLoc(),
                                         C.Id_container, containerType, DC);
   containerDecl->setImplicit();
@@ -495,7 +495,7 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                             Expr *base, Type returnType,
                                             NominalTypeDecl *param) {
   // (keyedBy:)
-  auto *keyedByDecl = new (C) ParamDecl(/*IsLet=*/true, SourceLoc(),
+  auto *keyedByDecl = new (C) ParamDecl(VarDecl::Specifier::None, SourceLoc(),
                                         SourceLoc(), C.Id_keyedBy, SourceLoc(),
                                         C.Id_keyedBy, returnType, DC);
   keyedByDecl->setImplicit();
@@ -568,7 +568,8 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedEncodingContainerDecl(),
-                                             codingKeysType, /*isLet=*/false);
+                                             codingKeysType,
+                                             VarDecl::Specifier::Var);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
                                             DeclNameLoc(), /*Implicit=*/true,
@@ -736,7 +737,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
 
   // Params: (self [implicit], Encoder)
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target);
-  auto *encoderParam = new (C) ParamDecl(/*isLet=*/true, SourceLoc(),
+  auto *encoderParam = new (C) ParamDecl(VarDecl::Specifier::None, SourceLoc(),
                                          SourceLoc(), C.Id_to, SourceLoc(),
                                          C.Id_encoder, encoderType, target);
   encoderParam->setInterfaceType(encoderType);
@@ -833,7 +834,8 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedDecodingContainerDecl(),
-                                             codingKeysType, /*isLet=*/true);
+                                             codingKeysType,
+                                             VarDecl::Specifier::Let);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
                                             DeclNameLoc(), /*Implicit=*/true,
@@ -1036,7 +1038,8 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target,
                                          /*isStatic=*/false,
                                          /*isInOut=*/inOut);
-  auto *decoderParamDecl = new (C) ParamDecl(/*isLet=*/true, SourceLoc(),
+  auto *decoderParamDecl = new (C) ParamDecl(VarDecl::Specifier::None,
+                                             SourceLoc(),
                                              SourceLoc(), C.Id_from,
                                              SourceLoc(), C.Id_decoder,
                                              decoderType, target);

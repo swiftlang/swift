@@ -882,7 +882,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       P.Tok.isAny(tok::l_brace, tok::kw_where)) {
     auto loc = P.Tok.getLoc();
     auto errorName = P.Context.Id_error;
-    auto var = new (P.Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+    auto var = new (P.Context) VarDecl(/*IsStatic*/false,
+                                       VarDecl::Specifier::Let,
                                        /*IsCaptureList*/false, loc, errorName,
                                        Type(), P.CurDeclContext);
     var->setImplicit();

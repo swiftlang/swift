@@ -318,9 +318,9 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// called 'static').
     unsigned IsStatic : 1;
 
-    /// \brief Whether this is a 'let' property, which can only be initialized
-    /// once (either in its declaration, or once later), making it immutable.
-    unsigned IsLet : 1;
+    /// \brief The specifier associated with this variable or parameter.  This
+    /// determines the storage semantics of the value e.g. mutability.
+    unsigned Specifier : 2;
 
     /// \brief Whether this declaration was an element of a capture list.
     unsigned IsCaptureList : 1;
@@ -335,7 +335,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned IsDebuggerVar : 1;
 
   };
-  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 5 };
+  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 6 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
 
   class EnumElementDeclBitfields {
@@ -4325,15 +4325,28 @@ public:
 
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
+public:
+  enum class Specifier : uint8_t {
+    // For Var Decls
+    
+    Let  = 0,
+    Var  = 1,
+    
+    // For Param Decls
+    
+    None  = Let,
+    InOut = 2,
+  };
+  
 protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
-  VarDecl(DeclKind Kind, bool IsStatic, bool IsLet, bool IsCaptureList,
+  VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
           SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
     : AbstractStorageDecl(Kind, DC, Name, NameLoc)
   {
     VarDeclBits.IsStatic = IsStatic;
-    VarDeclBits.IsLet = IsLet;
+    VarDeclBits.Specifier = static_cast<unsigned>(Sp);
     VarDeclBits.IsCaptureList = IsCaptureList;
     VarDeclBits.IsDebuggerVar = false;
     VarDeclBits.HasNonPatternBindingInit = false;
@@ -4346,9 +4359,9 @@ protected:
   Type typeInContext;
 
 public:
-  VarDecl(bool IsStatic, bool IsLet, bool IsCaptureList, SourceLoc NameLoc,
+  VarDecl(bool IsStatic, Specifier Sp, bool IsCaptureList, SourceLoc NameLoc,
           Identifier Name, Type Ty, DeclContext *DC)
-    : VarDecl(DeclKind::Var, IsStatic, IsLet, IsCaptureList, NameLoc, Name, Ty,
+    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, Ty,
               DC) {}
 
   SourceRange getSourceRange() const;
@@ -4448,6 +4461,11 @@ public:
   /// Determine whether this declaration is an anonymous closure parameter.
   bool isAnonClosureParam() const;
 
+  /// Return the raw specifier value for this property or parameter.
+  Specifier getSpecifier() const {
+    return static_cast<Specifier>(VarDeclBits.Specifier);
+  }
+  
   /// Is this a type ('static') variable?
   bool isStatic() const { return VarDeclBits.IsStatic; }
   void setStatic(bool IsStatic) { VarDeclBits.IsStatic = IsStatic; }
@@ -4456,9 +4474,20 @@ public:
   StaticSpellingKind getCorrectStaticSpelling() const;
 
   /// Is this an immutable 'let' property?
-  bool isLet() const { return VarDeclBits.IsLet; }
-  void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
-
+  bool isLet() const { return getSpecifier() == Specifier::Let; }
+  // FIXME: Remove this setter.
+  void setLet(bool immutable) {
+    auto specifier = VarDecl::Specifier::Let;
+    if (!immutable) {
+      if (getKind() == DeclKind::Param) {
+        specifier = VarDecl::Specifier::InOut;
+      } else {
+        specifier = VarDecl::Specifier::Var;
+      }
+    }
+    VarDeclBits.Specifier = static_cast<unsigned>(specifier);
+  }
+  
   /// Is this an element in a capture list?
   bool isCaptureList() const { return VarDeclBits.IsCaptureList; }
 
@@ -4530,7 +4559,8 @@ class ParamDecl : public VarDecl {
   DefaultArgumentKind defaultArgumentKind = DefaultArgumentKind::None;
   
 public:
-  ParamDecl(bool isLet, SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+  ParamDecl(VarDecl::Specifier specifier,
+            SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, Type ty, DeclContext *dc);
 

@@ -1675,7 +1675,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // imported header unit.
     auto paramInfo = createDeclWithClangNode<ParamDecl>(
         param, Accessibility::Private,
-        /*IsLet*/ true, SourceLoc(), SourceLoc(), name,
+        VarDecl::Specifier::None, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
         dc->mapTypeIntoContext(swiftParamTy),
         ImportedHeaderUnit);
@@ -1696,9 +1696,11 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
                               {SwiftContext.TheAnyType});
     auto name = SwiftContext.getIdentifier("varargs");
-    auto param = new (SwiftContext)
-        ParamDecl(true, SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                  name, paramTy, ImportedHeaderUnit);
+    auto param = new (SwiftContext) ParamDecl(VarDecl::Specifier::None,
+                                              SourceLoc(), SourceLoc(),
+                                              Identifier(), SourceLoc(),
+                                              name, paramTy,
+                                              ImportedHeaderUnit);
     param->setInterfaceType(paramTy);
 
     param->setVariadic();
@@ -1995,7 +1997,7 @@ Type ClangImporter::Implementation::importMethodType(
     // It doesn't actually matter which DeclContext we use, so just
     // use the imported header unit.
     auto type = TupleType::getEmpty(SwiftContext);
-    auto var = new (SwiftContext) ParamDecl(/*IsLet*/ true, SourceLoc(),
+    auto var = new (SwiftContext) ParamDecl(VarDecl::Specifier::None, SourceLoc(),
                                             SourceLoc(), argName,
                                             SourceLoc(), argName, type,
                                             ImportedHeaderUnit);
@@ -2113,7 +2115,7 @@ Type ClangImporter::Implementation::importMethodType(
     // Set up the parameter info.
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, Accessibility::Private,
-                                           /*IsLet*/ true,
+                                           VarDecl::Specifier::None,
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
                                            bodyName,
@@ -2237,7 +2239,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, Accessibility::Private,
-                                           /*IsLet*/true,
+                                           VarDecl::Specifier::None,
                                            /*let loc*/SourceLoc(),
                                            /*label loc*/SourceLoc(),
                                            argLabel, nameLoc, bodyName,

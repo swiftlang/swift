@@ -187,7 +187,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (Tok.is(tok::kw_inout)) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
-          param.SpecifierKind = ParsedParameter::InOut;
+          param.SpecifierKind = VarDecl::Specifier::InOut;
         } else {
           diagnose(Tok, diag::parameter_let_var_as_attr,
                    unsigned(Tok.is(tok::kw_let)))
@@ -341,9 +341,8 @@ mapParsedParameters(Parser &parser,
                          Identifier argName, SourceLoc argNameLoc,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
-    auto specifierKind = paramInfo.SpecifierKind;
-    bool isLet = specifierKind == Parser::ParsedParameter::None;
-    auto param = new (ctx) ParamDecl(isLet, paramInfo.SpecifierLoc,
+    auto param = new (ctx) ParamDecl(paramInfo.SpecifierKind,
+                                     paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
@@ -359,7 +358,7 @@ mapParsedParameters(Parser &parser,
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
-      if (specifierKind == Parser::ParsedParameter::InOut) {
+      if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
         auto InOutLoc = paramInfo.SpecifierLoc;
         if (isa<InOutTypeRepr>(type)) {
           parser.diagnose(InOutLoc, diag::parameter_inout_var_let_repeated)
@@ -379,10 +378,10 @@ mapParsedParameters(Parser &parser,
       
       param->getTypeLoc() = TypeLoc::withoutLoc(ErrorType::get(ctx));
       param->setInvalid();
-    } else if (specifierKind == Parser::ParsedParameter::InOut) {
+    } else if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
       parser.diagnose(paramInfo.SpecifierLoc, diag::inout_must_have_type);
       paramInfo.SpecifierLoc = SourceLoc();
-      specifierKind = Parser::ParsedParameter::None;
+      paramInfo.SpecifierKind = VarDecl::Specifier::None;
     }
     return param;
   };
@@ -797,12 +796,14 @@ ParserResult<Pattern> Parser::parsePattern() {
   case tok::identifier: {
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
-    bool isLet = InVarOrLetPattern != IVOLP_InVar;
-
+    bool isLet = (InVarOrLetPattern != IVOLP_InVar);
+    auto specifier = isLet
+                   ? VarDecl::Specifier::Let
+                   : VarDecl::Specifier::Var;
     if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
       diagnoseConsecutiveIDs(name.str(), loc, isLet ? "constant" : "variable");
 
-    return makeParserResult(createBindingFromPattern(loc, name, isLet));
+    return makeParserResult(createBindingFromPattern(loc, name, specifier));
   }
     
   case tok::code_complete:
@@ -856,8 +857,8 @@ ParserResult<Pattern> Parser::parsePattern() {
 }
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
-                                          bool isLet) {
-  auto var = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/isLet,
+                                          VarDecl::Specifier specifier) {
+  auto var = new (Context) VarDecl(/*IsStatic*/false, specifier,
                                    /*IsCaptureList*/false, loc, name, Type(),
                                    CurDeclContext);
   return new (Context) NamedPattern(var);

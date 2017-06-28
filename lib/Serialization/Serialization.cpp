@@ -2291,6 +2291,20 @@ static ForeignErrorConventionKind getRawStableForeignErrorConventionKind(
   llvm_unreachable("Unhandled ForeignErrorConvention in switch.");
 }
 
+/// Translate from the AST VarDeclSpecifier enum to the
+/// Serialization enum values, which are guaranteed to be stable.
+static uint8_t getRawStableVarDeclSpecifier(swift::VarDecl::Specifier sf) {
+  switch (sf) {
+  case swift::VarDecl::Specifier::Let:
+    return uint8_t(serialization::VarDeclSpecifier::Let);
+  case swift::VarDecl::Specifier::Var:
+    return uint8_t(serialization::VarDeclSpecifier::Var);
+  case swift::VarDecl::Specifier::InOut:
+    return uint8_t(serialization::VarDeclSpecifier::InOut);
+  }
+  llvm_unreachable("bad variable decl specifier kind");
+}
+
 void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
   using namespace decls_block;
 
@@ -2818,7 +2832,7 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(var);
 
     auto contextID = addDeclContextRef(var->getDeclContext());
-
+    
     Accessors accessors = getAccessors(var);
     uint8_t rawAccessLevel =
       getRawStableAccessibility(var->getFormalAccess());
@@ -2839,7 +2853,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isImplicit(),
                           var->isObjC(),
                           var->isStatic(),
-                          var->isLet(),
+                          getRawStableVarDeclSpecifier(var->getSpecifier()),
                           var->hasNonPatternBindingInit(),
                           (unsigned) accessors.Kind,
                           addTypeRef(ty),
@@ -2868,7 +2882,7 @@ void Serializer::writeDecl(const Decl *D) {
                             addDeclBaseNameRef(param->getArgumentName()),
                             addDeclBaseNameRef(param->getName()),
                             contextID,
-                            param->isLet(),
+                            getRawStableVarDeclSpecifier(param->getSpecifier()),
                             addTypeRef(interfaceType));
 
     if (interfaceType->hasError()) {

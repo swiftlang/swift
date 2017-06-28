@@ -70,7 +70,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   Type enumType = enumVarDecl->getType();
   Type intType = C.getIntDecl()->getDeclaredType();
 
-  auto indexVar = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
                                   /*IsCaptureList*/false, SourceLoc(),
                                   C.getIdentifier(indexName), intType,
                                   funcDecl);
@@ -217,7 +217,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl* {
-    auto *param = new (C) ParamDecl(/*isLet*/true, SourceLoc(), SourceLoc(),
+    auto *param = new (C) ParamDecl(VarDecl::Specifier::None, SourceLoc(), SourceLoc(),
                                     Identifier(), SourceLoc(), C.getIdentifier(s),
                                     enumTy, parentDC);
     param->setInterfaceType(enumIfaceTy);
@@ -438,7 +438,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     tc.Context.addExternalDecl(getterDecl);
 
   // Create the property.
-  VarDecl *hashValueDecl = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+  VarDecl *hashValueDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
                                            /*IsCaptureList*/false, SourceLoc(),
                                            C.Id_hashValue, intType, parentDC);
   hashValueDecl->setImplicit();
