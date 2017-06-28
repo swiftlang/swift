@@ -19,7 +19,7 @@ func checkSingleForm<S: StringProtocol>(
 ) {
 	expectEqual(expectedCount, Int(s.count))
 	if let cuCount = expectedCodeUnitCount {
-		expectEqual(expectedCodeUnitCount, Int(s.utf16.count))
+		expectEqual(cuCount, Int(s.utf16.count))
 	}
 
 	// Now check various reversed properties
@@ -34,11 +34,11 @@ func check(
 ) {
 	checkSingleForm(s, expectedCount: count, expectedCodeUnitCount: cuCount)
 
-	// TODO: substring tests
-	// checkSingleForm(s[...], expectedCount: count, expectedCodeUnitCount: cuCount)
-	// checkSingleForm(s.dropFirst(), expectedCount: count-1, expectedCodeUnitCount: nil)
-	// checkSingleForm(s.dropLast(), expectedCount: count-1, expectedCodeUnitCount: nil)
-	// checkSingleForm(s.dropLast().dropFirst(), expectedCount: count-2, expectedCodeUnitCount: nil)
+	// Substring tests
+	checkSingleForm(s[...], expectedCount: count, expectedCodeUnitCount: cuCount)
+	checkSingleForm(s.dropFirst(), expectedCount: count-1, expectedCodeUnitCount: nil)
+	checkSingleForm(s.dropLast(), expectedCount: count-1, expectedCodeUnitCount: nil)
+	checkSingleForm(s.dropLast().dropFirst(), expectedCount: count-2, expectedCodeUnitCount: nil)
 }
 
 tests.test("Unicode 9 grapheme breaking") {
