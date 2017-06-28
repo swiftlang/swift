@@ -1104,7 +1104,7 @@ namespace {
           }
         }
 
-        TC.diagnose(startLoc, diag::non_exhaustive_switch);
+        TC.diagnose(startLoc, mainDiagType);
         TC.diagnose(startLoc, diag::missing_several_cases, false)
           .fixItInsert(endLoc, buffer.str());
       } else {
