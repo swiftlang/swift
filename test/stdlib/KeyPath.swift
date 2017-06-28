@@ -12,6 +12,15 @@ final class C<T> {
   var y: LifetimeTracked?
   var z: T
 
+  var computed: T {
+    get {
+      return z
+    }
+    set {
+      z = newValue
+    }
+  }
+
   init(x: Int, y: LifetimeTracked?, z: T) {
     self.x = x
     self.y = y
@@ -403,6 +412,41 @@ keyPath.test("optional chaining") {
   let optional2_optional = \TestOptional2?.?.optional
   expectEqual(optional2[keyPath: optional2_optional]!.origin!.x, 3)
   expectEqual(optional2[keyPath: optional2_optional]!.origin!.y, 4)
+}
+
+func makeKeyPathInGenericContext<T>(of: T.Type)
+    -> ReferenceWritableKeyPath<C<T>, T> {
+  return \C<T>.computed
+}
+
+keyPath.test("computed generic key paths") {
+  let path = makeKeyPathInGenericContext(of: LifetimeTracked.self)
+
+  let z = LifetimeTracked(456)
+  let c = C(x: 42, y: LifetimeTracked(123), z: z)
+
+  expectTrue(c[keyPath: path] === z)
+
+  let z2 = LifetimeTracked(789)
+  c[keyPath: path] = z2
+  expectTrue(c[keyPath: path] === z2)
+  expectTrue(c.z === z2)
+
+  let path2 = makeKeyPathInGenericContext(of: LifetimeTracked.self)
+
+  expectEqual(path, path2)
+  expectEqual(path.hashValue, path2.hashValue)
+
+  let pathNonGeneric = \C<LifetimeTracked>.computed
+  expectEqual(path, pathNonGeneric)
+  expectEqual(path.hashValue, path2.hashValue)
+
+  let valuePath = path.appending(path: \LifetimeTracked.value)
+  expectEqual(c[keyPath: valuePath], 789)
+
+  let valuePathNonGeneric = pathNonGeneric.appending(path: \LifetimeTracked.value)
+  expectEqual(valuePath, valuePathNonGeneric)
+  expectEqual(valuePath.hashValue, valuePathNonGeneric.hashValue)
 }
 
 runAllTests()
