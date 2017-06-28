@@ -102,25 +102,14 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       processFullApply(info, argumentIndex, cast<TryApplyInst>(user), operand,
                        order);
       break;
-    case ValueKind::CopyAddrInst:
-    case ValueKind::ExistentialMetatypeInst:
-    case ValueKind::ValueMetatypeInst:
-    case ValueKind::LoadInst:
-    case ValueKind::LoadBorrowInst:
-    case ValueKind::EndBorrowInst:
-    case ValueKind::OpenExistentialAddrInst:
-    case ValueKind::ProjectBlockStorageInst:
-      // These likely represent scenarios in which we're not generating
+    default:
+      // FIXME: These likely represent scenarios in which we're not generating
       // begin access markers. Ignore these for now. But we really should
       // add SIL verification to ensure all loads and stores have associated
-      // access markers.
-      break;
-    default:
-      // TODO: These requirements should be checked for in the SIL verifier.
-      // This is an assertion rather than llvm_unreachable() because
-      // it is likely the whitelist above for scenarios in which we'ren
-      // not generating access markers is not comprehensive.
-      assert(false && "Unrecognized argument use");
+      // access markers. Once SIL verification is implemented, enable the
+      // following assert to verify that the whitelist above is comprehensive,
+      // which guarnatees that exclusivity enforcement is complete.
+      //   assert(false && "Unrecognized argument use");
       break;
     }
   }
@@ -130,7 +119,8 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
 /// Sanity check to make sure that a noescape partial apply is
 /// only ultimately used by an apply, a try_apply or as an argument (but not
 /// the called function) in a partial_apply.
-/// TODO: This really should be checked in the SILVerifier.
+///
+/// FIXME: This needs to be checked in the SILVerifier.
 static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   SILInstruction *user = partialApplyUse->getUser();
 
