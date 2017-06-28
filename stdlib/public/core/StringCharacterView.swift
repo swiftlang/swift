@@ -402,17 +402,19 @@ extension String.CharacterView : BidirectionalCollection {
     }
 
     // Perform a quick single-code-unit grapheme check
-    if _core._baseAddress != nil {
+    if _fastPath(_core._baseAddress != nil) {
       if String.CharacterView._quickCheckGraphemeBreakBetween(
         _core._nthContiguous(relativeOffset),
         _core._nthContiguous(relativeOffset+1)
       ) {
         return 1
       }
-    } else {
-      // TODO: Check for (potentially non-contiguous) UTF16 NSStrings,
-      // especially small tagged pointers
+    } else if String.CharacterView._quickCheckGraphemeBreakBetween(
+        _core[relativeOffset], _core[relativeOffset+1]
+    ) {
+      return 1
     }
+
     return _measureExtendedGraphemeClusterForwardSlow(
       relativeOffset: relativeOffset,
       start: start,
@@ -429,7 +431,11 @@ extension String.CharacterView : BidirectionalCollection {
     end: String.UnicodeScalarView.Index,
     startIndexUTF16: Int
   ) -> Int {
-    if _core._baseAddress != nil {
+    _sanityCheck(
+      start._position < end._position-1, "should have at least two code units")
+
+    // The vast majority of time, we can get a pointer and a length directly
+    if _fastPath(_core._baseAddress != nil) {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
       let ubrkFollowing = __swift_stdlib_ubrk_following(
@@ -440,18 +446,54 @@ extension String.CharacterView : BidirectionalCollection {
       let nextPosition =
         ubrkFollowing == -1 ? end._position : Int(ubrkFollowing)
       return nextPosition - relativeOffset
-    } else {
-      // TODO: See if we can get fast character contents.
     }
 
-    // FIXME: Need to handle the general case correctly with Unicode 9+
-    // semantics, as opposed to this legacy Unicode 8 path. This gets hit for
-    // e.g. non-contiguous NSStrings. In such cases, there may be an alternative
-    // CFString API available, or worst case we can map over it via UTextFuncs.
+    // We have a non-contiguous string. Pull out some code units into a fixed
+    // array and try to perform grapheme breaking on that. If even that's not
+    // sufficient (i.e. very pathological) then copy into an Array.
+    var codeUnitBuffer = _FixedArray16<UInt16>(allZeros:())
+    let maxBufferCount = codeUnitBuffer.count
+    var bufferCount = 0
+    while bufferCount < Swift.min(
+      maxBufferCount, end._position - relativeOffset
+    ) {
+      codeUnitBuffer[bufferCount] = _core[relativeOffset + bufferCount]
+      bufferCount += 1
+    }
 
-    return legacyGraphemeForward(
-      start: start, end: end, startIndexUTF16: startIndexUTF16
-    )
+    return withUnsafeBytes(of: &codeUnitBuffer.storage) {
+      (rawPtr : UnsafeRawBufferPointer) -> Int in
+      let bufPtr = UnsafeBufferPointer(
+        start: rawPtr.baseAddress!.assumingMemoryBound(to: UInt16.self),
+        count: bufferCount)
+
+      let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: bufPtr)
+      let ubrkFollowing = __swift_stdlib_ubrk_following(
+        breakIterator, Int32(0)
+      )
+
+      if _fastPath(
+        ubrkFollowing != -1 && ubrkFollowing != maxBufferCount
+      ) {
+        // The offset into our buffer *is* the distance.
+        return Int(ubrkFollowing)
+      }
+
+      // Nuclear option: copy out the rest of the string into an array
+      var codeUnits = Array<UInt16>()
+      codeUnits.reserveCapacity(end._position - relativeOffset + 1)
+      for i in relativeOffset..<end._position {
+        codeUnits.append(_core[i])
+      }
+      return codeUnits.withUnsafeBufferPointer { bufPtr -> Int in
+        let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: bufPtr)
+        let ubrkFollowing = __swift_stdlib_ubrk_following(
+          breakIterator, Int32(0)
+        )
+        return ubrkFollowing == -1 ?
+          end._position - relativeOffset : Int(ubrkFollowing)
+      }
+    }
   }
 
   @inline(never)
@@ -537,14 +579,19 @@ extension String.CharacterView : BidirectionalCollection {
     }
 
     // Perform a quick single-code-unit grapheme check
-    if _core._baseAddress != nil {
+    if _fastPath(_core._baseAddress != nil) {
       if String.CharacterView._quickCheckGraphemeBreakBetween(
         _core._nthContiguous(lastOffset-1),
         _core._nthContiguous(lastOffset)
       ) {
         return 1
       }
+    } else if String.CharacterView._quickCheckGraphemeBreakBetween(
+        _core[lastOffset-1], _core[lastOffset]
+    ) {
+      return 1
     }
+
     return _measureExtendedGraphemeClusterBackwardSlow(
       endOffset: endOffset, start: start, end: end, endIndexUTF16: endIndexUTF16
     )
@@ -558,29 +605,74 @@ extension String.CharacterView : BidirectionalCollection {
     end: String.UnicodeScalarView.Index,
     endIndexUTF16: Int
   ) -> Int {
-    if _core._baseAddress != nil {
+    _sanityCheck(
+      end._position-1 > start._position, 
+      "should have at least two code units"
+    )
+    func measureFromUBreakPosition(_ ubrkPos: Int32) -> Int {
+      // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
+      // string.
+      return endOffset - (ubrkPos == -1 ? start._position : Int(ubrkPos))
+    }
+
+    // The vast majority of time, we can get a pointer and a length directly
+    if _fastPath(_core._baseAddress != nil) {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
       let ubrkPreceding = __swift_stdlib_ubrk_preceding(
         breakIterator, Int32(endOffset)
       )
-      // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
-      // string.
-      let priorPosition =
-        ubrkPreceding == -1 ? start._position : Int(ubrkPreceding)
-      return endOffset - priorPosition
-    } else {
-      // TODO: See if we can get fast character contents.
+      return measureFromUBreakPosition(ubrkPreceding)
     }
 
-    // FIXME: Need to handle the general case correctly with Unicode 9+
-    // semantics, as opposed to this legacy Unicode 8 path. This gets hit for
-    // e.g. non-contiguous NSStrings. In such cases, there may be an alternative
-    // CFString API available, or worst case we can map over it via UTextFuncs.
+    // We have a non-contiguous string. Pull out some code units into a fixed
+    // array and try to perform grapheme breaking on that. If even that's not
+    // sufficient (i.e. very pathological) then copy into an Array.
+    var codeUnitBuffer = _FixedArray16<UInt16>(allZeros:())
+    let maxBufferCount = codeUnitBuffer.count
+    var coreIdx = Swift.max(start._position, endOffset - maxBufferCount)
+    var bufferCount = 0
+    while coreIdx < endOffset {
+      codeUnitBuffer[bufferCount] = _core[coreIdx]
+      bufferCount += 1
+      coreIdx += 1
+    }
 
-    return legacyGraphemeBackward(
-      start: start, end: end, endIndexUTF16: endIndexUTF16
-    )
+    return withUnsafeBytes(of: &codeUnitBuffer.storage) {
+      (rawPtr : UnsafeRawBufferPointer) -> Int in
+      let bufPtr = UnsafeBufferPointer(
+        start: rawPtr.baseAddress!.assumingMemoryBound(to: UInt16.self),
+        count: bufferCount)
+
+      let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: bufPtr)
+      let ubrkPreceding = __swift_stdlib_ubrk_preceding(
+        breakIterator, Int32(bufferCount)
+      )
+
+      if _fastPath(bufferCount != maxBufferCount || ubrkPreceding > 1) {
+        // There was a grapheme break within our buffer.
+        // Adjust ubrkPreceding, as it's relative to our buffer
+        let ubrkAbsPos = ubrkPreceding + (endOffset - bufferCount)
+        return measureFromUBreakPosition(ubrkAbsPos)
+      }
+
+      // Nuclear option: copy out the prefix of the string into an array
+      var codeUnits = Array<UInt16>()
+      codeUnits.reserveCapacity(endOffset - start._position + 1)
+      for i in 0..<endOffset {
+        codeUnits.append(_core[i])
+      }
+      return codeUnits.withUnsafeBufferPointer { bufPtr -> Int in
+        let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: bufPtr)
+        let ubrkPreceding = __swift_stdlib_ubrk_preceding(
+          breakIterator, Int32(endOffset)
+        )
+        // No need to adjust ubrkPreceding as we copied the prefix: it is the
+        // position in the original string
+        // dump(codeUnits)
+        return measureFromUBreakPosition(ubrkPreceding)
+      }
+    }    
   }
 
   @inline(never)
