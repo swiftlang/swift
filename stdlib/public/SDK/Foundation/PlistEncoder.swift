@@ -74,7 +74,11 @@ open class PropertyListEncoder {
                                                                    debugDescription: "Top-level \(Value.self) encoded as date property list fragment."))
         }
 
-        return try PropertyListSerialization.data(fromPropertyList: topLevel, format: self.outputFormat, options: 0)
+        do {
+            return try PropertyListSerialization.data(fromPropertyList: topLevel, format: self.outputFormat, options: 0)
+        } catch {
+            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value as a property list", underlyingError: error))
+        }
     }
 }
 
@@ -640,7 +644,12 @@ open class PropertyListDecoder {
     /// - throws: `DecodingError.dataCorrupted` if values requested from the payload are corrupted, or if the given data is not a valid property list.
     /// - throws: An error if any value throws an error during decoding.
     open func decode<T : Decodable>(_ type: T.Type, from data: Data, format: inout PropertyListSerialization.PropertyListFormat) throws -> T {
-        let topLevel = try PropertyListSerialization.propertyList(from: data, options: [], format: &format)
+        let topLevel: Any
+        do {
+            topLevel = try PropertyListSerialization.propertyList(from: data, options: [], format: &format)
+        } catch {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "The given data was not a valid property list.", underlyingError: error))
+        }
         let decoder = _PlistDecoder(referencing: topLevel, options: self.options)
         return try T(from: decoder)
     }
