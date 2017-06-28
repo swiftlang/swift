@@ -953,9 +953,8 @@ public:
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
     std::string CPU;
-    std::string Triple;
     std::vector<std::string> Features;
-    std::tie(TargetOpt, CPU, Features, Triple)
+    std::tie(TargetOpt, CPU, Features)
       = getIRTargetOptions(IRGenOpts, CI.getASTContext());
     
     builder.setRelocationModel(llvm::Reloc::PIC_);
