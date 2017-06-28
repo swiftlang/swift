@@ -1672,8 +1672,8 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
     auto parentAnchor = parent->getArchetypeAnchor(builder);
     assert(parentAnchor->getNestingDepth() <= parent->getNestingDepth());
     anchor = parentAnchor->getNestedArchetypeAnchor(
-                                      getNestedName(), builder,
-                                      ArchetypeResolutionKind::AlwaysPartial);
+                                  getNestedName(), builder,
+                                  ArchetypeResolutionKind::CompleteWellFormed);
 
     // FIXME: Hack for cases where we couldn't resolve the nested type.
     if (!anchor)
@@ -1690,8 +1690,6 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
       equivClass->archetypeAnchorCache.numMembers
         == equivClass->members.size()) {
     ++NumArchetypeAnchorCacheHits;
-    assert(equivClass->archetypeAnchorCache.anchor->getNestingDepth()
-             <= rep->getNestingDepth());
     return equivClass->archetypeAnchorCache.anchor;
   }
 
@@ -1709,8 +1707,6 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
            "archetype anchor isn't a total order");
   }
 #endif
-
-  assert(anchor->getNestingDepth() <= rep->getNestingDepth());
 
   // Record the cache miss and update the cache.
   ++NumArchetypeAnchorCacheMisses;
@@ -2513,22 +2509,8 @@ PotentialArchetype *GenericSignatureBuilder::resolveArchetype(
       return base->updateNestedTypeForConformance(assocType, resolutionKind);
 
     // Resolve based on name alone.
-    // FIXME: Pass through the resolution kind?
     auto name = dependentMember->getName();
-    switch (resolutionKind) {
-    case ArchetypeResolutionKind::AlreadyKnown: {
-      auto known = base->NestedTypes.find(name);
-      if (known == base->NestedTypes.end())
-        return nullptr;
-
-      return known->second.front();
-    }
-
-    case ArchetypeResolutionKind::AlwaysPartial:
-    case ArchetypeResolutionKind::CompleteWellFormed:
-    case ArchetypeResolutionKind::WellFormed:
-      return base->getNestedArchetypeAnchor(name, *this, resolutionKind);
-    }
+    return base->getNestedArchetypeAnchor(name, *this, resolutionKind);
   }
 
   return nullptr;
@@ -3331,11 +3313,9 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   unsigned nestingDepth2 = T2->getNestingDepth();
 
   // Decide which potential archetype is to be considered the representative.
-  // We prefer potential archetypes with lower nesting depths (because it
-  // prevents us from unnecessarily building deeply nested potential archetypes)
-  // and prefer anchors because it's a minor optimization.
-  if (nestingDepth2 < nestingDepth1 ||
-      compareDependentTypes(&T2, &T1) < 0) {
+  // We prefer potential archetypes with lower nesting depths, because it
+  // prevents us from unnecessarily building deeply nested potential archetypes.
+  if (nestingDepth2 < nestingDepth1) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
   }
@@ -4632,9 +4612,12 @@ static PotentialArchetype *getLocalAnchor(PotentialArchetype *pa,
   if (!parent) return pa;
 
   auto parentAnchor = getLocalAnchor(parent, builder);
-  return parentAnchor->getNestedArchetypeAnchor(
-                                        pa->getNestedName(), builder,
-                                        ArchetypeResolutionKind::AlwaysPartial);
+  if (!parentAnchor) return pa;
+  auto localAnchor =
+    parentAnchor->getNestedArchetypeAnchor(
+                                pa->getNestedName(), builder,
+                                ArchetypeResolutionKind::CompleteWellFormed);
+  return localAnchor ? localAnchor : pa;
 }
 
 /// Computes the ordered set of archetype anchors required to form a minimum
