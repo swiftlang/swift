@@ -9,6 +9,6 @@
 
 // RUN: not %swiftc_driver -D Correct -DAlsoCorrect -D@#%! -D Swift=Cool -D-D -c %s -o %t.o 2>&1 | %FileCheck -check-prefix=INVALID-COND %s
 // INVALID-COND: <unknown>:0: error: conditional compilation flags must be valid Swift identifiers (rather than '@#%!')
-// INVALID-COND-NEXT: <unknown>:0: error: conditional compilation flags do not have values in Swift; they are either present or absent (rather than 'Swift=Cool')
+// INVALID-COND-NEXT: <unknown>:0: warning: conditional compilation flags do not have values in Swift; they are either present or absent (rather than 'Swift=Cool')
 // INVALID-COND-NEXT: <unknown>:0: error: conditional compilation flags must be valid Swift identifiers (rather than '-D')
 
