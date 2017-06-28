@@ -30,9 +30,9 @@ func typoAssoc3<T : P2, U : P2>(t: T, u: U)
   where U.AssocP2.assoc : P3,  T.AssocP2.assoc : P4,
         T.AssocP2 == U.AssocP2 {}
 
-// expected-error@+3{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{47-52=Assoc}}
+// expected-error@+3{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}
 // expected-error@+2{{'T' does not have a member type named 'Assocp2'; did you mean 'AssocP2'?}}{{39-46=AssocP2}}
-// expected-error@+1{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}
+// expected-error@+1{{'assoc' is not a member type of 'T.AssocP2'}}
 func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 
 

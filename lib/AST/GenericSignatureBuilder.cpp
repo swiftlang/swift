@@ -1690,8 +1690,6 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
       equivClass->archetypeAnchorCache.numMembers
         == equivClass->members.size()) {
     ++NumArchetypeAnchorCacheHits;
-    assert(equivClass->archetypeAnchorCache.anchor->getNestingDepth()
-             <= rep->getNestingDepth());
     return equivClass->archetypeAnchorCache.anchor;
   }
 
@@ -1709,8 +1707,6 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
            "archetype anchor isn't a total order");
   }
 #endif
-
-  assert(anchor->getNestingDepth() <= rep->getNestingDepth());
 
   // Record the cache miss and update the cache.
   ++NumArchetypeAnchorCacheMisses;
@@ -3331,11 +3327,9 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   unsigned nestingDepth2 = T2->getNestingDepth();
 
   // Decide which potential archetype is to be considered the representative.
-  // We prefer potential archetypes with lower nesting depths (because it
-  // prevents us from unnecessarily building deeply nested potential archetypes)
-  // and prefer anchors because it's a minor optimization.
-  if (nestingDepth2 < nestingDepth1 ||
-      compareDependentTypes(&T2, &T1) < 0) {
+  // We prefer potential archetypes with lower nesting depths, because it
+  // prevents us from unnecessarily building deeply nested potential archetypes.
+  if (nestingDepth2 < nestingDepth1) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
   }
