@@ -1740,6 +1740,10 @@ public protocol UnkeyedDecodingContainer {
 /// A container that can support the storage and direct encoding of a single
 /// non-keyed value.
 public protocol SingleValueEncodingContainer {
+    /// The path of coding keys taken to get to this point in encoding.
+    /// A `nil` value indicates an unkeyed container.
+    var codingPath: [CodingKey?] { get }
+
     /// Encodes a null value.
     ///
     /// - throws: `EncodingError.invalidValue` if a null value is invalid in the current context for this format.
@@ -1854,6 +1858,10 @@ public protocol SingleValueEncodingContainer {
 
 /// A `SingleValueDecodingContainer` is a container which can support the storage and direct decoding of a single non-keyed value.
 public protocol SingleValueDecodingContainer {
+    /// The path of coding keys taken to get to this point in encoding.
+    /// A `nil` value indicates an unkeyed container.
+    var codingPath: [CodingKey?] { get }
+
     /// Decodes a null value.
     ///
     /// - returns: Whether the encountered value was null.
@@ -2172,6 +2180,47 @@ public enum DecodingError : Error {
         #else
             return nil
         #endif
+    }
+}
+
+// The following extensions allow for easier error construction.
+
+public extension DecodingError {
+    /// A convenience method which creates a new .dataCorrupted error using a constructed coding path and the given debug description.
+    ///
+    /// Constructs a coding path by appending the given key to the given container's coding path.
+    ///
+    /// - param key: The key which caused the failure.
+    /// - param container: The container in which the corrupted data was accessed.
+    /// - param debugDescription: A description of the error to aid in debugging.
+    static func dataCorruptedError<C : KeyedDecodingContainerProtocol>(forKey key: C.Key, in container: C, debugDescription: String) -> DecodingError {
+        let context = DecodingError.Context(codingPath: container.codingPath + [key],
+                                            debugDescription: debugDescription)
+        return .dataCorrupted(context)
+    }
+
+    /// A convenience method which creates a new .dataCorrupted error using a constructed coding path and the given debug description.
+    ///
+    /// Constructs a coding path by appending a nil key to the given container's coding path.
+    ///
+    /// - param container: The container in which the corrupted data was accessed.
+    /// - param debugDescription: A description of the error to aid in debugging.
+    static func dataCorruptedError(in container: UnkeyedDecodingContainer, debugDescription: String) -> DecodingError {
+        let context = DecodingError.Context(codingPath: container.codingPath + [nil],
+                                            debugDescription: debugDescription)
+        return .dataCorrupted(context)
+    }
+
+    /// A convenience method which creates a new .dataCorrupted error using a constructed coding path and the given debug description.
+    ///
+    /// Uses the given container's coding path as the constructed path.
+    ///
+    /// - param container: The container in which the corrupted data was accessed.
+    /// - param debugDescription: A description of the error to aid in debugging.
+    static func dataCorruptedError(in container: SingleValueDecodingContainer, debugDescription: String) -> DecodingError {
+        let context = DecodingError.Context(codingPath: container.codingPath,
+                                            debugDescription: debugDescription)
+        return .dataCorrupted(context)
     }
 }
 
