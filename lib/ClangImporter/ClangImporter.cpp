@@ -2272,7 +2272,14 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
           owner.importDecl(decl, owner.CurrentVersion);
       if (!importedDecl) continue;
 
-      auto ext = dyn_cast<ExtensionDecl>(importedDecl->getDeclContext());
+      // Find the enclosing extension, if there is one.
+      ExtensionDecl *ext = nullptr;
+      for (auto importedDC = importedDecl->getDeclContext();
+           !importedDC->isModuleContext();
+           importedDC = importedDC->getParent()) {
+        ext = dyn_cast<ExtensionDecl>(importedDC);
+        if (ext) break;
+      }
       if (!ext) continue;
 
       if (knownExtensions.insert(ext).second)
