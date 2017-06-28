@@ -2026,13 +2026,18 @@ public enum EncodingError : Error {
         /// A description of what went wrong, for debugging purposes.
         public let debugDescription: String
 
+        /// The underlying error which caused this error, if any.
+        public let underlyingError: Error?
+
         /// Initializes `self` with the given path of `CodingKey`s and a description of what went wrong.
         ///
         /// - parameter codingPath: The path of `CodingKey`s taken to get to the point of the failing encode call.
         /// - parameter debugDescription: A description of what went wrong, for debugging purposes.
-        public init(codingPath: [CodingKey?], debugDescription: String) {
+        /// - parameter underlyingError: The underlying error which caused this error, if any.
+        public init(codingPath: [CodingKey?], debugDescription: String, underlyingError: Error? = nil) {
             self.codingPath = codingPath
             self.debugDescription = debugDescription
+            self.underlyingError = underlyingError
         }
     }
 
@@ -2052,13 +2057,18 @@ public enum DecodingError : Error {
         /// A description of what went wrong, for debugging purposes.
         public let debugDescription: String
 
+        /// The underlying error which caused this error, if any.
+        public let underlyingError: Error?
+
         /// Initializes `self` with the given path of `CodingKey`s and a description of what went wrong.
         ///
         /// - parameter codingPath: The path of `CodingKey`s taken to get to the point of the failing decode call.
         /// - parameter debugDescription: A description of what went wrong, for debugging purposes.
-        public init(codingPath: [CodingKey?], debugDescription: String) {
+        /// - parameter underlyingError: The underlying error which caused this error, if any.
+        public init(codingPath: [CodingKey?], debugDescription: String, underlyingError: Error? = nil) {
             self.codingPath = codingPath
             self.debugDescription = debugDescription
+            self.underlyingError = underlyingError
         }
     }
 
