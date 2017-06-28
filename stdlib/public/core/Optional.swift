@@ -299,13 +299,19 @@ public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
                                     _filenameLength: Builtin.Word,
                                     _filenameIsASCII: Builtin.Int1,
-                                    _line: Builtin.Word) {
-  _preconditionFailure(
-    "unexpectedly found nil while unwrapping an Optional value",
-    file: StaticString(_start: _filenameStart,
-                       utf8CodeUnitCount: _filenameLength,
-                       isASCII: _filenameIsASCII),
-    line: UInt(_line))
+                                    _line: Builtin.Word,
+                                    _typeStart: Builtin.RawPointer,
+                                    _typeLength: Builtin.Word,
+                                    _typeIsASCII: Builtin.Int1) {
+  let type = StaticString(_start: _typeStart,
+                          utf8CodeUnitCount: _typeLength,
+                          isASCII: _typeIsASCII)
+  let file = StaticString(_start: _filenameStart,
+                          utf8CodeUnitCount: _filenameLength,
+                          isASCII: _filenameIsASCII)
+  let message =
+      "unexpectedly found nil while unwrapping value of optional type '\(type)'"
+  preconditionFailure(message, file: file, line: UInt(_line))
 }
 
 /// Returns a Boolean value indicating whether two optional instances are

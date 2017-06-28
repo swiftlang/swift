@@ -135,6 +135,31 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   return emitManagedRValueWithCleanup(result, optTL);
 }
 
+static void emitString(SILGenFunction &F, SILLocation emitLoc, StringRef s,
+                       ManagedValue &outStartPointer, ManagedValue &outLength,
+                       ManagedValue &outIsASCII) {
+  auto &ctx = F.getASTContext();
+
+  bool isASCII = true;
+  for (unsigned char c : s) {
+    if (c > 127) {
+      isASCII = false;
+      break;
+    }
+  }
+
+  auto wordTy = SILType::getBuiltinWordType(ctx);
+  auto i1Ty = SILType::getBuiltinIntegerType(1, ctx);
+
+  SILValue literal =
+      F.B.createStringLiteral(emitLoc, s, StringLiteralInst::Encoding::UTF8);
+  outStartPointer = ManagedValue::forUnmanaged(literal);
+  literal = F.B.createIntegerLiteral(emitLoc, wordTy, s.size());
+  outLength = ManagedValue::forUnmanaged(literal);
+  literal = F.B.createIntegerLiteral(emitLoc, i1Ty, isASCII);
+  outIsASCII = ManagedValue::forUnmanaged(literal);
+}
+
 auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
                                             SILLocation emitLoc)
 -> SourceLocArgs {
@@ -149,29 +174,13 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
     std::tie(line, column) = ctx.SourceMgr.getLineAndColumn(sourceLoc);
   }
   
-  bool isASCII = true;
-  for (unsigned char c : filename) {
-    if (c > 127) {
-      isASCII = false;
-      break;
-    }
-  }
-  
   auto wordTy = SILType::getBuiltinWordType(ctx);
-  auto i1Ty = SILType::getBuiltinIntegerType(1, ctx);
   
   SourceLocArgs result;
-  SILValue literal = B.createStringLiteral(emitLoc, filename,
-                                           StringLiteralInst::Encoding::UTF8);
-  result.filenameStartPointer = ManagedValue::forUnmanaged(literal);
-  // File length
-  literal = B.createIntegerLiteral(emitLoc, wordTy, filename.size());
-  result.filenameLength = ManagedValue::forUnmanaged(literal);
-  // File is ascii
-  literal = B.createIntegerLiteral(emitLoc, i1Ty, isASCII);
-  result.filenameIsAscii = ManagedValue::forUnmanaged(literal);
+  emitString(*this, emitLoc, filename, result.filenameStartPointer,
+             result.filenameLength, result.filenameIsAscii);
   // Line
-  literal = B.createIntegerLiteral(emitLoc, wordTy, line);
+  SILValue literal = B.createIntegerLiteral(emitLoc, wordTy, line);
   result.line = ManagedValue::forUnmanaged(literal);
   // Column
   literal = B.createIntegerLiteral(emitLoc, wordTy, column);
@@ -210,13 +219,23 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   if (auto diagnoseFailure =
         getASTContext().getDiagnoseUnexpectedNilOptional(nullptr)) {
     auto args = emitSourceLocationArgs(loc.getSourceLoc(), loc);
-    
+
+    std::string typeString = optional.getType().getSwiftRValueType().getString(
+        PrintOptions::printForDiagnostics());
+
+    ManagedValue typeStartPointer, typeLength, typeIsAscii;
+    emitString(*this, loc, typeString, typeStartPointer, typeLength,
+               typeIsAscii);
+
     emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, SubstitutionMap(),
                                 {
                                   args.filenameStartPointer,
                                   args.filenameLength,
                                   args.filenameIsAscii,
-                                  args.line
+                                  args.line,
+                                  typeStartPointer,
+                                  typeLength,
+                                  typeIsAscii
                                 },
                                 SGFContext());
   }
