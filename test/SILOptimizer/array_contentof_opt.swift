@@ -53,3 +53,7 @@ public func testString(_ a: inout [String], s: String) {
   a += [s]
 }
 
+// This is not supported yet. Just check that we don't crash on this.`
+public func dontPropagateContiguousArray(_ a: inout ContiguousArray<UInt8>) {
+  a += [4]
+}
