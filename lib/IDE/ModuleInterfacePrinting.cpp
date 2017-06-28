@@ -220,28 +220,49 @@ swift::ide::collectModuleGroups(ModuleDecl *M, std::vector<StringRef> &Scratch) 
   return llvm::makeArrayRef(Scratch);
 }
 
-/// Determine whether the given extension has a Clang node that
-/// created it (vs. being a Swift extension).
-static bool extensionHasClangNode(ExtensionDecl *ext) {
-  // If it has a Clang node (directly), 
-  if (ext->hasClangNode()) return true;
+/// Retrieve the effective Clang node for the given declaration, which
+/// copes with the odd case of imported Error enums.
+static ClangNode getEffectiveClangNode(const Decl *decl) {
+  // Directly...
+  if (auto clangNode = decl->getClangNode())
+    return clangNode;
 
-  // If it has a global imported as a member.
-  auto members = ext->getMembers();
-  if (members.empty()) return false;
-  return members.front()->hasClangNode();
+  // Or via the nested "Code" enum.
+  if (auto nominal =
+        const_cast<NominalTypeDecl *>(dyn_cast<NominalTypeDecl>(decl))) {
+    auto &ctx = nominal->getASTContext();
+    for (auto code : nominal->lookupDirect(ctx.Id_Code,
+                                           /*ignoreNewExtensions=*/true)) {
+      if (auto clangDecl = code->getClangDecl())
+        return clangDecl;
+    }
+  }
+
+  return ClangNode();
 }
 
 /// Retrieve the Clang node for the given extension, if it has one.
-/// created it (vs. being a Swift extension).
 static ClangNode extensionGetClangNode(ExtensionDecl *ext) {
   // If it has a Clang node (directly), 
   if (ext->hasClangNode()) return ext->getClangNode();
 
-  // If it has a global imported as a member.
-  auto members = ext->getMembers();
-  if (members.empty()) return ClangNode();
-  return members.front()->getClangNode();
+  // Check whether it was syntheszed into a module-scope context.
+  if (!isa<ClangModuleUnit>(ext->getModuleScopeContext()))
+    return ClangNode();
+
+  // It may have a global imported as a member.
+  for (auto member : ext->getMembers()) {
+    if (auto clangNode = getEffectiveClangNode(member))
+      return clangNode;
+  }
+
+  return ClangNode();
+}
+
+/// Determine whether the given extension has a Clang node that
+/// created it (vs. being a Swift extension).
+static bool extensionHasClangNode(ExtensionDecl *ext) {
+  return static_cast<bool>(extensionGetClangNode(ext));
 }
 
 Optional<StringRef>
@@ -393,8 +414,8 @@ void swift::ide::printSubmoduleInterface(
       }
     };
 
-    if (D->hasClangNode()) {
-      addToClangDecls(D, D->getClangNode());
+    if (auto clangNode = getEffectiveClangNode(D)) {
+      addToClangDecls(D, clangNode);
       continue;
     }
 
@@ -739,8 +760,8 @@ void swift::ide::printHeaderInterface(
   std::sort(ClangDecls.begin(), ClangDecls.end(),
             [&](Decl *LHS, Decl *RHS) -> bool {
               return ClangSM.isBeforeInTranslationUnit(
-                                            LHS->getClangNode().getLocation(),
-                                            RHS->getClangNode().getLocation());
+                                            getEffectiveClangNode(LHS).getLocation(),
+                                            getEffectiveClangNode(RHS).getLocation());
             });
 
   ASTPrinter *PrinterToUse = &Printer;
@@ -789,7 +810,7 @@ void ClangCommentPrinter::printDeclPre(const Decl *D,
   // single line.
   // FIXME: we should fix that, since it also affects struct members, etc.
   if (!isa<ParamDecl>(D)) {
-    if (auto ClangN = D->getClangNode()) {
+    if (auto ClangN = getEffectiveClangNode(D)) {
       printCommentsUntil(ClangN);
       if (shouldPrintNewLineBefore(ClangN)) {
         *this << "\n";
@@ -813,7 +834,7 @@ void ClangCommentPrinter::printDeclPost(const Decl *D,
     *this << " " << ASTPrinter::sanitizeUtf8(CommentText);
   }
   PendingComments.clear();
-  if (auto ClangN = D->getClangNode())
+  if (auto ClangN = getEffectiveClangNode(D))
     updateLastEntityLine(ClangN.getSourceRange().getEnd());
 }
 
