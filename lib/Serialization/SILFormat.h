@@ -73,6 +73,9 @@ enum class KeyPathComponentKindEncoding : uint8_t {
   StoredProperty,
   GettableProperty,
   SettableProperty,
+  OptionalChain,
+  OptionalForce,
+  OptionalWrap,
 };
 enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   Property,

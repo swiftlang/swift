@@ -380,7 +380,17 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                "generic computed key paths");
         return llvm::UndefValue::get(Int8PtrTy);
       }
+      break;
     }
+    case KeyPathPatternComponent::Kind::OptionalChain:
+      fields.addInt32(KeyPathComponentHeader::forOptionalChain().getData());
+      break;
+    case KeyPathPatternComponent::Kind::OptionalForce:
+      fields.addInt32(KeyPathComponentHeader::forOptionalForce().getData());
+      break;
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+      fields.addInt32(KeyPathComponentHeader::forOptionalWrap().getData());
+      break;
     }
     
     // For all but the last component, we pack in the type of the component.

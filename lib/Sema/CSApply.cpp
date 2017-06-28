@@ -4202,7 +4202,8 @@ namespace {
           baseTy &&
           !baseTy->hasUnresolvedType() &&
           !baseTy->isEqual(leafTy)) {
-        assert(leafTy->getAnyOptionalObjectType()->isEqual(baseTy));
+        assert(leafTy->getAnyOptionalObjectType()
+                     ->isEqual(baseTy->getLValueOrInOutObjectType()));
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
         baseTy = leafTy;

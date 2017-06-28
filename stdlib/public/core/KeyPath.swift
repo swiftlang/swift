@@ -199,14 +199,19 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
         
         func project<CurValue>(_ base: CurValue) -> Value? {
           func project2<NewValue>(_: NewValue.Type) -> Value? {
-            let newBase: NewValue = rawComponent.projectReadOnly(base)
-            if isLast {
-              _sanityCheck(NewValue.self == Value.self,
-                           "key path does not terminate in correct type")
-              return unsafeBitCast(newBase, to: Value.self)
-            } else {
-              curBase = newBase
-              return nil
+            switch rawComponent.projectReadOnly(base,
+              to: NewValue.self, endingWith: Value.self) {
+            case .continue(let newBase):
+              if isLast {
+                _sanityCheck(NewValue.self == Value.self,
+                             "key path does not terminate in correct type")
+                return unsafeBitCast(newBase, to: Value.self)
+              } else {
+                curBase = newBase
+                return nil
+              }
+            case .break(let result):
+              return result
             }
           }
 
@@ -304,7 +309,9 @@ public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value>
         
         func project<NewValue>(_: NewValue.Type) -> Any {
           func project2<CurValue>(_ base: CurValue) -> Any {
-            return rawComponent.projectReadOnly(base) as NewValue
+            return rawComponent.projectReadOnly(
+              base, to: NewValue.self, endingWith: Value.self)
+              .assumingContinue
           }
           return _openExistential(base, do: project2)
         }
@@ -834,46 +841,82 @@ internal struct RawKeyPathComponent {
       count: buffer.count - componentSize)
   }
 
-  func projectReadOnly<CurValue, NewValue>(_ base: CurValue) -> NewValue {
+  enum ProjectionResult<NewValue, LeafValue> {
+    /// Continue projecting the key path with the given new value.
+    case `continue`(NewValue)
+    /// Stop projecting the key path and use the given value as the final
+    /// result of the projection.
+    case `break`(LeafValue)
+
+    var assumingContinue: NewValue {
+      switch self {
+      case .continue(let x):
+        return x
+      case .break:
+        _sanityCheckFailure("should not have stopped key path projection")
+      }
+    }
+  }
+
+  func projectReadOnly<CurValue, NewValue, LeafValue>(
+    _ base: CurValue,
+    to: NewValue.Type,
+    endingWith: LeafValue.Type
+  ) -> ProjectionResult<NewValue, LeafValue> {
     switch value {
     case .struct(let offset):
       var base2 = base
-      return withUnsafeBytes(of: &base2) {
+      return .continue(withUnsafeBytes(of: &base2) {
         let p = $0.baseAddress.unsafelyUnwrapped.advanced(by: offset)
         // The contents of the struct should be well-typed, so we can assume
         // typed memory here.
         return p.assumingMemoryBound(to: NewValue.self).pointee
-      }
-    
+      })
+
     case .class(let offset):
       _sanityCheck(CurValue.self is AnyObject.Type,
                    "base is not a class")
       let baseObj = unsafeBitCast(base, to: AnyObject.self)
       let basePtr = UnsafeRawPointer(Builtin.bridgeToRawPointer(baseObj))
       defer { _fixLifetime(baseObj) }
-      return basePtr.advanced(by: offset)
+      return .continue(basePtr.advanced(by: offset)
         .assumingMemoryBound(to: NewValue.self)
-        .pointee
-    
+        .pointee)
+
     case .get(id: _, get: let rawGet, argument: let argument),
          .mutatingGetSet(id: _, get: let rawGet, set: _, argument: let argument),
          .nonmutatingGetSet(id: _, get: let rawGet, set: _, argument: let argument):
       typealias Getter
         = @convention(thin) (CurValue, UnsafeRawPointer) -> NewValue
       let get = unsafeBitCast(rawGet, to: Getter.self)
-      return get(base, argument)
+      return .continue(get(base, argument))
 
     case .optionalChain:
-      fatalError("TODO")
-    
+      _sanityCheck(CurValue.self == Optional<NewValue>.self,
+                   "should be unwrapping optional value")
+      _sanityCheck(_isOptional(LeafValue.self),
+                   "leaf result should be optional")
+      if let baseValue = unsafeBitCast(base, to: Optional<NewValue>.self) {
+        return .continue(baseValue)
+      } else {
+        // TODO: A more efficient way of getting the `none` representation
+        // of a dynamically-optional type...
+        return .break((Optional<()>.none as Any) as! LeafValue)
+      }
+
     case .optionalForce:
-      fatalError("TODO")
-      
+      _sanityCheck(CurValue.self == Optional<NewValue>.self,
+                   "should be unwrapping optional value")
+      return .continue(unsafeBitCast(base, to: Optional<NewValue>.self)!)
+
     case .optionalWrap:
-      fatalError("TODO")
+      _sanityCheck(NewValue.self == Optional<CurValue>.self,
+                   "should be wrapping optional value")
+      return .continue(
+        unsafeBitCast(base as Optional<CurValue>, to: NewValue.self))
     }
   }
-  
+
   func projectMutableAddress<CurValue, NewValue>(
     _ base: UnsafeRawPointer,
     from _: CurValue.Type,
@@ -944,7 +987,15 @@ internal struct RawKeyPathComponent {
       return UnsafeRawPointer(Builtin.addressof(&writeback.value))
 
     case .optionalForce:
-      fatalError("TODO")
+      _sanityCheck(CurValue.self == Optional<NewValue>.self,
+                   "should be unwrapping an optional value")
+      // Optional's layout happens to always put the payload at the start
+      // address of the Optional value itself, if a value is present at all.
+      let baseOptionalPointer
+        = base.assumingMemoryBound(to: Optional<NewValue>.self)
+      // Assert that a value exists
+      _ = baseOptionalPointer.pointee!
+      return base
     
     case .optionalChain, .optionalWrap, .get:
       _sanityCheckFailure("not a mutable key path component")

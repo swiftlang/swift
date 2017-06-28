@@ -1860,6 +1860,25 @@ public:
                && "todo");
         break;
       }
+      case KeyPathPatternComponent::Kind::OptionalWrap:
+      case KeyPathPatternComponent::Kind::OptionalChain:
+      case KeyPathPatternComponent::Kind::OptionalForce: {
+        switch (kind) {
+        case KeyPathPatternComponent::Kind::OptionalWrap:
+          *this << "optional_wrap : $";
+          break;
+        case KeyPathPatternComponent::Kind::OptionalChain:
+          *this << "optional_chain : $";
+          break;
+        case KeyPathPatternComponent::Kind::OptionalForce:
+          *this << "optional_force : $";
+          break;
+        default:
+          llvm_unreachable("out of sync");
+        }
+        *this << component.getComponentType();
+        break;
+      }
       }
     }
     
