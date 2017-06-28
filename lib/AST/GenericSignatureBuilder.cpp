@@ -1775,6 +1775,7 @@ static void concretizeNestedTypeFromConcreteParent(
 
 PotentialArchetype *PotentialArchetype::getNestedType(
                                            Identifier nestedName,
+                                           ArchetypeResolutionKind kind,
                                            GenericSignatureBuilder &builder) {
   // If we already have a nested type with this name, return it.
   auto known = NestedTypes.find(nestedName);
@@ -1783,8 +1784,7 @@ PotentialArchetype *PotentialArchetype::getNestedType(
 
   // Retrieve the nested archetype anchor, which is the best choice (so far)
   // for this nested type.
-  return getNestedArchetypeAnchor(nestedName, builder,
-                                  ArchetypeResolutionKind::AlwaysPartial);
+  return getNestedArchetypeAnchor(nestedName, builder, kind);
 }
 
 PotentialArchetype *PotentialArchetype::getNestedType(
@@ -1916,7 +1916,7 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
 
     auto rep = getRepresentative();
     if (rep != this) {
-      auto existingPA = rep->getNestedType(name, builder);
+      auto existingPA = rep->getNestedType(name, kind, builder);
 
       auto sameNamedSource =
         RequirementSource::forNestedTypeNameMatch(existingPA);
@@ -2040,7 +2040,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
           if (assocType)
             existingPA = rep->getNestedType(assocType, builder);
           else
-            existingPA = rep->getNestedType(name, builder);
+            existingPA = rep->getNestedType(concreteDecl, builder);
         }
       }
 
@@ -2304,7 +2304,10 @@ void ArchetypeType::resolveNestedType(
   auto parentPA =
     builder.resolveArchetype(interfaceType,
                              ArchetypeResolutionKind::CompleteWellFormed);
-  auto memberPA = parentPA->getNestedType(nested.first, builder);
+  auto memberPA = parentPA->getNestedType(
+                                    nested.first,
+                                    ArchetypeResolutionKind::CompleteWellFormed,
+                                    builder);
   auto result = memberPA->getTypeInContext(builder, genericEnv);
   assert(!nested.second ||
          nested.second->isEqual(result) ||
@@ -2903,13 +2906,13 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
 
 /// Perform typo correction on the given nested type, producing the
 /// corrected name (if successful).
-static Identifier typoCorrectNestedType(
-                    GenericSignatureBuilder::PotentialArchetype *pa) {
+static AssociatedTypeDecl *typoCorrectNestedType(
+                             GenericSignatureBuilder::PotentialArchetype *pa) {
   StringRef name = pa->getNestedName().str();
 
   // Look through all of the associated types of all of the protocols
   // to which the parent conforms.
-  llvm::SmallVector<Identifier, 2> bestMatches;
+  llvm::SmallVector<AssociatedTypeDecl *, 2> bestMatches;
   unsigned bestEditDistance = UINT_MAX;
   unsigned maxScore = (name.size() + 1) / 3;
   for (auto proto : pa->getParent()->getConformsTo()) {
@@ -2927,7 +2930,7 @@ static Identifier typoCorrectNestedType(
         bestMatches.clear();
       }
       if (dist == bestEditDistance)
-        bestMatches.push_back(assocType->getName());
+        bestMatches.push_back(assocType);
     }
   }
 
@@ -2935,13 +2938,13 @@ static Identifier typoCorrectNestedType(
 
   // If we didn't find any matches at all, fail.
   if (bestMatches.empty())
-    return Identifier();
+    return nullptr;
 
   // Make sure that we didn't find more than one match at the best
   // edit distance.
   for (auto other : llvm::makeArrayRef(bestMatches).slice(1)) {
     if (other != bestMatches.front())
-      return Identifier();
+      return nullptr;
   }
 
   return bestMatches.front();
@@ -2976,8 +2979,8 @@ ConstraintResult GenericSignatureBuilder::resolveUnresolvedType(
     return ConstraintResult::Unresolved;
 
   // Try to typo correct to a nested type name.
-  Identifier correction = typoCorrectNestedType(pa);
-  if (correction.empty()) {
+  auto correction = typoCorrectNestedType(pa);
+  if (!correction) {
     pa->setInvalid();
     return ConstraintResult::Conflicting;
   }
@@ -2988,8 +2991,7 @@ ConstraintResult GenericSignatureBuilder::resolveUnresolvedType(
 
   // Resolve the associated type and merge the potential archetypes.
   auto replacement = pa->getParent()->getNestedType(correction, *this);
-  pa->resolveAssociatedType(replacement->getResolvedAssociatedType(),
-                            *this);
+  pa->resolveAssociatedType(correction, *this);
   addSameTypeRequirement(pa, replacement,
                          RequirementSource::forNestedTypeNameMatch(pa),
                          UnresolvedHandlingKind::GenerateConstraints);

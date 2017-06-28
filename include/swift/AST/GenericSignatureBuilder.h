@@ -1596,6 +1596,7 @@ public:
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
+                                    ArchetypeResolutionKind kind,
                                     GenericSignatureBuilder &builder);
 
   /// \brief Retrieve (or create) a nested type with a known associated type.

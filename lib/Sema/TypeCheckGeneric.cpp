@@ -131,8 +131,22 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                              ArchetypeResolutionKind::CompleteWellFormed);
   assert(basePA && "Missing potential archetype for base");
 
+  // Local function to produce an error "no such member type" and return.
+  auto invalidMemberType = [&] {
+    // Complain that there is no suitable type.
+    Identifier name = ref->getIdentifier();
+    SourceLoc nameLoc = ref->getIdLoc();
+    TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
+      .highlight(baseRange);
+    return ErrorType::get(TC.Context);
+  };
+
   // Retrieve the potential archetype for the nested type.
-  auto nestedPA = basePA->getNestedType(ref->getIdentifier(), Builder);
+  auto nestedPA = basePA->getNestedType(ref->getIdentifier(),
+                                        ArchetypeResolutionKind::WellFormed,
+                                        Builder);
+  if (!nestedPA)
+    return invalidMemberType();
 
   // If this potential archetype was renamed due to typo correction,
   // complain and fix it.
@@ -145,7 +159,10 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     nestedPA->setAlreadyDiagnosedRename();
     
     // Go get the actual nested type.
-    nestedPA = basePA->getNestedType(newName, Builder);
+    nestedPA = basePA->getNestedType(newName,
+                                     ArchetypeResolutionKind::WellFormed,
+                                     Builder);
+    assert(nestedPA && "Nested type should have been available");
     assert(!nestedPA->wasRenamed());
   }
 
@@ -183,13 +200,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   }
 
   assert(nestedPA->isUnresolved() && "meaningless unresolved type");
-
-  // Complain that there is no suitable type.
-  Identifier name = ref->getIdentifier();
-  SourceLoc nameLoc = ref->getIdLoc();
-  TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
-    .highlight(baseRange);
-  return ErrorType::get(TC.Context);
+  return invalidMemberType();
 }
 
 bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {

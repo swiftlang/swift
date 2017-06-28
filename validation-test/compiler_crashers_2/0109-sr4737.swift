@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -typecheck
+// RUN: not --crash %target-swift-frontend %s -typecheck
 
 // REQUIRES: long_test
 
