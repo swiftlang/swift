@@ -28,6 +28,8 @@
   ]
 }
 {
+  key.offset: 36,
+  key.length: 0,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.syntaxmap: [
   ]
