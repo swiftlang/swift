@@ -7921,8 +7921,18 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
         // Then try to import the decl under the specified name.
         auto *member = importDecl(decl, nameVersion);
-        if (!member || member->getDeclContext() != ext)
-          return;
+        if (!member) return;
+
+        // Find the member that will land in an extension context.
+        while (!isa<ExtensionDecl>(member->getDeclContext())) {
+          auto nominal = dyn_cast<NominalTypeDecl>(member->getDeclContext());
+          if (!nominal) return;
+
+          member = nominal;
+          if (member->hasClangNode()) return;
+        }
+
+        if (member->getDeclContext() != ext) return;
         ext->addMember(member);
         
         for (auto alternate : getAlternateDecls(member)) {
