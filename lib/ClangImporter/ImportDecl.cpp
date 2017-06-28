@@ -3570,6 +3570,9 @@ namespace {
       // Look for a matching imported or deserialized member.
       bool result = false;
       for (auto decl : classDecl->lookupDirect(selector, isInstance)) {
+        if (auto *fn = dyn_cast<FuncDecl>(decl))
+          if (fn->isAccessor())
+            continue;
         if (decl->getClangDecl()
             || !decl->getDeclContext()->getParentSourceFile()) {
           result = true;
