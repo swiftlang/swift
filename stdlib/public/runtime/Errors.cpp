@@ -261,7 +261,7 @@ void swift::reportToDebugger(uintptr_t flags, const char *message,
 /// Does not crash by itself.
 void swift::swift_reportError(uint32_t flags,
                               const char *message) {
-#if NDEBUG
+#if defined(__APPLE__) && NDEBUG
   flags &= ~FatalErrorFlags::ReportBacktrace;
 #endif
   reportNow(flags, message);
