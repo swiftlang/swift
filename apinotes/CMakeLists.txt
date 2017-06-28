@@ -30,6 +30,7 @@ set(SWIFT_API_NOTES_INPUTS
   MediaPlayer
   MessageUI
   Metal
+  ModelIO
   MultipeerConnectivity
   NetworkExtension
   NotificationCenter
