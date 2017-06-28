@@ -109,14 +109,11 @@ static bool isFunctionAttr(Node::Kind kind) {
 
 } // anonymous namespace
 
-namespace swift {
-namespace Demangle {
-
 //////////////////////////////////
 // Public utility functions    //
 //////////////////////////////////
 
-int getManglingPrefixLength(const char *mangledName) {
+int swift::Demangle::getManglingPrefixLength(const char *mangledName) {
   // Check for the swift-4 prefix
   if (mangledName[0] == '_' && mangledName[1] == 'T' && mangledName[2] == '0')
     return 3;
@@ -129,13 +126,16 @@ int getManglingPrefixLength(const char *mangledName) {
   return 0;
 }
 
-bool isSwiftSymbol(const char *mangledName) {
+bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
   // The old mangling.
   if (mangledName[0] == '_' && mangledName[1] == 'T')
     return true;
 
   return getManglingPrefixLength(mangledName) != 0;
 }
+
+namespace swift {
+namespace Demangle {
 
 //////////////////////////////////
 // Node member functions        //
