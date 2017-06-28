@@ -88,6 +88,12 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 const Metadata *swift::swift_getObjectType(HeapObject *object) {
   auto classAsMetadata = _swift_getClass(object);
 
+#if !SWIFT_OBJC_INTEROP
+  assert(classAsMetadata &&
+         classAsMetadata->isTypeMetadata() &&
+         !classAsMetadata->isArtificialSubclass());
+  return classAsMetadata;
+#else
   // Walk up the superclass chain skipping over artifical Swift classes.
   // If we find a non-Swift class use the result of [object class] instead.
 
@@ -97,13 +103,9 @@ const Metadata *swift::swift_getObjectType(HeapObject *object) {
     classAsMetadata = classAsMetadata->SuperClass;
   }
 
-#if SWIFT_OBJC_INTEROP
   Class objcClass = [reinterpret_cast<id>(object) class];
   classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
   return swift_getObjCClassMetadata(classAsMetadata);
-#else
-  fatalError(/* flags = */ 0,
-             "swift_getObjectType: object has no Swift superclass");
 #endif
 }
 
