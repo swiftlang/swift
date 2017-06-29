@@ -85,9 +85,6 @@ struct GenericSignatureBuilder::Implementation {
   /// The potential archetypes for the generic parameters in \c GenericParams.
   SmallVector<PotentialArchetype *, 4> PotentialArchetypes;
 
-  /// The nested types that have been renamed.
-  SmallVector<PotentialArchetype *, 4> RenamedNestedTypes;
-
   /// The requirement sources used in this generic signature builder.
   llvm::FoldingSet<RequirementSource> RequirementSources;
 
@@ -1103,8 +1100,7 @@ bool FloatingRequirementSource::isRecursive(
 PotentialArchetype::PotentialArchetype(PotentialArchetype *parent,
                                        Identifier name)
   : parentOrBuilder(parent), identifier(name), isUnresolvedNestedType(true),
-  IsRecursive(false), Invalid(false),
-  DiagnosedRename(false)
+  IsRecursive(false), Invalid(false)
 {
   assert(parent != nullptr && "Not an associated type?");
   getBuilder()->recordUnresolvedType(this);
@@ -1641,17 +1637,6 @@ static int compareDependentTypes(PotentialArchetype * const* pa,
 
     if (int result = TypeDecl::compare(aa, ab))
       return result;
-  }
-
-  // Along the error path where one or both of the potential archetypes was
-  // renamed due to typo correction,
-  if (a->wasRenamed() || b->wasRenamed()) {
-    if (a->wasRenamed() != b->wasRenamed())
-      return a->wasRenamed() ? +1 : -1;
-
-    if (int compareNames = a->getOriginalName().str().compare(
-                                                    b->getOriginalName().str()))
-      return compareNames;
   }
 
   llvm_unreachable("potential archetype total order failure");
@@ -2891,59 +2876,8 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   return ConstraintResult::Resolved;
 }
 
-/// Perform typo correction on the given nested type, producing the
-/// corrected name (if successful).
-static Identifier typoCorrectNestedType(
-                    GenericSignatureBuilder::PotentialArchetype *pa) {
-  StringRef name = pa->getNestedName().str();
-
-  // Look through all of the associated types of all of the protocols
-  // to which the parent conforms.
-  llvm::SmallVector<Identifier, 2> bestMatches;
-  unsigned bestEditDistance = 0;
-  unsigned maxScore = (name.size() + 1) / 3;
-  for (auto proto : pa->getParent()->getConformsTo()) {
-    for (auto member : getProtocolMembers(proto)) {
-      auto assocType = dyn_cast<AssociatedTypeDecl>(member);
-      if (!assocType)
-        continue;
-
-      unsigned dist = name.edit_distance(assocType->getName().str(),
-                                         /*AllowReplacements=*/true,
-                                         maxScore);
-      assert(dist > 0 && "nested type should have matched associated type");
-      if (bestEditDistance == 0 || dist == bestEditDistance) {
-        bestEditDistance = dist;
-        maxScore = bestEditDistance;
-        bestMatches.push_back(assocType->getName());
-      } else if (dist < bestEditDistance) {
-        bestEditDistance = dist;
-        maxScore = bestEditDistance;
-        bestMatches.clear();
-        bestMatches.push_back(assocType->getName());
-      }
-    }
-  }
-
-  // FIXME: Look through the superclass.
-
-  // If we didn't find any matches at all, fail.
-  if (bestMatches.empty())
-    return Identifier();
-
-  // Make sure that we didn't find more than one match at the best
-  // edit distance.
-  for (auto other : llvm::makeArrayRef(bestMatches).slice(1)) {
-    if (other != bestMatches.front())
-      return Identifier();
-  }
-
-  return bestMatches.front();
-}
-
 ConstraintResult GenericSignatureBuilder::resolveUnresolvedType(
-                                          PotentialArchetype *pa,
-                                          bool allowTypoCorrection) {
+                                          PotentialArchetype *pa) {
   // If something else resolved this type, we're done.
   if (!pa->isUnresolved())
     return ConstraintResult::Resolved;
@@ -2964,31 +2898,7 @@ ConstraintResult GenericSignatureBuilder::resolveUnresolvedType(
     return ConstraintResult::Resolved;
   }
 
-  // If we aren't allowed to perform typo correction, we can't resolve the
-  // constraint.
-  if (!allowTypoCorrection)
-    return ConstraintResult::Unresolved;
-
-  // Try to typo correct to a nested type name.
-  Identifier correction = typoCorrectNestedType(pa);
-  if (correction.empty()) {
-    pa->setInvalid();
-    return ConstraintResult::Conflicting;
-  }
-
-  // Note that this is being renamed.
-  pa->saveNameForRenaming();
-  Impl->RenamedNestedTypes.push_back(pa);
-
-  // Resolve the associated type and merge the potential archetypes.
-  auto replacement = pa->getParent()->getNestedType(correction, *this);
-  pa->resolveAssociatedType(replacement->getResolvedAssociatedType(),
-                            *this);
-  addSameTypeRequirement(pa, replacement,
-                         RequirementSource::forNestedTypeNameMatch(pa),
-                         UnresolvedHandlingKind::GenerateConstraints);
-
-  return ConstraintResult::Resolved;
+  return ConstraintResult::Unresolved;
 }
 
 ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
@@ -4211,24 +4121,6 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   }
 }
 
-bool GenericSignatureBuilder::diagnoseRemainingRenames(
-                              SourceLoc loc,
-                              ArrayRef<GenericTypeParamType *> genericParams) {
-  bool invalid = false;
-
-  for (auto pa : Impl->RenamedNestedTypes) {
-    if (pa->alreadyDiagnosedRename()) continue;
-
-    Diags.diagnose(loc, diag::invalid_member_type_suggest,
-                   pa->getParent()->getDependentType(genericParams,
-                                                     /*allowUnresolved=*/true),
-                   pa->getOriginalName(), pa->getNestedName());
-    invalid = true;
-  }
-
-  return invalid;
-}
-
 /// Turn a requirement right-hand side into an unresolved type.
 static GenericSignatureBuilder::UnresolvedType asUnresolvedType(
                                 GenericSignatureBuilder::RequirementRHS rhs) {
@@ -4240,7 +4132,6 @@ static GenericSignatureBuilder::UnresolvedType asUnresolvedType(
 
 void GenericSignatureBuilder::processDelayedRequirements() {
   bool anySolved = !Impl->DelayedRequirements.empty();
-  bool allowTypoCorrection = false;
   while (anySolved) {
     // Steal the delayed requirements so we can reprocess them.
     anySolved = false;
@@ -4276,8 +4167,7 @@ void GenericSignatureBuilder::processDelayedRequirements() {
 
       case DelayedRequirement::Unresolved:
         reqResult = resolveUnresolvedType(
-                                      req.lhs.get<PotentialArchetype *>(),
-                                      allowTypoCorrection);
+                                      req.lhs.get<PotentialArchetype *>());
         break;
       }
 
@@ -4300,13 +4190,6 @@ void GenericSignatureBuilder::processDelayedRequirements() {
           hasUnresolvedUnresolvedTypes = true;
         break;
       }
-    }
-
-    // If we didn't solve anything, but we did see some unresolved types,
-    // try again with typo correction enabled.
-    if (!anySolved && hasUnresolvedUnresolvedTypes && !allowTypoCorrection) {
-      allowTypoCorrection = true;
-      anySolved = true;
     }
   }
 }
