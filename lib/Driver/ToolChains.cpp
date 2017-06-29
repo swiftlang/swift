@@ -1518,7 +1518,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
-  if (!staticExecutable && shouldProvideRPathToLinker()) {
+  if (!(staticExecutable || staticStdlib) && shouldProvideRPathToLinker()) {
     // FIXME: We probably shouldn't be adding an rpath here unless we know
     //        ahead of time the standard library won't be copied.
     Arguments.push_back("-Xlinker");
@@ -1548,6 +1548,14 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   if (!context.OI.SDKPath.empty()) {
     Arguments.push_back("--sysroot");
     Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
+  }
+
+  // Add any autolinking scripts to the arguments
+  for (const Job *Cmd : context.Inputs) {
+    auto &OutputInfo = Cmd->getOutput();
+    if (OutputInfo.getPrimaryOutputType() == types::TY_AutolinkFile)
+      Arguments.push_back(context.Args.MakeArgString(
+        Twine("@") + OutputInfo.getPrimaryOutputFilename()));
   }
 
   // Link the standard library.
@@ -1599,15 +1607,6 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
     Arguments.push_back(context.Args.MakeArgString(
         Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
-  }
-
-
-  // Add any autolinking scripts to the arguments
-  for (const Job *Cmd : context.Inputs) {
-    auto &OutputInfo = Cmd->getOutput();
-    if (OutputInfo.getPrimaryOutputType() == types::TY_AutolinkFile)
-      Arguments.push_back(context.Args.MakeArgString(
-        Twine("@") + OutputInfo.getPrimaryOutputFilename()));
   }
 
   // Just before the output option, allow GenericUnix toolchains to add
