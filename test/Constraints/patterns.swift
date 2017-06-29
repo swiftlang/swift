@@ -314,3 +314,25 @@ switch staticMembers {
 }
 
 _ = 0
+
+// rdar://problem/32241441 - Add fix-it for cases in switch with optional chaining
+
+struct S_32241441 {
+  enum E_32241441 {
+    case foo
+    case bar
+  }
+
+  var type: E_32241441 = E_32241441.foo
+}
+
+func rdar32241441() {
+  let s: S_32241441? = S_32241441()
+
+  switch s?.type {
+  case .foo: // expected-error {{enum case 'foo' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+    break;
+  case .bar: // expected-error {{enum case 'bar' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+    break;
+  }
+}
