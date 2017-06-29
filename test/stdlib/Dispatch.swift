@@ -40,6 +40,13 @@ DispatchAPI.test("DispatchGroup creation") {
   expectNotNil(group)
 }
 
+DispatchAPI.test("Dispatch sync return value") {
+  let value = 24;
+  let q = DispatchQueue(label: "Test")
+  let result = q.sync() { return 24 }
+  expectEqual(value, result)
+}
+
 DispatchAPI.test("dispatch_block_t conversions") {
   var counter = 0
   let closure = { () -> Void in
