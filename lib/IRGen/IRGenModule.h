@@ -792,6 +792,7 @@ private:
 
   void emitGlobalLists();
   void emitAutolinkInfo();
+  void emitEnableReportErrorsToDebugger();
   void cleanupClangCodeGenMetadata();
 
 //--- Remote reflection metadata --------------------------------------------
