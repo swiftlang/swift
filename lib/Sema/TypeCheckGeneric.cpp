@@ -757,8 +757,6 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
                                                allGenericParams);
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver))
     invalid = true;
-  if (builder.diagnoseRemainingRenames(func->getLoc(), allGenericParams))
-    invalid = true;
 
   // The generic function signature is complete and well-formed. Determine
   // the type of the generic function.
@@ -991,8 +989,6 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
                                                allGenericParams);
   if (checkGenericSubscriptSignature(*this, nullptr, subscript, completeResolver))
     invalid = true;
-  if (builder.diagnoseRemainingRenames(subscript->getLoc(), allGenericParams))
-    invalid = true;
 
   // The generic subscript signature is complete and well-formed. Determine
   // the type of the generic subscript.
@@ -1133,10 +1129,6 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     checkGenericParamList(nullptr, genericParams, parentSig,
                           &completeResolver);
   }
-
-  // Complain about any other renamed references.
-  (void)builder.diagnoseRemainingRenames(genericParams->getSourceRange().Start,
-                                         allGenericParams);
 
   // Record the generic type parameter types and the requirements.
   auto sig = builder.getGenericSignature();

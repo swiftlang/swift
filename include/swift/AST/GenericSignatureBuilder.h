@@ -316,8 +316,7 @@ private:
                                              const RequirementSource *Source);
 
   /// Try to resolve the given unresolved potential archetype.
-  ConstraintResult resolveUnresolvedType(PotentialArchetype *pa,
-                                         bool allowTypoCorrection);
+  ConstraintResult resolveUnresolvedType(PotentialArchetype *pa);
 
 public:
   /// \brief Add a new same-type requirement between two fully resolved types
@@ -566,12 +565,6 @@ public:
   void finalize(SourceLoc loc,
                 ArrayRef<GenericTypeParamType *> genericParams,
                 bool allowConcreteGenericParams=false);
-
-  /// Diagnose any remaining renames.
-  ///
-  /// \returns \c true if there were any remaining renames to diagnose.
-  bool diagnoseRemainingRenames(SourceLoc loc,
-                                ArrayRef<GenericTypeParamType *> genericParams);
 
   /// Process any delayed requirements that can be handled now.
   void processDelayedRequirements();
@@ -1370,13 +1363,6 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// be resolved.
   unsigned Invalid : 1;
 
-  /// Whether we have diagnosed a rename.
-  unsigned DiagnosedRename : 1;
-
-  /// If we have renamed this (nested) type due to typo correction,
-  /// the old name.
-  Identifier OrigName;
-
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
   PotentialArchetype(PotentialArchetype *parent, Identifier name);
@@ -1384,8 +1370,7 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
     : parentOrBuilder(parent), identifier(assocType),
-      isUnresolvedNestedType(false), IsRecursive(false), Invalid(false),
-      DiagnosedRename(false)
+      isUnresolvedNestedType(false), IsRecursive(false), Invalid(false)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
@@ -1394,8 +1379,7 @@ class GenericSignatureBuilder::PotentialArchetype {
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
     : parentOrBuilder(parent), identifier(concreteDecl),
       isUnresolvedNestedType(false),
-      IsRecursive(false), Invalid(false),
-      DiagnosedRename(false)
+      IsRecursive(false), Invalid(false)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
@@ -1404,8 +1388,7 @@ class GenericSignatureBuilder::PotentialArchetype {
   PotentialArchetype(GenericSignatureBuilder *builder, GenericParamKey genericParam)
     : parentOrBuilder(builder), identifier(genericParam),
       isUnresolvedNestedType(false),
-      IsRecursive(false), Invalid(false),
-      DiagnosedRename(false)
+      IsRecursive(false), Invalid(false)
   {
   }
 
@@ -1679,28 +1662,6 @@ public:
   bool isInvalid() const { return Invalid; }
 
   void setInvalid() { Invalid = true; }
-
-  /// Determine whether this archetype was renamed due to typo
-  /// correction. If so, \c getName() retrieves the new name.
-  bool wasRenamed() const { return !OrigName.empty(); }
-
-  /// Note that this potential archetype was is going to be renamed (due to typo
-  /// correction), saving the old name.
-  void saveNameForRenaming() {
-    OrigName = getNestedName();
-  }
-
-  /// For a renamed potential archetype, retrieve the original name.
-  Identifier getOriginalName() const {
-    assert(wasRenamed());
-    return OrigName;
-  }
-
-  /// Whether we already diagnosed this rename.
-  bool alreadyDiagnosedRename() const { return DiagnosedRename; }
-
-  /// Note that we already diagnosed this rename.
-  void setAlreadyDiagnosedRename() { DiagnosedRename = true; }
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const,
