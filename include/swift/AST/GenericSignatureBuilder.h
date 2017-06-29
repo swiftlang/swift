@@ -1335,26 +1335,20 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// \brief Recursively conforms to itself.
   unsigned IsRecursive : 1;
 
-  /// Whether this potential archetype is invalid, e.g., because it could not
-  /// be resolved.
-  unsigned Invalid : 1;
-
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
   PotentialArchetype(PotentialArchetype *parent, Identifier name);
 
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
-    : parentOrBuilder(parent), identifier(assocType),
-      IsRecursive(false), Invalid(false)
+    : parentOrBuilder(parent), identifier(assocType), IsRecursive(false)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
 
   /// \brief Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
-    : parentOrBuilder(parent), identifier(concreteDecl),
-      IsRecursive(false), Invalid(false)
+    : parentOrBuilder(parent), identifier(concreteDecl), IsRecursive(false)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
@@ -1363,7 +1357,7 @@ class GenericSignatureBuilder::PotentialArchetype {
   PotentialArchetype(GenericSignatureBuilder *builder,
                      GenericParamKey genericParam)
     : parentOrBuilder(builder), identifier(genericParam),
-      IsRecursive(false), Invalid(false)
+      IsRecursive(false)
   {
   }
 
@@ -1612,10 +1606,6 @@ public:
 
   void setIsRecursive() { IsRecursive = true; }
   bool isRecursive() const { return IsRecursive; }
-
-  bool isInvalid() const { return Invalid; }
-
-  void setInvalid() { Invalid = true; }
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const,

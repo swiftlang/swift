@@ -4941,21 +4941,6 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     archetypes.push_back(archetype);
   });
 
-  // Remove any invalid potential archetypes or archetypes whose parents are
-  // concrete; they have no requirements.
-  archetypes.erase(
-    std::remove_if(archetypes.begin(), archetypes.end(),
-      [&](PotentialArchetype *archetype) -> bool {
-        // Invalid archetypes are never representatives in well-formed or
-        // corrected signature, so we don't need to visit them.
-        if (archetype->isInvalid())
-          return true;
-
-        // Keep it.
-        return false;
-      }),
-    archetypes.end());
-
   // Sort the archetypes in canonical order.
   llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
                        compareDependentTypes);
