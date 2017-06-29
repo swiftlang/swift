@@ -793,13 +793,13 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
 #ifndef NDEBUG
   // Local function to determine whether there is a conformance of the given
-  // subject type to the given protocol within the given generic signature's
-  // explicit requirements.
-  auto hasConformanceInSignature = [&](const GenericSignature *genericSig,
+  // subject type to the given protocol within the given set of explicit
+  // requirements.
+  auto hasConformanceInSignature = [&](ArrayRef<Requirement> requirements,
                                        Type subjectType,
                                        ProtocolDecl *proto) -> bool {
     // Make sure this requirement exists in the requirement signature.
-    for (const auto& req: genericSig->getRequirements()) {
+    for (const auto& req: requirements) {
       if (req.getKind() == RequirementKind::Conformance &&
           req.getFirstType()->isEqual(subjectType) &&
           req.getSecondType()->castTo<ProtocolType>()->getDecl()
@@ -814,9 +814,9 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
   // Local function to construct the conformance access path from the
   // requirement.
-  std::function<void(GenericSignature *, const RequirementSource *,
+  std::function<void(ArrayRef<Requirement>, const RequirementSource *,
                      ProtocolDecl *, Type, ProtocolDecl *)> buildPath;
-  buildPath = [&](GenericSignature *sig, const RequirementSource *source,
+  buildPath = [&](ArrayRef<Requirement> reqs, const RequirementSource *source,
                   ProtocolDecl *conformingProto, Type rootType,
                   ProtocolDecl *requirementSignatureProto) {
     // Each protocol requirement is a step along the path.
@@ -833,7 +833,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       // Follow the rest of the path to derive the conformance into which
       // this particular protocol requirement step would look.
       auto inProtocol = source->getProtocolDecl();
-      buildPath(sig, source->parent, inProtocol, rootType,
+      buildPath(reqs, source->parent, inProtocol, rootType,
                 requirementSignatureProto);
       assert(path.path.back().second == inProtocol &&
              "path produces incorrect conformance");
@@ -901,9 +901,8 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                                                *inProtocol->getModuleContext());
 
       // Build the path according to the requirement signature.
-      auto reqSig = inProtocol->getRequirementSignature();
-      buildPath(reqSig, conformsSource, conformingProto, localRootType,
-                inProtocol);
+      buildPath(inProtocol->getRequirementSignature(), conformsSource,
+                conformingProto, localRootType, inProtocol);
 
       // We're done.
       return;
@@ -911,7 +910,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
     // If we still have a parent, keep going.
     if (source->parent) {
-      buildPath(sig, source->parent, conformingProto, rootType,
+      buildPath(reqs, source->parent, conformingProto, rootType,
                 requirementSignatureProto);
       return;
     }
@@ -927,7 +926,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
         rootType->isEqual(conformingProto->getSelfInterfaceType()))
       return;
 
-    assert(hasConformanceInSignature(sig, rootType, conformingProto) &&
+    assert(hasConformanceInSignature(reqs, rootType, conformingProto) &&
            "missing explicit conformance in signature");
 
     // Add the root of the path, which starts at this explicit requirement.
@@ -942,7 +941,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                                               /*allowUnresolved=*/false);
 
   // Build the path.
-  buildPath(this, source, protocol, rootType, nullptr);
+  buildPath(getRequirements(), source, protocol, rootType, nullptr);
 
   // Return the path; we're done!
   return path;

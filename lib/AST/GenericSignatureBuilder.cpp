@@ -2617,12 +2617,10 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   // cannot compute the requirement signature directly, because that may be
   // infinitely recursive: this code is also used to construct it.
   if (Proto->isRequirementSignatureComputed()) {
-    auto reqSig = Proto->getRequirementSignature();
-
     auto innerSource =
       FloatingRequirementSource::viaProtocolRequirement(Source, Proto,
                                                         /*inferred=*/false);
-    for (auto req : reqSig->getRequirements()) {
+    for (const auto &req : Proto->getRequirementSignature()) {
       auto reqResult = addRequirement(req, innerSource, nullptr,
                                       &protocolSubMap);
       if (isErrorResult(reqResult)) return reqResult;

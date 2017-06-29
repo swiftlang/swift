@@ -7376,7 +7376,7 @@ void ClangImporter::Implementation::finishProtocolConformance(
 
   // Collect conformances for the requirement signature.
   SmallVector<ProtocolConformanceRef, 4> reqConformances;
-  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+  for (const auto &req : proto->getRequirementSignature()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
