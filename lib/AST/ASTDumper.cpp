@@ -676,7 +676,9 @@ namespace {
 
       OS << " requirement signature=";
       if (PD->isRequirementSignatureComputed()) {
-        OS << PD->getRequirementSignature()->getAsString();
+        OS << GenericSignature::get({PD->getProtocolSelfType()} ,
+                                    PD->getRequirementSignature())
+                ->getAsString();
       } else {
         OS << "<null>";
       }

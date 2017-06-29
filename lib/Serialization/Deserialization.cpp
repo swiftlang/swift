@@ -656,7 +656,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   // Read requirement signature conformances.
   SmallVector<ProtocolConformanceRef, 4> reqConformances;
-  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+  for (const auto &req : proto->getRequirementSignature()) {
     if (req.getKind() == RequirementKind::Conformance) {
       auto reqConformance = readConformance(DeclTypeCursor);
       reqConformances.push_back(reqConformance);
@@ -4598,7 +4598,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   // Skip requirement signature conformances.
   auto proto = conformance->getProtocol();
-  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+  for (const auto &req : proto->getRequirementSignature()) {
     if (req.getKind() == RequirementKind::Conformance) {
       (void)readConformance(DeclTypeCursor);
     }

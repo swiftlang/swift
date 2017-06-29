@@ -3700,17 +3700,17 @@ public:
     return TrailingWhere;
   }
 
-  /// Retrieve the generic signature representing the requirements introduced by
-  /// this protocol.
+  /// Retrieve the requirements that describe this protocol.
   ///
-  /// These are the requirements like any inherited protocols and conformances
-  /// for associated types that are mentioned literally in this
-  /// decl. Requirements implied via inheritance are not mentioned, nor is the
-  /// conformance of Self to this protocol.
-  GenericSignature *getRequirementSignature() const {
+  /// These are the requirements including any inherited protocols
+  /// and conformances for associated types that are introduced in this
+  /// protocol. Requirements implied via any other protocol (e.g., inherited
+  /// protocols of the inherited protocols) are not mentioned. The conformance
+  /// requirements listed here become entries in the witness table.
+  ArrayRef<Requirement> getRequirementSignature() const {
     assert(RequirementSignature &&
            "getting requirement signature before computing it");
-    return RequirementSignature;
+    return RequirementSignature->getRequirements();
   }
 
   /// Has the requirement signature been computed yet?
