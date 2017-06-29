@@ -92,6 +92,17 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     _testRoundTrip(of: employee)
   }
 
+  func testEncodingTopLevelNullableType() {
+    // EnhancedBool is a type which encodes either as a Bool or as nil.
+    _testEncodeFailure(of: EnhancedBool.true)
+    _testEncodeFailure(of: EnhancedBool.false)
+    _testEncodeFailure(of: EnhancedBool.fileNotFound)
+
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.true), expectedJSON: "{\"value\":true}".data(using: .utf8)!)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.false), expectedJSON: "{\"value\":false}".data(using: .utf8)!)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.fileNotFound), expectedJSON: "{\"value\":null}".data(using: .utf8)!)
+  }
+
   // MARK: - Output Formatting Tests
   func testEncodingOutputFormattingDefault() {
     let expectedJSON = "{\"name\":\"Johnny Appleseed\",\"email\":\"appleseed@apple.com\"}".data(using: .utf8)!
@@ -661,60 +672,29 @@ fileprivate struct Company : Codable, Equatable {
   }
 }
 
-// MARK: - Helper Types
-
-/// Wraps a type T so that it can be encoded at the top level of a payload.
-fileprivate struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
-  let value: T
-
-  init(_ value: T) {
-    self.value = value
-  }
-
-  static func ==(_ lhs: TopLevelWrapper<T>, _ rhs: TopLevelWrapper<T>) -> Bool {
-    return lhs.value == rhs.value
-  }
-}
-
-fileprivate struct FloatNaNPlaceholder : Codable, Equatable {
-  init() {}
-
-  func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(Float.nan)
-  }
+/// An enum type which decodes from Bool?.
+fileprivate enum EnhancedBool : Codable {
+  case `true`
+  case `false`
+  case fileNotFound
 
   init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
-    let float = try container.decode(Float.self)
-    if !float.isNaN {
-      throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Couldn't decode NaN."))
+    if container.decodeNil() {
+      self = .fileNotFound
+    } else {
+      let value = try container.decode(Bool.self)
+      self = value ? .true : .false
     }
   }
-
-  static func ==(_ lhs: FloatNaNPlaceholder, _ rhs: FloatNaNPlaceholder) -> Bool {
-    return true
-  }
-}
-
-fileprivate struct DoubleNaNPlaceholder : Codable, Equatable {
-  init() {}
 
   func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
-    try container.encode(Double.nan)
-  }
-
-  init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    let double = try container.decode(Double.self)
-    if !double.isNaN {
-      throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Couldn't decode NaN."))
+    switch self {
+    case .true: try container.encode(true)
+    case .false: try container.encode(false)
+    case .fileNotFound: try container.encodeNil()
     }
-  }
-
-  static func ==(_ lhs: DoubleNaNPlaceholder, _ rhs: DoubleNaNPlaceholder) -> Bool {
-    return true
   }
 }
 
@@ -864,6 +844,63 @@ struct NestedContainersTestType : Encodable {
   }
 }
 
+// MARK: - Helper Types
+
+/// Wraps a type T so that it can be encoded at the top level of a payload.
+fileprivate struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
+  let value: T
+
+  init(_ value: T) {
+    self.value = value
+  }
+
+  static func ==(_ lhs: TopLevelWrapper<T>, _ rhs: TopLevelWrapper<T>) -> Bool {
+    return lhs.value == rhs.value
+  }
+}
+
+fileprivate struct FloatNaNPlaceholder : Codable, Equatable {
+  init() {}
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(Float.nan)
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let float = try container.decode(Float.self)
+    if !float.isNaN {
+      throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Couldn't decode NaN."))
+    }
+  }
+
+  static func ==(_ lhs: FloatNaNPlaceholder, _ rhs: FloatNaNPlaceholder) -> Bool {
+    return true
+  }
+}
+
+fileprivate struct DoubleNaNPlaceholder : Codable, Equatable {
+  init() {}
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(Double.nan)
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let double = try container.decode(Double.self)
+    if !double.isNaN {
+      throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Couldn't decode NaN."))
+    }
+  }
+
+  static func ==(_ lhs: DoubleNaNPlaceholder, _ rhs: DoubleNaNPlaceholder) -> Bool {
+    return true
+  }
+}
+
 // MARK: - Run Tests
 
 #if !FOUNDATION_XCTEST
@@ -881,6 +918,7 @@ JSONEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestJSONEncode
 JSONEncoderTests.test("testEncodingTopLevelStructuredClass") { TestJSONEncoder().testEncodingTopLevelStructuredClass() }
 JSONEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestJSONEncoder().testEncodingTopLevelDeepStructuredType()}
 JSONEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestJSONEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
+JSONEncoderTests.test("testEncodingTopLevelNullableType") { TestJSONEncoder().testEncodingTopLevelNullableType() }
 JSONEncoderTests.test("testEncodingOutputFormattingDefault") { TestJSONEncoder().testEncodingOutputFormattingDefault() }
 JSONEncoderTests.test("testEncodingOutputFormattingPrettyPrinted") { TestJSONEncoder().testEncodingOutputFormattingPrettyPrinted() }
 JSONEncoderTests.test("testEncodingOutputFormattingSortedKeys") { TestJSONEncoder().testEncodingOutputFormattingSortedKeys() }
