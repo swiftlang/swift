@@ -552,6 +552,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         SourceLoc nameLoc,
                                         NameLookupOptions lookupOptions,
                                         LookupResult &result,
+                                        GenericSignatureBuilder *gsb,
                                         unsigned maxResults) {
   // Disable typo-correction if we won't show the diagnostic anyway.
   if (getLangOpts().DisableTypoCorrection ||
@@ -592,7 +593,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   TypoCorrectionResolver resolver(*this, nameLoc);
   if (baseTypeOrNull) {
     lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, &resolver,
-                             /*include instance members*/ true);
+                             /*include instance members*/ true, gsb);
   } else {
     lookupVisibleDecls(consumer, DC, &resolver, /*top level*/ true, nameLoc);
   }

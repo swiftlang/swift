@@ -2519,7 +2519,7 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
 
     // Determine what kind of resolution we want.
     ArchetypeResolutionKind resolutionKind =
-      ArchetypeResolutionKind::AlwaysPartial;
+      ArchetypeResolutionKind::WellFormed;
     if (!source.isExplicit() && source.isRecursive(type, *this))
       resolutionKind = ArchetypeResolutionKind::AlreadyKnown;
 

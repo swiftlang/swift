@@ -2365,6 +2365,7 @@ public:
                              SourceLoc lookupLoc,
                              NameLookupOptions lookupOptions,
                              LookupResult &result,
+                             GenericSignatureBuilder *gsb = nullptr,
                              unsigned maxResults = 4);
 
   void noteTypoCorrection(DeclName name, DeclNameLoc nameLoc,

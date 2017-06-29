@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// RUN: not %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
 
 class PropertyDataSource<O: PropertyHosting> {
