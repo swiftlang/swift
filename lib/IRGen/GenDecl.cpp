@@ -338,12 +338,7 @@ public:
     NewProto = Builder.CreateCall(objc_allocateProtocol, protocolName);
     
     // Add the parent protocols.
-    auto *requirementSig = proto->getRequirementSignature();
-    auto conformsTo =
-      requirementSig->getConformsTo(proto->getSelfInterfaceType(),
-                                    *IGF.IGM.getSwiftModule());
-
-    for (auto parentProto : conformsTo) {
+    for (auto parentProto : proto->getInheritedProtocols()) {
       if (!parentProto->isObjC())
         continue;
       llvm::Value *parentRef = IGM.getAddrOfObjCProtocolRef(parentProto,
@@ -626,13 +621,8 @@ void IRGenModule::emitRuntimeRegistration() {
 
       std::function<void(ProtocolDecl*)> orderProtocol
         = [&](ProtocolDecl *proto) {
-          auto *requirementSig = proto->getRequirementSignature();
-          auto conformsTo = requirementSig->getConformsTo(
-              proto->getSelfInterfaceType(),
-              *getSwiftModule());
-
           // Recursively put parents first.
-          for (auto parent : conformsTo)
+          for (auto parent : proto->getInheritedProtocols())
             orderProtocol(parent);
 
           // Skip if we don't need to reify this protocol.

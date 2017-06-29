@@ -2348,7 +2348,7 @@ public:
       if (!normal->isInvalid()){
         auto conformances = normal->getSignatureConformances();
         unsigned idx = 0;
-        for (auto req : proto->getRequirementSignature()->getRequirements()) {
+        for (const auto &req : proto->getRequirementSignature()) {
           if (req.getKind() != RequirementKind::Conformance)
             continue;
 
