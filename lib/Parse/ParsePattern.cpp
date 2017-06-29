@@ -184,20 +184,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     bool hasSpecifier = false;
     while (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var)) {
       if (!hasSpecifier) {
-        if (Tok.is(tok::kw_let)) {
-          diagnose(Tok, diag::parameter_let_as_attr)
-            .fixItRemove(Tok.getLoc());
+        if (Tok.is(tok::kw_inout)) {
+          // This case is handled later when mapping to ParamDecls for
+          // better fixits.
+          param.SpecifierKind = ParsedParameter::InOut;
         } else {
-          // We handle the var error in sema for a better fixit and inout is
-          // handled later in this function for better fixits.
-          param.SpecifierKind = Tok.is(tok::kw_inout) ? ParsedParameter::InOut :
-                                                        ParsedParameter::Var;
+          diagnose(Tok, diag::parameter_let_var_as_attr,
+                   unsigned(Tok.is(tok::kw_let)))
+            .fixItRemove(Tok.getLoc());
         }
-        param.LetVarInOutLoc = consumeToken();
+        param.SpecifierLoc = consumeToken();
         hasSpecifier = true;
       } else {
-        // Redundant specifiers are fairly common, recognize, reject, and recover
-        // from this gracefully.
+        // Redundant specifiers are fairly common, recognize, reject, and
+        // recover from this gracefully.
         diagnose(Tok, diag::parameter_inout_var_let_repeated)
           .fixItRemove(Tok.getLoc());
         consumeToken();
@@ -342,8 +342,8 @@ mapParsedParameters(Parser &parser,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
     auto specifierKind = paramInfo.SpecifierKind;
-    bool isLet = specifierKind == Parser::ParsedParameter::Let;
-    auto param = new (ctx) ParamDecl(isLet, paramInfo.LetVarInOutLoc,
+    bool isLet = specifierKind == Parser::ParsedParameter::None;
+    auto param = new (ctx) ParamDecl(isLet, paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
@@ -360,7 +360,7 @@ mapParsedParameters(Parser &parser,
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
       if (specifierKind == Parser::ParsedParameter::InOut) {
-        auto InOutLoc = paramInfo.LetVarInOutLoc;
+        auto InOutLoc = paramInfo.SpecifierLoc;
         if (isa<InOutTypeRepr>(type)) {
           parser.diagnose(InOutLoc, diag::parameter_inout_var_let_repeated)
             .fixItRemove(InOutLoc);
@@ -380,9 +380,9 @@ mapParsedParameters(Parser &parser,
       param->getTypeLoc() = TypeLoc::withoutLoc(ErrorType::get(ctx));
       param->setInvalid();
     } else if (specifierKind == Parser::ParsedParameter::InOut) {
-      parser.diagnose(paramInfo.LetVarInOutLoc, diag::inout_must_have_type);
-      paramInfo.LetVarInOutLoc = SourceLoc();
-      specifierKind = Parser::ParsedParameter::Let;
+      parser.diagnose(paramInfo.SpecifierLoc, diag::inout_must_have_type);
+      paramInfo.SpecifierLoc = SourceLoc();
+      specifierKind = Parser::ParsedParameter::None;
     }
     return param;
   };

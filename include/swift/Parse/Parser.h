@@ -977,15 +977,14 @@ public:
     /// Any declaration attributes attached to the parameter.
     DeclAttributes Attrs;
 
-    /// The location of the 'let', 'var', or 'inout' keyword, if present.
-    SourceLoc LetVarInOutLoc;
+    /// The location of the 'inout' keyword, if present.
+    SourceLoc SpecifierLoc;
 
     enum SpecifierKindTy {
-      Let,
-      Var,
+      None,
       InOut
     };
-    SpecifierKindTy SpecifierKind = Let; // Defaults to let.
+    SpecifierKindTy SpecifierKind = None; // Defaults to 'no value'.
 
     /// The location of the first name.
     ///
