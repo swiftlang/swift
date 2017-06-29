@@ -53,6 +53,7 @@ import DropFirst
 import DropLast
 import DropWhile
 import ErrorHandling
+import Exclusivity
 import ExistentialPerformance
 import Fibonacci
 import Hanoi
@@ -448,6 +449,9 @@ addTo(&precommitTests, "TypeFlood", run_TypeFlood)
 addTo(&precommitTests, "UTF8Decode", run_UTF8Decode)
 addTo(&precommitTests, "Walsh", run_Walsh)
 addTo(&precommitTests, "XorLoop", run_XorLoop)
+addTo(&precommitTests, "accessGlobal", run_accessGlobal)
+addTo(&precommitTests, "accessInMatSet", run_accessInMatSet)
+addTo(&precommitTests, "accessIndependent", run_accessIndependent)
 
 // Other tests
 addTo(&otherTests, "Ackermann", run_Ackermann)
