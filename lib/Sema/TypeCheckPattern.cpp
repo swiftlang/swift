@@ -1396,8 +1396,17 @@ recur:
             goto recur;
           }
 
-          diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
-                   EEP->getName().str(), type);
+          auto diag = diagnose(EEP->getLoc(),
+                               diag::enum_element_pattern_member_not_found,
+                               EEP->getName().str(), type);
+
+          // If we have an optional type let's try to see if the case
+          // exists in its base type, if so we can suggest a fix-it for that.
+          if (auto baseType = type->getOptionalObjectType()) {
+            if (lookupEnumMemberElement(*this, dc, baseType, EEP->getName(),
+                                        EEP->getLoc()))
+              diag.fixItInsertAfter(EEP->getEndLoc(), "?");
+          }
         }
         return true;
       }
