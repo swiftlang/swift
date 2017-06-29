@@ -4709,7 +4709,9 @@ public:
     TC.checkDeclAttributes(PD);
 
     if (TC.Context.LangOpts.DebugGenericSignatures) {
-      auto requirementsSig = PD->getRequirementSignature();
+      auto requirementsSig =
+        GenericSignature::get({PD->getProtocolSelfType()},
+                              PD->getRequirementSignature());
 
       llvm::errs() << "Protocol requirement signature:\n";
       PD->dumpRef(llvm::errs());
