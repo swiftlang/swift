@@ -212,6 +212,7 @@ extension String._XContent._Inline {
   public mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<CodeUnit>)->R
   ) -> R {
+    let capacity = self.capacity, count = self.count
     return withUnsafeMutablePointer(to: &_storage) {
       let start = UnsafeMutableRawPointer($0).bindMemory(
         to: CodeUnit.self,
@@ -227,6 +228,7 @@ extension String._XContent._Inline {
   public mutating func _withMutableCapacity<R>(
     body: (inout UnsafeMutableBufferPointer<CodeUnit>)->R
   ) -> R {
+    let capacity = self.capacity
     return self.withUnsafeMutableBufferPointer { buf in
       var fullBuf = UnsafeMutableBufferPointer(
         start: buf.baseAddress, count: capacity)
