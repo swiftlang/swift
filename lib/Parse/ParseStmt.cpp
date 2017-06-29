@@ -1511,9 +1511,14 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
 
   // Parse the 'else'.  If it is missing, and if the following token isn't a {
   // then the parser is hopelessly lost - just give up instead of spewing.
-  if (parseToken(tok::kw_else, diag::expected_else_after_guard) &&
-      Tok.isNot(tok::l_brace))
-    return recoverWithCond(Status, Condition);
+  if (!consumeIf(tok::kw_else)) {
+    checkForInputIncomplete();
+    auto diag = diagnose(Tok, diag::expected_else_after_guard);
+    if (Tok.is(tok::l_brace))
+      diag.fixItInsert(Tok.getLoc(), "else ");
+    else
+      return recoverWithCond(Status, Condition);
+  }
 
   // Before parsing the body, disable all of the bound variables so that they
   // cannot be used unbound.
