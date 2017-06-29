@@ -6192,7 +6192,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   return false;
 }
 
-/// Check if there failure associated with expresssion is related
+/// Check if there failure associated with expression is related
 /// to given contextual type.
 bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
     ApplyExpr *callExpr, Type contextualType) {
@@ -7165,7 +7165,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
                        !resultType->hasTypeVariable();
               };
 
-              // If there an expected result type but it hasn't been explictly
+              // If there an expected result type but it hasn't been explicitly
               // provided, let's add it to the argument.
               if (hasResult(resultType) && !CE->hasExplicitResultType()) {
                 nameOS << " -> ";
