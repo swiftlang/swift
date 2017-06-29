@@ -1206,12 +1206,12 @@ void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
   // If this binding is one of multiple patterns, each individual binding
   // will just be let, and then the chosen value will get forwarded into
   // a var box in the final shared case block.
-  bool forcedLet = hasMultipleItems && !var->isLet();
-  if (forcedLet)
-    var->setLet(true);
+  bool forcedLet = var->isLet();
+  if (hasMultipleItems && !var->isLet())
+    forcedLet = true;
   
   // Initialize the variable value.
-  InitializationPtr init = SGF.emitInitializationForVarDecl(var);
+  InitializationPtr init = SGF.emitInitializationForVarDecl(var, forcedLet);
 
   RValue rv(SGF, loc, formalValueType, value.getFinalManagedValue());
   if (shouldTake(value, isIrrefutable)) {
@@ -1219,9 +1219,6 @@ void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
   } else {
     std::move(rv).copyInto(SGF, loc, init.get());
   }
-  
-  if (forcedLet)
-    var->setLet(false);
 }
 
 /// Evaluate a guard expression and, if it returns false, branch to
@@ -2374,12 +2371,13 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
         if (V->isLet()) {
           // Just emit a let with cleanup.
           SGF.VarLocs[V].value = caseBB->getArgument(argIndex++);
-          SGF.emitInitializationForVarDecl(V)->finishInitialization(SGF);
+          SGF.emitInitializationForVarDecl(V, V->isLet())
+            ->finishInitialization(SGF);
         } else {
           // The pattern variables were all emitted as lets and one got passed in,
           // now we finally alloc a box for the var and forward in the chosen value.
           SGF.VarLocs.erase(V);
-          auto newVar = SGF.emitInitializationForVarDecl(V);
+          auto newVar = SGF.emitInitializationForVarDecl(V, V->isLet());
           auto loc = SGF.CurrentSILLoc;
           auto value =
               ManagedValue::forUnmanaged(caseBB->getArgument(argIndex++));

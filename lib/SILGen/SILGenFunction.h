@@ -1678,7 +1678,8 @@ public:
   void visitVarDecl(VarDecl *D);
 
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
-  std::unique_ptr<Initialization> emitInitializationForVarDecl(VarDecl *vd);
+  std::unique_ptr<Initialization> emitInitializationForVarDecl(VarDecl *vd,
+                                                               bool immutable);
   
   /// Emit the allocation for a local variable, provides an Initialization
   /// that can be used to initialize it, and registers cleanups in the active
