@@ -1,3 +1,4 @@
+// RUN: mkdir -p %t
 // RUN: %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o
 // RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out
 // RUN: %target-run %t/a.out
