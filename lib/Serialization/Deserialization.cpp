@@ -3066,9 +3066,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       proto->setImplicit();
     proto->computeType();
 
-    auto signature = GenericSignature::get(
-                               { proto->getProtocolSelfType() }, requirements);
-    proto->setRequirementSignature(signature);
+    proto->setRequirementSignature(requirements);
 
     proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     proto->setCircularityCheck(CircularityCheck::Checked);

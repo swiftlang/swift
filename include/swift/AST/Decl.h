@@ -3501,7 +3501,7 @@ class ProtocolDecl : public NominalTypeDecl {
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  GenericSignature *RequirementSignature = nullptr;
+  const Requirement *RequirementSignature = nullptr;
 
   /// True if the protocol has requirements that cannot be satisfied (e.g.
   /// because they could not be imported from Objective-C).
@@ -3510,6 +3510,9 @@ class ProtocolDecl : public NominalTypeDecl {
   /// If this is a compiler-known protocol, this will be a KnownProtocolKind
   /// value, plus one. Otherwise, it will be 0.
   unsigned KnownProtocol : 6;
+
+  /// The number of requirements in the requirement signature.
+  unsigned NumRequirementsInSignature : 16;
 
   bool requiresClassSlow();
 
@@ -3687,8 +3690,6 @@ public:
 
   /// Create the implicit generic parameter list for a protocol or
   /// extension thereof.
-  ///
-  /// FIXME: protocol extensions will introduce a where clause here as well.
   GenericParamList *createGenericParams(DeclContext *dc);
 
   /// Create the generic parameters of this protocol if the haven't been
@@ -3708,9 +3709,9 @@ public:
   /// protocols of the inherited protocols) are not mentioned. The conformance
   /// requirements listed here become entries in the witness table.
   ArrayRef<Requirement> getRequirementSignature() const {
-    assert(RequirementSignature &&
+    assert(isRequirementSignatureComputed() &&
            "getting requirement signature before computing it");
-    return RequirementSignature->getRequirements();
+    return llvm::makeArrayRef(RequirementSignature, NumRequirementsInSignature);
   }
 
   /// Has the requirement signature been computed yet?
@@ -3720,9 +3721,7 @@ public:
 
   void computeRequirementSignature();
 
-  void setRequirementSignature(GenericSignature *sig) {
-    RequirementSignature = sig;
-  }
+  void setRequirementSignature(ArrayRef<Requirement> requirements);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
