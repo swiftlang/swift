@@ -176,6 +176,9 @@ struct RuntimeErrorDetails {
 void reportToDebugger(bool isFatal, const char *message,
                       RuntimeErrorDetails *details = nullptr);
 
+SWIFT_RUNTIME_EXPORT
+bool _swift_reportFatalErrorsToDebugger;
+
 // namespace swift
 }
 
