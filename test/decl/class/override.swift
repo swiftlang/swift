@@ -169,8 +169,8 @@ class H : G {
 
   func manyA(_: AnyObject, _: AnyObject) {}
   func manyB(_ a: AnyObject, b: AnyObject) {}
-  func manyC(var a: AnyObject,  // expected-error {{parameters may not have the 'var' specifier}} {{14-17=}}
-             var b: AnyObject) {} // expected-error {{parameters may not have the 'var' specifier}} {{14-18=}}
+  func manyC(var a: AnyObject,  // expected-error {{'var' as a parameter attribute is not allowed}}
+             var b: AnyObject) {} // expected-error {{'var' as a parameter attribute is not allowed}}
 
   func result() -> AnyObject? { return nil }
   func both(_ x: AnyObject) -> AnyObject? { return x }

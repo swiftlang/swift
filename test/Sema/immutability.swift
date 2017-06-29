@@ -348,11 +348,11 @@ func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{20-25=}}{{34-34=inout }}
 }
-func invalid_var(var x: Int) { // expected-error {{parameters may not have the 'var' specifier}}{{18-21=}} {{1-1=    var x = x\n}}
+func invalid_var(var x: Int) { // expected-error {{'var' as a parameter attribute is not allowed}}
   
 }
 func takesClosure(_: (Int) -> Int) {
-  takesClosure { (var d) in d } // expected-error {{parameters may not have the 'var' specifier}}
+  takesClosure { (var d) in d } // expected-error {{'var' as a parameter attribute is not allowed}}
 }
 
 func updateInt(_ x : inout Int) {}

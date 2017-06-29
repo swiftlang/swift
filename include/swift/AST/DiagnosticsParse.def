@@ -814,8 +814,8 @@ ERROR(inout_as_attr_disallowed,none,
 ERROR(parameter_inout_var_let_repeated,none,
       "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
       ())
-ERROR(parameter_let_as_attr,none,
-      "'let' as a parameter attribute is not allowed", ())
+ERROR(parameter_let_var_as_attr,none,
+      "'%select{var|let}0' as a parameter attribute is not allowed", (unsigned))
 
 
 ERROR(expected_behavior_name,none,
