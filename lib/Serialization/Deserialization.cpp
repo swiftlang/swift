@@ -647,59 +647,6 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   dc->getAsNominalTypeOrNominalTypeExtensionContext()
     ->registerProtocolConformance(conformance);
 
-  // Read requirement signature conformances.
-  SmallVector<ProtocolConformanceRef, 4> reqConformances;
-
-  if (proto->isObjC() && getContext().LangOpts.EnableDeserializationRecovery) {
-    // Don't crash if inherited protocols are added or removed.
-    // This is limited to Objective-C protocols because we know their only
-    // conformance requirements are on Self. This isn't actually a /safe/ change
-    // even in Objective-C, but we mostly just don't want to crash.
-
-    // FIXME: DenseMap requires that its value type be default-constructible,
-    // which ProtocolConformanceRef is not, hence the extra Optional.
-    llvm::SmallDenseMap<ProtocolDecl *, Optional<ProtocolConformanceRef>, 16>
-        conformancesForProtocols;
-    while (conformanceCount--) {
-      ProtocolConformanceRef nextConformance = readConformance(DeclTypeCursor);
-      ProtocolDecl *confProto = nextConformance.getRequirement();
-      conformancesForProtocols[confProto] = nextConformance;
-    }
-
-    for (const auto &req : proto->getRequirementSignature()) {
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
-      ProtocolDecl *proto =
-          req.getSecondType()->castTo<ProtocolType>()->getDecl();
-      auto iter = conformancesForProtocols.find(proto);
-      if (iter != conformancesForProtocols.end()) {
-        reqConformances.push_back(iter->getSecond().getValue());
-      } else {
-        // Put in an abstract conformance as a placeholder. This is a lie, but
-        // there's not much better we can do. We're relying on the fact that
-        // the rest of the compiler doesn't actually need to check the
-        // conformance to an Objective-C protocol for anything important.
-        // There are no associated types and we don't emit a Swift conformance
-        // record.
-        reqConformances.push_back(ProtocolConformanceRef(proto));
-      }
-    }
-
-  } else {
-    auto isConformanceReq = [](const Requirement &req) {
-      return req.getKind() == RequirementKind::Conformance;
-    };
-    if (conformanceCount != llvm::count_if(proto->getRequirementSignature(),
-                                           isConformanceReq)) {
-      fatal(llvm::make_error<llvm::StringError>(
-          "serialized conformances do not match requirement signature",
-          llvm::inconvertibleErrorCode()));
-    }
-    while (conformanceCount--)
-      reqConformances.push_back(readConformance(DeclTypeCursor));
-  }
-  conformance->setSignatureConformances(reqConformances);
-
   // If the conformance is complete, we're done.
   if (conformance->isComplete())
     return conformance;
@@ -4633,10 +4580,59 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                               typeCount, conformanceCount,
                                               rawIDs);
 
-  // Skip requirement signature conformances.
-  auto proto = conformance->getProtocol();
-  while (conformanceCount--)
-    (void)readConformance(DeclTypeCursor);
+  // Read requirement signature conformances.
+  const ProtocolDecl *proto = conformance->getProtocol();
+  SmallVector<ProtocolConformanceRef, 4> reqConformances;
+
+  if (proto->isObjC() && getContext().LangOpts.EnableDeserializationRecovery) {
+    // Don't crash if inherited protocols are added or removed.
+    // This is limited to Objective-C protocols because we know their only
+    // conformance requirements are on Self. This isn't actually a /safe/ change
+    // even in Objective-C, but we mostly just don't want to crash.
+
+    // FIXME: DenseMap requires that its value type be default-constructible,
+    // which ProtocolConformanceRef is not, hence the extra Optional.
+    llvm::SmallDenseMap<ProtocolDecl *, Optional<ProtocolConformanceRef>, 16>
+        conformancesForProtocols;
+    while (conformanceCount--) {
+      ProtocolConformanceRef nextConformance = readConformance(DeclTypeCursor);
+      ProtocolDecl *confProto = nextConformance.getRequirement();
+      conformancesForProtocols[confProto] = nextConformance;
+    }
+
+    for (const auto &req : proto->getRequirementSignature()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+      ProtocolDecl *proto =
+          req.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto iter = conformancesForProtocols.find(proto);
+      if (iter != conformancesForProtocols.end()) {
+        reqConformances.push_back(iter->getSecond().getValue());
+      } else {
+        // Put in an abstract conformance as a placeholder. This is a lie, but
+        // there's not much better we can do. We're relying on the fact that
+        // the rest of the compiler doesn't actually need to check the
+        // conformance to an Objective-C protocol for anything important.
+        // There are no associated types and we don't emit a Swift conformance
+        // record.
+        reqConformances.push_back(ProtocolConformanceRef(proto));
+      }
+    }
+
+  } else {
+    auto isConformanceReq = [](const Requirement &req) {
+      return req.getKind() == RequirementKind::Conformance;
+    };
+    if (conformanceCount != llvm::count_if(proto->getRequirementSignature(),
+                                           isConformanceReq)) {
+      fatal(llvm::make_error<llvm::StringError>(
+          "serialized conformances do not match requirement signature",
+          llvm::inconvertibleErrorCode()));
+    }
+    while (conformanceCount--)
+      reqConformances.push_back(readConformance(DeclTypeCursor));
+  }
+  conformance->setSignatureConformances(reqConformances);
 
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
