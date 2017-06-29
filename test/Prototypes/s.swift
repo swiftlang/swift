@@ -92,13 +92,13 @@ extension _Concat3 : Collection {
     switch i {
     case ._0(let j):
       let r = c0.index(after: j)
-      if _fastPath(r != c0.endIndex) { return ._0(r) }
+      if r != c0.endIndex { return ._0(r) }
       if !c1.isEmpty { return ._1(c1.startIndex) }
       return ._2(c2.startIndex)
       
     case ._1(let j):
       let r = c1.index(after: j)
-      if _fastPath(r != c1.endIndex) { return ._1(r) }
+      if r != c1.endIndex { return ._1(r) }
       return ._2(c2.startIndex)
       
     case ._2(let j):
@@ -715,7 +715,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
           let u = source.next()
-          guard _fastPath(u != nil && u! <= 0xFF) else {
+          guard u != nil && u! <= 0xFF else {
             let newContent = String._XContent._Inline<UInt8>(buf[..<i])!
             _content = .inline8(newContent)
             if u != nil { self.append(u!) }
@@ -729,7 +729,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
           guard let u = source.next() else { break }
-          guard _fastPath(u <= 0xFF) else {
+          guard u <= 0xFF else {
             self.append(u)
             break
           }
@@ -742,7 +742,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
           let u = source.next()
-          guard _fastPath(u != nil) else {
+          guard u != nil else {
             _content = .inline16(String._XContent._Inline<UInt16>(buf[..<i])!)
             break
           }
@@ -772,7 +772,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
     defer { _fixLifetime(self) }
     
     // In-place mutation
-    if _fastPath(knownUnique || _dynamicStorageIsMutable != false) {
+    if knownUnique || _dynamicStorageIsMutable != false {
       switch self._content {
       case .inline8(var x) where u <= 0xFF:
         x.append(UInt8(u))
