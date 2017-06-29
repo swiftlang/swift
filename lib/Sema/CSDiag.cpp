@@ -6237,6 +6237,36 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   return false;
 }
 
+// Check if there is a structural problem in the function expression
+// by performing type checking with the option to allow unresolved
+// type variables. If that is going to produce a function type with
+// unresolved result let's not re-typecheck the function expression,
+// because it might produce unrelated diagnostics due to lack of
+// contextual information.
+static bool shouldTypeCheckFunctionExpr(TypeChecker &TC, DeclContext *DC,
+                                        Expr *fnExpr) {
+  if (!isa<UnresolvedDotExpr>(fnExpr))
+    return true;
+
+  SmallVector<Type, 4> fnTypes;
+  TC.getPossibleTypesOfExpressionWithoutApplying(fnExpr, DC, fnTypes,
+                                       FreeTypeVariableBinding::UnresolvedType);
+
+  if (fnTypes.size() == 1) {
+    // Some member types depend on the arguments to produce a result type,
+    // type-checking such expressions without associated arguments is
+    // going to produce unrelated diagnostics.
+    if (auto fn = fnTypes[0]->getAs<AnyFunctionType>()) {
+      auto resultType = fn->getResult();
+      if (resultType->hasUnresolvedType() || resultType->hasTypeVariable())
+        return false;
+    }
+  }
+
+  // Might be a structural problem related to the member itself.
+  return true;
+}
+
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // If this call involves trailing closure as an argument,
   // let's treat it specially, because re-typecheck of the
@@ -6248,11 +6278,16 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (diagnoseCallContextualConversionErrors(callExpr, CS->getContextualType()))
     return true;
 
-  // Type check the function subexpression to resolve a type for it if
-  // possible.
-  auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
-  if (!fnExpr)
-    return true;
+  auto *fnExpr = callExpr->getFn();
+  auto originalFnType = CS->getType(callExpr->getFn());
+
+  if (shouldTypeCheckFunctionExpr(CS->TC, CS->DC, fnExpr)) {
+    // Type check the function subexpression to resolve a type for it if
+    // possible.
+    fnExpr = typeCheckChildIndependently(callExpr->getFn());
+    if (!fnExpr)
+      return true;
+  }
 
   SWIFT_DEFER {
     if (!fnExpr) return;
@@ -6270,6 +6305,33 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   };
 
   auto fnType = getFuncType(fnExpr->getType());
+
+  // Let's see if this has to do with member vs. property error
+  // because sometimes when there is a member and a property declared
+  // on the nominal type with the same name. Type-checking function
+  // expression separately from arguments might produce solution for
+  // the property instead of the member.
+  if (!fnType->is<AnyFunctionType>() &&
+    isa<UnresolvedDotExpr>(callExpr->getFn())) {
+    fnExpr = callExpr->getFn();
+
+    SmallVector<Type, 4> types;
+    CS->TC.getPossibleTypesOfExpressionWithoutApplying(fnExpr, CS->DC, types);
+
+    auto isFunctionType = [getFuncType](Type type) -> bool {
+      return type && getFuncType(type)->is<AnyFunctionType>();
+    };
+
+    auto fnTypes = std::find_if(types.begin(), types.end(), isFunctionType);
+    if (fnTypes != types.end()) {
+      auto funcType = getFuncType(*fnTypes);
+      // If there is only one function type, let's use it.
+      if (std::none_of(std::next(fnTypes), types.end(), isFunctionType))
+        fnType = funcType;
+    } else {
+      fnType = getFuncType(originalFnType);
+    }
+  }
 
   // If we have a contextual type, and if we have an ambiguously typed function
   // result from our previous check, we re-type-check it using this contextual
@@ -6320,8 +6382,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     {
       auto diag = diagnose(arg->getStartLoc(),
-                           diag::cannot_call_non_function_value,
-                           fnExpr->getType());
+                           diag::cannot_call_non_function_value, fnType);
+
       diag.highlight(fnExpr->getSourceRange());
 
       // If the argument is an empty tuple, then offer a
