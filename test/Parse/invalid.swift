@@ -82,18 +82,18 @@ func SR979d(let let a: Int) {}  // expected-error {{'let' as a parameter attribu
 // expected-error @-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-21=}}
 func SR979e(inout x: inout String) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-18=}}
 func SR979f(var inout x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-23=}}
-// expected-error @-1 {{parameters may not have the 'var' specifier}} {{13-16=}}{{3-3=var x = x\n  }} 
-  x += 10
+// expected-error @-1 {{'var' as a parameter attribute is not allowed}}
+  x += 10     // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
 }
 func SR979g(inout i: inout Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-18=}}
 func SR979h(let inout x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-23=}}
 // expected-error @-1 {{'let' as a parameter attribute is not allowed}}
 class VarTester {
-  init(var a: Int, var b: Int) {} // expected-error {{parameters may not have the 'var' specifier}} {{8-11=}} {{33-33= var a = a }}
-  // expected-error @-1 {{parameters may not have the 'var' specifier}} {{20-24=}} {{33-33= var b = b }}
-    func x(var b: Int) { //expected-error {{parameters may not have the 'var' specifier}} {{12-15=}} {{9-9=var b = b\n        }}
-        b += 10
-    }
+  init(var a: Int, var b: Int) {} // expected-error {{'var' as a parameter attribute is not allowed}}
+  // expected-error @-1 {{'var' as a parameter attribute is not allowed}}
+  func x(var b: Int) { //expected-error {{'var' as a parameter attribute is not allowed}}
+    b += 10 // expected-error {{left side of mutating operator isn't mutable: 'b' is a 'let' constant}}
+  }
 }
 
 func repeat() {}

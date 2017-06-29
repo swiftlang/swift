@@ -1006,10 +1006,6 @@ ERROR(attribute_requires_operator_identifier,none,
 ERROR(attribute_requires_single_argument,none,
       "'%0' requires a function with one argument", (StringRef))
 
-ERROR(var_parameter_not_allowed,none,
-      "parameters may not have the 'var' specifier", ())
-
-
 ERROR(mutating_invalid_global_scope,none,
       "'mutating' is only valid on methods", ())
 ERROR(mutating_invalid_classes,none,
