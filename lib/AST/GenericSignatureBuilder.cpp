@@ -1097,15 +1097,6 @@ bool FloatingRequirementSource::isRecursive(
   return false;
 }
 
-PotentialArchetype::PotentialArchetype(PotentialArchetype *parent,
-                                       Identifier name)
-  : parentOrBuilder(parent), identifier(name), isUnresolvedNestedType(true),
-  IsRecursive(false), Invalid(false)
-{
-  assert(parent != nullptr && "Not an associated type?");
-  getBuilder()->recordUnresolvedType(this);
-}
-
 GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
   ++NumPotentialArchetypes;
 
@@ -1161,24 +1152,6 @@ unsigned GenericSignatureBuilder::PotentialArchetype::getNestingDepth() const {
   for (auto P = getParent(); P; P = P->getParent())
     ++Depth;
   return Depth;
-}
-
-void GenericSignatureBuilder::PotentialArchetype::resolveAssociatedType(
-       AssociatedTypeDecl *assocType,
-       GenericSignatureBuilder &builder) {
-  assert(isUnresolvedNestedType && "associated type is already resolved");
-  isUnresolvedNestedType = false;
-  identifier.assocTypeOrConcrete = assocType;
-  assert(assocType->getName() == getNestedName());
-}
-
-void GenericSignatureBuilder::PotentialArchetype::resolveConcreteType(
-       TypeDecl *concreteDecl,
-       GenericSignatureBuilder &builder) {
-  assert(isUnresolvedNestedType && "nested type is already resolved");
-  isUnresolvedNestedType = false;
-  identifier.assocTypeOrConcrete = concreteDecl;
-  assert(concreteDecl->getName() == getNestedName());
 }
 
 Optional<ConcreteConstraint>
@@ -1275,13 +1248,6 @@ void EquivalenceClass::dump(llvm::raw_ostream &out) const {
 
 void EquivalenceClass::dump() const {
   dump(llvm::errs());
-}
-
-void GenericSignatureBuilder::recordUnresolvedType(
-                                          PotentialArchetype *unresolvedPA) {
-  Impl->DelayedRequirements.push_back(
-    {DelayedRequirement::Unresolved, unresolvedPA, RequirementRHS(),
-     FloatingRequirementSource::forAbstract()});
 }
 
 ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
@@ -1880,38 +1846,7 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
       resultPA = concreteDeclPA;
   }
 
-  if (resultPA)
-    return resultPA;
-
-  // Check whether we can add a missing nested type for this case.
-  switch (kind) {
-  case ArchetypeResolutionKind::AlwaysPartial:
-    break;
-
-  case ArchetypeResolutionKind::WellFormed:
-  case ArchetypeResolutionKind::CompleteWellFormed:
-  case ArchetypeResolutionKind::AlreadyKnown:
-    return nullptr;
-  }
-
-  // Build an unresolved type if we don't have one yet.
-  auto &nested = NestedTypes[name];
-  if (nested.empty()) {
-    nested.push_back(new PotentialArchetype(this, name));
-
-    auto rep = getRepresentative();
-    if (rep != this) {
-      auto existingPA = rep->getNestedType(name, kind, builder);
-
-      auto sameNamedSource =
-        RequirementSource::forNestedTypeNameMatch(existingPA);
-      builder.addSameTypeRequirement(
-                                 existingPA, nested.back(), sameNamedSource,
-                                 UnresolvedHandlingKind::GenerateConstraints);
-    }
-  }
-
-  return nested.front();
+  return resultPA;
 }
 
 
@@ -1972,20 +1907,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   auto &builder = *getBuilder();
   if (knownNestedTypes != NestedTypes.end()) {
     for (auto existingPA : knownNestedTypes->second) {
-      // Resolve an unresolved potential archetype.
-      if (existingPA->isUnresolvedNestedType) {
-        if (assocType) {
-          existingPA->resolveAssociatedType(assocType, builder);
-        } else {
-          existingPA->resolveConcreteType(concreteDecl, builder);
-        }
-
-        // We've resolved this nested type; nothing more to do.
-        resultPA = existingPA;
-        shouldUpdatePA = true;
-        break;
-      }
-
       // Do we have an associated-type match?
       if (assocType && existingPA->getResolvedAssociatedType() == assocType) {
         resultPA = existingPA;
@@ -2003,7 +1924,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   // If we don't have a result potential archetype yet, we may need to add one.
   if (!resultPA) {
     switch (kind) {
-    case ArchetypeResolutionKind::AlwaysPartial:
     case ArchetypeResolutionKind::CompleteWellFormed:
     case ArchetypeResolutionKind::WellFormed: {
       if (assocType)
@@ -2887,31 +2807,6 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   return ConstraintResult::Resolved;
 }
 
-ConstraintResult GenericSignatureBuilder::resolveUnresolvedType(
-                                          PotentialArchetype *pa) {
-  // If something else resolved this type, we're done.
-  if (!pa->isUnresolved())
-    return ConstraintResult::Resolved;
-
-  // If the parent isn't resolved, we can't resolve this now.
-  auto parentPA = pa->getParent();
-  if (parentPA->isUnresolved())
-    return ConstraintResult::Unresolved;
-
-  // Resolve this via its parent.
-  auto resolvedPA =
-    parentPA->getNestedArchetypeAnchor(
-                        pa->getNestedName(),
-                        *this,
-                        ArchetypeResolutionKind::WellFormed);
-  if (resolvedPA) {
-    assert(!pa->isUnresolved() && "This type must have been resolved");
-    return ConstraintResult::Resolved;
-  }
-
-  return ConstraintResult::Unresolved;
-}
-
 ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
                                              PotentialArchetype *PAT,
                                              LayoutConstraint Layout,
@@ -2997,24 +2892,11 @@ void GenericSignatureBuilder::updateSuperclass(
     }
   };
 
-  // Local function to resolve nested types found in the superclass.
-  auto updateSuperclassNestedTypes = [&] {
-    for (auto &nested : T->getNestedTypes()) {
-      if (nested.second.empty()) continue;
-      if (nested.second.front()->isUnresolved()) {
-        (void)T->getNestedArchetypeAnchor(
-                                        nested.first, *this,
-                                        ArchetypeResolutionKind::AlreadyKnown);
-      }
-    }
-  };
-
   // If we haven't yet recorded a superclass constraint for this equivalence
   // class, do so now.
   if (!equivClass->superclass) {
     equivClass->superclass = superclass;
     updateSuperclassConformances();
-    updateSuperclassNestedTypes();
 
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
@@ -3046,7 +2928,6 @@ void GenericSignatureBuilder::updateSuperclass(
 
     // We've strengthened the bound, so update superclass conformances.
     updateSuperclassConformances();
-    updateSuperclassNestedTypes();
     return;
   }
 
@@ -4149,10 +4030,6 @@ void GenericSignatureBuilder::processDelayedRequirements() {
     auto delayed = std::move(Impl->DelayedRequirements);
     Impl->DelayedRequirements.clear();
 
-    // Whether we saw any unresolve type constraints that we couldn't
-    // resolve.
-    bool hasUnresolvedUnresolvedTypes = false;
-
     // Process delayed requirements.
     for (const auto &req : delayed) {
       // Reprocess the delayed requirement.
@@ -4175,11 +4052,6 @@ void GenericSignatureBuilder::processDelayedRequirements() {
                                req.lhs, asUnresolvedType(req.rhs), req.source,
                                UnresolvedHandlingKind::ReturnUnresolved);
         break;
-
-      case DelayedRequirement::Unresolved:
-        reqResult = resolveUnresolvedType(
-                                      req.lhs.get<PotentialArchetype *>());
-        break;
       }
 
       // Update our state based on what happened.
@@ -4196,9 +4068,6 @@ void GenericSignatureBuilder::processDelayedRequirements() {
       case ConstraintResult::Unresolved:
         // Add the requirement back.
         Impl->DelayedRequirements.push_back(req);
-
-        if (req.kind == DelayedRequirement::Unresolved)
-          hasUnresolvedUnresolvedTypes = true;
         break;
       }
     }
