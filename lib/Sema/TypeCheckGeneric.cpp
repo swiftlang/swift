@@ -131,76 +131,86 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                              ArchetypeResolutionKind::CompleteWellFormed);
   assert(basePA && "Missing potential archetype for base");
 
-  // Local function to produce an error "no such member type" and return.
-  auto invalidMemberType = [&] {
-    // Complain that there is no suitable type.
-    Identifier name = ref->getIdentifier();
-    SourceLoc nameLoc = ref->getIdLoc();
-    TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
-      .highlight(baseRange);
-    return ErrorType::get(TC.Context);
-  };
-
   // Retrieve the potential archetype for the nested type.
   auto nestedPA = basePA->getNestedType(ref->getIdentifier(),
                                         ArchetypeResolutionKind::WellFormed,
                                         Builder);
-  if (!nestedPA)
-    return invalidMemberType();
 
-  // If this potential archetype was renamed due to typo correction,
-  // complain and fix it.
-  if (nestedPA->wasRenamed()) {
-    auto newName = nestedPA->getNestedName();
+  // If there was no such nested type, produce an error.
+  if (!nestedPA) {
+    // Perform typo correction.
+    LookupResult corrections;
+    TC.performTypoCorrection(DC, DeclRefKind::Ordinary,
+                             MetatypeType::get(baseTy),
+                             ref->getIdentifier(), ref->getIdLoc(),
+                             NameLookupFlags::ProtocolMembers,
+                             corrections, &Builder);
+
+    // Filter out non-types.
+    corrections.filter([](const LookupResult::Result &result) {
+      return isa<TypeDecl>(result.Decl);
+    });
+
+    // Check whether we have a single type result.
+    auto singleType = corrections.getSingleTypeResult();
+
+    // If we don't have a single result, complain and fail.
+    if (!singleType) {
+      Identifier name = ref->getIdentifier();
+      SourceLoc nameLoc = ref->getIdLoc();
+      TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
+        .highlight(baseRange);
+      for (const auto &suggestion : corrections)
+        TC.noteTypoCorrection(name, DeclNameLoc(nameLoc), suggestion);
+
+      return ErrorType::get(TC.Context);
+    }
+
+    // We have a single type result. Suggest it.
     TC.diagnose(ref->getIdLoc(), diag::invalid_member_type_suggest,
-                baseTy, ref->getIdentifier(), newName)
-      .fixItReplace(ref->getIdLoc(), newName.str());
-    ref->overwriteIdentifier(newName);
-    nestedPA->setAlreadyDiagnosedRename();
-    
-    // Go get the actual nested type.
-    nestedPA = basePA->getNestedType(newName,
-                                     ArchetypeResolutionKind::WellFormed,
-                                     Builder);
-    assert(nestedPA && "Nested type should have been available");
-    assert(!nestedPA->wasRenamed());
+                baseTy, ref->getIdentifier(),
+                singleType->getBaseName().getIdentifier())
+      .fixItReplace(ref->getIdLoc(),
+                    singleType->getBaseName().userFacingName());
+
+    // Correct to the single type result.
+    ref->overwriteIdentifier(singleType->getBaseName().getIdentifier());
+    ref->setValue(singleType);
+  } else if (auto assocType = nestedPA->getResolvedAssociatedType()) {
+    ref->setValue(assocType);
+  } else {
+    assert(nestedPA->getConcreteTypeDecl());
+    ref->setValue(nestedPA->getConcreteTypeDecl());
   }
 
   // If the nested type has been resolved to an associated type, use it.
-  if (auto assocType = nestedPA->getResolvedAssociatedType()) {
-    ref->setValue(assocType);
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(ref->getBoundDecl())) {
     return DependentMemberType::get(baseTy, assocType);
   }
 
-  // If the nested type comes from a concrete type, substitute the base type
-  // into it.
-  if (auto concrete = nestedPA->getConcreteTypeDecl()) {
-    ref->setValue(concrete);
-
-    if (baseTy->isTypeParameter()) {
-      if (auto proto =
-            concrete->getDeclContext()
-              ->getAsProtocolOrProtocolExtensionContext()) {
-        TC.validateDecl(proto);
-        auto subMap = SubstitutionMap::getProtocolSubstitutions(
-                        proto, baseTy, ProtocolConformanceRef(proto));
-        return concrete->getDeclaredInterfaceType().subst(subMap);
-      }
-
-      if (auto superclass = basePA->getSuperclass()) {
-        return superclass->getTypeOfMember(
-                                         DC->getParentModule(), concrete,
-                                         concrete->getDeclaredInterfaceType());
-      }
-
-      llvm_unreachable("shouldn't have a concrete decl here");
+  // Otherwise, the nested type comes from a concrete tpye. Substitute the
+  // base type into it.
+  auto concrete = ref->getBoundDecl();
+  if (baseTy->isTypeParameter()) {
+    if (auto proto =
+          concrete->getDeclContext()
+            ->getAsProtocolOrProtocolExtensionContext()) {
+      TC.validateDecl(proto);
+      auto subMap = SubstitutionMap::getProtocolSubstitutions(
+                      proto, baseTy, ProtocolConformanceRef(proto));
+      return concrete->getDeclaredInterfaceType().subst(subMap);
     }
 
-    return TC.substMemberTypeWithBase(DC->getParentModule(), concrete, baseTy);
+    if (auto superclass = basePA->getSuperclass()) {
+      return superclass->getTypeOfMember(
+                                       DC->getParentModule(), concrete,
+                                       concrete->getDeclaredInterfaceType());
+    }
+
+    llvm_unreachable("shouldn't have a concrete decl here");
   }
 
-  assert(nestedPA->isUnresolved() && "meaningless unresolved type");
-  return invalidMemberType();
+  return TC.substMemberTypeWithBase(DC->getParentModule(), concrete, baseTy);
 }
 
 bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
