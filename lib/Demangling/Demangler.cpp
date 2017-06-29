@@ -418,6 +418,11 @@ NodePointer Demangler::demangleOperator() {
     case 'z': return createType(createWithChild(Node::Kind::InOut,
                                                 popTypeAndGetChild()));
     case '_': return createNode(Node::Kind::FirstElementMarker);
+    case '.':
+      // IRGen still uses '.<n>' to disambiguate partial apply thunks and
+      // outlined copy functions. We treat such a suffix as "unmangled suffix".
+      pushBack();
+      return createNode(Node::Kind::Suffix, consumeAll());
     default:
       pushBack();
       return demangleIdentifier();

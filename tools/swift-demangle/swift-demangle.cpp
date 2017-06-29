@@ -166,7 +166,7 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   // Also accept the future mangling prefix.
   // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
-  llvm::Regex maybeSymbol("(_T|_*\\$S|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
+  llvm::Regex maybeSymbol("(_T|_*\\$S|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$.]+");
 
   swift::Demangle::Context DCtx;
   for (std::string mangled; std::getline(std::cin, mangled);) {
