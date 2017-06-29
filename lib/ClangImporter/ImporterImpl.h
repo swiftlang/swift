@@ -496,9 +496,6 @@ private:
   /// External Decls that we have imported but not passed to the ASTContext yet.
   SmallVector<Decl *, 4> RegisteredExternalDecls;
 
-  /// Protocol conformances that may be missing witnesses.
-  SmallVector<NormalProtocolConformance *, 4> DelayedProtocolConformances;
-
   unsigned NumCurrentImportingEntities = 0;
 
   /// Mapping from delayed conformance IDs to the set of delayed
@@ -517,7 +514,6 @@ private:
   void startedImportingEntity();
   void finishedImportingEntity();
   void finishPendingActions();
-  void finishProtocolConformance(NormalProtocolConformance *conformance);
 
   struct ImportingEntityRAII {
     Implementation &Impl;
@@ -565,10 +561,6 @@ public:
 public:
   void registerExternalDecl(Decl *D) {
     RegisteredExternalDecls.push_back(D);
-  }
-
-  void scheduleFinishProtocolConformance(NormalProtocolConformance *C) {
-    DelayedProtocolConformances.push_back(C);
   }
 
   /// \brief Retrieve the Clang AST context.
@@ -1114,6 +1106,9 @@ public:
   loadAllConformances(
     const Decl *D, uint64_t contextData,
     SmallVectorImpl<ProtocolConformance *> &Conformances) override;
+
+  void finishNormalConformance(NormalProtocolConformance *conformance,
+                               uint64_t unused) override;
 
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, Accessibility access,

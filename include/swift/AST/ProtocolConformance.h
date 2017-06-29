@@ -462,6 +462,8 @@ public:
   /// protocol, which line up with the conformance constraints in the
   /// protocol's requirement signature.
   ArrayRef<ProtocolConformanceRef> getSignatureConformances() const {
+    if (Resolver)
+      resolveLazyInfo();
     return SignatureConformances;
   }
 
