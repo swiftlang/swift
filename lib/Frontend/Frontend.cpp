@@ -97,6 +97,12 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (!Invocation.getFrontendOptions().ModuleDocOutputPath.empty())
     Invocation.getLangOptions().AttachCommentsToDecls = true;
 
+  // If we are doing index-while-building, configure lexing and parsing to
+  // remember comments.
+  if (!Invocation.getFrontendOptions().IndexStorePath.empty()) {
+    Invocation.getLangOptions().AttachCommentsToDecls = true;
+  }
+
   Context.reset(new ASTContext(Invocation.getLangOptions(),
                                Invocation.getSearchPathOptions(),
                                SourceMgr, Diagnostics));

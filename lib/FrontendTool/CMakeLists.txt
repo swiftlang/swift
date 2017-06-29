@@ -5,6 +5,7 @@ add_swift_library(swiftFrontendTool STATIC
   TBD.cpp
   DEPENDS SwiftOptions
   LINK_LIBRARIES
+    swiftIndex
     swiftIDE
     swiftTBDGen swiftIRGen swiftSIL swiftSILGen swiftSILOptimizer
     swiftDemangling

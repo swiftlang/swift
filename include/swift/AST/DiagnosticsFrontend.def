@@ -167,6 +167,17 @@ ERROR(verify_encountered_fatal,none,
 ERROR(error_parse_input_file,none,
   "error parsing input file '%0' (%1)", (StringRef, StringRef))
 
+ERROR(error_write_index_unit,none,
+  "writing index unit file: %0", (StringRef))
+ERROR(error_create_index_dir,none,
+  "creating index directory: %0", (StringRef))
+ERROR(error_write_index_record,none,
+  "writing index record file: %0", (StringRef))
+ERROR(error_index_failed_status_check,none,
+  "failed file status check: %0", (StringRef))
+ERROR(error_index_inputs_more_than_outputs,none,
+  "index output filenames do not match input source files", ())
+
 ERROR(error_formatting_multiple_file_ranges,none,
   "file ranges don't support multiple input files", ())
 

@@ -169,6 +169,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.GroupInfoPath = A->getValue();
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
+    Opts.IndexStorePath = A->getValue();
+  }
+  Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
+
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 
@@ -1142,6 +1147,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   if (const Arg *A = Args.getLastArg(OPT_target_cpu))
     Opts.TargetCPU = A->getValue();
+
+  if (const Arg *A = Args.getLastArg(OPT_index_store_path))
+    Opts.IndexStorePath = A->getValue();
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_Xcc),
                                  Args.filtered_end())) {

@@ -48,6 +48,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Immediate/Immediate.h"
+#include "swift/Index/IndexRecord.h"
 #include "swift/Option/Options.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
@@ -368,6 +369,10 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
+static bool emitIndexData(SourceFile *PrimarySourceFile,
+      const CompilerInvocation &Invocation,
+      CompilerInstance &Instance);
+
 static void countStatsPostSema(UnifiedStatsReporter &Stats,
                                CompilerInstance& Instance) {
   auto &C = Stats.getFrontendCounters();
@@ -646,8 +651,16 @@ static bool performCompile(CompilerInstance &Instance,
     (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(),
                                 opts);
 
-  if (Context.hadError())
+  bool shouldIndex = !opts.IndexStorePath.empty();
+
+  if (Context.hadError()) {
+    if (shouldIndex) {
+      //  Emit the index store data even if there were compiler errors.
+      if (emitIndexData(PrimarySourceFile, Invocation, Instance))
+        return true;
+    }
     return true;
+  }
 
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
@@ -661,6 +674,10 @@ static bool performCompile(CompilerInstance &Instance,
     if (!opts.ObjCHeaderOutputPath.empty())
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    if (shouldIndex) {
+      if (emitIndexData(PrimarySourceFile, Invocation, Instance))
+        return true;
+    }
     return Context.hadError();
   }
 
@@ -858,8 +875,13 @@ static bool performCompile(CompilerInstance &Instance,
       serialize(DC, serializationOpts, SM.get());
     }
 
-    if (Action == FrontendOptions::EmitModuleOnly)
+    if (Action == FrontendOptions::EmitModuleOnly) {
+      if (shouldIndex) {
+        if (emitIndexData(PrimarySourceFile, Invocation, Instance))
+          return true;
+      }
       return Context.hadError();
+    }
   }
 
   assert(Action >= FrontendOptions::EmitSIL &&
@@ -918,6 +940,13 @@ static bool performCompile(CompilerInstance &Instance,
                                    &HashGlobal);
   }
 
+  // Walk the AST for indexing after IR generation. Walking it before seems
+  // to cause miscompilation issues.
+  if (shouldIndex) {
+    if (emitIndexData(PrimarySourceFile, Invocation, Instance))
+      return true;
+  }
+
   // Just because we had an AST error it doesn't mean we can't performLLVM.
   bool HadError = Instance.getASTContext().hadError();
   
@@ -973,6 +1002,52 @@ static bool performCompile(CompilerInstance &Instance,
   return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
                   IRModule.get(), TargetMachine.get(), EffectiveLanguageVersion,
                   opts.getSingleOutputFilename(), Stats) || HadError;
+}
+
+static bool emitIndexData(SourceFile *PrimarySourceFile,
+      const CompilerInvocation &Invocation,
+      CompilerInstance &Instance) {
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
+  assert(!opts.IndexStorePath.empty());
+  // FIXME: provide index unit token(s) explicitly and only use output file
+  // paths as a fallback.
+
+  bool isDebugCompilation;
+  switch (Invocation.getSILOptions().Optimization) {
+    case SILOptions::SILOptMode::NotSet:
+    case SILOptions::SILOptMode::None:
+    case SILOptions::SILOptMode::Debug:
+      isDebugCompilation = true;
+      break;
+    case SILOptions::SILOptMode::Optimize:
+    case SILOptions::SILOptMode::OptimizeUnchecked:
+      isDebugCompilation = false;
+      break;
+  }
+
+  if (PrimarySourceFile) {
+    if (index::indexAndRecord(
+            PrimarySourceFile, opts.getSingleOutputFilename(),
+            opts.IndexStorePath, opts.IndexSystemModules,
+            isDebugCompilation, Invocation.getTargetTriple(),
+            *Instance.getDependencyTracker())) {
+      return true;
+    }
+  } else {
+    StringRef moduleToken = opts.ModuleOutputPath;
+    if (moduleToken.empty())
+      moduleToken = opts.getSingleOutputFilename();
+
+    if (index::indexAndRecord(Instance.getMainModule(), opts.OutputFilenames,
+                              moduleToken, opts.IndexStorePath,
+                              opts.IndexSystemModules,
+                              isDebugCompilation, Invocation.getTargetTriple(),
+                              *Instance.getDependencyTracker())) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /// Returns true if an error occurred.
@@ -1231,6 +1306,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   DependencyTracker depTracker;
   if (!Invocation.getFrontendOptions().DependenciesFilePath.empty() ||
       !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty() ||
+      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
       !Invocation.getFrontendOptions().LoadedModuleTracePath.empty()) {
     Instance->setDependencyTracker(&depTracker);
   }
