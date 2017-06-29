@@ -226,24 +226,6 @@ public:
   }
 };
 
-/// A set of independent access sets.  This is not designed to put
-/// the access sets on different cache lines, so it's fine for
-/// thread-local sets and probably not fine for concurrent sets.
-class AccessSets {
-  enum { NumAccessSets = 8 };
-  AccessSet Sets[NumAccessSets];
-
-public:
-  constexpr AccessSets() = default;
-  AccessSets(const AccessSets &) = delete;
-  AccessSets &operator=(const AccessSets &) = delete;
-
-  AccessSet &get(void *pointer) {
-    size_t index = std::hash<void*>()(pointer) % NumAccessSets;
-    return Sets[index];
-  }
-};
-
 } // end anonymous namespace
 
 // Each of these cases should define a function with this prototype:
@@ -253,10 +235,10 @@ public:
 // Use direct language support for thread-locals.
 
 static_assert(LLVM_ENABLE_THREADS, "LLVM_THREAD_LOCAL will use a global?");
-static LLVM_THREAD_LOCAL AccessSets ExclusivityAccessSets;
+static LLVM_THREAD_LOCAL AccessSet ExclusivityAccessSet;
 
-static AccessSets &getAllSets() {
-  return ExclusivityAccessSets;
+static AccessSet &getAccessSet() {
+  return ExclusivityAccessSet;
 }
 
 #elif SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC
@@ -265,7 +247,7 @@ static AccessSets &getAllSets() {
 static pthread_key_t createAccessSetPthreadKey() {
   pthread_key_t key;
   int result = pthread_key_create(&key, [](void *pointer) {
-    delete static_cast<AccessSets*>(pointer);
+    delete static_cast<AccessSet*>(pointer);
   });
 
   if (result != 0) {
@@ -275,26 +257,21 @@ static pthread_key_t createAccessSetPthreadKey() {
   return key;
 }
 
-static AccessSets &getAllSets() {
+static AccessSet &getAccessSet() {
   static pthread_key_t key = createAccessSetPthreadKey();
 
-  AccessSets *sets = static_cast<AccessSets*>(pthread_getspecific(key));
-  if (!sets) {
-    sets = new AccessSets();
-    pthread_setspecific(key, sets);
+  AccessSet *set = static_cast<AccessSet*>(pthread_getspecific(key));
+  if (!set) {
+    set = new AccessSet();
+    pthread_setspecific(key, set);
   }
-  return *sets;
+  return *set;
 }
 
 /** An access set accessed via pthread_get_specific. *************************/
 #else
 #error No implementation chosen for exclusivity!
 #endif
-
-/// Return the right access set for the given pointer.
-static AccessSet &getAccessSet(void *pointer) {
-  return getAllSets().get(pointer);
-}
 
 /// Begin tracking a dynamic access.
 ///
@@ -315,7 +292,7 @@ void swift::swift_beginAccess(void *pointer, ValueBuffer *buffer,
 
   if (!pc) pc = get_return_address();
 
-  getAccessSet(pointer).insert(access, pc, pointer, flags);
+  getAccessSet().insert(access, pc, pointer, flags);
 }
 
 /// End tracking a dynamic access.
@@ -329,5 +306,5 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
     return;
   }
 
-  getAccessSet(pointer).remove(access);
+  getAccessSet().remove(access);
 }
