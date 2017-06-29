@@ -815,15 +815,26 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   // Local function to construct the conformance access path from the
   // requirement.
   std::function<void(GenericSignature *, const RequirementSource *,
-                     ProtocolDecl *, Type)> buildPath;
+                     ProtocolDecl *, Type, ProtocolDecl *)> buildPath;
   buildPath = [&](GenericSignature *sig, const RequirementSource *source,
-                  ProtocolDecl *conformingProto, Type rootType) {
+                  ProtocolDecl *conformingProto, Type rootType,
+                  ProtocolDecl *requirementSignatureProto) {
     // Each protocol requirement is a step along the path.
     if (source->isProtocolRequirement()) {
+      // If we're expanding for a protocol that has no requirement signature
+      // (yet) and have hit the penultimate step, this is the last step
+      // that would occur in the requirement signature.
+      if (!source->parent->parent && requirementSignatureProto) {
+        Type subjectType = source->getStoredType()->getCanonicalType();
+        path.path.push_back({subjectType, conformingProto});
+        return;
+      }
+
       // Follow the rest of the path to derive the conformance into which
       // this particular protocol requirement step would look.
       auto inProtocol = source->getProtocolDecl();
-      buildPath(sig, source->parent, inProtocol, rootType);
+      buildPath(sig, source->parent, inProtocol, rootType,
+                requirementSignatureProto);
       assert(path.path.back().second == inProtocol &&
              "path produces incorrect conformance");
 
@@ -857,11 +868,10 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                "missing signature");
       }
 
-      // Get a generic signature builder for the requirement signature. This has
-      // the requirement we need.
-      auto reqSig = inProtocol->getRequirementSignature();
-      auto &reqSigBuilder = *reqSig->getGenericSignatureBuilder(
-                                               *inProtocol->getModuleContext());
+      // Get a generic signature for the protocol's signature.
+      auto inProtoSig = inProtocol->getGenericSignature();
+      auto &inProtoSigBuilder = *inProtoSig->getGenericSignatureBuilder(
+                                                                *inProtocol->getModuleContext());
 
       // Retrieve the stored type, but erase all of the specific associated
       // type declarations; we don't want any details of the enclosing context
@@ -870,9 +880,9 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
       // Dig out the potential archetype for this stored type.
       auto pa =
-        reqSigBuilder.resolveArchetype(
+        inProtoSigBuilder.resolveArchetype(
                                  storedType,
-                                 ArchetypeResolutionKind::AlwaysPartial);
+                                 ArchetypeResolutionKind::WellFormed);
       auto equivClass = pa->getOrCreateEquivalenceClass();
 
       // Find the conformance of this potential archetype to the protocol in
@@ -881,8 +891,8 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       assert(conforms != equivClass->conformsTo.end());
 
       // Compute the root type, canonicalizing it w.r.t. the protocol context.
-      auto inProtoSig = inProtocol->getGenericSignature();
       auto conformsSource = getBestRequirementSource(conforms->second);
+      assert(conformsSource != source || !requirementSignatureProto);
       Type localRootType = conformsSource->getRootPotentialArchetype()
                              ->getDependentType(inProtoSig->getGenericParams(),
                                                 /*allowUnresolved*/true);
@@ -891,7 +901,9 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                                                *inProtocol->getModuleContext());
 
       // Build the path according to the requirement signature.
-      buildPath(reqSig, conformsSource, conformingProto, localRootType);
+      auto reqSig = inProtocol->getRequirementSignature();
+      buildPath(reqSig, conformsSource, conformingProto, localRootType,
+                inProtocol);
 
       // We're done.
       return;
@@ -899,7 +911,8 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
     // If we still have a parent, keep going.
     if (source->parent) {
-      buildPath(sig, source->parent, conformingProto, rootType);
+      buildPath(sig, source->parent, conformingProto, rootType,
+                requirementSignatureProto);
       return;
     }
 
@@ -929,7 +942,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                                               /*allowUnresolved=*/false);
 
   // Build the path.
-  buildPath(this, source, protocol, rootType);
+  buildPath(this, source, protocol, rootType, nullptr);
 
   // Return the path; we're done!
   return path;
