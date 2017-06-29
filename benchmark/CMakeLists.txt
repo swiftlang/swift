@@ -48,6 +48,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DropLast
     single-source/DropWhile
     single-source/ErrorHandling
+    single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
     single-source/Hanoi
