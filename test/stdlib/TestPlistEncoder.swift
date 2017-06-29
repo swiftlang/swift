@@ -111,6 +111,24 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     _testRoundTrip(of: employee, in: .xml)
   }
 
+  func testEncodingTopLevelNullableType() {
+    // EnhancedBool is a type which encodes either as a Bool or as nil.
+    _testEncodeFailure(of: EnhancedBool.true, in: .binary)
+    _testEncodeFailure(of: EnhancedBool.true, in: .xml)
+    _testEncodeFailure(of: EnhancedBool.false, in: .binary)
+    _testEncodeFailure(of: EnhancedBool.false, in: .xml)
+    _testEncodeFailure(of: EnhancedBool.fileNotFound, in: .binary)
+    _testEncodeFailure(of: EnhancedBool.fileNotFound, in: .xml)
+
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.true), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.true), in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.false), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.false), in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.fileNotFound), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.fileNotFound), in: .xml)
+  }
+
+
   // MARK: - Encoder Features
   func testNestedContainerCodingPaths() {
     let encoder = JSONEncoder()
@@ -438,6 +456,32 @@ fileprivate struct Company : Codable, Equatable {
   }
 }
 
+/// An enum type which decodes from Bool?.
+fileprivate enum EnhancedBool : Codable {
+  case `true`
+  case `false`
+  case fileNotFound
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    if container.decodeNil() {
+      self = .fileNotFound
+    } else {
+      let value = try container.decode(Bool.self)
+      self = value ? .true : .false
+    }
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    switch self {
+    case .true: try container.encode(true)
+    case .false: try container.encode(false)
+    case .fileNotFound: try container.encodeNil()
+    }
+  }
+}
+
 /// A type which encodes as an array directly through a single value container.
 struct Numbers : Codable, Equatable {
   let values = [4, 8, 15, 16, 23, 42]
@@ -614,6 +658,7 @@ PropertyListEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { Te
 PropertyListEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestPropertyListEncoder().testEncodingTopLevelStructuredSingleClass() }
 PropertyListEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestPropertyListEncoder().testEncodingTopLevelDeepStructuredType() }
 PropertyListEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestPropertyListEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
+PropertyListEncoderTests.test("testEncodingTopLevelNullableType") { TestPropertyListEncoder().testEncodingTopLevelNullableType() }
 PropertyListEncoderTests.test("testNestedContainerCodingPaths") { TestPropertyListEncoder().testNestedContainerCodingPaths() }
 PropertyListEncoderTests.test("testSuperEncoderCodingPaths") { TestPropertyListEncoder().testSuperEncoderCodingPaths() }
 runAllTests()
