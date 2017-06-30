@@ -914,7 +914,8 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
   }
 
   // Create a new match variable $match.
-  auto *matchVar = new (tc.Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+  auto *matchVar = new (tc.Context) VarDecl(/*IsStatic*/false,
+                                            VarDecl::Specifier::Let,
                                             /*IsCaptureList*/false,
                                             pattern->getLoc(),
                                             tc.Context.getIdentifier("$match"),

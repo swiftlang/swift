@@ -484,7 +484,8 @@ static void emitIndirectResultParameters(SILGenFunction &gen, Type resultType,
     return;
   }
   auto &ctx = gen.getASTContext();
-  auto var = new (ctx) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
+  auto var = new (ctx) ParamDecl(VarDecl::Specifier::InOut,
+                                 SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), Type(),
                                  DC);
