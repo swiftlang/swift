@@ -74,20 +74,25 @@ internal struct _ThreadLocalStorage {
   }
 
   // Retrieve our thread's local uBreakIterator and set it up for the given
-  // StringCore. Checks our TLS cache to avoid excess text resetting.
+  // StringCore.
   static internal func getUBreakIterator(
     for core: _StringCore
+  ) -> OpaquePointer {
+    _sanityCheck(core._owner != nil || core._baseAddress != nil,
+      "invalid StringCore")
+    let corePtr: UnsafeMutablePointer<UTF16.CodeUnit> = core.startUTF16
+    return getUBreakIterator(
+      for: UnsafeBufferPointer(start: corePtr, count: core.count))
+  }
+  static internal func getUBreakIterator(
+    for bufPtr: UnsafeBufferPointer<UTF16.CodeUnit>
   ) -> OpaquePointer {
     let tlsPtr = getPointer()
     let brkIter = tlsPtr[0].uBreakIterator
 
-    _sanityCheck(core._owner != nil || core._baseAddress != nil,
-      "invalid StringCore")
-
     var err = __swift_stdlib_U_ZERO_ERROR
-    let corePtr: UnsafeMutablePointer<UTF16.CodeUnit>
-    corePtr = core.startUTF16
-    __swift_stdlib_ubrk_setText(brkIter, corePtr, Int32(core.count), &err)
+    __swift_stdlib_ubrk_setText(
+      brkIter, bufPtr.baseAddress!, Int32(bufPtr.count), &err)
     _precondition(err.isSuccess, "unexpected ubrk_setUText failure")
 
     return brkIter

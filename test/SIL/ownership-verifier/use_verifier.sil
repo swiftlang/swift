@@ -334,6 +334,14 @@ bb0:
   return %9999 : $()
 }
 
+sil @block_invoke_test : $@convention(thin) (@owned @convention(block) () -> ()) -> () {
+bb0(%0 : @owned $@convention(block) () -> ()):
+  apply %0() : $@convention(block) () -> ()
+  destroy_value %0 : $@convention(block) () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////
