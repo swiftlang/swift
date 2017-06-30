@@ -403,7 +403,7 @@ extension String._XContent.UTF16View : Sequence {
           return .deep8(s, s + $0.count)
         }
       case .utf16(let x):
-        _owner = nil
+        _owner = x
         _buffer = x.withUnsafeBufferPointer {
           let s = $0.baseAddress._unsafelyUnwrappedUnchecked
           return .deep16(s, s + $0.count)
@@ -703,6 +703,29 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
     defer { _fixLifetime(self) }
 
     switch _content {
+    case .latin1(let x) where knownMutable || _dynamicStorageIsMutable != false:
+      let buf = UnsafeMutableBufferPointer(
+        start: x._baseAddress + x.count, count: x.capacity &- x.count)
+      
+      for i in 0..<buf.count {
+        guard let u = source.next() else { break }
+        guard u <= 0xFF else {
+          self.append(u)
+          break
+        }
+        buf[i] = UInt8(extendingOrTruncating: u)
+        x.count = x.count &+ 1
+      }
+      
+    case .utf16(let x) where knownMutable || _dynamicStorageIsMutable != false:
+      let availableCapacity = UnsafeMutableBufferPointer(
+        start: x._baseAddress + x.count, count: x.capacity &- x.count)
+
+      let (newSource, copiedCount) = source._copyContents(
+        initializing: availableCapacity)
+      x.count += copiedCount
+      source = newSource
+      
     case .inline8(var x):
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
@@ -714,19 +737,6 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
             break
           }
           buf[i] = UInt8(extendingOrTruncating: u!)
-        }
-      }
-      
-    case .latin1(let x) where knownMutable || _dynamicStorageIsMutable != false:
-      x._withMutableCapacity { buf in
-        for i in count..<buf.count {
-          guard let u = source.next() else { break }
-          guard u <= 0xFF else {
-            self.append(u)
-            break
-          }
-          buf[i] = UInt8(extendingOrTruncating: u)
-          x.count += 1
         }
       }
       
@@ -742,17 +752,6 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
         }
       }
       
-    case .utf16(let x) where knownMutable || _dynamicStorageIsMutable != false:
-      x._withMutableCapacity { buf in
-        let availableCapacity = UnsafeMutableBufferPointer(
-          start: buf.baseAddress._unsafelyUnwrappedUnchecked + x.count,
-          count: buf.count - x.count)
-        let (newSource, copiedCount) = source._copyContents(
-          initializing: availableCapacity
-        )
-        x.count += copiedCount
-        source = newSource
-      }
     default: break
     }
     for u in source { append(u) }
