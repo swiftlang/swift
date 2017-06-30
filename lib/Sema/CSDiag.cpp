@@ -6157,28 +6157,30 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
       if (!fnType)
         return false;
 
-      auto expectedArgType = FunctionType::get(fnType->getInput(), resultType,
-                                               fnType->getExtInfo());
-
-      auto expectedType =
-          FunctionType::get(expectedArgType, CS->getContextualType());
-
       class ClosureCalleeListener : public ExprTypeCheckListener {
-        Type contextualType;
+        Type InputType;
+        Type ResultType;
 
       public:
-        explicit ClosureCalleeListener(Type contextualType)
-            : contextualType(contextualType) {}
+        explicit ClosureCalleeListener(Type inputType, Type resultType)
+            : InputType(inputType), ResultType(resultType) {}
 
         bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
+          if (!InputType || !ResultType)
+            return false;
+
+          auto expectedType = FunctionType::get(InputType, ResultType);
           cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                           contextualType, cs.getConstraintLocator(expr),
+                           expectedType, cs.getConstraintLocator(expr),
                            /*isFavored*/ true);
           return false;
         }
       };
 
-      ClosureCalleeListener listener(expectedType);
+      auto expectedArgType = FunctionType::get(fnType->getInput(), resultType,
+                                               fnType->getExtInfo());
+
+      ClosureCalleeListener listener(expectedArgType, CS->getContextualType());
       return !typeCheckChildIndependently(callExpr->getFn(), Type(),
                                           CTP_CalleeResult, TCC_ForceRecheck,
                                           &listener);
