@@ -288,7 +288,8 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               Type BaseTy,
                               const DeclContext *CurrDC,
                               LazyResolver *typeResolver,
-                              bool includeInstanceMembers);
+                              bool includeInstanceMembers,
+                              GenericSignatureBuilder *GSB = nullptr);
 
 namespace namelookup {
 enum class ResolutionKind {
