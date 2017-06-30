@@ -28,7 +28,7 @@ class DiagnosticEngine;
 /// \brief Parses a -sanitize= argument's values.
 ///
 /// \param Diag If non null, the argument is used to diagnose invalid values.
-/// \param sanitizerRuntimeLibExists Function which checks for existance of a
+/// \param sanitizerRuntimeLibExists Function which checks for existence of a
 //         sanitizer dylib with a given name.
 /// \return Returns a SanitizerKind.
 SanitizerKind parseSanitizerArgValues(

@@ -394,7 +394,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // CHECK:  %11 = builtin "cmp_eq_Word"(%9 : $Builtin.Word, %10 : $Builtin.Word) : $Builtin.Int1
 // CHECK:  cond_br %11, bb4, bb2
 
-// None of the constraint checks was successfull, perform a generic copy.
+// None of the constraint checks was successful, perform a generic copy.
 // CHECK: bb2:
 // CHECK:  copy_addr %2 to [initialization] %0 : $*S
 // CHECK:  destroy_addr %1 : $*S
@@ -470,7 +470,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // CHECK:  %4 = builtin "ispod"<S>(%3 : $@thick S.Type) : $Builtin.Int1
 // CHECK:  cond_br %4, bb3, bb1
 
-// None of the constraint checks was successfull, perform a generic copy.
+// None of the constraint checks was successful, perform a generic copy.
 // CHECK: bb1:
 // CHECK:  copy_addr %2 to [initialization] %0 : $*S
 // CHECK:  destroy_addr %1 : $*S
@@ -620,7 +620,7 @@ bb0(%0 : $*T, %1 : $*S):
 // CHECK:   %6 = builtin "cmp_eq_Word"(%4 : $Builtin.Word, %5 : $Builtin.Word) : $Builtin.Int1
 // CHECK:   cond_br %6, bb3, bb1
 
-// Type dispatch was not successfull.
+// Type dispatch was not successful.
 // CHECK: bb1:
 // CHECK:   destroy_addr %1 : $*S
 // CHECK:   destroy_addr %0 : $*T

@@ -1175,7 +1175,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         ConstraintKind kind,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
-  // FIXME: Fees like a hack.
+  // FIXME: Feels like a hack.
   if (type1->is<InOutType>())
     return SolutionKind::Error;
 

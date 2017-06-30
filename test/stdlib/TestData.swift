@@ -1034,19 +1034,19 @@ class TestData : TestDataSuper {
     
     func test_splittingHttp() {
         func split(_ data: Data, on delimiter: String) -> [Data] {
-            let dataDelimeter = delimiter.data(using: .utf8)!
+            let dataDelimiter = delimiter.data(using: .utf8)!
             var found = [Data]()
             let start = data.startIndex
-            let end = data.endIndex.advanced(by: -dataDelimeter.count)
+            let end = data.endIndex.advanced(by: -dataDelimiter.count)
             guard end >= start else { return [data] }
             var index = start
             var previousIndex = index
             while index < end {
-                let slice = data[index..<index.advanced(by: dataDelimeter.count)]
+                let slice = data[index..<index.advanced(by: dataDelimiter.count)]
                 
-                if slice == dataDelimeter {
+                if slice == dataDelimiter {
                     found.append(data[previousIndex..<index])
-                    previousIndex = index + dataDelimeter.count
+                    previousIndex = index + dataDelimiter.count
                 }
                 
                 index = index.advanced(by: 1)

@@ -654,16 +654,6 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   dc->getAsNominalTypeOrNominalTypeExtensionContext()
     ->registerProtocolConformance(conformance);
 
-  // Read requirement signature conformances.
-  SmallVector<ProtocolConformanceRef, 4> reqConformances;
-  for (const auto &req : proto->getRequirementSignature()) {
-    if (req.getKind() == RequirementKind::Conformance) {
-      auto reqConformance = readConformance(DeclTypeCursor);
-      reqConformances.push_back(reqConformance);
-    }
-  }
-  conformance->setSignatureConformances(reqConformances);
-
   // If the conformance is complete, we're done.
   if (conformance->isComplete())
     return conformance;
@@ -4594,13 +4584,16 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                               typeCount,
                                               rawIDs);
 
-  // Skip requirement signature conformances.
-  auto proto = conformance->getProtocol();
+  // Read requirement signature conformances.
+  const ProtocolDecl *proto = conformance->getProtocol();
+  SmallVector<ProtocolConformanceRef, 4> reqConformances;
   for (const auto &req : proto->getRequirementSignature()) {
     if (req.getKind() == RequirementKind::Conformance) {
-      (void)readConformance(DeclTypeCursor);
+      auto reqConformance = readConformance(DeclTypeCursor);
+      reqConformances.push_back(reqConformance);
     }
   }
+  conformance->setSignatureConformances(reqConformances);
 
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 

@@ -6348,7 +6348,8 @@ void SwiftDeclConverter::addObjCProtocolConformances(
     auto conformance = ctx.getConformance(dc->getDeclaredTypeInContext(),
                                           protocols[i], SourceLoc(), dc,
                                           ProtocolConformanceState::Incomplete);
-    Impl.scheduleFinishProtocolConformance(conformance);
+    conformance->setLazyLoader(&Impl, /*context*/0);
+    conformance->setState(ProtocolConformanceState::Complete);
     conformances.push_back(conformance);
   }
 
@@ -7286,6 +7287,9 @@ void ClangImporter::Implementation::finishedImportingEntity() {
 
 void ClangImporter::Implementation::finishPendingActions() {
   while (true) {
+    // The odd shape of this loop comes from previously having more than one
+    // possible kind of pending action. It's left this way to make it easy to
+    // add another one back in an `else if` clause.
     if (!RegisteredExternalDecls.empty()) {
       if (hasFinishedTypeChecking()) {
         RegisteredExternalDecls.clear();
@@ -7297,21 +7301,21 @@ void ClangImporter::Implementation::finishPendingActions() {
             if (!nominal->hasDelayedMembers())
               typeResolver->resolveExternalDeclImplicitMembers(nominal);
       }
-    } else if (!DelayedProtocolConformances.empty()) {
-      NormalProtocolConformance *conformance =
-          DelayedProtocolConformances.pop_back_val();
-      finishProtocolConformance(conformance);
     } else {
       break;
     }
   }
 }
 
-/// Finish the given protocol conformance (for an imported type)
-/// by filling in any missing witnesses.
-void ClangImporter::Implementation::finishProtocolConformance(
-    NormalProtocolConformance *conformance) {
+void ClangImporter::Implementation::finishNormalConformance(
+    NormalProtocolConformance *conformance,
+    uint64_t unused) {
+  (void)unused;
   const ProtocolDecl *proto = conformance->getProtocol();
+
+  PrettyStackTraceType trace(SwiftContext, "completing conformance for",
+                             conformance->getType());
+  PrettyStackTraceDecl traceTo("... to", proto);
 
   // Create witnesses for requirements not already met.
   for (auto req : proto->getMembers()) {

@@ -7,7 +7,7 @@ import Swift
 
 // CHECK-LABEL: sil @exp1 : $@convention(thin) () -> () {
 // CHECK-NOT: apply
-// Call of specialized intializer: <Int32>
+// Call of specialized initializer: <Int32>
 // CHECK: [[CTOR:%[0-9]+]] = function_ref @_T08XXX_inits5Int32V_Tg5
 // CHECK: apply [[CTOR]]
 // CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @acceptsInt
