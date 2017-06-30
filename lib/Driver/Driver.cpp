@@ -1153,6 +1153,17 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       break;
 
+    // BEGIN APPLE-ONLY OUTPUT ACTIONS
+    case options::OPT_index_file:
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      OI.CompilerOutputType = types::TY_IndexData;
+      break;
+    // END APPLE-ONLY OUTPUT ACTIONS
+
+    case options::OPT_update_code:
+      OI.CompilerOutputType = types::TY_Remapping;
+      OI.LinkAction = LinkKind::None;
+      break;
     case options::OPT_parse:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
@@ -1449,6 +1460,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_ClangModuleFile:
       case types::TY_SwiftDeps:
       case types::TY_Remapping:
+      case types::TY_IndexData:
       case types::TY_PCH:
       case types::TY_ImportedModules:
       case types::TY_TBD:
