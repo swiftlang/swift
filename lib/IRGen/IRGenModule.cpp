@@ -796,9 +796,11 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
   if (CPU != "")
     Attrs.addAttribute("target-cpu", CPU);
 
-  std::vector<std::string> &Features = ClangOpts.Features;
+  std::vector<std::string> Features = ClangOpts.Features;
   if (!Features.empty()) {
     SmallString<64> allFeatures;
+    // Sort so that the target features string is canonical.
+    std::sort(Features.begin(), Features.end());
     interleave(Features, [&](const std::string &s) {
       allFeatures.append(s);
     }, [&]{
