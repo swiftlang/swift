@@ -408,27 +408,13 @@ class TestJSONEncoder : TestJSONEncoderSuper {
 }
 
 // MARK: - Helper Global Functions
-func expectEqualPaths(_ lhs: [CodingKey?], _ rhs: [CodingKey?], _ prefix: String) {
+func expectEqualPaths(_ lhs: [CodingKey], _ rhs: [CodingKey], _ prefix: String) {
   if lhs.count != rhs.count {
-    expectUnreachable("\(prefix) [CodingKey?].count mismatch: \(lhs.count) != \(rhs.count)")
+    expectUnreachable("\(prefix) [CodingKey].count mismatch: \(lhs.count) != \(rhs.count)")
     return
   }
 
-  for (k1, k2) in zip(lhs, rhs) {
-    switch (k1, k2) {
-    case (.none, .none): continue
-    case (.some(let _k1), .none):
-      expectUnreachable("\(prefix) CodingKey mismatch: \(type(of: _k1)) != nil")
-      return
-    case (.none, .some(let _k2)):
-      expectUnreachable("\(prefix) CodingKey mismatch: nil != \(type(of: _k2))")
-      return
-    default: break
-    }
-
-    let key1 = k1!
-    let key2 = k2!
-
+  for (key1, key2) in zip(lhs, rhs) {
     switch (key1.intValue, key2.intValue) {
     case (.none, .none): break
     case (.some(let i1), .none):
@@ -788,7 +774,7 @@ struct NestedContainersTestType : Encodable {
     }
   }
 
-  func _testNestedContainers(in encoder: Encoder, baseCodingPath: [CodingKey?]) {
+  func _testNestedContainers(in encoder: Encoder, baseCodingPath: [CodingKey]) {
     expectEqualPaths(encoder.codingPath, baseCodingPath, "New encoder has non-empty codingPath.")
 
     // codingPath should not change upon fetching a non-nested container.
@@ -822,29 +808,51 @@ struct NestedContainersTestType : Encodable {
     // Nested Unkeyed Container
     do {
       // Nested container for key should have a new key pushed on.
-      var secondLevelContainer = firstLevelContainer.nestedUnkeyedContainer(forKey: .a)
+      var secondLevelContainer = firstLevelContainer.nestedUnkeyedContainer(forKey: .b)
       expectEqualPaths(encoder.codingPath, baseCodingPath, "Top-level Encoder's codingPath changed.")
       expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath, "First-level keyed container's codingPath changed.")
-      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.a], "New second-level keyed container had unexpected codingPath.")
+      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.b], "New second-level keyed container had unexpected codingPath.")
 
       // Appending a keyed container should not change existing coding paths.
       let thirdLevelContainerKeyed = secondLevelContainer.nestedContainer(keyedBy: IntermediateCodingKeys.self)
       expectEqualPaths(encoder.codingPath, baseCodingPath, "Top-level Encoder's codingPath changed.")
       expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath, "First-level keyed container's codingPath changed.")
-      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.a], "Second-level unkeyed container's codingPath changed.")
-      expectEqualPaths(thirdLevelContainerKeyed.codingPath, baseCodingPath + [TopLevelCodingKeys.a, nil], "New third-level keyed container had unexpected codingPath.")
+      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.b], "Second-level unkeyed container's codingPath changed.")
+      expectEqualPaths(thirdLevelContainerKeyed.codingPath, baseCodingPath + [TopLevelCodingKeys.b, _TestKey(index: 0)], "New third-level keyed container had unexpected codingPath.")
 
       // Appending an unkeyed container should not change existing coding paths.
       let thirdLevelContainerUnkeyed = secondLevelContainer.nestedUnkeyedContainer()
       expectEqualPaths(encoder.codingPath, baseCodingPath, "Top-level Encoder's codingPath changed.")
       expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath, "First-level keyed container's codingPath changed.")
-      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.a], "Second-level unkeyed container's codingPath changed.")
-      expectEqualPaths(thirdLevelContainerUnkeyed.codingPath, baseCodingPath + [TopLevelCodingKeys.a, nil], "New third-level unkeyed container had unexpected codingPath.")
+      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.b], "Second-level unkeyed container's codingPath changed.")
+      expectEqualPaths(thirdLevelContainerUnkeyed.codingPath, baseCodingPath + [TopLevelCodingKeys.b, _TestKey(index: 1)], "New third-level unkeyed container had unexpected codingPath.")
     }
   }
 }
 
 // MARK: - Helper Types
+
+/// A key type which can take on any string or integer value.
+/// This needs to mirror _JSONKey.
+fileprivate struct _TestKey : CodingKey {
+  var stringValue: String
+  var intValue: Int?
+
+  init?(stringValue: String) {
+    self.stringValue = stringValue
+    self.intValue = nil
+  }
+
+  init?(intValue: Int) {
+    self.stringValue = "\(intValue)"
+    self.intValue = intValue
+  }
+
+  init(index: Int) {
+    self.stringValue = "Index \(index)"
+    self.intValue = index
+  }
+}
 
 /// Wraps a type T so that it can be encoded at the top level of a payload.
 fileprivate struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
