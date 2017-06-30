@@ -270,8 +270,8 @@ Type CompleteGenericTypeResolver::resolveSelfAssociatedType(
        Type selfTy, AssociatedTypeDecl *assocType) {
   return Builder.resolveArchetype(selfTy,
                                   ArchetypeResolutionKind::CompleteWellFormed)
-    ->getNestedType(assocType, Builder)
-    ->getDependentType(GenericParams, /*allowUnresolved=*/false);
+           ->getNestedType(assocType, Builder)
+           ->getDependentType(GenericParams);
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
