@@ -874,7 +874,7 @@ TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {
   // The existential's box reference should be copied.
   EXPECT_EQ(buf1.buffer.PrivateData[0], buf2.buffer.PrivateData[0]);
 
-  // Ownership of the box should have been transfered.
+  // Ownership of the box should have been transferred.
   auto *reference = reinterpret_cast<HeapObject *>(buf2.buffer.PrivateData[0]);
   EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(reference));
 

@@ -335,7 +335,7 @@ bb0(%0: @trivial $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned 
 }
 
 // This test makes sure that we properly handle non load uses of
-// struct_element_addr that always have load users with the load occuring before
+// struct_element_addr that always have load users with the load occurring before
 // and after the element in the use list.
 
 sil @mutate_int : $@convention(thin) (@inout Int) -> ()
