@@ -709,7 +709,7 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type,
       return getCanonicalTypeInContext(rep->getConcreteType(), builder);
     }
 
-    return rep->getDependentType(getGenericParams(), /*allowUnresolved*/ false);
+    return rep->getDependentType(getGenericParams());
   });
   
   auto result = type->getCanonicalType();
@@ -894,8 +894,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       auto conformsSource = getBestRequirementSource(conforms->second);
       assert(conformsSource != source || !requirementSignatureProto);
       Type localRootType = conformsSource->getRootPotentialArchetype()
-                             ->getDependentType(inProtoSig->getGenericParams(),
-                                                /*allowUnresolved*/true);
+                             ->getDependentType(inProtoSig->getGenericParams());
       localRootType = inProtoSig->getCanonicalTypeInContext(
                                                localRootType,
                                                *inProtocol->getModuleContext());
@@ -937,8 +936,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   auto source = getBestRequirementSource(conforms->second);
   auto subjectPA = source->getRootPotentialArchetype();
   subjectPA = subjectPA->getArchetypeAnchor(*subjectPA->getBuilder());
-  Type rootType = subjectPA->getDependentType(getGenericParams(),
-                                              /*allowUnresolved=*/false);
+  Type rootType = subjectPA->getDependentType(getGenericParams());
 
   // Build the path.
   buildPath(getRequirements(), source, protocol, rootType, nullptr);
