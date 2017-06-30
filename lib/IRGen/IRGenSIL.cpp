@@ -2176,7 +2176,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     SubstitutionMap subMap;
     if (auto genericSig = origCalleeType->getGenericSignature())
       subMap = genericSig->getSubstitutionMap(site.getSubstitutions());
-    emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
+    emitPolymorphicArguments(*this, origCalleeType,
                              subMap, &witnessMetadata, llArgs);
   }
 

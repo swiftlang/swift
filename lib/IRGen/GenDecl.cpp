@@ -1522,6 +1522,23 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   return result;
 }
 
+LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
+                       StringRef name,
+                       SILLinkage linkage,
+                       bool isFragile,
+                       bool isSILOnly,
+                       ForDefinition_t isDefinition,
+                       bool isWeakImported) {
+  LinkInfo result;
+  
+  result.Name += name;
+  std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
+    getIRLinkage(linkInfo, linkage, isFragile, isSILOnly,
+                 isDefinition, isWeakImported);
+  result.ForDefinition = isDefinition;
+  return result;
+}
+                       
 static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
   return cast<llvm::PointerType>(ptrTy)->getElementType() == objTy;
 }
