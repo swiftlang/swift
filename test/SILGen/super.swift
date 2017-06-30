@@ -86,7 +86,10 @@ public class ChildToResilientParent : ResilientOutsideParent {
     // CHECK: bb0([[SELF:%.*]] : $ChildToResilientParent):
     // CHECK:   [[COPY_SELF:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF:%.*]] = upcast [[COPY_SELF]]
-    // CHECK:   [[FUNC:%.*]] = super_method [[COPY_SELF]] : $ChildToResilientParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+    // CHECK:   [[BORROW_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF]]
+    // CHECK:   [[CAST_BORROW_BACK_TO_BASE:%.*]] = unchecked_ref_cast [[BORROW_UPCAST_SELF]]
+    // CHECK:   [[FUNC:%.*]] = super_method [[CAST_BORROW_BACK_TO_BASE]] : $ChildToResilientParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+    // CHECK:   end_borrow [[BORROW_UPCAST_SELF]] from [[UPCAST_SELF]]
     // CHECK:   apply [[FUNC]]([[UPCAST_SELF]])
     super.method()
   }
@@ -121,7 +124,10 @@ public class ChildToFixedParent : OutsideParent {
     // CHECK: bb0([[SELF:%.*]] : $ChildToFixedParent):
     // CHECK:   [[COPY_SELF:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_COPY_SELF:%.*]] = upcast [[COPY_SELF]]
-    // CHECK:   [[FUNC:%.*]] = super_method [[COPY_SELF]] : $ChildToFixedParent, #OutsideParent.method!1 : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
+    // CHECK:   [[BORROWED_UPCAST_COPY_SELF:%.*]] = begin_borrow [[UPCAST_COPY_SELF]]
+    // CHECK:   [[DOWNCAST_BORROWED_UPCAST_COPY_SELF:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_COPY_SELF]] : $OutsideParent to $ChildToFixedParent
+    // CHECK:   [[FUNC:%.*]] = super_method [[DOWNCAST_BORROWED_UPCAST_COPY_SELF]] : $ChildToFixedParent, #OutsideParent.method!1 : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
+    // CHECK:   end_borrow [[BORROWED_UPCAST_COPY_SELF]] from [[UPCAST_COPY_SELF]]
     // CHECK:   apply [[FUNC]]([[UPCAST_COPY_SELF]])
     super.method()
   }
