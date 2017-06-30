@@ -312,7 +312,10 @@ class Hoozit : Gizmo {
   // CHECK: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]
   // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
-  // CHECK: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo!, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
+  // CHECK: [[BORROWED_GIZMO:%.*]] = begin_borrow [[GIZMO]]
+  // CHECK: [[CAST_BORROWED_GIZMO:%.*]] = unchecked_ref_cast [[BORROWED_GIZMO]] : $Gizmo to $Hoozit
+  // CHECK: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[CAST_BORROWED_GIZMO]] : $Hoozit, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo!, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
+  // CHECK-NEXT: end_borrow [[BORROWED_GIZMO]] from [[GIZMO]]
   // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
   // CHECK: unchecked_ref_cast

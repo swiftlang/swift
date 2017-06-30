@@ -160,6 +160,30 @@ static SILValue getOriginalSelfValue(SILValue selfValue) {
   return selfValue;
 }
 
+/// We return the casted value and the borrowed value so we can input the
+/// end_borrow.
+///
+/// TODO: Once end_borrow's 2nd value is eliminated, this should return just a
+/// SILValue.
+static std::pair<SILValue, SILValue> castToOriginalSelfType(SILGenBuilder &builder,
+                                       SILLocation loc,
+                                       SILValue selfValue) {
+  SILValue originalSelfValue = getOriginalSelfValue(selfValue);
+  SILType originalSelfType = originalSelfValue->getType();
+
+  // If we have a metatype, then we just return the original self value since
+  // metatypes are trivial, so we can avoid ownership concerns.
+  if (originalSelfType.getSwiftRValueType()->is<AnyMetatypeType>()) {
+    assert(originalSelfType.isTrivial(builder.getModule()) && "Metatypes should always be trivial");
+    return {originalSelfValue, SILValue()};
+  }
+
+  // Otherwise, we have a non-metatype. Use an unchecked_ref_cast.
+  SILValue borrowedValue = builder.createBeginBorrow(loc, selfValue);
+  SILValue castValue = builder.createUncheckedRefCast(loc, borrowedValue, originalSelfType);
+  return {castValue, borrowedValue};
+}
+
 namespace {
 
 /// Abstractly represents a callee, which may be a constant or function value,
@@ -301,7 +325,6 @@ public:
                                SILDeclRef c,
                                SubstitutionList subs,
                                SILLocation l) {
-    selfValue = getOriginalSelfValue(selfValue);
     auto formalType = getConstantFormalInterfaceType(SGF, c);
     return Callee(Kind::SuperMethod, SGF, selfValue, c,
                   formalType, formalType, subs, l);
@@ -450,14 +473,19 @@ public:
     case Kind::SuperMethod: {
       assert(!constant->isCurried);
 
+      SILValue castValue, borrowedValue;
+      std::tie(castValue, borrowedValue) = castToOriginalSelfType(SGF.B, Loc, SelfValue);
+
       auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
-      auto methodVal = SGF.B.createSuperMethod(Loc,
-                                               SelfValue,
+      auto methodVal = SGF.B.createSuperMethod(Loc, castValue,
                                                *constant,
                                                constantInfo.getSILType(),
                                                /*volatile*/
                                                  constant->isForeign);
+      if (borrowedValue) {
+        SGF.B.createEndBorrow(Loc, borrowedValue, SelfValue);
+      }
       mv = ManagedValue::forUnmanaged(methodVal);
       break;
     }
@@ -4316,15 +4344,17 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
   auto loc = uncurriedLoc.getValue();
   auto subs = callee.getSubstitutions();
   auto upcastedSelf = uncurriedArgs.back();
-  auto upcastedSelfValue = upcastedSelf.getValue();
-  auto self = getOriginalSelfValue(upcastedSelfValue);
+  SILValue castValue, borrowedValue;
+  std::tie(castValue, borrowedValue) = castToOriginalSelfType(SGF.B, loc, upcastedSelf.getValue());
   auto constantInfo = SGF.getConstantInfo(callee.getMethodName());
   auto functionTy = constantInfo.getSILType();
   SILValue superMethodVal =
-      SGF.B.createSuperMethod(loc, self, constant, functionTy,
+      SGF.B.createSuperMethod(loc, castValue, constant, functionTy,
                               /*volatile*/
                               constant.isForeign);
-
+  if (borrowedValue) {
+    SGF.B.createEndBorrow(loc, borrowedValue, upcastedSelf.getValue());
+  }
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
       constantInfo.getSILType(), 1, SGF.B.getModule(), subs,
       ParameterConvention::Direct_Owned);
