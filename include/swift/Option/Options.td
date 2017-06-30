@@ -646,6 +646,18 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
 
+def index_file : Flag<["-"], "index-file">,
+  HelpText<"Produce index data for a source file">, ModeOpt,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def index_file_path : Separate<["-"], "index-file-path">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Produce index data for file <path>">,
+  MetaVarName<"<path>">;
+
+def index_store_path : Separate<["-"], "index-store-path">,
+  Flags<[FrontendOption]>, MetaVarName<"<path>">,
+  HelpText<"Store indexing data to <path>">;
+
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
   Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,
   HelpText<"Enforce law of exclusivity">;

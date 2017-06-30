@@ -132,6 +132,12 @@ public:
   /// The path to collect the group information for the compiled source files.
   std::string GroupInfoPath;
 
+  /// The path to which we should store indexing data, if any.
+  std::string IndexStorePath;
+
+  /// Emit index data for imported serialized swift system modules.
+  bool IndexSystemModules = false;
+
   /// If non-zero, warn when a function body takes longer than this many
   /// milliseconds to type-check.
   ///
