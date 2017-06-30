@@ -479,7 +479,7 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               MaybeLoadInitExpr->getType(), TypeCheckDC);

@@ -2682,7 +2682,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isObjC, isStatic, isLet, hasNonPatternBindingInit;
+    bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
+    unsigned specifier;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
@@ -2690,7 +2691,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ArrayRef<uint64_t> dependencyIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
-                                       isImplicit, isObjC, isStatic, isLet,
+                                       isImplicit, isObjC, isStatic, specifier,
                                        hasNonPatternBindingInit, storageKind,
                                        interfaceTypeID,
                                        getterID, setterID, materializeForSetID,
@@ -2719,7 +2720,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto var = createDecl<VarDecl>(/*IsStatic*/isStatic, /*IsLet*/isLet,
+    auto var = createDecl<VarDecl>(/*IsStatic*/isStatic,
+                                   (VarDecl::Specifier)specifier,
                                    /*IsCaptureList*/false, SourceLoc(), name,
                                    Type(), DC);
     var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
@@ -2764,17 +2766,18 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::PARAM_DECL: {
     IdentifierID argNameID, paramNameID;
     DeclContextID contextID;
-    bool isLet;
+    unsigned specifier;
     TypeID interfaceTypeID;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
-                                         contextID, isLet, interfaceTypeID);
+                                         contextID, specifier, interfaceTypeID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto param = createDecl<ParamDecl>(isLet, SourceLoc(), SourceLoc(),
+    auto param = createDecl<ParamDecl>((VarDecl::Specifier)specifier,
+                                       SourceLoc(), SourceLoc(),
                                        getIdentifier(argNameID), SourceLoc(),
                                        getIdentifier(paramNameID), Type(), DC);
 

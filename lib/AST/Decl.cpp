@@ -4129,20 +4129,22 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
-ParamDecl::ParamDecl(bool isLet,
+ParamDecl::ParamDecl(Specifier specifier,
                      SourceLoc specifierLoc, SourceLoc argumentNameLoc,
                      Identifier argumentName, SourceLoc parameterNameLoc,
                      Identifier parameterName, Type ty, DeclContext *dc)
-  : VarDecl(DeclKind::Param, /*IsStatic*/false, /*IsLet*/isLet,
+  : VarDecl(DeclKind::Param, /*IsStatic*/false, specifier,
             /*IsCaptureList*/false, parameterNameLoc, parameterName, ty, dc),
   ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
   SpecifierLoc(specifierLoc) {
+    assert(specifier != Specifier::Var &&
+           "'var' cannot appear on parameters; you meant 'inout'");
 }
 
 /// Clone constructor, allocates a new ParamDecl identical to the first.
 /// Intentionally not defined as a copy constructor to avoid accidental copies.
 ParamDecl::ParamDecl(ParamDecl *PD)
-  : VarDecl(DeclKind::Param, /*IsStatic*/false, /*IsLet*/PD->isLet(),
+  : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getSpecifier(),
             /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
             PD->hasType() ? PD->getType() : Type(), PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
@@ -4188,7 +4190,7 @@ Type DeclContext::getSelfInterfaceType() const {
 /// generic parameters.
 ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC) {
   ASTContext &C = DC->getASTContext();
-  auto *selfDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(), SourceLoc(),
+  auto *selfDecl = new (C) ParamDecl(VarDecl::Specifier::None, SourceLoc(), SourceLoc(),
                                      Identifier(), loc, C.Id_self, Type(), DC);
   selfDecl->setImplicit();
   return selfDecl;
@@ -4208,6 +4210,7 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   ASTContext &C = DC->getASTContext();
   auto selfType = DC->getSelfTypeInContext();
   auto selfInterfaceType = DC->getSelfInterfaceType();
+  auto specifier = VarDecl::Specifier::None;
   assert(selfType && selfInterfaceType);
 
   if (isStaticMethod) {
@@ -4218,9 +4221,10 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   if (isInOut) {
     selfType = InOutType::get(selfType);
     selfInterfaceType = InOutType::get(selfInterfaceType);
+    specifier = VarDecl::Specifier::InOut;
   }
 
-  auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),SourceLoc(),
+  auto *selfDecl = new (C) ParamDecl(specifier, SourceLoc(),SourceLoc(),
                                      Identifier(), loc, C.Id_self, selfType,DC);
   selfDecl->setImplicit();
   selfDecl->setInterfaceType(selfInterfaceType);

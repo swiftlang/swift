@@ -664,7 +664,7 @@ public:
         name = "$"+np->getBoundName().str().str();
       name += "$generator";
       generator = new (TC.Context)
-        VarDecl(/*IsStatic*/false, /*IsLet*/false, /*IsCaptureList*/false,
+        VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
                 S->getInLoc(), TC.Context.getIdentifier(name), generatorTy, DC);
       generator->setInterfaceType(DC->mapTypeOutOfContext(generatorTy));
       generator->setImplicit();

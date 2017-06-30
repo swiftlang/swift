@@ -34,7 +34,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
   Type metatype = ctor->getInterfaceType()->castTo<AnyFunctionType>()->getInput();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = gen.getASTContext();
-  auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(VarDecl::Specifier::None, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$metatype"), SourceLoc(),
                                AC.getIdentifier("$metatype"), Type(),
                                DC);
@@ -61,7 +61,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
     return tuple;
   } else {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(VarDecl::Specifier::None, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$implicit_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$implicit_value"), Type(),
@@ -88,7 +88,8 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   SILValue resultSlot;
   if (selfTy.isAddressOnly(gen.SGM.M) && gen.silConv.useLoweredAddresses()) {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+                                 SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"), Type(),
@@ -369,7 +370,8 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   std::unique_ptr<Initialization> dest;
   if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+                                 SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"), Type(),

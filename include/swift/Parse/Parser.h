@@ -979,12 +979,9 @@ public:
 
     /// The location of the 'inout' keyword, if present.
     SourceLoc SpecifierLoc;
-
-    enum SpecifierKindTy {
-      None,
-      InOut
-    };
-    SpecifierKindTy SpecifierKind = None; // Defaults to 'no value'.
+    
+    /// The parsed specifier kind, if present.
+    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::None;
 
     /// The location of the first name.
     ///
@@ -1096,7 +1093,8 @@ public:
                                                        bool isExprBasic);
   
 
-  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
+  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name,
+                                    VarDecl::Specifier specifier);
   
 
   /// \brief Determine whether this token can only start a matching pattern
