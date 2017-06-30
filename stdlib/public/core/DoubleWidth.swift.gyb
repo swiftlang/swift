@@ -176,9 +176,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       }
 
       // TODO: move to Int128 just like init(_builtinIntegerLiteral:) ?
-      return (n < _storage.low.countRepresentedWords) ?
+      return (n < _storage.low._countRepresentedWords) ?
         _storage.low._word(at: n) :
-        _storage.high._word(at: n - _storage.low.countRepresentedWords)
+        _storage.high._word(at: n - _storage.low._countRepresentedWords)
     }
   }
 
