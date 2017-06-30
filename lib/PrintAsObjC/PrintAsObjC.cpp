@@ -1719,7 +1719,7 @@ private:
     os << ")(";
     Type paramsTy = FT->getInput();
     if (auto tupleTy = paramsTy->getAs<TupleType>()) {
-      if (tupleTy->getNumElements() == 0) {
+      if (FT->getParams().empty()) {
         os << "void";
       } else {
         interleave(tupleTy->getElements(),
