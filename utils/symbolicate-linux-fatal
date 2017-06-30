@@ -79,6 +79,45 @@ lldb_target = None
 known_memmap = {}
 
 
+def check_base_address(dynlib_path, dynlib_baseaddr, memmap):
+    global known_memmap
+    if dynlib_path in memmap or dynlib_path in known_memmap:
+        if dynlib_path in memmap:
+            existing_baseaddr = memmap[dynlib_path]
+        else:
+            existing_baseaddr = known_memmap[dynlib_path]
+        if existing_baseaddr != dynlib_baseaddr:
+            error_msg = "Mismatched base address for: {0:s}, " \
+                        "had: {1:x}, now got {2:x}"
+            error_msg = error_msg.format(
+                dynlib_path, existing_baseaddr, dynlib_baseaddr)
+            raise Exception(error_msg)
+
+
+def symbolicate_one(frame_addr, frame_idx, dynlib_fname):
+    global lldb_target
+    so_addr = lldb_target.ResolveLoadAddress(frame_addr - 1)
+    sym_ctx = so_addr.GetSymbolContext(lldb.eSymbolContextEverything)
+    frame_fragment = "{0: <4d} {1:20s} 0x{2:016x}".format(
+        frame_idx, dynlib_fname, frame_addr)
+    symbol = sym_ctx.GetSymbol()
+    if not symbol.IsValid():
+        raise Exception("symbol isn't valid")
+
+    symbol_base = symbol.GetStartAddress().GetLoadAddress(lldb_target)
+    symbol_fragment = "{0:s} + {1:d}".format(
+        symbol.GetName(), frame_addr - symbol_base)
+    line_entry = sym_ctx.GetLineEntry()
+    if line_entry.IsValid():
+        line_fragment = "at {0:s}:{1:d}".format(
+            line_entry.GetFileSpec().GetFilename(), line_entry.GetLine())
+    else:
+        line_fragment = ""
+
+    return "{0:s}    {1:s} {2:s}".format(
+           frame_fragment, symbol_fragment, line_fragment)
+
+
 def process_stack(binary, dyn_libs, stack):
     global lldb_target
     global known_memmap
@@ -96,26 +135,20 @@ def process_stack(binary, dyn_libs, stack):
         else:
             dynlib_path = None
 
-        if "<unavailable>" in stack_tokens[3]:
+        try:
             framePC = int(stack_tokens[2], 16)
             symbol_offset = int(stack_tokens[-1], 10)
+        except:
+            full_stack.append({"line": line, "framePC": 0, "dynlib_fname": ""})
+            continue
+
+        if "<unavailable>" in stack_tokens[3]:
             dynlib_baseaddr = framePC - symbol_offset
-            if dynlib_path in memmap or dynlib_path in known_memmap:
-                if dynlib_path in memmap:
-                    existing_baseaddr = memmap[dynlib_path]
-                else:
-                    existing_baseaddr = known_memmap[dynlib_path]
-                if existing_baseaddr != dynlib_baseaddr:
-                    error_msg = "Mismatched base address for: {0:s}, " \
-                                "had: {1:x}, now got {2:x}"
-                    error_msg = error_msg.format(
-                        dynlib_path, existing_baseaddr, dynlib_baseaddr)
-                    raise Exception(error_msg)
-            else:
-                known_memmap[dynlib_path] = dynlib_baseaddr
-                memmap[dynlib_path] = dynlib_baseaddr
+            check_base_address(dynlib_path, dynlib_baseaddr, memmap)
+            known_memmap[dynlib_path] = dynlib_baseaddr
+            memmap[dynlib_path] = dynlib_baseaddr
         else:
-            framePC = int(stack_tokens[2], 16) + int(stack_tokens[-1], 10)
+            framePC = framePC + symbol_offset
         full_stack.append(
             {"line": line, "framePC": framePC, "dynlib_fname": dynlib_fname})
 
@@ -125,32 +158,13 @@ def process_stack(binary, dyn_libs, stack):
         add_lldb_target_modules(lldb_target, memmap)
     frame_idx = 0
     for frame in full_stack:
-        use_orig_line = True
         frame_addr = frame["framePC"]
         dynlib_fname = frame["dynlib_fname"]
-        so_addr = lldb_target.ResolveLoadAddress(frame_addr - 1)
-        sym_ctx = so_addr.GetSymbolContext(lldb.eSymbolContextEverything)
-        frame_fragment = "{0: <4d} {1:20s} 0x{2:016x}".format(
-            frame_idx, dynlib_fname, frame_addr)
-        symbol = sym_ctx.GetSymbol()
-        if symbol.IsValid():
-            symbol_base = symbol.GetStartAddress().GetLoadAddress(lldb_target)
-            symbol_fragment = "{0:s} + {1:d}".format(
-                symbol.GetName(), frame_addr - symbol_base)
-            use_orig_line = False
-        else:
-            symbol_fragment = "<unavailable>"
-        line_entry = sym_ctx.GetLineEntry()
-        if line_entry.IsValid():
-            line_fragment = "at {0:s}:{1:d}".format(
-                line_entry.GetFileSpec().GetFilename(), line_entry.GetLine())
-        else:
-            line_fragment = ""
-        if use_orig_line:
+        try:
+            sym_line = symbolicate_one(frame_addr, frame_idx, dynlib_fname)
+            print(sym_line)
+        except:
             print(frame["line"].rstrip())
-        else:
-            print("{0:s}    {1:s} {2:s}".format(
-                frame_fragment, symbol_fragment, line_fragment))
         frame_idx = frame_idx + 1
 
 
