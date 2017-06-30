@@ -694,7 +694,7 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
 
   // Determine the input and result types of this function.
   auto fnType = this->castTo<AnyFunctionType>();
-  Type inputType = fnType->getInput();
+  auto inputType = fnType->getParams();
   Type resultType =
     fnType->getResult()->replaceCovariantResultType(newResultType,
                                                     uncurryLevel - 1);

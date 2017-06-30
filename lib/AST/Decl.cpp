@@ -1681,7 +1681,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
         if (auto funcTy = signature.InterfaceType->getAs<AnyFunctionType>()) {
           signature.InterfaceType
             = GenericFunctionType::get(genericSig,
-                                       funcTy->getInput(),
+                                       funcTy->getParams(),
                                        funcTy->getResult(),
                                        funcTy->getExtInfo())
                 ->getCanonicalType();
@@ -3021,9 +3021,8 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   // Tuples preserve variance.
   if (auto tuple = type->getAs<TupleType>()) {
     auto kind = SelfReferenceKind::None();
-    for (auto &elt: tuple->getElements()) {
-      kind |= findProtocolSelfReferences(proto, elt.getType(),
-                                         skipAssocTypes);
+    for (auto &elt : tuple->getElements()) {
+      kind |= findProtocolSelfReferences(proto, elt.getType(), skipAssocTypes);
     }
     return kind;
   } 
@@ -3031,8 +3030,11 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   // Function preserve variance in the result type, and flip variance in
   // the parameter type.
   if (auto funcTy = type->getAs<AnyFunctionType>()) {
-    auto inputKind = findProtocolSelfReferences(proto, funcTy->getInput(),
-                                                skipAssocTypes);
+    auto inputKind = SelfReferenceKind::None();
+    for (auto &elt : funcTy->getParams()) {
+      inputKind |= findProtocolSelfReferences(proto, elt.getType(),
+                                              skipAssocTypes);
+    }
     auto resultKind = findProtocolSelfReferences(proto, funcTy->getResult(),
                                                  skipAssocTypes);
 
