@@ -1581,12 +1581,7 @@ public:
   ///
   /// \param genericParams The set of generic parameters to use in the resulting
   /// dependent type.
-  ///
-  /// \param allowUnresolved If true, allow the result to contain
-  /// \c DependentMemberType types with a name but no specific associated
-  /// type.
-  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams,
-                        bool allowUnresolved);
+  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams);
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
