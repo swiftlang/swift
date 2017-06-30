@@ -824,7 +824,10 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Illegal convention for callee");
   case ParameterConvention::Direct_Unowned:
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+    if (isAddressOrTrivialType())
+      return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+    // We accept unowned, owned, and guaranteed in unowned positions.
+    return {true, false};
   case ParameterConvention::Direct_Owned:
     return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
   case ParameterConvention::Direct_Guaranteed:
