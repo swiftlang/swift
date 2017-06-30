@@ -817,6 +817,8 @@ llvm::AttributeSet IRGenModule::constructInitialAttributes() {
   std::vector<std::string> &Features = ClangOpts.Features;
   if (!Features.empty()) {
     SmallString<64> allFeatures;
+    // Sort so that the target features string is canonical.
+    std::sort(Features.begin(), Features.end());
     interleave(Features, [&](const std::string &s) {
       allFeatures.append(s);
     }, [&]{
