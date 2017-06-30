@@ -421,7 +421,6 @@ func makeKeyPathInGenericContext<T>(of: T.Type)
 
 keyPath.test("computed generic key paths") {
   let path = makeKeyPathInGenericContext(of: LifetimeTracked.self)
-
   let z = LifetimeTracked(456)
   let c = C(x: 42, y: LifetimeTracked(123), z: z)
 
@@ -439,9 +438,10 @@ keyPath.test("computed generic key paths") {
 
   let pathNonGeneric = \C<LifetimeTracked>.computed
   expectEqual(path, pathNonGeneric)
-  expectEqual(path.hashValue, path2.hashValue)
+  expectEqual(path.hashValue, pathNonGeneric.hashValue)
 
   let valuePath = path.appending(path: \LifetimeTracked.value)
+
   expectEqual(c[keyPath: valuePath], 789)
 
   let valuePathNonGeneric = pathNonGeneric.appending(path: \LifetimeTracked.value)

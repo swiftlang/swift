@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // -- Convert <i32 0x...> constants to decimal constants that LLVM will print
 // RUN: %utils/chex.py < %s > %t/keypaths.sil
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/keypaths.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/keypaths.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-os
 
 sil_stage canonical
 import Swift
@@ -293,3 +293,14 @@ entry:
 // CHECK:   [[BUF:%.*]] = bitcast i8* %0
 // CHECK:   [[A:%.*]] = load %swift.type*, %swift.type** [[BUF]]
 // CHECK:   ret %swift.type* [[A]]
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @computed_property_generics
+sil @computed_property_generics : $@convention(thin) <T, U> () -> () {
+entry:
+  %n = keypath $WritableKeyPath<T, U>, <UUU, TTT> (root $TTT; settable_property $UUU, id @n_get : $@convention(thin) <UU, TT> (@in TT) -> @out UU, getter @n_get : $@convention(thin) <UU, TT> (@in TT) -> @out UU, setter @n_set : $@convention(thin) <UU, TT> (@in UU, @in TT) -> ()) <U, T>
+
+  return undef : $()
+}
+
+sil @n_get : $@convention(thin) <UU, TT> (@in TT) -> @out UU
+sil @n_set : $@convention(thin) <UU, TT> (@in UU, @in TT) -> ()
