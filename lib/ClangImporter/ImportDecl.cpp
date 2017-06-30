@@ -1434,7 +1434,7 @@ static Type getGenericMethodType(DeclContext *dc, AnyFunctionType *fnType) {
     return fnType;
 
   Type interfaceType = GenericFunctionType::get(
-      sig, fnType->getInput(), fnType->getResult(), AnyFunctionType::ExtInfo());
+      sig, fnType->getParams(), fnType->getResult(), AnyFunctionType::ExtInfo());
 
   return interfaceType;
 }
@@ -1552,9 +1552,7 @@ static std::pair<Type, ParamDecl *> decomposeSubscriptSetter(FuncDecl *setter) {
                          ->castTo<AnyFunctionType>()
                          ->getResult()
                          ->castTo<AnyFunctionType>()
-                         ->getInput()
-                         ->castTo<TupleType>()
-                         ->getElementType(0);
+                         ->getParams().front().getType();
   ParamDecl *keyDecl = PL->get(1);
 
   return {elementType, keyDecl};

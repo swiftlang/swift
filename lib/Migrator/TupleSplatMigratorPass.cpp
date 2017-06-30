@@ -88,13 +88,7 @@ struct TupleSplatMigratorPass : public ASTMigratorPass,
 
     FunctionType *FuncTy = FC->getType()->getAs<FunctionType>();
 
-    unsigned NativeArity = 0;
-    if (isa<ParenType>(FuncTy->getInput().getPointer())) {
-      NativeArity = 1;
-    } else if (auto TT = FuncTy->getInput()->getAs<TupleType>()) {
-      NativeArity = TT->getNumElements();
-    }
-
+    unsigned NativeArity = FuncTy->getParams().size();
     unsigned ClosureArity = Closure->getParameters()->size();
     if (NativeArity <= ClosureArity)
       return false;
@@ -149,10 +143,10 @@ struct TupleSplatMigratorPass : public ASTMigratorPass,
       auto fnTy = E->getFn()->getType()->getAs<FunctionType>();
       if (!fnTy)
         return false;
-      auto parenT = dyn_cast<ParenType>(fnTy->getInput().getPointer());
-      if (!parenT)
+      if (!(fnTy->getParams().size() == 1 &&
+            fnTy->getParams().front().getLabel().empty()))
         return false;
-      auto inp = dyn_cast<TupleType>(parenT->getUnderlyingType().getPointer());
+      auto inp = fnTy->getParams().front().getType()->getAs<TupleType>();
       if (!inp)
         return false;
       if (inp->getNumElements() != 0)
