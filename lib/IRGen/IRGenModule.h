@@ -740,10 +740,7 @@ private:
   SmallVector<llvm::WeakTrackingVH, 4> LLVMCompilerUsed;
 
   /// Metadata nodes for autolinking info.
-  ///
-  /// This is typed using llvm::Value instead of llvm::MDNode because it
-  /// needs to be used to produce another MDNode during finalization.
-  SmallVector<llvm::Metadata *, 32> AutolinkEntries;
+  SmallVector<llvm::MDNode *, 32> AutolinkEntries;
 
   /// List of Objective-C classes, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCClasses;

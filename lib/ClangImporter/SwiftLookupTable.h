@@ -39,6 +39,7 @@ namespace clang {
 class NamedDecl;
 class DeclContext;
 class MacroInfo;
+class ModuleMacro;
 class ObjCCategoryDecl;
 class TypedefNameDecl;
 }
@@ -204,7 +205,8 @@ public:
   static bool contextRequiresName(ContextKind kind);
 
   /// A single entry referencing either a named declaration or a macro.
-  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *>
+  typedef llvm::PointerUnion3<clang::NamedDecl *, clang::MacroInfo *, 
+                              clang::ModuleMacro *>
     SingleEntry;
 
   /// A stored version of the context of an entity, which is Clang
@@ -224,50 +226,51 @@ public:
     /// The low bit indicates whether we have a declaration or macro
     /// (declaration = unset, macro = set) and the second lowest bit
     /// indicates whether we have a serialization ID (set = DeclID or
-    /// MacroID, as appropriate) vs. a pointer (unset,
-    /// clang::NamedDecl * or clang::MacroInfo *). In the ID case, the
-    /// upper N-2 bits are the ID value; in the pointer case, the
-    /// lower two bits will always be clear due to the alignment of
+    /// {IdentifierID,SubmoduleID}, as appropriate) vs. a pointer (unset,
+    /// clang::NamedDecl *, clang::MacroInfo *, clang::ModuleMacro *).
+    /// In the ID case, the upper N-2 bits are the ID value; in the pointer
+    /// case, the lower two bits will always be clear due to the alignment of
     /// the Clang pointers.
-    llvm::SmallVector<uintptr_t, 2> DeclsOrMacros;
+    llvm::SmallVector<uint64_t, 2> DeclsOrMacros;
   };
 
   /// Whether the given entry is a macro entry.
-  static bool isMacroEntry(uintptr_t entry) { return entry & 0x01; }
+  static bool isMacroEntry(uint64_t entry) { return entry & 0x01; }
 
   /// Whether the given entry is a declaration entry.
-  static bool isDeclEntry(uintptr_t entry) { return !isMacroEntry(entry); }
+  static bool isDeclEntry(uint64_t entry) { return !isMacroEntry(entry); }
 
   /// Whether the given entry is a serialization ID.
-  static bool isSerializationIDEntry(uintptr_t entry) { return (entry & 0x02); }
+  static bool isSerializationIDEntry(uint64_t entry) { return (entry & 0x02); }
 
   /// Whether the given entry is an AST node.
-  static bool isASTNodeEntry(uintptr_t entry) {
+  static bool isASTNodeEntry(uint64_t entry) {
     return !isSerializationIDEntry(entry);
   }
 
-  /// Retrieve the serialization ID for an entry.
-  static uint32_t getSerializationID(uintptr_t entry) {
-    assert(isSerializationIDEntry(entry) && "Not a serialization entry");
-    return entry >> 2;
-  }
-
   /// Retrieve the pointer for an entry.
-  static void *getPointerFromEntry(uintptr_t entry) {
+  static void *getPointerFromEntry(uint64_t entry) {
     assert(isASTNodeEntry(entry) && "Not an AST node entry");
-    const uintptr_t mask = ~static_cast<uintptr_t>(0x03);
+    const uint64_t mask = ~static_cast<uint64_t>(0x03);
     return reinterpret_cast<void *>(entry & mask);
   }
 
   /// Encode a Clang named declaration as an entry in the table.
-  static uintptr_t encodeEntry(clang::NamedDecl *decl) {
+  static uint64_t encodeEntry(clang::NamedDecl *decl) {
     auto bits = reinterpret_cast<uintptr_t>(decl);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits;
   }
 
   // Encode a Clang macro as an entry in the table.
-  static uintptr_t encodeEntry(clang::MacroInfo *macro) {
+  static uint64_t encodeEntry(clang::MacroInfo *macro) {
+    auto bits = reinterpret_cast<uintptr_t>(macro);
+    assert((bits & 0x03) == 0 && "low bits set?");
+    return bits | 0x01;
+  }
+
+  // Encode a Clang macro as an entry in the table.
+  static uint64_t encodeEntry(clang::ModuleMacro *macro) {
     auto bits = reinterpret_cast<uintptr_t>(macro);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits | 0x01;
@@ -286,7 +289,7 @@ private:
   ///
   /// The values use the same representation as
   /// FullTableEntry::DeclsOrMacros.
-  llvm::DenseMap<StoredContext, SmallVector<uintptr_t, 2>> GlobalsAsMembers;
+  llvm::DenseMap<StoredContext, SmallVector<uint64_t, 2>> GlobalsAsMembers;
 
   /// The reader responsible for lazily loading the contents of this table.
   SwiftLookupTableReader *Reader;
@@ -307,20 +310,20 @@ private:
   /// present.
   ///
   /// \returns true if the entry was added, false otherwise.
-  bool addLocalEntry(SingleEntry newEntry, SmallVectorImpl<uintptr_t> &entries,
+  bool addLocalEntry(SingleEntry newEntry, SmallVectorImpl<uint64_t> &entries,
                      const clang::Preprocessor *PP);
 
 public:
   explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
 
   /// Maps a stored declaration entry to an actual Clang declaration.
-  clang::NamedDecl *mapStoredDecl(uintptr_t &entry);
+  clang::NamedDecl *mapStoredDecl(uint64_t &entry);
 
   /// Maps a stored macro entry to an actual Clang macro.
-  clang::MacroInfo *mapStoredMacro(uintptr_t &entry);
+  SingleEntry mapStoredMacro(uint64_t &entry, bool assumeModule = false);
 
   /// Maps a stored entry to an actual Clang AST node.
-  SingleEntry mapStored(uintptr_t &entry);
+  SingleEntry mapStored(uint64_t &entry, bool assumeModule = false);
 
   /// Translate a Clang DeclContext into a context kind and name.
   static llvm::Optional<StoredContext> translateDeclContext(
