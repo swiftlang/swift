@@ -1960,13 +1960,9 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     }
 
     case ArchetypeResolutionKind::AlreadyKnown:
-      break;
+        return nullptr;
     }
   }
-
-  // If we still don't have a result potential archetype, we're done.
-  if (!resultPA)
-    return nullptr;
 
   // If we have a potential archetype that requires more processing, do so now.
   if (shouldUpdatePA) {

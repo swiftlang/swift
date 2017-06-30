@@ -132,9 +132,10 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   assert(basePA && "Missing potential archetype for base");
 
   // Retrieve the potential archetype for the nested type.
-  auto nestedPA = basePA->getNestedType(ref->getIdentifier(),
-                                        ArchetypeResolutionKind::WellFormed,
-                                        Builder);
+  auto nestedPA =
+    basePA->getNestedType(ref->getIdentifier(),
+                          ArchetypeResolutionKind::CompleteWellFormed,
+                          Builder);
 
   // If there was no such nested type, produce an error.
   if (!nestedPA) {

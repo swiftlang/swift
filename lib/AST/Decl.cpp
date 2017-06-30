@@ -3292,8 +3292,7 @@ void ProtocolDecl::computeRequirementSignature() {
                                   LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
   auto selfPA =
-      builder.resolveArchetype(selfType,
-                               ArchetypeResolutionKind::CompleteWellFormed);
+      builder.resolveArchetype(selfType, ArchetypeResolutionKind::WellFormed);
 
   builder.addRequirement(
          requirement,
