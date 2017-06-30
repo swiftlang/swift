@@ -283,8 +283,11 @@ extension Substring : _SwiftStringView {
     let wholeCore = _slice._base._core
     let subCore : _StringCore = wholeCore[
       startIndex._base._position..<endIndex._base._position]
-    // check that we haven't allocated a new buffer for the result
-    _sanityCheck(subCore._owner === wholeCore._owner)
+    // Check that we haven't allocated a new buffer for the result, if we have
+    // contiguous storage.
+    _sanityCheck(
+      subCore._owner === wholeCore._owner || !wholeCore.hasContiguousStorage)
+
     return String(subCore)
   }
 }
