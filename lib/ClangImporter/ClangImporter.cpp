@@ -46,6 +46,7 @@
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/Utils.h"
+#include "clang/Index/IndexingAction.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Lex/Preprocessor.h"
@@ -704,6 +705,11 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back(overrideResourceDir);
   }
 
+  if (!importerOpts.IndexStorePath.empty()) {
+    invocationArgStrs.push_back("-index-store-path");
+    invocationArgStrs.push_back(importerOpts.IndexStorePath);
+  }
+
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
@@ -1305,6 +1311,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().Inputs.push_back(
       clang::FrontendInputFile(headerPath, clang::InputKind::ObjC));
   invocation->getFrontendOpts().OutputFile = outputPCHPath;
+  invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
   clang::CompilerInstance emitInstance(
@@ -1318,8 +1325,15 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   emitInstance.createSourceManager(fileManager);
   emitInstance.setTarget(&Impl.Instance->getTarget());
 
-  clang::GeneratePCHAction action;
-  emitInstance.ExecuteAction(action);
+  std::unique_ptr<clang::FrontendAction> action;
+  action.reset(new clang::GeneratePCHAction());
+  if (!emitInstance.getFrontendOpts().IndexStorePath.empty()) {
+    action = clang::index::
+      createIndexDataRecordingAction(emitInstance.getFrontendOpts(),
+                                     std::move(action));
+  }
+  emitInstance.ExecuteAction(*action);
+
   if (emitInstance.getDiagnostics().hasErrorOccurred()) {
     Impl.SwiftContext.Diags.diagnose({},
                                      diag::bridging_header_pch_error,
@@ -1406,6 +1420,17 @@ ModuleDecl *ClangImporter::loadModule(
     auto importRAII = diagClient.handleImport(clangPath.front().first,
                                               importLoc);
 
+    std::string preservedIndexStorePathOption;
+    auto &clangFEOpts = Impl.Instance->getFrontendOpts();
+    if (!clangFEOpts.IndexStorePath.empty()) {
+      StringRef moduleName = path[0].first->getName();
+      // Ignore the SwiftShims module for the index data.
+      if (moduleName == Impl.SwiftContext.SwiftShimsModuleName.str()) {
+        preservedIndexStorePathOption = clangFEOpts.IndexStorePath;
+        clangFEOpts.IndexStorePath.clear();
+      }
+    }
+
     // FIXME: The source location here is completely bogus. It can't be
     // invalid, it can't be the same thing twice in a row, and it has to come
     // from an actual buffer, so we make a fake buffer and just use a counter.
@@ -1426,6 +1451,12 @@ ModuleDecl *ClangImporter::loadModule(
     clang::ModuleLoadResult result =
         Impl.Instance->loadModule(clangImportLoc, path, visibility,
                                   /*IsInclusionDirective=*/false);
+
+    if (!preservedIndexStorePathOption.empty()) {
+      // Restore the -index-store-path option.
+      clangFEOpts.IndexStorePath = preservedIndexStorePathOption;
+    }
+
     if (result && makeVisible)
       Impl.getClangPreprocessor().makeModuleVisible(result, clangImportLoc);
     return result;

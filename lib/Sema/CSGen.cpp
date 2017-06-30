@@ -696,8 +696,7 @@ namespace {
     auto fTy = VD->getInterfaceType()->getAs<AnyFunctionType>();
     assert(fTy && "attempting to count parameters of a non-function type");
     
-    auto inputTy = fTy->getInput();
-    size_t nOperands = getOperandCount(inputTy);
+    size_t nOperands = fTy->getParams().size();
     size_t nNoDefault = 0;
     
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
