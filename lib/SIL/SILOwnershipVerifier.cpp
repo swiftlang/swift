@@ -1884,21 +1884,29 @@ bool SILValueOwnershipChecker::checkDataflow() {
     });
   }
 
-  // Make sure that we do not have any lifetime ending uses left to visit. If we
-  // do, then these non lifetime ending uses must be outside of our "alive"
-  // blocks implying a use-after free.
+  // Make sure that we do not have any lifetime ending uses left to visit that
+  // are not transitively unreachable blocks. If we do, then these non lifetime
+  // ending uses must be outside of our "alive" blocks implying a use-after
+  // free.
   if (!BlocksWithNonLifetimeEndingUses.empty()) {
-    return handleError([&] {
-      llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
-                   << "Found use after free due to unvisited non lifetime "
-                      "ending uses?!\n"
-                   << "Value: " << *Value << "    Remaining Users:\n";
-      for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
-        llvm::errs() << "User:" << *Pair.second << "Block: bb"
-                     << Pair.first->getDebugID() << "\n";
+    for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
+      if (TUB.isUnreachable(Pair.first)) {
+        continue;
       }
-      llvm::errs() << "\n";
-    });
+
+      return handleError([&] {
+        llvm::errs() << "Function: '" << Value->getFunction()->getName()
+                     << "'\n"
+                     << "Found use after free due to unvisited non lifetime "
+                        "ending uses?!\n"
+                     << "Value: " << *Value << "    Remaining Users:\n";
+        for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
+          llvm::errs() << "User:" << *Pair.second << "Block: bb"
+                       << Pair.first->getDebugID() << "\n";
+        }
+        llvm::errs() << "\n";
+      });
+    }
   }
 
   return true;
