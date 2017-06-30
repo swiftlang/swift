@@ -3307,20 +3307,10 @@ void ProtocolDecl::computeRequirementSignature() {
 
   auto module = getParentModule();
 
-  auto genericSig = getGenericSignature();
-  // The signature should look like <Self where Self : ThisProtocol>, and we
-  // reuse the two parts of it because the parameter and the requirement are
-  // exactly what we need.
-  auto validSig = genericSig->getGenericParams().size() == 1 &&
-                  genericSig->getRequirements().size() == 1;
-  if (!validSig) {
-    // This doesn't look like a protocol we can handle, so some other error must
-    // have occurred (usually a protocol nested within another declaration)
-    return;
-  }
-
-  auto selfType = genericSig->getGenericParams()[0];
-  auto requirement = genericSig->getRequirements()[0];
+  auto selfType = getSelfInterfaceType()->castTo<GenericTypeParamType>();
+  auto requirement =
+    Requirement(RequirementKind::Conformance, selfType,
+                getDeclaredInterfaceType());
 
   GenericSignatureBuilder builder(getASTContext(),
                                   LookUpConformanceInModule(module));
@@ -3332,7 +3322,7 @@ void ProtocolDecl::computeRequirementSignature() {
   builder.addRequirement(
          requirement,
          GenericSignatureBuilder::RequirementSource
-          ::forRequirementSignature(selfPA, this),
+           ::forRequirementSignature(selfPA, this),
          nullptr);
   
   RequirementSignature = builder.computeGenericSignature(SourceLoc());
