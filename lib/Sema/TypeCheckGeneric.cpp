@@ -244,6 +244,9 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // Otherwise, the nested type comes from a concrete tpye. Substitute the
   // base type into it.
   auto concrete = ref->getBoundDecl();
+  TC.validateDeclForNameLookup(concrete);
+  if (!concrete->hasInterfaceType())
+    return ErrorType::get(TC.Context);
   if (baseTy->isTypeParameter()) {
     if (auto proto =
           concrete->getDeclContext()
