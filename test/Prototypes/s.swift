@@ -115,17 +115,16 @@ extension _Concat3 : Collection {
   }
 }
 
+internal var zero_Int4 : Builtin.Int4 {
+  return Builtin.trunc_Int32_Int4((0 as UInt32)._value)
+}
 extension String {
   internal enum _XContent {
     typealias _InlineStorage = (UInt64, UInt32, UInt16, UInt8)
     
     internal struct _Inline<CodeUnit : FixedWidthInteger> {
       var _storage: _InlineStorage
-#if arch(i386) || arch(arm)
-      var _count: Builtin.Int4 = Builtin.trunc_Int32_Int4(0._value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)      
-      var _count: Builtin.Int4 = Builtin.trunc_Int64_Int4(0._value)
-#endif
+      var _count: Builtin.Int4 = zero_Int4
     }
     
   case inline8(_Inline<UInt8>)
@@ -178,19 +177,12 @@ extension String._XContent._Inline {
 
   public var count : Int {
     get {
-#if arch(i386) || arch(arm)
-      return Int(Builtin.zext_Int4_Int32(_count))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)      
-      return Int(Builtin.zext_Int4_Int64(_count))
-#endif
+      return Int(extendingOrTruncating: UInt8(Builtin.zext_Int4_Int8(_count)))
     }
     
     set {
-#if arch(i386) || arch(arm)
-      _count = Builtin.trunc_Int32_Int4(newValue._value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)      
-      _count = Builtin.trunc_Int64_Int4(newValue._value)
-#endif
+      _count = Builtin.trunc_Int8_Int4(
+        Int8(extendingOrTruncating: newValue)._value)
     }
   }
   
