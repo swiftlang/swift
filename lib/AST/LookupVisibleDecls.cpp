@@ -798,6 +798,13 @@ public:
                         VD->getDeclContext()->isTypeContext());
     ModuleDecl *M = DC->getParentModule();
 
+    // Hack; we shouldn't be filtering at this level anyway.
+    if (!VD->hasInterfaceType()) {
+      FoundDecls[VD->getBaseName()].insert(VD);
+      DeclsToReport.insert(FoundDeclTy(VD, Reason));
+      return;
+    }
+
     auto FoundSignature = VD->getOverloadSignature();
     if (FoundSignature.InterfaceType && shouldSubst &&
         shouldSubstIntoDeclType(FoundSignature.InterfaceType)) {
@@ -809,7 +816,7 @@ public:
     for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
          I != E; ++I) {
       auto *OtherVD = *I;
-      if (OtherVD->isInvalid()) {
+      if (OtherVD->isInvalid() || !OtherVD->hasInterfaceType()) {
         // For some invalid decls it might be impossible to compute the
         // signature, for example, if the types could not be resolved.
         continue;
