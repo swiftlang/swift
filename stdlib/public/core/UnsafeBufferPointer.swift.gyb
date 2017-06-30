@@ -187,6 +187,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
   /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
   ///   initialized.
+  @inline(__always)
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
@@ -240,16 +241,18 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///   range `0..<count`.
   @_inlineable
   public subscript(i: Int) -> Element {
+    @inline(__always)
     get {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      return _position![i]
+      return _position.unsafelyUnwrapped[i]
     }
 %if Mutable:
+    @inline(__always)
     nonmutating set {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      _position![i] = newValue
+      _position.unsafelyUnwrapped[i] = newValue
     }
 %end
   }
@@ -371,11 +374,14 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_inlineable
   public var count: Int {
-    switch(_position, _end) {
-    case (.some(let pos), .some(let end)):
-      return (end - pos)
-    case _:
-      return 0
+    @inline(__always)
+    get {
+      switch(_position, _end) {
+      case (.some(let pos), .some(let end)):
+        return (end - pos)
+      case _:
+        return 0
+      }
     }
   }
 
