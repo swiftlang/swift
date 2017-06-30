@@ -12,7 +12,6 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
-// REQUIRES: radar_31897334
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -276,7 +275,10 @@ LazyTestSuite.test("EmptyCollection/${name}/Trap")
   .forEach(in: [-1 ..< -1, -1..<0, -1..<1, 0..<1, 1..<1] as [Range<Int>]) {
   r in
   var c = EmptyCollection<OpaqueValue<Int>>()
-  expectCrashLater()
+  // Access is guarded by a _debugPrecondition in EmptyCollection
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
   ${operation}
 }
 
@@ -296,7 +298,10 @@ LazyTestSuite.test("EmptyCollection/index(_:offsetBy:)/Trap")
   ]) {
   (i, offset) in
   let c = EmptyCollection<OpaqueValue<Int>>()
-  expectCrashLater()
+  // Access is guarded by a _debugPrecondition in EmptyCollection
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
   _ = c.index(i, offsetBy: offset)
 }
 
@@ -313,7 +318,10 @@ LazyTestSuite.test("EmptyCollection/index(_:offsetBy:limitedBy:)/Trap")
   ]) {
   (i, offset, limit) in
   let c = EmptyCollection<OpaqueValue<Int>>()
-  expectCrashLater()
+  // Access is guarded by a _debugPrecondition in EmptyCollection
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
   _ = c.index(i, offsetBy: offset, limitedBy: limit)
 }
 
@@ -340,7 +348,10 @@ LazyTestSuite.test("EmptyCollection/distance(from:to:)/Trap")
   ]) {
   (start, end) in
   let c = EmptyCollection<OpaqueValue<Int>>()
-  expectCrashLater()
+  // Access is guarded by a _debugPrecondition in EmptyCollection
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
   _ = c.distance(from: start, to: end)
 }
 
