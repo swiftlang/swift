@@ -1063,37 +1063,6 @@ bool FloatingRequirementSource::isRecursive(
       return true;
   }
 
-  // For a nested type match, look for another type with that name.
-  // FIXME: Actually, look for 5 of them. This is totally bogus.
-  if (kind == NestedTypeNameMatch) {
-    unsigned grossCount = 0;
-    auto pa = storage.dyn_cast<const RequirementSource *>()
-                ->getAffectedPotentialArchetype();
-    while (auto parent = pa->getParent()) {
-      if (pa->getNestedName() == nestedName) {
-        if (++grossCount > 4) {
-          ++NumRecursive;
-          return true;
-        }
-      }
-
-      pa = parent;
-    }
-
-    // Also check the root type.
-    grossCount = 0;
-    for (Type type = rootType;
-         auto depTy = type->getAs<DependentMemberType>();
-         type = depTy->getBase()) {
-      if (depTy->getName() == nestedName) {
-        if (++grossCount > 4) {
-          ++NumRecursive;
-          return true;
-        }
-      }
-    }
-  }
-
   return false;
 }
 
@@ -1960,13 +1929,9 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     }
 
     case ArchetypeResolutionKind::AlreadyKnown:
-      break;
+        return nullptr;
     }
   }
-
-  // If we still don't have a result potential archetype, we're done.
-  if (!resultPA)
-    return nullptr;
 
   // If we have a potential archetype that requires more processing, do so now.
   if (shouldUpdatePA) {
