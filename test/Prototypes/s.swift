@@ -1001,15 +1001,33 @@ let testers: [String] = [
 import Dispatch
 import Darwin
 
-func time<T>(_ _caller : String = #function, _ block: () -> T) -> T {
-  let start = DispatchTime.now()
-  let res = block()
-  let end = DispatchTime.now()
-  let milliseconds = (Double(end.uptimeNanoseconds) - Double(start.uptimeNanoseconds)) / 1_000_000.0
-  print("\(_caller),\(Int(milliseconds))")
+let testOld = CommandLine.arguments.count < 2
+  || CommandLine.arguments.dropFirst().contains("--old")
+let testNew = CommandLine.arguments.count < 2
+  || CommandLine.arguments.dropFirst().contains("--new")
+
+@discardableResult
+func time<T>(_ _caller : String = #function, _ block: () -> T) -> T? {
+  if !testOld && _caller.hasSuffix("_old()") { return nil }
+  if !testNew && _caller.hasSuffix("_new()") { return nil }
+  var tmin = Double.infinity
+  var tmax = 0.0, sum = 0.0
+  var res: T?
+  let reps = 3
+  for _ in 0..<reps {
+    let start = DispatchTime.now()
+    res = block()
+    let end = DispatchTime.now()
+    let milliseconds = (Double(end.uptimeNanoseconds) - Double(start.uptimeNanoseconds)) / 1_000_000.0
+    tmin = min(tmin, milliseconds)
+    sum += milliseconds
+    tmax = max(tmax, milliseconds)
+  }
+  var prefix = "\(_caller),\(String(repeating: " ", count: 50 - _caller.utf16.count))\(Int(tmin)),"
+  let spaces = String(repeating: " ", count: 60 - prefix.utf16.count)
+  print(prefix, spaces, "±\(Int((sum / Double(reps) - tmin) / 2))")
   return res
 }
-
 
 func testme2() {
   let cores
