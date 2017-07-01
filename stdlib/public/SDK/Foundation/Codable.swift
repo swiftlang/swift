@@ -29,7 +29,7 @@ internal extension DecodingError {
     /// - parameter expectation: The type expected to be encountered.
     /// - parameter reality: The value that was encountered instead of the expected type.
     /// - returns: A `DecodingError` with the appropriate path and debug description.
-    internal static func _typeMismatch(at path: [CodingKey?], expectation: Any.Type, reality: Any) -> DecodingError {
+    internal static func _typeMismatch(at path: [CodingKey], expectation: Any.Type, reality: Any) -> DecodingError {
         let description = "Expected to decode \(expectation) but found \(_typeDescription(of: reality)) instead."
         return .typeMismatch(expectation, Context(codingPath: path, debugDescription: description))
     }
