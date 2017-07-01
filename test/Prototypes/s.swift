@@ -762,7 +762,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
   where S.Element == Element {
     let knownMutable = _reserveCapacity(forAppending: s)
     
-    var source: S.Iterator
+    var source = s.makeIterator()
     defer { _fixLifetime(self) }
 
     switch _content {
@@ -770,7 +770,6 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       let buf = UnsafeMutableBufferPointer(
         start: x._baseAddress + x.count, count: x.capacity &- x.count)
       
-      source = s.makeIterator()
       for i in 0..<buf.count {
         guard let u = source.next() else { break }
         guard u <= 0xFF else {
@@ -790,7 +789,6 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       x.count += copiedCount
 
     case .inline8(var x):
-      source = s.makeIterator()
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
           let u = source.next()
@@ -805,7 +803,6 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       }
       
     case .inline16(var x):
-      source = s.makeIterator()
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
           let u = source.next()
@@ -817,8 +814,9 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
         }
       }
       
-    default:  source = s.makeIterator()
+    default:  break
     }
+    
     while let u = source.next() { append(u) }
   }
 
