@@ -304,7 +304,7 @@ extension String._XContent {
   ) -> UnsafeBufferPointer<UInt8>? {
     switch self {
     case .inline8(let x): return x.copiedToUnsafeBuffer(in: &scratch)
-    case .latin1(let x): return x.withUnsafeBufferPointer { return $0 }
+    case .latin1(let x): return x.withUnsafeBufferPointer { $0 }
     case .unowned8(let x): return x.unsafeBuffer
       /*
     case .nsString(let x):
@@ -321,7 +321,7 @@ extension String._XContent {
   ) -> UnsafeBufferPointer<UInt16>? {
     switch self {
     case .inline16(let x): return x.copiedToUnsafeBuffer(in: &scratch)
-    case .utf16(let x): return x.withUnsafeBufferPointer { return $0 }
+    case .utf16(let x): return x.withUnsafeBufferPointer { $0 }
     case .unowned16(let x): return x.unsafeBuffer
     case .nsString(let x):
       return x._fastCharacterContents().map {
