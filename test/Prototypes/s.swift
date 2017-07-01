@@ -1006,7 +1006,7 @@ func time<T>(_ _caller : String = #function, _ block: () -> T) -> T {
   let res = block()
   let end = DispatchTime.now()
   let milliseconds = (Double(end.uptimeNanoseconds) - Double(start.uptimeNanoseconds)) / 1_000_000.0
-  print("\(_caller),\(milliseconds)")        
+  print("\(_caller),\(Int(milliseconds))")
   return res
 }
 
@@ -1037,7 +1037,7 @@ func testme2() {
 
   var total = 0
   @inline(never)
-  func lex_new() {
+  func lexicographicalComparison_new() {
     time {
       for _ in 0...N {
         for a in contents {
@@ -1050,7 +1050,7 @@ func testme2() {
   }
 
   @inline(never)
-  func lex_old() {
+  func lexicographicalComparison_old() {
     time {
       for _ in 0...N {
         for a in cores {
@@ -1061,12 +1061,12 @@ func testme2() {
       }
     }
   }
-  lex_old()
-  lex_new()
+  lexicographicalComparison_old()
+  lexicographicalComparison_new()
   print()
   
   @inline(never)
-  func init_new() {
+  func initFromArray_new() {
     time {
       for _ in 0...10*N {
         for a in arrays {
@@ -1077,7 +1077,7 @@ func testme2() {
   }
   
   @inline(never)
-  func init_old() {
+  func initFromArray_old() {
     time {
       for _ in 0...10*N {
         for a in arrays {
@@ -1086,8 +1086,8 @@ func testme2() {
       }
     }
   }
-  init_old()
-  init_new()
+  initFromArray_old()
+  initFromArray_new()
   print()
   
   @inline(never)
@@ -1110,7 +1110,7 @@ func testme2() {
   let short8_new = short8_old.map { String._XContent.UTF16View($0) }
   
   @inline(never)
-  func  buildString_old() {
+  func  appendManyTinyASCIIFragments_ToASCII_old() {
     time {
       var sb = a_old
       for _ in 0...N*200 {
@@ -1121,10 +1121,10 @@ func testme2() {
       total = total &+ sb.count
     }
   }
-  buildString_old()
+  appendManyTinyASCIIFragments_ToASCII_old()
   
   @inline(never)
-  func  buildString_new() {
+  func  appendManyTinyASCIIFragments_ToASCII_new() {
     time {
       var sb = a_new
       for _ in 0...N*200 {
@@ -1135,14 +1135,14 @@ func testme2() {
       total = total &+ sb.count
     }
   }
-  buildString_new()
+  appendManyTinyASCIIFragments_ToASCII_new()
   print()
   
   let short16_old = ["🎉","c","d","pizza"].map { $0._core }
   let short16_new = short16_old.map { String._XContent.UTF16View($0) }
 
   @inline(never)
-  func  buildStringUTF16_old() {
+  func  appendManyTinyFragmentsOfBothWidths_old() {
     time {
       var sb = a_old
       for _ in 0...N*300 {
@@ -1153,10 +1153,10 @@ func testme2() {
       total = total &+ sb.count
     }
   }
-  buildStringUTF16_old()
+  appendManyTinyFragmentsOfBothWidths_old()
   
   @inline(never)
-  func  buildStringUTF16_new() {
+  func  appendManyTinyFragmentsOfBothWidths_new() {
     time {
       var sb = a_new
       for _ in 0...N*300 {
@@ -1167,7 +1167,7 @@ func testme2() {
       total = total &+ sb.count
     }
   }
-  buildStringUTF16_new()
+  appendManyTinyFragmentsOfBothWidths_new()
   print()
   
   let ghost_old = "👻"._core
@@ -1177,7 +1177,7 @@ func testme2() {
   let long_new = String._XContent.UTF16View(long_old)
   
   @inline(never)
-  func  buildStringLong_old() {
+  func appendManyLongASCII_ToUTF16_old() {
     time {
       var sb = ghost_old
       for _ in 0...N*20 {
@@ -1186,10 +1186,10 @@ func testme2() {
       total = total &+ sb.count
     }
   }
-  buildStringLong_old()
+  appendManyLongASCII_ToUTF16_old()
   
   @inline(never)
-  func  buildStringLong_new() {
+  func appendManyLongASCII_ToUTF16_new() {
     time {
       var sb = ghost_new
       for _ in 0...N*20 {
@@ -1198,11 +1198,11 @@ func testme2() {
       total = total &+ sb.count
     }
   }
-  buildStringLong_new()
+  appendManyLongASCII_ToUTF16_new()
   print()
   
   @inline(never)
-  func  buildShortString_old() {
+  func  appendFewTinyASCIIFragments_ToASCII_old() {
     time {
       for _ in 0...N*200 {
         var sb = a_old
@@ -1213,10 +1213,10 @@ func testme2() {
       }
     }
   }
-  buildShortString_old()
+  appendFewTinyASCIIFragments_ToASCII_old()
   
   @inline(never)
-  func  buildShortString_new() {
+  func  appendFewTinyASCIIFragments_ToASCII_new() {
     time {
       for _ in 0...N*200 {
         var sb = a_new
@@ -1227,11 +1227,11 @@ func testme2() {
       }
     }
   }
-  buildShortString_new()
+  appendFewTinyASCIIFragments_ToASCII_new()
   print()
   
   @inline(never)
-  func  buildShortStringUTF16_old() {
+  func  appendFewTinyFragmentsOfBothWidths_old() {
     time {
       for _ in 0...N*300 {
         var sb = a_old
@@ -1242,10 +1242,10 @@ func testme2() {
       }
     }
   }
-  buildShortStringUTF16_old()
+  appendFewTinyFragmentsOfBothWidths_old()
   
   @inline(never)
-  func  buildShortStringUTF16_new() {
+  func  appendFewTinyFragmentsOfBothWidths_new() {
     time {
       for _ in 0...N*300 {
         var sb = a_new
@@ -1256,11 +1256,11 @@ func testme2() {
       }
     }
   }
-  buildShortStringUTF16_new()
+  appendFewTinyFragmentsOfBothWidths_new()
   print()
   
   @inline(never)
-  func  buildShortStringLong_old() {
+  func  appendOneLongASCII_ToUTF16_old() {
     time {
       for _ in 0...N*20 {
         var sb = ghost_old
@@ -1269,10 +1269,10 @@ func testme2() {
       }
     }
   }
-  buildShortStringLong_old()
+  appendOneLongASCII_ToUTF16_old()
   
   @inline(never)
-  func  buildShortStringLong_new() {
+  func  appendOneLongASCII_ToUTF16_new() {
     time {
       for _ in 0...N*20 {
         var sb = ghost_new
@@ -1280,15 +1280,14 @@ func testme2() {
       }
     }
   }
-  buildShortStringLong_new()
+  appendOneLongASCII_ToUTF16_new()
   print()
   
   if total == 0 { print() }
 }
 
 let cat = _Concat3(5..<10, 15...20, (25...30).dropFirst())
-print(Array(cat))
-print(cat.indices.map { cat[$0] })
+assert(cat.elementsEqual(cat.indices.map { cat[$0] }))
 print(MemoryLayout<String._XContent>.size)
 assert(MemoryLayout<String._XContent>.size <= 16)
 testme2()
