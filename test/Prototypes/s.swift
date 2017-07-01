@@ -1021,7 +1021,7 @@ func testme2() {
     String._XContent.UTF16View(legacy: $0)
   }
 
-  var N = 10000
+  var N = 20000
   _sanityCheck({ N = 1; return true }()) // Reset N for debug builds
   
   for (x, y) in zip(cores, contents) {
