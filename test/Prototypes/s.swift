@@ -415,6 +415,41 @@ extension String._XContent.UTF16View : Sequence {
     }
 
     @inline(__always)
+    init(_ content: String._XContent, offset: Int) {
+      switch content {
+      case .inline16(let x):
+        _buffer = .inline16(x, UInt8(extendingOrTruncating: offset))
+      case .inline8(let x):
+        _buffer = .inline8(x, UInt8(extendingOrTruncating: offset))
+      case .utf16(let x):
+        _owner = x
+        _buffer = x.withUnsafeBufferPointer {
+          let s = $0.baseAddress._unsafelyUnwrappedUnchecked
+          return .deep16(s + offset, s + $0.count)
+        }
+      case .unowned16(let x):
+        _owner = nil
+        let b = x.unsafeBuffer
+        let s = b.baseAddress._unsafelyUnwrappedUnchecked
+        _buffer = _Buffer.deep16(s + offset, s + b.count)
+      case .unowned8(let x):
+        _owner = nil
+        let b = x.unsafeBuffer
+        let s = b.baseAddress._unsafelyUnwrappedUnchecked
+        _buffer = _Buffer.deep8(s + offset, s + b.count)
+      case .latin1(let x):
+        _owner = x
+        _buffer = x.withUnsafeBufferPointer {
+          let s = $0.baseAddress._unsafelyUnwrappedUnchecked
+          return .deep8(s + offset, s + $0.count)
+        }
+      case .nsString(let x):
+        _buffer = .nsString(offset)
+        _owner = x
+      }
+    }
+    
+    @inline(__always)
     mutating func next() -> UInt16? {
       switch _buffer {
       case .deep8(let start, let end):
@@ -448,6 +483,34 @@ extension String._XContent.UTF16View : Sequence {
   
   func makeIterator() -> Iterator {
     return Iterator(_content)
+  }
+
+  func _copyContents(
+    initializing destination: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    var scratch = String._XContent._scratch()
+    defer { _fixLifetime(scratch) }
+    
+    if let codeUnits = _content._existingUTF16(in: &scratch) {
+      let (_, n) = codeUnits._copyContents(initializing: destination)
+      return (Iterator(_content, offset: n), n)
+    }
+    else if let codeUnits = _content._existingLatin1(in: &scratch) {
+      let (_, n) = _MapCollection(
+        codeUnits, through: _TruncExt()
+      )._copyContents(initializing: destination)
+      return (Iterator(_content, offset: n), n)
+    }
+    else {
+      var source = makeIterator()
+      guard var p = destination.baseAddress else { return (source, 0) }
+      for n in 0..<destination.count {
+        guard let x = source.next() else { return (source, n) }
+        p.initialize(to: x)
+        p += 1
+      }
+      return (source, destination.count)
+    }
   }
 }
 
