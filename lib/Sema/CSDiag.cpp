@@ -9134,7 +9134,7 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
   
   auto decl = resolved.getDecl();
   if (auto FD = dyn_cast<FuncDecl>(decl)) {
-    auto name = FD->getName();
+    auto name = FD->getFullName();
     auto diagID = name.isOperator() ? diag::note_call_to_operator
                                     : diag::note_call_to_func;
     tc.diagnose(decl, diagID, name);

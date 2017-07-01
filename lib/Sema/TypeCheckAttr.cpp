@@ -1651,7 +1651,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   if (!genericSig) {
     // Only generic functions are permitted to have trailing where clauses.
     TC.diagnose(attr->getLocation(),
-                diag::specialize_attr_nongeneric_trailing_where, FD->getName())
+                diag::specialize_attr_nongeneric_trailing_where,
+                FD->getFullName())
         .highlight(trailingWhereClause->getSourceRange());
     return;
   }
@@ -1832,7 +1833,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   if (access < Accessibility::Public) {
     TC.diagnose(attr->getLocation(),
                 diag::fixed_layout_attr_on_internal_type,
-                VD->getBaseName(),
+                VD->getFullName(),
                 access)
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
@@ -1856,7 +1857,7 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
   if (VD->getFormalAccess() != Accessibility::Internal) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_attr_with_explicit_accessibility,
-                VD->getBaseName(),
+                VD->getFullName(),
                 VD->getFormalAccess())
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
