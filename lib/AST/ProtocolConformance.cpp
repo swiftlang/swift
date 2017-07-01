@@ -25,9 +25,14 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SaveAndRestore.h"
+
+#define DEBUG_TYPE "AST"
+
+STATISTIC(NumConformanceLookupTables, "# of conformance lookup tables built");
 
 using namespace swift;
 
@@ -917,6 +922,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
   auto resolver = ctx.getLazyResolver();
   ConformanceTable = new (ctx) ConformanceLookupTable(ctx, mutableThis,
                                                       resolver);
+  ++NumConformanceLookupTables;
 
   // If this type declaration was not parsed from source code or introduced
   // via the Clang importer, don't add any synthesized conformances.
