@@ -758,11 +758,11 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
     }
   }
   
-  mutating func append<S: Sequence>(contentsOf source_: S)
+  mutating func append<S: Sequence>(contentsOf s: S)
   where S.Element == Element {
-    let knownMutable = _reserveCapacity(forAppending: source_)
+    let knownMutable = _reserveCapacity(forAppending: s)
     
-    var source = IteratorSequence(source_.makeIterator())
+    var source: S.Iterator
     defer { _fixLifetime(self) }
 
     switch _content {
@@ -770,6 +770,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       let buf = UnsafeMutableBufferPointer(
         start: x._baseAddress + x.count, count: x.capacity &- x.count)
       
+      source = s.makeIterator()
       for i in 0..<buf.count {
         guard let u = source.next() else { break }
         guard u <= 0xFF else {
@@ -779,17 +780,17 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
         buf[i] = UInt8(extendingOrTruncating: u)
         x.count = x.count &+ 1
       }
-      
+
     case .utf16(let x) where knownMutable || _dynamicStorageIsMutable != false:
       let availableCapacity = UnsafeMutableBufferPointer(
         start: x._baseAddress + x.count, count: x.capacity &- x.count)
 
-      let (newSource, copiedCount) = source._copyContents(
-        initializing: availableCapacity)
+      var copiedCount = 0
+      (source, copiedCount) = s._copyContents(initializing: availableCapacity)
       x.count += copiedCount
-      source = newSource
-      
+
     case .inline8(var x):
+      source = s.makeIterator()
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
           let u = source.next()
@@ -804,6 +805,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       }
       
     case .inline16(var x):
+      source = s.makeIterator()
       x._withMutableCapacity { buf in
         for i in count..<buf.count {
           let u = source.next()
@@ -815,9 +817,9 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
         }
       }
       
-    default: break
+    default:  source = s.makeIterator()
     }
-    for u in source { append(u) }
+    while let u = source.next() { append(u) }
   }
 
   mutating func append(_ u: UInt16) {
