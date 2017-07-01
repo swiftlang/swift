@@ -185,7 +185,6 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
   /// - Returns: an iterator over any remaining elements of `self` and the
   ///   number of elements initialized.
-  @inline(__always)
   public func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
