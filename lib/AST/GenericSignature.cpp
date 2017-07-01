@@ -488,21 +488,25 @@ bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
     builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return false;
 
-  pa = pa->getRepresentative();
+  if (pa->isConcreteType()) return false;
 
   // If this type was mapped to a concrete type, then there is no
   // requirement.
+  pa = pa->getRepresentative();
+
   if (pa->isConcreteType()) return false;
 
   // If there is a layout constraint, it might be a class.
-  if (auto layout = pa->getLayout())
-    if (layout->isClass())
-      return true;
+  if (auto layout = pa->getLayout()) {
+    if (layout->isClass()) return true;
+  }
 
   // If there is a superclass bound, then obviously it must be a class.
+  // FIXME: We shouldn't need this?
   if (pa->getSuperclass()) return true;
 
   // If any of the protocols are class-bound, then it must be a class.
+  // FIXME: We shouldn't need this?
   for (auto proto : pa->getConformsTo()) {
     if (proto->requiresClass()) return true;
   }
@@ -518,8 +522,6 @@ Type GenericSignature::getSuperclassBound(Type type, ModuleDecl &mod) {
   auto pa =
     builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return nullptr;
-
-  pa = pa->getRepresentative();
 
   // If this type was mapped to a concrete type, then there is no
   // requirement.
@@ -539,8 +541,6 @@ SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
   auto pa =
     builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return { };
-
-  pa = pa->getRepresentative();
 
   // If this type was mapped to a concrete type, then there are no
   // requirements.
@@ -566,8 +566,6 @@ bool GenericSignature::conformsToProtocol(Type type, ProtocolDecl *proto,
   auto pa =
     builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return false;
-
-  pa = pa->getRepresentative();
 
   // FIXME: Deal with concrete conformances here?
   if (pa->isConcreteType()) return false;
@@ -596,9 +594,6 @@ Type GenericSignature::getConcreteType(Type type, ModuleDecl &mod) {
     builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return Type();
 
-  pa = pa->getRepresentative();
-  if (!pa->isConcreteType()) return Type();
-
   return pa->getConcreteType();
 }
 
@@ -611,7 +606,6 @@ LayoutConstraint GenericSignature::getLayoutConstraint(Type type,
     builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return LayoutConstraint();
 
-  pa = pa->getRepresentative();
   return pa->getLayout();
 }
 
@@ -882,7 +876,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       auto pa =
         inProtoSigBuilder.resolveArchetype(
                                  storedType,
-                                 ArchetypeResolutionKind::WellFormed);
+                                 ArchetypeResolutionKind::CompleteWellFormed);
       auto equivClass = pa->getOrCreateEquivalenceClass();
 
       // Find the conformance of this potential archetype to the protocol in
