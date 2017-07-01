@@ -2641,6 +2641,9 @@ static void checkBridgedFunctions(TypeChecker &TC) {
 
 /// Infer the Objective-C name for a given declaration.
 static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
+  if (isa<DestructorDecl>(decl))
+    return;
+
   // If this declaration overrides an @objc declaration, use its name.
   if (auto overridden = decl->getOverriddenDecl()) {
     if (overridden->isObjC()) {
