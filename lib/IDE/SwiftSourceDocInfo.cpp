@@ -108,14 +108,6 @@ bool SemaLocResolver::tryResolve(Stmt *St) {
   return false;
 }
 
-bool SemaLocResolver::tryResolve(Expr *Exp) {
-  if (!Exp->isImplicit() && Exp->getStartLoc() == LocToResolve) {
-    SemaTok = { Exp };
-    return true;
-  }
-  return false;
-}
-
 bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
@@ -193,6 +185,10 @@ bool SemaLocResolver::walkToExprPre(Expr *E) {
         ContainerType = ME->getBase()->getType();
       }
     }
+
+    // Keep track of trailing expressions.
+    if (!E->isImplicit() && E->getStartLoc() == LocToResolve)
+      TrailingExprStack.push_back(E);
   }
   return true;
 }
@@ -200,7 +196,12 @@ bool SemaLocResolver::walkToExprPre(Expr *E) {
 bool SemaLocResolver::walkToExprPost(Expr *E) {
   if (isDone())
     return false;
-  return !tryResolve(E);
+  if (!TrailingExprStack.empty() && TrailingExprStack.back() == E) {
+    // We return the outtermost expression in the token info.
+    SemaTok = { TrailingExprStack.front() };
+    return false;
+  }
+  return true;
 }
 
 bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,
