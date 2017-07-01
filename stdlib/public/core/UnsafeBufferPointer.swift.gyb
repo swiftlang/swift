@@ -180,27 +180,23 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return startIndex..<endIndex
   }
 
-  /// Copies `self` into the supplied buffer.
+  /// Initializes the memory at `destination.baseAddress` with elements of `self`,
+  /// stopping when either `self` or `destination` is exhausted.
   ///
-  /// - Precondition: The memory in `self` is uninitialized. The buffer must
-  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
-  ///
-  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
-  ///   initialized.
-  @inline(__always)
+  /// - Returns: an iterator over any remaining elements of `self` and the
+  ///   number of elements initialized.
   public func _copyContents(
-    initializing buffer: UnsafeMutableBufferPointer<Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
-    guard !isEmpty else { return (makeIterator(),buffer.startIndex) }
-
-    guard count <= buffer.count, let ptr = buffer.baseAddress else {
-      fatalError("Insufficient space allocated to copy buffer contents")      
+    initializing destination: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    var r = makeIterator(), n = 0
+    if let s = self._position, let d = destination._position {
+      n = Swift.min(
+        self._end._unsafelyUnwrappedUnchecked - s,
+        destination._end._unsafelyUnwrappedUnchecked - d)
+      d.initialize(from: s, count: n)
+      r._position = UnsafePointer(s) + n
     }
-  
-    ptr.initialize(from: baseAddress!, count: self.count)
-    var it: Iterator = self.makeIterator()
-    it._position = it._end
-    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))        
+    return (r, n)
   }
 
   /// Accesses the element at the specified position.
