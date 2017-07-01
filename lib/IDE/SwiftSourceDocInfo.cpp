@@ -196,7 +196,7 @@ bool SemaLocResolver::walkToExprPre(Expr *E) {
 bool SemaLocResolver::walkToExprPost(Expr *E) {
   if (isDone())
     return false;
-  if (!TrailingExprStack.empty()) {
+  if (!TrailingExprStack.empty() && TrailingExprStack.back() == E) {
     // We return the outtermost expression in the token info.
     SemaTok = { TrailingExprStack.front() };
     return false;
