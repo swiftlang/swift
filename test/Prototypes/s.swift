@@ -1001,19 +1001,25 @@ let testers: [String] = [
 import Dispatch
 import Darwin
 
-let testOld = CommandLine.arguments.count < 2
-  || CommandLine.arguments.dropFirst().contains("--old")
-let testNew = CommandLine.arguments.count < 2
-  || CommandLine.arguments.dropFirst().contains("--new")
+let args = CommandLine.arguments.dropFirst()
+let testOld = !args.contains { $0.hasPrefix("--") } || args.contains("--old")
+let testNew = !args.contains { $0.hasPrefix("--") } || args.contains("--new")
+let testFilter = args.filter { !$0.hasPrefix("--") }
 
 @discardableResult
 func time<T>(_ _caller : String = #function, _ block: () -> T) -> T? {
   if !testOld && _caller.hasSuffix("_old()") { return nil }
   if !testNew && _caller.hasSuffix("_new()") { return nil }
+  if !testFilter.isEmpty && !testFilter.contains(where: {
+    _caller.hasPrefix($0)
+    }) {
+    return nil
+  }
+  
   var tmin = Double.infinity
   var tmax = 0.0, sum = 0.0
   var res: T?
-  let reps = 3
+  let reps = testFilter.isEmpty ? 3 : 5
   for _ in 0..<reps {
     let start = DispatchTime.now()
     res = block()
