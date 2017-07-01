@@ -492,14 +492,14 @@ extension String._XContent.UTF16View : Sequence {
     var scratch = String._XContent._scratch()
     defer { _fixLifetime(scratch) }
     
-    if let codeUnits = _content._existingUTF16(in: &scratch) {
-      let (_, n) = codeUnits._copyContents(initializing: destination)
-      return (Iterator(_content, offset: n), n)
-    }
-    else if let codeUnits = _content._existingLatin1(in: &scratch) {
+    if let codeUnits = _content._existingLatin1(in: &scratch) {
       let (_, n) = _MapCollection(
         codeUnits, through: _TruncExt()
       )._copyContents(initializing: destination)
+      return (Iterator(_content, offset: n), n)
+    }
+    else if let codeUnits = _content._existingUTF16(in: &scratch) {
+      let (_, n) = codeUnits._copyContents(initializing: destination)
       return (Iterator(_content, offset: n), n)
     }
     else {
