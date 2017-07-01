@@ -491,34 +491,45 @@ extension String._XContent.UTF16View : Sequence {
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     var scratch = String._XContent._scratch()
     defer { _fixLifetime(scratch) }
-    
-    if let codeUnits = _content._existingLatin1(in: &scratch) {
-      let (_, n) = _MapCollection(
-        codeUnits, through: _TruncExt()
-      )._copyContents(initializing: destination)
-      return (Iterator(_content, offset: n), n)
+
+    var n = 0
+    if var d = destination._position {
+      n = destination._end._unsafelyUnwrappedUnchecked - d
+      
+      if let source = _content._existingLatin1(in: &scratch) {
+        var s = source._position._unsafelyUnwrappedUnchecked
+        n = Swift.min(n, source._end._unsafelyUnwrappedUnchecked - s)
+        let end = d + n
+        while d != end {
+          d.pointee = UInt16(extendingOrTruncating: s.pointee)
+          d += 1
+          s += 1
+        }
+      }
+      else if let source = _content._existingUTF16(in: &scratch) {
+        let s = source._position._unsafelyUnwrappedUnchecked
+        n = Swift.min(n, source._end._unsafelyUnwrappedUnchecked - s)
+        d.initialize(from: s, count: n)
+      }
+      else {
+        n = _copyContentsSlow(initializing: destination)
+      }
     }
-    else if let codeUnits = _content._existingUTF16(in: &scratch) {
-      let (_, n) = codeUnits._copyContents(initializing: destination)
-      return (Iterator(_content, offset: n), n)
-    }
-    else {
-      return _copyContentsSlow(initializing: destination)
-    }
+    return (Iterator(_content, offset: n), n)
   }
 
   @inline(never)
   func _copyContentsSlow(
     initializing destination: UnsafeMutableBufferPointer<Element>
-  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+  ) -> Int {
     var source = makeIterator()
-    guard var p = destination.baseAddress else { return (source, 0) }
+    guard var p = destination.baseAddress else { return 0 }
     for n in 0..<destination.count {
-      guard let x = source.next() else { return (source, n) }
+      guard let x = source.next() else { return n }
       p.initialize(to: x)
       p += 1
     }
-    return (source, destination.count)
+    return destination.count
   }
 }
 
