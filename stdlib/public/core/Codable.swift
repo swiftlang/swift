@@ -75,7 +75,7 @@ public protocol CodingKey {
 public protocol Encoder {
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
-    var codingPath: [CodingKey?] { get }
+    var codingPath: [CodingKey] { get }
 
     /// Any contextual information set by the user for encoding.
     var userInfo: [CodingUserInfoKey : Any] { get }
@@ -108,7 +108,7 @@ public protocol Encoder {
 public protocol Decoder {
     /// The path of coding keys taken to get to this point in decoding.
     /// A `nil` value indicates an unkeyed container.
-    var codingPath: [CodingKey?] { get }
+    var codingPath: [CodingKey] { get }
 
     /// Any contextual information set by the user for decoding.
     var userInfo: [CodingUserInfoKey : Any] { get }
@@ -147,7 +147,7 @@ public protocol KeyedEncodingContainerProtocol {
 
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
-    var codingPath: [CodingKey?] { get }
+    var codingPath: [CodingKey] { get }
 
     /// Encodes a null value for the given key.
     ///
@@ -423,7 +423,7 @@ public struct KeyedEncodingContainer<K : CodingKey> : KeyedEncodingContainerProt
 
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
-    public var codingPath: [CodingKey?] {
+    public var codingPath: [CodingKey] {
         return _box.codingPath
     }
 
@@ -761,7 +761,7 @@ public protocol KeyedDecodingContainerProtocol {
 
     /// The path of coding keys taken to get to this point in decoding.
     /// A `nil` value indicates an unkeyed container.
-    var codingPath: [CodingKey?] { get }
+    var codingPath: [CodingKey] { get }
 
     /// All the keys the `Decoder` has for this container.
     ///
@@ -1136,7 +1136,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
 
     /// The path of coding keys taken to get to this point in decoding.
     /// A `nil` value indicates an unkeyed container.
-    public var codingPath: [CodingKey?] {
+    public var codingPath: [CodingKey] {
         return _box.codingPath
     }
 
@@ -1578,7 +1578,10 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
 public protocol UnkeyedEncodingContainer {
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
-    var codingPath: [CodingKey?] { get }
+    var codingPath: [CodingKey] { get }
+
+    /// The number of elements encoded into the container.
+    var count: Int { get }
 
     /// Encodes a null value.
     ///
@@ -1800,7 +1803,7 @@ public protocol UnkeyedEncodingContainer {
 public protocol UnkeyedDecodingContainer {
     /// The path of coding keys taken to get to this point in decoding.
     /// A `nil` value indicates an unkeyed container.
-    var codingPath: [CodingKey?] { get }
+    var codingPath: [CodingKey] { get }
 
     /// Returns the number of elements (if known) contained within this container.
     var count: Int? { get }
@@ -1808,7 +1811,13 @@ public protocol UnkeyedDecodingContainer {
     /// Returns whether there are no more elements left to be decoded in the container.
     var isAtEnd: Bool { get }
 
+    /// The current decoding index of the container (i.e. the index of the next element to be decoded.)
+    /// Incremented after every successful decode call.
+    var currentIndex: Int { get }
+
     /// Decodes a null value.
+    ///
+    /// If the value is not null, does not increment currentIndex.
     ///
     /// - returns: Whether the encountered value was null.
     /// - throws: `DecodingError.valueNotFound` if there are no more values to decode.
@@ -2098,7 +2107,7 @@ public protocol UnkeyedDecodingContainer {
 public protocol SingleValueEncodingContainer {
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
-    var codingPath: [CodingKey?] { get }
+    var codingPath: [CodingKey] { get }
 
     /// Encodes a null value.
     ///
@@ -2216,7 +2225,7 @@ public protocol SingleValueEncodingContainer {
 public protocol SingleValueDecodingContainer {
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
-    var codingPath: [CodingKey?] { get }
+    var codingPath: [CodingKey] { get }
 
     /// Decodes a null value.
     ///
@@ -2385,7 +2394,7 @@ public enum EncodingError : Error {
     /// The context in which the error occurred.
     public struct Context {
         /// The path of `CodingKey`s taken to get to the point of the failing encode call.
-        public let codingPath: [CodingKey?]
+        public let codingPath: [CodingKey]
 
         /// A description of what went wrong, for debugging purposes.
         public let debugDescription: String
@@ -2398,7 +2407,7 @@ public enum EncodingError : Error {
         /// - parameter codingPath: The path of `CodingKey`s taken to get to the point of the failing encode call.
         /// - parameter debugDescription: A description of what went wrong, for debugging purposes.
         /// - parameter underlyingError: The underlying error which caused this error, if any.
-        public init(codingPath: [CodingKey?], debugDescription: String, underlyingError: Error? = nil) {
+        public init(codingPath: [CodingKey], debugDescription: String, underlyingError: Error? = nil) {
             self.codingPath = codingPath
             self.debugDescription = debugDescription
             self.underlyingError = underlyingError
@@ -2454,7 +2463,7 @@ public enum DecodingError : Error {
     /// The context in which the error occurred.
     public struct Context {
         /// The path of `CodingKey`s taken to get to the point of the failing decode call.
-        public let codingPath: [CodingKey?]
+        public let codingPath: [CodingKey]
 
         /// A description of what went wrong, for debugging purposes.
         public let debugDescription: String
@@ -2467,7 +2476,7 @@ public enum DecodingError : Error {
         /// - parameter codingPath: The path of `CodingKey`s taken to get to the point of the failing decode call.
         /// - parameter debugDescription: A description of what went wrong, for debugging purposes.
         /// - parameter underlyingError: The underlying error which caused this error, if any.
-        public init(codingPath: [CodingKey?], debugDescription: String, underlyingError: Error? = nil) {
+        public init(codingPath: [CodingKey], debugDescription: String, underlyingError: Error? = nil) {
             self.codingPath = codingPath
             self.debugDescription = debugDescription
             self.underlyingError = underlyingError
@@ -2541,6 +2550,20 @@ public enum DecodingError : Error {
 
 // The following extensions allow for easier error construction.
 
+internal struct _GenericIndexKey : CodingKey {
+    var stringValue: String
+    var intValue: Int?
+
+    init?(stringValue: String) {
+        return nil
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = "Index \(intValue)"
+        self.intValue = intValue
+    }
+}
+
 public extension DecodingError {
     /// A convenience method which creates a new .dataCorrupted error using a constructed coding path and the given debug description.
     ///
@@ -2562,7 +2585,7 @@ public extension DecodingError {
     /// - param container: The container in which the corrupted data was accessed.
     /// - param debugDescription: A description of the error to aid in debugging.
     static func dataCorruptedError(in container: UnkeyedDecodingContainer, debugDescription: String) -> DecodingError {
-        let context = DecodingError.Context(codingPath: container.codingPath + [nil],
+        let context = DecodingError.Context(codingPath: container.codingPath + [_GenericIndexKey(intValue: container.currentIndex)!],
                                             debugDescription: debugDescription)
         return .dataCorrupted(context)
     }
@@ -2590,7 +2613,7 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
     // These must all be given a concrete implementation in _*Box.
     @_inlineable
     @_versioned
-    internal var codingPath: [CodingKey?] {
+    internal var codingPath: [CodingKey] {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
@@ -2827,7 +2850,7 @@ internal final class _KeyedEncodingContainerBox<Concrete : KeyedEncodingContaine
 
     @_inlineable
     @_versioned
-    override internal var codingPath: [CodingKey?] {
+    override internal var codingPath: [CodingKey] {
         return concrete.codingPath
     }
 
@@ -3053,7 +3076,7 @@ internal final class _KeyedEncodingContainerBox<Concrete : KeyedEncodingContaine
 internal class _KeyedDecodingContainerBase<Key : CodingKey> {
     @_inlineable
     @_versioned
-    internal var codingPath: [CodingKey?] {
+    internal var codingPath: [CodingKey] {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
@@ -3296,7 +3319,7 @@ internal final class _KeyedDecodingContainerBox<Concrete : KeyedDecodingContaine
 
     @_inlineable
     @_versioned
-    override var codingPath: [CodingKey?] {
+    override var codingPath: [CodingKey] {
         return concrete.codingPath
     }
 
