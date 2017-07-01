@@ -485,6 +485,7 @@ extension String._XContent.UTF16View : Sequence {
     return Iterator(_content)
   }
 
+  @inline(__always)
   func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
@@ -502,15 +503,22 @@ extension String._XContent.UTF16View : Sequence {
       return (Iterator(_content, offset: n), n)
     }
     else {
-      var source = makeIterator()
-      guard var p = destination.baseAddress else { return (source, 0) }
-      for n in 0..<destination.count {
-        guard let x = source.next() else { return (source, n) }
-        p.initialize(to: x)
-        p += 1
-      }
-      return (source, destination.count)
+      return _copyContentsSlow(initializing: destination)
     }
+  }
+
+  @inline(never)
+  func _copyContentsSlow(
+    initializing destination: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    var source = makeIterator()
+    guard var p = destination.baseAddress else { return (source, 0) }
+    for n in 0..<destination.count {
+      guard let x = source.next() else { return (source, n) }
+      p.initialize(to: x)
+      p += 1
+    }
+    return (source, destination.count)
   }
 }
 
