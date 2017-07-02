@@ -333,34 +333,3 @@ where C.Element == UInt16
   return String._UTF16Storage.copying(
     x, minCapacity: minCapacity, maxElement: maxElement)
 }
-
-extension String {
-  internal enum _Content {
-    internal struct _ShortLatin1 {
-      var _codeUnits: (UInt64, UInt32, UInt16)
-      var _count: UInt8
-    }
-  case shortLatin1(_ShortLatin1)
-    
-    internal struct _ShortUTF16 {
-      var _codeUnits: (UInt64, UInt32, UInt16)
-      var _count: UInt8
-    }
-  case shortUTF16(_ShortUTF16)
-
-    internal struct _UnownedLatin1 {
-      var _start: UnsafePointer<UInt8>, count: UInt32, isASCII: Bool
-    }
-  case unownedLatin1(_UnownedLatin1)
-    
-    internal struct _UnownedUTF16 {
-      var _start: UnsafePointer<UInt8>, count: UInt32, isASCII: Bool
-    }
-  case unownedUTF16(_UnownedUTF16)
-    
-  case latin1(_Latin1Storage)
-  case utf16(_UTF16Storage)
-  case nsString(_NSStringCore)
-  }
-}
-
