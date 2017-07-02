@@ -225,7 +225,7 @@ extension String._XContent._Inline {
 extension String._XContent._Inline : Sequence {
   struct Iterator : IteratorProtocol, Sequence {
     var bits: UInt128
-    var count: Int
+    var count: UInt8
     
     mutating func next() -> CodeUnit? {
       guard count > 0 else { return nil }
@@ -234,11 +234,11 @@ extension String._XContent._Inline : Sequence {
       count = count &- 1
       return r
     }
-    var underestimatedCount: Int { return count }
+    var underestimatedCount: Int { return Int(extendingOrTruncating: count) }
   }
   
   func makeIterator() -> Iterator {
-    return Iterator(bits: _bits, count: count)
+    return Iterator(bits: _bits, count: UInt8(extendingOrTruncating: count))
   }
 }
 
