@@ -124,7 +124,7 @@ internal var zero_Int120 : Builtin.Int120 {
 }
 
 extension String {
-  internal enum _XContent {
+  internal enum _Content {
     // WORKAROUND: https://bugs.swift.org/browse/SR-5352
     // Using Builtin.Int120 bumps the size of the whole thing to 17 bytes!
     typealias _InlineStorage = (UInt64, UInt32, UInt16, UInt8)
@@ -171,7 +171,7 @@ extension String {
   }
 }
 
-extension String._XContent._Inline {
+extension String._Content._Inline {
   public var capacity: Int {
     return MemoryLayout.size(ofValue: _storage)
       / MemoryLayout<CodeUnit>.stride
@@ -222,7 +222,7 @@ extension String._XContent._Inline {
   }
 }
 
-extension String._XContent._Inline : Sequence {
+extension String._Content._Inline : Sequence {
   struct Iterator : IteratorProtocol, Sequence {
     var bits: UInt128
     var count: UInt8
@@ -242,7 +242,7 @@ extension String._XContent._Inline : Sequence {
   }
 }
 
-extension String._XContent._Inline : RandomAccessCollection, MutableCollection {
+extension String._Content._Inline : RandomAccessCollection, MutableCollection {
   typealias Index = Int
   var startIndex: Index { return 0 }
   var endIndex: Index { return count }
@@ -270,13 +270,13 @@ extension String._XContent._Inline : RandomAccessCollection, MutableCollection {
   }
 }
 
-extension String._XContent._Inline : CustomDebugStringConvertible {
+extension String._Content._Inline : CustomDebugStringConvertible {
   var debugDescription: String {
     return String(describing: Array(self))
   }
 }
 
-extension String._XContent._Inline {
+extension String._Content._Inline {
   public mutating func append(_ u: CodeUnit) {
     let oldCount = count
     count = count &+ 1
@@ -284,13 +284,13 @@ extension String._XContent._Inline {
   }
 }
 
-extension String._XContent._Inline where CodeUnit == UInt8 {
+extension String._Content._Inline where CodeUnit == UInt8 {
   internal var isASCII : Bool {
     return _bits & (0x80_8080__8080_8080___8080_8080__8080_8080 as UInt128) == 0
   }
 }
 
-extension String._XContent._Inline where CodeUnit == UInt16 {
+extension String._Content._Inline where CodeUnit == UInt16 {
   
   internal var isASCII : Bool {
     return _bits & (0xFF80__FF80_FF80___FF80_FF80__FF80_FF80 as UInt128) == 0
@@ -301,7 +301,7 @@ extension String._XContent._Inline where CodeUnit == UInt16 {
   }
 }
 
-extension String._XContent._Unowned {
+extension String._Content._Unowned {
   init?(
     _ source: UnsafeBufferPointer<CodeUnit>,
     isASCII: Bool?,
@@ -323,7 +323,7 @@ extension String._XContent._Unowned {
   }
 }
 
-extension String._XContent {
+extension String._Content {
 
   init() {
     self = .inline16(_Inline<UInt16>(EmptyCollection<UInt16>())!)
@@ -370,9 +370,9 @@ extension String._XContent {
   }
 }
 
-extension String._XContent {
+extension String._Content {
   struct UTF16View {
-    var _content: String._XContent
+    var _content: String._Content
   }
   
   var _nsString : _NSStringCore {
@@ -393,20 +393,20 @@ struct _TruncExt<Input: BinaryInteger, Output: FixedWidthInteger>
   }
 }
 
-extension String._XContent.UTF16View : Sequence {
+extension String._Content.UTF16View : Sequence {
   struct Iterator : IteratorProtocol {
     internal enum _Buffer {
     case deep8(UnsafePointer<UInt8>, UnsafePointer<UInt8>)
     case deep16(UnsafePointer<UInt16>, UnsafePointer<UInt16>)
-    case inline8(String._XContent._Inline<UInt8>.Iterator)
-    case inline16(String._XContent._Inline<UInt16>.Iterator)
+    case inline8(String._Content._Inline<UInt8>.Iterator)
+    case inline16(String._Content._Inline<UInt16>.Iterator)
     case nsString(Int)
     }
     
     internal var _buffer: _Buffer
     internal let _owner: AnyObject?
 
-    init(_ content: String._XContent) {
+    init(_ content: String._Content) {
       switch content {
       case .inline8(let x):
         _owner = nil
@@ -443,7 +443,7 @@ extension String._XContent.UTF16View : Sequence {
     }
 
     @inline(__always)
-    init(_ content: String._XContent, offset: Int) {
+    init(_ content: String._Content, offset: Int) {
       switch content {
       case .inline8(let x):
         _owner = nil
@@ -576,15 +576,15 @@ extension String._XContent.UTF16View : Sequence {
   }
 }
 
-extension String._XContent.UTF16View : BidirectionalCollection {
+extension String._Content.UTF16View : BidirectionalCollection {
   init<C : Collection>(
     _ c: C, maxElement: UInt16? = nil, minCapacity: Int = 0
   )
   where C.Element == UInt16 {
-    if let x = String._XContent._Inline<UInt8>(c) {
+    if let x = String._Content._Inline<UInt8>(c) {
       _content = .inline8(x)
     }
-    else if let x = String._XContent._Inline<UInt16>(c) {
+    else if let x = String._Content._Inline<UInt16>(c) {
       _content = .inline16(x)
     }
     else  {
@@ -613,7 +613,7 @@ extension String._XContent.UTF16View : BidirectionalCollection {
   init<C : Collection>(
     _ c: C, minCapacity: Int = 0, isASCII: Bool? = nil
   ) where C.Element == UInt8 {
-    if let x = String._XContent._Inline<UInt8>(c) {
+    if let x = String._Content._Inline<UInt8>(c) {
       _content = .inline8(x)
     }
     else {
@@ -629,10 +629,10 @@ extension String._XContent.UTF16View : BidirectionalCollection {
     isASCII: Bool?,
     isNULTerminated: Bool
   ) {
-    if let x = String._XContent._Inline<UInt8>(source) {
+    if let x = String._Content._Inline<UInt8>(source) {
       _content = .inline8(x)
     }
-    else if let x = String._XContent._Unowned<UInt8>(
+    else if let x = String._Content._Unowned<UInt8>(
       source, isASCII: isASCII,
       isNULTerminated: isNULTerminated
     ) {
@@ -651,13 +651,13 @@ extension String._XContent.UTF16View : BidirectionalCollection {
     isASCII: Bool?,
     isNULTerminated: Bool
   ) {
-    if let x = String._XContent._Inline<UInt8>(source) {
+    if let x = String._Content._Inline<UInt8>(source) {
       _content = .inline8(x)
     }
-    else if let x = String._XContent._Inline<UInt16>(source) {
+    else if let x = String._Content._Inline<UInt16>(source) {
       _content = .inline16(x)
     }
-    else if let x = String._XContent._Unowned<UInt16>(
+    else if let x = String._Content._Unowned<UInt16>(
       source, isASCII: isASCII,
       isNULTerminated: isNULTerminated
     ) {
@@ -715,7 +715,7 @@ extension String._XContent.UTF16View : BidirectionalCollection {
   func index(before i: Int) -> Int { return i - 1 }
 }
 
-extension String._XContent.UTF16View : RangeReplaceableCollection {
+extension String._Content.UTF16View : RangeReplaceableCollection {
   public var capacity: Int {
     get {
       switch self._content {
@@ -731,7 +731,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
   }
   
   public init() {
-    _content = String._XContent()
+    _content = String._Content()
   }
 
   internal var _rangeReplaceableStorageID: ObjectIdentifier? {
@@ -965,23 +965,23 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
   }
 }
 
-extension String._XContent.UTF16View {
+extension String._Content.UTF16View {
   init(legacy source: _StringCore) {
     var isASCII: Bool? = nil
     
     defer { _fixLifetime(source) }
-    if let x = String._XContent._Inline<UInt8>(source) {
+    if let x = String._Content._Inline<UInt8>(source) {
       _content = .inline8(x)
       return
     }
-    else if let x = String._XContent._Inline<UInt16>(source) {
+    else if let x = String._Content._Inline<UInt16>(source) {
       _content = .inline16(x)
       return
     }
     else if source._owner == nil {
       if let a = source.asciiBuffer {
         let base = a.baseAddress
-        if let me = String._XContent._Unowned<UInt8>(
+        if let me = String._Content._Unowned<UInt8>(
           UnsafeBufferPointer<UInt8>(
             start: base, count: source.count),
           isASCII: true,
@@ -993,7 +993,7 @@ extension String._XContent.UTF16View {
       }
       else {
         isASCII = source.contains { $0 > 0x7f }
-        if let me = String._XContent._Unowned<UInt16>(
+        if let me = String._Content._Unowned<UInt16>(
           UnsafeBufferPointer(
             start: source.startUTF16, count: source.count),
         isASCII: isASCII,
@@ -1006,13 +1006,13 @@ extension String._XContent.UTF16View {
     }
     
     if isASCII == true || !source.contains { $0 > 0xff } {
-      self = String._XContent.UTF16View(
+      self = String._Content.UTF16View(
         _MapCollection(source, through: _TruncExt()),
         isASCII: isASCII ?? false
       )
     }
     else {
-      self = String._XContent.UTF16View(source)
+      self = String._Content.UTF16View(source)
     }
   }
 }
@@ -1069,7 +1069,7 @@ func testme2() {
   let arrays = cores.map(Array.init)
   
   let contents = cores.map {
-    String._XContent.UTF16View(legacy: $0)
+    String._Content.UTF16View(legacy: $0)
   }
 
   var N = 20000
@@ -1128,7 +1128,7 @@ func testme2() {
     time {
       for _ in 0...10*N {
         for a in arrays {
-          total = total &+ String._XContent.UTF16View(a).count
+          total = total &+ String._Content.UTF16View(a).count
         }
       }
     }
@@ -1162,10 +1162,10 @@ func testme2() {
   print()
   
   let a_old = "a"._core
-  let a_new = String._XContent.UTF16View(a_old)
+  let a_new = String._Content.UTF16View(a_old)
   
   let short8_old = ["b","c","d","pizza"].map { $0._core }
-  let short8_new = short8_old.map { String._XContent.UTF16View($0) }
+  let short8_new = short8_old.map { String._Content.UTF16View($0) }
   
   @inline(never)
   func  appendManyTinyASCIIFragments_ToASCII_old() {
@@ -1197,7 +1197,7 @@ func testme2() {
   print()
   
   let short16_old = ["🎉","c","d","pizza"].map { $0._core }
-  let short16_new = short16_old.map { String._XContent.UTF16View($0) }
+  let short16_new = short16_old.map { String._Content.UTF16View($0) }
 
   @inline(never)
   func  appendManyTinyFragmentsOfBothWidths_old() {
@@ -1229,10 +1229,10 @@ func testme2() {
   print()
   
   let ghost_old = "👻"._core
-  let ghost_new = String._XContent.UTF16View(ghost_old)
+  let ghost_new = String._Content.UTF16View(ghost_old)
   
   let long_old = "Swift is a multi-paradigm, compiled programming language created for iOS, OS X, watchOS, tvOS and Linux development by Apple Inc. Swift is designed to work with Apple's Cocoa and Cocoa Touch frameworks and the large body of existing Objective-C code written for Apple products. Swift is intended to be more resilient to erroneous code (\"safer\") than Objective-C and also more concise. It is built with the LLVM compiler framework included in Xcode 6 and later and uses the Objective-C runtime, which allows C, Objective-C, C++ and Swift code to run within a single program."._core
-  let long_new = String._XContent.UTF16View(long_old)
+  let long_new = String._Content.UTF16View(long_old)
   
   @inline(never)
   func appendManyLongASCII_ToUTF16_old() {
@@ -1346,8 +1346,8 @@ func testme2() {
 
 let cat = _Concat3(5..<10, 15...20, (25...30).dropFirst())
 assert(cat.elementsEqual(cat.indices.map { cat[$0] }))
-print(MemoryLayout<String._XContent>.size)
-assert(MemoryLayout<String._XContent>.size <= 16)
+print(MemoryLayout<String._Content>.size)
+assert(MemoryLayout<String._Content>.size <= 16)
 testme2()
 
 
