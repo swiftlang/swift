@@ -746,7 +746,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
                         PP.getBuiltinInfo());
 
   std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
-      PP, ctx, CI.getPCHContainerReader(),
+      PP, &ctx, CI.getPCHContainerReader(),
       CI.getFrontendOpts().ModuleFileExtensions,
       CI.getHeaderSearchOpts().Sysroot,
       /*DisableValidation*/ false,
