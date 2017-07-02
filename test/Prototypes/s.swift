@@ -780,8 +780,6 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
   }
 
   mutating func _allocateCapacity(_ minCapacity: Int, forcingUTF16: Bool) {
-    defer { _fixLifetime(self) }
-    
     if let codeUnits = _content._existingUTF16 {
       self._content = .utf16(
         String._UTF16Storage.copying(codeUnits, minCapacity: minCapacity))
