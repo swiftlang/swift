@@ -767,10 +767,12 @@ extension Sequence {
     initializing memory: UnsafeMutableBufferPointer<Iterator.Element>
   ) {
     var (excessElements, endOfCopy) = self._copyContents(initializing: memory)
-    _precondition(
+    _debugPrecondition(
       excessElements.next() == nil,
       "_copyCompleteContents: source not completely copied (under-reported count?)")
-    _precondition(
+    // Failing to catch this one can leave uninitialized elements, leading to
+    // undefined behavior.
+    _precondition( 
       endOfCopy == memory.endIndex,
       "_copyCompleteContents: target not completely filled (over-reported count?)")
   }
@@ -783,10 +785,10 @@ extension Sequence {
     assigning target: UnsafeMutableBufferPointer<Iterator.Element>
   ) {
     var (excessElements, endOfCopy) = self._copyContents(assigning: target)
-    _precondition(
+    _debugPrecondition(
       excessElements.next() == nil,
       "_copyCompleteContents: source not completely copied (under-reported count?)")
-    _precondition(
+    _debugPrecondition(
       endOfCopy == target.endIndex,
       "_copyCompleteContents: target not completely filled (over-reported count?)")
   }
