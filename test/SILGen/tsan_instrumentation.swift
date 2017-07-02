@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -sanitize=thread -emit-silgen %s | %FileCheck %s
 // REQUIRES: tsan_runtime
-// XFAIL: linux
 
 func takesInout(_ p: inout Int) { }
 func takesInout(_ p: inout MyStruct) { }
