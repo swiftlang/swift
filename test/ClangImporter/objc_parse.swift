@@ -44,7 +44,7 @@ func instanceMethods(_ b: B) {
   }
 
   // Renaming of redundant parameters.
-  b.performAdd(1, withValue:2, withValue2:3, withValue:4) // expected-error{{argument 'withValue' must precede argument 'withValue2'}}
+  b.performAdd(1, withValue:2, withValue2:3, withValue:4) // expected-error{{argument 'withValue' must precede argument 'withValue2'}} {{32-32=withValue:4, }} {{44-57=}}
   b.performAdd(1, withValue:2, withValue:4, withValue2: 3)
 
   b.performAdd(1, 2, 3, 4) // expected-error{{missing argument labels 'withValue:withValue:withValue2:' in call}} {{19-19=withValue: }} {{22-22=withValue: }} {{25-25=withValue2: }}

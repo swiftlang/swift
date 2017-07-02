@@ -449,50 +449,46 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // If any arguments were provided out-of-order, check whether we have
   // violated any of the reordering rules.
   if (potentiallyOutOfOrder) {
-    // Build a mapping from arguments to parameters.
-    SmallVector<unsigned, 4> argumentBindings(numArgs);
-    for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
-      for (auto argIdx : parameterBindings[paramIdx])
-        argumentBindings[argIdx] = paramIdx;
-    }
-
-    // Walk through the arguments, determining if any were bound to parameters
-    // out-of-order where it is not permitted.
-    unsigned prevParamIdx = argumentBindings[0];
-    for (unsigned argIdx = 1; argIdx != numArgs; ++argIdx) {
-      unsigned paramIdx = argumentBindings[argIdx];
-
-      // If this argument binds to the same parameter as the previous one or to
-      // a later parameter, just update the parameter index.
-      if (paramIdx >= prevParamIdx) {
-        prevParamIdx = paramIdx;
-        continue;
-      }
-
-      unsigned prevArgIdx = parameterBindings[prevParamIdx].front();
-
-      // First let's double check if out-of-order argument is nothing
-      // more than a simple label mismatch, because in situation where
-      // one argument requires label and another one doesn't, but caller
-      // doesn't provide either, problem is going to be identified as
-      // out-of-order argument instead of label mismatch.
-      auto &parameter = params[prevArgIdx];
-      if (!parameter.getLabel().empty()) {
-        auto expectedLabel = parameter.getLabel();
-        auto argumentLabel = args[argIdx].getLabel();
-        
-        // If there is a label but it's incorrect it can only mean
-        // situation like this: expected (x, _ y) got (y, _ x).
-        if (argumentLabel.empty() ||
-            (expectedLabel.compare(argumentLabel) != 0 &&
-             args[prevArgIdx].getLabel().empty())) {
-          listener.missingLabel(prevArgIdx);
-          return true;
+    unsigned argIdx = 0;
+    // Enumerate the parameters and their bindings to see if any arguments are
+    // our of order
+    for (auto binding : parameterBindings) {
+      for (auto boundArgIdx : binding) {
+        if (boundArgIdx == argIdx) {
+          // If the argument is in the right location, just continue
+          argIdx++;
+          continue;
         }
+
+        // Otherwise, we've found the (first) parameter that has an out of order
+        // argument, and know the indices of the argument the needs to move
+        // (fromArgIdx) and the argument location it should move to (toArgItd).
+        auto fromArgIdx = boundArgIdx;
+        auto toArgIdx = argIdx;
+
+        // First let's double check if out-of-order argument is nothing
+        // more than a simple label mismatch, because in situation where
+        // one argument requires label and another one doesn't, but caller
+        // doesn't provide either, problem is going to be identified as
+        // out-of-order argument instead of label mismatch.
+        auto &parameter = params[toArgIdx];
+        if (!parameter.getLabel().empty()) {
+          auto expectedLabel = parameter.getLabel();
+          auto argumentLabel = args[fromArgIdx].getLabel();
+
+          // If there is a label but it's incorrect it can only mean
+          // situation like this: expected (x, _ y) got (y, _ x).
+          if (argumentLabel.empty() ||
+              (expectedLabel.compare(argumentLabel) != 0 &&
+               args[toArgIdx].getLabel().empty())) {
+            listener.missingLabel(toArgIdx);
+            return true;
+          }
+        }
+
+        listener.outOfOrderArgument(fromArgIdx, toArgIdx);
+        return true;
       }
-      
-      listener.outOfOrderArgument(argIdx, prevArgIdx);
-      return true;
     }
   }
 

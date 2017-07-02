@@ -36,7 +36,7 @@ var s: String = optFunc("hi")
 // <rdar://problem/17652759> Default arguments cause crash with tuple permutation
 func testArgumentShuffle(_ first: Int = 7, third: Int = 9) {
 }
-testArgumentShuffle(third: 1, 2) // expected-error {{unnamed argument #2 must precede argument 'third'}} {{21-29=2}} {{31-32=third: 1}}
+testArgumentShuffle(third: 1, 2) // expected-error {{unnamed argument #2 must precede argument 'third'}} {{21-21=2, }} {{29-32=}}
 
 
 
