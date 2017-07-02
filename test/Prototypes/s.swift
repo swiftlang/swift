@@ -779,31 +779,26 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
     return true
   }
 
+  @inline(__always)
   mutating func _allocateCapacity(_ minCapacity: Int, forcingUTF16: Bool) {
     if let codeUnits = _content._existingUTF16 {
       self._content = .utf16(
         String._UTF16Storage.copying(codeUnits, minCapacity: minCapacity))
     }
-    else if let codeUnits = _content._existingLatin1 {
-      if !forcingUTF16 {
-        self._content = .latin1(
-          String._Latin1Storage.copying(
-            codeUnits, minCapacity: minCapacity, isASCII: _content.isASCII))
-      }
-      else {
-        self._content = .utf16(
-          String._UTF16Storage.copying(
-            _MapCollection(codeUnits, through: _TruncExt()),
-            minCapacity: minCapacity,
-            maxElement: _content.isASCII == true ? 0x7F
-            : _content.isASCII == false ? 0xFF : nil)
-        )
-      }
+    else if !forcingUTF16, let codeUnits = _content._existingLatin1 {
+      self._content = .latin1(
+        String._Latin1Storage.copying(
+          codeUnits, minCapacity: minCapacity, isASCII: _content.isASCII))
     }
     else {
-      self._content = .utf16(
-        String._UTF16Storage.copying(self, minCapacity: minCapacity))
+      _allocateCapacitySlow(minCapacity, forcingUTF16: forcingUTF16)
     }
+  }
+
+  @inline(never)
+  mutating func _allocateCapacitySlow(_ minCapacity: Int, forcingUTF16: Bool) {
+    self._content = .utf16(
+      String._UTF16Storage.copying(self, minCapacity: minCapacity))
   }
   
   mutating func reserveCapacity(_ minCapacity: Int) {
