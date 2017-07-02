@@ -398,18 +398,22 @@ extension String._XContent.UTF16View : Sequence {
     internal enum _Buffer {
     case deep8(UnsafePointer<UInt8>, UnsafePointer<UInt8>)
     case deep16(UnsafePointer<UInt16>, UnsafePointer<UInt16>)
-    case inline8(String._XContent._Inline<UInt8>, UInt8)
-    case inline16(String._XContent._Inline<UInt16>, UInt8)
+    case inline8(String._XContent._Inline<UInt8>.Iterator)
+    case inline16(String._XContent._Inline<UInt16>.Iterator)
     case nsString(Int)
     }
     
     internal var _buffer: _Buffer
-    internal var _owner: AnyObject?
+    internal let _owner: AnyObject?
 
     init(_ content: String._XContent) {
       switch content {
-      case .inline8(let x): _buffer = .inline8(x, 0)
-      case .inline16(let x): _buffer = .inline16(x, 0)
+      case .inline8(let x):
+        _owner = nil
+        _buffer = .inline8(x.makeIterator())
+      case .inline16(let x):
+        _owner = nil
+        _buffer = .inline16(x.makeIterator())
       case .unowned8(let x):
         _owner = nil
         let b = x.unsafeBuffer
@@ -441,10 +445,18 @@ extension String._XContent.UTF16View : Sequence {
     @inline(__always)
     init(_ content: String._XContent, offset: Int) {
       switch content {
-      case .inline16(let x):
-        _buffer = .inline16(x, UInt8(extendingOrTruncating: offset))
       case .inline8(let x):
-        _buffer = .inline8(x, UInt8(extendingOrTruncating: offset))
+        _owner = nil
+        _buffer = .inline8(
+          .init(
+            bits: x._bits &>> (offset &<< 3),
+            count: UInt8(extendingOrTruncating: x.count &- offset)))
+      case .inline16(let x):
+        _owner = nil
+        _buffer = .inline16(
+          .init(
+            bits: x._bits &>> (offset &<< 4),
+            count: UInt8(extendingOrTruncating: x.count &- offset)))
       case .utf16(let x):
         _owner = x
         _buffer = x.withUnsafeBufferPointer {
@@ -476,6 +488,14 @@ extension String._XContent.UTF16View : Sequence {
     @inline(__always)
     mutating func next() -> UInt16? {
       switch _buffer {
+      case .inline8(var x):
+        guard let r = x.next() else { return nil }
+        _buffer = .inline8(x)
+        return UInt16(r)
+      case .inline16(var x):
+        guard let r = x.next() else { return nil }
+        _buffer = .inline16(x)
+        return r
       case .deep8(let start, let end):
         guard start != end else { return nil }
         _buffer = .deep8(start + 1, end)
@@ -484,14 +504,6 @@ extension String._XContent.UTF16View : Sequence {
         guard start != end else { return nil }
         _buffer = .deep16(start + 1, end)
         return start.pointee
-      case .inline8(var x, let i):
-        if i == x.count { return nil }
-        _buffer = .inline8(x, i &+ 1)
-        return UInt16(x[Int(i)])
-      case .inline16(var x, let i):
-        if i == x.count { return nil }
-        _buffer = .inline16(x, i &+ 1)
-        return x[Int(i)]
       case .nsString(let i):
         let s = unsafeBitCast(_owner, to: _NSStringCore.self)
         if i == s.length() { return nil }
