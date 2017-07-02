@@ -591,21 +591,14 @@ extension String._Content.UTF16View : BidirectionalCollection {
       let maxCodeUnit = maxElement ?? c.max() ?? 0
       if maxCodeUnit <= 0xFF {
         _content = .latin1(
-          unsafeDowncast(
-            _mkLatin1(
+            .copying(
               _MapCollection(c, through: _TruncExt()),
               minCapacity: minCapacity,
-              isASCII: maxCodeUnit <= 0x7f),
-            to: String._Latin1Storage.self))
+              isASCII: maxCodeUnit <= 0x7f))
       }
       else {
-        _content = .utf16(//.init(c)
-          unsafeDowncast(
-            _mkUTF16(
-              c,
-              minCapacity: minCapacity,
-              maxElement: maxCodeUnit),
-            to: String._UTF16Storage.self))
+        _content = .utf16(
+           .copying(c, minCapacity: minCapacity, maxElement: maxCodeUnit))
       }
     }
   }
@@ -617,10 +610,8 @@ extension String._Content.UTF16View : BidirectionalCollection {
       _content = .inline8(x)
     }
     else {
-      _content = .latin1(//.init(c)
-        unsafeDowncast(
-          _mkLatin1(c, minCapacity: minCapacity, isASCII: isASCII),
-          to: String._Latin1Storage.self))
+      _content = .latin1(
+          .copying(c, minCapacity: minCapacity, isASCII: isASCII))
     }
   }
   
@@ -639,10 +630,7 @@ extension String._Content.UTF16View : BidirectionalCollection {
       _content = .unowned8(x)
     }
     else {
-      _content = .latin1(//.init(c)
-        unsafeDowncast(
-          _mkLatin1(source, isASCII: isASCII),
-          to: String._Latin1Storage.self))
+      _content = .latin1(.copying(source, isASCII: isASCII))
     }
   }
   
@@ -665,16 +653,10 @@ extension String._Content.UTF16View : BidirectionalCollection {
     }
     else if isASCII == true || !source.contains { $0 > 0xFF } {
       _content = .latin1(
-        unsafeDowncast(
-          _mkLatin1(
-            _MapCollection(source, through: _TruncExt()),
-            isASCII: true),
-          to: String._Latin1Storage.self))
+        .copying(_MapCollection(source, through: _TruncExt()), isASCII: true))
     }
     else {
-      _content = .utf16(//.init(c)            
-        unsafeDowncast(
-          _mkUTF16(source), to: String._UTF16Storage.self))
+      _content = .utf16(.copying(source))
     }
   }
   

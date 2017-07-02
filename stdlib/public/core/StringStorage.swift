@@ -312,24 +312,3 @@ extension String._Latin1Storage {
   }
 }
 
-//===--- Multi-Format String Storage --------------------------------------===//
-
-@inline(__always)
-public func _mkLatin1<C: Collection>(
-  _ x: C, minCapacity: Int = 0, isASCII: Bool? = nil
-) -> AnyObject
-where C.Element == UInt8
-{
-  return String._Latin1Storage.copying(
-    x, minCapacity: minCapacity, isASCII: isASCII)
-}
-
-@inline(__always)
-public func _mkUTF16<C: Collection>(
-  _ x: C, minCapacity: Int = 0, maxElement: UInt16? = nil
-) -> AnyObject
-where C.Element == UInt16
-{
-  return String._UTF16Storage.copying(
-    x, minCapacity: minCapacity, maxElement: maxElement)
-}
