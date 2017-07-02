@@ -197,7 +197,6 @@ extension String._UTF16Storage /*: UnicodeStorage*/ {
     if maxCodeUnit < 0xD800 { isValidEncoding = true }
   }
   
-  @inline(__always)
   public static func copying<Source : Collection>(
     _ source: Source,
     minCapacity: Int = 0,
