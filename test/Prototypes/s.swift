@@ -222,6 +222,26 @@ extension String._XContent._Inline {
   }
 }
 
+extension String._XContent._Inline : Sequence {
+  struct Iterator : IteratorProtocol, Sequence {
+    var bits: UInt128
+    var count: Int
+    
+    mutating func next() -> CodeUnit? {
+      guard count > 0 else { return nil }
+      let r = CodeUnit(extendingOrTruncating: bits)
+      bits &>>= CodeUnit.bitWidth
+      count = count &- 1
+      return r
+    }
+    var underestimatedCount: Int { return count }
+  }
+  
+  func makeIterator() -> Iterator {
+    return Iterator(bits: _bits, count: count)
+  }
+}
+
 extension String._XContent._Inline : RandomAccessCollection, MutableCollection {
   typealias Index = Int
   var startIndex: Index { return 0 }
