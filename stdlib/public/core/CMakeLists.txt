@@ -160,6 +160,7 @@ set(SWIFTLIB_ESSENTIAL
   StringStorage.swift
   ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
+  StringCore2.swift
   )
 
 # The complete list of sources in the core standard library.  Includes
