@@ -16,6 +16,7 @@
     "StringCharacterView.swift",
     "StringComparable.swift",
     "StringCore.swift",
+    "StringCore2.swift",
     "StringHashable.swift",
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
