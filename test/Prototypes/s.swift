@@ -118,12 +118,19 @@ extension _Concat3 : Collection {
 internal var zero_Int4 : Builtin.Int4 {
   return Builtin.trunc_Int32_Int4((0 as UInt32)._value)
 }
+
+internal var zero_Int120 : Builtin.Int120 {
+  return Builtin.zext_Int32_Int120((0 as UInt32)._value)
+}
+
 extension String {
   internal enum _XContent {
+    // WORKAROUND: https://bugs.swift.org/browse/SR-5352
+    // Using Builtin.Int120 bumps the size of the whole thing to 17 bytes!
     typealias _InlineStorage = (UInt64, UInt32, UInt16, UInt8)
     
     internal struct _Inline<CodeUnit : FixedWidthInteger> {
-      var _storage: _InlineStorage
+      var _storage: _InlineStorage = (0,0,0,0)
       var _count: Builtin.Int4 = zero_Int4
     }
     
@@ -164,17 +171,32 @@ extension String {
   }
 }
 
-extension String._XContent {
-  public typealias _Scratch = (UInt64, UInt64)
-  internal static func _scratch() -> _Scratch { return (0,0) }
-}
-
 extension String._XContent._Inline {
   public var capacity: Int {
     return MemoryLayout.size(ofValue: _storage)
       / MemoryLayout<CodeUnit>.stride
   }
 
+  internal var _bits : UInt128 {
+    get {
+#if _endian(little)
+      return unsafeBitCast(self, to: UInt128.self) & ~(0 as UInt128) &>> 8
+#else
+      return unsafeBitCast(self, to: UInt128.self) &>> 8
+#endif
+    }
+    set {
+#if _endian(little)
+      let non_bits = unsafeBitCast(self, to: UInt128.self) & (0xFF &<< 120)
+      self = unsafeBitCast(newValue | non_bits, to: type(of: self))
+#else
+      let non_bits = unsafeBitCast(self, to: UInt128.self) & 0xFF
+      self = unsafeBitCast((newValue &<< 8) | non_bits, to: type(of: self))
+#endif
+      _sanityCheck(_bits == newValue)
+    }
+  }
+  
   public var count : Int {
     get {
       return Int(extendingOrTruncating: UInt8(Builtin.zext_Int4_Int8(_count)))
@@ -187,88 +209,76 @@ extension String._XContent._Inline {
   }
   
   public init?<S: Sequence>(_ s: S) where S.Element : BinaryInteger {
-    _storage = (0,0,0,0)
-    let failed: Bool = withUnsafeMutableBufferPointer {
-      let start = $0.baseAddress._unsafelyUnwrappedUnchecked
-      for i in s {
-        guard count < capacity, let u = CodeUnit(exactly: i)
-        else { return true }
-        start[count] = u
-        count = count &+ 1
-      }
-      return false
+    var newBits: UInt128 = 0
+    var shift = 0
+    let maxShift = MemoryLayout.size(ofValue: _storage) * 8
+    for i in s {
+      guard shift < maxShift, let _ = CodeUnit(exactly: i) else { return nil }
+      newBits |= UInt128(i) &<< shift
+      shift += CodeUnit.bitWidth
     }
-    if failed { return nil }
+    count = shift / CodeUnit.bitWidth
+    _bits = newBits
   }
+}
 
-  public mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (UnsafeMutableBufferPointer<CodeUnit>)->R
-  ) -> R {
-    let capacity = self.capacity, count = self.count
-    return withUnsafeMutablePointer(to: &_storage) {
-      let start = UnsafeMutableRawPointer($0).bindMemory(
-        to: CodeUnit.self,
-        capacity: capacity
-      )
-      return body(
-        UnsafeMutableBufferPointer(start: start, count: count))
+extension String._XContent._Inline : RandomAccessCollection, MutableCollection {
+  typealias Index = Int
+  var startIndex: Index { return 0 }
+  var endIndex: Index { return count }
+  subscript(i: Index) -> CodeUnit {
+    get {
+      return CodeUnit(extendingOrTruncating: _bits &>> (i &* CodeUnit.bitWidth))
+    }
+    set {
+      let shift = i &* CodeUnit.bitWidth
+      _bits = (_bits & ~(UInt128(~newValue) &<< shift))
+        | (UInt128(newValue) &<< shift)
     }
   }
+  func index(after i: Index) -> Index {
+    return i &+ 1
+  }
+  func index(before i: Index) -> Index {
+    return i &- 1
+  }
+  func index(_ i: Index, offsetBy n: Int) -> Index {
+    return i &+ n
+  }
+  func distance(from i: Index, to j: Index) -> Int {
+    return j &- i
+  }
+}
 
-  /// Calls `body` on a mutable buffer that covers the entire extent of
-  /// allocated memory.
-  public mutating func _withMutableCapacity<R>(
-    body: (inout UnsafeMutableBufferPointer<CodeUnit>)->R
-  ) -> R {
-    let capacity = self.capacity
-    return self.withUnsafeMutableBufferPointer { buf in
-      var fullBuf = UnsafeMutableBufferPointer(
-        start: buf.baseAddress, count: capacity)
-      return body(&fullBuf)
-    }
+extension String._XContent._Inline : CustomDebugStringConvertible {
+  var debugDescription: String {
+    return String(describing: Array(self))
   }
-  
-  public func copiedToUnsafeBuffer(in scratch: inout String._XContent._Scratch)
-  -> UnsafeBufferPointer<CodeUnit> {
-    return withUnsafeMutablePointer(to: &scratch) {
-      UnsafeMutableRawPointer($0).storeBytes(
-        of: _storage, as: String._XContent._InlineStorage.self)
-      
-      let start = UnsafeRawPointer($0).bindMemory(
-        to: CodeUnit.self,
-        capacity: capacity
-      )
-      _sanityCheck(start[count] == 0)
-      return UnsafeBufferPointer(start: start, count: count)
-    }
-  }
+}
 
+extension String._XContent._Inline {
   public mutating func append(_ u: CodeUnit) {
     let oldCount = count
     count = count &+ 1
-    withUnsafeMutableBufferPointer { $0[oldCount] = u }
+    self[oldCount] = u
   }
 }
 
 extension String._XContent._Inline where CodeUnit == UInt8 {
   internal var isASCII : Bool {
-    return (UInt64(_storage.0) | UInt64(_storage.1) | UInt64(_storage.2))
-      & (0x8080_8080__8080_8080 as UInt64).littleEndian == 0
+    return _bits & (0x80_8080__8080_8080___8080_8080__8080_8080 as UInt128) == 0
   }
 }
 
 extension String._XContent._Inline where CodeUnit == UInt16 {
   
   internal var isASCII : Bool {
-    return (UInt64(_storage.0) | UInt64(_storage.1) | UInt64(_storage.2))
-      & (0xFF80_FF80__FF80_FF80 as UInt64).littleEndian == 0
+    return _bits & (0xFF80__FF80_FF80___FF80_FF80__FF80_FF80 as UInt128) == 0
   }
   
   internal var isLatin1 : Bool {
-    return (UInt64(_storage.0) | UInt64(_storage.1) | UInt64(_storage.2))
-      & (0xFF00_FF00__FF00_FF00 as UInt64).littleEndian == 0
+    return _bits & (0xFF00__FF00_FF00___FF00_FF00__FF00_FF00 as UInt128) == 0
   }
-  
 }
 
 extension String._XContent._Unowned {
@@ -299,11 +309,8 @@ extension String._XContent {
     self = .inline16(_Inline<UInt16>(EmptyCollection<UInt16>())!)
   }
   
-  func _existingLatin1(
-    in scratch: inout _Scratch
-  ) -> UnsafeBufferPointer<UInt8>? {
+  var _existingLatin1 : UnsafeBufferPointer<UInt8>? {
     switch self {
-    case .inline8(let x): return x.copiedToUnsafeBuffer(in: &scratch)
     case .latin1(let x): return x.withUnsafeBufferPointer { $0 }
     case .unowned8(let x): return x.unsafeBuffer
       /*
@@ -316,11 +323,8 @@ extension String._XContent {
     }
   }
 
-  func _existingUTF16(
-    in scratch: inout _Scratch
-  ) -> UnsafeBufferPointer<UInt16>? {
+  var _existingUTF16 : UnsafeBufferPointer<UInt16>? {
     switch self {
-    case .inline16(let x): return x.copiedToUnsafeBuffer(in: &scratch)
     case .utf16(let x): return x.withUnsafeBufferPointer { $0 }
     case .unowned16(let x): return x.unsafeBuffer
     case .nsString(let x):
@@ -461,17 +465,13 @@ extension String._XContent.UTF16View : Sequence {
         _buffer = .deep16(start + 1, end)
         return start.pointee
       case .inline8(var x, let i):
-        return x.withUnsafeMutableBufferPointer {
-          if i == $0.count { return nil }
-          _buffer = .inline8(x, i + 1)
-          return UInt16($0[Int(i)])
-        }
+        if i == x.count { return nil }
+        _buffer = .inline8(x, i &+ 1)
+        return UInt16(x[Int(i)])
       case .inline16(var x, let i):
-        return x.withUnsafeMutableBufferPointer {
-          if i == $0.count { return nil }
-          _buffer = .inline16(x, i + 1)
-          return $0[Int(i)]
-        }
+        if i == x.count { return nil }
+        _buffer = .inline16(x, i &+ 1)
+        return x[Int(i)]
       case .nsString(let i):
         let s = unsafeBitCast(_owner, to: _NSStringCore.self)
         if i == s.length() { return nil }
@@ -489,14 +489,30 @@ extension String._XContent.UTF16View : Sequence {
   func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
-    var scratch = String._XContent._scratch()
-    defer { _fixLifetime(scratch) }
-
     var n = 0
     if var d = destination._position {
       n = destination._end._unsafelyUnwrappedUnchecked - d
-      
-      if let source = _content._existingLatin1(in: &scratch) {
+
+      if case .inline8(let source) = _content, source.count <= n {
+        n = source.count
+        for u in source {
+          d.pointee = UInt16(extendingOrTruncating: u)
+          d += 1
+        }
+      }
+      else if case .inline16(let source) = _content, source.count <= n {
+        n = source.count
+        for u in source {
+          d.pointee = u
+          d += 1
+        }
+      }
+      else if let source = _content._existingUTF16 {
+        let s = source._position._unsafelyUnwrappedUnchecked
+        n = Swift.min(n, source._end._unsafelyUnwrappedUnchecked - s)
+        d.initialize(from: s, count: n)
+      }
+      else if let source = _content._existingLatin1 {
         var s = source._position._unsafelyUnwrappedUnchecked
         n = Swift.min(n, source._end._unsafelyUnwrappedUnchecked - s)
         let end = d + n
@@ -505,11 +521,6 @@ extension String._XContent.UTF16View : Sequence {
           d += 1
           s += 1
         }
-      }
-      else if let source = _content._existingUTF16(in: &scratch) {
-        let s = source._position._unsafelyUnwrappedUnchecked
-        n = Swift.min(n, source._end._unsafelyUnwrappedUnchecked - s)
-        d.initialize(from: s, count: n)
       }
       else {
         n = _copyContentsSlow(initializing: destination)
@@ -656,10 +667,8 @@ extension String._XContent.UTF16View : BidirectionalCollection {
     @inline(__always)
     get {
       switch self._content {
-      case .inline8(var x):
-        return x.withUnsafeMutableBufferPointer { UInt16($0[i]) }
-      case .inline16(var x):
-        return x.withUnsafeMutableBufferPointer { $0[i] }
+      case .inline8(var x): return UInt16(x[i])
+      case .inline16(var x):  return x[i]
       case .unowned8(let x): return UInt16(x.unsafeBuffer[i])
       case .unowned16(let x): return x.unsafeBuffer[i]
       case .latin1(let x): return UInt16(x[i])
@@ -739,17 +748,13 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
   }
 
   mutating func _allocateCapacity(_ minCapacity: Int, forcingUTF16: Bool) {
-    var scratch = String._XContent._scratch()
-    defer {
-      _fixLifetime(self)
-      _fixLifetime(scratch)
-    }
+    defer { _fixLifetime(self) }
     
-    if let codeUnits = _content._existingUTF16(in: &scratch) {
+    if let codeUnits = _content._existingUTF16 {
       self._content = .utf16(
         String._UTF16Storage.copying(codeUnits, minCapacity: minCapacity))
     }
-    else if let codeUnits = _content._existingLatin1(in: &scratch) {
+    else if let codeUnits = _content._existingLatin1 {
       if !forcingUTF16 {
         self._content = .latin1(
           String._Latin1Storage.copying(
@@ -808,32 +813,23 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
       x.count += copiedCount
 
     case .inline8(var x):
-      x._withMutableCapacity { buf in
-        for i in count..<buf.count {
-          let u = source.next()
-          guard u != nil && u! <= 0xFF else {
-            let newContent = String._XContent._Inline<UInt8>(buf[..<i])!
-            _content = .inline8(newContent)
-            if u != nil { self.append(u!) }
-            break
-          }
-          buf[i] = UInt8(extendingOrTruncating: u!)
+      while x.count < x.capacity, let u = source.next() {
+        guard let u8 = UInt8(exactly: u) else {
+          _content = .inline8(x)
+          self.append(u)
+          break
         }
+        x.append(u8)
       }
       
     case .inline16(var x):
-      x._withMutableCapacity { buf in
-        for i in count..<buf.count {
-          let u = source.next()
-          guard u != nil else {
-            _content = .inline16(String._XContent._Inline<UInt16>(buf[..<i])!)
-            break
-          }
-          buf[i] = u!
-        }
+      while x.count < x.capacity, let u = source.next() {
+        x.append(u)
       }
+      _content = .inline16(x)
       
-    default:  break
+    default:
+      break
     }
     
     while let u = source.next() { append(u) }
@@ -911,17 +907,10 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
     let minCapacity
       = target.upperBound == count && !newElements.isEmpty ? count * 2 : count
 
-    var scratch = String._XContent._scratch()
-    defer {
-      _fixLifetime(self)
-      _fixLifetime(scratch)
-    }
+    defer { _fixLifetime(self)  }
     
-    if let codeUnits = _content._existingLatin1(in: &scratch),
-    (
-      maxNewElement.map { $0 <= 0xFF }
-      ?? !newElements.contains { $0 > 0xFF }
-    ) {
+    if let codeUnits = _content._existingLatin1,
+    (maxNewElement.map { $0 <= 0xFF } ?? !newElements.contains { $0 > 0xFF }) {
       self = .init(
         _Concat3(
           codeUnits[..<target.lowerBound],
@@ -930,7 +919,7 @@ extension String._XContent.UTF16View : RangeReplaceableCollection {
         minCapacity: minCapacity
       )
     }
-    else if let codeUnits = _content._existingUTF16(in: &scratch) {
+    else if let codeUnits = _content._existingUTF16 {
       self = .init(
         _Concat3(
           codeUnits[..<target.lowerBound],
@@ -1030,7 +1019,9 @@ func time<T>(_ _caller : String = #function, _ block: () -> T) -> T? {
   var tmin = Double.infinity
   var tmax = 0.0, sum = 0.0
   var res: T?
-  let reps = testFilter.isEmpty ? 3 : 5
+  var reps = testFilter.isEmpty ? 3 : 5
+  _sanityCheck({ reps=1; return true }())
+  
   for _ in 0..<reps {
     let start = DispatchTime.now()
     res = block()
@@ -1060,7 +1051,14 @@ func testme2() {
   _sanityCheck({ N = 1; return true }()) // Reset N for debug builds
   
   for (x, y) in zip(cores, contents) {
-    if !x.elementsEqual(y) { fatalError("unequal") }
+    if !x.elementsEqual(y) {
+      debugPrint(String(x))
+      dump(y)
+      debugPrint(y)
+      print(Array(x))
+      print(Array(y))
+      fatalError("unequal")
+    }
     _sanityCheck(
       {
         debugPrint(String(x))
