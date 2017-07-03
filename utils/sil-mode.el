@@ -10,6 +10,9 @@
 ;;
 ;;===----------------------------------------------------------------------===;;
 
+(eval-when-compile
+  (require 'cl))
+
 ;; Create mode-specific tables.
 (defvar sil-mode-syntax-table nil
   "Syntax table used while in SIL mode.")
@@ -111,7 +114,7 @@
                     "existential_metatype" "init_existential_metatype")
                   'words) . font-lock-keyword-face)
    ;; Aggregate Types
-   `(,(regexp-opt '("retain_value" "release_value_addr" "retain_value"
+   `(,(regexp-opt '("retain_value" "release_value_addr" "release_value"
                     "release_value_addr" "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"
                     "struct_element_addr" "ref_element_addr"
@@ -238,7 +241,7 @@
 (define-abbrev-table 'sil-mode-abbrev-table ())
 
 (defvar sil-mode-hook nil)
-(defvar sil-mode-map nil)   ; Create a mode-specific keymap.
+(defvar sil-mode-map nil)   ;; Create a mode-specific keymap.
 
 (unless sil-mode-map
   (setq sil-mode-map (make-sparse-keymap))
@@ -246,19 +249,54 @@
   (define-key sil-mode-map "\es" 'center-line)
   (define-key sil-mode-map "\eS" 'center-paragraph))
 
+;;; Helper functions
+
+;; ViewCFG Integration
+;;
+;; *NOTE* viewcfg must be in the $PATH and .dot files should be associated with
+;; the graphviz app.
+(defvar sil-mode-viewcfg-program-name "viewcfg")
+(defvar sil-mode-viewcfg-buffer-name "*viewcfg*")
+
+(defcustom sil-mode-viewcfg-command-default "viewcfg"
+  "The path to the viewcfg command that should be used to dump
+  partial cfgs if we can not find viewcfg locally ourselves using swift-project-settings")
+;; TODO: If we have swift-project-settings enabled, we will know the swift
+;; source root directory. This will let us just use the absolute path to
+;; viewcfg.
+(defun get-viewcfg-command() sil-mode-viewcfg-command-default)
+
+(defvar sil-mode-viewcfg-command (get-viewcfg-command)
+  "The path to the viewcfg command that should be used")
+
+(defun sil-mode-display-function-cfg()
+  (interactive)
+  ;; First we need to find the previous '{' and then the next '}'
+  (save-mark-and-excursion
+   (let ((brace-start (search-backward "{"))
+         (brace-end (search-forward "}"))
+         (process-connection-type nil))
+     (let ((p (start-process sil-mode-viewcfg-program-name
+                             sil-mode-viewcfg-buffer-name
+                             sil-mode-viewcfg-command)))
+       (process-send-region p brace-start brace-end)
+       (process-send-eof p)))))
+
+;;; Top Level Entry point
+
 (defun sil-mode ()
   "Major mode for editing SIL source files.
   \\{sil-mode-map}
   Runs sil-mode-hook on startup."
   (interactive)
   (kill-all-local-variables)
-  (use-local-map sil-mode-map)         ; Provides the local keymap.
+  (use-local-map sil-mode-map)         ;; Provides the local keymap.
   (setq major-mode 'sil-mode)
 
   (make-local-variable 'font-lock-defaults)
-  (setq major-mode 'sil-mode           ; This is how describe-mode
-                                         ;   finds the doc string to print.
-  mode-name "SIL"                      ; This name goes into the modeline.
+  (setq major-mode 'sil-mode           ;; This is how describe-mode
+                                       ;; finds the doc string to print.
+  mode-name "SIL"                      ;; This name goes into the modeline.
   font-lock-defaults `(sil-font-lock-keywords))
 
   (setq local-abbrev-table sil-mode-abbrev-table)
@@ -266,8 +304,8 @@
   (setq comment-start "//")
   (setq tab-stop-list (number-sequence 2 120 2))
   (setq tab-width 2)
-  (run-hooks 'sil-mode-hook))          ; Finally, this permits the user to
-                                        ;   customize the mode with a hook.
+  (run-hooks 'sil-mode-hook))          ;; Finally, this permits the user to
+                                       ;;   customize the mode with a hook.
 
 ;; Associate .sil files with sil-mode
 (setq auto-mode-alist
