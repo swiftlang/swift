@@ -385,6 +385,85 @@ bb3:
   return %9999 : $()
 }
 
+// Make sure that we can properly handle a guaranteed switch_enum.
+sil @switch_enum_guaranteed_arg_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %0 : $Builtin.NativeObject
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%2 : @guaranteed $Builtin.NativeObject):
+  end_borrow_argument %2 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @switch_enum_guaranteed_beginborrow_test_1a : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %2 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %1 : $Builtin.NativeObject
+  switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @guaranteed $Builtin.NativeObject):
+  end_borrow_argument %3 : $Builtin.NativeObject
+  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  br bb3
+
+bb2:
+  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  br bb3
+
+bb3:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @switch_enum_guaranteed_beginborrow_test_1b : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %2 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %1 : $Builtin.NativeObject
+  switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @guaranteed $Builtin.NativeObject):
+  end_borrow_argument %3 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @switch_enum_guaranteed_beginborrow_test_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %0 : $Builtin.NativeObject
+  %2 = begin_borrow %1 : $Optional<Builtin.NativeObject>
+  switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @guaranteed $Builtin.NativeObject):
+  end_borrow_argument %3 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %2 from %1 : $Optional<Builtin.NativeObject>, $Optional<Builtin.NativeObject>
+  destroy_value %1 : $Optional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // Make sure that we can properly handle a switch enum case where the input
 // argument is an enum, but the final argument is trivial.
 sil @switch_enum_no_payload_test : $@convention(thin) () -> () {

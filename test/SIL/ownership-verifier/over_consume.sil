@@ -172,3 +172,74 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: Function: 'switch_enum_mismatching_argument_guaranteed_to_owned'
+// CHECK: Error! Argument ownership kind does not match switch_enum!
+// CHECK: SwitchEnum:   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+// CHECK: Argument:   %2 = argument of bb1 : $Builtin.NativeObject
+// CHECK: Expected convention: guaranteed.
+// CHECK: Actual convention:   owned
+sil @switch_enum_mismatching_argument_guaranteed_to_owned : $@convention(thin) (@guaranteed Optional<Builtin.NativeObject>) -> () {
+bb0(%0 : @guaranteed $Optional<Builtin.NativeObject>):
+  switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'switch_enum_mismatching_argument_owned_to_guaranteed'
+// CHECK: Error! Argument ownership kind does not match switch_enum!
+// CHECK: SwitchEnum:   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+// CHECK: Argument:   %2 = argument of bb1 : $Builtin.NativeObject
+// CHECK: Expected convention: owned.
+// CHECK: Actual convention: guaranteed
+sil @switch_enum_mismatching_argument_owned_to_guaranteed : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
+bb0(%0 : @owned $Optional<Builtin.NativeObject>):
+  switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%1 : @guaranteed $Builtin.NativeObject):
+  end_borrow_argument %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+// CHECK-LABEL: Function: 'switch_enum_guaranteed_arg_outlives_original_value'
+// CHECK: Found use after free?!
+// CHECK: Value:   %1 = begin_borrow %0 : $Optional<Builtin.NativeObject>
+// CHECK: Consuming User:   end_borrow %1 from %0 : $Optional<Builtin.NativeObject>, $Optional<Builtin.NativeObject>
+// CHECK: Non Consuming User:   end_borrow_argument %3 : $Builtin.NativeObject
+// CHECK: Block: bb1
+sil @switch_enum_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
+bb0(%0 : @owned $Optional<Builtin.NativeObject>):
+  %1 = begin_borrow %0 : $Optional<Builtin.NativeObject>
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%2 : @guaranteed $Builtin.NativeObject):
+  end_borrow %1 from %0 : $Optional<Builtin.NativeObject>, $Optional<Builtin.NativeObject>
+  end_borrow_argument %2 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %0 : $Optional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
