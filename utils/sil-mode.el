@@ -10,6 +10,9 @@
 ;;
 ;;===----------------------------------------------------------------------===;;
 
+(eval-when-compile
+  (require 'cl))
+
 ;; Create mode-specific tables.
 (defvar sil-mode-syntax-table nil
   "Syntax table used while in SIL mode.")
@@ -246,6 +249,38 @@
   (define-key sil-mode-map "\es" 'center-line)
   (define-key sil-mode-map "\eS" 'center-paragraph))
 
+;;; Helper functions
+
+;; ViewCFG Integration
+;;
+;; *NOTE* viewcfg must be in the $PATH and .dot files should be associated with
+;; the graphviz app.
+(defvar sil-mode-viewcfg-program-name "viewcfg")
+(defvar sil-mode-viewcfg-buffer-name "*viewcfg*")
+
+(defcustom sil-mode-viewcfg-command-default "viewcfg"
+  "The path to the viewcfg command that should be used to dump
+  partial cfgs if we can not find viewcfg locally ourselves using swift-project-settings")
+;; TODO: If we have swift-project-settings enabled, we will know the swift
+;; source root directory. This will let us just use the absolute path to
+;; viewcfg.
+(defun get-viewcfg-command() sil-mode-viewcfg-command-default)
+
+(defvar sil-mode-viewcfg-command (get-viewcfg-command)
+  "The path to the viewcfg command that should be used")
+
+(defun sil-mode-display-function-cfg()
+  (interactive)
+  ;; First we need to find the previous '{' and then the next '}'
+  (save-mark-and-excursion
+   (let ((brace-start (search-backward "{"))
+         (brace-end (search-forward "}"))
+         (process-connection-type nil))
+     (let ((p (start-process sil-mode-viewcfg-program-name
+                             sil-mode-viewcfg-buffer-name
+                             sil-mode-viewcfg-command)))
+       (process-send-region p brace-start brace-end)
+       (process-send-eof p)))))
 
 ;;; Top Level Entry point
 
