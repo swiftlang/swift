@@ -35,6 +35,14 @@
 using namespace swift;
 using namespace Lowering;
 
+//===----------------------------------------------------------------------===//
+//                             Pattern Utilities
+//===----------------------------------------------------------------------===//
+
+// TODO: These routines should probably be refactored into their own file since
+// they have nothing to do with the implementation of SILGenPattern
+// specifically.
+
 /// Shallow-dump a pattern node one level deep for debug purposes.
 static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
   if (!p) {
@@ -290,6 +298,10 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
+//===----------------------------------------------------------------------===//
+//                           SILGenPattern Emission
+//===----------------------------------------------------------------------===//
+
 namespace {
 
 /// A row which we intend to specialize.
@@ -467,6 +479,10 @@ private:
 
 /// A handle to a row in a clause matrix. Does not own memory; use of the
 /// ClauseRow must be dominated by its originating ClauseMatrix.
+///
+/// TODO: This should be refactored into a more general formulation that uses a
+/// child template pattern to inject our logic. This will then allow us to
+/// inject "mock" objects in a unittest file.
 class ClauseRow {
   friend class ClauseMatrix;
   
