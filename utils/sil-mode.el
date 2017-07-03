@@ -238,7 +238,7 @@
 (define-abbrev-table 'sil-mode-abbrev-table ())
 
 (defvar sil-mode-hook nil)
-(defvar sil-mode-map nil)   ; Create a mode-specific keymap.
+(defvar sil-mode-map nil)   ;; Create a mode-specific keymap.
 
 (unless sil-mode-map
   (setq sil-mode-map (make-sparse-keymap))
@@ -246,19 +246,22 @@
   (define-key sil-mode-map "\es" 'center-line)
   (define-key sil-mode-map "\eS" 'center-paragraph))
 
+
+;;; Top Level Entry point
+
 (defun sil-mode ()
   "Major mode for editing SIL source files.
   \\{sil-mode-map}
   Runs sil-mode-hook on startup."
   (interactive)
   (kill-all-local-variables)
-  (use-local-map sil-mode-map)         ; Provides the local keymap.
+  (use-local-map sil-mode-map)         ;; Provides the local keymap.
   (setq major-mode 'sil-mode)
 
   (make-local-variable 'font-lock-defaults)
-  (setq major-mode 'sil-mode           ; This is how describe-mode
-                                         ;   finds the doc string to print.
-  mode-name "SIL"                      ; This name goes into the modeline.
+  (setq major-mode 'sil-mode           ;; This is how describe-mode
+                                       ;; finds the doc string to print.
+  mode-name "SIL"                      ;; This name goes into the modeline.
   font-lock-defaults `(sil-font-lock-keywords))
 
   (setq local-abbrev-table sil-mode-abbrev-table)
@@ -266,8 +269,8 @@
   (setq comment-start "//")
   (setq tab-stop-list (number-sequence 2 120 2))
   (setq tab-width 2)
-  (run-hooks 'sil-mode-hook))          ; Finally, this permits the user to
-                                        ;   customize the mode with a hook.
+  (run-hooks 'sil-mode-hook))          ;; Finally, this permits the user to
+                                       ;;   customize the mode with a hook.
 
 ;; Associate .sil files with sil-mode
 (setq auto-mode-alist
