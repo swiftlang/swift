@@ -146,7 +146,7 @@ namespace swift {
 
     /// \brief Enable the experimental constraint propagation in the
     /// type checker.
-    bool EnableConstraintPropagation = false;
+    bool EnableConstraintPropagation = true;
 
     /// \brief Enable the iterative type checker.
     bool IterativeTypeChecker = false;
