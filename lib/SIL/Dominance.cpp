@@ -20,7 +20,6 @@
 using namespace swift;
 
 template class llvm::DominatorTreeBase<SILBasicBlock>;
-template class llvm::DominatorBase<SILBasicBlock>;
 template class llvm::DomTreeNodeBase<SILBasicBlock>;
 
 /// Compute the immediate-dominators map.
