@@ -344,13 +344,13 @@ bool ConstraintSystem::areProtocolConformancesConsistent(
           conformingType, associated,
           ConstraintGraph::GatheringKind::EquivalenceClass);
 
-      // For now we're only looking at operator argument conversions.
       // We'll test the source type of the conversion against the
-      // conformance. This does not work for non-operator arguments
-      // because of the implicit conversions we perform.
+      // conformance.
       for (auto *argumentConstraint : associated) {
         auto kind = argumentConstraint->getKind();
         switch (kind) {
+        case ConstraintKind::ArgumentTupleConversion:
+        case ConstraintKind::ArgumentConversion:
         case ConstraintKind::OperatorArgumentTupleConversion:
         case ConstraintKind::OperatorArgumentConversion:
           break;
