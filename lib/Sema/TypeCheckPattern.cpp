@@ -759,7 +759,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     
     checkTypeModifyingDeclAttributes(param);
     if (!hadError && type->is<InOutType>()) {
-      param->setLet(false);
+      param->setSpecifier(VarDecl::Specifier::InOut);
     }
   }
   
@@ -1045,7 +1045,7 @@ recur:
 
     checkTypeModifyingDeclAttributes(var);
     if (type->is<InOutType>()) {
-      NP->getDecl()->setLet(false);
+      NP->getDecl()->setSpecifier(VarDecl::Specifier::InOut);
     }
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
       type = var->getType()->getReferenceStorageReferent();
@@ -1565,7 +1565,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     
     assert(!ty->hasLValueType() && "Bound param type to @lvalue?");
     if (ty->is<InOutType>()) {
-      param->setLet(false);
+      param->setSpecifier(VarDecl::Specifier::InOut);
     } else if (auto *TTy = ty->getAs<TupleType>()) {
       if (param->hasName() && TTy->hasInOutElement()) {
         diagnose(param->getStartLoc(),

@@ -1272,7 +1272,10 @@ static void configureImplicitSelf(TypeChecker &tc,
 
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
-  selfDecl->setLet(!selfIfaceTy->is<InOutType>());
+  auto specifier = selfIfaceTy->is<InOutType>()
+                 ? VarDecl::Specifier::InOut
+                 : VarDecl::Specifier::Owned;
+  selfDecl->setSpecifier(specifier);
 
   selfDecl->setInterfaceType(selfIfaceTy);
 }

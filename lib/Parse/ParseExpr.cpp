@@ -2373,7 +2373,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
         Identifier name = Tok.is(tok::identifier) ?
             Context.getIdentifier(Tok.getText()) : Identifier();
-        auto var = new (Context) ParamDecl(VarDecl::Specifier::None, SourceLoc(),
+        auto var = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
                                            SourceLoc(), Identifier(),
                                            Tok.getLoc(), name, Type(), nullptr);
         elements.push_back(var);
@@ -2672,7 +2672,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = leftBraceLoc;
-    auto *var = new (Context) ParamDecl(VarDecl::Specifier::None, SourceLoc(),SourceLoc(),
+    auto *var = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),SourceLoc(),
                                         Identifier(), varLoc, ident, Type(),
                                         closure);
     var->setImplicit();
