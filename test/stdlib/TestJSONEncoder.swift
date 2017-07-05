@@ -136,6 +136,9 @@ class TestJSONEncoder : TestJSONEncoderSuper {
   func testEncodingDate() {
     // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     _testRoundTrip(of: TopLevelWrapper(Date()))
+
+    // Optional dates should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(Date()))
   }
 
   func testEncodingDateSecondsSince1970() {
@@ -148,6 +151,12 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                    expectedJSON: expectedJSON,
                    dateEncodingStrategy: .secondsSince1970,
                    dateDecodingStrategy: .secondsSince1970)
+
+    // Optional dates should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(Date(timeIntervalSince1970: seconds)),
+                   expectedJSON: expectedJSON,
+                   dateEncodingStrategy: .secondsSince1970,
+                   dateDecodingStrategy: .secondsSince1970)
   }
 
   func testEncodingDateMillisecondsSince1970() {
@@ -157,6 +166,12 @@ class TestJSONEncoder : TestJSONEncoderSuper {
 
     // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     _testRoundTrip(of: TopLevelWrapper(Date(timeIntervalSince1970: seconds)),
+                   expectedJSON: expectedJSON,
+                   dateEncodingStrategy: .millisecondsSince1970,
+                   dateDecodingStrategy: .millisecondsSince1970)
+
+    // Optional dates should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(Date(timeIntervalSince1970: seconds)),
                    expectedJSON: expectedJSON,
                    dateEncodingStrategy: .millisecondsSince1970,
                    dateDecodingStrategy: .millisecondsSince1970)
@@ -175,6 +190,13 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                      expectedJSON: expectedJSON,
                      dateEncodingStrategy: .iso8601,
                      dateDecodingStrategy: .iso8601)
+
+
+      // Optional dates should encode the same way.
+      _testRoundTrip(of: OptionalTopLevelWrapper(timestamp),
+                     expectedJSON: expectedJSON,
+                     dateEncodingStrategy: .iso8601,
+                     dateDecodingStrategy: .iso8601)
     }
   }
 
@@ -188,6 +210,12 @@ class TestJSONEncoder : TestJSONEncoderSuper {
 
     // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     _testRoundTrip(of: TopLevelWrapper(timestamp),
+                   expectedJSON: expectedJSON,
+                   dateEncodingStrategy: .formatted(formatter),
+                   dateDecodingStrategy: .formatted(formatter))
+
+    // Optional dates should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(timestamp),
                    expectedJSON: expectedJSON,
                    dateEncodingStrategy: .formatted(formatter),
                    dateDecodingStrategy: .formatted(formatter))
@@ -209,6 +237,12 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                    expectedJSON: expectedJSON,
                    dateEncodingStrategy: .custom(encode),
                    dateDecodingStrategy: .custom(decode))
+
+    // Optional dates should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(timestamp),
+                   expectedJSON: expectedJSON,
+                   dateEncodingStrategy: .custom(encode),
+                   dateDecodingStrategy: .custom(decode))
   }
 
   func testEncodingDateCustomEmpty() {
@@ -224,6 +258,12 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                    expectedJSON: expectedJSON,
                    dateEncodingStrategy: .custom(encode),
                    dateDecodingStrategy: .custom(decode))
+
+    // Optional dates should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(timestamp),
+                   expectedJSON: expectedJSON,
+                   dateEncodingStrategy: .custom(encode),
+                   dateDecodingStrategy: .custom(decode))
   }
 
   // MARK: - Data Strategy Tests
@@ -236,17 +276,26 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                    expectedJSON: expectedJSON,
                    dataEncodingStrategy: .deferredToData,
                    dataDecodingStrategy: .deferredToData)
+
+    // Optional data should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(data),
+                   expectedJSON: expectedJSON,
+                   dataEncodingStrategy: .deferredToData,
+                   dataDecodingStrategy: .deferredToData)
   }
 
-  func testEncodingBase64Data() {
+  func testEncodingDataBase64() {
     let data = Data(bytes: [0xDE, 0xAD, 0xBE, 0xEF])
 
     // We can't encode a top-level Data, so it'll be wrapped in a dictionary.
     let expectedJSON = "{\"value\":\"3q2+7w==\"}".data(using: .utf8)!
     _testRoundTrip(of: TopLevelWrapper(data), expectedJSON: expectedJSON)
+
+    // Optional data should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(data), expectedJSON: expectedJSON)
   }
 
-  func testEncodingCustomData() {
+  func testEncodingDataCustom() {
     // We'll encode a number instead of data.
     let encode = { (_ data: Data, _ encoder: Encoder) throws -> Void in
       var container = encoder.singleValueContainer()
@@ -260,9 +309,15 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                    expectedJSON: expectedJSON,
                    dataEncodingStrategy: .custom(encode),
                    dataDecodingStrategy: .custom(decode))
+
+    // Optional data should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(Data()),
+                   expectedJSON: expectedJSON,
+                   dataEncodingStrategy: .custom(encode),
+                   dataDecodingStrategy: .custom(decode))
   }
 
-  func testEncodingCustomDataEmpty() {
+  func testEncodingDataCustomEmpty() {
     // Encoding nothing should encode an empty keyed container ({}).
     let encode = { (_: Data, _: Encoder) throws -> Void in }
     let decode = { (_: Decoder) throws -> Data in return Data() }
@@ -270,6 +325,12 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     // We can't encode a top-level Data, so it'll be wrapped in a dictionary.
     let expectedJSON = "{\"value\":{}}".data(using: .utf8)!
     _testRoundTrip(of: TopLevelWrapper(Data()),
+                   expectedJSON: expectedJSON,
+                   dataEncodingStrategy: .custom(encode),
+                   dataDecodingStrategy: .custom(decode))
+
+    // Optional Data should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(Data()),
                    expectedJSON: expectedJSON,
                    dataEncodingStrategy: .custom(encode),
                    dataDecodingStrategy: .custom(decode))
@@ -284,12 +345,20 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     _testEncodeFailure(of: TopLevelWrapper(Double.infinity))
     _testEncodeFailure(of: TopLevelWrapper(-Double.infinity))
     _testEncodeFailure(of: TopLevelWrapper(Double.nan))
+
+    // Optional Floats/Doubles should encode the same way.
+    _testEncodeFailure(of: OptionalTopLevelWrapper(Float.infinity))
+    _testEncodeFailure(of: OptionalTopLevelWrapper(-Float.infinity))
+    _testEncodeFailure(of: OptionalTopLevelWrapper(Float.nan))
+
+    _testEncodeFailure(of: OptionalTopLevelWrapper(Double.infinity))
+    _testEncodeFailure(of: OptionalTopLevelWrapper(-Double.infinity))
+    _testEncodeFailure(of: OptionalTopLevelWrapper(Double.nan))
   }
 
   func testEncodingNonConformingFloatStrings() {
     let encodingStrategy: JSONEncoder.NonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: "INF", negativeInfinity: "-INF", nan: "NaN")
     let decodingStrategy: JSONDecoder.NonConformingFloatDecodingStrategy = .convertFromString(positiveInfinity: "INF", negativeInfinity: "-INF", nan: "NaN")
-
 
     _testRoundTrip(of: TopLevelWrapper(Float.infinity),
                    expectedJSON: "{\"value\":\"INF\"}".data(using: .utf8)!,
@@ -320,6 +389,24 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                    expectedJSON: "{\"value\":\"NaN\"}".data(using: .utf8)!,
                    nonConformingFloatEncodingStrategy: encodingStrategy,
                    nonConformingFloatDecodingStrategy: decodingStrategy)
+
+    // Optional Floats and Doubles should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(Float.infinity),
+                   expectedJSON: "{\"value\":\"INF\"}".data(using: .utf8)!,
+                   nonConformingFloatEncodingStrategy: encodingStrategy,
+                   nonConformingFloatDecodingStrategy: decodingStrategy)
+    _testRoundTrip(of: OptionalTopLevelWrapper(-Float.infinity),
+                   expectedJSON: "{\"value\":\"-INF\"}".data(using: .utf8)!,
+                   nonConformingFloatEncodingStrategy: encodingStrategy,
+                   nonConformingFloatDecodingStrategy: decodingStrategy)
+    _testRoundTrip(of: OptionalTopLevelWrapper(Double.infinity),
+                   expectedJSON: "{\"value\":\"INF\"}".data(using: .utf8)!,
+                   nonConformingFloatEncodingStrategy: encodingStrategy,
+                   nonConformingFloatDecodingStrategy: decodingStrategy)
+    _testRoundTrip(of: OptionalTopLevelWrapper(-Double.infinity),
+                   expectedJSON: "{\"value\":\"-INF\"}".data(using: .utf8)!,
+                   nonConformingFloatEncodingStrategy: encodingStrategy,
+                   nonConformingFloatDecodingStrategy: decodingStrategy)
   }
 
   // MARK: - Encoder Features
@@ -348,6 +435,9 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     // 1e127 is too big to fit natively in a Double, too, so want to make sure it's encoded as a Decimal.
     let decimal = Decimal(sign: .plus, exponent: 127, significand: Decimal(1))
     _testRoundTrip(of: TopLevelWrapper(decimal), expectedJSON: expectedJSON)
+
+    // Optional Decimals should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(decimal), expectedJSON: expectedJSON)
   }
 
   func testInterceptURL() {
@@ -355,6 +445,9 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let expectedJSON = "{\"value\":\"http:\\/\\/swift.org\"}".data(using: .utf8)!
     let url = URL(string: "http://swift.org")!
     _testRoundTrip(of: TopLevelWrapper(url), expectedJSON: expectedJSON)
+
+    // Optional URLs should encode the same way.
+    _testRoundTrip(of: OptionalTopLevelWrapper(url), expectedJSON: expectedJSON)
   }
 
   // MARK: - Helper Functions
@@ -867,6 +960,34 @@ fileprivate struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T 
   }
 }
 
+/// Wraps a type T (as T?) so that it can be encoded at the top level of a payload.
+fileprivate struct OptionalTopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
+  let value: T?
+
+  init(_ value: T) {
+    self.value = value
+  }
+
+  // Provide an implementation of Codable to encode(forKey:) instead of encodeIfPresent(forKey:).
+  private enum CodingKeys : String, CodingKey {
+    case value
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    value = try container.decode(T?.self, forKey: .value)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(value, forKey: .value)
+  }
+
+  static func ==(_ lhs: OptionalTopLevelWrapper<T>, _ rhs: OptionalTopLevelWrapper<T>) -> Bool {
+    return lhs.value == rhs.value
+  }
+}
+
 fileprivate struct FloatNaNPlaceholder : Codable, Equatable {
   init() {}
 
@@ -939,9 +1060,9 @@ JSONEncoderTests.test("testEncodingDateFormatted") { TestJSONEncoder().testEncod
 JSONEncoderTests.test("testEncodingDateCustom") { TestJSONEncoder().testEncodingDateCustom() }
 JSONEncoderTests.test("testEncodingDateCustomEmpty") { TestJSONEncoder().testEncodingDateCustomEmpty() }
 JSONEncoderTests.test("testEncodingData") { TestJSONEncoder().testEncodingData() }
-JSONEncoderTests.test("testEncodingBase64Data") { TestJSONEncoder().testEncodingBase64Data() }
-JSONEncoderTests.test("testEncodingCustomData") { TestJSONEncoder().testEncodingCustomData() }
-JSONEncoderTests.test("testEncodingCustomDataEmpty") { TestJSONEncoder().testEncodingCustomDataEmpty() }
+JSONEncoderTests.test("testEncodingDataBase64") { TestJSONEncoder().testEncodingDataBase64() }
+JSONEncoderTests.test("testEncodingDataCustom") { TestJSONEncoder().testEncodingDataCustom() }
+JSONEncoderTests.test("testEncodingDataCustomEmpty") { TestJSONEncoder().testEncodingDataCustomEmpty() }
 JSONEncoderTests.test("testEncodingNonConformingFloats") { TestJSONEncoder().testEncodingNonConformingFloats() }
 JSONEncoderTests.test("testEncodingNonConformingFloatStrings") { TestJSONEncoder().testEncodingNonConformingFloatStrings() }
 JSONEncoderTests.test("testNestedContainerCodingPaths") { TestJSONEncoder().testNestedContainerCodingPaths() }
