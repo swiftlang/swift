@@ -4464,6 +4464,9 @@ public:
   Specifier getSpecifier() const {
     return static_cast<Specifier>(VarDeclBits.Specifier);
   }
+  void setSpecifier(Specifier Spec) {
+    VarDeclBits.Specifier = static_cast<unsigned>(Spec);
+  }
   
   /// Is this a type ('static') variable?
   bool isStatic() const { return VarDeclBits.IsStatic; }
@@ -4474,18 +4477,6 @@ public:
 
   /// Is this an immutable 'let' property?
   bool isLet() const { return getSpecifier() == Specifier::Let; }
-  // FIXME: Remove this setter.
-  void setLet(bool immutable) {
-    auto specifier = VarDecl::Specifier::Let;
-    if (!immutable) {
-      if (getKind() == DeclKind::Param) {
-        specifier = VarDecl::Specifier::InOut;
-      } else {
-        specifier = VarDecl::Specifier::Var;
-      }
-    }
-    VarDeclBits.Specifier = static_cast<unsigned>(specifier);
-  }
   
   /// Is this an element in a capture list?
   bool isCaptureList() const { return VarDeclBits.IsCaptureList; }

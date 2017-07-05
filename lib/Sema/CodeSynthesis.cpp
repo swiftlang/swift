@@ -304,8 +304,8 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
                   ctx.TheRawPointerType,
                   VarDecl::Specifier::Owned),
     buildArgument(loc, DC, "callbackStorage",
-                  ctx.TheUnsafeValueBufferType,
-                  ctx.TheUnsafeValueBufferType,
+                  InOutType::get(ctx.TheUnsafeValueBufferType),
+                  InOutType::get(ctx.TheUnsafeValueBufferType),
                   VarDecl::Specifier::InOut)
   };
   params.push_back(buildIndexForwardingParamList(storage, bufferElements));
