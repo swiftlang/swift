@@ -1501,7 +1501,7 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   auto elementTy = dc->mapTypeIntoContext(elementInterfaceTy);
 
   auto paramVarDecl =
-      new (C) ParamDecl(VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                         Identifier(), loc, valueIndex->get(0)->getName(),
                         elementTy, dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
