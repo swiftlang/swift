@@ -2319,23 +2319,31 @@ namespace {
     Parameter,
     ParameterTupleElement
   };
+
+  enum class OptionalUnwrapping {
+    None,
+    OptionalToOptional,
+    ValueToOptional,
+    OptionalToValue
+  };
 } // end anonymous namespace
 
 static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
-                    ParameterPosition paramPosition, bool insideOptional,
+                    ParameterPosition paramPosition,
+                    OptionalUnwrapping insideOptional,
                     LazyResolver *resolver) {
   if (t1 == t2) return true;
 
   // First try unwrapping optionals.
   // Make sure we only unwrap at most one layer of optional.
-  if (!insideOptional) {
+  if (insideOptional == OptionalUnwrapping::None) {
     // Value-to-optional and optional-to-optional.
     if (auto obj2 = t2.getAnyOptionalObjectType()) {
       // Optional-to-optional.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         // Allow T? and T! to freely match one another.
         return matches(obj1, obj2, matchMode, ParameterPosition::NotParameter,
-                       /*insideOptional=*/true, resolver);
+                       OptionalUnwrapping::OptionalToOptional, resolver);
       }
 
       // Value-to-optional.
@@ -2346,7 +2354,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (matchMode.contains(TypeMatchFlags::AllowOverride) ||
           matchMode.contains(TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
         return matches(t1, obj2, matchMode, ParameterPosition::NotParameter,
-                       /*insideOptional=*/true, resolver);
+                       OptionalUnwrapping::ValueToOptional, resolver);
       }
 
     } else if (matchMode.contains(
@@ -2354,7 +2362,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       // Optional-to-value, normally disallowed.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         return matches(obj1, t2, matchMode, ParameterPosition::NotParameter,
-                       /*insideOptional=*/true, resolver);
+                       OptionalUnwrapping::OptionalToValue, resolver);
       }
     }
   }
@@ -2378,14 +2386,14 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1) {
         return matches(t1, tuple2.getElementType(0), matchMode, elementPosition,
-                       /*insideOptional=*/false, resolver);
+                       OptionalUnwrapping::None, resolver);
       }
       return false;
     }
 
     for (auto i : indices(tuple1.getElementTypes())) {
       if (!matches(tuple1.getElementType(i), tuple2.getElementType(i),
-                   matchMode, elementPosition, /*insideOptional=*/false,
+                   matchMode, elementPosition, OptionalUnwrapping::None,
                    resolver)){
         return false;
       }
@@ -2414,22 +2422,32 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
         ext1 = ext1.withThrows(true);
       }
     }
+    // If specified, allow an escaping function parameter to override a
+    // non-escaping function parameter when the parameter is optional.
+    // Note that this is checking 'ext2' rather than 'ext1' because parameters
+    // must be contravariant for the containing function to be covariant.
+    if (matchMode.contains(
+          TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam) &&
+        insideOptional == OptionalUnwrapping::OptionalToOptional) {
+      if (!ext2.isNoEscape())
+        ext1 = ext1.withNoEscape(false);
+    }
     if (ext1 != ext2)
       return false;
 
     // Inputs are contravariant, results are covariant.
     return (matches(fn2.getInput(), fn1.getInput(), matchMode,
-                    ParameterPosition::Parameter, /*insideOptional=*/false,
+                    ParameterPosition::Parameter, OptionalUnwrapping::None,
                     resolver) &&
             matches(fn1.getResult(), fn2.getResult(), matchMode,
-                    ParameterPosition::NotParameter, /*insideOptional=*/false,
+                    ParameterPosition::NotParameter, OptionalUnwrapping::None,
                     resolver));
   }
 
   if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
       (paramPosition == ParameterPosition::Parameter ||
        paramPosition == ParameterPosition::ParameterTupleElement) &&
-      !insideOptional) {
+      insideOptional == OptionalUnwrapping::None) {
     // Allow T to override T! in certain cases.
     if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
       t1 = obj1->getCanonicalType();
@@ -2452,7 +2470,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
                        LazyResolver *resolver) {
   return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
-                   ParameterPosition::NotParameter, /*insideOptional=*/false,
+                   ParameterPosition::NotParameter, OptionalUnwrapping::None,
                    resolver);
 }
 

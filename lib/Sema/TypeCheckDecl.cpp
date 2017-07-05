@@ -5823,6 +5823,8 @@ public:
           matchMode |= TypeMatchFlags::AllowTopLevelOptionalMismatch;
         } else if (parentDecl->isObjC()) {
           matchMode |= TypeMatchFlags::AllowNonOptionalForIUOParam;
+          matchMode |=
+              TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam;
         }
 
         if (declTy->matches(parentDeclTy, matchMode, &TC)) {
