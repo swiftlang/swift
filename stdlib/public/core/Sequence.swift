@@ -375,6 +375,19 @@ public protocol Sequence {
     _ transform: (Element) throws -> T
   ) rethrows -> [T]
 
+  /// Returns an array containing extracted values behind keypaths of
+  /// the Sequences elements.
+  ///
+  /// In this example, `map` is used to get the number of unicode scalars
+  /// of each String in an array.
+  ///
+  ///     let a = ["a", "foo", "bar"]
+  ///     let b = a.map(keypath: \.count)
+  ///
+  /// - Parameter keyPath: The keypath of the property to extract
+  /// - Returns: An array containing the extracted values of the elements
+  func map<Value>(keyPath: KeyPath<Element, Value>) -> [Value]
+
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
   ///
@@ -847,6 +860,22 @@ extension Sequence {
       result.append(try transform(element))
     }
     return Array(result)
+  }
+
+  /// Returns an array containing extracted values behind keypaths of
+  /// the Sequences elements.
+  ///
+  /// In this example, `map` is used to get the number of unicode scalars
+  /// of each String in an array.
+  ///
+  ///     let a = ["a", "foo", "bar"]
+  ///     let b = a.map(keypath: \.count)
+  ///
+  /// - Parameter keyPath: The keypath of the property to extract
+  /// - Returns: An array containing the extracted values of the elements
+  @_inlineable
+  public func map<Value>(keyPath: KeyPath<Element, Value>) -> [Value] {
+      return self.map { $0[keyPath: keypath] }
   }
 
   /// Returns an array containing, in order, the elements of the sequence

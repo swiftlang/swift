@@ -57,6 +57,10 @@ extension _SequenceWrapper where Element == Base.Element {
 ) rethrows -> [T] {
     return try _base.map(transform)
   }
+
+  func map<Value>(keyPath: KeyPath<Element, Value>) -> [Value] {
+    return _base.map(keyPath: keyPath)
+  }
   
   public func filter(
     _ isIncluded: (Element) throws -> Bool
