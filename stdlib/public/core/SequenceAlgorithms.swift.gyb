@@ -667,6 +667,24 @@ extension Sequence {
     }
     return result
   }
+
+  /// Returns an array containing the extracted members behind the keypath of
+  /// each element, flattened, since the value is a `Sequence` itself.
+  ///
+  /// In this example, `flatMap` maps all elements to it's description (which
+  /// is a Sequence itself) and flattens this to a Sequence of all characters.
+  ///
+  ///     let a = ["foo", "bar"]
+  ///     a.flatMap(keyPath: \.description)
+  ///     // ["f", "o", "o", "b", "a", "r"]
+  ///
+  /// - Parameter keyPath: A valid keypath of `Element` that is a `Sequence`.
+  /// - Returns: The resulting flattened array.
+  @_inlineable
+  func flatMap<SequenceValue: Sequence>(
+    keyPath: KeyPath<Element, SequenceValue>) -> [SequenceValue.Element] {
+    return self.flatMap { $0[keyPath: keyPath] }
+  }
 }
 
 extension Sequence {
@@ -715,6 +733,31 @@ extension Sequence {
       }
     }
     return result
+  }
+
+  /// Returns an array containing the extracted members behind the keypath of
+  /// each element. Since the members are `Optional` it will also filter out
+  /// the `Elements` that are `nil`.
+  ///
+  /// In this example, `flatMap` maps all Person elements to it's name (which
+  /// is optional) and filters the resulting array for it's non-nil values.
+  ///
+  /// struct Person {
+  ///     var name: String?
+  /// }
+  /// 
+  /// let p1 = Person(name: "Tim")
+  /// let p2 = Person(name: nil)
+  /// let p3 = Person(name: "Steve")
+  /// 
+  /// let persons = [p1, p2, p3]
+  /// persons.flatMap(keyPath: \.name)
+  ///
+  /// - Parameter keyPath: A valid keypath of Element that is an `Optional`.
+  /// - Returns: The resulting flattened array.
+  @_inlineable
+  public func flatMap<Value>(keyPath: KeyPath<Element, Value?>) -> [Value] {
+    return self.flatMap { $0[keyPath: keyPath] }
   }
 }
 

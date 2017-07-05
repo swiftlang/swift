@@ -375,6 +375,19 @@ public protocol Sequence {
     _ transform: (Element) throws -> T
   ) rethrows -> [T]
 
+  /// Returns an array containing extracted values behind keypaths of
+  /// the Sequences elements.
+  ///
+  /// In this example, `map` is used to get the number of unicode scalars
+  /// of each String in an array.
+  ///
+  ///     let a = ["a", "foo", "bar"]
+  ///     let b = a.map(keypath: \.count)
+  ///
+  /// - Parameter keyPath: The keypath of the property to extract
+  /// - Returns: An array containing the extracted values of the elements
+  func map<Value>(keyPath: KeyPath<Element, Value>) -> [Value]
+
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
   ///
@@ -393,6 +406,19 @@ public protocol Sequence {
   func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element]
+
+  /// Returns an array containing, in order, the extracted properties of the
+  /// elements of the sequence if they evaluate to true.
+  ///
+  /// In this example, `filter(keyPath:)` is used to get all ASCII characters
+  /// from a Sequence of UnicodeScalars.
+  ///
+  ///     "foo😱".unicodeScalars.filter(keyPath: \.isASCII)
+  ///
+  /// - Parameter keyPath: A valid keypath of Element that is of type Bool
+  /// - Returns: The filtered `Sequence` as an array containing only the
+  ///     elements where the extracted value evaluates to true.
+  func filter(keyPath: KeyPath<Element, Bool>) -> [Element]
 
   /// Calls the given closure on each element in the sequence in the same order
   /// as a `for`-`in` loop.
@@ -849,6 +875,22 @@ extension Sequence {
     return Array(result)
   }
 
+  /// Returns an array containing extracted values behind keypaths of
+  /// the Sequences elements.
+  ///
+  /// In this example, `map` is used to get the number of unicode scalars
+  /// of each String in an array.
+  ///
+  ///     let a = ["a", "foo", "bar"]
+  ///     let b = a.map(keypath: \.count)
+  ///
+  /// - Parameter keyPath: The keypath of the property to extract
+  /// - Returns: An array containing the extracted values of the elements
+  @_inlineable
+  public func map<Value>(keyPath: KeyPath<Element, Value>) -> [Value] {
+      return self.map { $0[keyPath: keypath] }
+  }
+
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
   ///
@@ -887,6 +929,22 @@ extension Sequence {
     }
 
     return Array(result)
+  }
+
+  /// Returns an array containing, in order, the extracted properties of the
+  /// elements of the sequence if they evaluate to true.
+  ///
+  /// In this example, `filter(keyPath:)` is used to get all ASCII characters
+  /// from a Sequence of UnicodeScalars.
+  ///
+  ///     "foo😱".unicodeScalars.filter(keyPath: \.isASCII)
+  ///
+  /// - Parameter keyPath: A valid keypath of Element that is of type Bool
+  /// - Returns: The filtered `Sequence` as an array containing only the
+  ///     elements where the extracted value evaluates to true.
+  @_inlineable
+  func filter(keyPath: KeyPath<Element, Bool>) -> [Element] {
+    return self.filter { $0[keyPath: keyPath] }
   }
 
   /// Returns a subsequence, up to the given maximum length, containing the
