@@ -209,12 +209,9 @@ llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
 }
 
 llvm::Value *IRGenFunction::emitAllocEmptyBoxCall() {
-  llvm::Attribute::AttrKind attrKinds[] = {
-    llvm::Attribute::NoUnwind,
-  };
-  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
-                                       llvm::AttributeSet::FunctionIndex,
-                                       attrKinds);
+  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+                                        llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getAllocEmptyBoxFn(), {});
   call->setCallingConv(IGM.DefaultCC);

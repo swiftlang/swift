@@ -22,7 +22,6 @@
 #include "swift/SIL/CFG.h"
 
 extern template class llvm::DominatorTreeBase<swift::SILBasicBlock>;
-extern template class llvm::DominatorBase<swift::SILBasicBlock>;
 extern template class llvm::DomTreeNodeBase<swift::SILBasicBlock>;
 
 namespace swift {
