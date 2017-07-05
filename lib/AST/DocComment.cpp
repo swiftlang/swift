@@ -22,7 +22,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Markup/Markup.h"
-#include "llvm/ADT/SetVector.h"
 
 using namespace swift;
 
@@ -215,7 +214,6 @@ bool extractSimpleField(
     SmallVectorImpl<const swift::markup::MarkupASTNode *> &BodyNodes) {
   auto Children = L->getChildren();
   SmallVector<swift::markup::MarkupASTNode *, 8> NormalItems;
-  llvm::SmallSetVector<StringRef, 8> Tags;
   for (auto Child : Children) {
     auto I = dyn_cast<swift::markup::Item>(Child);
     if (!I) {
@@ -271,7 +269,7 @@ bool extractSimpleField(
       llvm::SmallString<64> Scratch;
       llvm::raw_svector_ostream OS(Scratch);
       printInlinesUnder(TF, OS);
-      Tags.insert(MC.allocateCopy(OS.str()));
+      Parts.Tags.insert(MC.allocateCopy(OS.str()));
     } else if (auto LKF = dyn_cast<markup::LocalizationKeyField>(Field)) {
       Parts.LocalizationKeyField = LKF;
     } else {
@@ -281,8 +279,6 @@ bool extractSimpleField(
 
   if (NormalItems.size() != Children.size())
     L->setChildren(NormalItems);
-
-  Parts.Tags = MC.allocateCopy(Tags.getArrayRef());
 
   return NormalItems.size() == 0;
 }
