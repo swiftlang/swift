@@ -753,8 +753,8 @@ handleSemanticRequest(RequestDict Req,
       return Rec(createErrorRequestInvalid("'key.namekind' is required"));
     }
 
-    static UIdent UIDKindNameSwift("source.lang.name.kind.swift");
-    static UIdent UIDKindNameObjc("source.lang.name.kind.objc");
+    static UIdent UIDKindNameSwift(KindNameSwift.str());
+    static UIdent UIDKindNameObjc(KindNameObjc.str());
 
     if (NK == KindNameSwift.get())
       Input.NameKind = UIDKindNameSwift;
