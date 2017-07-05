@@ -122,8 +122,8 @@ For every target above, there are variants for different optimizations:
   ``check-swift-non-executable-iphoneos-arm64``) -- runs tests not marked with
   ``executable_test`` in ``-Onone`` mode.
 
-If you need to manually run certain tests, you can invoke LLVM's lit.py script
-directly. For example:
+If more control is required (e.g. to manually run certain tests), you can invoke
+LLVM's lit.py script directly. For example:
 
 .. code-block:: bash
 
@@ -148,10 +148,33 @@ regardless of location.
 For more complicated configuration, copy the invocation from one of the build
 targets mentioned above and modify it as necessary. lit.py also has several
 useful features, like timing tests and providing a timeout. Check these features
-out with ``lit.py -h``.
+out with ``lit.py -h``. We document some of the more useful ones below:
 
 Extra lit.py invocation options
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* ``-s`` reduces the amount of output that lit shows.
+
+* ``-v`` causes a test's commandline and output to be printed if the test fails.
+
+* ``-a`` causes a test's commandline and output to always be printed.
+
+* ``--filter=<pattern>`` causes only tests with paths matching the given regular
+  expression to be run.
+
+* ``-i`` causes tests that have a newer modification date and failing tests to
+  be run first. This is implemented by updating the mtimes of the tests.
+
+* ``--no-execute`` causes a dry run to be performed. *NOTE* This means that all
+  tests are assumed to PASS.
+
+* ``--time-tests`` will cause elapsed wall time to be tracked for each test.
+
+* ``--timeout=<MAXINDIVIDUALTESTTIME>`` sets a maximum time that can be spent
+  running a single test (in seconds). 0 (the default means no time limit.
+
+* ``--max-failures=<MAXFAILURES>`` stops execution after ``MAXFAILURES`` number
+  of failures.
 
 * ``--param gmalloc`` will run all tests under Guard Malloc (macOS only). See
   ``man libgmalloc`` for more information.
