@@ -39,7 +39,8 @@ class AccessSummaryDumper : public SILModuleTransform {
       }
       const AccessSummaryAnalysis::FunctionSummary &summary =
           analysis->getOrCreateSummary(&fn);
-      llvm::outs() << summary << "\n";
+      summary.print(llvm::outs(), &fn);
+      llvm::outs() << "\n";
     }
   }
 };
