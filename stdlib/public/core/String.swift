@@ -879,7 +879,7 @@ extension String {
   }
 }
 
-extension Sequence where Element == String {
+extension Sequence where Element : StringProtocol {
 
   /// Returns a new string by concatenating the elements of the sequence,
   /// adding the given separator between each element.
@@ -913,7 +913,7 @@ extension Sequence where Element == String {
       for chunk in self {
         // FIXME(performance): this code assumes UTF-16 in-memory representation.
         // It should be switched to low-level APIs.
-        r += separatorSize + chunk.utf16.count
+        r += separatorSize + numericCast(chunk.utf16.count)
       }
       return r - separatorSize
     }
@@ -924,17 +924,17 @@ extension Sequence where Element == String {
 
     if separatorSize == 0 {
       for x in self {
-        result.append(x)
+        result.append(x._ephemeralString)
       }
       return result
     }
 
     var iter = makeIterator()
     if let first = iter.next() {
-      result.append(first)
+      result.append(first._ephemeralString)
       while let next = iter.next() {
         result.append(separator)
-        result.append(next)
+        result.append(next._ephemeralString)
       }
     }
 
@@ -946,7 +946,7 @@ extension Sequence where Element == String {
 // This overload is necessary because String now conforms to
 // BidirectionalCollection, and there are other `joined` overloads that are
 // considered more specific. See Flatten.swift.gyb.
-extension BidirectionalCollection where Iterator.Element == String {
+extension BidirectionalCollection where Element : StringProtocol {
   /// Returns a new string by concatenating the elements of the sequence,
   /// adding the given separator between each element.
   ///
