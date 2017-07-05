@@ -208,6 +208,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::MarkUninitializedInst:
   case ValueKind::SelectEnumInst:
   case ValueKind::SwitchEnumInst:
+  case ValueKind::CheckedCastBranchInst:
     return true;
   default:
     return false;
@@ -337,6 +338,12 @@ public:
   OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I) {
     return visitForwardingInst(I, I->getAllOperands());
   }
+
+  /// Visit a terminator instance that performs a transform like
+  /// operation. E.x.: switch_enum, checked_cast_br. This does not include br or
+  /// cond_br.
+  OwnershipUseCheckerResult visitTransformingTerminatorInst(TermInst *TI);
+
   OwnershipUseCheckerResult
   visitApplyArgument(ValueOwnershipKind RequiredConvention, bool ShouldCheck);
   OwnershipUseCheckerResult
@@ -520,7 +527,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, DeallocValueBuffer)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastBranch)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastValueBranch)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialOpaque)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, DeinitExistentialOpaque)
@@ -745,6 +751,18 @@ OwnershipCompatibilityUseChecker::visitCondBranchInst(CondBranchInst *CBI) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitSwitchEnumInst(SwitchEnumInst *SEI) {
+  return visitTransformingTerminatorInst(SEI);
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitCheckedCastBranchInst(
+    CheckedCastBranchInst *SEI) {
+  return visitTransformingTerminatorInst(SEI);
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitTransformingTerminatorInst(
+    TermInst *TI) {
   // If our operand was trivial, return early.
   if (compatibleWithOwnership(ValueOwnershipKind::Trivial))
     return {true, false};
@@ -753,11 +771,9 @@ OwnershipCompatibilityUseChecker::visitSwitchEnumInst(SwitchEnumInst *SEI) {
   // they have a payload, the payload's convention matches our
   // convention.
   //
-  // *NOTE* since we are dealing with enums, we ignore trivial and no payload
-  // enums.
   // *NOTE* we assume that all of our types line up and are checked by the
   // normal verifier.
-  for (auto *Succ : SEI->getParent()->getSuccessorBlocks()) {
+  for (auto *Succ : TI->getParent()->getSuccessorBlocks()) {
     // This must be a no-payload case... continue.
     if (Succ->args_size() == 0)
       continue;
@@ -773,10 +789,9 @@ OwnershipCompatibilityUseChecker::visitSwitchEnumInst(SwitchEnumInst *SEI) {
     handleError([&]() {
       llvm::errs()
           << "Function: '" << Succ->getParent()->getName() << "'\n"
-          << "Error! Argument ownership kind does not match switch_enum!\n"
-          << "SwitchEnum: " << *SEI << "Argument: " << *Succ->getArgument(0)
-          << "Expected convention: " << SEI->getOperand().getOwnershipKind()
-          << ".\n"
+          << "Error! Argument ownership kind does not match terminator!\n"
+          << "Terminator: " << *TI << "Argument: " << *Succ->getArgument(0)
+          << "Expected convention: " << getOwnershipKind() << ".\n"
           << "Actual convention:   " << OwnershipKind << '\n'
           << '\n';
     });
