@@ -1295,12 +1295,12 @@ To build with AddressSanitizer:
 
   [~/src/s]$ ./swift/utils/build-script --preset=asan
 
-To build a root for Xcode XYZ, '/tmp/xcode-xyz-root.tar.gz':
+To build a root for Xcode XYZ, '/tmp/xcode-xyz-root.tar.xz':
 
   [~/src/s]$ ./swift/utils/build-script --preset=buildbot_BNI_internal_XYZ \\
       install_destdir="/tmp/install"
       install_symroot="/tmp/symroot"
-      installable_package="/tmp/xcode-xyz-root.tar.gz"
+      installable_package="/tmp/xcode-xyz-root.tar.xz"
 
 If you have your own favorite set of options, you can create your own, local,
 preset.  For example, let's create a preset called 'ds' (which stands for

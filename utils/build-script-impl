@@ -3307,15 +3307,15 @@ function build_and_test_installable_package() {
           # host_install_destdir contains the toolchain prefix.
           # We want to create the package in host_install_destdir_nonprefixed.
           with_pushd "${host_install_destdir}" \
-              call tar -c -z -f "${package_for_host}" "${TOOLCHAIN_PREFIX/#\/}"
+              call tar -c -J -f "${package_for_host}" "${TOOLCHAIN_PREFIX/#\/}"
         else
             # tar on OS X doesn't support --owner/--group.
             if [[ "$(uname -s)" == "Darwin" ]] ; then
                 with_pushd "${host_install_destdir}" \
-                    tar -c -z -f "${package_for_host}" "${host_install_prefix/#\/}"
+                    tar -c -J -f "${package_for_host}" "${host_install_prefix/#\/}"
             else
                 with_pushd "${host_install_destdir}" \
-                    tar -c -z -f "${package_for_host}" --owner=0 --group=0 "${host_install_prefix/#\/}"
+                    tar -c -J -f "${package_for_host}" --owner=0 --group=0 "${host_install_prefix/#\/}"
             fi
         fi
         if [[ "${TEST_INSTALLABLE_PACKAGE}" ]] ; then
@@ -3335,7 +3335,7 @@ function build_and_test_installable_package() {
             call rm -rf "${PKG_TESTS_SANDBOX_PARENT}"
             call mkdir -p "${PKG_TESTS_SANDBOX}"
             with_pushd "${PKG_TESTS_SANDBOX_PARENT}" \
-                call tar xzf "${package_for_host}"
+                call tar xf "${package_for_host}"
 
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
                 call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}" --param test-exec-root="${PKG_TESTS_TEMPS}"
