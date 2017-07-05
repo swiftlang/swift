@@ -752,10 +752,14 @@ handleSemanticRequest(RequestDict Req,
     if (!NK) {
       return Rec(createErrorRequestInvalid("'key.namekind' is required"));
     }
+
+    static UIdent UIDKindNameSwift("source.lang.name.kind.swift");
+    static UIdent UIDKindNameObjc("source.lang.name.kind.objc");
+
     if (NK == KindNameSwift.get())
-      Input.NameKind = UIdent(KindNameSwift.str());
+      Input.NameKind = UIDKindNameSwift;
     else if (NK == KindNameObjc.get())
-      Input.NameKind = UIdent(KindNameObjc.str());
+      Input.NameKind = UIDKindNameObjc;
     else
       return Rec(createErrorRequestInvalid("'key.namekind' is unrecognizable"));
     if (auto Base = Req.getString(KeyBaseName)) {
@@ -1310,12 +1314,14 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
 
   auto Elem = Arr.appendDictionary();
   UIdent SeverityUID;
+  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
+  static UIdent UIDKindDiagError(KindDiagError.str());
   switch (Info.Severity) {
   case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIdent(KindDiagWarning.str());
+    SeverityUID = UIDKindDiagWarning;
     break;
   case DiagnosticSeverityKind::Error:
-    SeverityUID = UIdent(KindDiagError.str());
+    SeverityUID = UIDKindDiagError;
     break;
   }
 
@@ -1453,8 +1459,9 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
     Elem.set(KeyBaseName, Info.BaseName);
   }
   if (!Info.ArgNames.empty()) {
-    auto Arr = Elem.setArray(Info.NameKind == UIdent(KindNameSwift.str()) ?
-                               KeyArgNames : KeySelectorPieces);
+    static UIdent UIDKindNameSwift(KindNameSwift.str());
+    auto Arr = Elem.setArray(Info.NameKind == UIDKindNameSwift ?
+                             KeyArgNames : KeySelectorPieces);
     for (auto N : Info.ArgNames) {
       auto NameEle = Arr.appendDictionary();
       NameEle.set(KeyName, N);
@@ -2204,12 +2211,14 @@ bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
 
   auto Elem = Arr.appendDictionary();
   UIdent SeverityUID;
+  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
+  static UIdent UIDKindDiagError(KindDiagError.str());
   switch (Info.Severity) {
   case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIdent(KindDiagWarning.str());
+    SeverityUID = UIDKindDiagWarning;
     break;
   case DiagnosticSeverityKind::Error:
-    SeverityUID = UIdent(KindDiagError.str());
+    SeverityUID = UIDKindDiagError;
     break;
   }
 
