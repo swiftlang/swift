@@ -1,27 +1,18 @@
-:orphan:
 
-.. @raise litre.TestsAreMissing
-
-=============
-Testing Swift
-=============
+# Testing Swift
 
 This document describes how we test the Swift compiler, the Swift runtime, and
 the Swift standard library.
 
-Testing approaches
-==================
+## Testing approaches
 
 We use multiple approaches to test the Swift toolchain.
 
 * LLVM lit-based testsuites for the compiler, runtime and the standard library.
-
 * Unit tests for sub-tools.
-
 * A selection of open source projects written in Swift.
 
-The LLVM lit-based testsuite
-============================
+## The LLVM lit-based testsuite
 
 **Purpose**: primary testsuites for the Swift toolchain.
 
@@ -32,27 +23,21 @@ The LLVM lit-based testsuite
 * Engineers and contributors are expected to run tests from these testsuites
   locally before committing.  (Usually on a single platform, and not necessarily
   all tests.)
-
 * Buildbots run all tests, on all supported platforms.
 
-Testsuite subsets
------------------
+### Testsuite subsets
 
 The testsuite is split into four subsets:
 
 * Primary testsuite, located under ``swift/test``.
-
 * Validation testsuite, located under ``swift/validation-test``.
-
 * Unit tests, located under ``swift/unittests``.
-
 * Long tests, which are marked with ``REQUIRES: long_test``.
 
-  Unlike other tests, every long test should also include either
-  ``REQUIRES: nonexecutable_test`` or ``REQUIRES: executable_test``.
+Unlike other tests, every long test should also include either
+``REQUIRES: nonexecutable_test`` or ``REQUIRES: executable_test``.
 
-Running the LLVM lit-based testsuite
-------------------------------------
+### Running the LLVM lit-based testsuite
 
 It is recommended that you run the Swift test suites via ``utils/build-script``.
 For day-to-day work on the Swift compiler, using ``utils/build-script --test``
@@ -68,56 +53,35 @@ technically possible to execute the tests directly via CMake. For example, if yo
 built Swift products at the directory ``build/Ninja-ReleaseAssert/swift-macosx-x86_64``,
 you may run the entire test suite directly using the following command:
 
-.. code-block:: bash
-
+```
   cmake --build build/Ninja-ReleaseAssert/swift-macosx-x86_64 -- check-swift-macosx-x86_64
+```
 
 Note that ``check-swift`` is suffixed with a target operating system and architecture.
 Besides ``check-swift``, other targets are also available. Here's the full list:
 
-* ``check-swift``
-
-  Runs tests from the ``${SWIFT_SOURCE_ROOT}/test`` directory.
-
-* ``check-swift-only_validation``
-
-  Runs tests from the ``${SWIFT_SOURCE_ROOT}/validation-test`` directory.
-
-* ``check-swift-validation``
-
-  Runs the primary and validation tests, without the long tests.
-
-* ``check-swift-only_long``
-
-  Runs long tests only.
-
-* ``check-swift-all``
-
-  Runs all tests (primary, validation, and long).
-
-* ``SwiftUnitTests``
-
-  Builds all unit tests.  Executables are located under
+* ``check-swift``: Runs tests from the ``${SWIFT_SOURCE_ROOT}/test`` directory.
+* ``check-swift-only_validation``: Runs tests from the ``${SWIFT_SOURCE_ROOT}/validation-test`` directory.
+* ``check-swift-validation``: Runs the primary and validation tests, without the long tests.
+* ``check-swift-only_long``: Runs long tests only.
+* ``check-swift-all``: Runs all tests (primary, validation, and long).
+* ``SwiftUnitTests``: Builds all unit tests.  Executables are located under
   ``${SWIFT_BUILD_ROOT}/unittests`` and must be run individually.
 
 For every target above, there are variants for different optimizations:
 
 * the target itself (e.g., ``check-swift``) -- runs all tests from the primary
   testsuite.  The execution tests are run in ``-Onone`` mode.
-
 * the target with ``-optimize`` suffix (e.g., ``check-swift-optimize``) -- runs
   execution tests in ``-O`` mode.  This target will only run tests marked as
   ``executable_test``.
-
 * the target with ``-optimize-unchecked`` suffix (e.g.,
   ``check-swift-optimize-unchecked``) -- runs execution tests in
   ``-Ounchecked`` mode. This target will only run tests marked as
   ``executable_test``.
-
 * the target with ``-executable`` suffix (e.g.,
   ``check-swift-executable-iphoneos-arm64``) -- runs tests marked with
   ``executable_test`` in ``-Onone`` mode.
-
 * the target with ``-non-executable`` suffix (e.g.,
   ``check-swift-non-executable-iphoneos-arm64``) -- runs tests not marked with
   ``executable_test`` in ``-Onone`` mode.
@@ -125,9 +89,9 @@ For every target above, there are variants for different optimizations:
 If more control is required (e.g. to manually run certain tests), you can invoke
 LLVM's lit.py script directly. For example:
 
-.. code-block:: bash
-
+```
     % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/Parse/
+```
 
 This runs the tests in the test/Parse/ directory targeting the 32-bit iOS
 Simulator. The ``-sv`` options give you a nice progress bar and only show you
@@ -141,60 +105,45 @@ source 'test/' directory.) There is a more verbose form that specifies the
 testing configuration explicitly, which then allows you to test files
 regardless of location.
 
-.. code-block:: bash
-
+```
     % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
+```
 
 For more complicated configuration, copy the invocation from one of the build
 targets mentioned above and modify it as necessary. lit.py also has several
 useful features, like timing tests and providing a timeout. Check these features
 out with ``lit.py -h``. We document some of the more useful ones below:
 
-Extra lit.py invocation options
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#### Extra lit.py invocation options
 
 * ``-s`` reduces the amount of output that lit shows.
-
 * ``-v`` causes a test's commandline and output to be printed if the test fails.
-
 * ``-a`` causes a test's commandline and output to always be printed.
-
 * ``--filter=<pattern>`` causes only tests with paths matching the given regular
   expression to be run.
-
 * ``-i`` causes tests that have a newer modification date and failing tests to
   be run first. This is implemented by updating the mtimes of the tests.
-
 * ``--no-execute`` causes a dry run to be performed. *NOTE* This means that all
   tests are assumed to PASS.
-
 * ``--time-tests`` will cause elapsed wall time to be tracked for each test.
-
 * ``--timeout=<MAXINDIVIDUALTESTTIME>`` sets a maximum time that can be spent
   running a single test (in seconds). 0 (the default means no time limit.
-
 * ``--max-failures=<MAXFAILURES>`` stops execution after ``MAXFAILURES`` number
   of failures.
-
 * ``--param gmalloc`` will run all tests under Guard Malloc (macOS only). See
   ``man libgmalloc`` for more information.
-
 * ``--param swift-version=<MAJOR>`` overrides the default Swift language
   version used by swift/swiftc and swift-ide-test.
-
 * ``--param interpret`` is an experimental option for running execution tests
   using Swift's interpreter rather than compiling them first. Note that this
   does not affect all substitutions.
-
 * ``--param swift_test_mode=<MODE>`` drives the various suffix variations
   mentioned above. Again, it's best to get the invocation from the existing
   build system targets and modify it rather than constructing it yourself.
 
-Writing tests
--------------
+### Writing tests
 
-General guidelines
-^^^^^^^^^^^^^^^^^^
+#### General guidelines
 
 When adding a new testcase, try to find an existing test file focused on the
 same topic rather than starting a new test file.  There is a fixed runtime cost
@@ -225,7 +174,6 @@ details of the standard library (unless doing so is point of the test).
 Platform-dependent details include:
 
 * ``Int`` (use integer types with explicit types instead).
-
 * Layout of ``String``, ``Array``, ``Dictionary``, ``Set``.  These differ
   between platforms that have Objective-C interop and those that don't.
 
@@ -239,8 +187,7 @@ standard library that only has a very basic set of APIs.
 If you write an executable test please add ``REQUIRES: executable_test`` to the
 test.
 
-Substitutions in lit tests
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+#### Substitutions in lit tests
 
 Substitutions that start with ``%target`` configure the compiler for building
 code for the target that is not the build machine:
@@ -427,6 +374,7 @@ Other substitutions:
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::
 
+```
   // RUN: %target-swift-frontend ... | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
 
   // CHECK: common line
@@ -439,10 +387,12 @@ target CPU, use this pattern::
   // CHECK: define @foo() {
   // CHECK-32: integer_literal $Builtin.Int32, 0
   // CHECK-64: integer_literal $Builtin.Int64, 0
+```
 
 When writing a test where output (or IR, SIL) depends on the target CPU itself,
 use this pattern::
 
+```
   // RUN: %target-swift-frontend ... | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 
   // CHECK: common line
@@ -452,9 +402,9 @@ use this pattern::
   // CHECK-arm64:       only for arm64
   // CHECK-powerpc64:   only for powerpc64
   // CHECK-powerpc64le: only for powerpc64le
+```
 
-Features for ``REQUIRES`` and ``XFAIL``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#### Features for ``REQUIRES`` and ``XFAIL``
 
 FIXME: full list.
 
@@ -476,25 +426,23 @@ FIXME: full list.
 * ``XFAIL: linux``: tests that need to be adapted for Linux, for example parts
   that depend on Objective-C interop need to be split out.
 
-Feature ``REQUIRES: executable_test``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#### Feature ``REQUIRES: executable_test``
 
 This feature marks an executable test. The test harness makes this feature
 generally available. It can be used to restrict the set of tests to run.
 
-StdlibUnittest
-^^^^^^^^^^^^^^
+#### StdlibUnittest
 
 Tests accept command line parameters, run StdlibUnittest-based test binary
 with ``--help`` for more information.
 
-Testing memory management in execution tests
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#### Testing memory management in execution tests
 
 In execution tests, memory management testing should be performed
 using local variables enclosed in a closure passed to the standard
 library ``autoreleasepool`` function. For example::
 
+```
   // A counter that's decremented by Canary's deinitializer.
   var CanaryCount = 0
 
@@ -510,6 +458,7 @@ library ``autoreleasepool`` function. For example::
     let canary = Canary()
   }
   assert(CanaryCount == 1, "canary was not released")
+```
 
 Memory management tests should be performed in a local scope because Swift does
 not guarantee the destruction of global variables. Code that needs to
