@@ -3503,7 +3503,7 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
     name = P.Context.getIdentifier(implName);
   }
 
-  auto result = new (P.Context) ParamDecl(VarDecl::Specifier::None,
+  auto result = new (P.Context) ParamDecl(VarDecl::Specifier::Owned,
                                           SourceLoc(),SourceLoc(),
                                           Identifier(), nameLoc, name,
                                           Type(), P.CurDeclContext);
@@ -4086,7 +4086,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
       diagnose(accessors.LBLoc, diag::let_cannot_be_addressed_property);
     else
       diagnose(accessors.LBLoc, diag::let_cannot_be_computed_property);
-    PrimaryVar->setLet(false);
+    PrimaryVar->setSpecifier(VarDecl::Specifier::Var);
     Invalid = true;
   }
 
