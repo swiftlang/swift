@@ -236,7 +236,8 @@ void SelectEnforcement::analyzeUsesOfBox(SILInstruction *source) {
         isa<DeallocBoxInst>(user))
       continue;
 
-    // Treat everything else as an escape:
+    // Treat everything else as an escape.
+    // A Box typically escapes via copy_value.
     noteEscapingUse(user);
   }
   // Accesses may still be empty if the user of the Box is a partial apply
