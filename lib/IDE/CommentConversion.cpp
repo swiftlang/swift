@@ -285,7 +285,7 @@ void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts 
     printThrowsDiscussion(Parts.ThrowsField.getValue());
 
   if (!Parts.Tags.empty()) {
-    printTagFields(Parts.Tags);
+    printTagFields(llvm::makeArrayRef(Parts.Tags.begin(), Parts.Tags.end()));
   }
 
   if (!Parts.BodyNodes.empty()) {
