@@ -591,7 +591,7 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
                os << "        \"" << Pipeline.Name << "\"";
                for (PassKind Kind : getPipelinePasses(Pipeline)) {
                  os << ",\n        [\"" << PassKindID(Kind) << "\","
-                    << PassKindTag(Kind) << ']';
+                    << "\"" << PassKindTag(Kind) << "\"]";
                }
              },
              [&] { os << "\n    ],\n"; });
