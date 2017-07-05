@@ -888,7 +888,7 @@ public:
       assert(operand.getFinalConsumption() !=
                  CastConsumptionKind::TakeOnSuccess &&
              "When compiling with sil ownership take on success is disabled");
-      // No unforwarding is needed, we always copy.
+      // No unforwarding is needed, we always borrow/copy.
       return false;
     }
 
@@ -1394,12 +1394,14 @@ static ConsumableManagedValue
 getManagedSubobject(SILGenFunction &SGF, SILValue value,
                     const TypeLowering &valueTL,
                     CastConsumptionKind consumption) {
-  if (consumption != CastConsumptionKind::CopyOnSuccess) {
-    return {SGF.emitManagedRValueWithCleanup(value, valueTL),
-             consumption};
-  } else {
+  if (consumption == CastConsumptionKind::CopyOnSuccess) {
     return {ManagedValue::forUnmanaged(value), consumption};
   }
+
+  assert((!SGF.F.getModule().getOptions().EnableSILOwnership ||
+          consumption != CastConsumptionKind::TakeOnSuccess) &&
+         "TakeOnSuccess should never be used when sil ownership is enabled");
+  return {SGF.emitManagedRValueWithCleanup(value, valueTL), consumption};
 }
 
 static ConsumableManagedValue
