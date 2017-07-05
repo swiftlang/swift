@@ -3852,7 +3852,8 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
   // If we're fixed to a bound generic type, trying harvesting context from it.
   // However, we don't want a solution that fixes the expression type to
   // PartialKeyPath; we'd rather that be represented using an upcast conversion.
-  if (auto keyPathBGT = keyPathTy->getAs<BoundGenericType>()) {
+  auto keyPathBGT = keyPathTy->getAs<BoundGenericType>();
+  if (keyPathBGT) {
     if (tryMatchRootAndValueFromKeyPathType(keyPathBGT, /*allowPartial*/false)
           == SolutionKind::Error)
       return SolutionKind::Error;
@@ -3950,9 +3951,19 @@ done:
     break;
   }
   
+  // FIXME: Allow the type to be upcast if the type system has a concrete
+  // KeyPath type assigned to the expression already.
+  if (keyPathBGT) {
+    if (keyPathBGT->getDecl() == getASTContext().getKeyPathDecl())
+      kpDecl = getASTContext().getKeyPathDecl();
+    else if (keyPathBGT->getDecl() == getASTContext().getWritableKeyPathDecl()
+             && capability >= Writable)
+      kpDecl = getASTContext().getWritableKeyPathDecl();
+  }
+  
   auto resolvedKPTy = BoundGenericType::get(kpDecl, nullptr,
                                             {rootTy, valueTy});
-  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Subtype,
+  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind,
                     subflags, locator);
 }
 
