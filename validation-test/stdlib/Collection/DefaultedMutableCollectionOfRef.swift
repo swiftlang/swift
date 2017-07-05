@@ -13,37 +13,30 @@ import StdlibCollectionUnittest
 
 var CollectionTests = TestSuite("Collection")
 
-// Test collections using value types as elements.
+// Test collections using a reference type as element.
 do {
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
 
-  CollectionTests.addRangeReplaceableBidirectionalCollectionTests(
-    makeCollection: { (elements: [OpaqueValue<Int>]) in
-      return DefaultedMutableRangeReplaceableBidirectionalCollection(elements: elements)
+  CollectionTests.addMutableCollectionTests(
+    makeCollection: { (elements: [LifetimeTracked]) in
+      return DefaultedMutableCollection(elements: elements)
     },
-    wrapValue: identity,
-    extractValue: identity,
+    wrapValue: { (element: OpaqueValue<Int>) in
+      LifetimeTracked(element.value, identity: element.identity)
+    },
+    extractValue: { (element: LifetimeTracked) in
+      OpaqueValue(element.value, identity: element.identity)
+    },
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return DefaultedMutableRangeReplaceableBidirectionalCollection(elements: elements)
-    },
-    wrapValueIntoEquatable: identityEq,
-    extractValueFromEquatable: identityEq,
-    resiliencyChecks: resiliencyChecks
-  )
-  CollectionTests.addMutableBidirectionalCollectionTests(
-    makeCollection: { (elements: [OpaqueValue<Int>]) in
-      return DefaultedMutableRangeReplaceableBidirectionalCollection(elements: elements)
-    },
-    wrapValue: identity,
-    extractValue: identity,
-    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return DefaultedMutableRangeReplaceableBidirectionalCollection(elements: elements)
+      // FIXME: use LifetimeTracked.
+      return DefaultedMutableCollection(elements: elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
     makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
-      return DefaultedMutableRangeReplaceableBidirectionalCollection(elements: elements)
+      // FIXME: use LifetimeTracked.
+      return DefaultedMutableCollection(elements: elements)
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
@@ -54,5 +47,3 @@ do {
 }
 
 runAllTests()
-
-
