@@ -29,38 +29,26 @@
 
 using namespace swift;
 
-// This option allows markers to remain in -Onone as a structural SIL property.
-// Regardless of this option, sufficient markers are always emitted to satisfy
-// the current enforcement level. This options simply allows markers to remain
-// for testing and validation.
+// This temporary option allows markers during optimization passes. Enabling
+// this flag causes this pass to preserve only dynamic checks when dynamic
+// checking is enabled. Otherwise, this pass removes all checks.
 //
-// This option only applies to InactiveAccessMarkerElimination. Any occurrence
-// of FullAccessMarkerElimination in the pass pipeline effectively overrides the
-// options and removes all markers.
-//
-// At -Onone, with EnableMarkers, no static markers are removed.
-// With !EnableMarkers:
-// Enforcement | Static               | Dynamic
-// none        | Remove after Diag    | Remove ASAP
-// unchecked   | Remain through IRGen | Remove ASAP
-// checked     | Remain through IRGen | Remain through IRGen
-// dynamic-only| Remove after Diag    | Remain through IRGen
-llvm::cl::opt<bool> EnableAccessMarkers(
-    "sil-access-markers", llvm::cl::init(true),
-    llvm::cl::desc("Enable memory access makers that aren't needed for "
-                   "diagnostics."));
+// This is currently unsupported because tail duplication results in
+// address-type block arguments.
+llvm::cl::opt<bool> EnableOptimizedAccessMarkers(
+    "sil-optimized-access-markers", llvm::cl::init(false),
+    llvm::cl::desc("Enable memory access markers during optimization passes."));
 
 namespace {
 
 struct AccessMarkerElimination {
   SILModule *Mod;
   SILFunction *F;
-  bool isFullElimination;
 
   bool removedAny = false;
 
-  AccessMarkerElimination(SILFunction *F, bool isFullElimination)
-      : Mod(&F->getModule()), F(F), isFullElimination(isFullElimination) {}
+  AccessMarkerElimination(SILFunction *F)
+      : Mod(&F->getModule()), F(F) {}
 
   SILBasicBlock::iterator eraseInst(SILInstruction *inst) {
     DEBUG(llvm::dbgs() << "Erasing access marker: " << *inst);
@@ -70,7 +58,6 @@ struct AccessMarkerElimination {
 
   void replaceBeginAccessUsers(BeginAccessInst *beginAccess);
 
-  // Precondition: !EnableAccessMarkers || isFullElimination
   bool shouldPreserveAccess(SILAccessEnforcement enforcement);
 
   // Check if the instruction is a marker that should be eliminated. If so,
@@ -100,26 +87,18 @@ void AccessMarkerElimination::replaceBeginAccessUsers(
   }
 }
 
-// Precondition: !EnableAccessMarkers || isFullElimination
 bool AccessMarkerElimination::shouldPreserveAccess(
     SILAccessEnforcement enforcement) {
-  if (isFullElimination)
+  if (!EnableOptimizedAccessMarkers)
     return false;
 
   switch (enforcement) {
-  case SILAccessEnforcement::Unknown:
-    return false;
   case SILAccessEnforcement::Static:
-    // Even though static enforcement is already performed, this flag is
-    // useful to control marker preservation for now.
-    return EnableAccessMarkers || Mod->getOptions().EnforceExclusivityStatic;
-  case SILAccessEnforcement::Dynamic:
-    // FIXME: when dynamic markers are fully supported, don't strip:
-    //   return
-    //     EnableAccessMarkers || Mod->getOptions().EnforceExclusivityDynamic;
-    return Mod->getOptions().EnforceExclusivityDynamic;
   case SILAccessEnforcement::Unsafe:
     return false;
+  case SILAccessEnforcement::Unknown:
+  case SILAccessEnforcement::Dynamic:
+    return Mod->getOptions().EnforceExclusivityDynamic;
   }
 }
 
@@ -162,10 +141,6 @@ bool AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
 // Top-level per-function entry-point.
 // Return `true` if any markers were removed.
 bool AccessMarkerElimination::stripMarkers() {
-  // FIXME: When dynamic markers are fully supported, just skip this pass:
-  //   if (EnableAccessMarkers && !isFullElimination)
-  //     return false;
-
   // Iterating in reverse eliminates more begin_access users before they
   // need to be replaced.
   for (auto &BB : reversed(*F)) {
@@ -186,19 +161,16 @@ bool AccessMarkerElimination::stripMarkers() {
 static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
   DEBUG(llvm::dbgs() << "Stripping all markers in: " << F->getName() << "\n");
 
-  AccessMarkerElimination(F, /*isFullElimination=*/true).stripMarkers();
+  AccessMarkerElimination(F).stripMarkers();
 }
 
 namespace {
 
 struct AccessMarkerEliminationPass : SILModuleTransform {
-  virtual bool isFullElimination() = 0;
-
   void run() override {
     auto &M = *getModule();
     for (auto &F : M) {
-      bool removedAny = AccessMarkerElimination(&F, isFullElimination())
-                            .stripMarkers();
+      bool removedAny = AccessMarkerElimination(&F).stripMarkers();
 
       // Only invalidate analyses if we removed some markers.
       if (removedAny) {
@@ -208,26 +180,14 @@ struct AccessMarkerEliminationPass : SILModuleTransform {
 
       // Markers from all current SIL functions are stripped. Register a
       // callback to strip an subsequently loaded functions on-the-fly.
-      if (isFullElimination())
+      if (!EnableOptimizedAccessMarkers)
         M.registerDeserializationCallback(prepareSILFunctionForOptimization);
     }
   }
 };
 
-struct InactiveAccessMarkerElimination : AccessMarkerEliminationPass {
-  virtual bool isFullElimination() { return false; }
-};
-
-struct FullAccessMarkerElimination : AccessMarkerEliminationPass {
-  virtual bool isFullElimination() { return true; }
-};
-
 } // end anonymous namespace
 
-SILTransform *swift::createInactiveAccessMarkerElimination() {
-  return new InactiveAccessMarkerElimination();
-}
-
-SILTransform *swift::createFullAccessMarkerElimination() {
-  return new FullAccessMarkerElimination();
+SILTransform *swift::createAccessMarkerElimination() {
+  return new AccessMarkerEliminationPass();
 }

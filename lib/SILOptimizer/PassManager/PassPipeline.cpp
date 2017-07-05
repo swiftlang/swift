@@ -83,7 +83,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   // Select access kind after capture promotion and before stack promotion.
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
-  P.addInactiveAccessMarkerElimination();
 
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
@@ -454,7 +453,7 @@ SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
   }
 
   P.startPipeline("SILOpt Prepare Passes");
-  P.addFullAccessMarkerElimination();
+  P.addAccessMarkerElimination();
 
   return P;
 }
