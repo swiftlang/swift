@@ -35,6 +35,10 @@
 STATISTIC(NumDeclsLoaded, "# of decls deserialized");
 STATISTIC(NumMemberListsLoaded,
           "# of nominals/extensions whose members were loaded");
+STATISTIC(NumNormalProtocolConformancesLoaded,
+          "# of normal protocol conformances deserialized");
+STATISTIC(NumNormalProtocolConformancesCompleted,
+          "# of normal protocol conformances completed");
 STATISTIC(NumNestedTypeShortcuts,
           "# of same-module nested types resolved without lookup");
 
@@ -106,18 +110,6 @@ namespace {
 
     void print(raw_ostream &os) const override {
       XRefTracePath::print(os, "\t");
-    }
-  };
-
-  class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
-    const char *Action;
-    const ModuleFile *MF;
-  public:
-    explicit PrettyStackTraceModuleFile(const char *action, ModuleFile *module)
-        : Action(action), MF(module) {}
-
-    void print(raw_ostream &os) const override {
-      os << Action << " \'" << getNameOfModule(MF) << "'\n";
     }
   };
 } // end anonymous namespace
@@ -583,7 +575,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     nominal->lookupConformance(module, proto, conformances);
     PrettyStackTraceModuleFile traceMsg(
         "If you're seeing a crash here, check that your SDK and dependencies "
-        "are at least as new as the versions used to build", this);
+        "are at least as new as the versions used to build", *this);
     // This would normally be an assertion but it's more useful to print the
     // PrettyStackTrace here even in no-asserts builds.
     if (conformances.empty())
@@ -640,6 +632,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
   PrettyStackTraceDecl traceTo("... to", proto);
+  ++NumNormalProtocolConformancesLoaded;
 
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,
                                         ProtocolConformanceState::Incomplete);
@@ -1588,7 +1581,7 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     if (M != getAssociatedModule()) {
       traceMsg.emplace("If you're seeing a crash here, check that your SDK "
                          "and dependencies match the versions used to build",
-                       this);
+                       *this);
     }
 
     if (values.empty()) {
@@ -4564,6 +4557,13 @@ ModuleFile::loadAssociatedTypeDefault(const swift::AssociatedTypeDecl *ATD,
 void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                          uint64_t contextData) {
   using namespace decls_block;
+
+  PrettyStackTraceModuleFile traceModule("While reading from", *this);
+  PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
+                             "finishing conformance for",
+                             conformance->getType());
+  PrettyStackTraceDecl traceTo("... to", conformance->getProtocol());
+  ++NumNormalProtocolConformancesCompleted;
 
   // Find the conformance record.
   BCOffsetRAII restoreOffset(DeclTypeCursor);

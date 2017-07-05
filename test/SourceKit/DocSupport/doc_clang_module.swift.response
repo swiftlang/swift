@@ -209,13 +209,13 @@ class FooClassBase {
 
     class func fooBaseClassFunc0()
 
-    func _internalMeth3() -> Any!
+    func _internalMeth1() -> Any!
 
     func _internalMeth2() -> Any!
 
     func nonInternalMeth() -> Any!
 
-    func _internalMeth1() -> Any!
+    func _internalMeth3() -> Any!
 }
 class FooClassDerived : FooClassBase, FooProtocolDerived {
 
@@ -235,13 +235,13 @@ class FooClassDerived : FooClassBase, FooProtocolDerived {
 
     class func fooClassFunc0()
 
-    func _internalMeth3() -> Any!
+    func _internalMeth1() -> Any!
 
     func _internalMeth2() -> Any!
 
     func nonInternalMeth() -> Any!
 
-    func _internalMeth1() -> Any!
+    func _internalMeth3() -> Any!
 }
 typealias typedef_int_t = Int32
 var FOO_MACRO_1: Int32 { get }
@@ -301,13 +301,13 @@ class FooClassPropertyOwnership : FooClassBase {
 
     var scalar: Int32
 
-    func _internalMeth3() -> Any!
+    func _internalMeth1() -> Any!
 
     func _internalMeth2() -> Any!
 
     func nonInternalMeth() -> Any!
 
-    func _internalMeth1() -> Any!
+    func _internalMeth3() -> Any!
 }
 var FOO_NIL: ()
 class FooUnavailableMembers : FooClassBase {
@@ -336,13 +336,13 @@ class FooUnavailableMembers : FooClassBase {
 
     func availabilityUnavailableMsg()
 
-    func _internalMeth3() -> Any!
+    func _internalMeth1() -> Any!
 
     func _internalMeth2() -> Any!
 
     func nonInternalMeth() -> Any!
 
-    func _internalMeth1() -> Any!
+    func _internalMeth3() -> Any!
 }
 class FooCFType {
 }
@@ -7041,11 +7041,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "_internalMeth3()",
-        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth3",
+        key.name: "_internalMeth1()",
+        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth1",
         key.offset: 5048,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth3</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth1</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -7065,11 +7065,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "_internalMeth1()",
-        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth1",
+        key.name: "_internalMeth3()",
+        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth3",
         key.offset: 5154,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth1</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth3</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       }
     ]
   },
@@ -7194,12 +7194,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "_internalMeth3()",
-        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth3::SYNTHESIZED::c:objc(cs)FooClassDerived",
-        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth3",
+        key.name: "_internalMeth1()",
+        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth1::SYNTHESIZED::c:objc(cs)FooClassDerived",
+        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth1",
         key.offset: 5542,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth3</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth1</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -7221,12 +7221,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "_internalMeth1()",
-        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth1::SYNTHESIZED::c:objc(cs)FooClassDerived",
-        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth1",
+        key.name: "_internalMeth3()",
+        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth3::SYNTHESIZED::c:objc(cs)FooClassDerived",
+        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth3",
         key.offset: 5648,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth1</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth3</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       }
     ]
   },
@@ -7582,12 +7582,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "_internalMeth3()",
-        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth3::SYNTHESIZED::c:objc(cs)FooClassPropertyOwnership",
-        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth3",
+        key.name: "_internalMeth1()",
+        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth1::SYNTHESIZED::c:objc(cs)FooClassPropertyOwnership",
+        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth1",
         key.offset: 6861,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth3</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth1</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -7609,12 +7609,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "_internalMeth1()",
-        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth1::SYNTHESIZED::c:objc(cs)FooClassPropertyOwnership",
-        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth1",
+        key.name: "_internalMeth3()",
+        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth3::SYNTHESIZED::c:objc(cs)FooClassPropertyOwnership",
+        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth3",
         key.offset: 6967,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth1</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth3</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       }
     ]
   },
@@ -7850,12 +7850,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "_internalMeth3()",
-        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth3::SYNTHESIZED::c:objc(cs)FooUnavailableMembers",
-        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth3",
+        key.name: "_internalMeth1()",
+        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth1::SYNTHESIZED::c:objc(cs)FooUnavailableMembers",
+        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth1",
         key.offset: 7470,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth3</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth1</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -7877,12 +7877,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "_internalMeth1()",
-        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth1::SYNTHESIZED::c:objc(cs)FooUnavailableMembers",
-        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth1",
+        key.name: "_internalMeth3()",
+        key.usr: "c:objc(cs)FooClassBase(im)_internalMeth3::SYNTHESIZED::c:objc(cs)FooUnavailableMembers",
+        key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth3",
         key.offset: 7576,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth1</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth3</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       }
     ]
   },
