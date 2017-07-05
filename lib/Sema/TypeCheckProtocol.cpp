@@ -5581,6 +5581,8 @@ bool TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
       // If we have a nominal type, "use" its conformance to
       // _ObjectiveCBridgeable if it has one.
       if (auto *nominalDecl = ty->getAnyNominal()) {
+        if (isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl))
+          return Action::Continue;
         auto result = TC.conformsToProtocol(ty, Proto, DC, options,
                                             /*ComplainLoc=*/SourceLoc(),
                                             Callback);
