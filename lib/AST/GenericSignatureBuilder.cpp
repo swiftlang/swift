@@ -1660,6 +1660,14 @@ static void concretizeNestedTypeFromConcreteParent(
   if (!assocType) return;
 
   auto proto = assocType->getProtocol();
+
+  // If we don't already have a conformance of the parent to this protocol,
+  // add it now; it was elided earlier.
+  if (parentEquiv->conformsTo.count(proto) == 0) {
+    auto source = parentEquiv->concreteTypeConstraints.front().source;
+    parent->addConformance(proto, source, builder);
+  }
+
   assert(parentEquiv->conformsTo.count(proto) > 0 &&
          "No conformance requirement");
   const RequirementSource *parentConcreteSource = nullptr;
@@ -1929,7 +1937,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     }
 
     case ArchetypeResolutionKind::AlreadyKnown:
-        return nullptr;
+      return nullptr;
     }
   }
 
