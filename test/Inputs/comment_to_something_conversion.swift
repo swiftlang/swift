@@ -486,6 +486,9 @@ public func localizationKeyShouldNotAppearInDocComments2() {}
 /// - Tag: Tag B
 /// - Tag: Dedupe tag
 /// - Tag: Dedupe tag
+///
+/// Intentional break
+///
 /// - TAG: TAG_C
 public func tags() {}
-// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>tags()</Name><USR>s:14comment_to_xml4tagsyyF</USR><Declaration>public func tags()</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract><Tags><Tag>Tag_A</Tag><Tag>Tag B</Tag><Tag>Dedupe tag</Tag><Tag>TAG_C</Tag></Tags></CommentParts></Function>]
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>tags()</Name><USR>s:14comment_to_xml4tagsyyF</USR><Declaration>public func tags()</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract><Tags><Tag>Tag_A</Tag><Tag>Tag B</Tag><Tag>Dedupe tag</Tag><Tag>TAG_C</Tag></Tags><Discussion><Para>Intentional break</Para></Discussion></CommentParts></Function>]
