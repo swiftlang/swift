@@ -4191,7 +4191,7 @@ Type DeclContext::getSelfInterfaceType() const {
 /// generic parameters.
 ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC) {
   ASTContext &C = DC->getASTContext();
-  auto *selfDecl = new (C) ParamDecl(VarDecl::Specifier::None, SourceLoc(), SourceLoc(),
+  auto *selfDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                      Identifier(), loc, C.Id_self, Type(), DC);
   selfDecl->setImplicit();
   return selfDecl;
@@ -4211,7 +4211,7 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   ASTContext &C = DC->getASTContext();
   auto selfType = DC->getSelfTypeInContext();
   auto selfInterfaceType = DC->getSelfInterfaceType();
-  auto specifier = VarDecl::Specifier::None;
+  auto specifier = VarDecl::Specifier::Owned;
   assert(selfType && selfInterfaceType);
 
   if (isStaticMethod) {

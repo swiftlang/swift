@@ -217,7 +217,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl* {
-    auto *param = new (C) ParamDecl(VarDecl::Specifier::None, SourceLoc(), SourceLoc(),
+    auto *param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                     Identifier(), SourceLoc(), C.getIdentifier(s),
                                     enumTy, parentDC);
     param->setInterfaceType(enumIfaceTy);

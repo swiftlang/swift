@@ -34,7 +34,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
   Type metatype = ctor->getInterfaceType()->castTo<AnyFunctionType>()->getInput();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = gen.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::None, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$metatype"), SourceLoc(),
                                AC.getIdentifier("$metatype"), Type(),
                                DC);
@@ -61,7 +61,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
     return tuple;
   } else {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::None, SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$implicit_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$implicit_value"), Type(),

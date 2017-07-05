@@ -200,7 +200,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
                             storage->getDeclContext(), "value",
                             storageType,
                             storageInterfaceType,
-                            VarDecl::Specifier::None);
+                            VarDecl::Specifier::Owned);
   params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
@@ -302,7 +302,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
     buildArgument(loc, DC, "buffer",
                   ctx.TheRawPointerType,
                   ctx.TheRawPointerType,
-                  VarDecl::Specifier::None),
+                  VarDecl::Specifier::Owned),
     buildArgument(loc, DC, "callbackStorage",
                   ctx.TheUnsafeValueBufferType,
                   ctx.TheUnsafeValueBufferType,
@@ -1375,7 +1375,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
       llvm::raw_svector_ostream names(ParamNameBuf);
       names << "%arg." << i;
     }
-    auto param = new (Context) ParamDecl(VarDecl::Specifier::None,
+    auto param = new (Context) ParamDecl(VarDecl::Specifier::Owned,
                                          SourceLoc(), SourceLoc(),
                                          Identifier(),
                                          SourceLoc(),
@@ -1930,7 +1930,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       }
 
       // Create the parameter.
-      auto *arg = new (context) ParamDecl(VarDecl::Specifier::None, SourceLoc(), 
+      auto *arg = new (context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), 
                                           Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
       arg->setInterfaceType(varInterfaceType);

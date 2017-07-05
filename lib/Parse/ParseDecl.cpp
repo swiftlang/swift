@@ -3503,7 +3503,7 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
     name = P.Context.getIdentifier(implName);
   }
 
-  auto result = new (P.Context) ParamDecl(VarDecl::Specifier::None,
+  auto result = new (P.Context) ParamDecl(VarDecl::Specifier::Owned,
                                           SourceLoc(),SourceLoc(),
                                           Identifier(), nameLoc, name,
                                           Type(), P.CurDeclContext);

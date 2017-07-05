@@ -981,7 +981,7 @@ public:
     SourceLoc SpecifierLoc;
     
     /// The parsed specifier kind, if present.
-    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::None;
+    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::Owned;
 
     /// The location of the first name.
     ///
