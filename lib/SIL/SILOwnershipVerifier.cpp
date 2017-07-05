@@ -174,6 +174,15 @@ static bool compatibleOwnershipKinds(ValueOwnershipKind K1,
   return K1.merge(K2).hasValue();
 }
 
+/// Returns true if \p Kind is trivial or if \p Kind is compatible with \p
+/// ComparisonKind.
+static bool
+trivialOrCompatibleOwnershipKinds(ValueOwnershipKind Kind,
+                                  ValueOwnershipKind ComparisonKind) {
+  return compatibleOwnershipKinds(Kind, ValueOwnershipKind::Trivial) ||
+         compatibleOwnershipKinds(Kind, ComparisonKind);
+}
+
 static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
   return V->getType().isAddress() ||
          V.getOwnershipKind() == ValueOwnershipKind::Trivial ||
@@ -198,6 +207,8 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::MarkUninitializedInst:
   case ValueKind::SelectEnumInst:
+  case ValueKind::SwitchEnumInst:
+  case ValueKind::CheckedCastBranchInst:
     return true;
   default:
     return false;
@@ -327,6 +338,12 @@ public:
   OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I) {
     return visitForwardingInst(I, I->getAllOperands());
   }
+
+  /// Visit a terminator instance that performs a transform like
+  /// operation. E.x.: switch_enum, checked_cast_br. This does not include br or
+  /// cond_br.
+  OwnershipUseCheckerResult visitTransformingTerminatorInst(TermInst *TI);
+
   OwnershipUseCheckerResult
   visitApplyArgument(ValueOwnershipKind RequiredConvention, bool ShouldCheck);
   OwnershipUseCheckerResult
@@ -420,7 +437,6 @@ NO_OPERAND_INST(KeyPath)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, true, EndBorrowArgument)
 CONSTANT_OWNERSHIP_INST(Guaranteed, false, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Owned, true, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocBox)
@@ -511,9 +527,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, DeallocValueBuffer)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastBranch)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastValueBranch)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, SwitchEnum)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialOpaque)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, DeinitExistentialOpaque)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
@@ -656,6 +670,17 @@ FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitEndBorrowArgumentInst(EndBorrowArgumentInst *I) {
+  // If we are currently checking an end_borrow_argument as a subobject, then we
+  // treat this as just a use.
+  if (isCheckingSubObject())
+    return {true, false};
+
+  // Otherwise, we must be checking an actual argument. Make sure it is guaranteed!
+  return {true, compatibleWithOwnership(ValueOwnershipKind::Guaranteed)};
+}
+
+OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitSelectEnumInst(SelectEnumInst *I) {
   if (getValue() == I->getEnumOperand()) {
     return {true, false};
@@ -722,6 +747,59 @@ OwnershipCompatibilityUseChecker::visitCondBranchInst(CondBranchInst *CBI) {
   unsigned FalseOffset = 1 + CBI->getTrueOperands().size();
   return checkTerminatorArgumentMatchesDestBB(CBI->getFalseBB(),
                                               getOperandIndex() - FalseOffset);
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitSwitchEnumInst(SwitchEnumInst *SEI) {
+  return visitTransformingTerminatorInst(SEI);
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitCheckedCastBranchInst(
+    CheckedCastBranchInst *SEI) {
+  return visitTransformingTerminatorInst(SEI);
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitTransformingTerminatorInst(
+    TermInst *TI) {
+  // If our operand was trivial, return early.
+  if (compatibleWithOwnership(ValueOwnershipKind::Trivial))
+    return {true, false};
+
+  // Then we need to go through all of our destinations and make sure that if
+  // they have a payload, the payload's convention matches our
+  // convention.
+  //
+  // *NOTE* we assume that all of our types line up and are checked by the
+  // normal verifier.
+  for (auto *Succ : TI->getParent()->getSuccessorBlocks()) {
+    // This must be a no-payload case... continue.
+    if (Succ->args_size() == 0)
+      continue;
+
+    // If we have a trivial value or a value with ownership kind that matches
+    // the switch_enum, then continue.
+    auto OwnershipKind = Succ->getArgument(0)->getOwnershipKind();
+    if (OwnershipKind == ValueOwnershipKind::Trivial ||
+        compatibleWithOwnership(OwnershipKind))
+      continue;
+
+    // Otherwise, emit an error.
+    handleError([&]() {
+      llvm::errs()
+          << "Function: '" << Succ->getParent()->getName() << "'\n"
+          << "Error! Argument ownership kind does not match terminator!\n"
+          << "Terminator: " << *TI << "Argument: " << *Succ->getArgument(0)
+          << "Expected convention: " << getOwnershipKind() << ".\n"
+          << "Actual convention:   " << OwnershipKind << '\n'
+          << '\n';
+    });
+  }
+
+  // Finally, if everything lines up, emit that we match and are a lifetime
+  // ending point if we are owned.
+  return {true, compatibleWithOwnership(ValueOwnershipKind::Owned)};
 }
 
 OwnershipUseCheckerResult
@@ -1454,8 +1532,8 @@ void SILValueOwnershipChecker::gatherUsers(
   // we need to look through subobject uses for more uses. Otherwise, if we are
   // forwarding, we do not create any lifetime ending users/non lifetime ending
   // users since we verify against our base.
-  bool IsGuaranteed =
-      Value.getOwnershipKind() == ValueOwnershipKind::Guaranteed;
+  auto OwnershipKind = Value.getOwnershipKind();
+  bool IsGuaranteed = OwnershipKind == ValueOwnershipKind::Guaranteed;
 
   if (IsGuaranteed && isOwnershipForwardingValue(Value))
     return;
@@ -1512,19 +1590,63 @@ void SILValueOwnershipChecker::gatherUsers(
 
     // At this point, we know that we must have a forwarded subobject. Since the
     // base type is guaranteed, we know that the subobject is either guaranteed
-    // or trivial. The trivial case is not interesting for ARC verification, so
-    // if the user has a trivial ownership kind, continue.
-    if (SILValue(User).getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    // or trivial. We now split into two cases, if the user is a terminator or
+    // not. If we do not have a terminator, then just add User->getUses() to the
+    // worklist.
+    auto *TI = dyn_cast<TermInst>(User);
+    if (!TI) {
+      if (SILValue(User).getOwnershipKind() == ValueOwnershipKind::Trivial) {
+        continue;
+      }
+
+      // Now, we /must/ have a guaranteed subobject, so lets assert that the
+      // user
+      // is actually guaranteed and add the subobject's users to our worklist.
+      assert(SILValue(User).getOwnershipKind() ==
+                 ValueOwnershipKind::Guaranteed &&
+             "Our value is guaranteed and this is a forwarding instruction. "
+             "Should have guaranteed ownership as well.");
+      std::copy(User->use_begin(), User->use_end(), std::back_inserter(Users));
       continue;
     }
 
-    // Now, we /must/ have a guaranteed subobject, so lets assert that the user
-    // is actually guaranteed and add the subobject's users to our worklist.
-    assert(SILValue(User).getOwnershipKind() ==
-               ValueOwnershipKind::Guaranteed &&
-           "Our value is guaranteed and this is a forwarding instruction. "
-           "Should have guaranteed ownership as well.");
-    std::copy(User->use_begin(), User->use_end(), std::back_inserter(Users));
+    // Otherwise if we have a terminator, add any as uses any
+    // end_borrow_argument to ensure that the subscope is completely enclsed
+    // within the super scope. all of the arguments to the work list. We require
+    // all of our arguments to be either trivial or guaranteed.
+    for (auto &Succ : TI->getSuccessors()) {
+      auto *BB = Succ.getBB();
+
+      // If we do not have any arguments, then continue.
+      if (BB->args_empty())
+        continue;
+
+      // Otherwise, make sure that all arguments are trivial or guaranteed. If
+      // we fail, emit an error.
+      //
+      // TODO: We could ignore this error and emit a more specific error on the
+      // actual terminator.
+      for (auto *BBArg : BB->getArguments()) {
+        // *NOTE* We do not emit an error here since we want to allow for more
+        // specific errors to be found during use_verification.
+        //
+        // TODO: Add a flag that associates the terminator instruction with
+        // needing to be verified. If it isn't verified appropriately, assert
+        // when the verifier is destroyed.
+        if (!trivialOrCompatibleOwnershipKinds(BBArg->getOwnershipKind(),
+                                               OwnershipKind)) {
+          // This is where the error would go.
+          continue;
+        }
+
+        // If we have a trivial value, just continue.
+        if (BBArg->getOwnershipKind() == ValueOwnershipKind::Trivial)
+          continue;
+
+        // Otherwise, 
+        std::copy(BBArg->use_begin(), BBArg->use_end(), std::back_inserter(Users));
+      }
+    }
   }
 }
 
