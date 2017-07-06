@@ -205,7 +205,10 @@ extension Decimal : ExpressibleByIntegerLiteral {
 
 extension Decimal : SignedNumeric {
   public var magnitude: Decimal {
-      return Decimal(_exponent: self._exponent, _length: self._length, _isNegative: 0, _isCompact: self._isCompact, _reserved: 0, _mantissa: self._mantissa)
+      return Decimal(
+          _exponent: self._exponent, _length: self._length,
+          _isNegative: 0, _isCompact: self._isCompact,
+          _reserved: 0, _mantissa: self._mantissa)
   }
 
   // FIXME(integers): implement properly
