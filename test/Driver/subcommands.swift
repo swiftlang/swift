@@ -1,4 +1,4 @@
-// Check that each of 'swift', 'swift repl', 'swift run' invoke the REPL.
+// Check that 'swift' and 'swift repl' invoke the REPL.
 //
 // REQUIRES: swift_interpreter
 //
@@ -7,7 +7,6 @@
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t.dir/usr/bin/swift)
 
 // RUN: %t.dir/usr/bin/swift -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
-// RUN: %t.dir/usr/bin/swift run -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 // RUN: %t.dir/usr/bin/swift repl -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 //
 // CHECK-SWIFT-INVOKES-REPL: {{.*}}/swift -frontend -repl
