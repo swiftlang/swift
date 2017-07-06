@@ -10,7 +10,7 @@ func 2.0() {}
 // expected-error@-1 {{function name can only start with a letter or underscore, not a number}}
 func 3func() {}
 // expected-error@-1 {{function name can only start with a letter or underscore, not a number}}
-// expected-error@-2 {{expected a digit after integer literal prefix}}
+// expected-error@-2 {{expected a digit in integer literal}}
 
 protocol 4 {
   // expected-error@-1 {{protocol name can only start with a letter or underscore, not a number}}
@@ -24,10 +24,10 @@ protocol 6.0 {
 }
 protocol 8protocol {
   // expected-error@-1 {{protocol name can only start with a letter or underscore, not a number}}
-  // expected-error@-2 {{expected a digit after integer literal prefix}}
+  // expected-error@-2 {{expected a digit in integer literal}}
   associatedtype 9associatedtype
   // expected-error@-1 {{associatedtype name can only start with a letter or underscore, not a number}}
-  // expected-error@-2 {{expected a digit after integer literal prefix}}
+  // expected-error@-2 {{expected a digit in integer literal}}
 }
 
 typealias 10 = Int
@@ -36,7 +36,7 @@ typealias 11.0 = Int
 // expected-error@-1 {{typealias name can only start with a letter or underscore, not a number}}
 typealias 12typealias = Int
 // expected-error@-1 {{typealias name can only start with a letter or underscore, not a number}}
-// expected-error@-2 {{expected a digit after integer literal prefix}}
+// expected-error@-2 {{expected a digit in integer literal}}
 
 struct 13 {}
 // expected-error@-1 {{struct name can only start with a letter or underscore, not a number}}
@@ -44,7 +44,7 @@ struct 14.0 {}
 // expected-error@-1 {{struct name can only start with a letter or underscore, not a number}}
 struct 15struct {}
 // expected-error@-1 {{struct name can only start with a letter or underscore, not a number}}
-// expected-error@-2 {{expected a digit after integer literal prefix}}
+// expected-error@-2 {{expected a digit in integer literal}}
 
 enum 16 {}
 // expected-error@-1 {{enum name can only start with a letter or underscore, not a number}}
@@ -67,8 +67,8 @@ class 21.0 {
 
 class 23class {
   // expected-error@-1 {{class name can only start with a letter or underscore, not a number}}
-  // expected-error@-2 {{expected a digit after integer literal prefix}}
+  // expected-error@-2 {{expected a digit in integer literal}}
   func 24method() {}
   // expected-error@-1 {{function name can only start with a letter or underscore, not a number}}
-  // expected-error@-2 {{expected a digit after integer literal prefix}}
+  // expected-error@-2 {{expected a digit in integer literal}}
 }

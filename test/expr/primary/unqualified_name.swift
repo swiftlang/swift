@@ -81,6 +81,6 @@ struct S1 {
     _ = S1.init(`x`: 1)  // expected-warning {{keyword 'x' does not need to be escaped in argument list}} {{17-18=}} {{19-20=}}
 
     // Test for unknown token.
-    _ = S1.init(x: 0xG) // expected-error {{expected a digit after integer literal prefix}} expected-error {{missing argument for parameter 'x' in call}}
+    _ = S1.init(x: 0xG) // expected-error {{expected a hex digit (0-9,A-F) in integer literal}} expected-error {{missing argument for parameter 'x' in call}}
   }
 }

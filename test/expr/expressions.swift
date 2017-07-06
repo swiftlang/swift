@@ -322,11 +322,18 @@ var oct_literal_test: Int64 = 0123
 assert(oct_literal_test == 123)
 
 // ensure that we swallow random invalid chars after the first invalid char
-var invalid_num_literal: Int64 = 0QWERTY  // expected-error{{expected a digit after integer literal prefix}}
-var invalid_bin_literal: Int64 = 0bQWERTY // expected-error{{expected a digit after integer literal prefix}}
-var invalid_hex_literal: Int64 = 0xQWERTY // expected-error{{expected a digit after integer literal prefix}}
-var invalid_oct_literal: Int64 = 0oQWERTY // expected-error{{expected a digit after integer literal prefix}}
+var invalid_num_literal: Int64 = 0QWERTY  // expected-error{{expected a digit in integer literal}}
+var invalid_bin_literal: Int64 = 0bQWERTY // expected-error{{expected a binary digit (0-1) in integer literal}}
+var invalid_hex_literal: Int64 = 0xQWERTY // expected-error{{expected a hex digit (0-9,A-F) in integer literal}}
+var invalid_oct_literal: Int64 = 0oQWERTY // expected-error{{expected an octal digit (0-7) in integer literal}}
 var invalid_exp_literal: Double = 1.0e+QWERTY // expected-error{{expected a digit in floating point exponent}}
+
+// don't emit a partial integer literal if it looks like the 
+var invalid_num_literal_prefix: Int64 = 0a1234567 // expected-error{{expected a digit in integer literal}}
+var invalid_num_literal_middle: Int64 = 0123A5678 // expected-error{{expected a digit in integer literal}}
+var invalid_bin_literal_middle: Int64 = 0b1020101 // expected-error{{expected a binary digit (0-1) in integer literal}}
+var invalid_oct_literal_middle: Int64 = 0o1357864 // expected-error{{expected an octal digit (0-7) in integer literal}}
+var invalid_hex_literal_middle: Int64 = 0x147ADG0 // expected-error{{expected a hex digit (0-9,A-F) in integer literal}}
 
 // rdar://11088443
 var negative_int32: Int32 = -1
