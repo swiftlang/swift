@@ -183,6 +183,7 @@ extension String {
 
 
 @_versioned
+@inline(__always)
 internal prefix func ~(_ x: Builtin.Int128) -> Builtin.Int128 {
   return Builtin.sub_Int128(
     Builtin.sub_Int128(
@@ -192,41 +193,49 @@ internal prefix func ~(_ x: Builtin.Int128) -> Builtin.Int128 {
 }
 
 @_versioned
+@inline(__always)
 internal func _trunc64(_ x: Builtin.Int128) -> UInt64 {
   return UInt64(Builtin.trunc_Int128_Int64(x))
 }
 
 @_versioned
+@inline(__always)
 internal func _int128(_ x: UInt64) -> Builtin.Int128 {
   return Builtin.zext_Int64_Int128(x._value)
 }
 
 @_versioned
+@inline(__always)
 internal func _int128(_ x: Int) -> Builtin.Int128 {
   return Builtin.sext_Int64_Int128(Int64(extendingOrTruncating: x)._value)
 }
 
 @_versioned
+@inline(__always)
 internal func >>(_ x: Builtin.Int128, _ y: UInt64) -> Builtin.Int128 {
   return Builtin.lshr_Int128(x, _int128(y))
 }
 
 @_versioned
+@inline(__always)
 internal func <<(_ x: Builtin.Int128, _ y: UInt64) -> Builtin.Int128 {
   return Builtin.shl_Int128(x, _int128(y))
 }
 
 @_versioned
+@inline(__always)
 internal func &(_ x: Builtin.Int128, _ y: Builtin.Int128) -> Builtin.Int128 {
   return Builtin.and_Int128(x, y)
 }
 
 @_versioned
+@inline(__always)
 internal func |(_ x: Builtin.Int128, _ y: Builtin.Int128) -> Builtin.Int128 {
   return Builtin.or_Int128(x, y)
 }
 
 @_versioned
+@inline(__always)
 internal func ==(_ x: Builtin.Int128, _ y: Builtin.Int128) -> Bool {
   return Bool(Builtin.cmp_eq_Int128(x, y))
 }
