@@ -11,13 +11,8 @@ struct StructWithStoredProperties {
   @sil_stored var g: Int
 }
 
-struct StructWithStructWithStoredProperties {
-  @sil_stored var a: StructWithStoredProperties
-  @sil_stored var b: StructWithStoredProperties
-}
-
 // CHECK-LABEL: @assignsToCapture
-// CHECK-NEXT: ([modify], [])
+// CHECK-NEXT: (modify, none)
 sil private @assignsToCapture : $@convention(thin) (@inout_aliasable Int, Int) -> () {
 bb0(%0 : $*Int, %1: $Int):
   %2 = begin_access [modify] [unknown] %0 : $*Int
@@ -28,7 +23,7 @@ bb0(%0 : $*Int, %1: $Int):
 }
 
 // CHECK-LABEL: @readsAndModifiesSameCapture
-// CHECK-NEXT: ([modify])
+// CHECK-NEXT: (modify)
 sil private @readsAndModifiesSameCapture : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = begin_access [read] [unknown] %0 : $*Int
@@ -40,7 +35,7 @@ bb0(%0 : $*Int):
 }
 
 // CHECK-LABEL: @readsAndModifiesSeparateCaptures
-// CHECK-NEXT: ([read], [modify])
+// CHECK-NEXT: (read, modify)
 sil private @readsAndModifiesSeparateCaptures : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $*Int):
   %2 = begin_access [read] [unknown] %0 : $*Int
@@ -52,7 +47,7 @@ bb0(%0 : $*Int, %1 : $*Int):
 }
 
 // CHECK-LABEL: @modifyInModifySubAccess
-// CHECK-NEXT: ([modify])
+// CHECK-NEXT: (modify)
 sil private @modifyInModifySubAccess : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = begin_access [modify] [unknown] %0 : $*Int
@@ -64,7 +59,7 @@ bb0(%0 : $*Int):
 }
 
 // CHECK-LABEL: @readInModifySubAccess
-// CHECK-NEXT: ([modify])
+// CHECK-NEXT: (modify)
 sil private @readInModifySubAccess : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = begin_access [modify] [unknown] %0 : $*Int
@@ -75,107 +70,8 @@ bb0(%0 : $*Int):
   return %3 : $()
 }
 
-// CHECK-LABEL: @accessSeparateStoredPropertiesOfSameCapture
-// CHECK-NEXT: ([.f modify, .g read])
-sil private @accessSeparateStoredPropertiesOfSameCapture : $@convention(thin) (@inout_aliasable StructWithStoredProperties) -> () {
-bb0(%0 : $*StructWithStoredProperties):
-  %1 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
-  %2 = struct_element_addr %1 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %3 = end_access %1 : $*StructWithStoredProperties
-  %4 = begin_access [read] [unknown] %0: $*StructWithStoredProperties
-  %5 = struct_element_addr %4 : $*StructWithStoredProperties, #StructWithStoredProperties.g
-  %6 = end_access %4 : $*StructWithStoredProperties
-  %7 = tuple ()
-  return %7 : $()
-}
-
-// CHECK-LABEL: @accessSeparateElementsOfSameCapture
-// CHECK-NEXT: ([.0 modify, .1 read])
-sil private @accessSeparateElementsOfSameCapture : $@convention(thin) (@inout_aliasable (Int, Int)) -> () {
-bb0(%0 : $*(Int, Int)):
-  %1 = begin_access [modify] [unknown] %0: $*(Int, Int)
-  %2 = tuple_element_addr %1 : $*(Int, Int), 0
-  %3 = end_access %1 : $*(Int, Int)
-  %4 = begin_access [read] [unknown] %0: $*(Int, Int)
-  %5 = tuple_element_addr %4 : $*(Int, Int), 1
-  %6 = end_access %4 : $*(Int, Int)
-  %7 = tuple ()
-  return %7 : $()
-}
-
-// CHECK-LABEL: @accessSeparateNestedStoredPropertiesOfSameCapture
-// CHECK-NEXT: ([.a.f modify, .b.g modify])
-sil private @accessSeparateNestedStoredPropertiesOfSameCapture : $@convention(thin) (@inout_aliasable StructWithStructWithStoredProperties) -> () {
-bb0(%0 : $*StructWithStructWithStoredProperties):
-  %1 = begin_access [modify] [unknown] %0: $*StructWithStructWithStoredProperties
-  %2 = struct_element_addr %1 : $*StructWithStructWithStoredProperties, #StructWithStructWithStoredProperties.a
-  %3 = struct_element_addr %2 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %4 = end_access %1 : $*StructWithStructWithStoredProperties
-  %5 = begin_access [modify] [unknown] %0: $*StructWithStructWithStoredProperties
-  %6 = struct_element_addr %5 : $*StructWithStructWithStoredProperties, #StructWithStructWithStoredProperties.b
-  %7 = struct_element_addr %6 : $*StructWithStoredProperties, #StructWithStoredProperties.g
-  %8 = end_access %5 : $*StructWithStructWithStoredProperties
-  %9 = tuple ()
-  return %9 : $()
-}
-
-
-// CHECK-LABEL: @accessSeparateStoredPropertiesOfSameCaptureOppositeOfDeclarationOrder
-// CHECK-NEXT: ([.f read, .g modify])
-sil private @accessSeparateStoredPropertiesOfSameCaptureOppositeOfDeclarationOrder : $@convention(thin) (@inout_aliasable StructWithStoredProperties) -> () {
-bb0(%0 : $*StructWithStoredProperties):
-  %1 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
-  %2 = struct_element_addr %1 : $*StructWithStoredProperties, #StructWithStoredProperties.g
-  %3 = end_access %1 : $*StructWithStoredProperties
-  %4 = begin_access [read] [unknown] %0: $*StructWithStoredProperties
-  %5 = struct_element_addr %4 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %6 = end_access %4 : $*StructWithStoredProperties
-  %7 = tuple ()
-  return %7 : $()
-}
-
-// CHECK-LABEL: @accessAggregateDoesNotSubsumeAccessStoredProp
-// CHECK-NEXT: ([modify, .g modify])
-sil private @accessAggregateDoesNotSubsumeAccessStoredProp : $@convention(thin) (@inout_aliasable StructWithStoredProperties) -> () {
-bb0(%0 : $*StructWithStoredProperties):
-  %1 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
-  %3 = end_access %1 : $*StructWithStoredProperties
-  %4 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
-  %5 = struct_element_addr %4 : $*StructWithStoredProperties, #StructWithStoredProperties.g
-  %6 = end_access %4 : $*StructWithStoredProperties
-  %7 = tuple ()
-  return %7 : $()
-}
-
-// CHECK-LABEL: @accessAggregateDoesNotSubsumeAccessStoredPropWithAggregateSecond
-// CHECK-NEXT: ([modify, .f modify])
-sil private @accessAggregateDoesNotSubsumeAccessStoredPropWithAggregateSecond : $@convention(thin) (@inout_aliasable StructWithStoredProperties) -> () {
-bb0(%0 : $*StructWithStoredProperties):
-  %1 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
-  %2 = struct_element_addr %1 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %3 = end_access %1 : $*StructWithStoredProperties
-  %4 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
-  %6 = end_access %4 : $*StructWithStoredProperties
-  %7 = tuple ()
-  return %7 : $()
-}
-
-// CHECK-LABEL: @accessSameStoredPropertyOfSameCapture
-// CHECK-NEXT: ([.f modify])
-sil private @accessSameStoredPropertyOfSameCapture : $@convention(thin) (@inout_aliasable StructWithStoredProperties) -> () {
-bb0(%0 : $*StructWithStoredProperties):
-  %1 = begin_access [read] [unknown] %0: $*StructWithStoredProperties
-  %2 = struct_element_addr %1 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %3 = end_access %1 : $*StructWithStoredProperties
-  %4 = begin_access [modify] [unknown] %0: $*StructWithStoredProperties
-  %5 = struct_element_addr %4 : $*StructWithStoredProperties, #StructWithStoredProperties.f
-  %6 = end_access %4 : $*StructWithStoredProperties
-  %7 = tuple ()
-  return %7 : $()
-}
-
 // CHECK-LABEL: @addressToPointerOfStructElementAddr
-// CHECK-NEXT: ([])
+// CHECK-NEXT: (none)
 // This mirrors the code pattern for materializeForSet on a struct stored
 // property
 sil private @addressToPointerOfStructElementAddr : $@convention(method) (@inout StructWithStoredProperties) -> (Builtin.RawPointer) {
@@ -186,7 +82,7 @@ bb0(%1 : $*StructWithStoredProperties):
 }
 
 // CHECK-LABEL: @endUnpairedAccess
-// CHECK-NEXT: ([])
+// CHECK-NEXT: (none)
 sil private @endUnpairedAccess : $@convention(method) (@inout Builtin.UnsafeValueBuffer) -> () {
 bb0(%0 : $*Builtin.UnsafeValueBuffer):
   end_unpaired_access [dynamic] %0 : $*Builtin.UnsafeValueBuffer
@@ -195,7 +91,7 @@ bb0(%0 : $*Builtin.UnsafeValueBuffer):
 }
 
 // CHECK-LABEL: @tupleElementAddr
-// CHECK-NEXT: ([modify])
+// CHECK-NEXT: (modify)
 sil private @tupleElementAddr : $@convention(thin) (@inout_aliasable (Int, Int)) -> () {
 bb0(%0 : $*(Int, Int)):
   %1 = tuple_element_addr %0 : $*(Int, Int), 1
@@ -208,7 +104,7 @@ bb0(%0 : $*(Int, Int)):
 sil @closureWithMissingBody : $@convention(thin) (@inout_aliasable Int, Int) -> ()
 
 // CHECK-LABEL: @callClosureWithMissingBody
-// CHECK-NEXT: ([], [])
+// CHECK-NEXT: (none, none)
 sil private @callClosureWithMissingBody : $@convention(thin) (@inout_aliasable Int, Int) -> () {
 bb0(%0 : $*Int, %1 : $Int):
   %2 = function_ref @closureWithMissingBody : $@convention(thin) (@inout_aliasable Int, Int) -> ()
@@ -218,7 +114,7 @@ bb0(%0 : $*Int, %1 : $Int):
 }
 
 // CHECK-LABEL: @callClosureThatModifiesCapture
-// CHECK-NEXT: ([modify], [])
+// CHECK-NEXT: (modify, none)
 sil private @callClosureThatModifiesCapture : $@convention(thin) (@inout_aliasable Int, Int) -> () {
 bb0(%0 : $*Int, %1 : $Int):
   %2 = function_ref @assignsToCapture : $@convention(thin) (@inout_aliasable Int, Int) -> ()
@@ -228,7 +124,7 @@ bb0(%0 : $*Int, %1 : $Int):
 }
 
 // CHECK-LABEL: @throwingClosureThatModifesCapture
-// CHECK-NEXT: ([modify])
+// CHECK-NEXT: (modify)
 sil private @throwingClosureThatModifesCapture : $@convention(thin) (@inout_aliasable Int) -> @error Error {
 bb0(%0 : $*Int):
   %1 = begin_access [modify] [unknown] %0 : $*Int
@@ -237,7 +133,7 @@ bb0(%0 : $*Int):
   return %2 : $()
 }
 // CHECK-LABEL: @callThrowingClosureThatModifiesCapture
-// CHECK-NEXT: ([modify])
+// CHECK-NEXT: (modify)
 sil private @callThrowingClosureThatModifiesCapture : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = function_ref @throwingClosureThatModifesCapture : $@convention(thin) (@inout_aliasable Int) -> @error Error
@@ -253,7 +149,7 @@ bb2(%5: $Error):
 sil @takesNoEscapeClosure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 
 // CHECK-LABEL: @partialApplyPassedOffToFunction
-// CHECK-NEXT: ([modify], [])
+// CHECK-NEXT: (modify, none)
 sil private @partialApplyPassedOffToFunction : $@convention(thin) (@inout_aliasable Int, Int) -> () {
 bb0(%0 : $*Int, %1: $Int):
   %2 = function_ref @assignsToCapture : $@convention(thin) (@inout_aliasable Int, Int) -> ()
@@ -268,7 +164,7 @@ sil @takesNoEscapeClosureTakingArgument : $@convention(thin) (@owned @callee_own
 sil @takesNoEscapeClosureTakingArgumentThrowing : $@convention(thin) (@owned @callee_owned (Int) -> (@error Error)) -> ()
 
 // CHECK-LABEL: @hasThreeCapturesAndTakesArgument
-// CHECK-NEXT: ([], [modify], [], [read])
+// CHECK-NEXT: (none, modify, none, read)
 sil private @hasThreeCapturesAndTakesArgument : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> () {
 bb0(%0 : $Int, %1: $*Int, %2: $*Int, %3: $*Int):
   %4 = begin_access [modify] [unknown] %1 : $*Int
@@ -280,7 +176,7 @@ bb0(%0 : $Int, %1: $*Int, %2: $*Int, %3: $*Int):
 }
 
 // CHECK-LABEL: @partialApplyOfClosureTakingArgumentPassedOffToFunction
-// CHECK-NEXT: ([modify], [], [read])
+// CHECK-NEXT: (modify, none, read
 sil private @partialApplyOfClosureTakingArgumentPassedOffToFunction : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
   %3 = function_ref @hasThreeCapturesAndTakesArgument : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
@@ -292,7 +188,7 @@ bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
 }
 
 // CHECK-LABEL: @partialApplyFollowedByConvertFunction
-// CHECK-NEXT: ([modify], [], [read])
+// CHECK-NEXT: (modify, none, read)
 sil private @partialApplyFollowedByConvertFunction : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
   %3 = function_ref @hasThreeCapturesAndTakesArgument : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
@@ -309,7 +205,7 @@ sil @takesAutoClosureReturningGeneric : $@convention(thin) <T where T : Equatabl
 sil @thunkForAutoClosure : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
 
 // CHECK-LABEL: @readsAndThrows
-// CHECK-NEXT: ([read])
+// CHECK-NEXT: (read)
 sil private  @readsAndThrows : $@convention(thin) (@inout_aliasable Int) -> (Int, @error Error) {
 bb0(%0 : $*Int):
   %3 = begin_access [read] [unknown] %0 : $*Int
@@ -319,7 +215,7 @@ bb0(%0 : $*Int):
 }
 
 // CHECK-LABEL: @passPartialApplyAsArgumentToPartialApply
-// CHECK-NEXT: ([read])
+// CHECK-NEXT: (read)
 sil hidden @passPartialApplyAsArgumentToPartialApply : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %2 = function_ref @takesAutoClosureReturningGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> ()
@@ -333,7 +229,7 @@ bb0(%0 : $*Int):
 }
 
 // CHECK-LABEL: @reads
-// CHECK-NEXT: ([read])
+// CHECK-NEXT: (read)
 sil private  @reads : $@convention(thin) (@inout_aliasable Int) -> Int {
 bb0(%0 : $*Int):
   %3 = begin_access [read] [unknown] %0 : $*Int
@@ -343,7 +239,7 @@ bb0(%0 : $*Int):
 }
 
 // CHECK-LABEL: @convertPartialApplyAndPassToPartialApply
-// CHECK-NEXT: ([read])
+// CHECK-NEXT: (read)
 sil hidden @convertPartialApplyAndPassToPartialApply : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %2 = function_ref @takesAutoClosureReturningGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> ()
@@ -358,7 +254,7 @@ bb0(%0 : $*Int):
 }
 
 // CHECK-LABEL: @selfRecursion
-// CHECK-NEXT: ([modify], [])
+// CHECK-NEXT: (modify, none)
 sil private @selfRecursion : $@convention(thin) (@inout_aliasable Int, Int) -> () {
 bb0(%0 : $*Int, %1 : $Int):
   %2 = function_ref @selfRecursion : $@convention(thin) (@inout_aliasable Int, Int) -> ()
@@ -370,7 +266,7 @@ bb0(%0 : $*Int, %1 : $Int):
 }
 
 // CHECK-LABEL: @callsMutuallyRecursive
-// CHECK-NEXT: ([modify], [])
+// CHECK-NEXT: (modify, none)
 sil private @callsMutuallyRecursive : $@convention(thin) (@inout_aliasable Int, Int) -> () {
 bb0(%0 : $*Int, %1 : $Int):
   %2 = function_ref @mutualRecursion1 : $@convention(thin) (@inout_aliasable Int, Int) -> ()
@@ -380,7 +276,7 @@ bb0(%0 : $*Int, %1 : $Int):
 }
 
 // CHECK-LABEL: @mutualRecursion1
-// CHECK-NEXT: ([modify], [])
+// CHECK-NEXT: (modify, none)
 sil private @mutualRecursion1 : $@convention(thin) (@inout_aliasable Int, Int) -> () {
 bb0(%0 : $*Int, %1 : $Int):
   %2 = function_ref @mutualRecursion2 : $@convention(thin) (@inout_aliasable Int, Int) -> ()
@@ -392,7 +288,7 @@ bb0(%0 : $*Int, %1 : $Int):
 }
 
 // CHECK-LABEL: @mutualRecursion2
-// CHECK-NEXT: ([modify], [])
+// CHECK-NEXT: (modify, none)
 sil private @mutualRecursion2 : $@convention(thin) (@inout_aliasable Int, Int) -> () {
 bb0(%0 : $*Int, %1 : $Int):
   %2 = function_ref @mutualRecursion1 : $@convention(thin) (@inout_aliasable Int, Int) -> ()
@@ -416,7 +312,7 @@ bb0(%0 : $*Int, %1 : $Int):
 //     C
 //
 // CHECK-LABEL: @multipleCycleA
-// CHECK-NEXT: ([modify])
+// CHECK-NEXT: (modify)
 sil private @multipleCycleA : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = function_ref @multipleCycleB : $@convention(thin) (@inout_aliasable Int) -> ()
@@ -428,7 +324,7 @@ bb0(%0 : $*Int):
 }
 
 // CHECK-LABEL: @multipleCycleB
-// CHECK-NEXT: ([modify])
+// CHECK-NEXT: (modify)
 sil private @multipleCycleB : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = function_ref @multipleCycleA : $@convention(thin) (@inout_aliasable Int) -> ()
@@ -440,7 +336,7 @@ bb0(%0 : $*Int):
 }
 
 // CHECK-LABEL: @multipleCycleC
-// CHECK-NEXT: ([modify])
+// CHECK-NEXT: (modify)
 sil private @multipleCycleC : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = function_ref @multipleCycleB : $@convention(thin) (@inout_aliasable Int) -> ()
