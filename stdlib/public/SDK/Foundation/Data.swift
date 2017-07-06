@@ -1085,35 +1085,26 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // slightly faster paths for common sequences
     
     public init<S: Sequence>(_ elements: S) where S.Iterator.Element == UInt8 {
-        let underestimatedCount = elements.underestimatedCount
-        self.init(count: underestimatedCount)
-        
-        let (endIterator, _) = UnsafeMutableBufferPointer(start: _backing._bytes?.assumingMemoryBound(to: UInt8.self), count: underestimatedCount).initialize(from: elements)
-        var iter = endIterator
-        while let byte = iter.next() { self.append(byte) }
+        if elements is Array<UInt8> {
+            self.init(bytes: _identityCast(elements, to: Array<UInt8>.self))
+        } else if elements is ArraySlice<UInt8> {
+            self.init(bytes: _identityCast(elements, to: ArraySlice<UInt8>.self))
+        } else if elements is UnsafeBufferPointer<UInt8> {
+            self.init(buffer: _identityCast(elements, to: UnsafeBufferPointer<UInt8>.self))
+        } else if let buffer = elements as? UnsafeMutableBufferPointer<UInt8> {
+            self.init(buffer: buffer)
+        } else if let data = elements as? Data {
+            self.init(backing: data._backing.mutableCopy(data._sliceRange), range: 0..<data.count)
+        } else {
+            let underestimatedCount = elements.underestimatedCount
+            self.init(count: underestimatedCount)
+            
+            let (endIterator, _) = UnsafeMutableBufferPointer(start: _backing._bytes?.assumingMemoryBound(to: UInt8.self), count: underestimatedCount).initialize(from: elements)
+            var iter = endIterator
+            while let byte = iter.next() { self.append(byte) }
+        }
     }
-    
-    public init(_ bytes: Array<UInt8>) {
-        self.init(bytes: bytes)
-    }
-    
-    public init(_ bytes: ArraySlice<UInt8>) {
-        self.init(bytes: bytes)
-    }
-    
-    public init(_ buffer: UnsafeBufferPointer<UInt8>) {
-        self.init(buffer: buffer)
-    }
-    
-    public init(_ buffer: UnsafeMutableBufferPointer<UInt8>) {
-        self.init(buffer: buffer)
-    }
-    
-    public init(_ data: Data) {
-        _sliceRange = 0..<data.count
-        _backing = data._backing.mutableCopy(data._sliceRange)
-    }
-    
+
     @_versioned
     internal init(backing: _DataStorage, range: Range<Index>) {
         _backing = backing
