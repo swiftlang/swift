@@ -2390,7 +2390,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
 }
 
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
-  Type formalBaseType = baseExpr->getType()->getLValueOrInOutObjectType();
+  Type formalBaseType = baseExpr->getType()->getWithoutSpecifierType();
   CanType baseTy = formalBaseType->getCanonicalType();
 
   // For class, archetype, and protocol types, look up the dynamic metatype.
@@ -2840,7 +2840,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         // If the stored value would need to be reabstracted in fully opaque
         // context, then we have to treat the component as computed.
         auto componentObjTy =
-          component.getComponentType()->getLValueOrInOutObjectType();
+          component.getComponentType()->getWithoutSpecifierType();
         auto storageTy = SGF.SGM.Types.getSubstitutedStorageType(decl,
                                                                 componentObjTy);
         auto opaqueTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
@@ -3277,7 +3277,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
 }
 
 static bool isVerbatimNullableTypeInC(SILModule &M, Type ty) {
-  ty = ty->getLValueOrInOutObjectType()->getReferenceStorageReferent();
+  ty = ty->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // Class instances, and @objc existentials are all nullable.
   if (ty->hasReferenceSemantics()) {
@@ -4184,7 +4184,7 @@ void SILGenFunction::emitOpenExistentialExprImpl(
     writebackScope.emplace(*this);
 
     Type formalRValueType =
-      E->getOpaqueValue()->getType()->getLValueOrInOutObjectType();
+      E->getOpaqueValue()->getType()->getWithoutSpecifierType();
 
     accessKind = E->getExistentialValue()->getLValueAccessKind();
     auto lv = emitLValue(E->getExistentialValue(), accessKind);

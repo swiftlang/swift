@@ -588,7 +588,7 @@ AbstractionPattern AbstractionPattern::dropLastTupleElement() const {
   llvm_unreachable("bad kind");  
 }
 
-AbstractionPattern AbstractionPattern::getLValueOrInOutObjectType() const {
+AbstractionPattern AbstractionPattern::getWithoutSpecifierType() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -607,13 +607,13 @@ AbstractionPattern AbstractionPattern::getLValueOrInOutObjectType() const {
     return *this;
   case Kind::Type:
     return AbstractionPattern(getGenericSignature(),
-                              getType().getLValueOrInOutObjectType());
+                              getType().getWithoutSpecifierType());
   case Kind::Discard:
     return AbstractionPattern::getDiscard(getGenericSignature(),
-                                        getType().getLValueOrInOutObjectType());
+                                        getType().getWithoutSpecifierType());
   case Kind::ClangType:
     return AbstractionPattern(getGenericSignature(),
-                              getType().getLValueOrInOutObjectType(),
+                              getType().getWithoutSpecifierType(),
                               getClangType());
   }
   llvm_unreachable("bad kind");

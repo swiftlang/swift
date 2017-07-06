@@ -672,7 +672,7 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                         ? value->getInterfaceType()
                         : value->getType());
 
-  requestedType = requestedType->getLValueOrInOutObjectType()
+  requestedType = requestedType->getWithoutSpecifierType()
     ->getReferenceStorageReferent();
 
   // If we're dealing with contextual types, and we referenced this type from
@@ -1702,7 +1702,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
 
       // FIXME: It's kind of weird in general that we have to look
       // through lvalue, inout and IUO types here
-      Type lookupBaseType = newBase->getLValueOrInOutObjectType();
+      Type lookupBaseType = newBase->getWithoutSpecifierType();
 
       auto *module = cs.DC->getParentModule();
 

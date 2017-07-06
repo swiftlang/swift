@@ -381,7 +381,7 @@ class CanType : public Type {
   static CanType getAnyOptionalObjectTypeImpl(CanType type,
                                               OptionalTypeKind &kind);
   static CanType getReferenceStorageReferentImpl(CanType type);
-  static CanType getLValueOrInOutObjectTypeImpl(CanType type);
+  static CanType getWithoutSpecifierTypeImpl(CanType type);
 
 public:
   explicit CanType(TypeBase *P = 0) : Type(P) {
@@ -459,8 +459,8 @@ public:
     return getReferenceStorageReferentImpl(*this);
   }
   
-  CanType getLValueOrInOutObjectType() const {
-    return getLValueOrInOutObjectTypeImpl(*this);
+  CanType getWithoutSpecifierType() const {
+    return getWithoutSpecifierTypeImpl(*this);
   }
 
   // Direct comparison is allowed for CanTypes - they are known canonical.
