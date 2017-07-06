@@ -261,6 +261,12 @@ ManagedValue SILGenBuilder::createOwnedPHIArgument(SILType type) {
   return SGF.emitManagedRValueWithCleanup(arg);
 }
 
+ManagedValue SILGenBuilder::createGuaranteedPHIArgument(SILType type) {
+  SILPHIArgument *arg =
+      getInsertionBB()->createPHIArgument(type, ValueOwnershipKind::Guaranteed);
+  return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
+}
+
 ManagedValue SILGenBuilder::createAllocRef(
     SILLocation loc, SILType refType, bool objc, bool canAllocOnStack,
     ArrayRef<SILType> inputElementTypes,

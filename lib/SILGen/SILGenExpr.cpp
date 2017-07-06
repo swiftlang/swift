@@ -261,6 +261,40 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
   return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 
+namespace {
+
+struct EndBorrowArgumentCleanup : Cleanup {
+  SILPHIArgument *arg;
+
+  EndBorrowArgumentCleanup(SILPHIArgument *arg) : arg(arg) {}
+
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.createEndBorrowArgument(l, arg);
+  }
+
+  void dump(SILGenFunction &gen) const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndBorrowArgumentCleanup "
+                 << "State:" << getState() << "\n"
+                 << "argument: " << *arg << "\n";
+#endif
+  }
+};
+
+} // end anonymous namespace
+
+ManagedValue
+SILGenFunction::emitManagedBorrowedArgumentWithCleanup(SILPHIArgument *arg) {
+  if (arg->getOwnershipKind() == ValueOwnershipKind::Trivial ||
+      arg->getType().isTrivial(arg->getModule())) {
+    return ManagedValue::forUnmanaged(arg);
+  }
+
+  assert(arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+  Cleanups.pushCleanup<EndBorrowArgumentCleanup>(arg);
+  return ManagedValue(arg, CleanupHandle::invalid());
+}
+
 ManagedValue
 SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue original,
                                                      SILValue borrowed) {

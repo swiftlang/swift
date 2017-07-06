@@ -159,7 +159,7 @@ work with other SDKs, you'll need to create a second build using Ninja.
 
 ## Testing Swift
 
-See [docs/Testing.rst](docs/Testing.rst).
+See [docs/Testing.md](docs/Testing.md).
 
 ## Contributing to Swift
 
