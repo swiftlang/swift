@@ -98,9 +98,9 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
 
 }
 
-extension _FixedArray${N} where T: IntegerLiteralConvertible {
+extension _FixedArray${N} where T : ExpressibleByIntegerLiteral {
   @inline(__always)
-  internal init(allZeros:()) {
+  internal init(allZeros: ()) {
     self.storage = (
 % for i in range(0, N-1):
     0,
