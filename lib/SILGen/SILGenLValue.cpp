@@ -2085,7 +2085,7 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
     lv = SGF.emitOpenExistentialLValue(
         opened, std::move(lv),
         CanArchetypeType(opened->getOpenedArchetype()),
-        e->getType()->getLValueOrInOutObjectType()->getCanonicalType(),
+        e->getType()->getWithoutSpecifierType()->getCanonicalType(),
         accessKind);
     return lv;
   }

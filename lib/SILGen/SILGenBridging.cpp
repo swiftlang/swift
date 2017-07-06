@@ -1320,7 +1320,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   if (thunk.kind == SILDeclRef::Kind::Allocator) {
     allocatorSelfType = forwardedParameters[0]
       ->getInterfaceType(getASTContext())
-      ->getLValueOrInOutObjectType();
+      ->getWithoutSpecifierType();
     if (F.getGenericEnvironment())
       allocatorSelfType = F.getGenericEnvironment()
         ->mapTypeIntoContext(allocatorSelfType);

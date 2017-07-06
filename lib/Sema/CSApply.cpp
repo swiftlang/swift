@@ -1508,7 +1508,7 @@ namespace {
       if (selfTy->hasReferenceSemantics()) {
         auto covariantTy = resultTy
           ->replaceCovariantResultType(cs.getType(base)
-                                           ->getLValueOrInOutObjectType(),
+                                           ->getWithoutSpecifierType(),
                                        ctor->getNumParameterLists());
         if (!covariantTy->isEqual(resultTy))
           ctorRef = cs.cacheType(
@@ -4020,7 +4020,7 @@ namespace {
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
           // Chaining always forces the element to be an rvalue.
-          auto objectTy = baseTy->getLValueOrInOutObjectType()
+          auto objectTy = baseTy->getWithoutSpecifierType()
             ->getAnyOptionalObjectType();
           if (baseTy->hasUnresolvedType() && !objectTy) {
             objectTy = baseTy;
@@ -4072,7 +4072,7 @@ namespace {
           !baseTy->hasUnresolvedType() &&
           !baseTy->isEqual(leafTy)) {
         assert(leafTy->getAnyOptionalObjectType()
-                     ->isEqual(baseTy->getLValueOrInOutObjectType()));
+                     ->isEqual(baseTy->getWithoutSpecifierType()));
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
         baseTy = leafTy;
@@ -4098,7 +4098,7 @@ namespace {
       
       // The final component type ought to line up with the leaf type of the
       // key path.
-      assert(!baseTy || baseTy->getLValueOrInOutObjectType()->isEqual(leafTy));
+      assert(!baseTy || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
       return E;
     }
 
@@ -5235,8 +5235,8 @@ Expr *ExprRewriter::coerceCallArguments(
     
       for (size_t i = 0; i < params.size(); i++) {
         if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(argElts[i])) {
-          auto paramTy = params[i].getType()->getLValueOrInOutObjectType();
-          auto argTy = cs.getType(dotExpr)->getLValueOrInOutObjectType();
+          auto paramTy = params[i].getType()->getWithoutSpecifierType();
+          auto argTy = cs.getType(dotExpr)->getWithoutSpecifierType();
           if (!paramTy->isEqual(argTy)) {
             allParamsMatch = false;
             break;
@@ -5548,7 +5548,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
     // necessary any more, but it's probably still a good idea.
     if (cs.getType(singleExpr)->is<LValueType>())
       cs.setType(singleExpr,
-                 cs.getType(singleExpr)->getLValueOrInOutObjectType());
+                 cs.getType(singleExpr)->getWithoutSpecifierType());
 
     tc.checkIgnoredExpr(singleExpr);
 
@@ -6246,7 +6246,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
                                     AccessSemantics semantics,
                                     DeclContext *UseDC) {
-  auto baseObjectTy = baseTy->getLValueOrInOutObjectType();
+  auto baseObjectTy = baseTy->getWithoutSpecifierType();
   if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
     // If 'self' is an inout type, turn the base type into an lvalue
     // type with the same qualifiers.
@@ -6732,7 +6732,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         assert(arg->getNumElements() == 2 && "should have two arguments");
         auto nonescaping = arg->getElements()[0];
         auto body = arg->getElements()[1];
-        auto bodyTy = cs.getType(body)->getLValueOrInOutObjectType();
+        auto bodyTy = cs.getType(body)->getWithoutSpecifierType();
         auto bodyFnTy = bodyTy->castTo<FunctionType>();
         auto escapableType = bodyFnTy->getInput();
         auto resultType = bodyFnTy->getResult();

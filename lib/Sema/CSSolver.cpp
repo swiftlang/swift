@@ -1052,7 +1052,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     if (kind == AllowedBindingKind::Supertypes &&
         constraint->getKind() >= ConstraintKind::Conversion &&
         constraint->getKind() <= ConstraintKind::OperatorArgumentConversion) {
-      auto innerType = type->getLValueOrInOutObjectType();
+      auto innerType = type->getWithoutSpecifierType();
       if (auto objectType =
           cs.lookThroughImplicitlyUnwrappedOptionalType(innerType)) {
         type = OptionalType::get(objectType);
@@ -2649,8 +2649,8 @@ bool DisjunctionChoice::isSymmetricOperator() const {
     return true;
 
   auto firstType =
-      paramList->get(0)->getInterfaceType()->getLValueOrInOutObjectType();
+      paramList->get(0)->getInterfaceType()->getWithoutSpecifierType();
   auto secondType =
-      paramList->get(1)->getInterfaceType()->getLValueOrInOutObjectType();
+      paramList->get(1)->getInterfaceType()->getWithoutSpecifierType();
   return firstType->isEqual(secondType);
 }

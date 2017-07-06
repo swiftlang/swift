@@ -1589,7 +1589,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       Type baseType;
       if (isa<SelfApplyExpr>(AE) &&
           !isUnresolvedOrTypeVarType(CS->getType(AE->getArg())))
-        baseType = CS->getType(AE->getArg())->getLValueOrInOutObjectType();
+        baseType = CS->getType(AE->getArg())->getWithoutSpecifierType();
 
       for (auto &C : candidates) {
         C.level += 1;
@@ -1599,7 +1599,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
         // Compute a new substituted type if we have a base type to apply.
         if (baseType && C.level == 1 && C.getDecl()) {
           baseType = baseType
-              ->getLValueOrInOutObjectType()
+              ->getWithoutSpecifierType()
               ->getRValueInstanceType();
           C.entityType = baseType->getTypeOfMember(CS->DC->getParentModule(),
                                                    C.getDecl(), nullptr);
@@ -1652,7 +1652,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     // If we have useful information about the type we're
     // initializing, provide it.
     if (UDE->getName().getBaseName() == CS->TC.Context.Id_init) {
-      auto selfTy = CS->getType(UDE->getBase())->getLValueOrInOutObjectType();
+      auto selfTy = CS->getType(UDE->getBase())->getWithoutSpecifierType();
       if (!selfTy->hasTypeVariable())
         declName = selfTy.getString() + "." + declName;
     }
@@ -1786,7 +1786,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       auto substType = replaceTypeVariablesWithUnresolved(baseType);
       if (substType)
         substType = substType
-            ->getLValueOrInOutObjectType()
+            ->getWithoutSpecifierType()
             ->getRValueInstanceType();
 
       // If this is a DeclViaUnwrappingOptional, then we're actually looking
@@ -5931,7 +5931,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     // Bindings specify the arguments that source the parameter. The only case
     // this returns a non-singular value is when there are varargs in play.
     for (auto argNo : bindings[i]) {
-      auto argType = args[argNo].getType()->getLValueOrInOutObjectType();
+      auto argType = args[argNo].getType()->getWithoutSpecifierType();
 
       if (argType->is<ArchetypeType>()) {
         diagnoseUnboundArchetype(archetype, fnExpr);
@@ -8283,7 +8283,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
     if (!baseExpr)
       return true;
 
-    baseTy = CS->getType(baseExpr)->getLValueOrInOutObjectType();
+    baseTy = CS->getType(baseExpr)->getWithoutSpecifierType();
     baseObjTy = baseTy;
   }
 
@@ -8853,7 +8853,7 @@ FailureDiagnosis::validateContextualType(Type contextualType,
   };
 
   bool shouldNullify = false;
-  if (auto objectType = contextualType->getLValueOrInOutObjectType()) {
+  if (auto objectType = contextualType->getWithoutSpecifierType()) {
     // Note that simply checking for `objectType->hasUnresolvedType()` is not
     // appropriate in this case standalone, because if it's in a function,
     // for example, or inout type, we still want to preserve it's skeleton

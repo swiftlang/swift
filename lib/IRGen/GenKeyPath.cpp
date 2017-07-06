@@ -173,7 +173,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     Lowering::GenericContextScope scope(getSILTypes(),
                                         pattern->getGenericSignature());
     loweredBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
-                                   baseTy->getLValueOrInOutObjectType());
+                                   baseTy->getWithoutSpecifierType());
     auto &component = pattern->getComponents()[i];
     switch (auto kind = component.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {
