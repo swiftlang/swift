@@ -215,20 +215,10 @@ protected:
   enum { NumAccessibilityAttrBits = NumDeclAttrBits + 3 };
   static_assert(NumAccessibilityAttrBits <= 32, "fits in an unsigned");
 
-  class AutoClosureAttrBitFields {
-    friend class AutoClosureAttr;
-    unsigned : NumDeclAttrBits;
-
-    unsigned Escaping : 1;
-  };
-  enum { NumAutoClosureAttrBits = NumDeclAttrBits + 1 };
-  static_assert(NumAutoClosureAttrBits <= 32, "fits in an unsigned");
-
   union {
     DeclAttrBitFields DeclAttrBits;
     ObjCAttrBitFields ObjCAttrBits;
     AccessibilityAttrBitFields AccessibilityAttrBits;
-    AutoClosureAttrBitFields AutoClosureAttrBits;
   };
 
   DeclAttribute *Next = nullptr;
@@ -913,24 +903,6 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SetterAccessibility;
-  }
-};
-
-/// Represents the autoclosure attribute.
-class AutoClosureAttr : public DeclAttribute {
-public:
-  AutoClosureAttr(SourceLoc atLoc, SourceRange range, bool escaping,
-                  bool implicit = false)
-    : DeclAttribute(DAK_AutoClosure, atLoc, range, implicit)
-  {
-    AutoClosureAttrBits.Escaping = escaping;
-  }
-
-  /// Determine whether this autoclosure is escaping.
-  bool isEscaping() const { return AutoClosureAttrBits.Escaping; }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_AutoClosure;
   }
 };
 

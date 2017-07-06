@@ -1652,15 +1652,13 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       return nullptr;
 
     // Map __attribute__((noescape)) to @noescape.
-    bool addNoEscapeAttr = false;
     if (param->hasAttr<clang::NoEscapeAttr>()) {
       Type newParamTy = applyNoEscape(swiftParamTy);
       if (newParamTy.getPointer() != swiftParamTy.getPointer()) {
         swiftParamTy = newParamTy;
-        addNoEscapeAttr = true;
       }
     }
-
+    
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
@@ -1681,11 +1679,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         ImportedHeaderUnit);
 
     paramInfo->setInterfaceType(swiftParamTy);
-
-    if (addNoEscapeAttr)
-      paramInfo->getAttrs().add(new (SwiftContext)
-                                  NoEscapeAttr(/*IsImplicit=*/false));
-
     parameters.push_back(paramInfo);
     ++index;
   }
@@ -2122,11 +2115,6 @@ Type ClangImporter::Implementation::importMethodType(
                                            swiftParamTy,
                                            ImportedHeaderUnit);
     paramInfo->setInterfaceType(dc->mapTypeOutOfContext(swiftParamTy));
-
-    if (addNoEscapeAttr) {
-      paramInfo->getAttrs().add(
-        new (SwiftContext) NoEscapeAttr(/*IsImplicit=*/false));
-    }
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||
