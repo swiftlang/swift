@@ -12,6 +12,7 @@ add_swift_tool_subdirectory(sil-passpipeline-dumper)
 add_swift_tool_subdirectory(swift-llvm-opt)
 add_swift_tool_subdirectory(swift-api-digester)
 add_swift_tool_subdirectory(swift-syntax-test)
+add_swift_tool_subdirectory(yaml2json)
 
 if(SWIFT_BUILD_SOURCEKIT)
   add_swift_tool_subdirectory(SourceKit)
