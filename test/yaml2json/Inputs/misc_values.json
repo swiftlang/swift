@@ -1,0 +1,19 @@
+{
+  "TopLevelMap": [
+    "Key1",
+    "QuotedKey",
+    {
+      "sub_map": {
+        "foo": true,
+        "bar": "Block string!\nWoo!\n\n\nLots of newlines here, huh?\n",
+        "baz": null
+      }
+    },
+    {
+      "another key": 23.0
+    },
+    {
+      "integer_value": 23
+    }
+  ]
+}

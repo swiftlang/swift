@@ -1,4 +1,4 @@
-# RUN: %yaml2json %s > %t
+# RUN: %yaml2json -pretty-print %s > %t
 # RUN: diff %t %S/Inputs/misc_values.json
 
 TopLevelMap:
