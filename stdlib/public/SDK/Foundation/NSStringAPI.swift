@@ -536,8 +536,10 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns the result of invoking `compare:options:` with
   /// `NSCaseInsensitiveSearch` as the only option.
-  public func caseInsensitiveCompare(_ aString: String) -> ComparisonResult {
-    return _ns.caseInsensitiveCompare(aString)
+  public func caseInsensitiveCompare<
+    T : StringProtocol
+  >(_ aString: T) -> ComparisonResult {
+    return _ns.caseInsensitiveCompare(aString._ephemeralString)
   }
 
   //===--- Omitted by agreement during API review 5/20/2014 ---------------===//
@@ -553,9 +555,10 @@ extension StringProtocol where Index == String.Index {
   /// Returns a string containing characters this string and the
   /// given string have in common, starting from the beginning of each
   /// up to the first characters that aren't equivalent.
-  public func commonPrefix(
-    with aString: String, options: String.CompareOptions = []) -> String {
-    return _ns.commonPrefix(with: aString, options: options)
+  public func commonPrefix<
+    T : StringProtocol
+  >(with aString: T, options: String.CompareOptions = []) -> String {
+    return _ns.commonPrefix(with: aString._ephemeralString, options: options)
   }
 
   // - (NSComparisonResult)
@@ -574,8 +577,8 @@ extension StringProtocol where Index == String.Index {
 
   /// Compares the string using the specified options and
   /// returns the lexical ordering for the range.
-  public func compare(
-    _ aString: String,
+  public func compare<T : StringProtocol>(
+    _ aString: T,
     options mask: String.CompareOptions = [],
     range: Range<Index>? = nil,
     locale: Locale? = nil
@@ -583,6 +586,7 @@ extension StringProtocol where Index == String.Index {
     // According to Ali Ozer, there may be some real advantage to
     // dispatching to the minimal selector for the supplied options.
     // So let's do that; the switch should compile away anyhow.
+    let aString = aString._ephemeralString
     return locale != nil ? _ns.compare(
       aString,
       options: mask,
@@ -695,8 +699,10 @@ extension StringProtocol where Index == String.Index {
   ///   string using `separator`.
   // FIXME(strings): now when String conforms to Collection, this can be
   //   replaced by split(separator:maxSplits:omittingEmptySubsequences:)
-  public func components(separatedBy separator: String) -> [String] {
-    return _ns.components(separatedBy: separator)
+  public func components<
+    T : StringProtocol
+  >(separatedBy separator: T) -> [String] {
+    return _ns.components(separatedBy: separator._ephemeralString)
   }
 
   // - (const char *)cStringUsingEncoding:(NSStringEncoding)encoding
@@ -812,20 +818,26 @@ extension StringProtocol where Index == String.Index {
   /// Compares the string and the given string using a case-insensitive,
   /// localized, comparison.
   public
-  func localizedCaseInsensitiveCompare(_ aString: String) -> ComparisonResult {
-    return _ns.localizedCaseInsensitiveCompare(aString)
+  func localizedCaseInsensitiveCompare<
+    T : StringProtocol
+  >(_ aString: T) -> ComparisonResult {
+    return _ns.localizedCaseInsensitiveCompare(aString._ephemeralString)
   }
 
   // - (NSComparisonResult)localizedCompare:(NSString *)aString
 
   /// Compares the string and the given string using a localized comparison.
-  public func localizedCompare(_ aString: String) -> ComparisonResult {
-    return _ns.localizedCompare(aString)
+  public func localizedCompare<
+    T : StringProtocol
+  >(_ aString: T) -> ComparisonResult {
+    return _ns.localizedCompare(aString._ephemeralString)
   }
 
   /// Compares the string and the given string as sorted by the Finder.
-  public func localizedStandardCompare(_ string: String) -> ComparisonResult {
-    return _ns.localizedStandardCompare(string)
+  public func localizedStandardCompare<
+    T : StringProtocol
+  >(_ string: T) -> ComparisonResult {
+    return _ns.localizedStandardCompare(string._ephemeralString)
   }
 
   //===--- Omitted for consistency with API review results 5/20/2014 ------===//
@@ -899,8 +911,10 @@ extension StringProtocol where Index == String.Index {
   /// locale-aware, case and diacritic insensitive.  The exact list of search
   /// options applied may change over time.
   @available(OSX 10.11, iOS 9.0, *)
-  public func localizedStandardContains(_ string: String) -> Bool {
-    return _ns.localizedStandardContains(string)
+  public func localizedStandardContains<
+    T : StringProtocol
+  >(_ string: T) -> Bool {
+    return _ns.localizedStandardContains(string._ephemeralString)
   }
 
   // @property NSStringEncoding smallestEncoding;
@@ -938,18 +952,23 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns a string created by appending a string constructed from a given
   /// format string and the following arguments.
-  public func appendingFormat(
-    _ format: String, _ arguments: CVarArg...
+  public func appendingFormat<
+    T : StringProtocol
+  >(
+    _ format: T, _ arguments: CVarArg...
   ) -> String {
     return _ns.appending(
-      String(format: format, arguments: arguments))
+      String(format: format._ephemeralString, arguments: arguments))
   }
 
   // - (NSString *)stringByAppendingString:(NSString *)aString
 
   /// Returns a new string created by appending the given string.
-  public func appending(_ aString: String) -> String {
-    return _ns.appending(aString)
+  // FIXME(strings): shouldn't it be deprecated in favor of `+`?
+  public func appending<
+    T : StringProtocol
+  >(_ aString: T) -> String {
+    return _ns.appending(aString._ephemeralString)
   }
 
   /// Returns a string with the given character folding options
@@ -967,13 +986,17 @@ extension StringProtocol where Index == String.Index {
   /// Returns a new string formed from the `String` by either
   /// removing characters from the end, or by appending as many
   /// occurrences as necessary of a given pad string.
-  public func padding(
+  public func padding<
+    T : StringProtocol
+  >(
     toLength newLength: Int,
-    withPad padString: String,
+    withPad padString: T,
     startingAt padIndex: Int
   ) -> String {
     return _ns.padding(
-      toLength: newLength, withPad: padString, startingAt: padIndex)
+      toLength: newLength,
+      withPad: padString._ephemeralString,
+      startingAt: padIndex)
   }
 
   // @property NSString* stringByRemovingPercentEncoding;
@@ -990,10 +1013,11 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns a new string in which the characters in a
   /// specified range of the `String` are replaced by a given string.
-  public func replacingCharacters(
-    in range: Range<Index>, with replacement: String
-  ) -> String {
-    return _ns.replacingCharacters(in: _toNSRange(range), with: replacement)
+  public func replacingCharacters<
+    T : StringProtocol
+  >(in range: Range<Index>, with replacement: T) -> String {
+    return _ns.replacingCharacters(
+      in: _toNSRange(range), with: replacement._ephemeralString)
   }
 
   // - (NSString *)
@@ -1009,12 +1033,17 @@ extension StringProtocol where Index == String.Index {
   /// Returns a new string in which all occurrences of a target
   /// string in a specified range of the string are replaced by
   /// another given string.
-  public func replacingOccurrences(
-    of target: String,
-    with replacement: String,
+  public func replacingOccurrences<
+    Target : StringProtocol,
+    Replacement : StringProtocol
+  >(
+    of target: Target,
+    with replacement: Replacement,
     options: String.CompareOptions = [],
     range searchRange: Range<Index>? = nil
   ) -> String {
+    let target = target._ephemeralString
+    let replacement = replacement._ephemeralString
     return (searchRange != nil) || (!options.isEmpty)
     ? _ns.replacingOccurrences(
       of: target,
@@ -1078,12 +1107,16 @@ extension StringProtocol where Index == String.Index {
 
   /// Writes the contents of the `String` to a file at a given
   /// path using a given encoding.
-  public func write(
-    toFile path: String, atomically useAuxiliaryFile:Bool,
+  public func write<
+    T : StringProtocol
+  >(
+    toFile path: T, atomically useAuxiliaryFile: Bool,
     encoding enc: String.Encoding
   ) throws {
     try _ns.write(
-      toFile: path, atomically: useAuxiliaryFile, encoding: enc.rawValue)
+      toFile: path._ephemeralString,
+      atomically: useAuxiliaryFile,
+      encoding: enc.rawValue)
   }
 
   // - (BOOL)
@@ -1126,9 +1159,11 @@ extension StringProtocol where Index == String.Index {
   /// Performs linguistic analysis on the specified string by
   /// enumerating the specific range of the string, providing the
   /// Block with the located tags.
-  public func enumerateLinguisticTags(
+  public func enumerateLinguisticTags<
+    T : StringProtocol
+  >(
     in range: Range<Index>,
-    scheme tagScheme: String,
+    scheme tagScheme: T,
     options opts: NSLinguisticTagger.Options = [],
     orthography: NSOrthography? = nil,
     invoking body:
@@ -1136,7 +1171,7 @@ extension StringProtocol where Index == String.Index {
   ) {
     _ns.enumerateLinguisticTags(
       in: _toNSRange(range),
-      scheme: tagScheme,
+      scheme: tagScheme._ephemeralString,
       options: opts,
       orthography: orthography != nil ? orthography! : nil
     ) {
@@ -1355,9 +1390,11 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns an array of linguistic tags for the specified
   /// range and requested tags within the receiving string.
-  public func linguisticTags(
+  public func linguisticTags<
+    T : StringProtocol
+  >(
     in range: Range<Index>,
-    scheme tagScheme: String,
+    scheme tagScheme: T,
     options opts: NSLinguisticTagger.Options = [],
     orthography: NSOrthography? = nil,
     tokenRanges: UnsafeMutablePointer<[Range<Index>]>? = nil // FIXME:Can this be nil?
@@ -1365,8 +1402,11 @@ extension StringProtocol where Index == String.Index {
     var nsTokenRanges: NSArray?
     let result = tokenRanges._withNilOrAddress(of: &nsTokenRanges) {
       self._ns.linguisticTags(
-        in: _toNSRange(range), scheme: tagScheme, options: opts,
-        orthography: orthography, tokenRanges: $0) as NSArray
+        in: _toNSRange(range),
+        scheme: tagScheme._ephemeralString,
+        options: opts,
+        orthography: orthography,
+        tokenRanges: $0) as NSArray
     }
 
     if nsTokenRanges != nil {
@@ -1459,12 +1499,15 @@ extension StringProtocol where Index == String.Index {
   /// Finds and returns the range of the first occurrence of a
   /// given string within a given range of the `String`, subject to
   /// given options, using the specified locale, if any.
-  public func range(
-    of aString: String,
+  public func range<
+    T : StringProtocol
+  >(
+    of aString: T,
     options mask: String.CompareOptions = [],
     range searchRange: Range<Index>? = nil,
     locale: Locale? = nil
   ) -> Range<Index>? {
+    let aString = aString._ephemeralString
     return _optionalRange(
       locale != nil ? _ns.range(
         of: aString,
@@ -1493,8 +1536,11 @@ extension StringProtocol where Index == String.Index {
   /// locale-aware, case and diacritic insensitive.  The exact list of search
   /// options applied may change over time.
   @available(OSX 10.11, iOS 9.0, *)
-  public func localizedStandardRange(of string: String) -> Range<Index>? {
-    return _optionalRange(_ns.localizedStandardRange(of: string))
+  public func localizedStandardRange<
+    T : StringProtocol
+  >(of string: T) -> Range<Index>? {
+    return _optionalRange(
+      _ns.localizedStandardRange(of: string._ephemeralString))
   }
 
   // - (NSString *)
@@ -1518,7 +1564,8 @@ extension StringProtocol where Index == String.Index {
   /// `self` by case-sensitive, non-literal search.
   ///
   /// Equivalent to `self.rangeOfString(other) != nil`
-  public func contains(_ other: String) -> Bool {
+  public func contains<T : StringProtocol>(_ other: T) -> Bool {
+    let other = other._ephemeralString
     let r = self.range(of: other) != nil
     if #available(OSX 10.10, iOS 8.0, *) {
       _sanityCheck(r == _ns.contains(other))
@@ -1537,7 +1584,10 @@ extension StringProtocol where Index == String.Index {
   ///
   ///     range(of: other, options: .caseInsensitiveSearch,
   ///           locale: Locale.current) != nil
-  public func localizedCaseInsensitiveContains(_ other: String) -> Bool {
+  public func localizedCaseInsensitiveContains<
+    T : StringProtocol
+  >(_ other: T) -> Bool {
+    let other = other._ephemeralString
     let r = self.range(
       of: other, options: .caseInsensitive, locale: Locale.current
     ) != nil
