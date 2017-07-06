@@ -4330,7 +4330,7 @@ public:
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_generic_function,
                       NTD->getName(),
-                      AFD->getName());
+                      AFD->getFullName());
         } else {
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_generic_closure,
