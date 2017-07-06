@@ -1033,7 +1033,8 @@ extension StringProtocol where Index == String.Index {
   /// Returns a new string made by replacing in the `String`
   /// all percent escapes with the matching characters as determined
   /// by a given encoding.
-  @available(*, deprecated, message: "Use removingPercentEncoding instead, which always uses the recommended UTF-8 encoding.")
+  @available(swift, deprecated: 3.2, obsoleted: 4.0,
+    message: "Use removingPercentEncoding instead, which always uses the recommended UTF-8 encoding.")
   public func replacingPercentEscapes(
     using encoding: String.Encoding
   ) -> String? {
@@ -1046,33 +1047,6 @@ extension StringProtocol where Index == String.Index {
   /// the `String` characters contained in a given character set.
   public func trimmingCharacters(in set: CharacterSet) -> String {
     return _ns.trimmingCharacters(in: set)
-  }
-
-  // - (NSString *)substringFromIndex:(NSUInteger)anIndex
-
-  /// Returns a new string containing the characters of the
-  /// `String` from the one at a given index to the end.
-  // FIXME(strings): should be deprecated in favor of slicing?
-  public func substring(from index: Index) -> String {
-    return _ns.substring(from: index.encodedOffset)
-  }
-
-  // - (NSString *)substringToIndex:(NSUInteger)anIndex
-
-  /// Returns a new string containing the characters of the
-  /// `String` up to, but not including, the one at a given index.
-  // FIXME(strings): should be deprecated in favor of slicing?
-  public func substring(to index: Index) -> String {
-    return _ns.substring(to: index.encodedOffset)
-  }
-
-  // - (NSString *)substringWithRange:(NSRange)aRange
-
-  /// Returns a string object containing the characters of the
-  /// `String` that lie within a given range.
-  // FIXME(strings): should be deprecated in favor of slicing?
-  public func substring(with aRange: Range<Index>) -> String {
-    return _ns.substring(with: _toNSRange(aRange))
   }
 
   // @property (readonly, copy) NSString *localizedUppercaseString NS_AVAILABLE(10_11, 9_0);
@@ -1571,6 +1545,39 @@ extension StringProtocol where Index == String.Index {
       _sanityCheck(r == _ns.localizedCaseInsensitiveContains(other))
     }
     return r
+  }
+}
+
+// Deprecated slicing
+extension StringProtocol where Index == String.Index {
+  // - (NSString *)substringFromIndex:(NSUInteger)anIndex
+
+  /// Returns a new string containing the characters of the
+  /// `String` from the one at a given index to the end.
+  @available(swift, deprecated: 4.0,
+    message: "Please use String slicing subscript with a 'partial range from' operator.")
+  public func substring(from index: Index) -> String {
+    return _ns.substring(from: index.encodedOffset)
+  }
+
+  // - (NSString *)substringToIndex:(NSUInteger)anIndex
+
+  /// Returns a new string containing the characters of the
+  /// `String` up to, but not including, the one at a given index.
+  @available(swift, deprecated: 4.0,
+    message: "Please use String slicing subscript with a 'partial range upto' operator.")
+  public func substring(to index: Index) -> String {
+    return _ns.substring(to: index.encodedOffset)
+  }
+
+  // - (NSString *)substringWithRange:(NSRange)aRange
+
+  /// Returns a string object containing the characters of the
+  /// `String` that lie within a given range.
+  @available(swift, deprecated: 4.0,
+    message: "Please use String slicing subscript.")
+  public func substring(with aRange: Range<Index>) -> String {
+    return _ns.substring(with: _toNSRange(aRange))
   }
 }
 
