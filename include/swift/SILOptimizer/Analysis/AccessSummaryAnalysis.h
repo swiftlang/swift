@@ -30,34 +30,72 @@ namespace swift {
 
 class AccessSummaryAnalysis : public BottomUpIPAnalysis {
 public:
-  /// Summarizes the accesses that a function begins on an argument.
-  class ArgumentSummary {
+  class SubAccessSummary {
   private:
     /// The kind of access begun on the argument.
-    /// 'None' means no access performed.
-    Optional<SILAccessKind> Kind = None;
+    SILAccessKind Kind;
 
     /// The location of the access. Used for diagnostics.
     SILLocation AccessLoc = SILLocation((Expr *)nullptr);
 
+    const IndexTrieNode *SubPath = nullptr;
+
   public:
-    Optional<SILAccessKind> getAccessKind() const { return Kind; }
+    SubAccessSummary(SILAccessKind Kind, SILLocation AccessLoc,
+                     const IndexTrieNode *SubPath)
+        : Kind(Kind), AccessLoc(AccessLoc), SubPath(SubPath) {}
+
+    SILAccessKind getAccessKind() const { return Kind; }
 
     SILLocation getAccessLoc() const { return AccessLoc; }
 
+    const IndexTrieNode *getSubPath() const { return SubPath; }
+
+    /// The lattice operation on SubAccessSummaries summaries.
+    bool mergeWith(const SubAccessSummary &other);
+
+    /// Merge in an access to the argument of the given kind at the given
+    /// location with the given suppath. Returns true if the merge caused the
+    /// summary to change.
+    bool mergeWith(SILAccessKind otherKind, SILLocation otherLoc,
+                   const IndexTrieNode *otherSubPath);
+
+    /// Returns a description of the summary. For debugging and testing
+    /// purposes.
+    std::string getDescription(SILType BaseType, SILModule &M) const;
+  };
+
+  /// Summarizes the accesses that a function begins on an argument, including
+  /// the projection subpath that was accessed.
+  class ArgumentSummary {
+  private:
+    typedef llvm::SmallDenseMap<const IndexTrieNode *, SubAccessSummary, 8>
+        SubAccessMap;
+    SubAccessMap SubAccesses;
+
+  public:
     /// The lattice operation on argument summaries.
     bool mergeWith(const ArgumentSummary &other);
 
     /// Merge in an access to the argument of the given kind at the given
     /// location. Returns true if the merge caused the summary to change.
-    bool mergeWith(SILAccessKind otherKind, SILLocation otherLoc);
+    bool mergeWith(SILAccessKind otherKind, SILLocation otherLoc,
+                   const IndexTrieNode *otherSubPath);
 
     /// Returns a description of the summary. For debugging and testing
     /// purposes.
-    StringRef getDescription() const;
+    std::string getDescription(SILType BaseType, SILModule &M) const;
+
+    unsigned getSubAccessCount() const { return SubAccesses.size(); }
+
+    /// Returns the sorted subaccess summaries into the passed-in storage.
+    /// The accesses are sorted lexicographically by increasing subpath
+    /// length and projection index.
+    void getSortedSubAccesses(SmallVectorImpl<SubAccessSummary> &storage) const;
   };
 
-  /// Summarizes the accesses that a function begins on its arguments.
+  /// Summarizes the accesses that a function begins on its arguments or
+  /// projections from its arguments.
   class FunctionSummary {
   private:
     llvm::SmallVector<ArgumentSummary, 6> ArgAccesses;
@@ -77,10 +115,9 @@ public:
 
     /// Returns the number of argument in the summary.
     unsigned getArgumentCount() const { return ArgAccesses.size(); }
-  };
 
-  friend raw_ostream &operator<<(raw_ostream &os,
-                                 const FunctionSummary &summary);
+    void print(raw_ostream &os, SILFunction *fn) const;
+  };
 
   class FunctionInfo;
   /// Records a flow of a caller's argument to a called function.
@@ -151,6 +188,10 @@ public:
     return SubPathTrie;
   }
 
+  /// Returns an IndexTrieNode that represents the single subpath accessed from
+  /// BAI or the root if no such node exists.
+  const IndexTrieNode *findSubPathAccessed(BeginAccessInst *BAI);
+
   virtual void initialize(SILPassManager *PM) override {}
   virtual void invalidate() override;
   virtual void invalidate(SILFunction *F, InvalidationKind K) override;
@@ -163,6 +204,10 @@ public:
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::AccessSummary;
   }
+
+  static std::string getSubPathDescription(SILType BaseType,
+                                           const IndexTrieNode *SubPath,
+                                           SILModule &M);
 
 private:
   typedef BottomUpFunctionOrder<FunctionInfo> FunctionOrder;
