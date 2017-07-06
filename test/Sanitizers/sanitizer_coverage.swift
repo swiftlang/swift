@@ -1,6 +1,6 @@
-// RUN: %target-build-swift -sanitize=address -sanitize-coverage=edge %s -o %t_binary
+// RUN: %target-build-swift -sanitize=address -sanitize-coverage=edge -target %sanitizers-target-triple %s -o %t_binary
 // RUN: %empty-directory(%t_coverage_dir)
-// RUN: ASAN_OPTIONS=abort_on_error=0,coverage=1,coverage_dir=%t_coverage_dir %t_binary
+// RUN: %env-ASAN_OPTIONS=abort_on_error=0,coverage=1,coverage_dir=%t_coverage_dir %target-run %t_binary
 // check the coverage file exists
 // RUN: ls %t_coverage_dir/sanitizer_coverage.swift.tmp_binary.*.sancov > /dev/null
 
