@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 348; // Last change: 'inout' in parameter decls.
+const uint16_t VERSION_MINOR = 349; // Last change: '@autoclosure' and '@noescape' no longer decl attributes.
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1369,12 +1369,6 @@ namespace decls_block {
   >;
 
 #undef BC_AVAIL_TUPLE
-
-  using AutoClosureDeclAttrLayout = BCRecordLayout<
-    AutoClosure_DECL_ATTR,
-    BCFixed<1>, // implicit flag
-    BCFixed<1>  // escaping
-  >;
 
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,

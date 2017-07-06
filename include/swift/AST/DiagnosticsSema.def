@@ -993,9 +993,6 @@ ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
 // Attributes
-ERROR(attr_decl_attr_now_on_type,none,
-      "%0 is now an attribute on a parameter type, "
-      "instead of on the parameter itself", (StringRef))
 
 ERROR(operator_not_func,none,
       "operators must be declared with 'func'", ())
@@ -2183,20 +2180,15 @@ ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
 
 ERROR(autoclosure_function_type,none,
-      "@autoclosure may only be applied to values of function type",
+      "@autoclosure attribute only applies to function types",
       ())
 ERROR(autoclosure_function_input_nonunit,none,
-      "autoclosure argument type must be '()'", ())
+      "argument type of @autoclosure parameter must be '()'", ())
 
 // FIXME: drop these when we drop @noescape
-ERROR(noescape_function_type,none,
-      "@noescape may only be applied to parameters of function type",
-      ())
 ERROR(noescape_implied_by_autoclosure,none,
       "@noescape is implied by @autoclosure and should not be "
       "redundantly specified", ())
-ERROR(noescape_conflicts_escaping_autoclosure,none,
-      "@noescape conflicts with @autoclosure(escaping)", ())
 
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())

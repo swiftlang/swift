@@ -413,12 +413,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ")";
     break;
   }
-  case DAK_AutoClosure:
-    Printer.printAttrName("@autoclosure");
-    if (cast<AutoClosureAttr>(this)->isEscaping())
-      Printer << "(escaping)";
-    break;
-      
+
   case DAK_CDecl:
     Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
     break;
@@ -568,8 +563,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "_semantics";
   case DAK_Available:
     return "availability";
-  case DAK_AutoClosure:
-    return "autoclosure";
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
