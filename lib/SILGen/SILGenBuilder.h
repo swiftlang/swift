@@ -153,6 +153,7 @@ public:
   ManagedValue createUnsafeCopyUnownedValue(SILLocation loc,
                                             ManagedValue originalValue);
   ManagedValue createOwnedPHIArgument(SILType type);
+  ManagedValue createGuaranteedPHIArgument(SILType type);
 
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
