@@ -85,12 +85,12 @@ public:
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
 
   void unwrapLValueOrInOutType() {
-    Type = Type->getLValueOrInOutObjectType().getPointer();
+    Type = Type->getWithoutSpecifierType().getPointer();
   }
 
   // Determine whether this type is an Archetype itself.
   bool isArchetype() const {
-    return Type->getLValueOrInOutObjectType()->is<ArchetypeType>();
+    return Type->getWithoutSpecifierType()->is<ArchetypeType>();
   }
 
   /// LValues, inout args, and Archetypes are implicitly indirect by

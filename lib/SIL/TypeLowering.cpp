@@ -1444,7 +1444,7 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
 
     CanType loweredSubstEltType;
     if (auto substLV = dyn_cast<InOutType>(substEltType)) {
-      SILType silType = tc.getLoweredType(origType.getLValueOrInOutObjectType(),
+      SILType silType = tc.getLoweredType(origType.getWithoutSpecifierType(),
                                           substLV.getObjectType());
       loweredSubstEltType = CanInOutType::get(silType.getSwiftRValueType());
 
@@ -1527,8 +1527,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // completely removed and represented as 'address' SILTypes.
   if (isa<InOutType>(substType)) {
     // Derive SILType for InOutType from the object type.
-    CanType substObjectType = substType.getLValueOrInOutObjectType();
-    AbstractionPattern origObjectType = origType.getLValueOrInOutObjectType();
+    CanType substObjectType = substType.getWithoutSpecifierType();
+    AbstractionPattern origObjectType = origType.getWithoutSpecifierType();
 
     SILType loweredType = getLoweredType(origObjectType, substObjectType)
       .getAddressType();

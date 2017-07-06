@@ -838,9 +838,10 @@ public:
   /// type.  Otherwise, returns the type itself.
   Type getInOutObjectType();
 
-  /// getLValueOrInOutObjectType - For an @lvalue or inout type, retrieves the
-  /// underlying object type. Otherwise, returns the type itself.
-  Type getLValueOrInOutObjectType();
+  /// getWithoutSpecifierType - For a non-materializable type
+  /// e.g. @lvalue or inout, retrieves the underlying object type.
+  /// Otherwise, returns the type itself.
+  Type getWithoutSpecifierType();
 
   /// Retrieves the rvalue instance type, looking through single-element
   /// tuples, inout types, and metatypes.
@@ -4655,9 +4656,10 @@ inline Type TypeBase::getRValueObjectType() {
   return type->getWithoutImmediateLabel();
 }
 
-/// getLValueOrInOutObjectType - For an @lvalue or inout type, retrieves the
-/// underlying object type. Otherwise, returns the type itself.
-inline Type TypeBase::getLValueOrInOutObjectType() {
+/// getWithoutSpecifierType - For a non-materializable type
+/// e.g. @lvalue or inout, retrieves the underlying object type.
+/// Otherwise, returns the type itself.
+inline Type TypeBase::getWithoutSpecifierType() {
   if (auto iot = getAs<InOutType>())
     return iot->getObjectType();
   if (auto lv = getAs<LValueType>())
@@ -4679,7 +4681,7 @@ inline CanType CanType::getReferenceStorageReferentImpl(CanType type) {
   return type;
 }
 
-inline CanType CanType::getLValueOrInOutObjectTypeImpl(CanType type) {
+inline CanType CanType::getWithoutSpecifierTypeImpl(CanType type) {
   if (auto refType = dyn_cast<InOutType>(type))
     return refType.getObjectType();
   if (auto refType = dyn_cast<LValueType>(type))

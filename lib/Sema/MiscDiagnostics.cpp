@@ -3663,7 +3663,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     }
 
     // Strip off lvalue/inout types.
-    Type newType = type->getLValueOrInOutObjectType();
+    Type newType = type->getWithoutSpecifierType();
     if (newType.getPointer() != type.getPointer()) {
       type = newType;
       continue;
@@ -3852,7 +3852,7 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
 
   // Dig out the type of the variable.
   Type type = var->getInterfaceType()->getReferenceStorageReferent()
-                ->getLValueOrInOutObjectType();
+                ->getWithoutSpecifierType();
   while (auto optObjectTy = type->getAnyOptionalObjectType())
     type = optObjectTy;
 
