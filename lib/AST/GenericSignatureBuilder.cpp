@@ -68,7 +68,6 @@ STATISTIC(NumConcreteTypeConstraints,
 STATISTIC(NumSuperclassConstraints, "# of superclass constraints tracked");
 STATISTIC(NumLayoutConstraints, "# of layout constraints tracked");
 STATISTIC(NumSelfDerived, "# of self-derived constraints removed");
-STATISTIC(NumRecursive, "# of recursive types we bail out on");
 STATISTIC(NumArchetypeAnchorCacheHits,
           "# of hits in the archetype anchor cache");
 STATISTIC(NumArchetypeAnchorCacheMisses,
