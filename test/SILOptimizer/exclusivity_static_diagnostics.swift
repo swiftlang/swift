@@ -237,7 +237,7 @@ func callsTakesUnsafePointerAndNoEscapeClosure() {
 }
 
 func takesThrowingAutoClosureReturningGeneric<T: Equatable>(_ : @autoclosure () throws -> T) { }
-func takesInoutAndClosure(_: inout Int, _ : () -> ()) { }
+func takesInoutAndClosure<T>(_: inout T, _ : () -> ()) { }
 
 func callsTakesThrowingAutoClosureReturningGeneric() {
   var i = 0
@@ -303,6 +303,36 @@ func inoutSamePropertyInSameTuple() {
   takesTwoInouts(&t.name2.f1, &t.name2.f1)
   // expected-error@-1{{overlapping accesses to 't.name2.f1', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}
+}
+
+// Noescape closures and separate stored structs
+
+func callsTakesInoutAndNoEscapeClosureNoWarningOnSeparateStored() {
+  var local = StructWithTwoStoredProp()
+  takesInoutAndNoEscapeClosure(&local.f1) {
+    local.f2 = 8 // no-error
+  }
+}
+
+func callsTakesInoutAndNoEscapeClosureWarningOnSameStoredProp() {
+  var local = StructWithTwoStoredProp()
+  takesInoutAndNoEscapeClosure(&local.f1) { // expected-error {{overlapping accesses to 'local.f1', but modification requires exclusive access; consider copying to a local variable}}
+    local.f1 = 8 // expected-note {{conflicting access is here}}
+  }
+}
+
+func callsTakesInoutAndNoEscapeClosureWarningOnAggregateAndStoredProp() {
+  var local = StructWithTwoStoredProp()
+  takesInoutAndNoEscapeClosure(&local) { // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
+    local.f1 = 8 // expected-note {{conflicting access is here}}
+  }
+}
+
+func callsTakesInoutAndNoEscapeClosureWarningOnStoredPropAndAggrate() {
+  var local = StructWithTwoStoredProp()
+  takesInoutAndNoEscapeClosure(&local.f1) { // expected-error {{overlapping accesses to 'local.f1', but modification requires exclusive access; consider copying to a local variable}}
+    local = StructWithTwoStoredProp() // expected-note {{conflicting access is here}}
+  }
 }
 
 struct MyStruct<T> {
