@@ -419,6 +419,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     FrontendOpts.PlaygroundTransform = false;
   }
 
+  // Disable the index-store functionality for the sourcekitd requests.
+  FrontendOpts.IndexStorePath.clear();
+  ImporterOpts.IndexStorePath.clear();
+
   if (!PrimaryFile.empty()) {
     Optional<unsigned> PrimaryIndex;
     for (auto i : indices(Invocation.getFrontendOptions().InputFilenames)) {
