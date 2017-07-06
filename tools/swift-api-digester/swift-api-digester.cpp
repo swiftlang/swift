@@ -729,8 +729,10 @@ public:
   Optional<SDKNodeTypeDecl*> getSuperclass() const {
     if (SuperclassUsr.empty())
       return None;
-    return (*getRootNode()->getDescendantByUsr(SuperclassUsr))->
-      getAs<SDKNodeTypeDecl>();
+    if (auto SC = getRootNode()->getDescendantByUsr(SuperclassUsr)) {
+      return (*SC)->getAs<SDKNodeTypeDecl>();
+    }
+    return None;
   }
 
   /// Finding the node through all children, including the inheritted ones,
