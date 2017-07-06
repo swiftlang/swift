@@ -1,24 +1,6 @@
 ---
 Name: ObjectiveC
 Classes:
-- Name: NSArray
-  SwiftBridge: 'Swift.Array'
-- Name: NSDictionary
-  SwiftBridge: 'Swift.Dictionary'
-- Name: NSSet
-  SwiftBridge: 'Swift.Set'
-- Name: NSString
-  SwiftBridge: 'Swift.String'
-- Name: List
-  Methods:
-  - Selector: init
-    MethodKind: Instance
-    NullabilityOfRet: N
-  - Selector: 'isEqual:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    NullabilityOfRet: S
 - Name: NSObject
   SwiftName: NSObject
   Methods:
