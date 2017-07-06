@@ -1,0 +1,20 @@
+# RUN: %yaml2json %s > %t
+# RUN: diff %t %S/Inputs/misc_values.json
+
+TopLevelMap:
+  - Key1
+  - "QuotedKey"
+  - sub_map:
+      foo: true
+      bar: |
+        Block string!
+        Woo!
+
+
+        Lots of newlines here, huh?
+
+
+      baz: null
+  - "another key": 23.0
+  - integer_value: 23
+

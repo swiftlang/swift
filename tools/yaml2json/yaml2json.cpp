@@ -75,15 +75,46 @@ class YAML2JSON {
       jsonOut.preflightElement(index, context);
       output(&child);
       jsonOut.postflightElement(context);
+      ++index;
     }
     jsonOut.endArray();
+  }
+
+  // LLVM's YAML parser makes no distinction between numeric/bool/null values
+  // and strings. Check to see if we've got an explicitly-quoted string here
+  // and only require quotes if it's explicitly quoted, non-numeric,
+  // non-boolean, and non-null.
+  // This function is very basic and doesn't handle things like hexadecimal
+  // numbers which are otherwise supported by YAML.
+  bool mustQuoteRawString(StringRef string) {
+    if (string.startswith("\"")) {
+      return true;
+    }
+    if (string == "true") return false;
+    if (string == "false") return false;
+    if (string == "null") return false;
+
+    auto cStr = string.str().c_str();
+    char *endPtr = nullptr;
+
+    // Check if the value is an integer
+    (void)strtol(cStr, &endPtr, 10);
+    if (endPtr == &cStr[string.size()]) return false;
+
+    endPtr = nullptr;
+
+    // Check if the value is a floating-point number
+    (void)strtod(cStr, &endPtr);
+    if (endPtr == &cStr[string.size()]) return false;
+
+    return true;
   }
 
   /// Outputs a YAML string to a JSON string.
   void outputScalarNode(yaml::ScalarNode *node) {
     llvm::SmallString<24> scratch;
     auto string = node->getValue(scratch);
-    jsonOut.scalarString(string, /*mustQuote=*/true);
+    jsonOut.scalarString(string, mustQuoteRawString(node->getRawValue()));
   }
 
   /// Outputs a YAML block string to a JSON string.
