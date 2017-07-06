@@ -87,9 +87,7 @@ class YAML2JSON {
   // This function is very basic and doesn't handle things like hexadecimal
   // numbers which are otherwise supported by YAML.
   bool mustQuoteRawString(StringRef string) {
-    if (string.startswith("\"")) {
-      return true;
-    }
+    if (string.startswith("\"")) return true;
     if (string == "true") return false;
     if (string == "false") return false;
     if (string == "null") return false;
