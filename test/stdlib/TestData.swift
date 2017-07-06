@@ -1172,6 +1172,13 @@ class TestData : TestDataSuper {
         let dataFromSliceOfData = Data(sliceOfData)
         expectEqual(sliceOfData, dataFromSliceOfData)
     }
+
+    func test_reversedDataInit() {
+        let data = Data(bytes: [1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let reversedData = Data(data.reversed())
+        let expected = Data(bytes: [9, 8, 7, 6, 5, 4, 3, 2, 1])
+        expectEqual(expected, reversedData)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1235,7 +1242,7 @@ DataTests.test("test_copyBytes2") { TestData().test_copyBytes2() }
 DataTests.test("test_sliceOfSliceViaRangeExpression") { TestData().test_sliceOfSliceViaRangeExpression() }
 DataTests.test("test_appendingSlices") { TestData().test_appendingSlices() }
 DataTests.test("test_sequenceInitializers") { TestData().test_sequenceInitializers() }
-
+DataTests.test("test_reversedDataInit") { TestData().test_reversedDataInit() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
