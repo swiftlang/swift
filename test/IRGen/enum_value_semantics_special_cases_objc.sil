@@ -15,7 +15,7 @@ enum NullableObjCRefcounted {
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO* %0 to %objc_object**
 // CHECK:   %2 = load %objc_object*, %objc_object** %1, align 8
-// CHECK:   call void @objc_release(%objc_object* %2) {{#[0-9]+}}
+// CHECK:   call void @swift_unknownRelease(%objc_object* %2) {{#[0-9]+}}
 // CHECK:   ret void
 // CHECK: }
 
