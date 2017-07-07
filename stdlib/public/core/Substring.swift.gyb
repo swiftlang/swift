@@ -228,7 +228,7 @@ public struct Substring : StringProtocol {
   public func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
     return try _slice._base._core._withCSubstringAndLength(
-      in: startIndex.encodedOffset..<endIndex.encodedOffset,
+      in: startIndex._base._position..<endIndex._base._position,
       encoding: UTF8.self) {
       p, length in try p.withMemoryRebound(to: CChar.self, capacity: length) {
         try body($0)
@@ -257,7 +257,7 @@ public struct Substring : StringProtocol {
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
     return try _slice._base._core._withCSubstring(
-      in: startIndex.encodedOffset..<endIndex.encodedOffset,
+      in: startIndex._base._position..<endIndex._base._position,
       encoding: targetEncoding, body)
   }
 }
@@ -282,7 +282,7 @@ extension Substring : _SwiftStringView {
   var _ephemeralContent : String {
     let wholeCore = _slice._base._core
     let subCore : _StringCore = wholeCore[
-      startIndex.encodedOffset..<endIndex.encodedOffset]
+      startIndex._base._position..<endIndex._base._position]
     // Check that we haven't allocated a new buffer for the result, if we have
     // contiguous storage.
     _sanityCheck(
