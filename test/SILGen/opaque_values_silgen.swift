@@ -956,6 +956,20 @@ func s440__cleanupEmission<T>(_ x: T) {
   _ = x2
 }
 
+// Test SILGenBuilder.loadCopy().
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s450__________lastValxSayxGd_tlF : $@convention(thin) <T> (@owned Array<T>) -> @out T
+// CHECK: [[LOAD:%.*]] = load [copy] %34 : $*T
+// CHECK: return [[LOAD]] : $T
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s450__________lastValxSayxGd_tlF'
+func s450__________lastVal<T>(_ rest: T...) -> T {
+  var minValue: T
+  for value in rest {
+    minValue = value
+  }
+  return minValue
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
