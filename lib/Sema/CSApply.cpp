@@ -1308,6 +1308,7 @@ namespace {
       
       // Apply a key path if we have one.
       if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
+        index = cs.coerceToRValue(index);
         // The index argument should be (keyPath: KeyPath<Root, Value>).
         auto keyPathTTy = cs.getType(index)->castTo<TupleType>()
           ->getElementType(0);
