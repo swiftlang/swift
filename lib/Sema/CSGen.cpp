@@ -406,7 +406,7 @@ namespace {
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
 
-      auto favoredTy = (*lti.collectedTypes.begin())->getLValueOrInOutObjectType();
+      auto favoredTy = (*lti.collectedTypes.begin())->getWithoutSpecifierType();
 
       CS.setFavoredType(expr, favoredTy.getPointer());
       
@@ -533,7 +533,7 @@ namespace {
                             Type argTy,
                             Type otherArgTy = Type()) {
     // Determine the argument type.
-    argTy = argTy->getLValueOrInOutObjectType();
+    argTy = argTy->getWithoutSpecifierType();
 
     // Do the types match exactly?
     if (paramTy->isEqual(argTy))
@@ -547,7 +547,7 @@ namespace {
 
     // Dig out the second argument type.
     if (otherArgTy)
-      otherArgTy = otherArgTy->getLValueOrInOutObjectType();
+      otherArgTy = otherArgTy->getWithoutSpecifierType();
 
     // If there is another, concrete argument, check whether it's type
     // conforms to the literal protocol and test against it directly.
@@ -1054,7 +1054,7 @@ namespace {
         auto baseObjTy = baseTy;
         if (baseObjTy->is<LValueType>()) {
           isLValueBase = true;
-          baseObjTy = baseObjTy->getLValueOrInOutObjectType();
+          baseObjTy = baseObjTy->getWithoutSpecifierType();
         }
         
         if (CS.isArrayType(baseObjTy.getPointer())) {
@@ -1501,7 +1501,7 @@ namespace {
       // subexpr type.
       if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)) {
         auto baseTy = CS.getType(expr->getBase())
-                        ->getLValueOrInOutObjectType();
+                        ->getWithoutSpecifierType();
 
         // 'self' or 'super' will reference an instance, but the constructor
         // is semantically a member of the metatype. This:

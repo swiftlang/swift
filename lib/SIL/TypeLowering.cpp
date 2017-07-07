@@ -1441,20 +1441,14 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
 
     assert(!isa<LValueType>(substEltType) &&
            "lvalue types cannot exist in function signatures");
-
-    CanType loweredSubstEltType;
-    if (auto substLV = dyn_cast<InOutType>(substEltType)) {
-      SILType silType = tc.getLoweredType(origType.getLValueOrInOutObjectType(),
-                                          substLV.getObjectType());
-      loweredSubstEltType = CanInOutType::get(silType.getSwiftRValueType());
-
-    } else {
-      // If the original type was an archetype, use that archetype as
-      // the original type of the element --- the actual archetype
-      // doesn't matter, just the abstraction pattern.
-      SILType silType = tc.getLoweredType(origEltType, substEltType);
-      loweredSubstEltType = silType.getSwiftRValueType();
-    }
+    assert(!isa<InOutType>(substEltType) &&
+           "inout cannot appear in tuple element type here");
+    
+    // If the original type was an archetype, use that archetype as
+    // the original type of the element --- the actual archetype
+    // doesn't matter, just the abstraction pattern.
+    SILType silType = tc.getLoweredType(origEltType, substEltType);
+    CanType loweredSubstEltType = silType.getSwiftRValueType();
 
     changed = (changed || substEltType != loweredSubstEltType);
 
@@ -1527,8 +1521,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // completely removed and represented as 'address' SILTypes.
   if (isa<InOutType>(substType)) {
     // Derive SILType for InOutType from the object type.
-    CanType substObjectType = substType.getLValueOrInOutObjectType();
-    AbstractionPattern origObjectType = origType.getLValueOrInOutObjectType();
+    CanType substObjectType = substType.getWithoutSpecifierType();
+    AbstractionPattern origObjectType = origType.getWithoutSpecifierType();
 
     SILType loweredType = getLoweredType(origObjectType, substObjectType)
       .getAddressType();

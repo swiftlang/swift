@@ -3,7 +3,7 @@
 // Simple case.
 var fn : @autoclosure () -> Int = 4  // expected-error {{@autoclosure may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
 
-@autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
+@autoclosure func func1() {}  // expected-error {{attribute can only be applied to types, not declarations}}
 
 func func1a(_ v1 : @autoclosure Int) {} // expected-error {{@autoclosure attribute only applies to function types}}
 
@@ -14,24 +14,26 @@ func func3(fp fpx : @autoclosure () -> Int) {func3(fp: 0)}
 func func4(fp : @autoclosure () -> Int) {func4(fp: 0)}
 func func6(_: @autoclosure () -> Int) {func6(0)}
 
-// autoclosure + inout don't make sense.
+// autoclosure + inout doesn't make sense.
 func func8(_ x: inout @autoclosure () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be used on parameters}}
 }
 
+func func9(_ x: @autoclosure (Int) -> Bool) {} // expected-error {{argument type of @autoclosure parameter must be '()'}}
+func func10(_ x: @autoclosure (Int, String, Int) -> Void) {} // expected-error {{argument type of @autoclosure parameter must be '()'}}
 
 // <rdar://problem/19707366> QoI: @autoclosure declaration change fixit
 let migrate4 : (@autoclosure() -> ()) -> ()
 
 
 struct SomeStruct {
-  @autoclosure let property : () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{3-16=}}
+  @autoclosure let property : () -> Int  // expected-error {{attribute can only be applied to types, not declarations}}
 
   init() {
   }
 }
 
 class BaseClass {
-  @autoclosure var property : () -> Int // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{3-16=}}
+  @autoclosure var property : () -> Int // expected-error {{attribute can only be applied to types, not declarations}}
   init() {}
 }
 
@@ -63,13 +65,12 @@ struct S : P2 {
 
 
 struct AutoclosureEscapeTest {
-  @autoclosure let delayed: () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{3-16=}}
+  @autoclosure let delayed: () -> Int  // expected-error {{attribute can only be applied to types, not declarations}}
 }
 
 // @autoclosure(escaping)
-// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{13-34=}} {{38-38=@autoclosure @escaping }}
-func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected ')' in @autoclosure}}
-// expected-note@-1{{to match this opening '('}}
+// expected-error @+1 {{attribute can only be applied to types, not declarations}}
+func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected parameter name followed by ':'}}
 
 func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{@escaping conflicts with @noescape}}
   // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{28-38= @escaping}}
@@ -133,12 +134,13 @@ let _ : (@autoclosure(escaping) () -> ()) -> ()
 
 // escaping is the name of param type
 let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{use of undeclared type 'escaping'}}
+// expected-error@-1 {{argument type of @autoclosure parameter must be '()'}}
 
 // Migration
-// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{16-28=}} {{32-32=@autoclosure }}
+// expected-error @+1 {{attribute can only be applied to types, not declarations}}
 func migrateAC(@autoclosure _: () -> ()) { }
 
-// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{17-39=}} {{43-43=@autoclosure @escaping }}
+// expected-error @+1 {{attribute can only be applied to types, not declarations}}
 func migrateACE(@autoclosure(escaping) _: () -> ()) { }
 
 func takesAutoclosure(_ fn: @autoclosure () -> Int) {}

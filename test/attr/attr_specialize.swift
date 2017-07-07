@@ -39,7 +39,7 @@ public func twoGenericParams<T, U>(_ t: T, u: U) -> (T, U) {
   return (t, u)
 }
 
-@_specialize(where T == Int) // expected-error{{trailing 'where' clause in '_specialize' attribute of non-generic function 'nonGenericParam'}}
+@_specialize(where T == Int) // expected-error{{trailing 'where' clause in '_specialize' attribute of non-generic function 'nonGenericParam(x:)'}}
 func nonGenericParam(x: Int) {}
 
 // Specialize contextual types.
@@ -94,7 +94,7 @@ func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 @_specialize(where T == NonSub) // expected-error{{'T' requires that 'NonSub' inherit from 'Base'}}
 func superTypeRequirement<T : Base>(_ t: T) {}
 
-@_specialize(where X:_Trivial(8), Y == Int) // expected-error{{trailing 'where' clause in '_specialize' attribute of non-generic function 'requirementOnNonGenericFunction'}}
+@_specialize(where X:_Trivial(8), Y == Int) // expected-error{{trailing 'where' clause in '_specialize' attribute of non-generic function 'requirementOnNonGenericFunction(x:y:)'}}
 public func requirementOnNonGenericFunction(x: Int, y: Int) {
 }
 

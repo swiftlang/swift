@@ -1136,6 +1136,49 @@ class TestData : TestDataSuper {
         d2.append(slice)
         expectEqual(Data(bytes: [1]), slice)
     }
+
+    func test_sequenceInitializers() {
+        let seq = repeatElement(UInt8(0x02), count: 3) // ensure we fall into the sequence case
+        
+        let dataFromSeq = Data(seq)
+        expectEqual(3, dataFromSeq.count)
+        expectEqual(UInt8(0x02), dataFromSeq[0])
+        expectEqual(UInt8(0x02), dataFromSeq[1])
+        expectEqual(UInt8(0x02), dataFromSeq[2])
+
+        let array: [UInt8] = [0, 1, 2, 3, 4, 5, 6]
+
+        let dataFromArray = Data(array)
+        expectEqual(array.count, dataFromArray.count)
+        expectEqual(array[0], dataFromArray[0])
+        expectEqual(array[1], dataFromArray[1])
+        expectEqual(array[2], dataFromArray[2])
+        expectEqual(array[3], dataFromArray[3])
+
+        let slice = array[1..<4]
+        
+        let dataFromSlice = Data(slice)
+        expectEqual(slice.count, dataFromSlice.count)
+        expectEqual(slice.first, dataFromSlice.first)
+        expectEqual(slice.last, dataFromSlice.last)
+
+        let data = Data(bytes: [1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+        let dataFromData = Data(data)
+        expectEqual(data, dataFromData)
+
+        let sliceOfData = data[1..<3]
+
+        let dataFromSliceOfData = Data(sliceOfData)
+        expectEqual(sliceOfData, dataFromSliceOfData)
+    }
+
+    func test_reversedDataInit() {
+        let data = Data(bytes: [1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let reversedData = Data(data.reversed())
+        let expected = Data(bytes: [9, 8, 7, 6, 5, 4, 3, 2, 1])
+        expectEqual(expected, reversedData)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1198,7 +1241,8 @@ DataTests.test("test_copyBytes1") { TestData().test_copyBytes1() }
 DataTests.test("test_copyBytes2") { TestData().test_copyBytes2() }
 DataTests.test("test_sliceOfSliceViaRangeExpression") { TestData().test_sliceOfSliceViaRangeExpression() }
 DataTests.test("test_appendingSlices") { TestData().test_appendingSlices() }
-
+DataTests.test("test_sequenceInitializers") { TestData().test_sequenceInitializers() }
+DataTests.test("test_reversedDataInit") { TestData().test_reversedDataInit() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

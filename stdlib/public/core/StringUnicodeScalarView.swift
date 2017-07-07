@@ -85,41 +85,19 @@ extension String {
       }
     }
 
-    /// A position in a string's `UnicodeScalars` view.
-    ///
-    /// You can convert between indices of the different string views by using
-    /// conversion initializers and the `samePosition(in:)` method overloads.
-    /// The following example finds the index of the solid heart pictograph in
-    /// the string's character view and then converts that to the same
-    /// position in the Unicode scalars view:
-    ///
-    ///     let hearts = "Hearts <3 ♥︎ 💘"
-    ///     let i = hearts.index(of: "♥︎")!
-    ///
-    ///     let j = i.samePosition(in: hearts.unicodeScalars)
-    ///     print(hearts.unicodeScalars[j...])
-    ///     // Prints "♥︎ 💘"
-    ///     print(hearts.unicodeScalars[j].value)
-    ///     // Prints "9829"
-    public struct Index {
-      public // SPI(Foundation)
-      init(_position: Int) {
-        self._position = _position
-      }
-
-      @_versioned internal var _position: Int
-    }
-
+    public typealias Index = String.Index
+    public typealias IndexDistance = Int
+    
     /// Translates a `_core` index into a `UnicodeScalarIndex` using this view's
     /// `_coreOffset`.
     internal func _fromCoreIndex(_ i: Int) -> Index {
-      return Index(_position: i + _coreOffset)
+      return Index(encodedOffset: i + _coreOffset)
     }
     
     /// Translates a `UnicodeScalarIndex` into a `_core` index using this view's
     /// `_coreOffset`.
     internal func _toCoreIndex(_ i: Index) -> Int {
-      return i._position - _coreOffset
+      return i.encodedOffset - _coreOffset
     }
     
     /// The position of the first Unicode scalar value if the string is
@@ -208,7 +186,7 @@ extension String {
     public subscript(r: Range<Index>) -> UnicodeScalarView {
       let rawSubRange = _toCoreIndex(r.lowerBound)..<_toCoreIndex(r.upperBound)
       return UnicodeScalarView(_core[rawSubRange],
-        coreOffset: r.lowerBound._position)
+        coreOffset: r.lowerBound.encodedOffset)
     }
 
     /// An iterator over the Unicode scalars that make up a `UnicodeScalarView`
@@ -296,7 +274,7 @@ extension String {
     
     /// The offset of this view's `_core` from an original core. This works
     /// around the fact that `_StringCore` is always zero-indexed.
-    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex._position`
+    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex.encodedOffset`
     /// before that value is used as a `_core` index.
     internal var _coreOffset: Int
   }
@@ -339,22 +317,6 @@ extension String {
     set {
       _core = newValue._core
     }
-  }
-}
-
-extension String.UnicodeScalarView.Index : Comparable {
-  public static func == (
-    lhs: String.UnicodeScalarView.Index,
-    rhs: String.UnicodeScalarView.Index
-  ) -> Bool {
-    return lhs._position == rhs._position
-  }
-
-  public static func < (
-    lhs: String.UnicodeScalarView.Index,
-    rhs: String.UnicodeScalarView.Index
-  ) -> Bool {
-    return lhs._position < rhs._position
   }
 }
 
@@ -454,124 +416,8 @@ extension String.UnicodeScalarIndex {
     _ utf16Index: String.UTF16Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
-    let utf16 = String.UTF16View(unicodeScalars._core)
-
-    if utf16Index != utf16.startIndex
-    && utf16Index != utf16.endIndex {
-      _precondition(
-        utf16Index >= utf16.startIndex
-        && utf16Index <= utf16.endIndex,
-        "Invalid String.UTF16Index for this Unicode.Scalar view")
-
-      // Detect positions that have no corresponding index.  Note that
-      // we have to check before and after, because an unpaired
-      // surrogate will be decoded as a single replacement character,
-      // thus making the corresponding position valid.
-      if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16.index(before: utf16Index)]) {
-        return nil
-      }
-    }
-    self.init(_position: utf16Index._offset)
-  }
-
-  /// Creates an index in the given Unicode scalars view that corresponds
-  /// exactly to the specified `UTF8View` position.
-  ///
-  /// If the position passed as `utf8Index` doesn't have an exact corresponding
-  /// position in `unicodeScalars`, the result of the initializer is `nil`.
-  /// For example, an attempt to convert the position of a UTF-8 continuation
-  /// byte returns `nil`.
-  ///
-  /// - Parameters:
-  ///   - utf8Index: A position in the `utf8` view of a string. `utf8Index`
-  ///     must be an element of `String(unicodeScalars).utf8.indices`.
-  ///   - unicodeScalars: The `UnicodeScalarView` in which to find the new
-  ///     position.
-  public init?(
-    _ utf8Index: String.UTF8Index,
-    within unicodeScalars: String.UnicodeScalarView
-  ) {
-    let core = unicodeScalars._core
-
-    _precondition(
-      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
-      "Invalid String.UTF8Index for this Unicode.Scalar view")
-
-    // Detect positions that have no corresponding index.
-    if !utf8Index._isOnUnicodeScalarBoundary(in: core) {
-      return nil
-    }
-    self.init(_position: utf8Index._coreIndex)
-  }
-
-  /// Creates an index in the given Unicode scalars view that corresponds
-  /// exactly to the specified string position.
-  ///
-  /// The following example converts the position of the teacup emoji (`"🍵"`)
-  /// into its corresponding position in the string's `unicodeScalars` view.
-  ///
-  ///     let cafe = "Café 🍵"
-  ///     let stringIndex = cafe.index(of: "🍵")!
-  ///     let scalarIndex = String.UnicodeScalarView.Index(stringIndex, within: cafe.unicodeScalars)
-  ///
-  ///     print(cafe.unicodeScalars[scalarIndex...])
-  ///     // Prints "🍵"
-  ///
-  /// - Parameters:
-  ///   - index: A position in a string. `index` must be an element of
-  ///     `String(unicodeScalars).indices`.
-  ///   - unicodeScalars: The `UnicodeScalarView` in which to find the new
-  ///     position.
-  public init(
-    _ index: String.Index,
-    within unicodeScalars: String.UnicodeScalarView
-  ) {
-    self.init(_position: index._base._position)
-  }
-
-  /// Returns the position in the given UTF-8 view that corresponds exactly to
-  /// this index.
-  ///
-  /// The index must be a valid index of `String(utf8).unicodeScalars`.
-  ///
-  /// This example first finds the position of the character `"é"` and then uses
-  /// this method find the same position in the string's `utf8` view.
-  ///
-  ///     let cafe = "Café"
-  ///     if let i = cafe.unicodeScalars.index(of: "é") {
-  ///         let j = i.samePosition(in: cafe.utf8)
-  ///         print(Array(cafe.utf8[j...]))
-  ///     }
-  ///     // Prints "[195, 169]"
-  ///
-  /// - Parameter utf8: The view to use for the index conversion.
-  /// - Returns: The position in `utf8` that corresponds exactly to this index.
-  public func samePosition(in utf8: String.UTF8View) -> String.UTF8View.Index {
-    return String.UTF8View.Index(self, within: utf8)
-  }
-
-  /// Returns the position in the given UTF-16 view that corresponds exactly to
-  /// this index.
-  ///
-  /// The index must be a valid index of `String(utf16).unicodeScalars`.
-  ///
-  /// This example first finds the position of the character `"é"` and then uses
-  /// this method find the same position in the string's `utf16` view.
-  ///
-  ///     let cafe = "Café"
-  ///     if let i = cafe.unicodeScalars.index(of: "é") {
-  ///         let j = i.samePosition(in: cafe.utf16)
-  ///         print(cafe.utf16[j])
-  ///     }
-  ///     // Prints "233"
-  ///
-  /// - Parameter utf16: The view to use for the index conversion.
-  /// - Returns: The position in `utf16` that corresponds exactly to this index.
-  public func samePosition(
-    in utf16: String.UTF16View
-  ) -> String.UTF16View.Index {
-    return String.UTF16View.Index(self, within: utf16)
+    if !unicodeScalars._isOnUnicodeScalarBoundary(utf16Index) { return nil }
+    self = utf16Index
   }
 
   /// Returns the position in the given string that corresponds exactly to this
@@ -601,9 +447,21 @@ extension String.UnicodeScalarIndex {
 }
 
 extension String.UnicodeScalarView {
+  internal func _isOnUnicodeScalarBoundary(_ i: Index) -> Bool {
+    if _fastPath(_core.isASCII) { return true }
+    if i == startIndex || i == endIndex {
+      return true
+    }
+    if i._transcodedOffset != 0 { return false }
+    let i2 = _toCoreIndex(i)
+    if _fastPath(_core[i2] & 0xFC00 != 0xDC00) { return true }
+    return _core[i2 &- 1] & 0xFC00 != 0xD800
+  }
+  
   // NOTE: Don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
+    if !_isOnUnicodeScalarBoundary(i) { return false }
     if i == startIndex || i == endIndex {
       return true
     }
@@ -637,5 +495,33 @@ extension String.UnicodeScalarView : CustomReflectable {
 extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
+  }
+}
+
+// backward compatibility for index interchange.  
+extension String.UnicodeScalarView {
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
+  public func index(after i: Index?) -> Index {
+    return index(after: i)
+  }
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
+  public func index(_ i: Index?,  offsetBy n: IndexDistance) -> Index {
+    return index(i!, offsetBy: n)
+  }
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
+  public func distance(from i: Index?, to j: Index?) -> IndexDistance {
+    return distance(from: i!, to: j!)
+  }
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
+  public subscript(i: Index?) -> Unicode.Scalar {
+    return self[i!]
   }
 }

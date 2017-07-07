@@ -891,6 +891,13 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   }
 }
 
+// *HEY YOU, YES YOU, PLEASE READ*. Even though a textual partial apply is
+// printed with the convention of the closed over function upon it, all
+// non-inout arguments to a partial_apply are passed at +1. This includes
+// arguments that will eventually be passed as guaranteed or in_guaranteed to
+// the closed over function. This is because the partial apply is building up a
+// boxed aggregate to send off to the closed over function. Of course when you
+// call the function, the proper conventions will be used.
 void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
                                            SILValue Arg, SILParameterInfo PInfo,
                                            InstModCallbacks Callbacks) {
@@ -901,51 +908,51 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
   if (PInfo.isIndirectMutating())
     return;
 
-  if (isa<AllocStackInst>(Arg)) {
-    return;
-  }
-
   // If we have a trivial type, we do not need to put in any extra releases.
   if (Arg->getType().isTrivial(Builder.getModule()))
     return;
 
-  // Otherwise, we need to destroy the argument.
-  if (Arg->getType().isObject()) {
-    // If we have qualified ownership, we should just emit a destroy value.
-    if (Arg->getFunction()->hasQualifiedOwnership()) {
-      Callbacks.CreatedNewInst(Builder.createDestroyValue(Loc, Arg));
-      return;
-    }
-
-    if (Arg->getType().hasReferenceSemantics()) {
-      auto U = Builder.emitStrongRelease(Loc, Arg);
-      if (U.isNull())
-        return;
-
-      if (auto *SRI = U.dyn_cast<StrongRetainInst *>()) {
-        Callbacks.DeleteInst(SRI);
-        return;
-      }
-
-      Callbacks.CreatedNewInst(U.get<StrongReleaseInst *>());
-      return;
-    }
-
-    auto U = Builder.emitReleaseValue(Loc, Arg);
-    if (U.isNull())
-      return;
-
-    if (auto *RVI = U.dyn_cast<RetainValueInst *>()) {
-      Callbacks.DeleteInst(RVI);
-      return;
-    }
-
-    Callbacks.CreatedNewInst(U.get<ReleaseValueInst *>());
+  // Otherwise, we need to destroy the argument. If we have an address, just
+  // emit a destroy_addr.
+  if (Arg->getType().isAddress()) {
+    SILInstruction *NewInst = Builder.emitDestroyAddrAndFold(Loc, Arg);
+    Callbacks.CreatedNewInst(NewInst);
     return;
   }
 
-  SILInstruction *NewInst = Builder.emitDestroyAddrAndFold(Loc, Arg);
-  Callbacks.CreatedNewInst(NewInst);
+  // Otherwise, we have an object. We emit the most optimized form of release
+  // possible for that value.
+
+  // If we have qualified ownership, we should just emit a destroy value.
+  if (Arg->getFunction()->hasQualifiedOwnership()) {
+    Callbacks.CreatedNewInst(Builder.createDestroyValue(Loc, Arg));
+    return;
+  }
+
+  if (Arg->getType().hasReferenceSemantics()) {
+    auto U = Builder.emitStrongRelease(Loc, Arg);
+    if (U.isNull())
+      return;
+
+    if (auto *SRI = U.dyn_cast<StrongRetainInst *>()) {
+      Callbacks.DeleteInst(SRI);
+      return;
+    }
+
+    Callbacks.CreatedNewInst(U.get<StrongReleaseInst *>());
+    return;
+  }
+
+  auto U = Builder.emitReleaseValue(Loc, Arg);
+  if (U.isNull())
+    return;
+
+  if (auto *RVI = U.dyn_cast<RetainValueInst *>()) {
+    Callbacks.DeleteInst(RVI);
+    return;
+  }
+
+  Callbacks.CreatedNewInst(U.get<ReleaseValueInst *>());
 }
 
 /// For each captured argument of PAI, decrement the ref count of the captured

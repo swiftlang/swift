@@ -1,0 +1,17 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-runtime %s
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: @retain_release_unknown_object
+sil @retain_release_unknown_object : $@convention(thin) (@guaranteed Builtin.UnknownObject) -> () {
+entry(%x : $Builtin.UnknownObject):
+  // CHECK-native: swift_retain
+  // CHECK-objc: swift_unknownRetain
+  %y = copy_value %x : $Builtin.UnknownObject
+  // CHECK-native: swift_release
+  // CHECK-objc: swift_unknownRelease
+  destroy_value %y : $Builtin.UnknownObject
+  return undef : $()
+}

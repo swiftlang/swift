@@ -564,3 +564,4 @@ int swift::_swift_stdlib_putc_stderr(int C) {
 size_t swift::_swift_stdlib_getHardwareConcurrency() {
   return std::thread::hardware_concurrency();
 }
+

@@ -187,7 +187,7 @@ struct FooStruct {
   mutating
   func instanceFunc8(_ a: (Int, Int)) {}
   mutating
-  func instanceFunc9(@autoclosure a: () -> Int) {}
+  func instanceFunc9(a: @autoclosure () -> Int) {}
 
   mutating
   func varargInstanceFunc0(_ v: Int...) {}

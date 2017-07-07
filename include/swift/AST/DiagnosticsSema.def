@@ -839,9 +839,9 @@ ERROR(optional_chain_isnt_chaining,none,
 ERROR(pattern_in_expr,none,
       "%0 cannot appear in an expression", (PatternKind))
 NOTE(note_call_to_operator,none,
-     "in call to operator %0", (Identifier))
+     "in call to operator %0", (DeclName))
 NOTE(note_call_to_func,none,
-     "in call to function %0", (Identifier))
+     "in call to function %0", (DeclName))
 NOTE(note_call_to_initializer,none,
      "in call to initializer", ())
 NOTE(note_init_parameter,none,
@@ -993,9 +993,6 @@ ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
 // Attributes
-ERROR(attr_decl_attr_now_on_type,none,
-      "%0 is now an attribute on a parameter type, "
-      "instead of on the parameter itself", (StringRef))
 
 ERROR(operator_not_func,none,
       "operators must be declared with 'func'", ())
@@ -1257,7 +1254,7 @@ NOTE(unstable_mangled_name_add_objc,none,
 // Generic types
 ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 cannot be nested in generic function %1",
-      (Identifier, Identifier))
+      (Identifier, DeclName))
 ERROR(unsupported_type_nested_in_generic_closure,none,
       "type %0 cannot be nested in closure in generic context",
       (Identifier))
@@ -2183,20 +2180,15 @@ ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
 
 ERROR(autoclosure_function_type,none,
-      "@autoclosure may only be applied to values of function type",
+      "@autoclosure attribute only applies to function types",
       ())
 ERROR(autoclosure_function_input_nonunit,none,
-      "autoclosure argument type must be '()'", ())
+      "argument type of @autoclosure parameter must be '()'", ())
 
 // FIXME: drop these when we drop @noescape
-ERROR(noescape_function_type,none,
-      "@noescape may only be applied to parameters of function type",
-      ())
 ERROR(noescape_implied_by_autoclosure,none,
       "@noescape is implied by @autoclosure and should not be "
       "redundantly specified", ())
-ERROR(noescape_conflicts_escaping_autoclosure,none,
-      "@noescape conflicts with @autoclosure(escaping)", ())
 
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
@@ -2618,7 +2610,7 @@ NOTE(add_self_to_type,none,
 
 WARNING(warn_unqualified_access,none,
         "use of %0 treated as a reference to %1 in %2 %3",
-        (DeclBaseName, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
+        (Identifier, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
 NOTE(fix_unqualified_access_member,none,
      "use 'self.' to silence this warning", ())
 NOTE(fix_unqualified_access_top_level,none,
@@ -3584,12 +3576,12 @@ ERROR(fixed_layout_attr_on_internal_type,
       none, "'@_fixed_layout' attribute can only be applied to '@_versioned' "
       "or public declarations, but %0 is "
       "%select{private|fileprivate|internal|%error|%error}1",
-      (DeclBaseName, Accessibility))
+      (DeclName, Accessibility))
 
 ERROR(versioned_attr_with_explicit_accessibility,
       none, "'@_versioned' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
-      (DeclBaseName, Accessibility))
+      (DeclName, Accessibility))
 
 ERROR(versioned_attr_in_protocol,none,
       "'@_versioned' attribute cannot be used in protocols", ())
@@ -3644,7 +3636,7 @@ ERROR(inlineable_decl_not_public,
 //------------------------------------------------------------------------------
 
 ERROR(specialize_attr_nongeneric_trailing_where,none,
-      "trailing 'where' clause in '_specialize' attribute of non-generic function %0", (Identifier))
+      "trailing 'where' clause in '_specialize' attribute of non-generic function %0", (DeclName))
 ERROR(specialize_missing_where_clause,none,
       "missing 'where' clause in '_specialize' attribute", ())
 ERROR(specialize_empty_where_clause,none,

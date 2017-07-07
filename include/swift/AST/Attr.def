@@ -155,8 +155,6 @@ SIMPLE_DECL_ATTR(_transparent, Transparent,
                  OnFunc|OnConstructor|OnVar|UserInaccessible, 26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
-DECL_ATTR(autoclosure, AutoClosure, OnParam, 28)
-SIMPLE_DECL_ATTR(noescape, NoEscape, OnParam, 29)
 
 SIMPLE_DECL_ATTR(nonobjc, NonObjC,
                  OnExtension | OnFunc | OnVar | OnSubscript | OnConstructor, 30)

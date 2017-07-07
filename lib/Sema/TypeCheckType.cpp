@@ -2064,7 +2064,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Function attributes require a syntactic function type.
   auto *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
 
-  if (hasFunctionAttr && fnRepr && (options & TR_SILType)) {
+  if (!fnRepr) {
+    if (attrs.has(TAK_autoclosure)) {
+      TC.diagnose(attrs.getLoc(TAK_autoclosure),
+                  diag::autoclosure_function_type);
+      attrs.clearAttribute(TAK_autoclosure);
+    }
+    // Fall through to diagnose below.
+  } else if (hasFunctionAttr && (options & TR_SILType)) {
     SILFunctionType::Representation rep;
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
@@ -2107,8 +2114,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     if (!ty || ty->hasError()) return ty;
-  } else if (hasFunctionAttr && fnRepr) {
-
+  } else if (hasFunctionAttr) {
     FunctionType::Representation rep = FunctionType::Representation::Swift;
     if (attrs.hasConvention()) {
       auto parsedRep =
@@ -2136,9 +2142,17 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                       : diag::attr_only_on_parameters, "@autoclosure");
       attrs.clearAttribute(TAK_autoclosure);
     }
+    
+    auto *FuncTyInput = dyn_cast<TupleTypeRepr>(fnRepr->getArgsTypeRepr());
+    if ((!FuncTyInput || FuncTyInput->getNumElements() != 0)
+        && attrs.has(TAK_autoclosure)) {
+      TC.diagnose(attrs.getLoc(TAK_autoclosure),
+                  diag::autoclosure_function_input_nonunit);
+      attrs.clearAttribute(TAK_autoclosure);
+    }
 
     // @noreturn has been replaced with a 'Never' return type.
-    if (fnRepr && attrs.has(TAK_noreturn)) {
+    if (attrs.has(TAK_noreturn)) {
       auto loc = attrs.getLoc(TAK_noreturn);
       auto attrRange = getTypeAttrRangeWithAt(TC, loc);
       auto resultRange = fnRepr->getResultTypeRepr()->getSourceRange();
@@ -2179,8 +2193,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           isVariadicFunctionParam && Context.isSwiftVersion3();
 
       // The attribute is meaningless except on parameter types.
-      bool shouldDiagnose = !isFunctionParam && !skipDiagnostic;
-      if (shouldDiagnose) {
+      if (!isFunctionParam && !skipDiagnostic) {
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(TC, loc);
 

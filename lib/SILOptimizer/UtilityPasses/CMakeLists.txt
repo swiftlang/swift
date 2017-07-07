@@ -23,6 +23,7 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/RCIdentityDumper.cpp
   UtilityPasses/SILDebugInfoGenerator.cpp
   UtilityPasses/SideEffectsDumper.cpp
+  UtilityPasses/SimplifyUnreachableContainingBlocks.cpp
   UtilityPasses/StripDebugInfo.cpp
   UtilityPasses/ValueOwnershipKindDumper.cpp
   PARENT_SCOPE)

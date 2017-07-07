@@ -58,8 +58,8 @@ StringTests.test("AssociatedTypes-UTF8View") {
   typealias View = String.UTF8View
   expectCollectionAssociatedTypes(
     collectionType: View.self,
-    iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
+    iteratorType: View.Iterator.self,
+    subSequenceType: Slice<View>.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultIndices<View>.self)
@@ -177,7 +177,7 @@ StringTests.test("ForeignIndexes/Valid") {
   do {
     let donor = "abcdef"
     let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
-    expectEqual("\u{fffd}", acceptor[donor.startIndex])
+    expectEqual("\u{1f601}", acceptor[donor.startIndex])
     expectEqual("\u{fffd}", acceptor[donor.index(after: donor.startIndex)])
     expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
       acceptor[donor.index(_nth: 1)..<donor.index(_nth: 5)])
@@ -194,8 +194,12 @@ StringTests.test("ForeignIndexes/UnexpectedCrash")
 
   let donor = "\u{1f601}\u{1f602}\u{1f603}"
   let acceptor = "abcdef"
+
+  // Adjust donor.startIndex to ensure it caches a stride
+  let start = donor.index(before: donor.index(after: donor.startIndex))
+  
   // FIXME: this traps right now when trying to construct Character("ab").
-  expectEqual("a", acceptor[donor.startIndex])
+  expectEqual("a", acceptor[start])
 }
 
 StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {
@@ -1106,14 +1110,25 @@ StringTests.test("unicodeViews") {
   let winter = "\u{1F3C2}\u{2603}"
 
   // slices
-  // It is 4 bytes long, so it should return a replacement character.
+  // First scalar is 4 bytes long, so this should be invalid
+  expectNil(
+    String(winter.utf8[
+        winter.utf8.startIndex
+        ..<
+        winter.utf8.index(after: winter.utf8.index(after: winter.utf8.startIndex))
+      ]))
+
+  /*
+  // FIXME: note changed String(describing:) results
   expectEqual(
-    "\u{FFFD}", String(describing: 
+    "\u{FFFD}",
+    String(describing: 
       winter.utf8[
         winter.utf8.startIndex
         ..<
         winter.utf8.index(after: winter.utf8.index(after: winter.utf8.startIndex))
       ]))
+  */
   
   expectEqual(
     "\u{1F3C2}", String(
@@ -1170,8 +1185,8 @@ StringTests.test("indexConversion")
     result, flags, stop
   in
     let r = result!.rangeAt(1)
-    let start = String.UTF16Index(_offset: r.location)
-    let end = String.UTF16Index(_offset: r.location + r.length)
+    let start = String.UTF16Index(encodedOffset: r.location)
+    let end = String.UTF16Index(encodedOffset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)
   }
 
@@ -1267,8 +1282,7 @@ StringTests.test("String.append(_: Character)") {
 internal func decodeCString<
   C : UnicodeCodec
 >(_ s: String, as codec: C.Type)
--> (result: String, repairsMade: Bool)?
-where C.CodeUnit : FixedWidthInteger {
+-> (result: String, repairsMade: Bool)? {
   let units = s.unicodeScalars.map({ $0.value }) + [0]
   return units.map({ C.CodeUnit($0) }).withUnsafeBufferPointer {
     String.decodeCString($0.baseAddress, as: C.self)
