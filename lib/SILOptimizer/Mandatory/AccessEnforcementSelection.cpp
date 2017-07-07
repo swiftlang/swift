@@ -255,7 +255,7 @@ void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
 
       continue;
     }
-    if (auto *PAI = dyn_cast<PartialApplyInst>(user))
+    if (isa<PartialApplyInst>(user))
       Captures.emplace_back(AddressCapture(*use));
   }
 }

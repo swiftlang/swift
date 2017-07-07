@@ -5392,13 +5392,13 @@ static bool isRawRepresentableMismatch(Type fromType, Type toType,
   // First check if this is an attempt to convert from something to
   // raw representable.
   if (conformsToKnownProtocol(fromType, kind, CS)) {
-    if (auto rawType = isRawRepresentable(toType, kind, CS))
+    if (isRawRepresentable(toType, kind, CS))
       return true;
   }
 
   // Otherwise, it might be an attempt to convert from raw representable
   // to its raw value.
-  if (auto rawType = isRawRepresentable(fromType, kind, CS)) {
+  if (isRawRepresentable(fromType, kind, CS)) {
     if (conformsToKnownProtocol(toType, kind, CS))
       return true;
   }

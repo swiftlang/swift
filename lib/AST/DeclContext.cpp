@@ -658,7 +658,7 @@ unsigned DeclContext::getSyntacticDepth() const {
 
 unsigned DeclContext::getSemanticDepth() const {
   // For extensions, count the depth of the nominal type being extended.
-  if (auto ext = dyn_cast<ExtensionDecl>(this)) {
+  if (isa<ExtensionDecl>(this)) {
     if (auto nominal = getAsNominalTypeOrNominalTypeExtensionContext())
       return nominal->getSemanticDepth();
 
