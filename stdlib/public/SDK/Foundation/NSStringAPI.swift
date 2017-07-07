@@ -110,15 +110,6 @@ extension String {
       arguments: arguments)
   }
 
-  // + (NSString *)pathWithComponents:(NSArray *)components
-
-  /// Returns a string built from the strings in a given array
-  /// by concatenating them with a path separator between each pair.
-  @available(*, unavailable, message: "Use fileURL(withPathComponents:) on URL instead.")
-  public static func path(withComponents components: [String]) -> String {
-    return NSString.path(withComponents: components)
-  }
-
   //===--------------------------------------------------------------------===//
   // NSString factory functions that have a corresponding constructor
   // are omitted.
@@ -1788,8 +1779,7 @@ extension StringProtocol {
 }
 
 // Pre-Swift-3 method names
-extension StringProtocol {
-
+extension String {
   @available(*, unavailable, renamed: "localizedName(of:)")
   public static func localizedNameOfStringEncoding(
     _ encoding: String.Encoding
@@ -1801,6 +1791,18 @@ extension StringProtocol {
   public static func pathWithComponents(_ components: [String]) -> String {
     fatalError("unavailable function can't be called")
   }
+
+  // + (NSString *)pathWithComponents:(NSArray *)components
+
+  /// Returns a string built from the strings in a given array
+  /// by concatenating them with a path separator between each pair.
+  @available(*, unavailable, message: "Use fileURL(withPathComponents:) on URL instead.")
+  public static func path(withComponents components: [String]) -> String {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension StringProtocol {
 
   @available(*, unavailable, renamed: "canBeConverted(to:)")
   public func canBeConvertedToEncoding(_ encoding: String.Encoding) -> Bool {
