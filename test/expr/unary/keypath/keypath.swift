@@ -322,6 +322,10 @@ func testKeyPathSubscriptTuple(readonly: (Z,Z), writable: inout (Z,Z),
   writable[keyPath: rkp] = sink
 }
 
+func testKeyPathSubscriptLValue(base: Z, kp: inout KeyPath<Z, Z>) {
+  _ = base[keyPath: kp]
+}
+
 struct AA {
   subscript(x: Int) -> Int { return x }
   var c: CC? = CC()
