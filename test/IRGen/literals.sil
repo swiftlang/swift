@@ -6,9 +6,9 @@
 // CHECK: [[U8_1:@.*]] = private unnamed_addr constant [5 x i8] c"\00x\C6\AB\00"
 // CHECK: [[U16_0:@.*]] = private unnamed_addr constant [8 x i16] [i16 104, i16 101, i16 108, i16 112, i16 9, i16 109, i16 101, i16 0]
 // CHECK: [[U16_1:@.*]] = private unnamed_addr constant [4 x i16] [i16 0, i16 120, i16 427, i16 0]
-// CHECK: @_T0s19_UTF16StringStorageCN = external global %objc_class
-// CHECK: [[UTF16_CSTR_0:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, i8, [8 x i16] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @_T0s19_UTF16StringStorageCN to %swift.type*), i32 4, i32 0 }, i32 7, i32 8, i8 0, i8 0, [8 x i16] [i16 104, i16 101, i16 108, i16 112, i16 9, i16 109, i16 101, i16 0] }
-// CHECK: [[UTF16_CSTR_1:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, i8, [9 x i16] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @_T0s19_UTF16StringStorageCN to %swift.type*), i32 4, i32 0 }, i32 8, i32 9, i8 0, i8 0, [9 x i16] [i16 104, i16 101, i16 108, i16 112, i16 9, i16 109, i16 101, i16 0, i16 0] }
+// CHECK: @_T0SS13_UTF16StorageCN = external global %objc_class
+// CHECK: [[UTF16_CSTR_0:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, i8, [8 x i16] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @_T0SS13_UTF16StorageCN to %swift.type*), i32 4, i32 0 }, i32 7, i32 8, i8 0, i8 0, [8 x i16] [i16 104, i16 101, i16 108, i16 112, i16 9, i16 109, i16 101, i16 0] }
+// CHECK: [[UTF16_CSTR_1:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, i8, [9 x i16] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @_T0SS13_UTF16StorageCN to %swift.type*), i32 4, i32 0 }, i32 8, i32 9, i8 0, i8 0, [9 x i16] [i16 104, i16 101, i16 108, i16 112, i16 9, i16 109, i16 101, i16 0, i16 0] }
 // CHECK: @_T0s20_Latin1StringStorageCN = external global %objc_class
 // CHECK: [[CSTR_0:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, [12 x i8] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @_T0s20_Latin1StringStorageCN to %swift.type*), i32 4, i32 0 }, i32 11, i32 12, i8 0, [12 x i8] c"help\09me too\00" }
 // CHECK: [[CSTR_1:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, [13 x i8] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @_T0s20_Latin1StringStorageCN to %swift.type*), i32 4, i32 0 }, i32 12, i32 13, i8 0, [13 x i8] c"help\09me too\00\00" }

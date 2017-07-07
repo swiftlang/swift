@@ -3202,7 +3202,7 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
                             /*packed*/ false);
 
   auto metaclass = getMetatypeDeclarationFor(
-      *this, REALLY_STRINGIFY(CLASS_METADATA_SYM(s19_UTF16StringStorage)));
+      *this, REALLY_STRINGIFY(CLASS_METADATA_SYM(SS13_UTF16Storage)));
 
   metaclass = llvm::ConstantExpr::getBitCast(metaclass, TypeMetadataPtrTy);
 

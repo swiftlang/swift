@@ -30,6 +30,7 @@ set(SWIFTLIB_ESSENTIAL
   AssertCommon.swift
   BidirectionalCollection.swift
   Bool.swift
+  BoundedBufferReference.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift
@@ -38,10 +39,12 @@ set(SWIFTLIB_ESSENTIAL
   CharacterUnicodeScalars.swift
   CocoaArray.swift
   Codable.swift
+  Counted.swift.gyb
   Collection.swift
   CollectionAlgorithms.swift.gyb
   Comparable.swift
   CompilerProtocols.swift
+  ContiguouslyStored.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
   CString.swift
@@ -61,6 +64,8 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPoint.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
+  ForwardingWrapper.swift.gyb
+  Function.swift
   Hashable.swift
   HashedCollections.swift.gyb
   # WORKAROUND: This file name is not sorted alphabetically in the list because
@@ -153,8 +158,10 @@ set(SWIFTLIB_ESSENTIAL
   UTF16.swift
   UTF32.swift
   Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
+  StringStorage.swift
   ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
+  StringCore2.swift
   )
 
 # The complete list of sources in the core standard library.  Includes
