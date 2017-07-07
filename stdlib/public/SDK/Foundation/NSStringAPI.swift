@@ -414,7 +414,7 @@ extension StringProtocol where Index == String.Index {
   /// The corresponding `NSString` - a convenience for bridging code.
   // FIXME(strings): There is probably a better way to bridge Self to NSString
   var _ns: NSString {
-    return String(self) as NSString
+    return self._ephemeralString as NSString
   }
 
   /// Return an `Index` corresponding to the given offset in our UTF-16
