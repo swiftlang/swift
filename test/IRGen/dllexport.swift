@@ -33,15 +33,15 @@ open class d {
 // CHECK-DAG-OPT: @_T09dllexport1dCACycfc = dllexport alias void (), void ()* @_swift_dead_method_stub
 // CHECK-DAG-OPT: @_T09dllexport1cCACycfc = dllexport alias void (), void ()* @_swift_dead_method_stub
 // CHECK-DAG-OPT: @_T09dllexport1cCACycfC = dllexport alias void (), void ()* @_swift_dead_method_stub
-// CHECK-DAG: define dllexport swiftcc %swift.refcounted* @_T09dllexport1cCfd(%T9dllexport1cC*{{.*}})
-// CHECK-DAG-NO-OPT: define dllexport swiftcc %T9dllexport1cC* @_T09dllexport1cCACycfc(%T9dllexport1cC*)
-// CHECK-DAG-NO-OPT: define dllexport swiftcc %T9dllexport1cC* @_T09dllexport1cCACycfC(%swift.type*)
-// CHECK-DAG: define dllexport swiftcc i8* @_T09dllexport2ciAA1cCfau()
-// CHECK-DAG-NO-OPT: define dllexport swiftcc void @_T09dllexport1dC1m33_C57BA610BA35E21738CC992438E660E9LLyyF(%T9dllexport1dC*)
-// CHECK-DAG-NO-OPT: define dllexport swiftcc void @_T09dllexport1dCfD(%T9dllexport1dC*)
-// CHECK-DAG: define dllexport swiftcc %swift.refcounted* @_T09dllexport1dCfd(%T9dllexport1dC*{{.*}})
+// CHECK-DAG: define dllexport %swift.refcounted* @_T09dllexport1cCfd(%T9dllexport1cC*{{.*}})
+// CHECK-DAG-NO-OPT: define dllexport %T9dllexport1cC* @_T09dllexport1cCACycfc(%T9dllexport1cC*)
+// CHECK-DAG-NO-OPT: define dllexport %T9dllexport1cC* @_T09dllexport1cCACycfC(%swift.type*)
+// CHECK-DAG: define dllexport i8* @_T09dllexport2ciAA1cCfau()
+// CHECK-DAG-NO-OPT: define dllexport void @_T09dllexport1dC1m33_C57BA610BA35E21738CC992438E660E9LLyyF(%T9dllexport1dC*)
+// CHECK-DAG-NO-OPT: define dllexport void @_T09dllexport1dCfD(%T9dllexport1dC*)
+// CHECK-DAG: define dllexport %swift.refcounted* @_T09dllexport1dCfd(%T9dllexport1dC*{{.*}})
 // CHECK-DAG: define dllexport %swift.type* @_T09dllexport1cCMa()
 // CHECK-DAG: define dllexport %swift.type* @_T09dllexport1dCMa()
-// CHECK-DAG-NO-OPT: define dllexport swiftcc %T9dllexport1dC* @_T09dllexport1dCACycfc(%T9dllexport1dC*)
-// CHECK-DAG-OPT: define dllexport swiftcc void @_T09dllexport1dCfD(%T9dllexport1dC*)
+// CHECK-DAG-NO-OPT: define dllexport %T9dllexport1dC* @_T09dllexport1dCACycfc(%T9dllexport1dC*)
+// CHECK-DAG-OPT: define dllexport void @_T09dllexport1dCfD(%T9dllexport1dC*)
 

@@ -26,7 +26,6 @@
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILType.h"
-#include "swift/Runtime/Config.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/Support/Compiler.h"
 
@@ -109,7 +108,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM,
 
 static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
   // TODO: use a custom CC that returns three scalars efficiently
-  return SWIFT_LLVM_CC(SwiftCC);
+  return IGM.SwiftCC;
 }
 
 /// Expand the requirements of the given abstract calling convention

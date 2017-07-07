@@ -355,10 +355,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   InvariantMetadataID = LLVMContext.getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(LLVMContext, {});
   DereferenceableID = LLVMContext.getMDKindID("dereferenceable");
-  
+
   C_CC = llvm::CallingConv::C;
   // TODO: use "tinycc" on platforms that support it
-  DefaultCC = SWIFT_LLVM_CC(DefaultCC);
+  DefaultCC = llvm::CallingConv::C;
   // If it is an interpreter, don't use try to use any
   // advanced calling conventions and use instead a
   // more conservative C calling convention. This
@@ -367,17 +367,39 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // TODO: Check that the deployment target supports the new
   // calling convention. Older versions of the runtime library
   // may not contain the entries using the new calling convention.
-
+  //
   // Only use the new calling conventions on platforms that support it.
+  //
+  // NB: Runtime is built with just-built clang, swiftc (this file) is
+  // built with system clang. Do not use static clang feature-tests
+  // from runtime header (eg. SWIFT_USE_SWIFTCALL from
+  // Runtime/Config.h) to decide whether just-built clang supports a
+  // convention; you'll be incorrectly deciding based on system
+  // clang. Instead, replicate logic as dynamic checks made against
+  // just-built clang that this code will be linked and run with.
+  //
+  // (including: swiftcall dependence on WIN32 blocker
+  // http://bugs.llvm.org/show_bug.cgi?id=32000).
+  //
+  // (excluding: SWIFT_RT_USE_RegisterPreservingCC, which is currently
+  // a non-target-dependent, fixed definition in the runtime.)
+
+  auto const &TI = clangASTContext.getTargetInfo();
   auto Arch = Triple.getArch();
   (void)Arch;
-  if (SWIFT_RT_USE_RegisterPreservingCC &&
+  if ((SWIFT_RT_USE_RegisterPreservingCC) &&
+      (TI.checkCallingConvention(clang::CC_PreserveMost) ==
+       clang::TargetInfo::CCCR_OK) &&
       Arch == llvm::Triple::ArchType::aarch64)
-    RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
+    RegisterPreservingCC = llvm::CallingConv::PreserveMost;
   else
     RegisterPreservingCC = DefaultCC;
 
-  SwiftCC = SWIFT_LLVM_CC(SwiftCC);
+  SwiftCC = llvm::CallingConv::C;
+  if ((TI.checkCallingConvention(clang::CC_Swift) ==
+       clang::TargetInfo::CCCR_OK) && !Triple.isOSWindows()) {
+    SwiftCC = llvm::CallingConv::Swift;
+  }
   UseSwiftCC = (SwiftCC == llvm::CallingConv::Swift);
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
@@ -392,7 +414,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AtomicBoolAlign = Alignment(ClangASTContext->getTypeSize(atomicBoolTy));
   }
 
-  IsSwiftErrorInRegister =
+  IsSwiftErrorInRegister = UseSwiftCC &&
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
       ClangCodeGen->CGM());
 }

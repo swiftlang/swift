@@ -26,7 +26,6 @@
 #include <type_traits>
 #include <utility>
 #include <string.h>
-#include "swift/Runtime/Config.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
 #include "swift/Basic/Malloc.h"
