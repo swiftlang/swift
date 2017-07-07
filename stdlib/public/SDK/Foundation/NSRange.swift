@@ -151,8 +151,8 @@ extension NSRange {
   where R.Bound == S.Index, S.Index == String.Index {
     let r = region.relative(to: target)
     self = NSRange(
-      location: r.lowerBound._utf16Index - target.startIndex._utf16Index,
-      length: r.upperBound._utf16Index - r.lowerBound._utf16Index
+      location: r.lowerBound.encodedOffset - target.startIndex.encodedOffset,
+      length: r.upperBound.encodedOffset - r.lowerBound.encodedOffset
     )
   }
 
