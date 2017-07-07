@@ -172,13 +172,6 @@ extension _UIntBuffer : RangeReplaceableCollection {
     _storage |= Storage(newElement) &<< _bitCount
     _bitCount = _bitCount &+ _elementWidth
   }
-
-  @inline(__always)
-  public mutating func removeFirst() {
-    _debugPrecondition(!isEmpty)
-    _bitCount = _bitCount &- _elementWidth
-    _storage = _storage._fullShiftRight(_elementWidth)
-  }
   
   @inline(__always)
   public mutating func replaceSubrange<C: Collection>(

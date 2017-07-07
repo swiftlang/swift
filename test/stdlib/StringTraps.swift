@@ -88,8 +88,8 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  expectCrashLater()
   i = s.utf16.index(before: i)
+  expectCrashLater()
   s.utf16[i]
 }
 
