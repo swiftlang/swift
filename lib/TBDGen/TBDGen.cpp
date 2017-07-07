@@ -26,6 +26,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SILGen/SILGenMaterializeForSet.h"
 #include "llvm/ADT/StringSet.h"
 
 using namespace swift;
@@ -285,6 +286,15 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   InsideAbstractStorageDecl = true;
   visitMembers(ASD);
   InsideAbstractStorageDecl = false;
+
+  // IRGen currently promotes serialized private functions to public, which
+  // includes the closures inside materializeForSets of computed properties.
+  if (auto MFS = ASD->getMaterializeForSetFunc()) {
+    if (!isPrivateDecl(MFS)) {
+      addSymbol(Lowering::getMaterializeForSetCallbackName(
+          /*conformance=*/nullptr, MFS));
+    }
+  }
 }
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   // statically/globally stored variables have some special handling.
