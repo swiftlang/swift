@@ -78,11 +78,14 @@ void CacheImpl::setAndRetain(void *Key, void *Value, size_t Cost) {
   DefaultCacheKey CKey(Key, &DCache.CBs);
   auto Entry = DCache.Entries.find(CKey);
   if (Entry != DCache.Entries.end()) {
+    if (Entry->second == Value)
+      return;
     DCache.CBs.keyDestroyCB(Entry->first.Key, nullptr);
-    DCache.CBs.valueDestroyCB(Entry->second, nullptr);
+    DCache.CBs.valueReleaseCB(Entry->second, nullptr);
     DCache.Entries.erase(Entry);
   }
 
+  DCache.CBs.valueRetainCB(Value, nullptr);
   DCache.Entries[CKey] = Value;
 
   // FIXME: Not thread-safe! It should avoid deleting the value until
@@ -116,7 +119,7 @@ bool CacheImpl::remove(const void *Key) {
   auto Entry = DCache.Entries.find(CKey);
   if (Entry != DCache.Entries.end()) {
     DCache.CBs.keyDestroyCB(Entry->first.Key, nullptr);
-    DCache.CBs.valueDestroyCB(Entry->second, nullptr);
+    DCache.CBs.valueReleaseCB(Entry->second, nullptr);
     DCache.Entries.erase(Entry);
     return true;
   }
@@ -129,7 +132,7 @@ void CacheImpl::removeAll() {
 
   for (auto Entry : DCache.Entries) {
     DCache.CBs.keyDestroyCB(Entry.first.Key, nullptr);
-    DCache.CBs.valueDestroyCB(Entry.second, nullptr);
+    DCache.CBs.valueReleaseCB(Entry.second, nullptr);
   }
   DCache.Entries.clear();
 }
