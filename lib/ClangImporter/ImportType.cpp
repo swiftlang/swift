@@ -78,9 +78,6 @@ namespace {
       /// The source type is a CF object pointer type.
       CFPointer,
 
-      /// The source type is a C++ reference type.
-      Reference,
-
       /// The source type is a block pointer type.
       Block,
 
@@ -123,7 +120,6 @@ namespace {
     case ImportHint::BOOL:
     case ImportHint::Boolean:
     case ImportHint::NSUInteger:
-    case ImportHint::Reference:
     case ImportHint::Void:
       return false;
 
@@ -420,7 +416,7 @@ namespace {
     }
 
     ImportResult VisitReferenceType(const clang::ReferenceType *type) {
-      return { nullptr, ImportHint::Reference };
+      return Type();
     }
 
     ImportResult VisitMemberPointer(const clang::MemberPointerType *type) {
@@ -1169,21 +1165,6 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       (importKind == ImportTypeKind::Variable ||
        importKind == ImportTypeKind::AuditedVariable)) {
     return hint.BridgedType;
-  }
-
-  // Reference types are only permitted as function parameter types.
-  if (hint == ImportHint::Reference &&
-      importKind == ImportTypeKind::Parameter) {
-    auto refType = clangType->castAs<clang::ReferenceType>();
-    // Import the underlying type.
-    auto objectType = impl.importType(refType->getPointeeType(),
-                                      ImportTypeKind::Pointee,
-                                      allowNSUIntegerAsInt,
-                                      canFullyBridgeTypes);
-    if (!objectType)
-      return nullptr;
-
-    return InOutType::get(objectType);
   }
 
   // For anything else, if we completely failed to import the type
