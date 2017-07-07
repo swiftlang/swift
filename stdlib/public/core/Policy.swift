@@ -248,10 +248,11 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 ///         print("'obj' does not have a 'getIntegerValue()' method")
 ///     }
 ///     // Prints "The value of 'obj' is 100"
+public typealias AnyObject = Builtin.AnyObject
 #else
 /// The protocol to which all classes implicitly conform.
-#endif
 public typealias AnyObject = Builtin.AnyObject
+#endif
 
 /// The protocol to which all class types implicitly conform.
 ///
