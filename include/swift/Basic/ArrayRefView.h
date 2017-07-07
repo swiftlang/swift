@@ -24,14 +24,15 @@ namespace swift {
 
 /// An adapter for iterating over a range of values as a range of
 /// values of a different type.
-template <class Orig, class Projected, Projected (&Project)(const Orig &)>
+template <class Orig, class Projected, Projected (&Project)(const Orig &),
+          bool AllowOrigAccess = false>
 class ArrayRefView {
   llvm::ArrayRef<Orig> Array;
 public:
   ArrayRefView(llvm::ArrayRef<Orig> array) : Array(array) {}
 
   class iterator {
-    friend class ArrayRefView<Orig,Projected,Project>;
+    friend class ArrayRefView<Orig,Projected,Project,AllowOrigAccess>;
     const Orig *Ptr;
     iterator(const Orig *ptr) : Ptr(ptr) {}
   public:
@@ -97,6 +98,14 @@ public:
   }
   ArrayRefView slice(unsigned start, unsigned length) const {
     return ArrayRefView(Array.slice(start, length));
+  }
+
+  /// Peek through to the underlying array.  This operation is not
+  /// supported by default; it must be enabled at specialization time.
+  llvm::ArrayRef<Orig> getOriginalArray() const {
+    static_assert(AllowOrigAccess,
+                  "original array access not enabled for this view");
+    return Array;
   }
 };
 
