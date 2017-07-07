@@ -350,8 +350,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       continue;
 
     auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset =
-        !isGeneric && var && var->hasStorage() && !var->isStatic();
+    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {
       // FIXME: a field only has one sort of offset, but it is moderately
       // non-trivial to compute which one. Including both is less painful than
