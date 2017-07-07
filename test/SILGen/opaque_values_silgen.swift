@@ -970,6 +970,16 @@ func s450__________lastVal<T>(_ rest: T...) -> T {
   return minValue
 }
 
+// Test SILGenFunction::emitPointerToPointer.
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s460______________fooSRyxGSPyxG1p_tlF : $@convention(thin) <Element> (UnsafePointer<Element>) -> UnsafeBufferPointer<Element> {
+// CHECK: [[F:%.*]] = function_ref @_T0s017_convertPointerToB8Argumentq_xs01_B0RzsABR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : _Pointer, τ_0_1 : _Pointer> (@in τ_0_0) -> @out τ_0_1
+// CHECK: apply [[F]]<UnsafePointer<Element>, UnsafePointer<Element>>(%0) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : _Pointer, τ_0_1 : _Pointer> (@in τ_0_0) -> @out τ_0_1
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s460______________fooSRyxGSPyxG1p_tlF'
+func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPointer<Element> {
+  return UnsafeBufferPointer(start: p, count: 1)
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
