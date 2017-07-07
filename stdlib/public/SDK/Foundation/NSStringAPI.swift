@@ -1005,10 +1005,11 @@ extension StringProtocol where Index == String.Index {
   /// Returns a new string in which the characters in a
   /// specified range of the `String` are replaced by a given string.
   public func replacingCharacters<
-    T : StringProtocol
-  >(in range: Range<Index>, with replacement: T) -> String {
+    T : StringProtocol, R : RangeExpression
+  >(in range: R, with replacement: T) -> String where R.Bound == Index {
     return _ns.replacingCharacters(
-      in: _toNSRange(range), with: replacement._ephemeralString)
+      in: _toNSRange(range.relative(to: self)),
+      with: replacement._ephemeralString)
   }
 
   // - (NSString *)
@@ -1053,7 +1054,7 @@ extension StringProtocol where Index == String.Index {
   /// Returns a new string made by replacing in the `String`
   /// all percent escapes with the matching characters as determined
   /// by a given encoding.
-  @available(swift, deprecated: 3.2, obsoleted: 4.0,
+  @available(swift, deprecated: 3.0, obsoleted: 4.0,
     message: "Use removingPercentEncoding instead, which always uses the recommended UTF-8 encoding.")
   public func replacingPercentEscapes(
     using encoding: String.Encoding
@@ -1151,15 +1152,16 @@ extension StringProtocol where Index == String.Index {
   /// enumerating the specific range of the string, providing the
   /// Block with the located tags.
   public func enumerateLinguisticTags<
-    T : StringProtocol
+    T : StringProtocol, R : RangeExpression
   >(
-    in range: Range<Index>,
+    in range: R,
     scheme tagScheme: T,
     options opts: NSLinguisticTagger.Options = [],
     orthography: NSOrthography? = nil,
     invoking body:
       (String, Range<Index>, Range<Index>, inout Bool) -> Void
-  ) {
+  ) where R.Bound == Index {
+    let range = range.relative(to: self)
     _ns.enumerateLinguisticTags(
       in: _toNSRange(range),
       scheme: tagScheme._ephemeralString,
@@ -1214,15 +1216,18 @@ extension StringProtocol where Index == String.Index {
   ///       enumerated range is included in one and only one enclosing range.
   ///     - An `inout` Boolean value that the closure can use to stop the
   ///       enumeration by setting `stop = true`.
-  public func enumerateSubstrings(
-    in range: Range<Index>,
+  public func enumerateSubstrings<
+    R : RangeExpression
+  >(
+    in range: R,
     options opts: String.EnumerationOptions = [],
     _ body: @escaping (
       _ substring: String?, _ substringRange: Range<Index>,
       _ enclosingRange: Range<Index>, inout Bool
     ) -> Void
-  ) {
-    _ns.enumerateSubstrings(in: _toNSRange(range), options: opts) {
+  ) where R.Bound == Index {
+    _ns.enumerateSubstrings(
+      in: _toNSRange(range.relative(to: self)), options: opts) {
       var stop_ = false
 
       body($0,
@@ -1277,15 +1282,17 @@ extension StringProtocol where Index == String.Index {
   ///   conversion isn't possible due to the chosen encoding.
   ///
   /// - Note: will get a maximum of `min(buffer.count, maxLength)` bytes.
-  public func getBytes(
+  public func getBytes<
+    R : RangeExpression
+  >(
     _ buffer: inout [UInt8],
     maxLength maxBufferCount: Int,
     usedLength usedBufferCount: UnsafeMutablePointer<Int>,
     encoding: String.Encoding,
     options: String.EncodingConversionOptions = [],
-    range: Range<Index>,
+    range: R,
     remaining leftover: UnsafeMutablePointer<Range<Index>>
-  ) -> Bool {
+  ) -> Bool where R.Bound == Index {
     return _withOptionalOutParameter(leftover) {
       self._ns.getBytes(
         &buffer,
@@ -1293,7 +1300,7 @@ extension StringProtocol where Index == String.Index {
         usedLength: usedBufferCount,
         encoding: encoding.rawValue,
         options: options,
-        range: _toNSRange(range),
+        range: _toNSRange(range.relative(to: self)),
         remaining: $0)
     }
   }
@@ -1306,19 +1313,21 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns by reference the beginning of the first line and
   /// the end of the last line touched by the given range.
-  public func getLineStart(
+  public func getLineStart<
+    R : RangeExpression
+  >(
     _ start: UnsafeMutablePointer<Index>,
     end: UnsafeMutablePointer<Index>,
     contentsEnd: UnsafeMutablePointer<Index>,
-    for range: Range<Index>
-  ) {
+    for range: R
+  ) where R.Bound == Index {
     _withOptionalOutParameter(start) {
       start in self._withOptionalOutParameter(end) {
         end in self._withOptionalOutParameter(contentsEnd) {
           contentsEnd in self._ns.getLineStart(
             start, end: end,
             contentsEnd: contentsEnd,
-            for: _toNSRange(range))
+            for: _toNSRange(range.relative(to: self)))
         }
       }
     }
@@ -1332,19 +1341,21 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns by reference the beginning of the first paragraph
   /// and the end of the last paragraph touched by the given range.
-  public func getParagraphStart(
+  public func getParagraphStart<
+    R : RangeExpression
+  >(
     _ start: UnsafeMutablePointer<Index>,
     end: UnsafeMutablePointer<Index>,
     contentsEnd: UnsafeMutablePointer<Index>,
-    for range: Range<Index>
-  ) {
+    for range: R
+  ) where R.Bound == Index {
     _withOptionalOutParameter(start) {
       start in self._withOptionalOutParameter(end) {
         end in self._withOptionalOutParameter(contentsEnd) {
           contentsEnd in self._ns.getParagraphStart(
             start, end: end,
             contentsEnd: contentsEnd,
-            for: _toNSRange(range))
+            for: _toNSRange(range.relative(to: self)))
         }
       }
     }
@@ -1368,8 +1379,10 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns the range of characters representing the line or lines
   /// containing a given range.
-  public func lineRange(for aRange: Range<Index>) -> Range<Index> {
-    return _range(_ns.lineRange(for: _toNSRange(aRange)))
+  public func lineRange<
+    R : RangeExpression
+  >(for aRange: R) -> Range<Index> where R.Bound == Index {
+    return _range(_ns.lineRange(for: _toNSRange(aRange.relative(to: self))))
   }
 
   // - (NSArray *)
@@ -1382,18 +1395,18 @@ extension StringProtocol where Index == String.Index {
   /// Returns an array of linguistic tags for the specified
   /// range and requested tags within the receiving string.
   public func linguisticTags<
-    T : StringProtocol
+    T : StringProtocol, R : RangeExpression
   >(
-    in range: Range<Index>,
+    in range: R,
     scheme tagScheme: T,
     options opts: NSLinguisticTagger.Options = [],
     orthography: NSOrthography? = nil,
     tokenRanges: UnsafeMutablePointer<[Range<Index>]>? = nil // FIXME:Can this be nil?
-  ) -> [String] {
+  ) -> [String] where R.Bound == Index {
     var nsTokenRanges: NSArray?
     let result = tokenRanges._withNilOrAddress(of: &nsTokenRanges) {
       self._ns.linguisticTags(
-        in: _toNSRange(range),
+        in: _toNSRange(range.relative(to: self)),
         scheme: tagScheme._ephemeralString,
         options: opts,
         orthography: orthography,
@@ -1413,8 +1426,11 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns the range of characters representing the
   /// paragraph or paragraphs containing a given range.
-  public func paragraphRange(for aRange: Range<Index>) -> Range<Index> {
-    return _range(_ns.paragraphRange(for: _toNSRange(aRange)))
+  public func paragraphRange<
+    R : RangeExpression
+  >(for aRange: R) -> Range<Index> where R.Bound == Index {
+    return _range(
+      _ns.paragraphRange(for: _toNSRange(aRange.relative(to: self))))
   }
 
   // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet
@@ -1461,14 +1477,17 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns the range in the string of the composed character
   /// sequences for a given range.
-  public func rangeOfComposedCharacterSequences(
-    for range: Range<Index>
-  ) -> Range<Index> {
+  public func rangeOfComposedCharacterSequences<
+    R : RangeExpression
+  >(
+    for range: R
+  ) -> Range<Index> where R.Bound == Index {
     // Theoretically, this will be the identity function.  In practice
     // I think users will be able to observe differences in the input
     // and output ranges due (if nothing else) to locale changes
     return _range(
-      _ns.rangeOfComposedCharacterSequences(for: _toNSRange(range)))
+      _ns.rangeOfComposedCharacterSequences(
+        for: _toNSRange(range.relative(to: self))))
   }
 
   // - (NSRange)rangeOfString:(NSString *)aString
@@ -1540,7 +1559,8 @@ extension StringProtocol where Index == String.Index {
   /// Returns a representation of the `String` using a given
   /// encoding to determine the percent escapes necessary to convert
   /// the `String` into a legal URL string.
-  @available(*, deprecated, message: "Use addingPercentEncoding(withAllowedCharacters:) instead, which always uses the recommended UTF-8 encoding, and which encodes for a specific URL component or subcomponent since each URL component or subcomponent has different rules for what characters are valid.")
+  @available(swift, deprecated: 3.0, obsoleted: 4.0,
+    message: "Use addingPercentEncoding(withAllowedCharacters:) instead, which always uses the recommended UTF-8 encoding, and which encodes for a specific URL component or subcomponent since each URL component or subcomponent has different rules for what characters are valid.")
   public func addingPercentEscapes(
     using encoding: String.Encoding
   ) -> String? {
@@ -1556,10 +1576,9 @@ extension StringProtocol where Index == String.Index {
   ///
   /// Equivalent to `self.rangeOfString(other) != nil`
   public func contains<T : StringProtocol>(_ other: T) -> Bool {
-    let other = other._ephemeralString
     let r = self.range(of: other) != nil
     if #available(OSX 10.10, iOS 8.0, *) {
-      _sanityCheck(r == _ns.contains(other))
+      _sanityCheck(r == _ns.contains(other._ephemeralString))
     }
     return r
   }
@@ -1578,12 +1597,12 @@ extension StringProtocol where Index == String.Index {
   public func localizedCaseInsensitiveContains<
     T : StringProtocol
   >(_ other: T) -> Bool {
-    let other = other._ephemeralString
     let r = self.range(
       of: other, options: .caseInsensitive, locale: Locale.current
     ) != nil
     if #available(OSX 10.10, iOS 8.0, *) {
-      _sanityCheck(r == _ns.localizedCaseInsensitiveContains(other))
+      _sanityCheck(r ==
+        _ns.localizedCaseInsensitiveContains(other._ephemeralString))
     }
     return r
   }
