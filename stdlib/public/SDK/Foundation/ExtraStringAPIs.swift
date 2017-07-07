@@ -10,25 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Random access for String.UTF16View, only when Foundation is
-// imported.  Making this API dependent on Foundation decouples the
-// Swift core from a UTF16 representation.
-extension String.UTF16View.Index : Strideable {
+extension String.UTF16View.Index {
   /// Construct from an integer offset.
+  @available(swift, deprecated: 3.2)
+  @available(swift, obsoleted: 4.0)
   public init(_ offset: Int) {
     _precondition(offset >= 0, "Negative UTF16 index offset not allowed")
     self.init(_offset: offset)
   }
 
+  @available(swift, deprecated: 3.2)
+  @available(swift, obsoleted: 4.0)
   public func distance(to other: String.UTF16View.Index) -> Int {
     return _offset.distance(to: other._offset)
   }
 
+  @available(swift, deprecated: 3.2)
+  @available(swift, obsoleted: 4.0)
   public func advanced(by n: Int) -> String.UTF16View.Index {
     return String.UTF16View.Index(_offset.advanced(by: n))
   }
 }
-
-extension String.UTF16View : RandomAccessCollection {}
-extension String.UTF16View.Indices : RandomAccessCollection {}
-
