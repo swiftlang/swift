@@ -121,8 +121,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // FIXME: This is broken on 32-bit arch w/ Word = UInt64
     let wordRatio = UInt.bitWidth / Word.bitWidth
     _sanityCheck(wordRatio != 0)
-    for i in 0..<source._countRepresentedWords {
-      var sourceWord = source._word(at: i)
+    for var sourceWord in source.words {
       for _ in 0..<wordRatio {
         _data.append(Word(extendingOrTruncating: sourceWord))
         sourceWord >>= Word.bitWidth
@@ -660,36 +659,27 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
   }
 
-  public func _word(at n: Int) -> UInt {
-    let ratio = UInt.bitWidth / Word.bitWidth
-    _sanityCheck(ratio != 0)
-
-    var twosComplementData = _dataAsTwosComplement()
-
-    // Find beginning of range. If we're beyond the value, return 1s or 0s.
-    let start = n * ratio
-    if start >= twosComplementData.count {
-      return isNegative ? UInt.max : 0
+  public var words: [UInt] {
+    _sanityCheck(UInt.bitWidth % Word.bitWidth == 0)
+    var words: [UInt] = []
+    var word: UInt = 0
+    var shift = 0
+    for w in _dataAsTwosComplement() {
+      word |= UInt(extendingOrTruncating: w) << shift
+      shift += Word.bitWidth
+      if shift == UInt.bitWidth {
+        words.append(word)
+        word = 0
+        shift = 0
+      }
     }
-
-    // Find end of range. If the range extends beyond the representation,
-    // add bits to the end.
-    let end = (n + 1) * ratio
-    if end > twosComplementData.count {
-      twosComplementData.append(contentsOf:
-        repeatElement(isNegative ? Word.max : 0,
-          count: end - twosComplementData.count))
+    if shift != 0 {
+      if isNegative {
+        word |= ~((1 << shift) - 1)
+      }
+      words.append(word)
     }
-
-    // Build the correct word from the range determined above.
-    let wordSlice = twosComplementData[start..<end]
-    var result: UInt = 0
-    for v in wordSlice.reversed() {
-      result <<= Word.bitWidth
-      result |= UInt(extendingOrTruncating: v)
-    }
-
-    return result
+    return words
   }
 
   /// The number of bits used for storage of this value. Always a multiple of
@@ -1293,8 +1283,8 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     return self
   }
 
-  func _word(at n: Int) -> UInt {
-    return UInt(value)
+  var words: UInt.Words {
+    return UInt(value).words
   }
 
   // Hashable, CustomStringConvertible
