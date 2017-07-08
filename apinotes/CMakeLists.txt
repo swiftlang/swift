@@ -1,59 +1,10 @@
 set(SWIFT_API_NOTES_INPUTS
   Accelerate
-  AVFoundation
-  AVKit
-  AppKit
-  AudioToolbox
-  CallKit
-  CloudKit
-  Contacts
-  CoreBluetooth
-  CoreData
-  CoreGraphics
-  CoreLocation
-  CoreSpotlight
-  CoreText
-  CryptoTokenKit
   Dispatch
-  EventKit
-  ExternalAccessory
-  Foundation
-  GameKit
-  GameplayKit
-  GLKit
-  HealthKit
-  HomeKit
   iAd
-  Intents
-  LocalAuthentication
-  MapKit
-  MediaPlayer
-  MessageUI
-  Metal
   ModelIO
-  MultipeerConnectivity
-  NetworkExtension
-  NotificationCenter
-  ObjectiveC
-  PassKit
-  Photos
-  QuickLook
-  SafariServices
-  SceneKit
   ScreenSaver
   ScriptingBridge
-  SpriteKit
-  StoreKit
-  TVMLKit
-  TVServices
-  UIKit
-  UserNotifications
-  VideoSubscriberAccount
-  WatchConnectivity
-  WatchKit
-  WebKit
-  XCTest
-  XPC
   os
 )
 
