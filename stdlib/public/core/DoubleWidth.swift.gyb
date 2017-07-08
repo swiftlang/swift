@@ -157,31 +157,6 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       self.init(exactly: integerPart)
     }
   }
-    
-  public func _word(at n: Int) -> UInt {
-    if Base.bitWidth < UInt.bitWidth {
-      if UInt.bitWidth % Base.bitWidth != 0 {
-        fatalError("word(at:) is not supported on this type")
-      }
-      if n > 0 {
-        // Since `Base` is narrower than word, any non-zero word will give us
-        // the correct value here (0 or ~0).
-        return _storage.high._word(at: n)
-      }
-      return _storage.low._word(at: 0) |
-        (_storage.high._word(at: 0) << numericCast(Base.bitWidth))
-    } else {
-      // multiples of word-size only
-      if Base.bitWidth % UInt.bitWidth != 0 {
-        fatalError("word(at:) is not supported on this type")
-      }
-
-      // TODO: move to Int128 just like init(_builtinIntegerLiteral:) ?
-      return (n < _storage.low._countRepresentedWords) ?
-        _storage.low._word(at: n) :
-        _storage.high._word(at: n - _storage.low._countRepresentedWords)
-    }
-  }
 
   public struct Words : Collection {
     public enum _IndexValue {
