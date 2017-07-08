@@ -305,7 +305,7 @@ void NormalProtocolConformance::setSignatureConformances(
 
 #if !NDEBUG
   unsigned idx = 0;
-  for (auto req : getProtocol()->getRequirementSignature()->getRequirements()) {
+  for (const auto &req : getProtocol()->getRequirementSignature()) {
     if (req.getKind() == RequirementKind::Conformance) {
       assert(idx < conformances.size());
       assert(conformances[idx].getRequirement() ==
@@ -590,8 +590,7 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
          "signature conformances not yet computed");
 
   unsigned conformanceIndex = 0;
-  for (auto &reqt :
-         getProtocol()->getRequirementSignature()->getRequirements()) {
+  for (const auto &reqt : getProtocol()->getRequirementSignature()) {
     if (reqt.getKind() == RequirementKind::Conformance) {
       // Is this the conformance we're looking for?
       if (reqt.getFirstType()->isEqual(assocType) &&

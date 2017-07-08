@@ -105,14 +105,6 @@ ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   assert(getAsProtocolOrProtocolExtensionContext() && "not a protocol");
 
-  // FIXME: This comes up when the extension didn't resolve,
-  // and we have a protocol nested inside that extension
-  // (which is not allowed in the first place).
-  //
-  // Handle this more systematically elsewhere.
-  if (!isInnermostContextGeneric())
-    return nullptr;
-
   return getGenericParamsOfContext()->getParams().front()
       ->getDeclaredInterfaceType()
       ->castTo<GenericTypeParamType>();

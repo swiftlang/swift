@@ -2807,7 +2807,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(proto->getGenericParams());
     writeGenericRequirements(
-        proto->getRequirementSignature()->getRequirements(), DeclTypeAbbrCodes);
+      proto->getRequirementSignature(), DeclTypeAbbrCodes);
     writeMembers(proto->getMembers(), true);
     writeDefaultWitnessTable(proto, DeclTypeAbbrCodes);
     break;

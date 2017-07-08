@@ -3500,7 +3500,7 @@ class ProtocolDecl : public NominalTypeDecl {
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  GenericSignature *RequirementSignature = nullptr;
+  const Requirement *RequirementSignature = nullptr;
 
   /// True if the protocol has requirements that cannot be satisfied (e.g.
   /// because they could not be imported from Objective-C).
@@ -3509,6 +3509,9 @@ class ProtocolDecl : public NominalTypeDecl {
   /// If this is a compiler-known protocol, this will be a KnownProtocolKind
   /// value, plus one. Otherwise, it will be 0.
   unsigned KnownProtocol : 6;
+
+  /// The number of requirements in the requirement signature.
+  unsigned NumRequirementsInSignature : 16;
 
   bool requiresClassSlow();
 
@@ -3686,8 +3689,6 @@ public:
 
   /// Create the implicit generic parameter list for a protocol or
   /// extension thereof.
-  ///
-  /// FIXME: protocol extensions will introduce a where clause here as well.
   GenericParamList *createGenericParams(DeclContext *dc);
 
   /// Create the generic parameters of this protocol if the haven't been
@@ -3699,17 +3700,17 @@ public:
     return TrailingWhere;
   }
 
-  /// Retrieve the generic signature representing the requirements introduced by
-  /// this protocol.
+  /// Retrieve the requirements that describe this protocol.
   ///
-  /// These are the requirements like any inherited protocols and conformances
-  /// for associated types that are mentioned literally in this
-  /// decl. Requirements implied via inheritance are not mentioned, nor is the
-  /// conformance of Self to this protocol.
-  GenericSignature *getRequirementSignature() const {
-    assert(RequirementSignature &&
+  /// These are the requirements including any inherited protocols
+  /// and conformances for associated types that are introduced in this
+  /// protocol. Requirements implied via any other protocol (e.g., inherited
+  /// protocols of the inherited protocols) are not mentioned. The conformance
+  /// requirements listed here become entries in the witness table.
+  ArrayRef<Requirement> getRequirementSignature() const {
+    assert(isRequirementSignatureComputed() &&
            "getting requirement signature before computing it");
-    return RequirementSignature;
+    return llvm::makeArrayRef(RequirementSignature, NumRequirementsInSignature);
   }
 
   /// Has the requirement signature been computed yet?
@@ -3719,9 +3720,7 @@ public:
 
   void computeRequirementSignature();
 
-  void setRequirementSignature(GenericSignature *sig) {
-    RequirementSignature = sig;
-  }
+  void setRequirementSignature(ArrayRef<Requirement> requirements);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

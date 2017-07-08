@@ -85,9 +85,6 @@ struct GenericSignatureBuilder::Implementation {
   /// The potential archetypes for the generic parameters in \c GenericParams.
   SmallVector<PotentialArchetype *, 4> PotentialArchetypes;
 
-  /// The nested types that have been renamed.
-  SmallVector<PotentialArchetype *, 4> RenamedNestedTypes;
-
   /// The requirement sources used in this generic signature builder.
   llvm::FoldingSet<RequirementSource> RequirementSources;
 
@@ -1100,16 +1097,6 @@ bool FloatingRequirementSource::isRecursive(
   return false;
 }
 
-PotentialArchetype::PotentialArchetype(PotentialArchetype *parent,
-                                       Identifier name)
-  : parentOrBuilder(parent), identifier(name), isUnresolvedNestedType(true),
-  IsRecursive(false), Invalid(false),
-  DiagnosedRename(false)
-{
-  assert(parent != nullptr && "Not an associated type?");
-  getBuilder()->recordUnresolvedType(this);
-}
-
 GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
   ++NumPotentialArchetypes;
 
@@ -1165,24 +1152,6 @@ unsigned GenericSignatureBuilder::PotentialArchetype::getNestingDepth() const {
   for (auto P = getParent(); P; P = P->getParent())
     ++Depth;
   return Depth;
-}
-
-void GenericSignatureBuilder::PotentialArchetype::resolveAssociatedType(
-       AssociatedTypeDecl *assocType,
-       GenericSignatureBuilder &builder) {
-  assert(isUnresolvedNestedType && "associated type is already resolved");
-  isUnresolvedNestedType = false;
-  identifier.assocTypeOrConcrete = assocType;
-  assert(assocType->getName() == getNestedName());
-}
-
-void GenericSignatureBuilder::PotentialArchetype::resolveConcreteType(
-       TypeDecl *concreteDecl,
-       GenericSignatureBuilder &builder) {
-  assert(isUnresolvedNestedType && "nested type is already resolved");
-  isUnresolvedNestedType = false;
-  identifier.assocTypeOrConcrete = concreteDecl;
-  assert(concreteDecl->getName() == getNestedName());
 }
 
 Optional<ConcreteConstraint>
@@ -1281,13 +1250,6 @@ void EquivalenceClass::dump() const {
   dump(llvm::errs());
 }
 
-void GenericSignatureBuilder::recordUnresolvedType(
-                                          PotentialArchetype *unresolvedPA) {
-  Impl->DelayedRequirements.push_back(
-    {DelayedRequirement::Unresolved, unresolvedPA, RequirementRHS(),
-     FloatingRequirementSource::forAbstract()});
-}
-
 ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
                                    RequirementKind kind,
                                    UnresolvedType lhs,
@@ -1338,8 +1300,7 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
 
   // Lookup the conformance of the concrete type to this protocol.
   auto conformance =
-    getLookupConformanceFn()(pa->getDependentType({ }, /*allowUnresolved=*/true)
-                               ->getCanonicalType(),
+    getLookupConformanceFn()(pa->getDependentType({ })->getCanonicalType(),
                              concrete,
                              proto->getDeclaredInterfaceType()
                               ->castTo<ProtocolType>());
@@ -1369,8 +1330,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 
   // Lookup the conformance of the superclass to this protocol.
   auto conformance =
-    getLookupConformanceFn()(pa->getDependentType({ }, /*allowUnresolved=*/true)
-                               ->getCanonicalType(),
+    getLookupConformanceFn()(pa->getDependentType({ })->getCanonicalType(),
                              superclass,
                              proto->getDeclaredInterfaceType()
                                ->castTo<ProtocolType>());
@@ -1643,17 +1603,6 @@ static int compareDependentTypes(PotentialArchetype * const* pa,
       return result;
   }
 
-  // Along the error path where one or both of the potential archetypes was
-  // renamed due to typo correction,
-  if (a->wasRenamed() || b->wasRenamed()) {
-    if (a->wasRenamed() != b->wasRenamed())
-      return a->wasRenamed() ? +1 : -1;
-
-    if (int compareNames = a->getOriginalName().str().compare(
-                                                    b->getOriginalName().str()))
-      return compareNames;
-  }
-
   llvm_unreachable("potential archetype total order failure");
 }
 
@@ -1672,8 +1621,8 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
     auto parentAnchor = parent->getArchetypeAnchor(builder);
     assert(parentAnchor->getNestingDepth() <= parent->getNestingDepth());
     anchor = parentAnchor->getNestedArchetypeAnchor(
-                                      getNestedName(), builder,
-                                      ArchetypeResolutionKind::AlwaysPartial);
+                                  getNestedName(), builder,
+                                  ArchetypeResolutionKind::CompleteWellFormed);
 
     // FIXME: Hack for cases where we couldn't resolve the nested type.
     if (!anchor)
@@ -1690,8 +1639,6 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
       equivClass->archetypeAnchorCache.numMembers
         == equivClass->members.size()) {
     ++NumArchetypeAnchorCacheHits;
-    assert(equivClass->archetypeAnchorCache.anchor->getNestingDepth()
-             <= rep->getNestingDepth());
     return equivClass->archetypeAnchorCache.anchor;
   }
 
@@ -1709,8 +1656,6 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
            "archetype anchor isn't a total order");
   }
 #endif
-
-  assert(anchor->getNestingDepth() <= rep->getNestingDepth());
 
   // Record the cache miss and update the cache.
   ++NumArchetypeAnchorCacheMisses;
@@ -1796,7 +1741,7 @@ PotentialArchetype *PotentialArchetype::getNestedType(
   // Retrieve the nested archetype anchor, which is the best choice (so far)
   // for this nested type.
   return getNestedArchetypeAnchor(nestedName, builder,
-                                  ArchetypeResolutionKind::AlwaysPartial);
+                                  ArchetypeResolutionKind::WellFormed);
 }
 
 PotentialArchetype *PotentialArchetype::getNestedType(
@@ -1903,38 +1848,7 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
       resultPA = concreteDeclPA;
   }
 
-  if (resultPA)
-    return resultPA;
-
-  // Check whether we can add a missing nested type for this case.
-  switch (kind) {
-  case ArchetypeResolutionKind::AlwaysPartial:
-    break;
-
-  case ArchetypeResolutionKind::WellFormed:
-  case ArchetypeResolutionKind::CompleteWellFormed:
-  case ArchetypeResolutionKind::AlreadyKnown:
-    return nullptr;
-  }
-
-  // Build an unresolved type if we don't have one yet.
-  auto &nested = NestedTypes[name];
-  if (nested.empty()) {
-    nested.push_back(new PotentialArchetype(this, name));
-
-    auto rep = getRepresentative();
-    if (rep != this) {
-      auto existingPA = rep->getNestedType(name, builder);
-
-      auto sameNamedSource =
-        RequirementSource::forNestedTypeNameMatch(existingPA);
-      builder.addSameTypeRequirement(
-                                 existingPA, nested.back(), sameNamedSource,
-                                 UnresolvedHandlingKind::GenerateConstraints);
-    }
-  }
-
-  return nested.front();
+  return resultPA;
 }
 
 
@@ -1991,20 +1905,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   auto &builder = *getBuilder();
   if (knownNestedTypes != NestedTypes.end()) {
     for (auto existingPA : knownNestedTypes->second) {
-      // Resolve an unresolved potential archetype.
-      if (existingPA->isUnresolvedNestedType) {
-        if (assocType) {
-          existingPA->resolveAssociatedType(assocType, builder);
-        } else {
-          existingPA->resolveConcreteType(concreteDecl, builder);
-        }
-
-        // We've resolved this nested type; nothing more to do.
-        resultPA = existingPA;
-        shouldUpdatePA = true;
-        break;
-      }
-
       // Do we have an associated-type match?
       if (assocType && existingPA->getResolvedAssociatedType() == assocType) {
         resultPA = existingPA;
@@ -2022,7 +1922,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   // If we don't have a result potential archetype yet, we may need to add one.
   if (!resultPA) {
     switch (kind) {
-    case ArchetypeResolutionKind::AlwaysPartial:
     case ArchetypeResolutionKind::CompleteWellFormed:
     case ArchetypeResolutionKind::WellFormed: {
       if (assocType)
@@ -2091,8 +1990,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
           // Substitute in the type of the current PotentialArchetype in
           // place of 'Self' here.
           auto subMap = SubstitutionMap::getProtocolSubstitutions(
-            proto, getDependentType(/*genericParams=*/{},
-                                    /*allowUnresolved=*/true),
+            proto, getDependentType(/*genericParams=*/{}),
             ProtocolConformanceRef(proto));
           type = type.subst(subMap, SubstFlags::UseErrorType);
         } else {
@@ -2157,8 +2055,7 @@ Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
     // If this has a recursive type, return an error type.
     auto equivClass = representative->getEquivalenceClassIfPresent();
     if (equivClass->recursiveConcreteType) {
-      return ErrorType::get(getDependentType(genericParams,
-                                             /*allowUnresolved=*/true));
+      return ErrorType::get(getDependentType(genericParams));
     }
 
     return genericEnv->mapTypeIntoContext(concreteType,
@@ -2185,8 +2082,7 @@ Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
     // proper nested type.
     auto parentTy = parent->getTypeInContext(builder, genericEnv);
     if (!parentTy)
-      return ErrorType::get(getDependentType(genericParams,
-                                             /*allowUnresolved=*/true));
+      return ErrorType::get(getDependentType(genericParams));
 
     ParentArchetype = parentTy->getAs<ArchetypeType>();
     if (!ParentArchetype) {
@@ -2195,7 +2091,7 @@ Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
       (void) resolver;
 
       // Resolve the member type.
-      auto type = getDependentType(genericParams, /*allowUnresolved=*/false);
+      auto type = getDependentType(genericParams);
       if (type->hasError())
         return type;
 
@@ -2274,8 +2170,7 @@ Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
     // If we were unable to resolve this as an associated type, produce an
     // error type.
     if (!assocType) {
-      return ErrorType::get(getDependentType(genericParams,
-                                             /*allowUnresolved=*/true));
+      return ErrorType::get(getDependentType(genericParams));
     }
 
     // Create a nested archetype.
@@ -2317,22 +2212,15 @@ void ArchetypeType::resolveNestedType(
 }
 
 Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
-                                ArrayRef<GenericTypeParamType *> genericParams,
-                                bool allowUnresolved) {
+                                ArrayRef<GenericTypeParamType *> genericParams){
   if (auto parent = getParent()) {
-    Type parentType = parent->getDependentType(genericParams,
-                                               allowUnresolved);
+    Type parentType = parent->getDependentType(genericParams);
     if (parentType->hasError())
       return parentType;
 
     // If we've resolved to an associated type, use it.
     if (auto assocType = getResolvedAssociatedType())
       return DependentMemberType::get(parentType, assocType);
-
-    // If we don't allow unresolved dependent member types, fail.
-    if (!allowUnresolved)
-      return ErrorType::get(getDependentType(genericParams,
-                                             /*allowUnresolved=*/true));
 
     return DependentMemberType::get(parentType, getNestedName());
   }
@@ -2513,22 +2401,8 @@ PotentialArchetype *GenericSignatureBuilder::resolveArchetype(
       return base->updateNestedTypeForConformance(assocType, resolutionKind);
 
     // Resolve based on name alone.
-    // FIXME: Pass through the resolution kind?
     auto name = dependentMember->getName();
-    switch (resolutionKind) {
-    case ArchetypeResolutionKind::AlreadyKnown: {
-      auto known = base->NestedTypes.find(name);
-      if (known == base->NestedTypes.end())
-        return nullptr;
-
-      return known->second.front();
-    }
-
-    case ArchetypeResolutionKind::AlwaysPartial:
-    case ArchetypeResolutionKind::CompleteWellFormed:
-    case ArchetypeResolutionKind::WellFormed:
-      return base->getNestedArchetypeAnchor(name, *this, resolutionKind);
-    }
+    return base->getNestedArchetypeAnchor(name, *this, resolutionKind);
   }
 
   return nullptr;
@@ -2545,7 +2419,7 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
 
     // Determine what kind of resolution we want.
     ArchetypeResolutionKind resolutionKind =
-      ArchetypeResolutionKind::AlwaysPartial;
+      ArchetypeResolutionKind::WellFormed;
     if (!source.isExplicit() && source.isRecursive(type, *this))
       resolutionKind = ArchetypeResolutionKind::AlreadyKnown;
 
@@ -2635,7 +2509,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   if (!PAT->addConformance(Proto, Source, *this))
     return ConstraintResult::Resolved;
 
-  auto concreteSelf = PAT->getDependentType({}, /*allowUnresolved=*/true);
+  auto concreteSelf = PAT->getDependentType({});
   auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
       Proto, concreteSelf, ProtocolConformanceRef(Proto));
 
@@ -2643,12 +2517,10 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   // cannot compute the requirement signature directly, because that may be
   // infinitely recursive: this code is also used to construct it.
   if (Proto->isRequirementSignatureComputed()) {
-    auto reqSig = Proto->getRequirementSignature();
-
     auto innerSource =
       FloatingRequirementSource::viaProtocolRequirement(Source, Proto,
                                                         /*inferred=*/false);
-    for (auto req : reqSig->getRequirements()) {
+    for (const auto &req : Proto->getRequirementSignature()) {
       auto reqResult = addRequirement(req, innerSource, nullptr,
                                       &protocolSubMap);
       if (isErrorResult(reqResult)) return reqResult;
@@ -2919,106 +2791,6 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   return ConstraintResult::Resolved;
 }
 
-/// Perform typo correction on the given nested type, producing the
-/// corrected name (if successful).
-static Identifier typoCorrectNestedType(
-                    GenericSignatureBuilder::PotentialArchetype *pa) {
-  StringRef name = pa->getNestedName().str();
-
-  // Look through all of the associated types of all of the protocols
-  // to which the parent conforms.
-  llvm::SmallVector<Identifier, 2> bestMatches;
-  unsigned bestEditDistance = 0;
-  unsigned maxScore = (name.size() + 1) / 3;
-  for (auto proto : pa->getParent()->getConformsTo()) {
-    for (auto member : getProtocolMembers(proto)) {
-      auto assocType = dyn_cast<AssociatedTypeDecl>(member);
-      if (!assocType)
-        continue;
-
-      unsigned dist = name.edit_distance(assocType->getName().str(),
-                                         /*AllowReplacements=*/true,
-                                         maxScore);
-      assert(dist > 0 && "nested type should have matched associated type");
-      if (bestEditDistance == 0 || dist == bestEditDistance) {
-        bestEditDistance = dist;
-        maxScore = bestEditDistance;
-        bestMatches.push_back(assocType->getName());
-      } else if (dist < bestEditDistance) {
-        bestEditDistance = dist;
-        maxScore = bestEditDistance;
-        bestMatches.clear();
-        bestMatches.push_back(assocType->getName());
-      }
-    }
-  }
-
-  // FIXME: Look through the superclass.
-
-  // If we didn't find any matches at all, fail.
-  if (bestMatches.empty())
-    return Identifier();
-
-  // Make sure that we didn't find more than one match at the best
-  // edit distance.
-  for (auto other : llvm::makeArrayRef(bestMatches).slice(1)) {
-    if (other != bestMatches.front())
-      return Identifier();
-  }
-
-  return bestMatches.front();
-}
-
-ConstraintResult GenericSignatureBuilder::resolveUnresolvedType(
-                                          PotentialArchetype *pa,
-                                          bool allowTypoCorrection) {
-  // If something else resolved this type, we're done.
-  if (!pa->isUnresolved())
-    return ConstraintResult::Resolved;
-
-  // If the parent isn't resolved, we can't resolve this now.
-  auto parentPA = pa->getParent();
-  if (parentPA->isUnresolved())
-    return ConstraintResult::Unresolved;
-
-  // Resolve this via its parent.
-  auto resolvedPA =
-    parentPA->getNestedArchetypeAnchor(
-                        pa->getNestedName(),
-                        *this,
-                        ArchetypeResolutionKind::WellFormed);
-  if (resolvedPA) {
-    assert(!pa->isUnresolved() && "This type must have been resolved");
-    return ConstraintResult::Resolved;
-  }
-
-  // If we aren't allowed to perform typo correction, we can't resolve the
-  // constraint.
-  if (!allowTypoCorrection)
-    return ConstraintResult::Unresolved;
-
-  // Try to typo correct to a nested type name.
-  Identifier correction = typoCorrectNestedType(pa);
-  if (correction.empty()) {
-    pa->setInvalid();
-    return ConstraintResult::Conflicting;
-  }
-
-  // Note that this is being renamed.
-  pa->saveNameForRenaming();
-  Impl->RenamedNestedTypes.push_back(pa);
-
-  // Resolve the associated type and merge the potential archetypes.
-  auto replacement = pa->getParent()->getNestedType(correction, *this);
-  pa->resolveAssociatedType(replacement->getResolvedAssociatedType(),
-                            *this);
-  addSameTypeRequirement(pa, replacement,
-                         RequirementSource::forNestedTypeNameMatch(pa),
-                         UnresolvedHandlingKind::GenerateConstraints);
-
-  return ConstraintResult::Resolved;
-}
-
 ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
                                              PotentialArchetype *PAT,
                                              LayoutConstraint Layout,
@@ -3104,24 +2876,11 @@ void GenericSignatureBuilder::updateSuperclass(
     }
   };
 
-  // Local function to resolve nested types found in the superclass.
-  auto updateSuperclassNestedTypes = [&] {
-    for (auto &nested : T->getNestedTypes()) {
-      if (nested.second.empty()) continue;
-      if (nested.second.front()->isUnresolved()) {
-        (void)T->getNestedArchetypeAnchor(
-                                        nested.first, *this,
-                                        ArchetypeResolutionKind::AlreadyKnown);
-      }
-    }
-  };
-
   // If we haven't yet recorded a superclass constraint for this equivalence
   // class, do so now.
   if (!equivClass->superclass) {
     equivClass->superclass = superclass;
     updateSuperclassConformances();
-    updateSuperclassNestedTypes();
 
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
@@ -3153,7 +2912,6 @@ void GenericSignatureBuilder::updateSuperclass(
 
     // We've strengthened the bound, so update superclass conformances.
     updateSuperclassConformances();
-    updateSuperclassNestedTypes();
     return;
   }
 
@@ -3200,9 +2958,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   if (auto constraintPA = resolvedConstraint->getPotentialArchetype()) {
     // The constraint type isn't a statically-known constraint.
     if (source.getLoc().isValid()) {
-      auto constraintType =
-        constraintPA->getDependentType(Impl->GenericParams,
-                                       /*allowUnresolved=*/true);
+      auto constraintType = constraintPA->getDependentType(Impl->GenericParams);
       Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
                      1, TypeLoc::withoutLoc(constraintType), 0);
     }
@@ -3219,8 +2975,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       auto subjectType = subject.dyn_cast<Type>();
       if (!subjectType)
         subjectType = subject.get<PotentialArchetype *>()
-                        ->getDependentType(Impl->GenericParams,
-                                           /*allowUnresolved=*/true);
+                        ->getDependentType(Impl->GenericParams);
 
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
                      TypeLoc::withoutLoc(subjectType),
@@ -3335,11 +3090,9 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   unsigned nestingDepth2 = T2->getNestingDepth();
 
   // Decide which potential archetype is to be considered the representative.
-  // We prefer potential archetypes with lower nesting depths (because it
-  // prevents us from unnecessarily building deeply nested potential archetypes)
-  // and prefer anchors because it's a minor optimization.
-  if (nestingDepth2 < nestingDepth1 ||
-      compareDependentTypes(&T2, &T1) < 0) {
+  // We prefer potential archetypes with lower nesting depths, because it
+  // prevents us from unnecessarily building deeply nested potential archetypes.
+  if (nestingDepth2 < nestingDepth1) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
   }
@@ -3421,7 +3174,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Recursively merge the associated types of T2 into T1.
-  auto dependentT1 = T1->getDependentType({ }, /*allowUnresolved=*/true);
+  auto dependentT1 = T1->getDependentType({ });
   for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
       // If T1 is concrete but T2 is not, concretize the nested types of T2.
@@ -4140,8 +3893,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
               equivClass->findAnyConcreteConstraintAsWritten()) {
           Diags.diagnose(constraint->source->getLoc(),
                          diag::recursive_same_type_constraint,
-                         archetype->getDependentType(genericParams,
-                                                     /*allowUnresolved=*/true),
+                         archetype->getDependentType(genericParams),
                          constraint->value);
         }
 
@@ -4157,9 +3909,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         if (auto source = equivClass->findAnySuperclassConstraintAsWritten()) {
           Diags.diagnose(source->source->getLoc(),
                          diag::recursive_superclass_constraint,
-                         source->archetype->getDependentType(
-                                                     genericParams,
-                                                     /*allowUnresolved=*/true),
+                         source->archetype->getDependentType(genericParams),
                          equivClass->superclass);
         }
 
@@ -4199,8 +3949,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         if (auto constraint = equivClass->findAnyConcreteConstraintAsWritten())
           Diags.diagnose(constraint->source->getLoc(),
                          diag::requires_generic_param_made_equal_to_concrete,
-                         rep->getDependentType(genericParams,
-                                               /*allowUnresolved=*/true));
+                         rep->getDependentType(genericParams));
         continue;
       }
 
@@ -4232,31 +3981,13 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         if (repConstraint && repConstraint->source->getLoc().isValid()) {
           Diags.diagnose(repConstraint->source->getLoc(),
                          diag::requires_generic_params_made_equal,
-                         pa->getDependentType(genericParams, true),
-                         other->getDependentType(genericParams, true));
+                         pa->getDependentType(genericParams),
+                         other->getDependentType(genericParams));
         }
         break;
       }
     }
   }
-}
-
-bool GenericSignatureBuilder::diagnoseRemainingRenames(
-                              SourceLoc loc,
-                              ArrayRef<GenericTypeParamType *> genericParams) {
-  bool invalid = false;
-
-  for (auto pa : Impl->RenamedNestedTypes) {
-    if (pa->alreadyDiagnosedRename()) continue;
-
-    Diags.diagnose(loc, diag::invalid_member_type_suggest,
-                   pa->getParent()->getDependentType(genericParams,
-                                                     /*allowUnresolved=*/true),
-                   pa->getOriginalName(), pa->getNestedName());
-    invalid = true;
-  }
-
-  return invalid;
 }
 
 /// Turn a requirement right-hand side into an unresolved type.
@@ -4270,16 +4001,11 @@ static GenericSignatureBuilder::UnresolvedType asUnresolvedType(
 
 void GenericSignatureBuilder::processDelayedRequirements() {
   bool anySolved = !Impl->DelayedRequirements.empty();
-  bool allowTypoCorrection = false;
   while (anySolved) {
     // Steal the delayed requirements so we can reprocess them.
     anySolved = false;
     auto delayed = std::move(Impl->DelayedRequirements);
     Impl->DelayedRequirements.clear();
-
-    // Whether we saw any unresolve type constraints that we couldn't
-    // resolve.
-    bool hasUnresolvedUnresolvedTypes = false;
 
     // Process delayed requirements.
     for (const auto &req : delayed) {
@@ -4303,12 +4029,6 @@ void GenericSignatureBuilder::processDelayedRequirements() {
                                req.lhs, asUnresolvedType(req.rhs), req.source,
                                UnresolvedHandlingKind::ReturnUnresolved);
         break;
-
-      case DelayedRequirement::Unresolved:
-        reqResult = resolveUnresolvedType(
-                                      req.lhs.get<PotentialArchetype *>(),
-                                      allowTypoCorrection);
-        break;
       }
 
       // Update our state based on what happened.
@@ -4325,18 +4045,8 @@ void GenericSignatureBuilder::processDelayedRequirements() {
       case ConstraintResult::Unresolved:
         // Add the requirement back.
         Impl->DelayedRequirements.push_back(req);
-
-        if (req.kind == DelayedRequirement::Unresolved)
-          hasUnresolvedUnresolvedTypes = true;
         break;
       }
-    }
-
-    // If we didn't solve anything, but we did see some unresolved types,
-    // try again with typo correction enabled.
-    if (!anySolved && hasUnresolvedUnresolvedTypes && !allowTypoCorrection) {
-      allowTypoCorrection = true;
-      anySolved = true;
     }
   }
 }
@@ -4440,7 +4150,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                    otherNoteDiag,
                    representativeConstraint->source->classifyDiagKind(),
                    representativeConstraint->archetype->
-                     getDependentType(genericParams, /*allowUnresolved=*/true),
+                     getDependentType(genericParams),
                    diagValue(representativeConstraint->value));
   };
 
@@ -4459,7 +4169,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // diagnostic.
       auto getSubjectType =
         [&](PotentialArchetype *pa) -> std::pair<unsigned, Type> {
-          auto subjectType = pa->getDependentType(genericParams, true);
+          auto subjectType = pa->getDependentType(genericParams);
           unsigned kind;
           if (auto gp = subjectType->getAs<GenericTypeParamType>()) {
             if (gp->getDecl() &&
@@ -4517,8 +4227,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
           constraint.source->getLoc().isValid()) {
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,
-                       constraint.archetype->getDependentType(
-                         genericParams, /*allowUnresolved=*/true),
+                       constraint.archetype->getDependentType(genericParams),
                        diagValue(constraint.value));
 
         noteRepresentativeConstraint();
@@ -4636,9 +4345,12 @@ static PotentialArchetype *getLocalAnchor(PotentialArchetype *pa,
   if (!parent) return pa;
 
   auto parentAnchor = getLocalAnchor(parent, builder);
-  return parentAnchor->getNestedArchetypeAnchor(
-                                        pa->getNestedName(), builder,
-                                        ArchetypeResolutionKind::AlwaysPartial);
+  if (!parentAnchor) return pa;
+  auto localAnchor =
+    parentAnchor->getNestedArchetypeAnchor(
+                                pa->getNestedName(), builder,
+                                ArchetypeResolutionKind::CompleteWellFormed);
+  return localAnchor ? localAnchor : pa;
 }
 
 /// Computes the ordered set of archetype anchors required to form a minimum
@@ -4820,10 +4532,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
             constraint.source->getLoc().isValid()) {
           Diags.diagnose(constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
-                         constraint.archetype->getDependentType(
-                                                          genericParams, true),
-                         constraint.value->getDependentType(
-                                                          genericParams, true));
+                         constraint.archetype->getDependentType(genericParams),
+                         constraint.value->getDependentType(genericParams));
         }
 
         continue;
@@ -4890,7 +4600,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       diag::redundant_same_type_constraint,
       diag::previous_same_type_constraint,
       [&](PotentialArchetype *pa) {
-        return pa->getDependentType(genericParams, true);
+        return pa->getDependentType(genericParams);
       },
       /*removeSelfDerived=*/false);
   }
@@ -4925,16 +4635,14 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
         Diags.diagnose(lhs.constraint.source->getLoc(),
                        diag::redundant_same_type_constraint,
                        lhs.constraint.archetype->getDependentType(
-                                                          genericParams, true),
-                       lhs.constraint.value->getDependentType(
-                                                          genericParams, true));
+                                                                genericParams),
+                       lhs.constraint.value->getDependentType(genericParams));
         Diags.diagnose(rhs.constraint.source->getLoc(),
                        diag::previous_same_type_constraint,
                        rhs.constraint.source->classifyDiagKind(),
                        rhs.constraint.archetype->getDependentType(
-                                                          genericParams, true),
-                       rhs.constraint.value->getDependentType(
-                                                          genericParams, true));
+                                                          genericParams),
+                       rhs.constraint.value->getDependentType(genericParams));
         return true;
       }),
     intercomponentEdges.end());
@@ -4957,17 +4665,17 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
           Diags.diagnose(edge.constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
                          edge.constraint.archetype->getDependentType(
-                                                          genericParams, true),
+                                                          genericParams),
                          edge.constraint.value->getDependentType(
-                                                          genericParams, true));
+                                                          genericParams));
 
           Diags.diagnose(firstEdge.constraint.source->getLoc(),
                          diag::previous_same_type_constraint,
                          firstEdge.constraint.source->classifyDiagKind(),
                          firstEdge.constraint.archetype->getDependentType(
-                                                          genericParams, true),
+                                                          genericParams),
                          firstEdge.constraint.value->getDependentType(
-                                                          genericParams, true));
+                                                          genericParams));
         }
 
         continue;
@@ -4994,7 +4702,7 @@ static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
       if (!pa)
         return ErrorType::get(depTy);
 
-      return pa->getDependentType({ }, /*allowUnresolved=*/false);
+      return pa->getDependentType({ });
     }
 
     return None;
@@ -5084,8 +4792,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
                             representativeConstraint.archetype)) {
         Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
                        existing->archetype->getDependentType(
-                                                   genericParams,
-                                                   /*allowUnresolved=*/true),
+                                                   genericParams),
                        existing->value, equivClass->superclass);
 
         // FIXME: Note the representative constraint.
@@ -5093,8 +4800,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
         Diags.diagnose(representativeConstraint.source->getLoc(),
                        diag::type_does_not_inherit,
                        representativeConstraint.archetype->getDependentType(
-                                                    genericParams,
-                                                    /*allowUnresolved=*/true),
+                                                    genericParams),
                        equivClass->concreteType, equivClass->superclass);
       }
     } else if (representativeConstraint.source->getLoc().isValid()) {
@@ -5102,8 +4808,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       Diags.diagnose(representativeConstraint.source->getLoc(),
                      diag::redundant_superclass_constraint,
                      representativeConstraint.archetype->getDependentType(
-                                                  genericParams,
-                                                  /*allowUnresolved=*/true),
+                                                  genericParams),
                      representativeConstraint.value);
 
       if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
@@ -5111,9 +4816,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
         Diags.diagnose(existing->source->getLoc(),
                        diag::same_type_redundancy_here,
                        existing->source->classifyDiagKind(),
-                       existing->archetype->getDependentType(
-                                                   genericParams,
-                                                   /*allowUnresolved=*/true),
+                       existing->archetype->getDependentType(genericParams),
                        existing->value);
       }
     }
@@ -5215,21 +4918,6 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
     archetypes.push_back(archetype);
   });
-
-  // Remove any invalid potential archetypes or archetypes whose parents are
-  // concrete; they have no requirements.
-  archetypes.erase(
-    std::remove_if(archetypes.begin(), archetypes.end(),
-      [&](PotentialArchetype *archetype) -> bool {
-        // Invalid archetypes are never representatives in well-formed or
-        // corrected signature, so we don't need to visit them.
-        if (archetype->isInvalid())
-          return true;
-
-        // Keep it.
-        return false;
-      }),
-    archetypes.end());
 
   // Sort the archetypes in canonical order.
   llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
@@ -5459,8 +5147,7 @@ static void collectRequirements(GenericSignatureBuilder &builder,
           type.is<Type>()))
       return;
 
-    auto depTy = archetype->getDependentType(params,
-                                             /*allowUnresolved=*/false);
+    auto depTy = archetype->getDependentType(params);
 
     if (depTy->hasError())
       return;
@@ -5480,7 +5167,7 @@ static void collectRequirements(GenericSignatureBuilder &builder,
     } else {
       // ...or to a dependent type.
       repTy = type.get<GenericSignatureBuilder::PotentialArchetype *>()
-          ->getDependentType(params, /*allowUnresolved=*/false);
+          ->getDependentType(params);
     }
 
     if (repTy->hasError())

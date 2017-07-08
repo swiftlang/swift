@@ -1367,7 +1367,9 @@ void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
   if (isa<AssociatedTypeDecl>(attachingTo))
     flags |= SwapSelfAndDependentMemberType;
   printGenericSignature(
-      proto->getRequirementSignature(), flags,
+      GenericSignature::get({proto->getProtocolSelfType()} ,
+                            proto->getRequirementSignature()),
+      flags,
       [&](const Requirement &req) {
         auto location = bestRequirementPrintLocation(proto, req);
         return location.AttachedTo == attachingTo && location.InWhereClause;

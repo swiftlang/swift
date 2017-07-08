@@ -63,10 +63,6 @@ class DiagnosticEngine;
 
 /// Determines how to resolve a dependent type to a potential archetype.
 enum class ArchetypeResolutionKind {
-  /// Always create a new potential archetype to describe this dependent type,
-  /// which might be invalid and may not provide complete information.
-  AlwaysPartial,
-
   /// Only create a potential archetype when it is well-formed (e.g., a nested
   /// type should exist) and make sure we have complete information about
   /// that potential archetype.
@@ -274,10 +270,6 @@ private:
   GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
   GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
 
-  /// Record that the given potential archetype is unresolved, so we know to
-  /// resolve it later.
-  void recordUnresolvedType(PotentialArchetype *unresolvedPA);
-
   /// When a particular requirement cannot be resolved due to, e.g., a
   /// currently-unresolvable or nested type, this routine should be
   /// called to cope with the unresolved requirement.
@@ -314,10 +306,6 @@ private:
   ConstraintResult addConformanceRequirement(PotentialArchetype *T,
                                              ProtocolDecl *Proto,
                                              const RequirementSource *Source);
-
-  /// Try to resolve the given unresolved potential archetype.
-  ConstraintResult resolveUnresolvedType(PotentialArchetype *pa,
-                                         bool allowTypoCorrection);
 
 public:
   /// \brief Add a new same-type requirement between two fully resolved types
@@ -566,12 +554,6 @@ public:
   void finalize(SourceLoc loc,
                 ArrayRef<GenericTypeParamType *> genericParams,
                 bool allowConcreteGenericParams=false);
-
-  /// Diagnose any remaining renames.
-  ///
-  /// \returns \c true if there were any remaining renames to diagnose.
-  bool diagnoseRemainingRenames(SourceLoc loc,
-                                ArrayRef<GenericTypeParamType *> genericParams);
 
   /// Process any delayed requirements that can be handled now.
   void processDelayedRequirements();
@@ -1294,20 +1276,13 @@ class GenericSignatureBuilder::PotentialArchetype {
 
   /// The identifier describing this particular archetype.
   ///
-  /// \c parentOrBuilder determines whether we have a nested type vs. a root,
-  /// while `isUnresolvedNestedType` determines whether we have an unresolved
-  /// nested type (vs. a resolved one);
+  /// \c parentOrBuilder determines whether we have a nested type vs. a root.
   union PAIdentifier {
-    /// The name of an unresolved, nested type.
-    Identifier name;
-
     /// The associated type or typealias for a resolved nested type.
     TypeDecl *assocTypeOrConcrete;
 
     /// The generic parameter key for a root.
     GenericParamKey genericParam;
-
-    PAIdentifier(Identifier name) : name(name) { }
 
     PAIdentifier(AssociatedTypeDecl *assocType)
       : assocTypeOrConcrete(assocType) { }
@@ -1357,25 +1332,8 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// that share a name.
   llvm::MapVector<Identifier, StoredNestedType> NestedTypes;
 
-  /// Tracks the number of conformances that
-  unsigned numConformancesInNestedType = 0;
-
-  /// Whether this is an unresolved nested type.
-  unsigned isUnresolvedNestedType : 1;
-
   /// \brief Recursively conforms to itself.
   unsigned IsRecursive : 1;
-
-  /// Whether this potential archetype is invalid, e.g., because it could not
-  /// be resolved.
-  unsigned Invalid : 1;
-
-  /// Whether we have diagnosed a rename.
-  unsigned DiagnosedRename : 1;
-
-  /// If we have renamed this (nested) type due to typo correction,
-  /// the old name.
-  Identifier OrigName;
 
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
@@ -1383,29 +1341,23 @@ class GenericSignatureBuilder::PotentialArchetype {
 
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
-    : parentOrBuilder(parent), identifier(assocType),
-      isUnresolvedNestedType(false), IsRecursive(false), Invalid(false),
-      DiagnosedRename(false)
+    : parentOrBuilder(parent), identifier(assocType), IsRecursive(false)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
 
   /// \brief Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
-    : parentOrBuilder(parent), identifier(concreteDecl),
-      isUnresolvedNestedType(false),
-      IsRecursive(false), Invalid(false),
-      DiagnosedRename(false)
+    : parentOrBuilder(parent), identifier(concreteDecl), IsRecursive(false)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
-  PotentialArchetype(GenericSignatureBuilder *builder, GenericParamKey genericParam)
+  PotentialArchetype(GenericSignatureBuilder *builder,
+                     GenericParamKey genericParam)
     : parentOrBuilder(builder), identifier(genericParam),
-      isUnresolvedNestedType(false),
-      IsRecursive(false), Invalid(false),
-      DiagnosedRename(false)
+      IsRecursive(false)
   {
   }
 
@@ -1441,22 +1393,8 @@ public:
   /// has been resolved.
   AssociatedTypeDecl *getResolvedAssociatedType() const {
     assert(getParent() && "Not an associated type");
-    if (isUnresolvedNestedType)
-      return nullptr;
-
     return dyn_cast<AssociatedTypeDecl>(identifier.assocTypeOrConcrete);
   }
-
-  /// Determine whether this PA is still unresolved.
-  bool isUnresolved() const { return isUnresolvedNestedType; }
-
-  /// Resolve the potential archetype to the given associated type.
-  void resolveAssociatedType(AssociatedTypeDecl *assocType,
-                             GenericSignatureBuilder &builder);
-
-  /// Resolve the potential archetype to the given typealias.
-  void resolveConcreteType(TypeDecl *concreteDecl,
-                           GenericSignatureBuilder &builder);
 
   /// Determine whether this is a generic parameter.
   bool isGenericParam() const {
@@ -1484,18 +1422,12 @@ public:
   /// Retrieve the name of a nested potential archetype.
   Identifier getNestedName() const {
     assert(getParent() && "Not a nested type");
-    if (isUnresolvedNestedType)
-      return identifier.name;
-
     return identifier.assocTypeOrConcrete->getName();
   }
 
   /// Retrieve the concrete type declaration.
   TypeDecl *getConcreteTypeDecl() const {
     assert(getParent() && "not a nested type");
-    if (isUnresolvedNestedType)
-      return nullptr;
-
     if (isa<AssociatedTypeDecl>(identifier.assocTypeOrConcrete))
       return nullptr;
 
@@ -1648,12 +1580,7 @@ public:
   ///
   /// \param genericParams The set of generic parameters to use in the resulting
   /// dependent type.
-  ///
-  /// \param allowUnresolved If true, allow the result to contain
-  /// \c DependentMemberType types with a name but no specific associated
-  /// type.
-  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams,
-                        bool allowUnresolved);
+  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams);
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
@@ -1674,32 +1601,6 @@ public:
 
   void setIsRecursive() { IsRecursive = true; }
   bool isRecursive() const { return IsRecursive; }
-
-  bool isInvalid() const { return Invalid; }
-
-  void setInvalid() { Invalid = true; }
-
-  /// Determine whether this archetype was renamed due to typo
-  /// correction. If so, \c getName() retrieves the new name.
-  bool wasRenamed() const { return !OrigName.empty(); }
-
-  /// Note that this potential archetype was is going to be renamed (due to typo
-  /// correction), saving the old name.
-  void saveNameForRenaming() {
-    OrigName = getNestedName();
-  }
-
-  /// For a renamed potential archetype, retrieve the original name.
-  Identifier getOriginalName() const {
-    assert(wasRenamed());
-    return OrigName;
-  }
-
-  /// Whether we already diagnosed this rename.
-  bool alreadyDiagnosedRename() const { return DiagnosedRename; }
-
-  /// Note that we already diagnosed this rename.
-  void setAlreadyDiagnosedRename() { DiagnosedRename = true; }
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const,
@@ -1724,9 +1625,6 @@ public:
 
     /// A same-type requirement.
     SameType,
-
-    /// An unresolved potential archetype.
-    Unresolved,
   };
 
   Kind kind;
