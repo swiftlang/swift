@@ -53,7 +53,9 @@ struct TupleContainingNonTrivialStruct {
   var opt: Optional<Builtin.NativeObject>
 }
 
-class SuperKlass {}
+class SuperKlass {
+  func d() {}
+}
 class SubKlass : SuperKlass {}
 class X {
   @objc func f() { }
@@ -338,6 +340,13 @@ sil @block_invoke_test : $@convention(thin) (@owned @convention(block) () -> ())
 bb0(%0 : @owned $@convention(block) () -> ()):
   apply %0() : $@convention(block) () -> ()
   destroy_value %0 : $@convention(block) () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @class_method_metatype_test : $@convention(thin) (@thick SuperKlass.Type) -> () {
+bb0(%0 : @trivial $@thick SuperKlass.Type):
+  %1 = class_method %0 : $@thick SuperKlass.Type, #SuperKlass.d!1 : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
   %9999 = tuple()
   return %9999 : $()
 }
