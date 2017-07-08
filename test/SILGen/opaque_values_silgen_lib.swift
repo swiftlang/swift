@@ -25,6 +25,20 @@ func s010______PAndS_cases() {
   _ = PAndSEnum.A
 }
 
+// Test emitBuiltinReinterpretCast.
+// ---
+// CHECK-LABEL: sil hidden @_T0s21s020__________bitCastq_x_q_m2totr0_lF : $@convention(thin) <T, U> (@in T, @thick U.Type) -> @out U {
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $T
+// CHECK: [[COPY:%.*]] = copy_value [[BORROW]] : $T
+// CHECK: [[CAST:%.*]] = unchecked_bitwise_cast [[COPY]] : $T to $U
+// CHECK: [[RET:%.*]] = copy_value [[CAST]] : $U
+// CHECK: destroy_value [[COPY]] : $T
+// CHECK: return [[RET]] : $U
+// CHECK-LABEL: } // end sil function '_T0s21s020__________bitCastq_x_q_m2totr0_lF'
+func s020__________bitCast<T, U>(_ x: T, to type: U.Type) -> U {
+  return Builtin.reinterpretCast(x)
+}
+
 // Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
 // ---
 // CHECK-LABEL: sil shared [transparent] @_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmF : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum {

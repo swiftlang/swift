@@ -631,11 +631,11 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
   auto &toTL = gen.getTypeLowering(substitutions[1].getReplacement());
   
   // If casting between address-only types, cast the address.
-  if (!fromTL.isLoadable() || !toTL.isLoadable()) {
+  if (fromTL.isAddress() || toTL.isAddress()) {
     SILValue fromAddr;
 
     // If the from value is loadable, move it to a buffer.
-    if (fromTL.isLoadable()) {
+    if (!fromTL.isAddress()) {
       fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue()->getType());
       fromTL.emitStore(gen.B, loc, args[0].getValue(), fromAddr,
                        StoreOwnershipQualifier::Init);
@@ -647,7 +647,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     
     // Load and retain the destination value if it's loadable. Leave the cleanup
     // on the original value since we don't know anything about it's type.
-    if (toTL.isLoadable()) {
+    if (!toTL.isAddress()) {
       return gen.emitManagedLoadCopy(loc, toAddr, toTL);
     }
     // Leave the cleanup on the original value.
