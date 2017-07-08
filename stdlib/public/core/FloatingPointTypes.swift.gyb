@@ -816,27 +816,30 @@ extension ${Self} {
 
 % for self_ty in all_integer_types(word_bits):
 %   That = self_ty.stdlib_name
-%   ThatBuiltinName = self_ty.builtin_name
-%   srcBits = self_ty.bits
-%   sign = 's' if self_ty.is_signed else 'u'
-  ${'@_transparent' if self_ty.access == 'public' else ''}
-  ${self_ty.access} init(_ v: ${That}) {
+%   if not That.startswith('_'):
+%     ThatBuiltinName = self_ty.builtin_name
+%     srcBits = self_ty.bits
+%     sign = 's' if self_ty.is_signed else 'u'
+
+  @_transparent
+  public init(_ v: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
   
-%   if srcBits < SignificandBitCount:
+%     if srcBits < SignificandBitCount:
   @available(*, message: "Converting ${That} to ${Self} will always succeed.")
-%   end
-  ${'@inline(__always)' if self_ty.access == 'public' else ''}
-  ${self_ty.access} init?(exactly value: ${That}) {
+%     end
+  @inline(__always)
+  public init?(exactly value: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
 
-%   if srcBits < SignificandBitCount:
+%     if srcBits < SignificandBitCount:
     if ${That}(self) != value {
       return nil
     }
-%   end
+%     end
   }
+%   end
 % end # all_integer_types
 }
 

@@ -31,7 +31,6 @@ class SwiftIntegerType(object):
         self.is_word = is_word
         self.bits = bits
         self.is_signed = is_signed
-        self.access = 'public' if bits <= 64 else 'internal'
 
         if is_word:
             self.possible_bitwidths = [32, 64]
@@ -43,6 +42,7 @@ class SwiftIntegerType(object):
 
         # Derived properties
         self.stdlib_name = \
+            ('_' if bits > 64 else '') + \
             ('' if is_signed else 'U') + \
             'Int' + \
             ('' if is_word else str(bits))

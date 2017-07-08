@@ -134,16 +134,36 @@ internal var zero_Int120 : Builtin.Int120 {
 }
 
 extension String {
+  public enum _Testable {}
+}
+
+extension String._Testable {
+  // WORKAROUND: https://bugs.swift.org/browse/SR-5352
+  // Using Builtin.Int120 bumps the size of the whole thing to 17 bytes!
+  typealias _InlineStorage = (UInt64, UInt32, UInt16, UInt8)
+  
+  public // @testable
+  struct _Inline<CodeUnit : FixedWidthInteger> {
+    var _storage: _InlineStorage = (0,0,0,0)
+    var _count: Builtin.Int4 = zero_Int4
+  }
+
+  public // @testable
+  struct _Unowned<CodeUnit : FixedWidthInteger> {
+    var _start: UnsafePointer<CodeUnit>
+    var _count: UInt32
+    var isASCII: Bool?
+    var isNULTerminated: Bool
+  }
+}    
+
+extension String {
   internal enum _Content {
-    // WORKAROUND: https://bugs.swift.org/browse/SR-5352
-    // Using Builtin.Int120 bumps the size of the whole thing to 17 bytes!
-    typealias _InlineStorage = (UInt64, UInt32, UInt16, UInt8)
-    
-    internal struct _Inline<CodeUnit : FixedWidthInteger> {
-      var _storage: _InlineStorage = (0,0,0,0)
-      var _count: Builtin.Int4 = zero_Int4
-    }
-    
+    typealias _Inline<CodeUnit : FixedWidthInteger>
+      = String._Testable._Inline<CodeUnit>
+    typealias _Unowned<CodeUnit : FixedWidthInteger>
+      = String._Testable._Unowned<CodeUnit>
+
   case inline8(_Inline<UInt8>)
     public var _inline8: _Inline<UInt8>?
     { if case .inline8(let x) = self { return x } else { return nil } }
@@ -152,13 +172,6 @@ extension String {
     public var _inline16: _Inline<UInt16>?
     { if case .inline16(let x) = self { return x } else { return nil } }
 
-    internal struct _Unowned<CodeUnit : FixedWidthInteger> {
-      var _start: UnsafePointer<CodeUnit>
-      var _count: UInt32
-      var isASCII: Bool?
-      var isNULTerminated: Bool
-    }
-    
   case unowned8(_Unowned<UInt8>)
     public var _unowned8: _Unowned<UInt8>?
     { if case .unowned8(let x) = self { return x } else { return nil } }
@@ -187,20 +200,20 @@ extension String._Content._Inline {
       / MemoryLayout<CodeUnit>.stride
   }
 
-  internal var _bits : UInt128 {
+  internal var _bits : _UInt128 {
     get {
 #if _endian(little)
-      return unsafeBitCast(self, to: UInt128.self) & ~(0 as UInt128) &>> 8
+      return unsafeBitCast(self, to: _UInt128.self) & ~(0 as _UInt128) &>> 8
 #else
-      return unsafeBitCast(self, to: UInt128.self) &>> 8
+      return unsafeBitCast(self, to: _UInt128.self) &>> 8
 #endif
     }
     set {
 #if _endian(little)
-      let non_bits = unsafeBitCast(self, to: UInt128.self) & (0xFF &<< 120)
+      let non_bits = unsafeBitCast(self, to: _UInt128.self) & (0xFF &<< 120)
       self = unsafeBitCast(newValue | non_bits, to: type(of: self))
 #else
-      let non_bits = unsafeBitCast(self, to: UInt128.self) & 0xFF
+      let non_bits = unsafeBitCast(self, to: _UInt128.self) & 0xFF
       self = unsafeBitCast((newValue &<< 8) | non_bits, to: type(of: self))
 #endif
       _sanityCheck(_bits == newValue)
@@ -219,12 +232,12 @@ extension String._Content._Inline {
   }
   
   public init?<S: Sequence>(_ s: S) where S.Element : BinaryInteger {
-    var newBits: UInt128 = 0
+    var newBits: _UInt128 = 0
     var shift = 0
     let maxShift = MemoryLayout.size(ofValue: _storage) * 8
     for i in s {
       guard shift < maxShift, let _ = CodeUnit(exactly: i) else { return nil }
-      newBits |= UInt128(i) &<< shift
+      newBits |= _UInt128(i) &<< shift
       shift += CodeUnit.bitWidth
     }
     count = shift / CodeUnit.bitWidth
@@ -233,11 +246,15 @@ extension String._Content._Inline {
 }
 
 extension String._Content._Inline : Sequence {
+  public // @testable
   struct Iterator : IteratorProtocol, Sequence {
-    var bits: UInt128
+    @_versioned // @testable
+    var bits: _UInt128
+    public // @testable
     var count: UInt8
 
     @inline(__always)
+    public // @testable
     mutating func next() -> CodeUnit? {
       guard count > 0 else { return nil }
       let r = CodeUnit(extendingOrTruncating: bits)
@@ -245,44 +262,45 @@ extension String._Content._Inline : Sequence {
       count = count &- 1
       return r
     }
+    public // @testable
     var underestimatedCount: Int { return Int(extendingOrTruncating: count) }
   }
   
-  func makeIterator() -> Iterator {
+  public func makeIterator() -> Iterator {
     return Iterator(bits: _bits, count: UInt8(extendingOrTruncating: count))
   }
 }
 
 extension String._Content._Inline : RandomAccessCollection, MutableCollection {
-  typealias Index = Int
-  var startIndex: Index { return 0 }
-  var endIndex: Index { return count }
-  subscript(i: Index) -> CodeUnit {
+  public typealias Index = Int
+  public var startIndex: Index { return 0 }
+  public var endIndex: Index { return count }
+  public subscript(i: Index) -> CodeUnit {
     get {
       return CodeUnit(extendingOrTruncating: _bits &>> (i &* CodeUnit.bitWidth))
     }
     set {
       let shift = i &* CodeUnit.bitWidth
-      _bits = (_bits & ~(UInt128(~newValue) &<< shift))
-        | (UInt128(newValue) &<< shift)
+      _bits = (_bits & ~(_UInt128(~newValue) &<< shift))
+        | (_UInt128(newValue) &<< shift)
     }
   }
-  func index(after i: Index) -> Index {
+  public func index(after i: Index) -> Index {
     return i &+ 1
   }
-  func index(before i: Index) -> Index {
+  public func index(before i: Index) -> Index {
     return i &- 1
   }
-  func index(_ i: Index, offsetBy n: Int) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     return i &+ n
   }
-  func distance(from i: Index, to j: Index) -> Int {
+  public func distance(from i: Index, to j: Index) -> Int {
     return j &- i
   }
 }
 
 extension String._Content._Inline : CustomDebugStringConvertible {
-  var debugDescription: String {
+  public var debugDescription: String {
     return String(describing: Array(self))
   }
 }
@@ -297,18 +315,18 @@ extension String._Content._Inline {
 
 extension String._Content._Inline where CodeUnit == UInt8 {
   internal var isASCII : Bool {
-    return _bits & (0x80_8080__8080_8080___8080_8080__8080_8080 as UInt128) == 0
+    return _bits & (0x80_8080__8080_8080___8080_8080__8080_8080 as _UInt128) == 0
   }
 }
 
 extension String._Content._Inline where CodeUnit == UInt16 {
   
   internal var isASCII : Bool {
-    return _bits & (0xFF80__FF80_FF80___FF80_FF80__FF80_FF80 as UInt128) == 0
+    return _bits & (0xFF80__FF80_FF80___FF80_FF80__FF80_FF80 as _UInt128) == 0
   }
   
   internal var isLatin1 : Bool {
-    return _bits & (0xFF00__FF00_FF00___FF00_FF00__FF00_FF00 as UInt128) == 0
+    return _bits & (0xFF00__FF00_FF00___FF00_FF00__FF00_FF00 as _UInt128) == 0
   }
 }
 
@@ -381,13 +399,11 @@ extension String._Content {
   }
 }
 
-extension String {
-  public enum _Testable {
-    public // @testable
-    struct UTF16View {
-      @_versioned // testable
-      var _content: String._Content
-    }
+extension String._Testable {
+  public // @testable
+  struct UTF16View {
+    @_versioned // testable
+    var _content: String._Content
   }
 }
 
@@ -414,15 +430,17 @@ struct _TruncExt<Input: BinaryInteger, Output: FixedWidthInteger>
 
 extension String._Testable.UTF16View : Sequence {
   public struct Iterator : IteratorProtocol {
-    internal enum _Buffer {
+    public // @testable
+    enum _Buffer {
     case deep8(UnsafePointer<UInt8>, UnsafePointer<UInt8>)
     case deep16(UnsafePointer<UInt16>, UnsafePointer<UInt16>)
     case inline8(String._Content._Inline<UInt8>.Iterator)
     case inline16(String._Content._Inline<UInt16>.Iterator)
     case nsString(Int)
     }
-    
-    internal var _buffer: _Buffer
+
+    public // @testable
+    var _buffer: _Buffer
     internal let _owner: AnyObject?
 
     init(_ content: String._Content) {
@@ -504,7 +522,7 @@ extension String._Testable.UTF16View : Sequence {
       }
     }
     
-    // @inline(__always) - testable
+    @inline(__always)
     public mutating func next() -> UInt16? {
       switch _buffer {
       case .inline8(var x):
@@ -528,6 +546,7 @@ extension String._Testable.UTF16View : Sequence {
       }
     }
 
+    public // @testable
     mutating func _nextSlow(currentPosition i: Int) -> UInt16? {
       let s = unsafeBitCast(_owner, to: _NSStringCore.self)
       if i == s.length() { return nil }

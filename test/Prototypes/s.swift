@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift -O
 
 import Swift
 
@@ -35,12 +35,6 @@ func timer(_ _caller : String = #function, _ body: ()->()) {
   let spaces = String(repeating: " ", count: 60 - prefix.utf16.count)
   print(prefix, spaces, "±\(Int((sum / Double(reps) - tmin) / 2))")
 }
-
-
-//===--- Testing stuff that I couldn't easily pull out of the library -----===//
-// To be factored later, after all the public // @testable and @_versioned
-// annotations necessary have been added.
-
 
 public // @testable
 func test_newStringCore(
