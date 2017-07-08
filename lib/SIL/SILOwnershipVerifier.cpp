@@ -862,6 +862,10 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
     Base = MergedValue.getValue();
   }
 
+  if (auto *E = getType().getEnumOrBoundGenericEnum()) {
+    return visitNonTrivialEnum(E, Base);
+  }
+
   return {compatibleWithOwnership(Base), true};
 }
 

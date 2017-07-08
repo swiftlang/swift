@@ -351,6 +351,12 @@ bb0(%0 : @trivial $@thick SuperKlass.Type):
   return %9999 : $()
 }
 
+sil @trivial_enum_return_value : $@convention(thin) () -> @owned Optional<Builtin.NativeObject> {
+bb0:
+  %0 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  return %0 : $Optional<Builtin.NativeObject>
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////
