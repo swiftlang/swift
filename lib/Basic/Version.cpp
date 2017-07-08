@@ -43,9 +43,7 @@
   SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR)
 #endif
 
-#include "LLVMRevision.inc"
-#include "ClangRevision.inc"
-#include "SwiftRevision.inc"
+#include "Revision.inc"
 
 namespace swift {
 namespace version {

@@ -30,39 +30,33 @@ macro(find_first_existing_vc_file out_var path)
     )
 endmacro()
 
+set(revision_inc "${CMAKE_CURRENT_BINARY_DIR}/Revision.inc")
 set(get_svn_script "${LLVM_MAIN_SRC_DIR}/cmake/modules/GetSVN.cmake")
 
-function(generate_revision_inc revision_inc_var name dir)
-  find_first_existing_vc_file(dep_file "${dir}")
-  # Create custom target to generate the VC revision include.
-  set(revision_inc "${CMAKE_CURRENT_BINARY_DIR}/${name}Revision.inc")
-  string(TOUPPER ${name} upper_name)
-  if(DEFINED dep_file)
-    add_custom_command(OUTPUT "${revision_inc}"
-      DEPENDS "${dep_file}" "${get_svn_script}"
-      COMMAND
-      ${CMAKE_COMMAND} "-DFIRST_SOURCE_DIR=${dir}"
-                       "-DFIRST_NAME=${upper_name}"
-                       "-DHEADER_FILE=${revision_inc}"
-                       -P "${get_svn_script}")
-  else()
-    # Generate an empty Revision.inc file if we are not using git or SVN.
-    file(WRITE "${revision_inc}" "")
-  endif()
+find_first_existing_vc_file(llvm_dep_file "${LLVM_MAIN_SRC_DIR}")
+find_first_existing_vc_file(clang_dep_file "${CLANG_MAIN_SRC_DIR}")
+find_first_existing_vc_file(swift_dep_file "${SWIFT_SOURCE_DIR}")
 
-  # Mark the generated header as being generated.
-  set_source_files_properties("${revision_inc}"
-    PROPERTIES GENERATED TRUE
-               HEADER_FILE_ONLY TRUE)
-  set(${revision_inc_var} ${revision_inc} PARENT_SCOPE)
-endfunction()
+if(DEFINED llvm_dep_file OR DEFINED clang_dep_file OR DEFINED swift_dep_file)
+  add_custom_command(OUTPUT "${revision_inc}"
+    DEPENDS
+      "${llvm_dep_file}" "${clang_dep_file}" "${swift_dep_file}"
+      "${get_svn_script}"
+    COMMAND
+    ${CMAKE_COMMAND}
+      "-DSOURCE_DIRS=${LLVM_MAIN_SRC_DIR}\;${CLANG_MAIN_SRC_DIR}\;${SWIFT_SOURCE_DIR}"
+      "-DNAMES=LLVM\;CLANG\;SWIFT"
+      "-DHEADER_FILE=${revision_inc}"
+      -P "${get_svn_script}")
+else()
+  # Generate an empty Revision.inc file if we are not using git or SVN.
+  file(WRITE "${revision_inc}" "")
+endif()
 
-generate_revision_inc(llvm_revision_inc LLVM "${LLVM_MAIN_SRC_DIR}")
-generate_revision_inc(clang_revision_inc Clang "${CLANG_MAIN_SRC_DIR}")
-generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
-
-set(version_inc_files
-  ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
+# Mark the generated header as being generated.
+set_source_files_properties("${revision_inc}"
+  PROPERTIES GENERATED TRUE
+             HEADER_FILE_ONLY TRUE)
 
 add_swift_library(swiftBasic STATIC
   Cache.cpp
@@ -90,7 +84,7 @@ add_swift_library(swiftBasic STATIC
   Unicode.cpp
   UUID.cpp
   Version.cpp
-  ${version_inc_files}
+  ${revision_inc}
 
   # Platform-specific TaskQueue implementations
   Unix/TaskQueue.inc
