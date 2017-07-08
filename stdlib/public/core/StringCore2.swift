@@ -381,10 +381,18 @@ extension String._Content {
   }
 }
 
-extension String._Content {
-  struct UTF16View {
-    var _content: String._Content
+extension String {
+  public enum _Testable {
+    public // @testable
+    struct UTF16View {
+      @_versioned // testable
+      var _content: String._Content
+    }
   }
+}
+
+extension String._Content {
+  typealias UTF16View = String._Testable.UTF16View
   
   var _nsString : _NSStringCore {
     switch self {
@@ -404,8 +412,8 @@ struct _TruncExt<Input: BinaryInteger, Output: FixedWidthInteger>
   }
 }
 
-extension String._Content.UTF16View : Sequence {
-  struct Iterator : IteratorProtocol {
+extension String._Testable.UTF16View : Sequence {
+  public struct Iterator : IteratorProtocol {
     internal enum _Buffer {
     case deep8(UnsafePointer<UInt8>, UnsafePointer<UInt8>)
     case deep16(UnsafePointer<UInt16>, UnsafePointer<UInt16>)
@@ -496,8 +504,8 @@ extension String._Content.UTF16View : Sequence {
       }
     }
     
-    @inline(__always)
-    mutating func next() -> UInt16? {
+    // @inline(__always) - testable
+    public mutating func next() -> UInt16? {
       switch _buffer {
       case .inline8(var x):
         guard let r = x.next() else { return nil }
@@ -529,12 +537,12 @@ extension String._Content.UTF16View : Sequence {
     }
   }
   
-  func makeIterator() -> Iterator {
+  public func makeIterator() -> Iterator {
     return Iterator(_content)
   }
 
-  @inline(__always)
-  func _copyContents(
+  // @inline(__always) - testable
+  public func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     var n = 0
@@ -593,6 +601,7 @@ extension String._Content.UTF16View : Sequence {
 }
 
 extension String._Content.UTF16View : BidirectionalCollection {
+  public // @testable
   init<C : Collection>(
     _ c: C, maxElement: UInt16? = nil, minCapacity: Int = 0
   )
@@ -676,10 +685,10 @@ extension String._Content.UTF16View : BidirectionalCollection {
     }
   }
   
-  var startIndex: Int { return 0 }
-  var endIndex: Int { return count }
-  var count: Int {
-    @inline(__always)
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return count }
+  public var count: Int {
+    // @inline(__always) - testable
     get {
       switch self._content {
       case .inline8(let x): return x.count
@@ -693,8 +702,8 @@ extension String._Content.UTF16View : BidirectionalCollection {
     }
   }
   
-  subscript(i: Int) -> UInt16 {
-    @inline(__always)
+  public subscript(i: Int) -> UInt16 {
+    // @inline(__always) - testable
     get {
       switch self._content {
       case .inline8(var x): return UInt16(x[i])
@@ -709,11 +718,11 @@ extension String._Content.UTF16View : BidirectionalCollection {
     }
   }
 
-  func index(after i: Int) -> Int { return i + 1 }
-  func index(before i: Int) -> Int { return i - 1 }
+  public func index(after i: Int) -> Int { return i + 1 }
+  public func index(before i: Int) -> Int { return i - 1 }
 }
 
-extension String._Content.UTF16View : RangeReplaceableCollection {
+extension String._Testable.UTF16View : RangeReplaceableCollection {
   public var capacity: Int {
     get {
       switch self._content {
@@ -799,13 +808,13 @@ extension String._Content.UTF16View : RangeReplaceableCollection {
       String._UTF16Storage.copying(self, minCapacity: minCapacity))
   }
   
-  mutating func reserveCapacity(_ minCapacity: Int) {
+  public mutating func reserveCapacity(_ minCapacity: Int) {
     if capacity < minCapacity || _dynamicStorageIsMutable == false {
       _allocateCapacity(minCapacity, forcingUTF16: false)
     }
   }
   
-  mutating func append<S: Sequence>(contentsOf s: S)
+  public mutating func append<S: Sequence>(contentsOf s: S)
   where S.Element == Element {
     let knownMutable = _reserveCapacity(forAppending: s)
     
@@ -858,7 +867,7 @@ extension String._Content.UTF16View : RangeReplaceableCollection {
     while let u = source.next() { append(u) }
   }
 
-  mutating func append(_ u: UInt16) {
+  public mutating func append(_ u: UInt16) {
     let knownUnique = _reserveCapacity(forAppending: CollectionOfOne(u))
     
     defer { _fixLifetime(self) }
@@ -891,7 +900,7 @@ extension String._Content.UTF16View : RangeReplaceableCollection {
     }
   }
 
-  mutating func replaceSubrange<C : Collection>(
+  public mutating func replaceSubrange<C : Collection>(
     _ target: Range<Index>,
     with newElements_: C
   ) where C.Element == Element {
@@ -963,7 +972,8 @@ extension String._Content.UTF16View : RangeReplaceableCollection {
   }
 }
 
-extension String._Content.UTF16View {
+extension String._Testable.UTF16View {
+  public // @testable
   init(legacy source: _StringCore) {
     var isASCII: Bool? = nil
     
@@ -1004,318 +1014,13 @@ extension String._Content.UTF16View {
     }
     
     if isASCII == true || !source.contains { $0 > 0xff } {
-      self = String._Content.UTF16View(
+      self = String._Testable.UTF16View(
         _MapCollection(source, through: _TruncExt()),
         isASCII: isASCII ?? false
       )
     }
     else {
-      self = String._Content.UTF16View(source)
+      self = String._Testable.UTF16View(source)
     }
   }
-}
-
-//===--- Testing stuff that I couldn't easily pull out of the library -----===//
-// To be factored later, after all the public // @testable and @_versioned
-// annotations necessary have been added.
-
-
-public // @testable
-func test_newStringCore(
-  instrumentedWith time_: @escaping (String, ()->Void)->Void
-) {
-  let cat = _Concat3(5..<10, 15...20, (25...30).dropFirst())
-  assert(cat.elementsEqual(cat.indices.map { cat[$0] }), "cat failure")
-
-  assert(MemoryLayout<String._Content>.size <= 16)
-  
-  func time(_ _caller : String = #function, body: ()->()) {
-    time_(_caller, body)
-  }
-  
-  let testers: [String] = [
-    "foo", "foobar", "foobarbaz", "foobarbazniz", "foobarbaznizman", "the quick brown fox",
-    "f\u{f6}o", "f\u{f6}obar", "f\u{f6}obarbaz", "f\u{f6}obarbazniz", "f\u{f6}obarbaznizman", "the quick br\u{f6}wn fox",
-    "ƒoo", "ƒoobar", "ƒoobarba", "ƒoobarbazniz", "ƒoobarbaznizman", "the quick brown ƒox"
-  ]
-
-  let cores
-  = testers.map { $0._core } + testers.map { ($0 + "X")._core }
-
-  let arrays = cores.map(Array.init)
-  
-  let contents = cores.map {
-    String._Content.UTF16View(legacy: $0)
-  }
-
-  var N = 20000
-  _sanityCheck({ N = 1; return true }()) // Reset N for debug builds
-  
-  for (x, y) in zip(cores, contents) {
-    if !x.elementsEqual(y) {
-      debugPrint(String(x))
-      dump(y)
-      debugPrint(y)
-      print(Array(x))
-      print(Array(y))
-      fatalError("unequal")
-    }
-    _sanityCheck(
-      {
-        debugPrint(String(x))
-        dump(y)
-        print()
-        return true
-      }())
-  }
-
-  var total = 0
-  @inline(never)
-  func lexicographicalComparison_new() {
-    time {
-      for _ in 0...N {
-        for a in contents {
-          for b in contents {
-            if a.lexicographicallyPrecedes(b) { total = total &+ 1 }
-          }
-        }
-      }
-    }
-  }
-
-  @inline(never)
-  func lexicographicalComparison_old() {
-    time {
-      for _ in 0...N {
-        for a in cores {
-          for b in cores {
-            if a.lexicographicallyPrecedes(b) { total = total &+ 1 }
-          }
-        }
-      }
-    }
-  }
-  lexicographicalComparison_old()
-  lexicographicalComparison_new()
-  print()
-  
-  @inline(never)
-  func initFromArray_new() {
-    time {
-      for _ in 0...10*N {
-        for a in arrays {
-          total = total &+ String._Content.UTF16View(a).count
-        }
-      }
-    }
-  }
-  
-  @inline(never)
-  func initFromArray_old() {
-    time {
-      for _ in 0...10*N {
-        for a in arrays {
-          total = total &+ _StringCore(a).count
-        }
-      }
-    }
-  }
-  initFromArray_old()
-  initFromArray_new()
-  print()
-  
-  @inline(never)
-  func concat3Iteration() {
-    time {
-      for _ in 0...100*N {
-        for x in _Concat3(5..<90, 6...70, (4...30).dropFirst()) {
-          total = total &+ x
-        }
-      }
-    }
-  }
-  concat3Iteration()
-  print()
-  
-  let a_old = "a"._core
-  let a_new = String._Content.UTF16View(a_old)
-  
-  let short8_old = ["b","c","d","pizza"].map { $0._core }
-  let short8_new = short8_old.map { String._Content.UTF16View($0) }
-  
-  @inline(never)
-  func  appendManyTinyASCIIFragments_ToASCII_old() {
-    time {
-      var sb = a_old
-      for _ in 0...N*200 {
-        for x in short8_old {
-          sb.append(contentsOf: x)
-        }
-      }
-      total = total &+ sb.count
-    }
-  }
-  appendManyTinyASCIIFragments_ToASCII_old()
-  
-  @inline(never)
-  func  appendManyTinyASCIIFragments_ToASCII_new() {
-    time {
-      var sb = a_new
-      for _ in 0...N*200 {
-        for x in short8_new {
-          sb.append(contentsOf: x)
-        }
-      }
-      total = total &+ sb.count
-    }
-  }
-  appendManyTinyASCIIFragments_ToASCII_new()
-  print()
-  
-  let short16_old = ["🎉","c","d","pizza"].map { $0._core }
-  let short16_new = short16_old.map { String._Content.UTF16View($0) }
-
-  @inline(never)
-  func  appendManyTinyFragmentsOfBothWidths_old() {
-    time {
-      var sb = a_old
-      for _ in 0...N*300 {
-        for x in short16_old {
-          sb.append(contentsOf: x)
-        }
-      }
-      total = total &+ sb.count
-    }
-  }
-  appendManyTinyFragmentsOfBothWidths_old()
-  
-  @inline(never)
-  func  appendManyTinyFragmentsOfBothWidths_new() {
-    time {
-      var sb = a_new
-      for _ in 0...N*300 {
-        for x in short16_new {
-          sb.append(contentsOf: x)
-        }
-      }
-      total = total &+ sb.count
-    }
-  }
-  appendManyTinyFragmentsOfBothWidths_new()
-  print()
-  
-  let ghost_old = "👻"._core
-  let ghost_new = String._Content.UTF16View(ghost_old)
-  
-  let long_old = "Swift is a multi-paradigm, compiled programming language created for iOS, OS X, watchOS, tvOS and Linux development by Apple Inc. Swift is designed to work with Apple's Cocoa and Cocoa Touch frameworks and the large body of existing Objective-C code written for Apple products. Swift is intended to be more resilient to erroneous code (\"safer\") than Objective-C and also more concise. It is built with the LLVM compiler framework included in Xcode 6 and later and uses the Objective-C runtime, which allows C, Objective-C, C++ and Swift code to run within a single program."._core
-  let long_new = String._Content.UTF16View(long_old)
-  
-  @inline(never)
-  func appendManyLongASCII_ToUTF16_old() {
-    time {
-      var sb = ghost_old
-      for _ in 0...N*20 {
-        sb.append(contentsOf: long_old)
-      }
-      total = total &+ sb.count
-    }
-  }
-  appendManyLongASCII_ToUTF16_old()
-  
-  @inline(never)
-  func appendManyLongASCII_ToUTF16_new() {
-    time {
-      var sb = ghost_new
-      for _ in 0...N*20 {
-        sb.append(contentsOf: long_new)
-      }
-      total = total &+ sb.count
-    }
-  }
-  appendManyLongASCII_ToUTF16_new()
-  print()
-  
-  @inline(never)
-  func  appendFewTinyASCIIFragments_ToASCII_old() {
-    time {
-      for _ in 0...N*200 {
-        var sb = a_old
-        for x in short8_old {
-          sb.append(contentsOf: x)
-        }
-        total = total &+ sb.count
-      }
-    }
-  }
-  appendFewTinyASCIIFragments_ToASCII_old()
-  
-  @inline(never)
-  func  appendFewTinyASCIIFragments_ToASCII_new() {
-    time {
-      for _ in 0...N*200 {
-        var sb = a_new
-        for x in short8_new {
-          sb.append(contentsOf: x)
-        }
-        total = total &+ sb.count
-      }
-    }
-  }
-  appendFewTinyASCIIFragments_ToASCII_new()
-  print()
-  
-  @inline(never)
-  func  appendFewTinyFragmentsOfBothWidths_old() {
-    time {
-      for _ in 0...N*300 {
-        var sb = a_old
-        for x in short16_old {
-          sb.append(contentsOf: x)
-        }
-        total = total &+ sb.count
-      }
-    }
-  }
-  appendFewTinyFragmentsOfBothWidths_old()
-  
-  @inline(never)
-  func  appendFewTinyFragmentsOfBothWidths_new() {
-    time {
-      for _ in 0...N*300 {
-        var sb = a_new
-        for x in short16_new {
-          sb.append(contentsOf: x)
-        }
-        total = total &+ sb.count
-      }
-    }
-  }
-  appendFewTinyFragmentsOfBothWidths_new()
-  print()
-  
-  @inline(never)
-  func  appendOneLongASCII_ToUTF16_old() {
-    time {
-      for _ in 0...N*20 {
-        var sb = ghost_old
-        sb.append(contentsOf: long_old)
-        total = total &+ sb.count
-      }
-    }
-  }
-  appendOneLongASCII_ToUTF16_old()
-  
-  @inline(never)
-  func  appendOneLongASCII_ToUTF16_new() {
-    time {
-      for _ in 0...N*20 {
-        var sb = ghost_new
-        sb.append(contentsOf: long_new)
-      }
-    }
-  }
-  appendOneLongASCII_ToUTF16_new()
-  print()
-  
-  if total == 0 { print() }
 }
