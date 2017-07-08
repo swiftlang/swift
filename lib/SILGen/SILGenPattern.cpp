@@ -1568,9 +1568,12 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
     if (!hasAbstraction) {
-      SGF.B.emitStoreValueOperation(
-          loc, src.getFinalManagedValue().forward(SGF), init->getAddress(),
-          StoreOwnershipQualifier::Init);
+      ManagedValue finalValue = src.getFinalManagedValue();
+      if (finalValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+        finalValue = finalValue.copy(SGF, loc);
+      SGF.B.emitStoreValueOperation(loc, finalValue.forward(SGF),
+                                    init->getAddress(),
+                                    StoreOwnershipQualifier::Init);
       init->finishInitialization(SGF);
       ConsumableManagedValue result =
         { init->getManagedAddress(), src.getFinalConsumption() };
