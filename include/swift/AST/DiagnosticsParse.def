@@ -149,9 +149,13 @@ ERROR(lex_invalid_identifier_start_character,none,
        "an identifier cannot begin with this character", ())
 ERROR(lex_expected_digit_in_fp_exponent,none,
        "expected a digit in floating point exponent", ())
-ERROR(lex_expected_digit_in_int_literal,none,
-      "expected %select{a binary digit (0-1)|an octal digit (0-7)|a digit|a hex"
-      " digit (0-9,A-F)}0 in integer literal", (unsigned))
+ERROR(lex_invalid_digit_in_fp_exponent,none,
+      "'%0' is not a valid %select{digit|first character}1 in floating point exponent",
+      (StringRef, bool))
+ERROR(lex_invalid_digit_in_int_literal,none,
+      "'%0' is not a valid %select{binary digit (0 or 1)|octal digit (0-7)|"
+      "digit|hexadecimal digit (0-9, A-F)}1 in integer literal",
+      (StringRef, unsigned))
 ERROR(lex_expected_binary_exponent_in_hex_float_literal,none,
       "hexadecimal floating point literal must end with an exponent", ())
 ERROR(lex_unexpected_block_comment_end,none,
