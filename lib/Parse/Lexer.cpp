@@ -939,23 +939,24 @@ void Lexer::lexHexNumber() {
     return formToken(tok::unknown, TokStart);
   };
 
-  auto expected_hex_digit = [&]() {
-    diagnose(CurPtr, diag::lex_invalid_digit_in_int_literal,
-             StringRef(CurPtr, 1), (unsigned)ExpectedDigitKind::Hex);
+  auto expected_hex_digit = [&](const char *loc) {
+    diagnose(loc, diag::lex_invalid_digit_in_int_literal, StringRef(loc, 1),
+             (unsigned)ExpectedDigitKind::Hex);
     return expected_digit();
   };
 
   // 0x[0-9a-fA-F][0-9a-fA-F_]*
   ++CurPtr;
   if (!isHexDigit(*CurPtr))
-    return expected_hex_digit();
+    return expected_hex_digit(CurPtr);
 
   while (isHexDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
 
   if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P') {
-    if (isValidIdentifierContinuationCodePoint(*CurPtr))
-      return expected_hex_digit();
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+      return expected_hex_digit(tmp);
     else
       return formToken(tok::integer_literal, TokStart);
   }
@@ -1009,9 +1010,10 @@ void Lexer::lexHexNumber() {
     // There are 3 cases to diagnose if the exponent starts with a non-digit:
     // identifier (invalid character), underscore (invalid first character),
     // non-identifier (empty exponent)
-    if (isValidIdentifierContinuationCodePoint(*CurPtr))
-      diagnose(CurPtr, diag::lex_invalid_digit_in_fp_exponent,
-               StringRef(CurPtr, 1), *CurPtr == '_');
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+      diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+               *tmp == '_');
     else
       diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
 
@@ -1021,9 +1023,10 @@ void Lexer::lexHexNumber() {
   while (isDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
 
-  if (isValidIdentifierContinuationCodePoint(*CurPtr)) {
-    diagnose(CurPtr, diag::lex_invalid_digit_in_fp_exponent,
-             StringRef(CurPtr, 1), false);
+  auto tmp = CurPtr;
+  if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
+    diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+             false);
     return expected_digit();
   }
 
@@ -1049,9 +1052,9 @@ void Lexer::lexNumber() {
     return formToken(tok::unknown, TokStart);
   };
 
-  auto expected_int_digit = [&](ExpectedDigitKind kind) {
-    diagnose(CurPtr, diag::lex_invalid_digit_in_int_literal,
-             StringRef(CurPtr, 1), (unsigned)kind);
+  auto expected_int_digit = [&](const char *loc, ExpectedDigitKind kind) {
+    diagnose(loc, diag::lex_invalid_digit_in_int_literal, StringRef(loc, 1),
+             (unsigned)kind);
     return expected_digit();
   };
 
@@ -1062,13 +1065,14 @@ void Lexer::lexNumber() {
     // 0o[0-7][0-7_]*
     ++CurPtr;
     if (*CurPtr < '0' || *CurPtr > '7')
-      return expected_int_digit(ExpectedDigitKind::Octal);
+      return expected_int_digit(CurPtr, ExpectedDigitKind::Octal);
 
     while ((*CurPtr >= '0' && *CurPtr <= '7') || *CurPtr == '_')
       ++CurPtr;
 
-    if (isValidIdentifierContinuationCodePoint(*CurPtr))
-      return expected_int_digit(ExpectedDigitKind::Octal);
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+      return expected_int_digit(tmp, ExpectedDigitKind::Octal);
 
     return formToken(tok::integer_literal, TokStart);
   }
@@ -1077,13 +1081,14 @@ void Lexer::lexNumber() {
     // 0b[01][01_]*
     ++CurPtr;
     if (*CurPtr != '0' && *CurPtr != '1')
-      return expected_int_digit(ExpectedDigitKind::Binary);
+      return expected_int_digit(CurPtr, ExpectedDigitKind::Binary);
 
     while (*CurPtr == '0' || *CurPtr == '1' || *CurPtr == '_')
       ++CurPtr;
 
-    if (isValidIdentifierContinuationCodePoint(*CurPtr))
-      return expected_int_digit(ExpectedDigitKind::Binary);
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+      return expected_int_digit(tmp, ExpectedDigitKind::Binary);
 
     return formToken(tok::integer_literal, TokStart);
   }
@@ -1103,8 +1108,9 @@ void Lexer::lexNumber() {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is
     // something else, then this is the end of the token.
     if (*CurPtr != 'e' && *CurPtr != 'E') {
-      if (isValidIdentifierContinuationCodePoint(*CurPtr))
-        return expected_int_digit(ExpectedDigitKind::Decimal);
+      auto tmp = CurPtr;
+      if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+        return expected_int_digit(tmp, ExpectedDigitKind::Decimal);
 
       return formToken(tok::integer_literal, TokStart);
     }
@@ -1129,9 +1135,10 @@ void Lexer::lexNumber() {
       // There are 3 cases to diagnose if the exponent starts with a non-digit:
       // identifier (invalid character), underscore (invalid first character),
       // non-identifier (empty exponent)
-      if (isValidIdentifierContinuationCodePoint(*CurPtr))
-        diagnose(CurPtr, diag::lex_invalid_digit_in_fp_exponent,
-                 StringRef(CurPtr, 1), *CurPtr == '_');
+      auto tmp = CurPtr;
+      if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+        diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+                 *tmp == '_');
       else
         diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
 
@@ -1141,9 +1148,10 @@ void Lexer::lexNumber() {
     while (isDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
 
-    if (isValidIdentifierContinuationCodePoint(*CurPtr)) {
-      diagnose(CurPtr, diag::lex_invalid_digit_in_fp_exponent,
-               StringRef(CurPtr, 1), false);
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
+      diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+               false);
       return expected_digit();
     }
   }
