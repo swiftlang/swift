@@ -77,6 +77,11 @@ class BasicExternalUnion {
   char Storage[static_max<sizeof(Members)...>::value];
 
 public:
+  enum : bool {
+    union_is_trivially_copyable =
+      SpecialMembers<Members...>::is_trivially_copyable
+  };
+
   /// Construct a union member in-place.
   template <class T, class... Args>
   T &emplaceWithoutIndex(Args &&... args) {
@@ -94,6 +99,25 @@ public:
     assert(index == typeIndex && "current kind is wrong for value");
 
     return *(::new ((void*) &Storage) T(std::forward<Args>(args)...));
+  }
+
+  /// Construct a union member in-place using list-initialization ({}).
+  template <class T, class... Args>
+  T &emplaceAggregateWithoutIndex(Args &&... args) {
+    constexpr int typeIndex = indexOf<T, Members...>::value;
+    static_assert(typeIndex != -1, "type not in union");
+
+    return *(::new ((void*) &Storage) T{std::forward<Args>(args)...});
+  }
+
+  /// Construct a union member in-place using list-initialization ({}).
+  template <class T, class... Args>
+  T &emplaceAggregate(int index, Args &&... args) {
+    constexpr int typeIndex = indexOf<T, Members...>::value;
+    static_assert(typeIndex != -1, "type not in union");
+    assert(index == typeIndex && "current kind is wrong for value");
+
+    return *(::new ((void*) &Storage) T{std::forward<Args>(args)...});
   }
 
   /// Return a reference to a union member.
@@ -201,6 +225,10 @@ class ExternalUnion {
   BasicExternalUnion<Members...> Union;
 
 public:
+  enum : bool {
+    union_is_trivially_copyable = decltype(Union)::union_is_trivially_copyable
+  };
+
   /// Construct a union member in-place.
   template <class T, class... Args>
   T &emplace(Kind kind, Args &&... args) {
@@ -209,6 +237,18 @@ public:
                                      std::forward<Args>(args)...);
 #else
     return Union.template emplaceWithoutIndex<T>(std::forward<Args>(args)...);
+#endif
+  }
+
+  /// Construct a union member in-place using list-initialization ({}).
+  template <class T, class... Args>
+  T &emplaceAggregate(Kind kind, Args &&... args) {
+#ifndef NDEBUG
+    return Union.template emplaceAggregate<T>(GetIndexForKind(kind),
+                                     std::forward<Args>(args)...);
+#else
+    return Union.template emplaceAggregateWithoutIndex<T>(
+                                     std::forward<Args>(args)...);
 #endif
   }
 
@@ -265,6 +305,10 @@ public:
 /// A helper class for defining special members.
 template <>
 struct SpecialMembers<> {
+  enum : bool {
+    is_trivially_copyable = true
+  };
+
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   static void copyConstruct(void *self, int index, const void *other) {
     llvm_unreachable("bad index");
@@ -293,6 +337,12 @@ struct SpecialMembers<> {
 
 template <class T, class... Others>
 struct SpecialMembers<T, Others...> {
+  enum : bool {
+    is_trivially_copyable =
+      std::is_trivially_copyable<T>::value &&
+      SpecialMembers<Others...>::is_trivially_copyable
+  };
+
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   static void copyConstruct(void *self, int index, const void *other) {
     if (index == 0) {
