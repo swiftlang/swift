@@ -247,11 +247,14 @@ ManagedValue SILGenBuilder::createCopyUnownedValue(SILLocation loc,
 ManagedValue
 SILGenBuilder::createUnsafeCopyUnownedValue(SILLocation loc,
                                             ManagedValue originalValue) {
+  // *NOTE* The reason why this is unsafe is that we are converting and
+  // unconditionally retaining, rather than before converting from
+  // unmanaged->ref checking that our value is not yet uninitialized.
   auto unmanagedType = originalValue.getType().getAs<UnmanagedStorageType>();
   SILValue result = SILBuilder::createUnmanagedToRef(
       loc, originalValue.getValue(),
       SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
-  SILBuilder::createUnmanagedRetainValue(loc, result, getDefaultAtomicity());
+  result = SILBuilder::createCopyValue(loc, result);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
