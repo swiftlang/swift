@@ -552,6 +552,24 @@ ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
+#define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(                          \
+    SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS, INST)                                \
+  OwnershipUseCheckerResult                                                    \
+      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+    assert(I->getNumOperands() && "Expected to have non-zero operands");       \
+    if (getType().is<AnyMetatypeType>()) {                                     \
+      return {true, false};                                                    \
+    }                                                                          \
+    assert(!isAddressOrTrivialType() &&                                        \
+           "Shouldn't have an address or a non trivial type");                 \
+    bool compatible = getOwnershipKind() == ValueOwnershipKind::Any ||         \
+                      !compatibleWithOwnership(ValueOwnershipKind::Trivial);   \
+    return {compatible, SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                 \
+  }
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(false, ClassMethod)
+#undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE
+
+// Trivial if trivial typed, otherwise must accept owned?
 #define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS, \
                                          INST)                                 \
   OwnershipUseCheckerResult                                                    \
@@ -565,7 +583,6 @@ ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
   }
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, SuperMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, BridgeObjectToWord)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
