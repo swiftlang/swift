@@ -23,7 +23,7 @@
 #define SWIFT_BASIC_EXTERNALUNION_H
 
 #include "llvm/Support/Compiler.h"
-#include <type_traits>
+#include "swift/Basic/type_traits.h"
 #include <utility>
 #include <assert.h>
 
@@ -339,7 +339,7 @@ template <class T, class... Others>
 struct SpecialMembers<T, Others...> {
   enum : bool {
     is_trivially_copyable =
-      std::is_trivially_copyable<T>::value &&
+      IsTriviallyCopyable<T>::value &&
       SpecialMembers<Others...>::is_trivially_copyable
   };
 
