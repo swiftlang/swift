@@ -43,8 +43,12 @@ func testObjCBoolFnToBlockTypedef(_: @escaping ObjCBoolFn) -> ObjCBoolBlock
 func testDarwinBooleanFnToBlockTypedef(_: @escaping DarwinBooleanFn) -> DarwinBooleanBlock
 
 typealias CBoolFnToBlockType = (CBoolFn) -> CBoolBlock
-typealias ObjCCBoolFnToBlockType = (ObjCBoolFn) -> (ObjCBool) -> ObjCBool
-typealias DarwinBooleanFnToBlockType = (DarwinBooleanFn) -> (DarwinBoolean) -> DarwinBoolean
+typealias ObjCBoolFnToBlockType = (ObjCBoolFn) -> ObjCBoolBlock
+typealias DarwinBooleanFnToBlockType = (DarwinBooleanFn) -> DarwinBooleanBlock
+
+var globalObjCBoolFnToBlockFP: @convention(c) (ObjCBoolFn) -> @convention(block) (ObjCBool) -> ObjCBool
+var globalObjCBoolFnToBlockFPP: UnsafeMutablePointer<@convention(c) (ObjCBoolFn) -> @convention(block) (ObjCBool) -> ObjCBool>?
+var globalObjCBoolFnToBlockBP: @convention(block) (ObjCBoolFn) -> @convention(block) (ObjCBool) -> ObjCBool
 
 var globalCBoolFn: CBoolFn
 var globalObjCBoolFn: ObjCBoolFn
