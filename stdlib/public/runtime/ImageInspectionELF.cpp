@@ -68,8 +68,14 @@ static SectionInfo getSectionInfo(const char *imageName,
   SectionInfo sectionInfo = { 0, nullptr };
   void *handle = dlopen(imageName, RTLD_LAZY | RTLD_NOLOAD);
   if (!handle) {
+    #ifdef __ANDROID__
+    // https://bugs.swift.org/browse/SR-5414
+    // The dlopen can fail once on Android so for now, return an empty struct.
+    return sectionInfo;
+    #else
     fatalError(/* flags = */ 0, "dlopen() failed on `%s': %s", imageName,
                dlerror());
+    #endif
   }
   void *symbol = dlsym(handle, sectionName);
   if (symbol) {
