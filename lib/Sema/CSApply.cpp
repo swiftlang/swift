@@ -5551,6 +5551,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
       cs.setType(singleExpr,
                  cs.getType(singleExpr)->getWithoutSpecifierType());
 
+    cs.setExprTypes(singleExpr);
     tc.checkIgnoredExpr(singleExpr);
 
     SmallVector<ASTNode, 2> elements;
@@ -5591,6 +5592,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
     auto singleExpr = returnStmt->getResult();
 
+    cs.setExprTypes(singleExpr);
     tc.checkIgnoredExpr(singleExpr);
 
     SmallVector<ASTNode, 1> elements;
