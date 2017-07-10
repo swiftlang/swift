@@ -234,6 +234,11 @@ enum class TypeMatchFlags {
   AllowTopLevelOptionalMismatch = 1 << 2,
   /// Allow any ABI-compatible types to be considered matching.
   AllowABICompatible = 1 << 3,
+  /// Allow escaping function parameters to override optional non-escaping ones.
+  ///
+  /// This is necessary because Objective-C allows optional function paramaters
+  /// to be non-escaping, but Swift currently does not.
+  IgnoreNonEscapingForOptionalFunctionParam = 1 << 4
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
