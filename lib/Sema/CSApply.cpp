@@ -4013,9 +4013,10 @@ namespace {
           auto ref = ConcreteDeclRef(cs.getASTContext(), subscript, subs);
           component = KeyPathExpr::Component
             ::forSubscriptWithPrebuiltIndexExpr(ref,
-                                                origComponent.getIndexExpr(),
-                                                resolvedTy,
-                                                origComponent.getLoc());
+                                            origComponent.getIndexExpr(),
+                                            origComponent.getSubscriptLabels(),
+                                            resolvedTy,
+                                            origComponent.getLoc());
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalChain: {

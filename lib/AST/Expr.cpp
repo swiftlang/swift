@@ -2132,7 +2132,9 @@ KeyPathExpr::Component::forSubscript(ASTContext &ctx,
                                    trailingClosure, /*implicit*/ false,
                                    indexArgLabelsScratch,
                                    indexArgLabelLocsScratch);
-  return forSubscriptWithPrebuiltIndexExpr(subscript, index, elementType,
+  return forSubscriptWithPrebuiltIndexExpr(subscript, index,
+                                           ctx.AllocateCopy(indexArgLabels),
+                                           elementType,
                                            lSquareLoc);
 }
 
@@ -2151,5 +2153,7 @@ KeyPathExpr::Component::forUnresolvedSubscript(ASTContext &ctx,
                                    trailingClosure, /*implicit*/ false,
                                    indexArgLabelsScratch,
                                    indexArgLabelLocsScratch);
-  return forUnresolvedSubscriptWithPrebuiltIndexExpr(index, lSquareLoc);
+  return forUnresolvedSubscriptWithPrebuiltIndexExpr(index,
+                                               ctx.AllocateCopy(indexArgLabels),
+                                               lSquareLoc);
 }
