@@ -235,7 +235,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       if Base.bitWidth < UInt.bitWidth {
         _precondition(i == Index(.low(_low.startIndex)), "Invalid index")
         _sanityCheck(2 * Base.bitWidth <= UInt.bitWidth)
-        return _low.first! | (_high.first! &<< Base.bitWidth._lowUWord) 
+        return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
       }
       switch i._value {
       case let .low(li): return _low[li]

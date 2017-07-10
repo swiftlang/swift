@@ -1441,7 +1441,7 @@ public protocol BinaryInteger :
   var words: Words { get }
 
   /// The least significant word in this value's binary representation.
-  var _lowUWord: UInt { get }
+  var _lowWord: UInt { get }
 
   /// The number of bits in the current binary representation of this value.
   ///
@@ -1539,7 +1539,7 @@ extension BinaryInteger {
   }
 
   @_transparent
-  public var _lowUWord: UInt {
+  public var _lowWord: UInt {
     var it = words.makeIterator()
     return it.next() ?? 0
   }
@@ -2295,13 +2295,13 @@ ${unsafeOperationComment(x.operator)}
   @_transparent
   public init<T : BinaryInteger>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} || source.bitWidth <= ${word_bits} {
-      self = Self.init(_truncatingBits: source._lowUWord)
+      self = Self.init(_truncatingBits: source._lowWord)
     }
     else {
       let neg = source < (0 as T)
       var result: Self = neg ? ~0 : 0
       var shift: Self = 0
-      let width = Self(_truncatingBits: Self.bitWidth._lowUWord)
+      let width = Self(_truncatingBits: Self.bitWidth._lowWord)
       for word in source.words {
         guard shift < width else { break }
         // masking shift is OK here because we have already ensured
@@ -2751,7 +2751,7 @@ ${assignmentOperatorComment(x.operator, True)}
     return Int(
       ${Self}(
         Builtin.int_ctlz_Int${bits}(self._value, false._value)
-      )._lowUWord._value)
+      )._lowWord._value)
   }
 
   @_transparent
@@ -2759,7 +2759,7 @@ ${assignmentOperatorComment(x.operator, True)}
     return Int(
       ${Self}(
         Builtin.int_cttz_Int${bits}(self._value, false._value)
-      )._lowUWord._value)
+      )._lowWord._value)
   }
 
   @_transparent
@@ -2767,7 +2767,7 @@ ${assignmentOperatorComment(x.operator, True)}
     return Int(
       ${Self}(
         Builtin.int_ctpop_Int${bits}(self._value)
-      )._lowUWord._value)
+      )._lowWord._value)
   }
 
 % if Self == 'UInt' or (bits > word_bits and not signed):
@@ -2810,7 +2810,7 @@ ${assignmentOperatorComment(x.operator, True)}
         _precondition(position < endIndex, "Word index out of range")
         let shift = UInt(position._value) &* ${word_bits}
         _sanityCheck(shift < UInt(_value.bitWidth._value))
-        return (_value &>> ${Self}(_truncatingBits: shift))._lowUWord
+        return (_value &>> ${Self}(_truncatingBits: shift))._lowWord
       }
     }
   }
@@ -2831,13 +2831,13 @@ ${assignmentOperatorComment(x.operator, True)}
 
   @_transparent
   public var words: Words {
-    return Words(self._lowUWord)
+    return Words(self._lowWord)
   }
 % end
 
   @_transparent
   public // transparent
-  var _lowUWord: UInt {
+  var _lowWord: UInt {
     % truncOrExt = z + 'ext' if bits <= word_bits else 'trunc'
     return UInt(
       Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_value)
