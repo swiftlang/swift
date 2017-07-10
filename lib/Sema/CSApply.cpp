@@ -3712,7 +3712,9 @@ namespace {
     }
 
     Expr *visitKeyPathApplicationExpr(KeyPathApplicationExpr *expr){
-      llvm_unreachable("Already type-checked");
+      // This should already be type-checked, but we may have had to re-
+      // check it for failure diagnosis.
+      return simplifyExprType(expr);
     }
     
     Expr *visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
