@@ -145,12 +145,14 @@ extension String._Testable {
   public // @testable
   struct _Inline<CodeUnit : FixedWidthInteger> {
     var _storage: _InlineStorage = (0,0,0,0)
+    public // @testable
     var _count: Builtin.Int4 = zero_Int4
   }
 
   public // @testable
   struct _Unowned<CodeUnit : FixedWidthInteger> {
     var _start: UnsafePointer<CodeUnit>
+    public // @testable
     var _count: UInt32
     var isASCII: Bool?
     var isNULTerminated: Bool
@@ -158,6 +160,7 @@ extension String._Testable {
 }    
 
 extension String {
+  @_versioned
   internal enum _Content {
     typealias _Inline<CodeUnit : FixedWidthInteger>
       = String._Testable._Inline<CodeUnit>
@@ -200,6 +203,7 @@ extension String._Content._Inline {
       / MemoryLayout<CodeUnit>.stride
   }
 
+  @_versioned
   internal var _bits : _UInt128 {
     get {
 #if _endian(little)
@@ -248,6 +252,11 @@ extension String._Content._Inline {
 extension String._Content._Inline : Sequence {
   public // @testable
   struct Iterator : IteratorProtocol, Sequence {
+    @_versioned
+    init(bits: _UInt128, count: UInt8) {
+      self.bits = bits
+      self.count = count
+    }
     @_versioned // @testable
     var bits: _UInt128
     public // @testable
@@ -357,7 +366,8 @@ extension String._Content {
   init() {
     self = .inline16(_Inline<UInt16>(EmptyCollection<UInt16>())!)
   }
-  
+
+  public // @testable
   var _existingLatin1 : UnsafeBufferPointer<UInt8>? {
     switch self {
     case .latin1(let x): return x.withUnsafeBufferPointer { $0 }
@@ -372,6 +382,7 @@ extension String._Content {
     }
   }
 
+  public // @testable
   var _existingUTF16 : UnsafeBufferPointer<UInt16>? {
     switch self {
     case .utf16(let x): return x.withUnsafeBufferPointer { $0 }
@@ -441,7 +452,8 @@ extension String._Testable.UTF16View : Sequence {
 
     public // @testable
     var _buffer: _Buffer
-    internal let _owner: AnyObject?
+    public // @testable
+    let _owner: AnyObject?
 
     init(_ content: String._Content) {
       switch content {
@@ -480,7 +492,8 @@ extension String._Testable.UTF16View : Sequence {
     }
 
     @inline(__always)
-    init(_ content: String._Content, offset: Int) {
+    @_versioned
+    internal init(_ content: String._Content, offset: Int) {
       switch content {
       case .inline8(let x):
         _owner = nil
@@ -560,7 +573,7 @@ extension String._Testable.UTF16View : Sequence {
     return Iterator(_content)
   }
 
-  // @inline(__always) - testable
+  @inline(__always)
   public func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
@@ -605,6 +618,7 @@ extension String._Testable.UTF16View : Sequence {
   }
 
   @inline(never)
+  public // @testable
   func _copyContentsSlow(
     initializing destination: UnsafeMutableBufferPointer<Element>
   ) -> Int {
@@ -707,7 +721,7 @@ extension String._Content.UTF16View : BidirectionalCollection {
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return count }
   public var count: Int {
-    // @inline(__always) - testable
+    @inline(__always)
     get {
       switch self._content {
       case .inline8(let x): return x.count
@@ -722,7 +736,7 @@ extension String._Content.UTF16View : BidirectionalCollection {
   }
   
   public subscript(i: Int) -> UInt16 {
-    // @inline(__always) - testable
+    @inline(__always)
     get {
       switch self._content {
       case .inline8(var x): return UInt16(x[i])

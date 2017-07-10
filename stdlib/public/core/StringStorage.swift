@@ -37,7 +37,8 @@ struct _SwiftLatin1StringHeader : _BoundedBufferHeader {
 
 /// Common base class of our string storage classes
 extension String {
-  internal class _StorageBase<
+  @_versioned
+  class _StorageBase<
     Header: _BoundedBufferHeader,
     Element: UnsignedInteger
   > :
@@ -85,7 +86,7 @@ extension String._StorageBase {
 //===--- UTF16 String Storage ---------------------------------------------===//
 extension String {
   @_versioned
-  internal final class _UTF16Storage
+  final class _UTF16Storage
     : String._StorageBase<_SwiftUTF16StringHeader, UTF16.CodeUnit>,
       _NSStringCore {
     // WORKAROUND: helping type inference along will be unnecessary someday
@@ -216,7 +217,7 @@ extension String._UTF16Storage /*: UnicodeStorage*/ {
 //===--- Latin-1 String Storage -------------------------------------------===//
 extension String {
   @_versioned
-  internal final class _Latin1Storage
+  final class _Latin1Storage
   : String._StorageBase<_SwiftLatin1StringHeader, UInt8>,
     _NSStringCore // Ensures that we implement essential NSString methods.  
   {
