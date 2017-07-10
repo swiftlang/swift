@@ -4588,7 +4588,7 @@ class SuperMethodInst
 
   SuperMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
                   SILDeclRef Member, SILType Ty, bool Volatile = false)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}      
 };
 
 /// WitnessMethodInst - Given a type, a protocol conformance,

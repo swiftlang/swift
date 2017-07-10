@@ -2424,7 +2424,7 @@ namespace {
                              CanSILFunctionType polyFn)
       : PolymorphicConvention(IGF.IGM, polyFn), IGF(IGF) {}
 
-    void emit(CanSILFunctionType substFnType, const SubstitutionMap &subs,
+    void emit(const SubstitutionMap &subs,
               WitnessMetadata *witnessMetadata, Explosion &out);
 
   private:
@@ -2457,16 +2457,13 @@ namespace {
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
                                      CanSILFunctionType origFnType,
-                                     CanSILFunctionType substFnType,
                                      const SubstitutionMap &subs,
                                      WitnessMetadata *witnessMetadata,
                                      Explosion &out) {
-  EmitPolymorphicArguments(IGF, origFnType).emit(substFnType, subs,
-                                                 witnessMetadata, out);
+  EmitPolymorphicArguments(IGF, origFnType).emit(subs, witnessMetadata, out);
 }
 
-void EmitPolymorphicArguments::emit(CanSILFunctionType substFnType,
-                                    const SubstitutionMap &subs,
+void EmitPolymorphicArguments::emit(const SubstitutionMap &subs,
                                     WitnessMetadata *witnessMetadata,
                                     Explosion &out) {
   // Add all the early sources.

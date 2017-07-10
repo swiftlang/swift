@@ -2,6 +2,7 @@ set(swift_stubs_sources
     Assert.cpp
     CommandLine.cpp
     GlobalObjects.cpp
+    KeyPaths.cpp
     LibcShims.cpp
     Stubs.cpp
     UnicodeExtendedGraphemeClusters.cpp.gyb)
