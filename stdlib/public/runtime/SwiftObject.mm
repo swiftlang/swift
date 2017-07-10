@@ -926,7 +926,7 @@ bool swift::swift_unknownUnownedIsEqual(UnownedReference *ref, void *value) {
   if (!ref->Value) {
     return value == nullptr;
   } else if (auto objcRef = dyn_cast<ObjCUnownedReference>(ref)) {
-    auto refValue = objc_loadWeakRetained(&objcRef->storage()->WeakRef);
+    id refValue = objc_loadWeakRetained(&objcRef->storage()->WeakRef);
     bool isEqual = (void*)refValue == value;
     // This ObjC case has no deliberate unowned check here,
     // unlike the Swift case.
