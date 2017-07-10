@@ -357,6 +357,19 @@ bb0:
   return %0 : $Optional<Builtin.NativeObject>
 }
 
+sil @c_function : $@convention(c) (@inout_aliasable @block_storage @callee_owned () -> ()) -> ()
+
+sil @test_block_storage : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @c_function : $@convention(c) (@inout_aliasable @block_storage @callee_owned () -> ()) -> ()
+  %1 = alloc_stack $@block_storage @callee_owned () -> ()
+  %2 = project_block_storage %1 : $*@block_storage @callee_owned () -> ()
+  %3 = init_block_storage_header %1 : $*@block_storage @callee_owned () -> (), invoke %0 : $@convention(c) (@inout_aliasable @block_storage @callee_owned () -> ()) -> (), type $@convention(block) () -> ()
+  dealloc_stack %1 : $*@block_storage @callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////
