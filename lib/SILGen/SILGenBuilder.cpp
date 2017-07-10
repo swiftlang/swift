@@ -646,6 +646,17 @@ ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
   return cloner.clone(openedExistential);
 }
 
+ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
+                                        SILValue address,
+                                        StoreOwnershipQualifier qualifier) {
+  SILModule &M = SGF.F.getModule();
+  CleanupCloner cloner(*this, value);
+  if (value.getType().isTrivial(M) || value.getOwnershipKind() == ValueOwnershipKind::Trivial)
+    qualifier = StoreOwnershipQualifier::Trivial;
+  SILBuilder::createStore(loc, value.forward(SGF), address, qualifier);
+  return cloner.clone(address);
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//

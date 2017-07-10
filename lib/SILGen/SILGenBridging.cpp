@@ -471,11 +471,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto storageAddrTy = SILType::getPrimitiveAddressType(storageTy);
   auto storage = emitTemporaryAllocation(loc, storageAddrTy);
   auto capture = B.createProjectBlockStorage(loc, storage);
-  // Store the function to the block without claiming it, so that it still
-  // gets cleaned up in scope. Copying the block will create an independent
-  // reference.
-  B.emitStoreValueOperation(loc, fn.getValue(), capture,
-                            StoreOwnershipQualifier::Init);
+  B.createStore(loc, fn, capture, StoreOwnershipQualifier::Init);
   auto invokeFn = B.createFunctionRef(loc, thunk);
   
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,

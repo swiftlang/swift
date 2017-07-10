@@ -590,8 +590,8 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:       [[THUNK_FN:%.*]] = function_ref @_T0ypIxi_yXlIyBy_TR
   // CHECK-NEXT:  [[BLOCK_HEADER:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] : $*@block_storage @callee_owned (@in Any) -> (), invoke [[THUNK_FN]]
   // CHECK-NEXT:  [[BLOCK:%.*]] = copy_block [[BLOCK_HEADER]]
+  // CHECK-NEXT:  destroy_addr [[BLOCK_STORAGE_ADDR]]
   // CHECK-NEXT:  dealloc_stack [[BLOCK_STORAGE]]
-  // CHECK-NEXT:  destroy_value [[RESULT]]
   // CHECK-NEXT:  return [[BLOCK]]
 
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypIxi_yXlIyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> (), AnyObject) -> ()
@@ -668,8 +668,8 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[THUNK_FN:%.*]] = function_ref @_T0ypIxr_yXlIyBa_TR
   // CHECK-NEXT:  [[BLOCK_HEADER:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] : $*@block_storage @callee_owned () -> @out Any, invoke [[THUNK_FN]]
   // CHECK-NEXT:  [[BLOCK:%.*]] = copy_block [[BLOCK_HEADER]]
+  // CHECK-NEXT:  destroy_addr [[BLOCK_STORAGE_ADDR]]
   // CHECK-NEXT:  dealloc_stack [[BLOCK_STORAGE]]
-  // CHECK-NEXT:  destroy_value [[FUNCTION]]
   // CHECK-NEXT:  return [[BLOCK]]
 
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypIxr_yXlIyBa_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned () -> @out Any) -> @autoreleased AnyObject

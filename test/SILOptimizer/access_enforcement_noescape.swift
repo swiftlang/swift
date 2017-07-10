@@ -555,8 +555,8 @@ func noEscapeBlock() {
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: apply %{{.*}}([[ARG]], [[WRITE]]) : $@convention(thin) (@owned @convention(block) () -> (), @inout Int) -> ()
 // CHECK: end_access [[WRITE]] : $*Int
+// CHECK: destroy_addr [[ADDR]] : $*@callee_owned () -> ()
 // CHECK: dealloc_stack [[STORAGE]] : $*@block_storage @callee_owned () -> ()
-// CHECK: strong_release [[PA]] : $@callee_owned () -> ()
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape13noEscapeBlockyyFyycfU_'
 
 // CHECK-LABEL: sil private @_T027access_enforcement_noescape13noEscapeBlockyyFyycfU_yycfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
