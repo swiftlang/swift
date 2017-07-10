@@ -299,7 +299,7 @@ extension Character {
     let nonZeroBitCount = type(of: bits).bitWidth - bits.leadingZeroBitCount
     return _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(
       _storage: bits,
-      _bitCount: 16 * Swift.max(1, (nonZeroBitCount + 15) / 16)
+      _bitCount: UInt8(16) * UInt8(Swift.max(1, (nonZeroBitCount + 15) / 16))
     )
   }
 
