@@ -182,7 +182,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///         return overflowed ? nil : result
   ///     }
   ///     print(nonOverflowingSquare)
-  ///     // Prints "Optional(1746)"
+  ///     // Prints "Optional(1764)"
   ///
   /// - Parameter transform: A closure that takes the unwrapped value
   ///   of the instance.  
@@ -190,7 +190,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///   returns `nil`.
   @_inlineable
   public func flatMap<U>(
-    _ transform: (Wrapped) throws -> U?
+    _ transform: (Unwrapped) throws -> U?
   ) rethrows -> U? {
     switch self {
     case .some(let y):
