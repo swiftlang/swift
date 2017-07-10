@@ -395,14 +395,15 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
 #ifndef NDEBUG
-  // There's no (currently) relevant information about members of a protocol
-  // at individual protocols, each conforming type has to handle them
-  // individually. Let's assert this fact:
+  // There's no (currently) relevant information about members of a protocol at
+  // individual protocols, each conforming type has to handle them individually
+  // (NB. anything within an active IfConfigDecls also appears outside). Let's
+  // assert this fact:
   for (auto *member : PD->getMembers()) {
     auto isExpectedKind =
         isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
         isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
-        isa<AbstractFunctionDecl>(member);
+        isa<AbstractFunctionDecl>(member) || isa<IfConfigDecl>(member);
     assert(isExpectedKind &&
            "unexpected member of protocol during TBD generation");
   }
