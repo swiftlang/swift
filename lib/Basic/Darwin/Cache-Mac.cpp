@@ -29,11 +29,11 @@ CacheImpl::ImplTy CacheImpl::create(StringRef Name, const CallBacks &CBs) {
     CBs.keyIsEqualCB,
     nullptr,
     CBs.keyDestroyCB,
-    CBs.valueDestroyCB,
+    CBs.valueReleaseCB,
     nullptr,
     nullptr,
     CBs.UserData,
-    nullptr
+    CBs.valueRetainCB,
   };
 
   cache_t *cache_out = nullptr;
