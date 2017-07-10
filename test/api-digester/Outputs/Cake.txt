@@ -2,6 +2,7 @@
 /* Removed Decls */
 Class C3 has been removed
 Constructor Somestruct2.init(_:) has been removed
+Func C4.foo() has been removed
 
 /* Moved Decls */
 

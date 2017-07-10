@@ -1597,7 +1597,7 @@ public:
       }
       
       // The base of a member reference cannot be an existential type.
-      if (E->getBase()->getType()->getLValueOrInOutObjectType()
+      if (E->getBase()->getType()->getWithoutSpecifierType()
             ->isAnyExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
@@ -1627,7 +1627,7 @@ public:
 
       // The base of a dynamic member reference cannot be an
       // existential type.
-      if (E->getBase()->getType()->getLValueOrInOutObjectType()
+      if (E->getBase()->getType()->getWithoutSpecifierType()
             ->isAnyExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
@@ -1646,7 +1646,7 @@ public:
       }
 
       // The base of a subscript cannot be an existential type.
-      if (E->getBase()->getType()->getLValueOrInOutObjectType()
+      if (E->getBase()->getType()->getWithoutSpecifierType()
             ->isAnyExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
@@ -1662,7 +1662,7 @@ public:
       PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicSubscriptExpr", E);
 
       // The base of a subscript cannot be an existential type.
-      if (E->getBase()->getType()->getLValueOrInOutObjectType()
+      if (E->getBase()->getType()->getWithoutSpecifierType()
             ->isAnyExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);

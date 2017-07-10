@@ -78,9 +78,6 @@ namespace {
       /// The source type is a CF object pointer type.
       CFPointer,
 
-      /// The source type is a C++ reference type.
-      Reference,
-
       /// The source type is a block pointer type.
       Block,
 
@@ -123,7 +120,6 @@ namespace {
     case ImportHint::BOOL:
     case ImportHint::Boolean:
     case ImportHint::NSUInteger:
-    case ImportHint::Reference:
     case ImportHint::Void:
       return false;
 
@@ -420,7 +416,7 @@ namespace {
     }
 
     ImportResult VisitReferenceType(const clang::ReferenceType *type) {
-      return { nullptr, ImportHint::Reference };
+      return Type();
     }
 
     ImportResult VisitMemberPointer(const clang::MemberPointerType *type) {
@@ -1171,21 +1167,6 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     return hint.BridgedType;
   }
 
-  // Reference types are only permitted as function parameter types.
-  if (hint == ImportHint::Reference &&
-      importKind == ImportTypeKind::Parameter) {
-    auto refType = clangType->castAs<clang::ReferenceType>();
-    // Import the underlying type.
-    auto objectType = impl.importType(refType->getPointeeType(),
-                                      ImportTypeKind::Pointee,
-                                      allowNSUIntegerAsInt,
-                                      canFullyBridgeTypes);
-    if (!objectType)
-      return nullptr;
-
-    return InOutType::get(objectType);
-  }
-
   // For anything else, if we completely failed to import the type
   // abstractly, give up now.
   if (!importedType)
@@ -1652,15 +1633,13 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       return nullptr;
 
     // Map __attribute__((noescape)) to @noescape.
-    bool addNoEscapeAttr = false;
     if (param->hasAttr<clang::NoEscapeAttr>()) {
       Type newParamTy = applyNoEscape(swiftParamTy);
       if (newParamTy.getPointer() != swiftParamTy.getPointer()) {
         swiftParamTy = newParamTy;
-        addNoEscapeAttr = true;
       }
     }
-
+    
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
@@ -1681,11 +1660,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         ImportedHeaderUnit);
 
     paramInfo->setInterfaceType(swiftParamTy);
-
-    if (addNoEscapeAttr)
-      paramInfo->getAttrs().add(new (SwiftContext)
-                                  NoEscapeAttr(/*IsImplicit=*/false));
-
     parameters.push_back(paramInfo);
     ++index;
   }
@@ -2122,11 +2096,6 @@ Type ClangImporter::Implementation::importMethodType(
                                            swiftParamTy,
                                            ImportedHeaderUnit);
     paramInfo->setInterfaceType(dc->mapTypeOutOfContext(swiftParamTy));
-
-    if (addNoEscapeAttr) {
-      paramInfo->getAttrs().add(
-        new (SwiftContext) NoEscapeAttr(/*IsImplicit=*/false));
-    }
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||

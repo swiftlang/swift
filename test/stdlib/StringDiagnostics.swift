@@ -74,10 +74,9 @@ func testStringCollectionTypes(s: String) {
   acceptsBidirectionalCollection(s.utf8) // expected-error{{argument type 'String.UTF8View' does not conform to expected type 'BidirectionalCollection'}}
   acceptsRandomAccessCollection(s.utf8) // expected-error{{argument type 'String.UTF8View' does not conform to expected type 'RandomAccessCollection'}}
 
-  // UTF16View.Collection is random-access with Foundation, bidirectional without
-  acceptsCollection(s.utf16)
+  acceptsCollection(s.utf16) 
   acceptsBidirectionalCollection(s.utf16)
-  acceptsRandomAccessCollection(s.utf16)
+  acceptsRandomAccessCollection(s.utf16) // expected-error{{argument type 'String.UTF16View' does not conform to expected type 'RandomAccessCollection'}}
 
   acceptsCollection(s.unicodeScalars)
   acceptsBidirectionalCollection(s.unicodeScalars)

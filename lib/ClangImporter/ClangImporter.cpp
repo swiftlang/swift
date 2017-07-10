@@ -904,13 +904,15 @@ ClangImporter::create(ASTContext &ctx,
 
   // Don't stop emitting messages if we ever can't load a module.
   // FIXME: This is actually a general problem: any "fatal" error could mess up
-  // the CompilerInvocation.
+  // the CompilerInvocation when we're not in "show diagnostics after fatal 
+  // error" mode.
   clangDiags->setSeverity(clang::diag::err_module_not_found,
                           clang::diag::Severity::Error,
                           clang::SourceLocation());
   clangDiags->setSeverity(clang::diag::err_module_not_built,
                           clang::diag::Severity::Error,
                           clang::SourceLocation());
+  clangDiags->setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
 
   // Create an almost-empty memory buffer.
   auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
@@ -1083,7 +1085,7 @@ bool ClangImporter::Implementation::importHeader(
   // Don't even try to load the bridging header if the Clang AST is in a bad
   // state. It could cause a crash.
   auto &clangDiags = getClangASTContext().getDiagnostics();
-  if (clangDiags.hasFatalErrorOccurred())
+  if (clangDiags.hasUnrecoverableErrorOccurred())
     return true;
 
   assert(adapter);

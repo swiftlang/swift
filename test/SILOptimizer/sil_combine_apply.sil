@@ -1,0 +1,98 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil @unknown : $@convention(thin) () -> ()
+
+/////////////////////////////////
+// Tests for SILCombinerApply. //
+/////////////////////////////////
+
+// Make sure that we handle partial_apply captured arguments correctly.
+//
+// We use custom types here to make it easier to pattern match with FileCheck.
+struct S1 { var x: Builtin.NativeObject }
+struct S2 { var x: Builtin.NativeObject }
+struct S3 { var x: Builtin.NativeObject }
+struct S4 { var x: Builtin.NativeObject }
+struct S5 { var x: Builtin.NativeObject }
+struct S6 { var x: Builtin.NativeObject }
+struct S7 { var x: Builtin.NativeObject }
+struct S8 { var x: Builtin.NativeObject }
+sil @sil_combine_partial_apply_callee : $@convention(thin) (@in S1, @in S2, @in_guaranteed S3, @in_guaranteed S4, @inout S5, S6, @owned S7, @guaranteed S8) -> ()
+
+// *NOTE PLEASE READ*. If this test case looks funny to you, it is b/c partial
+// apply is funny. Specifically, even though a partial apply has the conventions
+// of the function on it, arguments to the partial apply (that will be passed
+// off to the function) must /always/ be passed in at +1. This is because the
+// partial apply is building up a boxed aggregate to send off to the closed over
+// function. Of course when you call the function, the proper conventions will
+// be used.
+//
+// CHECK-LABEL: sil @sil_combine_dead_partial_apply : $@convention(thin) (@in S2, @in S4, @inout S5, S6, @owned S7, @guaranteed S8) -> () {
+// CHECK: bb0([[IN_ARG:%.*]] : $*S2, [[INGUARANTEED_ARG:%.*]] : $*S4, [[INOUT_ARG:%.*]] : $*S5, [[UNOWNED_ARG:%.*]] : $S6, [[OWNED_ARG:%.*]] : $S7, [[GUARANTEED_ARG:%.*]] : $S8):
+//
+// CHECK: function_ref unknown
+// CHECK: [[UNKNOWN_FUNC:%.*]] = function_ref @unknown
+// CHECK-NEXT: [[IN_ADDRESS:%.*]] = alloc_stack $S1
+// CHECK-NEXT: [[INGUARANTEED_ADDRESS:%.*]] = alloc_stack $S3
+//
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+//
+// Then make sure that the destroys are placed after the destroy_value of the
+// partial_apply (which is after this apply)...
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+//
+// CHECK-NEXT: destroy_addr [[IN_ADDRESS]]
+// CHECK-NEXT: destroy_addr [[IN_ARG]]
+// CHECK-NEXT: destroy_addr [[INGUARANTEED_ADDRESS]]
+// CHECK-NEXT: destroy_addr [[INGUARANTEED_ARG]]
+// CHECK-NEXT: release_value [[UNOWNED_ARG]]
+// CHECK-NEXT: release_value [[OWNED_ARG]]
+// CHECK-NEXT: release_value [[GUARANTEED_ARG]]
+//
+// ... but before the function epilog.
+// CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT: dealloc_stack [[INGUARANTEED_ADDRESS]]
+// CHECK-NEXT: dealloc_stack [[IN_ADDRESS]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'sil_combine_dead_partial_apply'
+sil @sil_combine_dead_partial_apply : $@convention(thin) (@in S2, @in S4, @inout S5, S6, @owned S7, @guaranteed S8) -> () {
+bb0(%1 : $*S2, %2 : $*S4, %4 : $*S5, %5 : $S6, %6 : $S7, %7 : $S8):
+  %8 = function_ref @unknown : $@convention(thin) () -> ()
+  %9 = function_ref @sil_combine_partial_apply_callee : $@convention(thin) (@in S1, @in S2, @in_guaranteed S3, @in_guaranteed S4, @inout S5, S6, @owned S7, @guaranteed S8) -> ()
+
+  // This is for the @in alloc_stack case.
+  %10 = alloc_stack $S1
+  // This is for the @in_guaranteed alloc_stack case.
+  %11 = alloc_stack $S3
+
+  // Marker of space in between the alloc_stack and the partial_apply
+  apply %8() : $@convention(thin) () -> ()
+
+  // Now call the partial apply. We use the "unknown" function call after the
+  // partial apply to ensure that we are truly placing releases at the partial
+  // applies release rather than right afterwards.
+  %102 = partial_apply %9(%10, %1, %11, %2, %4, %5, %6, %7) : $@convention(thin) (@in S1, @in S2, @in_guaranteed S3, @in_guaranteed S4, @inout S5, S6, @owned S7, @guaranteed S8) -> ()
+
+  // Marker of space in between partial_apply and the release of %102.
+  apply %8() : $@convention(thin) () -> ()
+
+  strong_release %102 : $@callee_owned () -> ()
+
+  apply %8() : $@convention(thin) () -> ()
+
+  // Epilog.
+
+  // Cleanup the stack locations.
+  dealloc_stack %11 : $*S3
+  dealloc_stack %10 : $*S1
+
+  %9999 = tuple()
+  return %9999 : $()
+}

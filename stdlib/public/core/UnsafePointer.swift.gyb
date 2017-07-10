@@ -108,7 +108,7 @@
 /// example binds the memory referenced by `uint8Pointer` to one instance of
 /// the `UInt64` type:
 ///
-///     let uint64Pointer = Unsafe${Mutable}RawPointer(uint64Pointer)
+///     let uint64Pointer = Unsafe${Mutable}RawPointer(uint8Pointer)
 ///                               .bindMemory(to: UInt64.self, capacity: 1)
 ///
 /// After rebinding the memory referenced by `uint8Pointer` to `UInt64`,

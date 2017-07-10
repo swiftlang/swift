@@ -4330,7 +4330,7 @@ public:
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_generic_function,
                       NTD->getName(),
-                      AFD->getName());
+                      AFD->getFullName());
         } else {
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_generic_closure,
@@ -6153,9 +6153,6 @@ public:
     UNINTERESTING_ATTR(Specialize)
 
     // These can't appear on overridable declarations.
-    UNINTERESTING_ATTR(AutoClosure)
-    UNINTERESTING_ATTR(NoEscape)
-
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
     UNINTERESTING_ATTR(Infix)

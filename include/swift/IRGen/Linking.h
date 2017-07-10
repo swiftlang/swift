@@ -680,6 +680,14 @@ public:
 
   static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
                       ForDefinition_t forDefinition);
+  
+  static LinkInfo get(const UniversalLinkageInfo &linkInfo,
+                      StringRef name,
+                      SILLinkage linkage,
+                      bool isFragile,
+                      bool isSILOnly,
+                      ForDefinition_t isDefinition,
+                      bool isWeakImported);
 
   StringRef getName() const {
     return Name.str();

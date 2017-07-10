@@ -167,7 +167,7 @@ StringRef swift::PassKindTag(PassKind Kind) {
   switch (Kind) {
 #define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID:                                                           \
-    return #TAG;
+    return TAG;
 #include "swift/SILOptimizer/PassManager/Passes.def"
   case PassKind::invalidPassKind:
     llvm_unreachable("Invalid pass kind?!");
@@ -182,7 +182,7 @@ StringRef swift::PassKindName(PassKind Kind) {
   switch (Kind) {
 #define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID:                                                           \
-    return #NAME;
+    return NAME;
 #include "swift/SILOptimizer/PassManager/Passes.def"
   case PassKind::invalidPassKind:
     llvm_unreachable("Invalid pass kind?!");

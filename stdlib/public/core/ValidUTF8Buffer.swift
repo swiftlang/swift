@@ -21,6 +21,8 @@ public struct _ValidUTF8Buffer<
   Storage: UnsignedInteger & FixedWidthInteger
 > {
   public typealias Element = Unicode.UTF8.CodeUnit
+  internal typealias _Storage = Storage
+  
   @_versioned
   internal var _biasedBits: Storage
 
@@ -60,8 +62,10 @@ extension _ValidUTF8Buffer : Collection {
   public typealias IndexDistance = Int
   
   public struct Index : Comparable {
+    @_versioned
     internal var _biasedBits: Storage
     
+    @_versioned
     internal init(_biasedBits: Storage) { self._biasedBits = _biasedBits }
     
     public static func == (lhs: Index, rhs: Index) -> Bool {
@@ -104,15 +108,17 @@ extension _ValidUTF8Buffer : BidirectionalCollection {
 
 extension _ValidUTF8Buffer : RandomAccessCollection {
   public typealias Indices = DefaultRandomAccessIndices<_ValidUTF8Buffer>
-  
+
+  @inline(__always)
   public func distance(from i: Index, to j: Index) -> IndexDistance {
-    _debugPrecondition(indices.contains(i))
-    _debugPrecondition(indices.contains(j))
+    _debugPrecondition(_isValid(i))
+    _debugPrecondition(_isValid(j))
     return (
       i._biasedBits.leadingZeroBitCount - j._biasedBits.leadingZeroBitCount
     ) &>> 3
   }
   
+  @inline(__always)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     let startOffset = distance(from: startIndex, to: i)
     let newOffset = startOffset + n
@@ -128,22 +134,38 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
   }
 
   public var capacity: IndexDistance {
+    return _ValidUTF8Buffer.capacity
+  }
+
+  public static var capacity: IndexDistance {
     return Storage.bitWidth / Element.bitWidth
   }
 
+  @inline(__always)
   public mutating func append(_ e: Element) {
     _debugPrecondition(count + 1 <= capacity)
     _sanityCheck(
       e != 192 && e != 193 && !(245...255).contains(e), "invalid UTF8 byte")
     _biasedBits |= Storage(e &+ 1) &<< (count &<< 3)
   }
+
+  @inline(__always)
+  public mutating func removeFirst() {
+    _debugPrecondition(!isEmpty)
+    _biasedBits = _biasedBits._fullShiftRight(8)
+  }
+
+  @_versioned
+  internal func _isValid(_ i: Index) -> Bool {
+    return i == endIndex || indices.contains(i)
+  }
   
   @inline(__always)
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) where C.Element == Element {
-    _debugPrecondition(indices.contains(target.lowerBound))
-    _debugPrecondition(indices.contains(target.upperBound))
+    _debugPrecondition(_isValid(target.lowerBound))
+    _debugPrecondition(_isValid(target.upperBound))
     var r = _ValidUTF8Buffer()
     for x in self[..<target.lowerBound] { r.append(x) }
     for x in replacement                { r.append(x) }
@@ -151,9 +173,11 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
     self = r
   }
 
+  @inline(__always)
   public mutating func append<T>(contentsOf other: _ValidUTF8Buffer<T>) {
     _debugPrecondition(count + other.count <= capacity)
-    _biasedBits |= Storage(extendingOrTruncating: other._biasedBits) &<< (count &<< 3)
+    _biasedBits |= Storage(
+      extendingOrTruncating: other._biasedBits) &<< (count &<< 3)
   }
 }
 

@@ -205,7 +205,7 @@ var _ : Int = R24267414.foo() // expected-error {{generic parameter 'T' could no
 
 
 // https://bugs.swift.org/browse/SR-599
-func SR599<T: FixedWidthInteger>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599'}}
+func SR599<T: FixedWidthInteger>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599()'}}
 _ = SR599()         // expected-error {{generic parameter 'T' could not be inferred}}
 
 
