@@ -216,7 +216,7 @@ extension UIView : _DefaultCustomPlaygroundQuickLookable {
 #endif
 
 extension UIColor : _ExpressibleByColorLiteral {
-  @nonobjc public required convenience init(colorLiteralRed red: Float,
+  @nonobjc public required convenience init(_colorLiteralRed red: Float,
                                             green: Float,
                                             blue: Float, alpha: Float) {
     self.init(red: CGFloat(red), green: CGFloat(green),
