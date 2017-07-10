@@ -299,7 +299,8 @@ extension Character {
     let minBitWidth = type(of: bits).bitWidth - bits.leadingZeroBitCount
     return _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(
       _storage: bits,
-      _bitCount: UInt8(16 * Swift.max(1, (minBitWidth + 15) / 16))
+      _bitCount: UInt8(
+        extendingOrTruncating: 16 * Swift.max(1, (minBitWidth + 15) / 16))
     )
   }
 
