@@ -788,8 +788,7 @@ bool ConstraintSystem::Candidate::solve(
   };
 
   // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(TC, DC,
-                      ConstraintSystemFlags::ReturnAllDiscoveredSolutions);
+  ConstraintSystem cs(TC, DC, None);
 
   // Cleanup after constraint system generation/solving,
   // because it would assign types to expressions, which
@@ -1021,7 +1020,13 @@ void ConstraintSystem::shrink(Expr *expr) {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
-      if (expr == PrimaryExpr) {
+      auto isSrcOfPrimaryAssignment = [&](Expr *expr) -> bool {
+        if (auto *AE = dyn_cast<AssignExpr>(PrimaryExpr))
+          return expr == AE->getSrc();
+        return false;
+      };
+
+      if (expr == PrimaryExpr || isSrcOfPrimaryAssignment(expr)) {
         // If this is primary expression and there are no candidates
         // to be solved, let's not record it, because it's going to be
         // solved regardless.
@@ -1031,14 +1036,14 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto contextualType = CS.getContextualType();
         // If there is a contextual type set for this expression.
         if (!contextualType.isNull()) {
-          Candidates.push_back(Candidate(CS, expr, contextualType,
+          Candidates.push_back(Candidate(CS, PrimaryExpr, contextualType,
                                          CS.getContextualTypePurpose()));
           return expr;
         }
 
         // Or it's a function application with other candidates present.
         if (isa<ApplyExpr>(expr)) {
-          Candidates.push_back(Candidate(CS, expr));
+          Candidates.push_back(Candidate(CS, PrimaryExpr));
           return expr;
         }
       }
