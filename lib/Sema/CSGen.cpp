@@ -1030,12 +1030,14 @@ namespace {
     /// \brief Add constraints for a subscript operation.
     Type addSubscriptConstraints(Expr *anchor, Type baseTy, Expr *index,
                                  ValueDecl *declOrNull,
-                                 ConstraintLocator *memberLocator = nullptr) {
+                                 ConstraintLocator *memberLocator = nullptr,
+                                 ConstraintLocator *indexLocator = nullptr) {
       ASTContext &Context = CS.getASTContext();
 
       // Locators used in this expression.
-      auto indexLocator
-        = CS.getConstraintLocator(anchor, ConstraintLocator::SubscriptIndex);
+      if (!indexLocator)
+        indexLocator
+          = CS.getConstraintLocator(anchor, ConstraintLocator::SubscriptIndex);
       auto resultLocator
         = CS.getConstraintLocator(anchor, ConstraintLocator::SubscriptResult);
       
@@ -2841,7 +2843,8 @@ namespace {
           auto memberLocator = CS.getConstraintLocator(E,
                         ConstraintLocator::PathElement::getKeyPathComponent(i));
           base = addSubscriptConstraints(E, base, component.getIndexExpr(),
-                                         /*decl*/ nullptr, memberLocator);
+                                         /*decl*/ nullptr, memberLocator,
+                                         /*index locator*/ memberLocator);
           break;
         }
         
