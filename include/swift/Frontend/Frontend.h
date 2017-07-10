@@ -271,7 +271,8 @@ public:
     CodeCompletionBuffer = Buf;
     CodeCompletionOffset = Offset;
     // We don't need typo-correction for code-completion.
-    LangOpts.DisableTypoCorrection = true;
+    // FIXME: This isn't really true, but is a performance issue.
+    LangOpts.TypoCorrectionLimit = 0;
   }
 
   std::pair<llvm::MemoryBuffer *, unsigned> getCodeCompletionPoint() const {
