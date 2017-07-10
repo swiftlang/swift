@@ -456,6 +456,10 @@ public:
   ///          or is raw SIL (so that the mandatory passes still run).
   bool shouldOptimize() const;
 
+  /// Returns true if this is a function that should have its ownership
+  /// verified.
+  bool shouldVerifyOwnership() const;
+
   /// Check if the function has a location.
   /// FIXME: All functions should have locations, so this method should not be
   /// necessary.

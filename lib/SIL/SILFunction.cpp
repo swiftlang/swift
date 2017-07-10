@@ -464,3 +464,7 @@ SubstitutionList SILFunction::getForwardingSubstitutions() {
   ForwardingSubs = env->getForwardingSubstitutions();
   return *ForwardingSubs;
 }
+
+bool SILFunction::shouldVerifyOwnership() const {
+  return !hasSemanticsAttr("verify.ownership.sil.never");
+}

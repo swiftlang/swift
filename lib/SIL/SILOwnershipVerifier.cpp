@@ -2068,9 +2068,10 @@ void SILInstruction::verifyOperandOwnership() const {
   if (!getModule().getOptions().EnableSILOwnership)
     return;
 
-  // If the given function has unqualified ownership, there is nothing to
-  // verify.
-  if (getFunction()->hasUnqualifiedOwnership())
+  // If the given function has unqualified ownership or we have been asked by
+  // the user not to verify this function, there is nothing to verify.
+  if (getFunction()->hasUnqualifiedOwnership() ||
+      !getFunction()->shouldVerifyOwnership())
     return;
 
   // If we are testing the verifier, bail so we only print errors once when
@@ -2116,9 +2117,9 @@ void SILValue::verifyOwnership(SILModule &Mod,
   SILFunction *F = (*this)->getFunction();
   assert(F && "Instructions and arguments should have a function");
 
-  // If the given function has unqualified ownership, there is nothing further
-  // to verify.
-  if (F->hasUnqualifiedOwnership())
+  // If the given function has unqualified ownership or we have been asked by
+  // the user not to verify this function, there is nothing to verify.
+  if (F->hasUnqualifiedOwnership() || !F->shouldVerifyOwnership())
     return;
 
   ErrorBehaviorKind ErrorBehavior;
