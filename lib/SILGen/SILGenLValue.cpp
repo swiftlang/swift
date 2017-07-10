@@ -16,6 +16,7 @@
 
 #include "SILGen.h"
 #include "ArgumentSource.h"
+#include "Conversion.h"
 #include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
@@ -2511,6 +2512,34 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   return lv;
 }
 
+ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
+                                      AbstractionPattern origFormalType,
+                                      CanType substFormalType,
+                                      const TypeLowering &rvalueTL,
+                                      SGFContext C, IsTake_t isTake,
+                                      bool isGuaranteedValid) {
+  assert(addr->getType().isAddress());
+  SILType addrRValueType = addr->getType().getReferenceStorageReferentType();
+
+  // Fast path: the types match exactly.
+  if (addrRValueType == rvalueTL.getLoweredType().getAddressType()) {
+    return emitLoad(loc, addr, rvalueTL, C, isTake, isGuaranteedValid);
+  }
+
+  // Otherwise, we need to reabstract or bridge.
+  auto conversion =
+    origFormalType.isClangType()
+      ? Conversion::getBridging(Conversion::BridgeFromObjC,
+                                origFormalType.getType(),
+                                substFormalType, rvalueTL.getLoweredType())
+      : Conversion::getOrigToSubst(origFormalType, substFormalType);
+
+  return emitConvertedRValue(loc, conversion, C, [&](SGFContext C) {
+    return emitLoad(loc, addr, getTypeLowering(addrRValueType),
+                    C, isTake, isGuaranteedValid);
+  });
+}
+
 /// Load an r-value out of the given address.
 ///
 /// \param rvalueTL - the type lowering for the type-of-rvalue
@@ -2716,15 +2745,18 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
     return SGF.B.createCopyValue(loc, result);
   }
 
+#if 0
   // NSString * must be bridged to String.
   if (storageType.getSwiftRValueType() == SGF.SGM.Types.getNSStringType()) {
     auto nsstr = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Copy);
     auto str = SGF.emitBridgedToNativeValue(loc,
                                 ManagedValue::forUnmanaged(nsstr),
-                                SILFunctionTypeRepresentation::CFunctionPointer,
-                                SGF.SGM.Types.getStringType());
+                                storageType.getSwiftRValueType(),
+                                SGF.SGM.Types.getStringType(),
+                                );
     return str.forward(SGF);
   }
+#endif
 
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
 }

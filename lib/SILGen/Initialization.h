@@ -19,6 +19,7 @@
 #define SWIFT_LOWERING_INITIALIZATION_H
 
 #include "ManagedValue.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <memory>
 
@@ -30,7 +31,8 @@ class Initialization;
 using InitializationPtr = std::unique_ptr<Initialization>;
 class TemporaryInitialization;
 using TemporaryInitializationPtr = std::unique_ptr<TemporaryInitialization>;
-  
+class ConvertingInitialization;
+
 /// An abstract class for consuming a value.  This is used for initializing
 /// variables, although that is not the only way it is used.
 ///
@@ -58,6 +60,9 @@ using TemporaryInitializationPtr = std::unique_ptr<TemporaryInitialization>;
 ///     must be completely initialized (including calling
 ///     finishInitialization) before finishInitialization is called on the
 ///     outer initialization.
+///
+///   - If getAsConversion() returns non-null, the specialized interface
+//      for that subclass can be used.
 ///
 ///   - copyOrInitValueInto may be called.
 ///
@@ -126,7 +131,12 @@ public:
     llvm_unreachable("Must implement if canSplitIntoTupleElements "
                      "returns true");
   }
-  
+
+  /// Return a non-null pointer if this is a reabstracting initialization.
+  virtual ConvertingInitialization *getAsConversion() {
+    return nullptr;
+  }
+
   /// Initialize this with the given value.  This should be an operation
   /// of last resort: it is generally better to split tuples or evaluate
   /// in-place when the initialization supports that.

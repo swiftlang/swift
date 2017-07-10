@@ -1693,7 +1693,8 @@ namespace {
         // All function types look like () -> ().
         // FIXME: It'd be nice not to have to call through the runtime here.
         return IGF.emitTypeMetadataRef(
-                 CanFunctionType::get({ }, C.TheEmptyTupleType,
+                 CanFunctionType::get(AnyFunctionType::CanParamArrayRef({ }),
+                                      C.TheEmptyTupleType,
                                       AnyFunctionType::ExtInfo()));
       case SILFunctionType::Representation::Block:
         // All block types look like Builtin.UnknownObject.
@@ -1877,7 +1878,8 @@ namespace {
       case SILFunctionType::Representation::Thick:
         // All function types look like () -> ().
         return emitFromValueWitnessTable(
-                 CanFunctionType::get({ }, C.TheEmptyTupleType,
+                 CanFunctionType::get(AnyFunctionType::CanParamArrayRef({}),
+                                      C.TheEmptyTupleType,
                                       AnyFunctionType::ExtInfo()));
       case SILFunctionType::Representation::Block:
         // All block types look like Builtin.UnknownObject.

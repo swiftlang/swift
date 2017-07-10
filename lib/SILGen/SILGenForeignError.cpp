@@ -131,24 +131,13 @@ namespace {
 
     SILValue emitBridged(SILGenFunction &gen, SILLocation loc,
                          CanType bridgedErrorProto) const override {
-      bool errorShouldBeOptional = false;
-      CanType bridgedErrorObjectType = bridgedErrorProto;
-      if (auto objectType = bridgedErrorProto.getAnyOptionalObjectType()) {
-        bridgedErrorObjectType = objectType;
-        errorShouldBeOptional = true;
-      }
+      auto nativeErrorType = NativeError->getType().getSwiftRValueType();
+      assert(nativeErrorType == gen.SGM.getASTContext().getExceptionType());
 
       SILValue bridgedError = gen.emitNativeToBridgedError(loc,
                                 gen.emitManagedRValueWithCleanup(NativeError),
-                                bridgedErrorObjectType).forward(gen);
-
-      // Inject into an optional if necessary.
-      if (errorShouldBeOptional) {
-        bridgedError =
-          gen.B.createOptionalSome(loc, bridgedError,
-                                   gen.getLoweredType(bridgedErrorProto));
-      }
-
+                                nativeErrorType,
+                                bridgedErrorProto).forward(gen);
       return bridgedError;
     }
 
@@ -207,7 +196,8 @@ emitBridgeErrorForForeignError(SILLocation loc,
 SILValue SILGenFunction::
 emitBridgeReturnValueForForeignError(SILLocation loc,
                                      SILValue result,
-                                     SILFunctionTypeRepresentation repr,
+                                     CanType formalNativeType,
+                                     CanType formalBridgedType,
                                      SILType bridgedType,
                                      SILValue foreignErrorSlot,
                                const ForeignErrorConvention &foreignError) {
@@ -230,11 +220,10 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 
   // If an error is signalled by a nil result, inject a non-nil result.
   case ForeignErrorConvention::NilResult: {
-    auto bridgedObjectType =
-      bridgedType.getSwiftRValueType().getAnyOptionalObjectType();
     ManagedValue bridgedResult =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, bridgedObjectType);
+                               formalNativeType, formalBridgedType,
+                               bridgedType.getAnyOptionalObjectType());
 
     auto someResult =
       B.createOptionalSome(loc, bridgedResult.forward(*this), bridgedType);
@@ -250,7 +239,8 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
     // The actual result value just needs to be bridged normally.
     ManagedValue bridgedValue =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, bridgedType.getSwiftRValueType());
+                               formalNativeType, formalBridgedType,
+                               bridgedType);
     return bridgedValue.forward(*this);
   }
   }

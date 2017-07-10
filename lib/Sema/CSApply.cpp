@@ -1415,6 +1415,14 @@ namespace {
 
       // Form the subscript expression.
 
+      // Compute the substitutions used to reference the subscript.
+      SmallVector<Substitution, 4> substitutions;
+      solution.computeSubstitutions(
+        subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
+        locator.withPathElement(ConstraintLocator::SubscriptMember),
+        substitutions);
+      ConcreteDeclRef subscriptRef(tc.Context, subscript, substitutions);
+
       // Handle dynamic lookup.
       if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
           subscript->getAttrs().hasAttribute<OptionalAttr>()) {
@@ -1425,20 +1433,13 @@ namespace {
 
         // TODO: diagnose if semantics != AccessSemantics::Ordinary?
         auto subscriptExpr = DynamicSubscriptExpr::create(tc.Context, base,
-                                                          index, subscript,
+                                                          index, subscriptRef,
                                                           isImplicit, getType);
         cs.setType(subscriptExpr, resultTy);
         Expr *result = subscriptExpr;
         closeExistential(result, locator);
         return result;
       }
-
-      // Compute the substitutions used to reference the subscript.
-      SmallVector<Substitution, 4> substitutions;
-      solution.computeSubstitutions(
-        subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
-        locator.withPathElement(ConstraintLocator::SubscriptMember),
-        substitutions);
 
       // Convert the base.
       auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
@@ -1452,9 +1453,7 @@ namespace {
 
       // Form the subscript expression.
       auto subscriptExpr = SubscriptExpr::create(
-        tc.Context, base, index,
-          ConcreteDeclRef(tc.Context, subscript, substitutions), isImplicit,
-          semantics, getType);
+        tc.Context, base, index, subscriptRef, isImplicit, semantics, getType);
       cs.setType(subscriptExpr, resultTy);
       subscriptExpr->setIsSuper(isSuper);
 
@@ -4752,7 +4751,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   return
     cs.cacheType(new (tc.Context) TupleShuffleExpr(
                      expr, mapping,
-                     TupleShuffleExpr::SourceIsTuple,
+                     TupleShuffleExpr::TupleToTuple,
                      callee,
                      tc.Context.AllocateCopy(variadicArgs),
                      arrayType,
@@ -4847,7 +4846,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                             
   return cs.cacheType(new (tc.Context) TupleShuffleExpr(expr,
                                         tc.Context.AllocateCopy(elements),
-                                        TupleShuffleExpr::SourceIsScalar,
+                                        TupleShuffleExpr::ScalarToTuple,
                                         callee,
                                         tc.Context.AllocateCopy(variadicArgs),
                                         arrayType,
@@ -5468,7 +5467,14 @@ Expr *ExprRewriter::coerceCallArguments(
     return arg;
 
   // If we came from a scalar, create a scalar-to-tuple conversion.
-  auto isSourceScalar = TupleShuffleExpr::SourceIsScalar_t(argTuple == nullptr);
+  TupleShuffleExpr::TypeImpact typeImpact;
+  if (argTuple == nullptr) {
+    typeImpact = TupleShuffleExpr::ScalarToTuple;
+  } else if (isa<TupleType>(paramType.getPointer())) {
+    typeImpact = TupleShuffleExpr::TupleToTuple;
+  } else {
+    typeImpact = TupleShuffleExpr::TupleToScalar;
+  }
 
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
@@ -5476,7 +5482,7 @@ Expr *ExprRewriter::coerceCallArguments(
   return
     cs.cacheType(new (tc.Context) TupleShuffleExpr(
                      arg, mapping,
-                     isSourceScalar,
+                     typeImpact,
                      callee,
                      tc.Context.AllocateCopy(variadicArgs),
                      sliceType,

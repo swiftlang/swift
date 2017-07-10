@@ -360,24 +360,40 @@ struct SILConstantInfo {
   /// The formal type of the constant, still curried.  For a normal
   /// function, this is just its declared type; for a getter or
   /// setter, computing this can be more involved.
-  CanAnyFunctionType FormalInterfaceType;
+  CanAnyFunctionType FormalType;
+
+  /// The abstraction pattern of the constant.  Its type structure
+  /// matches the formal type, but with types replaced with their
+  /// bridged equivalents.
+  AbstractionPattern FormalPattern;
 
   /// The uncurried and bridged type of the constant.
-  CanAnyFunctionType LoweredInterfaceType;
+  CanAnyFunctionType LoweredType;
 
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
   
   /// The generic environment used by the constant.
   GenericEnvironment *GenericEnv;
+
+  SILConstantInfo(CanAnyFunctionType formalType,
+                  AbstractionPattern formalPattern,
+                  CanAnyFunctionType loweredType,
+                  CanSILFunctionType silFnTy,
+                  GenericEnvironment *env)
+    : FormalType(formalType),
+      FormalPattern(formalPattern),
+      LoweredType(loweredType),
+      SILFnType(silFnTy),
+      GenericEnv(env) {}
   
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);
   }
 
   friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
-    return lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
-           lhs.LoweredInterfaceType == rhs.LoweredInterfaceType &&
+    return lhs.FormalType == rhs.FormalType &&
+           lhs.LoweredType == rhs.LoweredType &&
            lhs.SILFnType == rhs.SILFnType &&
            lhs.GenericEnv == rhs.GenericEnv;
   }
@@ -639,15 +655,9 @@ public:
   CanSILFunctionType getSILFunctionType(AbstractionPattern origType,
                                         CanFunctionType substFnType);
 
-  /// Convert an AST function type into a SILFunctionType at a non-standard
-  /// uncurry level.
-  CanSILFunctionType getSILFunctionType(AbstractionPattern origType,
-                                        CanFunctionType substFnType,
-                                        unsigned uncurryLevel);
-
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
-  SILConstantInfo getConstantInfo(SILDeclRef constant);
+  const SILConstantInfo &getConstantInfo(SILDeclRef constant);
   
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {
@@ -682,7 +692,7 @@ public:
   ///
   /// Will be the same as getConstantInfo() if the declaration does not
   /// override anything.
-  SILConstantInfo getConstantOverrideInfo(SILDeclRef constant) {
+  const SILConstantInfo &getConstantOverrideInfo(SILDeclRef constant) {
     // Fast path if the constant does not override anything.
     auto next = constant.getNextOverriddenVTableEntry();
     if (next.isNull())
@@ -692,8 +702,8 @@ public:
     return getConstantOverrideInfo(constant, base);
   }
 
-  SILConstantInfo getConstantOverrideInfo(SILDeclRef constant,
-                                          SILDeclRef base);
+  const SILConstantInfo &getConstantOverrideInfo(SILDeclRef constant,
+                                                 SILDeclRef base);
 
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {
@@ -721,19 +731,24 @@ public:
                              SILFunctionTypeRepresentation rep,
                              BridgedTypePurpose purpose);
 
-  /// Convert a nested function type into an uncurried AST representation.
-  CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
-                                               unsigned uncurryLevel,
-                                               AnyFunctionType::ExtInfo info,
-                                               Optional<SILDeclRef> constant);
+  struct LoweredFormalTypes {
+    /// The abstraction pattern of the type.  This always has a type; the
+    /// type is a function type parallel in structure to the original formal
+    /// type but with types replaced with appropriate bridged types.
+    AbstractionPattern Pattern;
 
-  /// Convert a nested function type into an uncurried AST representation.
-  CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
-                                               unsigned uncurryLevel,
-                                               Optional<SILDeclRef> constant) {
-    return getLoweredASTFunctionType(t, uncurryLevel, t->getExtInfo(),
-                                     constant);
-  }
+    /// The bridged and uncurried type of the constant.
+    CanAnyFunctionType Uncurried;
+  };
+
+  /// Derive the lowered formal type of the given constant.
+  LoweredFormalTypes getLoweredFormalTypes(SILDeclRef constant,
+                                           CanAnyFunctionType formalType);
+
+  /// Given a function type, yield its bridged formal type.
+  CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
+                                            CanAnyFunctionType fnType,
+                                            AnyFunctionType::ExtInfo extInfo);
 
   /// Given a referenced value and the substituted formal type of a
   /// resulting l-value expression, produce the substituted formal
@@ -844,10 +859,6 @@ private:
                                AbstractionPattern pattern,
                                CanType result,
                                bool suppressOptional);
-
-  CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
-                                            CanAnyFunctionType fnType,
-                                            AnyFunctionType::ExtInfo extInfo);
 };
 
 inline const TypeLowering &
