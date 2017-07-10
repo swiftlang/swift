@@ -744,7 +744,7 @@ public protocol _ExpressibleByColorLiteral {
   ///
   /// Do not call this initializer directly. Instead, initialize a variable or
   /// constant using a color literal.
-  init(colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
+  init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
 }
 
 /// A type that can be initialized using an image literal (e.g.
