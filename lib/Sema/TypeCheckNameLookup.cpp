@@ -564,11 +564,14 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         LookupResult &result,
                                         GenericSignatureBuilder *gsb,
                                         unsigned maxResults) {
-  // Disable typo-correction if we won't show the diagnostic anyway.
-  if (getLangOpts().DisableTypoCorrection ||
+  // Disable typo-correction if we won't show the diagnostic anyway or if
+  // we've hit our typo correction limit.
+  if (NumTypoCorrections >= getLangOpts().TypoCorrectionLimit ||
       (Diags.hasFatalErrorOccurred() &&
        !Diags.getShowDiagnosticsAfterFatalError()))
     return;
+
+  ++NumTypoCorrections;
 
   // Fill in a collection of the most reasonable entries.
   TopCollection<unsigned, ValueDecl*> entries(maxResults);
