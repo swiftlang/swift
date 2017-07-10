@@ -1037,6 +1037,24 @@ public:
     
     TC.diagnose(loc, message).highlight(highlight);
     maybeAddRethrowsNote(TC, loc, reason);
+
+    // If this is a call without expected 'try[?|!]', like this:
+    //
+    // func foo() throws {}
+    // [let _ = ]foo()
+    //
+    // Let's suggest couple of alternative fix-its
+    // because complete context is unavailable.
+    if (reason.getKind() != PotentialReason::Kind::CallThrows)
+      return;
+
+    TC.diagnose(loc, diag::note_forgot_try).fixItInsert(loc, "try ").flush();
+    TC.diagnose(loc, diag::note_error_to_optional)
+        .fixItInsert(loc, "try? ")
+        .flush();
+
+    TC.diagnose(loc, diag::note_disable_error_propagation)
+        .fixItInsert(loc, "try! ");
   }
 
   void diagnoseThrowInLegalContext(TypeChecker &TC, ASTNode node,

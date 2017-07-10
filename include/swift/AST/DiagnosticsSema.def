@@ -2990,6 +2990,13 @@ ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
 ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
+NOTE(note_forgot_try,none,
+      "did you mean to use 'try'?", ())
+NOTE(note_error_to_optional,none,
+      "did you mean to handle error as optional value?", ())
+NOTE(note_disable_error_propagation,none,
+      "did you mean to disable error propagation?", ())
+
 WARNING(no_throw_in_try,none,
         "no calls to throwing functions occur within 'try' expression", ())
 
