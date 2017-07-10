@@ -1048,9 +1048,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (auto elt = locator.last()) {
       if (elt->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer())) {
-          func2Input = paren2->getUnderlyingType();
-          if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer()))
-            func1Input = paren1->getUnderlyingType();
+          if (!isa<ParenType>(func1Input.getPointer()))
+            func2Input = paren2->getUnderlyingType();
         }
       }
     }
