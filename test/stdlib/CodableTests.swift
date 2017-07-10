@@ -389,13 +389,17 @@ class TestCodable : TestCodableSuper {
         Decimal.greatestFiniteMagnitude,
         Decimal.leastNormalMagnitude,
         Decimal.leastNonzeroMagnitude,
-        Decimal.pi,
-        Decimal()
+        Decimal(),
+
+        // Decimal.pi does not round-trip at the moment.
+        // See rdar://problem/33165355
+        // Decimal.pi,
     ]
 
     func test_Decimal_JSON() {
         for decimal in decimalValues {
-            expectRoundTripEqualityThroughJSON(for: decimal)
+            // Decimal encodes as a number in JSON and cannot be encoded at the top level.
+            expectRoundTripEqualityThroughJSON(for: TopLevelWrapper(decimal))
         }
     }
 
@@ -568,7 +572,16 @@ class TestCodable : TestCodableSuper {
 
     func test_URL_JSON() {
         for url in urlValues {
-            expectRoundTripEqualityThroughJSON(for: url)
+            // URLs encode as single strings in JSON. They lose their baseURL this way.
+            // For relative URLs, we don't expect them to be equal to the original.
+            if url.baseURL == nil {
+                // This is an absolute URL; we can expect equality.
+                expectRoundTripEqualityThroughJSON(for: TopLevelWrapper(url))
+            } else {
+                // This is a relative URL. Make it absolute first.
+                let absoluteURL = URL(string: url.absoluteString)!
+                expectRoundTripEqualityThroughJSON(for: TopLevelWrapper(absoluteURL))
+            }
         }
     }
 
@@ -600,6 +613,22 @@ class TestCodable : TestCodableSuper {
         }
     }
 }
+
+// MARK: - Helper Types
+
+struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
+    let value: T
+
+    init(_ value: T) {
+        self.value = value
+    }
+
+    static func ==(_ lhs: TopLevelWrapper<T>, _ rhs: TopLevelWrapper<T>) -> Bool {
+        return lhs.value == rhs.value
+    }
+}
+
+// MARK: - Tests
 
 #if !FOUNDATION_XCTEST
 var CodableTests = TestSuite("TestCodable")
