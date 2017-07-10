@@ -187,6 +187,13 @@ typedef SomeCell <NSCopying> *CopyableSomeCell;
 + (BOOL)processValueAndReturnError:(NSError **)error;
 @end
 
+@interface CallbackBase : NSObject
+- (void)performWithHandler:(void(^ _Nonnull)(void))handler;
+- (void)performWithOptHandler:(void(^ _Nullable)(void))handler;
+- (void)performWithNonescapingHandler:(void(__attribute__((noescape)) ^ _Nonnull)(void))handler;
+- (void)performWithOptNonescapingHandler:(void(__attribute__((noescape)) ^ _Nullable)(void))handler;
+@end
+
 @interface SelectorSplittingAccessors : NSObject
 // Note the custom setter name here; this is important.
 @property (setter=takeFooForBar:) BOOL fooForBar;
