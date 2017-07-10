@@ -53,7 +53,7 @@ public protocol _CGColorInitTrampoline {
 }
 
 extension _CGColorInitTrampoline {
-  public init(colorLiteralRed red: Float, green: Float, blue: Float,
+  public init(_colorLiteralRed red: Float, green: Float, blue: Float,
               alpha: Float) {
     self.init(red: CGFloat(red), green: CGFloat(green), blue: CGFloat(blue),
               alpha: CGFloat(alpha))

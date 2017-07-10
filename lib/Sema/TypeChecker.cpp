@@ -172,7 +172,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
   case ObjectLiteralExpr::colorLiteral: {
     return DeclName(Context, Context.Id_init,
-                    { Context.getIdentifier("colorLiteralRed"),
+                    { Context.getIdentifier("_colorLiteralRed"),
                       Context.getIdentifier("green"),
                       Context.getIdentifier("blue"),
                       Context.getIdentifier("alpha") });
