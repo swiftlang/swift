@@ -252,12 +252,16 @@ private:
   bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod, StringRef KnownHash,
                                 bool &HashIsKnown);
 
+  llvm::SmallPtrSet<Decl*, 4> VisitedDecls;
+
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     // Do not handle unavailable decls.
     if (AvailableAttr::isUnavailable(D))
       return false;
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      if (FD->isAccessor() && getParentDecl() != FD->getAccessorStorageDecl())
+      auto *Parent = getParentDecl();
+      if (FD->isAccessor() && Parent != FD->getAccessorStorageDecl() &&
+          VisitedDecls.count(Parent))
         return false; // already handled as part of the var decl.
     }
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -266,6 +270,7 @@ private:
     }
     if (auto *ED = dyn_cast<ExtensionDecl>(D))
       return reportExtension(ED);
+    VisitedDecls.insert(D);
     return true;
   }
 
