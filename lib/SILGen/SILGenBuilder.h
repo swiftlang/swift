@@ -260,6 +260,15 @@ public:
   using SILBuilder::createOptionalSome;
   ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);
   ManagedValue createManagedOptionalNone(SILLocation Loc, SILType Type);
+
+  /// Forward \p value into \p address.
+  ///
+  /// This will forward value's cleanup (if it has one) into the equivalent
+  /// cleanup on address. In practice this means if the value is non-trivial,
+  /// the memory location will at end of scope have a destroy_addr applied to
+  /// it.
+  ManagedValue createStore(SILLocation loc, ManagedValue value,
+                           SILValue address, StoreOwnershipQualifier qualifier);
 };
 
 class SwitchCaseFullExpr;
