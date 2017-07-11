@@ -16,7 +16,7 @@ import Foundation
 #if os(iOS) || os(watchOS)
 @available(iOS 10.0, watchOS 3.2, *)
 extension INSearchCallHistoryIntent {
-  @available(iOS 10.0, watchOS 3.2, *)
+  @available(iOS 11.0, watchOS 4.0, *)
   @nonobjc
   public convenience init(
     dateCreated: INDateComponentsRange? = nil,
