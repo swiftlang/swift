@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
+#include "swift/Strings.h"
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -630,6 +631,8 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   if (!Callee) {
     return nullptr;
   }
+  auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
+  bool IsInStdlib = (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT);
 
   // Don't inline functions that are marked with the @_semantics or @effects
   // attribute if the inliner is asked not to inline them.
@@ -637,13 +640,23 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
       if (shouldSkipApplyDuringEarlyInlining(AI))
         return nullptr;
+      if (Callee->hasSemanticsAttr("inline_late"))
+        return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
     if (Callee->hasSemanticsAttrs() &&
         WhatToInline != InlineSelection::Everything &&
-        Callee->hasSemanticsAttrThatStartsWith("availability")) {
+        (Callee->hasSemanticsAttrThatStartsWith("availability") ||
+         (Callee->hasSemanticsAttrThatStartsWith("inline_late")))) {
       return nullptr;
     }
+    if (Callee->hasSemanticsAttrs() &&
+        WhatToInline == InlineSelection::Everything) {
+      if (Callee->hasSemanticsAttrThatStartsWith("inline_late") && IsInStdlib) {
+        return nullptr;
+      }
+    }
+
   } else if (Callee->isGlobalInit()) {
     if (WhatToInline != InlineSelection::Everything) {
       return nullptr;
