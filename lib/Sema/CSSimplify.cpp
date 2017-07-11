@@ -1459,7 +1459,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Simplify the right-hand type and perform the "occurs" check.
         typeVar1 = getRepresentative(typeVar1);
         type2 = simplifyType(type2, flags);
-        if (typeVarOccursInType(typeVar1, type2))
+        if (typeVarOccursInType(typeVar1, type2) ||
+            type2->is<DependentMemberType>())
           return formUnsolvedResult();
 
         // Equal constraints allow mixed LValue/RValue bindings, but
@@ -1509,7 +1510,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Simplify the left-hand type and perform the "occurs" check.
       typeVar2 = getRepresentative(typeVar2);
       type1 = simplifyType(type1, flags);
-      if (typeVarOccursInType(typeVar2, type1))
+      if (typeVarOccursInType(typeVar2, type1) ||
+          type1->is<DependentMemberType>())
         return formUnsolvedResult();
 
       // Equal constraints allow mixed LValue/RValue bindings, but
@@ -1541,7 +1543,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Simplify the left-hand type and perform the "occurs" check.
         typeVar2 = getRepresentative(typeVar2);
         type1 = simplifyType(type1, flags);
-        if (typeVarOccursInType(typeVar2, type1))
+        if (typeVarOccursInType(typeVar2, type1) ||
+            type1->is<DependentMemberType>())
           return formUnsolvedResult();
 
         if (auto *iot = type1->getAs<InOutType>()) {
@@ -1554,7 +1557,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Simplify the right-hand type and perform the "occurs" check.
         typeVar1 = getRepresentative(typeVar1);
         type2 = simplifyType(type2, flags);
-        if (typeVarOccursInType(typeVar1, type2))
+        if (typeVarOccursInType(typeVar1, type2) ||
+            type2->is<DependentMemberType>())
           return formUnsolvedResult();
 
         if (auto *lvt = type2->getAs<LValueType>()) {
