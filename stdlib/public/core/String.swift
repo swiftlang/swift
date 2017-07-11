@@ -14,7 +14,7 @@ import SwiftShims
 
 /// A type that can represent a string as a collection of characters.
 public protocol StringProtocol
-  : RangeReplaceableCollection, BidirectionalCollection,
+  : BidirectionalCollection,
   TextOutputStream, TextOutputStreamable,
   LosslessStringConvertible, ExpressibleByStringLiteral,
   Hashable, Comparable

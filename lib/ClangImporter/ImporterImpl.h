@@ -181,6 +181,22 @@ enum class ImportTypeKind {
   Enum
 };
 
+enum class Bridgeability {
+  /// This context does not permit bridging at all.  For example, the
+  /// target of a C pointer.
+  None,
+
+  /// This context permits all kinds of bridging.  For example, the
+  /// imported result of a method declaration.
+  Full
+};
+
+static inline Bridgeability getTypedefBridgeability(clang::QualType type) {
+  return (type->isBlockPointerType() || type->isFunctionType())
+            ? Bridgeability::Full
+            : Bridgeability::None;
+}
+
 /// \brief Describes the kind of the C type that can be mapped to a stdlib
 /// swift type.
 enum class MappedCTypeKind {
@@ -893,16 +909,17 @@ public:
   /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
   ///        in certain contexts. If false, it will always be imported as UInt.
   ///
-  /// \param canFullyBridgeTypes True if we can bridge types losslessly.
-  ///        This is an additional guarantee on top of the ImportTypeKind
-  ///        cases that allow bridging, and applies to the entire type.
+  /// \param bridgeability Whether we can bridge types in this context.
+  ///        This may restrict the ability to bridge types even in contexts
+  ///        that otherwise allow bridging, such as function results and
+  ///        parameters.
   ///
   /// \returns The imported type, or null if this type could
   /// not be represented in Swift.
   Type importType(clang::QualType type,
                   ImportTypeKind kind,
                   bool allowNSUIntegerAsInt,
-                  bool canFullyBridgeTypes,
+                  Bridgeability bridgeability,
                   OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
                   bool resugarNSErrorPointer = true);
 

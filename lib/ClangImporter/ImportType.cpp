@@ -78,9 +78,6 @@ namespace {
       /// The source type is a CF object pointer type.
       CFPointer,
 
-      /// The source type is a C++ reference type.
-      Reference,
-
       /// The source type is a block pointer type.
       Block,
 
@@ -123,7 +120,6 @@ namespace {
     case ImportHint::BOOL:
     case ImportHint::Boolean:
     case ImportHint::NSUInteger:
-    case ImportHint::Reference:
     case ImportHint::Void:
       return false;
 
@@ -180,14 +176,14 @@ namespace {
   {
     ClangImporter::Implementation &Impl;
     bool AllowNSUIntegerAsInt;
-    bool CanFullyBridgeTypes;
+    Bridgeability Bridging;
 
   public:
     SwiftTypeConverter(ClangImporter::Implementation &impl,
                        bool allowNSUIntegerAsInt,
-                       bool canFullyBridgeTypes)
+                       Bridgeability bridging)
       : Impl(impl), AllowNSUIntegerAsInt(allowNSUIntegerAsInt),
-        CanFullyBridgeTypes(canFullyBridgeTypes) {}
+        Bridging(bridging) {}
 
     using TypeVisitor::Visit;
     ImportResult Visit(clang::QualType type) {
@@ -359,7 +355,7 @@ namespace {
         pointeeType = Impl.importType(pointeeQualType,
                                       ImportTypeKind::Pointee,
                                       AllowNSUIntegerAsInt,
-                                      /*isFullyBridgeable*/false);
+                                      Bridgeability::None);
 
       // If the pointed-to type is unrepresentable in Swift, import as
       // OpaquePointer.
@@ -407,7 +403,7 @@ namespace {
       Type pointeeType = Impl.importType(type->getPointeeType(),
                                          ImportTypeKind::Abstract,
                                          AllowNSUIntegerAsInt,
-                                         CanFullyBridgeTypes);
+                                         Bridging);
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
@@ -419,7 +415,7 @@ namespace {
     }
 
     ImportResult VisitReferenceType(const clang::ReferenceType *type) {
-      return { nullptr, ImportHint::Reference };
+      return Type();
     }
 
     ImportResult VisitMemberPointer(const clang::MemberPointerType *type) {
@@ -446,7 +442,7 @@ namespace {
       Type elementType = Impl.importType(type->getElementType(),
                                          ImportTypeKind::Pointee,
                                          AllowNSUIntegerAsInt,
-                                         /*isFullyBridgeable*/false);
+                                         Bridgeability::None);
       if (!elementType)
         return Type();
       
@@ -501,7 +497,7 @@ namespace {
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
                                       AllowNSUIntegerAsInt,
-                                      CanFullyBridgeTypes,
+                                      Bridging,
                                       OTK_Optional);
       if (!resultTy)
         return Type();
@@ -512,7 +508,7 @@ namespace {
            param != paramEnd; ++param) {
         auto swiftParamTy = Impl.importType(*param, ImportTypeKind::Parameter,
                                             AllowNSUIntegerAsInt,
-                                            CanFullyBridgeTypes,
+                                            Bridging,
                                             OTK_Optional);
         if (!swiftParamTy)
           return Type();
@@ -537,7 +533,7 @@ namespace {
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
                                       AllowNSUIntegerAsInt,
-                                      CanFullyBridgeTypes,
+                                      Bridging,
                                       OTK_Optional);
       if (!resultTy)
         return Type();
@@ -668,12 +664,32 @@ namespace {
         }
         // Any other interesting mapped types should be hinted here.
 
-      // Otherwise, recurse on the underlying type in order to compute
-      // the hint correctly.
+      // Otherwise, recurse on the underlying type.  We need to recompute
+      // the hint, and if the typedef uses different bridgeability than the
+      // context then we may also need to bypass the typedef.
       } else {
+        auto underlyingType = type->desugar();
+
+        // Figure out the bridgeability we would normally use for this typedef.
+        auto typedefBridgeability = getTypedefBridgeability(underlyingType);
+
+        // Figure out the typedef we should actually use.
+        auto underlyingBridgeability =
+          (Bridging == Bridgeability::Full
+             ? typedefBridgeability : Bridgeability::None);
         SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt,
-                                          /*can fully bridge*/false);
-        auto underlyingResult = innerConverter.Visit(type->desugar());
+                                          underlyingBridgeability);
+        auto underlyingResult = innerConverter.Visit(underlyingType);
+
+        // If we used different bridgeability than this typedef normally
+        // would because we're in a non-bridgeable context, and therefore
+        // the underlying type is different from the mapping of the typedef,
+        // use the underlying type.
+        if (underlyingBridgeability != typedefBridgeability &&
+            !underlyingResult.AbstractType->isEqual(mappedType)) {
+          return underlyingResult;
+        }
+
 #ifndef NDEBUG
         switch (underlyingResult.Hint) {
         case ImportHint::Block:
@@ -963,7 +979,7 @@ namespace {
             Type importedTypeArg = Impl.importType(typeArg,
                                                    ImportTypeKind::BridgedValue,
                                                    AllowNSUIntegerAsInt,
-                                                   CanFullyBridgeTypes,
+                                                   Bridging,
                                                    OTK_None);
             if (!importedTypeArg) {
               importedTypeArgs.clear();
@@ -1149,7 +1165,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         ImportTypeKind importKind,
                                         ImportHint hint,
                                         bool allowNSUIntegerAsInt,
-                                        bool canFullyBridgeTypes,
+                                        Bridgeability bridging,
                                         OptionalTypeKind optKind,
                                         bool resugarNSErrorPointer) {
   if (importKind == ImportTypeKind::Abstract) {
@@ -1168,21 +1184,6 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       (importKind == ImportTypeKind::Variable ||
        importKind == ImportTypeKind::AuditedVariable)) {
     return hint.BridgedType;
-  }
-
-  // Reference types are only permitted as function parameter types.
-  if (hint == ImportHint::Reference &&
-      importKind == ImportTypeKind::Parameter) {
-    auto refType = clangType->castAs<clang::ReferenceType>();
-    // Import the underlying type.
-    auto objectType = impl.importType(refType->getPointeeType(),
-                                      ImportTypeKind::Pointee,
-                                      allowNSUIntegerAsInt,
-                                      canFullyBridgeTypes);
-    if (!objectType)
-      return nullptr;
-
-    return InOutType::get(objectType);
   }
 
   // For anything else, if we completely failed to import the type
@@ -1279,10 +1280,14 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     importedType = outParamTy;
   }
 
-  // Turn block pointer types back into normal function types in any
-  // context where bridging is possible, unless the block has a typedef.
+  // SwiftTypeConverter turns block pointers into @convention(block) types.
+  // In a bridgeable context, or in the direct structure of a typedef,
+  // we would prefer to instead use the default Swift convention.  But this
+  // does means that, when we're using a typedef of a block pointer type in
+  // an unbridgable context, we need to go back and do a fully-unbridged
+  // import of the underlying type.
   if (hint == ImportHint::Block) {
-    if (!canFullyBridgeTypes) {
+    if (bridging == Bridgeability::None) {
       if (auto typedefType = clangType->getAs<clang::TypedefType>()) {
         // In non-bridged contexts, drop the typealias sugar for blocks.
         // FIXME: This will do the wrong thing if there's any adjustment to do
@@ -1290,7 +1295,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
         Type underlyingTy = impl.importType(typedefType->desugar(),
                                             importKind,
                                             allowNSUIntegerAsInt,
-                                            canFullyBridgeTypes,
+                                            bridging,
                                             OTK_None);
         if (Type unwrappedTy = underlyingTy->getAnyOptionalObjectType())
           underlyingTy = unwrappedTy;
@@ -1299,7 +1304,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       }
     }
 
-    if (canBridgeTypes(importKind) || importKind == ImportTypeKind::Typedef) {
+    if (bridging == Bridgeability::Full) {
       auto fTy = importedType->castTo<FunctionType>();
       FunctionType::ExtInfo einfo = fTy->getExtInfo();
       if (einfo.getRepresentation() != FunctionTypeRepresentation::Swift) {
@@ -1312,7 +1317,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
   // losslessly.
   if ((hint == ImportHint::BOOL || hint == ImportHint::Boolean) &&
-      canFullyBridgeTypes && canBridgeTypes(importKind)) {
+      bridging == Bridgeability::Full && canBridgeTypes(importKind)) {
     return impl.SwiftContext.getBoolDecl()->getDeclaredType();
   }
 
@@ -1341,7 +1346,9 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // If we have a bridged Objective-C type and we are allowed to
   // bridge, do so.
-  if (hint == ImportHint::ObjCBridged && canBridgeTypes(importKind) &&
+  if (hint == ImportHint::ObjCBridged &&
+      bridging == Bridgeability::Full &&
+      canBridgeTypes(importKind) &&
       importKind != ImportTypeKind::PropertyWithReferenceSemantics) {
     // id and Any can be bridged without Foundation. There would be
     // bootstrapping issues with the ObjectiveC module otherwise.
@@ -1391,7 +1398,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 Type ClangImporter::Implementation::importType(clang::QualType type,
                                                ImportTypeKind importKind,
                                                bool allowNSUIntegerAsInt,
-                                               bool canFullyBridgeTypes,
+                                               Bridgeability bridging,
                                                OptionalTypeKind optionality,
                                                bool resugarNSErrorPointer) {
   if (type.isNull())
@@ -1432,14 +1439,13 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
   }
 
   // Perform abstract conversion, ignoring how the type is actually used.
-  SwiftTypeConverter converter(*this, allowNSUIntegerAsInt,canFullyBridgeTypes);
+  SwiftTypeConverter converter(*this, allowNSUIntegerAsInt, bridging);
   auto importResult = converter.Visit(type);
 
   // Now fix up the type based on we're concretely using it.
   return adjustTypeForConcreteImport(*this, type, importResult.AbstractType,
                                      importKind, importResult.Hint,
-                                     allowNSUIntegerAsInt,
-                                     canFullyBridgeTypes,
+                                     allowNSUIntegerAsInt, bridging,
                                      optionality,
                                      resugarNSErrorPointer);
 }
@@ -1511,7 +1517,7 @@ Type ClangImporter::Implementation::importPropertyType(
   OptionalTypeKind optionality = OTK_ImplicitlyUnwrappedOptional;
   return importType(decl->getType(), importKind,
                     shouldAllowNSUIntegerAsInt(isFromSystemModule, decl),
-                    /*isFullyBridgeable*/ true, optionality);
+                    Bridgeability::Full, optionality);
 }
 
 /// Apply the @noescape attribute
@@ -1584,7 +1590,7 @@ Type ClangImporter::Implementation::importFunctionReturnType(
                     (isAuditedResult ? ImportTypeKind::AuditedResult
                                      : ImportTypeKind::Result),
                     allowNSUIntegerAsInt,
-                    /*isFullyBridgeable*/ true, OptionalityOfReturn);
+                    Bridgeability::Full, OptionalityOfReturn);
 }
 
 Type ClangImporter::Implementation::
@@ -1646,7 +1652,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // Import the parameter type into Swift.
     Type swiftParamTy =
         importType(paramTy, importKind, allowNSUIntegerAsInt,
-                   /*isFullyBridgeable*/ true, OptionalityOfParam);
+                   Bridgeability::Full, OptionalityOfParam);
     if (!swiftParamTy)
       return nullptr;
 
@@ -1937,7 +1943,7 @@ Type ClangImporter::Implementation::importMethodType(
   clang::QualType resultType = clangDecl->getReturnType();
   swiftResultTy = importType(resultType, resultKind,
                              allowNSUIntegerAsIntInResult,
-                             /*isFullyBridgeable*/true,
+                             Bridgeability::Full,
                              OptionalityOfReturn);
   // Adjust the result type for a throwing function.
   if (swiftResultTy && errorInfo) {
@@ -1945,7 +1951,7 @@ Type ClangImporter::Implementation::importMethodType(
     // Get the original unbridged result type.
     origSwiftResultTy = importType(resultType, resultKind,
                                allowNSUIntegerAsIntInResult,
-                               /*isFullyBridgeable*/false,
+                               Bridgeability::None,
                                OptionalityOfReturn)
                             ->getCanonicalType();
 
@@ -2060,7 +2066,7 @@ Type ClangImporter::Implementation::importMethodType(
       // being lazier.)
       swiftParamTy = importType(paramTy, importKind,
                                 allowNSUIntegerAsIntInParam,
-                                /*isFullyBridgeable*/true,
+                                Bridgeability::Full,
                                 optionalityOfParam,
                                 /*resugarNSErrorPointer=*/!paramIsError);
     }

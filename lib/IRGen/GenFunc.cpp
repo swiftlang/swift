@@ -930,7 +930,7 @@ static llvm::Function *emitPartialApplicationForwarder(
     SubstitutionMap subMap;
     if (auto genericSig = origType->getGenericSignature())
       subMap = genericSig->getSubstitutionMap(subs);
-    emitPolymorphicArguments(subIGF, origType, substType, subMap,
+    emitPolymorphicArguments(subIGF, origType, subMap,
                              &witnessMetadata, polyArgs);
   }
 
@@ -1134,7 +1134,7 @@ static llvm::Function *emitPartialApplicationForwarder(
       SubstitutionMap subMap;
       if (auto genericSig = origType->getGenericSignature())
         subMap = genericSig->getSubstitutionMap(subs);
-      emitPolymorphicArguments(subIGF, origType, substType, subMap,
+      emitPolymorphicArguments(subIGF, origType, subMap,
                                &witnessMetadata, polyArgs);
     }
   }

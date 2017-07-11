@@ -3282,14 +3282,23 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // expression (which may lead to infinite recursion).  If the client is
   // telling us that it knows what it is doing, then believe it.
   if (!options.contains(TCC_ForceRecheck)) {
-    if (Expr *res = CS->TC.isExprBeingDiagnosed(subExpr)) {
+    if (CS->TC.isExprBeingDiagnosed(subExpr)) {
+      auto exprAndCS = CS->TC.getExprBeingDiagnosed(subExpr);
+      auto *savedExpr = exprAndCS.first;
+      if (subExpr == savedExpr)
+        return subExpr;
+
+      auto *oldCS = exprAndCS.second;
+
       // The types on the result might have already been cached into
       // another CS, but likely not this one.
-      CS->cacheExprTypes(res);
-      return res;
+      if (oldCS != CS)
+        CS->transferExprTypes(oldCS, savedExpr);
+
+      return savedExpr;
     }
 
-    CS->TC.addExprForDiagnosis(subExpr, subExpr);
+    CS->TC.addExprForDiagnosis(subExpr, std::make_pair(subExpr, CS));
   }
 
   // Validate contextual type before trying to use it.
@@ -3377,8 +3386,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
     SavedTypeData.restore();
   }
   
-  CS->TC.addExprForDiagnosis(preCheckedExpr, subExpr);
   CS->cacheExprTypes(subExpr);
+  CS->TC.addExprForDiagnosis(preCheckedExpr, std::make_pair(subExpr, CS));
 
   return subExpr;
 }

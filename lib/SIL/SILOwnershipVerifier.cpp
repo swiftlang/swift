@@ -552,6 +552,24 @@ ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
+#define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(                          \
+    SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS, INST)                                \
+  OwnershipUseCheckerResult                                                    \
+      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+    assert(I->getNumOperands() && "Expected to have non-zero operands");       \
+    if (getType().is<AnyMetatypeType>()) {                                     \
+      return {true, false};                                                    \
+    }                                                                          \
+    assert(!isAddressOrTrivialType() &&                                        \
+           "Shouldn't have an address or a non trivial type");                 \
+    bool compatible = getOwnershipKind() == ValueOwnershipKind::Any ||         \
+                      !compatibleWithOwnership(ValueOwnershipKind::Trivial);   \
+    return {compatible, SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                 \
+  }
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(false, ClassMethod)
+#undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE
+
+// Trivial if trivial typed, otherwise must accept owned?
 #define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS, \
                                          INST)                                 \
   OwnershipUseCheckerResult                                                    \
@@ -565,7 +583,6 @@ ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
   }
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, SuperMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, BridgeObjectToWord)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
@@ -843,6 +860,10 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
     }
     // In case Base is Any.
     Base = MergedValue.getValue();
+  }
+
+  if (auto *E = getType().getEnumOrBoundGenericEnum()) {
+    return visitNonTrivialEnum(E, Base);
   }
 
   return {compatibleWithOwnership(Base), true};
@@ -2047,9 +2068,10 @@ void SILInstruction::verifyOperandOwnership() const {
   if (!getModule().getOptions().EnableSILOwnership)
     return;
 
-  // If the given function has unqualified ownership, there is nothing to
-  // verify.
-  if (getFunction()->hasUnqualifiedOwnership())
+  // If the given function has unqualified ownership or we have been asked by
+  // the user not to verify this function, there is nothing to verify.
+  if (getFunction()->hasUnqualifiedOwnership() ||
+      !getFunction()->shouldVerifyOwnership())
     return;
 
   // If we are testing the verifier, bail so we only print errors once when
@@ -2095,9 +2117,9 @@ void SILValue::verifyOwnership(SILModule &Mod,
   SILFunction *F = (*this)->getFunction();
   assert(F && "Instructions and arguments should have a function");
 
-  // If the given function has unqualified ownership, there is nothing further
-  // to verify.
-  if (F->hasUnqualifiedOwnership())
+  // If the given function has unqualified ownership or we have been asked by
+  // the user not to verify this function, there is nothing to verify.
+  if (F->hasUnqualifiedOwnership() || !F->shouldVerifyOwnership())
     return;
 
   ErrorBehaviorKind ErrorBehavior;

@@ -322,8 +322,13 @@ func testKeyPathSubscriptTuple(readonly: (Z,Z), writable: inout (Z,Z),
   writable[keyPath: rkp] = sink
 }
 
+func testKeyPathSubscriptLValue(base: Z, kp: inout KeyPath<Z, Z>) {
+  _ = base[keyPath: kp]
+}
+
 struct AA {
   subscript(x: Int) -> Int { return x }
+  subscript(labeled x: Int) -> Int { return x }
   var c: CC? = CC()
 }
 
@@ -348,6 +353,17 @@ func testMoreGeneralContext<T, U>(_: KeyPath<T, U>, with: T.Type) {}
 func testLiteralInMoreGeneralContext() {
   testMoreGeneralContext(\.property, with: A.self)
 }
+
+func testLabeledSubscript() {
+  let _: KeyPath<AA, Int> = \AA.[labeled: 0]
+  let _: KeyPath<AA, Int> = \.[labeled: 0]
+  let k = \AA.[labeled: 0]
+
+  // TODO: These ought to work without errors.
+  let _ = \AA.[keyPath: k] // expected-error{{}}
+  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error{{}}
+}
+
 
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}

@@ -549,9 +549,9 @@ the caller.  A non-autoreleased ``apply`` of a function that is defined
 with an autoreleased result has the effect of performing an
 autorelease in the callee.
 
-- The @noescape declaration attribute on Swift parameters (which is valid only
-  on parameters of function type, and is implied by the @autoclosure attribute)
-  is turned into a @noescape type attribute on SIL arguments.  @noescape
+- The ``@noescape`` declaration attribute on Swift parameters (which is valid only
+  on parameters of function type, and is implied by the ``@autoclosure`` attribute)
+  is turned into a ``@noescape`` type attribute on SIL arguments.  ``@noescape``
   indicates that the lifetime of the closure parameter will not be extended by
   the callee (e.g. the pointer will not be stored in a global variable).  It
   corresponds to the LLVM "nocapture" attribute in terms of semantics (but is

@@ -75,6 +75,12 @@ namespace swift {
     /// Get the name of the transform.
     llvm::StringRef getName() { return PassKindName(getPassKind()); }
 
+    /// Get the transform's (command-line) tag.
+    llvm::StringRef getTag() { return PassKindTag(getPassKind()); }
+
+    /// Get the transform's name as a C++ identifier.
+    llvm::StringRef getID() { return PassKindID(getPassKind()); }
+
   protected:
     /// \brief Searches for an analysis of type T in the list of registered
     /// analysis. If the analysis is not found, the program terminates.

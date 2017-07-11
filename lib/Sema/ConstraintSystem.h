@@ -1287,6 +1287,30 @@ private:
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
+  class TransferExprTypes : public ASTWalker {
+    ConstraintSystem &toCS;
+    ConstraintSystem &fromCS;
+
+  public:
+    TransferExprTypes(ConstraintSystem &toCS, ConstraintSystem &fromCS)
+        : toCS(toCS), fromCS(fromCS) {}
+
+    Expr *walkToExprPost(Expr *expr) override {
+      if (fromCS.hasType(expr))
+        toCS.setType(expr, fromCS.getType(expr));
+
+      return expr;
+    }
+
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
+  };
+
 public:
 
   void setExprTypes(Expr *expr) {
@@ -1310,6 +1334,10 @@ public:
   void cacheSubExprTypes(Expr *expr) {
     bool excludeRoot = true;
     expr->walk(CacheExprTypes(expr, *this, excludeRoot));
+  }
+
+  void transferExprTypes(ConstraintSystem *oldCS, Expr *expr) {
+    expr->walk(TransferExprTypes(*this, *oldCS));
   }
 
   /// \brief The current solver state.
@@ -2424,6 +2452,169 @@ public:
   SolutionKind simplifyConstraint(const Constraint &constraint);
   /// \brief Simplify the given disjunction choice.
   void simplifyDisjunctionChoice(Constraint *choice);
+
+private:
+  /// The kind of bindings that are permitted.
+  enum class AllowedBindingKind : unsigned char {
+    /// Only the exact type.
+    Exact,
+    /// Supertypes of the specified type.
+    Supertypes,
+    /// Subtypes of the specified type.
+    Subtypes
+  };
+
+  /// The kind of literal binding found.
+  enum class LiteralBindingKind : unsigned char {
+    None,
+    Collection,
+    Float,
+    Atom,
+  };
+
+  /// A potential binding from the type variable to a particular type,
+  /// along with information that can be used to construct related
+  /// bindings, e.g., the supertypes of a given type.
+  struct PotentialBinding {
+    /// The type to which the type variable can be bound.
+    Type BindingType;
+
+    /// The kind of bindings permitted.
+    AllowedBindingKind Kind;
+
+    /// The defaulted protocol associated with this binding.
+    Optional<ProtocolDecl *> DefaultedProtocol;
+
+    /// If this is a binding that comes from a \c Defaultable constraint,
+    /// the locator of that constraint.
+    ConstraintLocator *DefaultableBinding = nullptr;
+
+    PotentialBinding(Type type, AllowedBindingKind kind,
+                     Optional<ProtocolDecl *> defaultedProtocol = None,
+                     ConstraintLocator *defaultableBinding = nullptr)
+        : BindingType(type), Kind(kind), DefaultedProtocol(defaultedProtocol),
+          DefaultableBinding(defaultableBinding) {}
+
+    bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
+  };
+
+  struct PotentialBindings {
+    /// The set of potential bindings.
+    SmallVector<PotentialBinding, 4> Bindings;
+
+    /// Whether this type variable is fully bound by one of its constraints.
+    bool FullyBound = false;
+
+    /// Whether the bindings of this type involve other type variables.
+    bool InvolvesTypeVariables = false;
+
+    /// Whether this type variable has literal bindings.
+    LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
+
+    /// Whether this type variable is only bound above by existential types.
+    bool SubtypeOfExistentialType = false;
+
+    /// The number of defaultable bindings.
+    unsigned NumDefaultableBindings = 0;
+
+    /// Determine whether the set of bindings is non-empty.
+    explicit operator bool() const { return !Bindings.empty(); }
+
+    /// Whether there are any non-defaultable bindings.
+    bool hasNonDefaultableBindings() const {
+      return Bindings.size() > NumDefaultableBindings;
+    }
+
+    /// Compare two sets of bindings, where \c x < y indicates that
+    /// \c x is a better set of bindings that \c y.
+    friend bool operator<(const PotentialBindings &x,
+                          const PotentialBindings &y) {
+      return std::make_tuple(!x.hasNonDefaultableBindings(), x.FullyBound,
+                             x.SubtypeOfExistentialType,
+                             static_cast<unsigned char>(x.LiteralBinding),
+                             x.InvolvesTypeVariables,
+                             -(x.Bindings.size() - x.NumDefaultableBindings)) <
+             std::make_tuple(!y.hasNonDefaultableBindings(), y.FullyBound,
+                             y.SubtypeOfExistentialType,
+                             static_cast<unsigned char>(y.LiteralBinding),
+                             y.InvolvesTypeVariables,
+                             -(y.Bindings.size() - y.NumDefaultableBindings));
+    }
+
+    void foundLiteralBinding(ProtocolDecl *proto) {
+      switch (*proto->getKnownProtocolKind()) {
+      case KnownProtocolKind::ExpressibleByDictionaryLiteral:
+      case KnownProtocolKind::ExpressibleByArrayLiteral:
+      case KnownProtocolKind::ExpressibleByStringInterpolation:
+        LiteralBinding = LiteralBindingKind::Collection;
+        break;
+
+      case KnownProtocolKind::ExpressibleByFloatLiteral:
+        LiteralBinding = LiteralBindingKind::Float;
+        break;
+
+      default:
+        if (LiteralBinding != LiteralBindingKind::Collection)
+          LiteralBinding = LiteralBindingKind::Atom;
+        break;
+      }
+    }
+
+    void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
+              unsigned indent) const {
+      out.indent(indent);
+      out << "(";
+      if (typeVar)
+        out << "$T" << typeVar->getImpl().getID();
+      if (FullyBound)
+        out << " fully_bound";
+      if (SubtypeOfExistentialType)
+        out << " subtype_of_existential";
+      if (LiteralBinding != LiteralBindingKind::None)
+        out << " literal=" << static_cast<int>(LiteralBinding);
+      if (InvolvesTypeVariables)
+        out << " involves_type_vars";
+      if (NumDefaultableBindings > 0)
+        out << " defaultable_bindings=" << NumDefaultableBindings;
+      out << " bindings=";
+      interleave(Bindings,
+                 [&](const PotentialBinding &binding) {
+                   auto type = binding.BindingType;
+                   auto &ctx = type->getASTContext();
+                   llvm::SaveAndRestore<bool> debugConstraints(
+                       ctx.LangOpts.DebugConstraintSolver, true);
+                   switch (binding.Kind) {
+                   case AllowedBindingKind::Exact:
+                     break;
+
+                   case AllowedBindingKind::Subtypes:
+                     out << "(subtypes of) ";
+                     break;
+
+                   case AllowedBindingKind::Supertypes:
+                     out << "(supertypes of) ";
+                     break;
+                   }
+                   if (binding.DefaultedProtocol)
+                     out << "(default from "
+                         << (*binding.DefaultedProtocol)->getName() << ") ";
+                   out << type.getString();
+                 },
+                 [&]() { out << " "; });
+      out << ")\n";
+    }
+  };
+
+  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type,
+                                    bool *isNilLiteral = nullptr);
+  std::pair<PotentialBindings, TypeVariableType *> determineBestBindings();
+  PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
+
+  bool
+  tryTypeVariableBindings(unsigned depth, TypeVariableType *typeVar,
+                          ArrayRef<ConstraintSystem::PotentialBinding> bindings,
+                          SmallVectorImpl<Solution> &solutions,
+                          FreeTypeVariableBinding allowFreeTypeVariables);
 
 private:
   /// \brief Add a constraint to the constraint system.

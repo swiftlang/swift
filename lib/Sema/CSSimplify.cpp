@@ -520,27 +520,55 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   if (!path.empty() &&
       !(path.size() == 1 &&
         (path.back().getKind() == ConstraintLocator::ApplyArgument ||
-         path.back().getKind() == ConstraintLocator::SubscriptIndex)))
+         path.back().getKind() == ConstraintLocator::SubscriptIndex ||
+         path.back().getKind() == ConstraintLocator::KeyPathComponent)))
     return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
 
   // Dig out the callee.
-  Expr *calleeExpr;
+  ConstraintLocator *targetLocator;
   if (auto call = dyn_cast<CallExpr>(callExpr)) {
-    calleeExpr = call->getDirectCallee();
+    targetLocator = cs.getConstraintLocator(call->getDirectCallee());
     argLabels = call->getArgumentLabels();
     hasTrailingClosure = call->hasTrailingClosure();
   } else if (auto unresolved = dyn_cast<UnresolvedMemberExpr>(callExpr)) {
-    calleeExpr = callExpr;
+    targetLocator = cs.getConstraintLocator(callExpr);
     argLabels = unresolved->getArgumentLabels();
     hasTrailingClosure = unresolved->hasTrailingClosure();
   } else if (auto subscript = dyn_cast<SubscriptExpr>(callExpr)) {
-    calleeExpr = callExpr;
+    targetLocator = cs.getConstraintLocator(callExpr);
     argLabels = subscript->getArgumentLabels();
     hasTrailingClosure = subscript->hasTrailingClosure();
   } else if (auto dynSubscript = dyn_cast<DynamicSubscriptExpr>(callExpr)) {
-    calleeExpr = callExpr;
+    targetLocator = cs.getConstraintLocator(callExpr);
     argLabels = dynSubscript->getArgumentLabels();
     hasTrailingClosure = dynSubscript->hasTrailingClosure();
+  } else if (auto keyPath = dyn_cast<KeyPathExpr>(callExpr)) {
+    if (path.empty()
+        || path.back().getKind() != ConstraintLocator::KeyPathComponent)
+      return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+    
+    auto componentIndex = path.back().getValue();
+    if (componentIndex >= keyPath->getComponents().size())
+      return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+
+    auto &component = keyPath->getComponents()[componentIndex];
+    switch (component.getKind()) {
+    case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      targetLocator = cs.getConstraintLocator(keyPath, path.back());
+      argLabels = component.getSubscriptLabels();
+      hasTrailingClosure = false; // key paths don't support trailing closures
+      break;
+      
+    case KeyPathExpr::Component::Kind::Invalid:
+    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::OptionalForce:
+    case KeyPathExpr::Component::Kind::OptionalChain:
+    case KeyPathExpr::Component::Kind::OptionalWrap:
+      return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+    }
+
   } else {
     if (auto apply = dyn_cast<ApplyExpr>(callExpr)) {
       argLabels = apply->getArgumentLabels(argLabelsScratch);
@@ -551,11 +579,6 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     }
     return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
   }
-
-  // Determine the target locator.
-  // FIXME: Check whether the callee is of an expression kind that
-  // could describe a declaration. This is an optimization.
-  ConstraintLocator *targetLocator = cs.getConstraintLocator(calleeExpr);
 
   // Find the overload choice corresponding to the callee locator.
   // FIXME: This linearly walks the list of resolved overloads, which is
@@ -1059,9 +1082,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (auto elt = locator.last()) {
       if (elt->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer())) {
-          func2Input = paren2->getUnderlyingType();
-          if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer()))
-            func1Input = paren1->getUnderlyingType();
+          if (!isa<ParenType>(func1Input.getPointer()))
+            func2Input = paren2->getUnderlyingType();
         }
       }
     }
@@ -3883,6 +3905,8 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     case KeyPathExpr::Component::Kind::Invalid:
       break;
       
+    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
       // If no choice was made, leave the constraint unsolved.
@@ -3927,10 +3951,11 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       // Forcing an optional preserves its lvalue-ness.
       break;
     
-    case KeyPathExpr::Component::Kind::Property:
-    case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::OptionalWrap:
-      llvm_unreachable("already resolved");
+      // An optional chain should already have forced the entire key path to
+      // be read-only.
+      assert(capability == ReadOnly);
+      break;
     }
   }
 done:

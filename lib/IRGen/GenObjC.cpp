@@ -210,25 +210,32 @@ llvm::Value *irgen::emitObjCAutoreleaseReturnValue(IRGenFunction &IGF,
 }
 
 namespace {
-  /// A type-info implementation suitable for an ObjC pointer type.
-  class ObjCTypeInfo : public HeapTypeInfo<ObjCTypeInfo> {
+  /// A type-info implementation suitable for Builtin.UnknownObject.
+  class UnknownTypeInfo : public HeapTypeInfo<UnknownTypeInfo> {
   public:
-    ObjCTypeInfo(llvm::PointerType *storageType, Size size,
+    UnknownTypeInfo(llvm::PointerType *storageType, Size size,
                  SpareBitVector spareBits, Alignment align)
       : HeapTypeInfo(storageType, size, spareBits, align) {
     }
 
     /// Builtin.UnknownObject requires ObjC reference-counting.
     ReferenceCounting getReferenceCounting() const {
-      return ReferenceCounting::ObjC;
+      return ReferenceCounting::Unknown;
     }
   };
 } // end anonymous namespace
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinUnknownObject() {
-  return new ObjCTypeInfo(IGM.ObjCPtrTy, IGM.getPointerSize(),
-                          IGM.getHeapObjectSpareBits(),
-                          IGM.getPointerAlignment());
+  // UnknownObject is only interestingly different from NativeObject on
+  // platforms with ObjC interop.
+  if (IGM.Context.LangOpts.EnableObjCInterop) {
+    return new UnknownTypeInfo(IGM.ObjCPtrTy, IGM.getPointerSize(),
+                               IGM.getHeapObjectSpareBits(),
+                               IGM.getPointerAlignment());
+  }
+  
+  // Without ObjC interop, UnknownObject handles just like a NativeObject.
+  return convertBuiltinNativeObject();
 }
 
 namespace {

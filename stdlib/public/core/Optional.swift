@@ -182,7 +182,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///         return overflowed ? nil : result
   ///     }
   ///     print(nonOverflowingSquare)
-  ///     // Prints "Optional(1746)"
+  ///     // Prints "Optional(1764)"
   ///
   /// - Parameter transform: A closure that takes the unwrapped value
   ///   of the instance.  

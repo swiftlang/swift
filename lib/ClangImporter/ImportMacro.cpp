@@ -91,7 +91,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     auto clangTy = parsed->getType();
     auto literalType = Impl.importType(clangTy, ImportTypeKind::Value,
                                        isInSystemModule(DC),
-                                       /*isFullyBridgeable*/false);
+                                       Bridgeability::None);
     if (!literalType)
       return nullptr;
 
@@ -101,7 +101,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     } else {
       constantType = Impl.importType(castType, ImportTypeKind::Value,
                                      isInSystemModule(DC),
-                                     /*isFullyBridgeable*/false);
+                                     Bridgeability::None);
       if (!constantType)
         return nullptr;
     }
@@ -278,7 +278,7 @@ static Optional<std::pair<llvm::APSInt, Type>>
       auto type  = impl.importType(literal->getType(),
                                    ImportTypeKind::Value,
                                    isInSystemModule(DC),
-                                   /*isFullyBridgeable*/false);
+                                   Bridgeability::None);
       return {{ value, type }};
     }
 

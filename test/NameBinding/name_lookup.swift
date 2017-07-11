@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -typo-correction-limit 100
 
 class ThisBase1 {
   init() { }

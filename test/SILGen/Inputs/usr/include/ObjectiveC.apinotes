@@ -1,0 +1,120 @@
+---
+Name: ObjectiveC
+Classes:
+- Name: NSObject
+  SwiftName: NSObject
+  Methods:
+  - Selector: alloc
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: 'allocWithZone:'
+    MethodKind: Class
+    Nullability:
+    - S
+    NullabilityOfRet: N
+  - Selector: class
+    MethodKind: Class
+    Availability: nonswift
+    AvailabilityMsg: use 'self' instead
+  - Selector: 'conformsToProtocol:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: copy
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: dealloc
+    MethodKind: Instance
+    Availability: nonswift
+    AvailabilityMsg: use 'deinit' to define a de-initializer
+  - Selector: debugDescription
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: description
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: 'forwardingTargetForSelector:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: 'forwardInvocation:'
+    MethodKind: Instance
+    Availability: nonswift
+  - Selector: init
+    MethodKind: Instance
+    NullabilityOfRet: N
+    DesignatedInit: true
+  - Selector: 'instanceMethodSignatureForSelector:'
+    MethodKind: Class
+    Availability: nonswift
+  - Selector: 'isSubclassOfClass:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'methodSignatureForSelector:'
+    MethodKind: Instance
+    Availability: nonswift
+  - Selector: mutableCopy
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: new
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: superclass
+    MethodKind: Class
+    NullabilityOfRet: O
+- Name: Object
+  Methods:
+  - Selector: init
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'isEqual:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+Protocols:
+- Name: NSObject
+  SwiftName: NSObjectProtocol
+  Methods:
+  - Selector: class
+    MethodKind: Instance
+    Availability: nonswift
+    AvailabilityMsg: use 'type(of:)' instead
+  - Selector: 'conformsToProtocol:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'isEqual:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'isKindOfClass:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'isMemberOfClass:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: self
+    MethodKind: Instance
+    NullabilityOfRet: N
+  Properties:
+  - Name: debugDescription
+    Nullability: N
+  - Name: description
+    Nullability: N
+  - Name: superclass
+    Nullability: O
+Tags:
+- Name: _NSZone
+  SwiftName: _NSZone
+

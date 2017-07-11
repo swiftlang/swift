@@ -1,3 +1,5 @@
+import APINotesTest
+
 public struct S1 {
   public init(_ : Double) {}
   mutating public func foo1() {}
@@ -25,3 +27,5 @@ public typealias C3 = C1
 public struct NSSomestruct2 {
   public static func foo1(_ a : C3) {}
 }
+
+public class C4: NewType {}
