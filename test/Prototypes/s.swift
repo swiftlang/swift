@@ -1,6 +1,4 @@
-// RUN: %target-run-stdlib-swift -O
-
-import Swift
+// RUN: %target-run-simple-swift -O
 
 import Dispatch
 import Darwin
@@ -45,7 +43,7 @@ func test_newStringCore(
   assert(cat.elementsEqual(cat.indices.map { cat[$0] }), "cat failure")
   */
   
-  assert(MemoryLayout<String._Content>.size <= 16)
+  assert(MemoryLayout<String._Testable.UTF16View>.size <= 16)
   
   func time(_ _caller : String = #function, body: ()->()) {
     time_(_caller, body)
@@ -63,7 +61,7 @@ func test_newStringCore(
   let arrays = cores.map(Array.init)
   
   let contents = cores.map {
-    String._Content.UTF16View(legacy: $0)
+    String._Testable.UTF16View(legacy: $0)
   }
 
   var N = 20000
@@ -122,7 +120,7 @@ func test_newStringCore(
     time {
       for _ in 0...10*N {
         for a in arrays {
-          total = total &+ String._Content.UTF16View(a).count
+          total = total &+ String._Testable.UTF16View(a).count
         }
       }
     }
@@ -158,10 +156,10 @@ func test_newStringCore(
   */
   
   let a_old = "a"._core
-  let a_new = String._Content.UTF16View(a_old)
+  let a_new = String._Testable.UTF16View(a_old)
   
   let short8_old = ["b","c","d","pizza"].map { $0._core }
-  let short8_new = short8_old.map { String._Content.UTF16View($0) }
+  let short8_new = short8_old.map { String._Testable.UTF16View($0) }
   
   @inline(never)
   func  appendManyTinyASCIIFragments_ToASCII_old() {
@@ -193,7 +191,7 @@ func test_newStringCore(
   print()
   
   let short16_old = ["🎉","c","d","pizza"].map { $0._core }
-  let short16_new = short16_old.map { String._Content.UTF16View($0) }
+  let short16_new = short16_old.map { String._Testable.UTF16View($0) }
 
   @inline(never)
   func  appendManyTinyFragmentsOfBothWidths_old() {
@@ -225,10 +223,10 @@ func test_newStringCore(
   print()
   
   let ghost_old = "👻"._core
-  let ghost_new = String._Content.UTF16View(ghost_old)
+  let ghost_new = String._Testable.UTF16View(ghost_old)
   
   let long_old = "Swift is a multi-paradigm, compiled programming language created for iOS, OS X, watchOS, tvOS and Linux development by Apple Inc. Swift is designed to work with Apple's Cocoa and Cocoa Touch frameworks and the large body of existing Objective-C code written for Apple products. Swift is intended to be more resilient to erroneous code (\"safer\") than Objective-C and also more concise. It is built with the LLVM compiler framework included in Xcode 6 and later and uses the Objective-C runtime, which allows C, Objective-C, C++ and Swift code to run within a single program."._core
-  let long_new = String._Content.UTF16View(long_old)
+  let long_new = String._Testable.UTF16View(long_old)
   
   @inline(never)
   func appendManyLongASCII_ToUTF16_old() {
