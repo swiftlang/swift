@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -Xfrontend -enable-experimental-keypath-components -o %t/a.out
+// RUN: %target-build-swift %s -Xfrontend -enable-sil-ownership -Xfrontend -enable-experimental-keypath-components -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -447,6 +447,52 @@ keyPath.test("computed generic key paths") {
   let valuePathNonGeneric = pathNonGeneric.appending(path: \LifetimeTracked.value)
   expectEqual(valuePath, valuePathNonGeneric)
   expectEqual(valuePath.hashValue, valuePathNonGeneric.hashValue)
+}
+
+var numberOfMutatingWritebacks = 0
+var numberOfNonmutatingWritebacks = 0
+
+struct NoisyWriteback {
+  var canary = LifetimeTracked(246)
+
+  var mutating: LifetimeTracked {
+    get { return canary }
+    set { numberOfMutatingWritebacks += 1 }
+  }
+
+  var nonmutating: LifetimeTracked {
+    get { return canary }
+    nonmutating set { numberOfNonmutatingWritebacks += 1 }
+  }
+}
+
+keyPath.test("read-only accesses don't trigger writebacks") {
+  var x = NoisyWriteback()
+  x = NoisyWriteback() // suppress "never mutated" warnings
+
+  let wkp = \NoisyWriteback.mutating
+  let rkp = \NoisyWriteback.nonmutating
+
+  numberOfMutatingWritebacks = 0
+  numberOfNonmutatingWritebacks = 0
+  _ = x[keyPath: wkp]
+  _ = x[keyPath: rkp]
+
+  expectEqual(x[keyPath: wkp].value, 246)
+  expectEqual(x[keyPath: rkp].value, 246)
+
+  expectEqual(numberOfMutatingWritebacks, 0)
+  expectEqual(numberOfNonmutatingWritebacks, 0)
+
+  let y = x
+  _ = y[keyPath: wkp]
+  _ = y[keyPath: rkp]
+
+  expectEqual(y[keyPath: wkp].value, 246)
+  expectEqual(y[keyPath: rkp].value, 246)
+
+  expectEqual(numberOfMutatingWritebacks, 0)
+  expectEqual(numberOfNonmutatingWritebacks, 0)
 }
 
 runAllTests()
