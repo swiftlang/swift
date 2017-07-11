@@ -640,7 +640,7 @@ ERROR(unspaced_unary_operator,none,
 
 
 ERROR(use_unresolved_identifier,none,
-      "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
+      "use of unresolved %select{identifier|operator}1 '%0'", (StringRef, bool))
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",

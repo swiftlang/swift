@@ -450,8 +450,25 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
     performTypoCorrection(DC, UDRE->getRefKind(), Type(), Name, Loc,
                           lookupOptions, Lookup);
+    
+    // Check if any lookups share a basename. If that's the case, we need
+    // to disambiguate the diagnostic by printing the UDRE's full name.
+    //
+    // We need to build a string here because the default printing behavior for
+    // DeclNames skips printing arguments if all the names are empty. Because
+    // we want to be explicit if there is any ambiguity in the unresolved
+    // identifiers, we explicitly get the full serialized DeclName for this
+    // diagnostic.
+    StringRef nameStr = Name.getBaseName().str();
+    llvm::SmallString<10> scratch;
+    for (auto &result : Lookup) {
+      if (result->getBaseName() == Name.getBaseName()) {
+        nameStr = Name.getString(scratch);
+        break;
+      }
+    }
 
-    diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
+    diagnose(Loc, diag::use_unresolved_identifier, nameStr, Name.isOperator())
       .highlight(UDRE->getSourceRange());
 
     Identifier simpleName = Name.getBaseIdentifier();
