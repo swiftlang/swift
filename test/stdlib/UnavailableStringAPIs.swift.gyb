@@ -26,26 +26,14 @@ func test_UTF16ViewSubscriptByInt(x: String.UTF16View, i: Int, r: Range<Int>) {
 % end
 
 func test_UTF8View(s: String.UTF8View, i: String.UTF8View.Index, d: Int) {
-  _ = i.successor() // expected-error {{'successor()' is unavailable: To get the next index call 'index(after:)' on the UTF8View instance that produced the index.}} {{none}}
-  _ = i.predecessor() // expected-error {{value of type 'String.UTF8View.Index' has no member 'predecessor'}} {{none}}
-  _ = i.advancedBy(d) // expected-error {{'advancedBy' is unavailable: To advance an index by n steps call 'index(_:offsetBy:)' on the UTF8View instance that produced the index.}} {{none}}
-  _ = i.advancedBy(d, limit: i) // expected-error {{'advancedBy(_:limit:)' is unavailable: To advance an index by n steps stopping at a given limit call 'index(_:offsetBy:limitedBy:)' on UTF8View instance that produced the index.  Note that the Swift 3 API returns 'nil' when trying to advance past the limit; the Swift 2 API returned the limit.}} {{none}}
-  _ = i.distanceTo(i) // expected-error {{'distanceTo' is unavailable: To find the distance between two indices call 'distance(from:to:)' on the UTF8View instance that produced the index.}} {{none}}
-
   _ = s.index(after: i) // OK
-  _ = s.index(before: i) // expected-error {{before:}}
+  _ = s.index(before: i) // expected-error {{before:}} expected-note {{overloads}}
   _ = s.index(i, offsetBy: d) // OK
   _ = s.index(i, offsetBy: d, limitedBy: i) // OK
   _ = s.distance(from: i, to: i) // OK
 }
 
 func test_UTF16View(s: String.UTF16View, i: String.UTF16View.Index, d: Int) {
-  _ = i.successor() // expected-error {{'successor()' is unavailable: To get the next index call 'index(after:)' on the UTF16View instance that produced the index.}} {{none}}
-  _ = i.predecessor() // expected-error {{'predecessor()' is unavailable: To get the previous index call 'index(before:)' on the UTF16View instance that produced the index.}} {{none}}
-  _ = i.advancedBy(d) // expected-error {{'advancedBy' is unavailable: To advance an index by n steps call 'index(_:offsetBy:)' on the UTF16View instance that produced the index.}} {{none}}
-  _ = i.advancedBy(d, limit: i) // expected-error {{'advancedBy(_:limit:)' is unavailable: To advance an index by n steps stopping at a given limit call 'index(_:offsetBy:limitedBy:)' on UTF16View instance that produced the index.  Note that the Swift 3 API returns 'nil' when trying to advance past the limit; the Swift 2 API returned the limit.}} {{none}}
-  _ = i.distanceTo(i) // expected-error {{'distanceTo' is unavailable: To find the distance between two indices call 'distance(from:to:)' on the UTF16View instance that produced the index.}} {{none}}
-
   _ = s.index(after: i) // OK
   _ = s.index(before: i) // OK
   _ = s.index(i, offsetBy: d) // OK
@@ -54,12 +42,6 @@ func test_UTF16View(s: String.UTF16View, i: String.UTF16View.Index, d: Int) {
 }
 
 func test_UnicodeScalarView(s: String.UnicodeScalarView, i: String.UnicodeScalarView.Index, d: Int) {
-  _ = i.successor() // expected-error {{'successor()' is unavailable: To get the next index call 'index(after:)' on the UnicodeScalarView instance that produced the index.}} {{none}}
-  _ = i.predecessor() // expected-error {{'predecessor()' is unavailable: To get the previous index call 'index(before:)' on the UnicodeScalarView instance that produced the index.}} {{none}}
-  _ = i.advancedBy(d) // expected-error {{'advancedBy' is unavailable: To advance an index by n steps call 'index(_:offsetBy:)' on the UnicodeScalarView instance that produced the index.}} {{none}}
-  _ = i.advancedBy(d, limit: i) // expected-error {{'advancedBy(_:limit:)' is unavailable: To advance an index by n steps stopping at a given limit call 'index(_:offsetBy:limitedBy:)' on UnicodeScalarView instance that produced the index.  Note that the Swift 3 API returns 'nil' when trying to advance past the limit; the Swift 2 API returned the limit.}} {{none}}
-  _ = i.distanceTo(i) // expected-error {{'distanceTo' is unavailable: To find the distance between two indices call 'distance(from:to:)' on the UnicodeScalarView instance that produced the index.}} {{none}}
-
   _ = s.index(after: i) // OK
   _ = s.index(before: i) // OK
   _ = s.index(i, offsetBy: d) // OK
@@ -68,12 +50,6 @@ func test_UnicodeScalarView(s: String.UnicodeScalarView, i: String.UnicodeScalar
 }
 
 func test_CharacterView(s: String.CharacterView, i: String.CharacterView.Index, d: Int) {
-  _ = i.successor() // expected-error {{'successor()' is unavailable: To get the next index call 'index(after:)' on the CharacterView instance that produced the index.}} {{none}}
-  _ = i.predecessor() // expected-error {{'predecessor()' is unavailable: To get the previous index call 'index(before:)' on the CharacterView instance that produced the index.}} {{none}}
-  _ = i.advancedBy(d) // expected-error {{'advancedBy' is unavailable: To advance an index by n steps call 'index(_:offsetBy:)' on the CharacterView instance that produced the index.}} {{none}}
-  _ = i.advancedBy(d, limit: i) // expected-error {{'advancedBy(_:limit:)' is unavailable: To advance an index by n steps stopping at a given limit call 'index(_:offsetBy:limitedBy:)' on CharacterView instance that produced the index.  Note that the Swift 3 API returns 'nil' when trying to advance past the limit; the Swift 2 API returned the limit.}} {{none}}
-  _ = i.distanceTo(i) // expected-error {{'distanceTo' is unavailable: To find the distance between two indices call 'distance(from:to:)' on the CharacterView instance that produced the index.}} {{none}}
-
   _ = s.index(after: i) // OK
   _ = s.index(before: i) // OK
   _ = s.index(i, offsetBy: d) // OK

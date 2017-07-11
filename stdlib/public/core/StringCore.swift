@@ -428,7 +428,6 @@ public struct _StringCore {
       // In order to grow the substring in place, this _StringCore should point
       // at the substring at the end of a _StringBuffer.  Otherwise, some other
       // String is using parts of the buffer beyond our last byte.
-      let usedStart = _pointer(toElementAt:0)
       let usedEnd = _pointer(toElementAt:count)
 
       // Attempt to claim unused capacity in the buffer

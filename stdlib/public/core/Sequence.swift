@@ -323,9 +323,11 @@ public protocol IteratorProtocol {
 /// traverse a sequence should be considered O(*n*) unless documented
 /// otherwise.
 public protocol Sequence {
+  /// A type representing the sequence's elements.
+  associatedtype Element
+
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  associatedtype Element
   associatedtype Iterator : IteratorProtocol where Iterator.Element == Element
 
   /// A type that represents a subsequence of some of the sequence's elements.
