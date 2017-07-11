@@ -93,11 +93,11 @@ SubstringTests.test("Comparison") {
 }
 
 SubstringTests.test("Filter") {
-	var name = "😂Edward Woodward".dropFirst()
-	var filtered = name.filter { $0 != "d" }
-	expectType(Substring.self, &name)
-	expectType(String.self, &filtered)
-	expectEqual("Ewar Woowar", filtered)
+  var name = "😂Edward Woodward".dropFirst()
+  var filtered = name.filter { $0 != "d" }
+  expectType(Substring.self, &name)
+  expectType(String.self, &filtered)
+  expectEqual("Ewar Woowar", filtered)
 }
 
 SubstringTests.test("CharacterView") {
