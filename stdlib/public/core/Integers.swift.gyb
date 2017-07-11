@@ -2292,7 +2292,7 @@ ${unsafeOperationComment(x.operator)}
   }
 % end
 
-  @_transparent
+  @inline(__always)
   public init<T : BinaryInteger>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} || source.bitWidth <= ${word_bits} {
       self = Self.init(_truncatingBits: source._lowWord)
