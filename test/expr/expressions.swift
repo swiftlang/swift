@@ -322,11 +322,22 @@ var oct_literal_test: Int64 = 0123
 assert(oct_literal_test == 123)
 
 // ensure that we swallow random invalid chars after the first invalid char
-var invalid_num_literal: Int64 = 0QWERTY  // expected-error{{expected a digit after integer literal prefix}}
-var invalid_bin_literal: Int64 = 0bQWERTY // expected-error{{expected a digit after integer literal prefix}}
-var invalid_hex_literal: Int64 = 0xQWERTY // expected-error{{expected a digit after integer literal prefix}}
-var invalid_oct_literal: Int64 = 0oQWERTY // expected-error{{expected a digit after integer literal prefix}}
-var invalid_exp_literal: Double = 1.0e+QWERTY // expected-error{{expected a digit in floating point exponent}}
+var invalid_num_literal: Int64 = 0QWERTY  // expected-error{{'Q' is not a valid digit in integer literal}}
+var invalid_bin_literal: Int64 = 0bQWERTY // expected-error{{'Q' is not a valid binary digit (0 or 1) in integer literal}}
+var invalid_hex_literal: Int64 = 0xQWERTY // expected-error{{'Q' is not a valid hexadecimal digit (0-9, A-F) in integer literal}}
+var invalid_oct_literal: Int64 = 0oQWERTY // expected-error{{'Q' is not a valid octal digit (0-7) in integer literal}}
+var invalid_exp_literal: Double = 1.0e+QWERTY // expected-error{{'Q' is not a valid digit in floating point exponent}}
+var invalid_fp_exp_literal: Double = 0x1p+QWERTY // expected-error{{'Q' is not a valid digit in floating point exponent}}
+
+// don't emit a partial integer literal if the invalid char is valid for identifiers.
+var invalid_num_literal_prefix: Int64 = 0a1234567 // expected-error{{'a' is not a valid digit in integer literal}}
+var invalid_num_literal_middle: Int64 = 0123A5678 // expected-error{{'A' is not a valid digit in integer literal}}
+var invalid_bin_literal_middle: Int64 = 0b1020101 // expected-error{{'2' is not a valid binary digit (0 or 1) in integer literal}}
+var invalid_oct_literal_middle: Int64 = 0o1357864 // expected-error{{'8' is not a valid octal digit (0-7) in integer literal}}
+var invalid_hex_literal_middle: Int64 = 0x147ADG0 // expected-error{{'G' is not a valid hexadecimal digit (0-9, A-F) in integer literal}}
+
+var invalid_hex_literal_exponent_ = 0xffp+12abc // expected-error{{'a' is not a valid digit in floating point exponent}}
+var invalid_float_literal_exponent = 12e1abc // expected-error{{'a' is not a valid digit in floating point exponent}}
 
 // rdar://11088443
 var negative_int32: Int32 = -1
@@ -427,8 +438,8 @@ var fl_separator6: Double = 1_000.200_001e1_000
 var fl_separator7: Double = 0x1_.0FFF_p1_
 var fl_separator8: Double = 0x1_0000.0FFF_ABCDp10_001
 
-var fl_bad_separator1: Double = 1e_ // expected-error {{expected a digit in floating point exponent}}
-var fl_bad_separator2: Double = 0x1p_ // expected-error {{expected a digit in floating point exponent}} expected-error{{'_' can only appear in a pattern or on the left side of an assignment}} expected-error {{consecutive statements on a line must be separated by ';'}} {{37-37=;}}
+var fl_bad_separator1: Double = 1e_ // expected-error {{'_' is not a valid first character in floating point exponent}}
+var fl_bad_separator2: Double = 0x1p_ // expected-error {{'_' is not a valid first character in floating point exponent}}
 
 //===----------------------------------------------------------------------===//
 // String Literals
