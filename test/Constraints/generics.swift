@@ -446,3 +446,35 @@ func sr3525_3<T>(t: SR_3525<T>) {
 class testStdlibType {
   let _: Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
 }
+
+// rdar://problem/32697033
+protocol P3 {
+    associatedtype InnerAssoc
+}
+
+protocol P4 {
+    associatedtype OuterAssoc: P3
+}
+
+struct S3 : P3 {
+  typealias InnerAssoc = S4
+}
+
+struct S4: P4 {
+  typealias OuterAssoc = S3
+}
+
+public struct S5 {
+    func f<Model: P4, MO> (models: [Model])
+        where Model.OuterAssoc == MO, MO.InnerAssoc == Model {
+    }
+
+    func g<MO, Model: P4> (models: [Model])
+        where Model.OuterAssoc == MO, MO.InnerAssoc == Model {
+    }
+
+    func f(arr: [S4]) {
+        f(models: arr)
+        g(models: arr)
+    }
+}
