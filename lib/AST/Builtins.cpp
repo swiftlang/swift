@@ -217,10 +217,15 @@ getBuiltinGenericFunction(Identifier Id,
   for (unsigned i = 0, e = ArgParamTypes.size(); i < e; i++) {
     auto paramType = ArgBodyTypes[i];
     auto paramIfaceType = ArgParamTypes[i].getType();
-    auto PD = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
+    auto specifier = (ArgParamTypes[i].getParameterFlags().isInOut())
+                   ? VarDecl::Specifier::InOut
+                   : VarDecl::Specifier::Owned;
+    auto PD = new (Context) ParamDecl(specifier,
+                                      SourceLoc(), SourceLoc(),
                                       Identifier(), SourceLoc(),
-                                      Identifier(), paramType, DC);
-    PD->setInterfaceType(paramIfaceType);
+                                      Identifier(),
+                                      paramType->getInOutObjectType(), DC);
+    PD->setInterfaceType(paramIfaceType->getInOutObjectType());
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -491,8 +496,12 @@ namespace {
     }
 
     template <class G>
-    void addParameter(const G &generator) {
-      InterfaceParams.push_back(generator.build(*this, false));
+    void addParameter(const G &generator, bool isInOut = false) {
+      Type gTyIface = generator.build(*this, false);
+      assert(isInOut || !gTyIface->is<InOutType>());
+      auto iFaceflags = ParameterTypeFlags().withInOut(isInOut);
+      InterfaceParams.push_back(TupleTypeElt(gTyIface->getInOutObjectType(),
+                                             Identifier(), iFaceflags));
       BodyParams.push_back(generator.build(*this, true));
     }
 
@@ -549,13 +558,6 @@ namespace {
       }
     };
     template <class T>
-    struct InOutGenerator {
-      T Object;
-      Type build(BuiltinGenericSignatureBuilder &builder, bool forBody) const {
-        return InOutType::get(Object.build(builder, forBody));
-      }
-    };
-    template <class T>
     struct MetatypeGenerator {
       T Object;
       Optional<MetatypeRepresentation> Repr;
@@ -594,12 +596,6 @@ static BuiltinGenericSignatureBuilder::FunctionGenerator<T,U>
 makeFunction(const T &arg, const U &result,
              FunctionType::ExtInfo extInfo = FunctionType::ExtInfo()) {
   return { arg, result, extInfo };
-}
-
-template <class T>
-static BuiltinGenericSignatureBuilder::InOutGenerator<T>
-makeInOut(const T &object) {
-  return { object };
 }
 
 template <class T>
@@ -667,7 +663,7 @@ static ValueDecl *getIsUniqueOperation(ASTContext &Context, Identifier Id) {
   Type Int1Ty = BuiltinIntegerType::get(1, Context);
 
   BuiltinGenericSignatureBuilder builder(Context);
-  builder.addParameter(makeInOut(makeGenericParam()));
+  builder.addParameter(makeGenericParam(), /*isInOut*/true);
   builder.setResult(makeConcrete(Int1Ty));
   return builder.build(Id);
 }
@@ -936,7 +932,7 @@ static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   BuiltinGenericSignatureBuilder builder(Context);
-  builder.addParameter(makeInOut(makeGenericParam()));
+  builder.addParameter(makeGenericParam(), /*isInOut*/true);
   builder.setResult(makeConcrete(Context.TheRawPointerType));
   return builder.build(Id);
 }
