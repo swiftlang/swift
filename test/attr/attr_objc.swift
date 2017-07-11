@@ -2262,3 +2262,23 @@ extension SubclassInfersFromProtocol2 {
 @objc class NeverReturningMethod {
   @objc func doesNotReturn() -> Never {}
 }
+
+// SR-5025
+class User: NSObject {
+}
+
+@objc extension User {
+	var name: String {
+		get {
+			return "No name"
+		}
+		set {
+			// Nothing
+		}
+	}
+
+	var other: String {
+    unsafeAddress { // expected-error{{addressors are not allowed to be marked @objc}}
+    }
+  }
+}
