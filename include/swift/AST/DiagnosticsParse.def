@@ -320,9 +320,12 @@ ERROR(static_func_decl_global_scope,none,
       (StaticSpellingKind))
 ERROR(func_decl_expected_arrow,none,
       "expected '->' after function parameter tuple", ())
-WARNING(operator_static_in_protocol,none,
+WARNING(swift3_operator_static_in_protocol,none,
         "operator '%0' declared in protocol must be 'static'",
         (StringRef))
+ERROR(operator_static_in_protocol,none,
+      "operator '%0' declared in protocol must be 'static'",
+      (StringRef))
 
 // Enum
 ERROR(expected_lbrace_enum,PointsToFirstBadToken,
