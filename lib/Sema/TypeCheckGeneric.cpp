@@ -486,6 +486,26 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
                                    source);
       }
     }
+
+    // If this is a materializeForSet, infer requirements from the
+    // storage type instead, since it's not part of the accessor's
+    // type signature.
+    if (fn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
+      if (builder) {
+        auto *storage = fn->getAccessorStorageDecl();
+        if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(storage)) {
+          auto source =
+            GenericSignatureBuilder::FloatingRequirementSource::forInferred(
+                subscriptDecl->getElementTypeLoc().getTypeRepr(),
+                /*quietly=*/true);
+
+          TypeLoc type(nullptr, subscriptDecl->getElementInterfaceType());
+          assert(type.getType());
+          builder->inferRequirements(*func->getParentModule(),
+                                     type, source);
+        }
+      }
+    }
   }
 
   return badType;
