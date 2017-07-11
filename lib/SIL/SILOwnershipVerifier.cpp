@@ -893,8 +893,10 @@ OwnershipCompatibilityUseChecker::visitStoreUnownedInst(StoreUnownedInst *I) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitStoreWeakInst(StoreWeakInst *I) {
+  // A store_weak instruction implies that the value to be stored to be live,
+  // but it does not touch the strong reference count of the value.
   if (getValue() == I->getSrc())
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
+    return {true, false};
   return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
 }
 
