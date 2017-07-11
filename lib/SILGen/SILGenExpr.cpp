@@ -15,6 +15,7 @@
 #include "ArgumentSource.h"
 #include "Callee.h"
 #include "Condition.h"
+#include "Conversion.h"
 #include "ExitableFullExpr.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -509,6 +510,122 @@ namespace {
   };
 } // end anonymous namespace
 
+namespace {
+  struct BridgingConversion {
+    Expr *SubExpr;
+    Conversion::KindTy Kind;
+    unsigned MaxOptionalDepth;
+
+    BridgingConversion() : SubExpr(nullptr) {}
+    BridgingConversion(Expr *sub, Conversion::KindTy kind, unsigned depth)
+      : SubExpr(sub), Kind(kind), MaxOptionalDepth(depth) {
+      assert(Conversion::isBridgingKind(kind));
+    }
+
+    explicit operator bool() const { return SubExpr != nullptr; }
+  };
+}
+
+static BridgingConversion getBridgingConversion(Expr *E) {
+  E = E->getSemanticsProvidingExpr();
+
+  // Detect bridging conversions.
+  if (auto bridge = dyn_cast<BridgeToObjCExpr>(E)) {
+    return { bridge->getSubExpr(), Conversion::BridgeToObjC, 0 };
+  }
+  if (auto bridge = dyn_cast<BridgeFromObjCExpr>(E)) {
+    return { bridge->getSubExpr(), Conversion::BridgeFromObjC, 0 };
+  }
+
+  // We can handle optional injections.
+  if (auto inject = dyn_cast<InjectIntoOptionalExpr>(E)) {
+    return getBridgingConversion(inject->getSubExpr());
+  }
+
+  // Look through optional-to-optional conversions.
+  if (auto optEval = dyn_cast<OptionalEvaluationExpr>(E)) {
+    auto sub = optEval->getSubExpr()->getSemanticsProvidingExpr();
+    if (auto subResult = getBridgingConversion(sub)) {
+      sub = subResult.SubExpr->getSemanticsProvidingExpr();
+      if (auto bind = dyn_cast<BindOptionalExpr>(sub)) {
+        if (bind->getDepth() == subResult.MaxOptionalDepth) {
+          return { bind->getSubExpr(),
+                   subResult.Kind,
+                   subResult.MaxOptionalDepth + 1 };
+        }
+      }
+    }
+  }
+
+  // Open-existentials can be part of bridging conversions in very
+  // specific patterns.
+  auto open = dyn_cast<OpenExistentialExpr>(E);
+  if (open) E = open->getSubExpr();
+
+  // Existential erasure.
+  if (auto erasure = dyn_cast<ErasureExpr>(E)) {
+    Conversion::KindTy kind;
+
+    // Converting to Any is sometimes part of bridging and definitely
+    // needs special peepholing behavior.
+    if (erasure->getType()->isAny()) {
+      kind = Conversion::AnyErasure;
+
+    // Otherwise, nope.
+    } else {
+      return {};
+    }
+
+    // Tentatively look through the erasure.
+    E = erasure->getSubExpr();
+
+    // If we have an opening, we can only peephole if the value being
+    // used is exactly the original value.
+    if (open) {
+      if (E == open->getOpaqueValue()) {
+        return { open->getExistentialValue(), kind, 0 };
+      }
+      return {};
+    }
+
+    // Otherwise we can always peephole.
+    return { E, kind, 0 };
+  }
+
+  return {};
+}
+
+/// If the given expression represents a bridging conversion, emit it with
+/// the special reabstracting context.
+static Optional<ManagedValue>
+tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
+                            SGFContext C) {
+  // Check whether it's a bridging conversion.
+  auto result = getBridgingConversion(E);
+  if (!result) return None;
+  auto kind = result.Kind;
+  auto subExpr = result.SubExpr;
+
+  CanType resultType = E->getType()->getCanonicalType();
+  Conversion conversion =
+    Conversion::getBridging(kind, subExpr->getType()->getCanonicalType(),
+                            resultType, SGF.getLoweredType(resultType),
+                            isExplicit);
+
+  // Only use this special pattern for AnyErasure conversions when we're
+  // emitting into a peephole.
+  if (kind == Conversion::AnyErasure) {
+    auto outerConversion = C.getAsConversion();
+    if (!outerConversion ||
+        !canPeepholeConversions(SGF, outerConversion->getConversion(),
+                                conversion)) {
+      return None;
+    }
+  }
+
+  return SGF.emitConvertedRValue(subExpr, conversion, C);
+}
+
 RValue RValueEmitter::visitApplyExpr(ApplyExpr *E, SGFContext C) {
   return SGF.emitApplyExpr(E, C);
 }
@@ -749,8 +866,22 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
                                                  result.getLValueAddress(), C);
       }
 
+      // Avoid computing an abstraction pattern for local variables.
+      // This is a slight compile-time optimization, but more importantly
+      // it avoids problems where locals don't always have interface types.
+      if (var->getDeclContext()->isLocalContext()) {
+        return RValue(*this, loc, refType,
+                      emitLoad(loc, result.getLValueAddress(),
+                               getTypeLowering(refType), C, shouldTake,
+                               guaranteedValid));
+      }
+
+      // Otherwise, do the full thing where we potentially bridge and
+      // reabstract the declaration.
+      auto origFormalType = SGM.Types.getAbstractionPattern(var);
       return RValue(*this, loc, refType,
                     emitLoad(loc, result.getLValueAddress(),
+                             origFormalType, refType,
                              getTypeLowering(refType), C, shouldTake,
                              guaranteedValid));
     }
@@ -1426,25 +1557,57 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
                                          { mv, metatype }, C);
 }
 
+/// Given an implicit bridging conversion, check whether the context
+/// can be peepholed.
+static bool
+tryPeepholeBridgingConversion(SILGenFunction &SGF, Conversion::KindTy kind,
+                              ImplicitConversionExpr *E, SGFContext C) {
+  assert(isa<BridgeFromObjCExpr>(E) || isa<BridgeToObjCExpr>(E));
+  if (auto outerConversion = C.getAsConversion()) {
+    auto subExpr = E->getSubExpr();
+    CanType sourceType = subExpr->getType()->getCanonicalType();
+    CanType resultType = E->getType()->getCanonicalType();
+    SILType loweredResultTy = SGF.getLoweredType(resultType);
+    auto conversion = Conversion::getBridging(kind, sourceType, resultType,
+                                              loweredResultTy);
+    if (outerConversion->tryPeephole(SGF, E->getSubExpr(), conversion)) {
+      outerConversion->finishInitialization(SGF);
+      return true;
+    }
+  }
+
+  return false;
+}
+
 RValue
 RValueEmitter::visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C) {
+  if (tryPeepholeBridgingConversion(SGF, Conversion::BridgeFromObjC, E, C))
+    return RValue::forInContext();
+
   // Emit the sub-expression.
   auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
 
+  CanType origType = E->getSubExpr()->getType()->getCanonicalType();
   CanType resultType = E->getType()->getCanonicalType();
-  auto repr = SILFunctionTypeRepresentation::CFunctionPointer;
-  auto result = SGF.emitBridgedToNativeValue(E, mv, repr, resultType, C);
+  SILType loweredResultTy = SGF.getLoweredType(resultType);
+  auto result = SGF.emitBridgedToNativeValue(E, mv, origType, resultType,
+                                             loweredResultTy, C);
   return RValue(SGF, E, result);
 }
 
 RValue
 RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
+  if (tryPeepholeBridgingConversion(SGF, Conversion::BridgeToObjC, E, C))
+    return RValue::forInContext();
+
   // Emit the sub-expression.
   auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
 
+  CanType origType = E->getSubExpr()->getType()->getCanonicalType();
   CanType resultType = E->getType()->getCanonicalType();
-  auto repr = SILFunctionTypeRepresentation::CFunctionPointer;
-  auto result = SGF.emitNativeToBridgedValue(E, mv, repr, resultType, C);
+  SILType loweredResultTy = SGF.getLoweredType(resultType);
+  auto result = SGF.emitNativeToBridgedValue(E, mv, origType, resultType,
+                                             loweredResultTy, C);
   return RValue(SGF, E, result);
 }
 
@@ -1551,57 +1714,57 @@ ManagedValue emitCFunctionPointer(SILGenFunction &gen,
 // abstraction level.
 static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
                                                   SILLocation loc,
-                                                  ManagedValue result,
-                                                  CanAnyFunctionType srcTy,
-                                                  CanAnyFunctionType destTy) {
-  auto resultFTy = result.getType().castTo<SILFunctionType>();
+                                                  ManagedValue source,
+                                            CanAnyFunctionType sourceFormalTy,
+                                            CanAnyFunctionType resultFormalTy) {
+  auto sourceTy = source.getType().castTo<SILFunctionType>();
+  CanSILFunctionType resultTy =
+    SGF.getLoweredType(resultFormalTy).castTo<SILFunctionType>();
 
   // Note that conversions to and from block require a thunk
-  switch (destTy->getRepresentation()) {
+  switch (resultFormalTy->getRepresentation()) {
 
   // Convert thin, c, block => thick
   case AnyFunctionType::Representation::Swift: {
-    switch (resultFTy->getRepresentation()) {
+    switch (sourceTy->getRepresentation()) {
     case SILFunctionType::Representation::Thin: {
-      auto v = SGF.B.createThinToThickFunction(loc, result.getValue(),
+      auto v = SGF.B.createThinToThickFunction(loc, source.getValue(),
         SILType::getPrimitiveObjectType(
-         adjustFunctionType(resultFTy, SILFunctionType::Representation::Thick)));
-      result = ManagedValue(v, result.getCleanup());
-      break;
+         adjustFunctionType(sourceTy, SILFunctionType::Representation::Thick)));
+      // FIXME: what if other reabstraction is required?
+      return ManagedValue(v, source.getCleanup());
     }
     case SILFunctionType::Representation::Thick:
       llvm_unreachable("should not try thick-to-thick repr change");
     case SILFunctionType::Representation::CFunctionPointer:
     case SILFunctionType::Representation::Block:
-      result = SGF.emitBlockToFunc(loc, result,
-                       SGF.getLoweredType(destTy).castTo<SILFunctionType>());
-      break;
+      return SGF.emitBlockToFunc(loc, source, sourceFormalTy, resultFormalTy,
+                                 resultTy);
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
       llvm_unreachable("should not do function conversion from method rep");
     }
-    break;
+    llvm_unreachable("bad representation");
   }
 
   // Convert thin, thick, c => block
   case AnyFunctionType::Representation::Block:
-    switch (resultFTy->getRepresentation()) {
+    switch (sourceTy->getRepresentation()) {
     case SILFunctionType::Representation::Thin: {
       // Make thick first.
-      auto v = SGF.B.createThinToThickFunction(loc, result.getValue(),
+      auto v = SGF.B.createThinToThickFunction(loc, source.getValue(),
         SILType::getPrimitiveObjectType(
-         adjustFunctionType(resultFTy, SILFunctionType::Representation::Thick)));
-      result = ManagedValue(v, result.getCleanup());
+         adjustFunctionType(sourceTy, SILFunctionType::Representation::Thick)));
+      source = ManagedValue(v, source.getCleanup());
       LLVM_FALLTHROUGH;
     }
     case SILFunctionType::Representation::Thick:
     case SILFunctionType::Representation::CFunctionPointer:
       // Convert to a block.
-      result = SGF.emitFuncToBlock(loc, result,
-                     SGF.getLoweredType(destTy).castTo<SILFunctionType>());
-      break;
+      return SGF.emitFuncToBlock(loc, source, sourceFormalTy, resultFormalTy,
+                                 resultTy);
     case SILFunctionType::Representation::Block:
       llvm_unreachable("should not try block-to-block repr change");
     case SILFunctionType::Representation::Method:
@@ -1610,7 +1773,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::WitnessMethod:
       llvm_unreachable("should not do function conversion from method rep");
     }
-    break;
+    llvm_unreachable("bad representation");
 
   // Unsupported
   case AnyFunctionType::Representation::Thin:
@@ -1618,8 +1781,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
   case AnyFunctionType::Representation::CFunctionPointer:
     llvm_unreachable("should not do C function pointer conversion here");
   }
-
-  return result;
+  llvm_unreachable("bad representation");
 }
 
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
@@ -1762,6 +1924,10 @@ RValue RValueEmitter::visitCovariantReturnConversionExpr(
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
+  if (auto result = tryEmitAsBridgingConversion(SGF, E, false, C)) {
+    return RValue(SGF, E, *result);
+  }
+
   auto &existentialTL = SGF.getTypeLowering(E->getType());
   auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
 
@@ -1906,6 +2072,9 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
 }
 
 RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
+  if (auto result = tryEmitAsBridgingConversion(SGF, E->getSubExpr(), true, C))
+    return RValue(SGF, E, *result);
+
   return visit(E->getSubExpr(), C);
 }
 
@@ -3473,17 +3642,17 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
     return RValue(SGF, E, bitcastMV);
   }
 
-  OptionalTypeKind OTK;
-  E->getType()->getAnyOptionalObjectType(OTK);
-  assert(OTK != OTK_None);
+  // Try the bridging peephole.
+  if (auto result = tryEmitAsBridgingConversion(SGF, E, false, C)) {
+    return RValue(SGF, E, *result);
+  }
 
-  auto someDecl = SGF.getASTContext().getOptionalSomeDecl(OTK);
+  auto helper = [E](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
+    return SGF.emitRValueAsSingleValue(E->getSubExpr(), C);
+  };
 
-  ManagedValue result = SGF.emitInjectEnum(E, ArgumentSource(E->getSubExpr()),
-                                           SGF.getLoweredType(E->getType()),
-                                           someDecl, C);
-  if (result.isInContext())
-    return RValue::forInContext();
+  auto result =
+    SGF.emitOptionalSome(E, SGF.getLoweredType(E->getType()), helper, C);
   return RValue(SGF, E, result);
 }
 
@@ -3854,6 +4023,10 @@ static bool emitOptimizedOptionalEvaluation(SILGenFunction &SGF,
 
 RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                                                   SGFContext C) {
+  if (auto result = tryEmitAsBridgingConversion(SGF, E, false, C)) {
+    return RValue(SGF, E, *result);
+  }
+
   SmallVector<ManagedValue, 1> results;
   SGF.emitOptionalEvaluation(E, E->getType(), results, C,
     [&](SmallVectorImpl<ManagedValue> &results, SGFContext primaryC) {
@@ -4214,6 +4387,10 @@ void SILGenFunction::emitOpenExistentialExprImpl(
 
 RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
                                                SGFContext C) {
+  if (auto result = tryEmitAsBridgingConversion(SGF, E, false, C)) {
+    return RValue(SGF, E, *result);
+  }
+
   return SGF.emitOpenExistentialExpr<RValue>(E,
                                              [&](Expr *subExpr) -> RValue {
                                                return visit(subExpr, C);

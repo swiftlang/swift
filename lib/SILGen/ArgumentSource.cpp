@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ArgumentSource.h"
+#include "Conversion.h"
 #include "Initialization.h"
 
 using namespace swift;
@@ -122,12 +123,25 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
 ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
                                               AbstractionPattern origFormalType,
                                               SGFContext C) && {
-  auto loc = getLocation();
   auto substFormalType = getSubstType();
-  ManagedValue outputValue = std::move(*this).getAsSingleValue(SGF);
-  return SGF.emitSubstToOrigValue(loc,
-                                  outputValue, origFormalType,
-                                  substFormalType, C);
+  auto conversion = Conversion::getSubstToOrig(origFormalType, substFormalType);
+  return std::move(*this).getConverted(SGF, conversion, C);
+}
+
+ManagedValue ArgumentSource::getConverted(SILGenFunction &SGF,
+                                          const Conversion &conversion,
+                                          SGFContext C) && {
+  assert(!isLValue());
+
+  if (isRValue()) {
+    auto loc = getKnownRValueLocation();
+    auto result = std::move(*this).asKnownRValue().getAsSingleValue(SGF, loc);
+    return conversion.emit(SGF, loc, result, C);
+  }
+
+  auto e = std::move(*this).asKnownExpr();
+  assert(!e->getType()->is<InOutType>());
+  return SGF.emitConvertedRValue(e, conversion, C);
 }
 
 void ArgumentSource::forwardInto(SILGenFunction &SGF, Initialization *dest) && {

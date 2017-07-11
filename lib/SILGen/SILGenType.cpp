@@ -61,7 +61,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // abstraction pattern of the base.
   auto baseInfo = Types.getConstantInfo(base);
   auto derivedInfo = Types.getConstantInfo(derived);
-  auto basePattern = AbstractionPattern(baseInfo.LoweredInterfaceType);
+  auto basePattern = AbstractionPattern(baseInfo.LoweredType);
   
   auto overrideInfo = M.Types.getConstantOverrideInfo(derived, base);
 
@@ -105,8 +105,8 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
 
   SILGenFunction(*this, *thunk)
     .emitVTableThunk(derived, implFn, basePattern,
-                     overrideInfo.LoweredInterfaceType,
-                     derivedInfo.LoweredInterfaceType);
+                     overrideInfo.LoweredType,
+                     derivedInfo.LoweredType);
 
   return {base, thunk, implLinkage};
 }
@@ -557,8 +557,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   GenericEnvironment *genericEnv = nullptr;
 
   // Work out the lowered function type of the SIL witness thunk.
-  auto reqtOrigTy
-    = cast<GenericFunctionType>(requirementInfo.LoweredInterfaceType);
+  auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
   CanAnyFunctionType reqtSubstTy;
   SubstitutionList witnessSubs;
   if (witness.requiresSubstitution()) {
@@ -614,10 +613,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   }
 
   // Lower the witness thunk type with the requirement's abstraction level.
-  auto witnessSILFnType = getNativeSILFunctionType(M,
-                                                   AbstractionPattern(reqtOrigTy),
-                                                   reqtSubstTy,
-                                                   witnessRef);
+  auto witnessSILFnType =
+    getNativeSILFunctionType(M, AbstractionPattern(reqtOrigTy),
+                             reqtSubstTy, witnessRef);
 
   // Mangle the name of the witness thunk.
   Mangle::ASTMangler NewMangler;

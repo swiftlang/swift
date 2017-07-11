@@ -93,6 +93,10 @@ public:
   Projected front() const { return Project(Array.front()); }
   Projected back() const { return Project(Array.back()); }
 
+  ArrayRefView drop_back(unsigned count = 1) const {
+    return ArrayRefView(Array.drop_back(count));
+  }
+
   ArrayRefView slice(unsigned start) const {
     return ArrayRefView(Array.slice(start));
   }

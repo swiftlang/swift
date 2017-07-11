@@ -773,8 +773,15 @@ class TestData : TestDataSuper {
 
     func test_passing() {
         let object = ImmutableDataVerifier()
-        takesData(object as Data)
+        let object_notPeepholed = object as Data
+        takesData(object_notPeepholed)
         expectTrue(object.verifier.wasCopied)
+    }
+
+    func test_passing_peepholed() {
+        let object = ImmutableDataVerifier()
+        takesData(object as Data)
+        expectFalse(object.verifier.wasCopied) // because of the peephole
     }
     
     // intentionally structured so sizeof() != strideof()

@@ -342,9 +342,9 @@ class alignas(8) Expr {
   class TupleShuffleExprBitfields {
     friend class TupleShuffleExpr;
     unsigned : NumImplicitConversionExprBits;
-    unsigned IsSourceScalar : 1;
+    unsigned TypeImpact : 2;
   };
-  enum { NumTupleShuffleExprBits = NumImplicitConversionExprBits + 1 };
+  enum { NumTupleShuffleExprBits = NumImplicitConversionExprBits + 2 };
   static_assert(NumTupleShuffleExprBits <= 32, "fits in an unsigned");
 
   class ApplyExprBitfields {
@@ -2804,7 +2804,7 @@ public:
 };
 
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
-/// tuple type.  The expression's type is known to be a tuple type.
+/// tuple type.
 ///
 /// If hasScalarSource() is true, the subexpression should be treated
 /// as if it were implicitly injected into a single-element tuple
@@ -2825,9 +2825,22 @@ public:
     CallerDefaultInitialize = -3
   };
 
-  enum SourceIsScalar_t : bool {
-    SourceIsTuple = false,
-    SourceIsScalar = true
+  enum TypeImpact {
+    /// The source value is a tuple which is destructured and modified to
+    /// create the result, which is a tuple.
+    TupleToTuple,
+
+    /// The source value is a tuple which is destructured and modified to
+    /// create the result, which is a scalar because it has one element and
+    /// no labels.
+    TupleToScalar,
+
+    /// The source value is an individual value (possibly one with tuple
+    /// type) which is inserted into a particular position in the result,
+    /// which is a tuple.
+    ScalarToTuple
+
+    // (TupleShuffleExprs are never created for a scalar-to-scalar conversion.)
   };
 
 private:
@@ -2851,7 +2864,7 @@ private:
 
 public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
-                   SourceIsScalar_t isSourceScalar,
+                   TypeImpact typeImpact,
                    ConcreteDeclRef defaultArgsOwner,
                    ArrayRef<unsigned> VariadicArgs,
                    Type VarargsArrayTy,
@@ -2862,17 +2875,23 @@ public:
       DefaultArgsOwner(defaultArgsOwner), VariadicArgs(VariadicArgs),
       CallerDefaultArgs(CallerDefaultArgs)
   {
-    TupleShuffleExprBits.IsSourceScalar = isSourceScalar;
+    TupleShuffleExprBits.TypeImpact = typeImpact;
   }
 
   ArrayRef<int> getElementMapping() const { return ElementMapping; }
 
-  /// Is the source expression scalar?
-  ///
-  /// This doesn't necessarily mean it's not a tuple; it just means
-  /// that it should be treated as if it were an element of a
-  /// single-element tuple for the purposes of interpreting behavior.
-  bool isSourceScalar() const { return TupleShuffleExprBits.IsSourceScalar; }
+  /// What is the type impact of this shuffle?
+  TypeImpact getTypeImpact() const {
+    return TypeImpact(TupleShuffleExprBits.TypeImpact);
+  }
+
+  bool isSourceScalar() const {
+    return getTypeImpact() == ScalarToTuple;
+  }
+
+  bool isResultScalar() const {
+    return getTypeImpact() == TupleToScalar;
+  }
 
   Type getVarargsArrayType() const {
     assert(!VarargsArrayTy.isNull());

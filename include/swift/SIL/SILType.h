@@ -426,6 +426,12 @@ public:
                                                         Ty.getSwiftRValueType());
   }
 
+  /// Look through reference-storage types on this type.
+  SILType getReferenceStorageReferentType() const {
+    return SILType(getSwiftRValueType().getReferenceStorageReferent(),
+                   getCategory());
+  }
+
   /// Transform the function type SILType by replacing all of its interface
   /// generic args with the appropriate item from the substitution.
   ///
@@ -561,10 +567,9 @@ NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
 
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
-                        Lowering::AbstractionPattern orig,
-                        CanAnyFunctionType substInterface,
-                        Optional<SILDeclRef> constant = None,
-                        SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
+                        Lowering::AbstractionPattern origType,
+                        CanAnyFunctionType substType,
+                        Optional<SILDeclRef> constant = None);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);
