@@ -75,16 +75,21 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
   ++NumAssignRewritten;
 
   SILValue Src = Inst->getSrc();
+  SILValue Dest = Inst->getDest();
   SILLocation Loc = Inst->getLoc();
 
-  if (isInitialization == PartialInitializationKind::IsInitialization ||
-      Inst->getDest()->getType().isTrivial(Inst->getModule())) {
+  // If we have a trivial value, just store.
+  if (Dest->getType().isTrivial(*Dest->getModule())) {
+    B.createStore(Loc, Src, Dest, StoreOwnershipQualifier::Trivial);
+    Inst->eraseFromParent();
+    return;
+  }
 
-    // If this is an initialization, or the storage type is trivial, we
-    // can just replace the assignment with a store.
+  if (isInitialization == PartialInitializationKind::IsInitialization) {
+    // If this is an initialization, we can just replace the assignment with a
+    // store.
     assert(isInitialization != PartialInitializationKind::IsReinitialization);
-    B.createStore(Loc, Src, Inst->getDest(),
-                  StoreOwnershipQualifier::Unqualified);
+    B.createStore(Loc, Src, Dest, StoreOwnershipQualifier::Init);
     Inst->eraseFromParent();
     return;
   }
@@ -95,14 +100,11 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     // Factory initializers give us a whole new instance, so the existing
     // instance, which has not been initialized and never will be, must be
     // freed using dealloc_partial_ref.
-    SILValue Pointer =
-        B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Unqualified);
-    B.createStore(Loc, Src, Inst->getDest(),
-                  StoreOwnershipQualifier::Unqualified);
+    SILValue Pointer = B.createLoad(Loc, Dest, LoadOwnershipQualifier::Take);
+    B.createStore(Loc, Src, Dest, StoreOwnershipQualifier::Init);
 
-    auto MetatypeTy = CanMetatypeType::get(
-        Inst->getDest()->getType().getSwiftRValueType(),
-        MetatypeRepresentation::Thick);
+    auto MetatypeTy = CanMetatypeType::get(Dest->getType().getSwiftRValueType(),
+                                           MetatypeRepresentation::Thick);
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
     SILValue Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
 
@@ -119,10 +121,8 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 
   // This is basically TypeLowering::emitStoreOfCopy, except that if we have
   // a known incoming value, we can avoid the load.
-  SILValue IncomingVal =
-      B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Unqualified);
-  B.createStore(Inst->getLoc(), Src, Inst->getDest(),
-                StoreOwnershipQualifier::Unqualified);
+  SILValue IncomingVal = B.createLoad(Loc, Dest, LoadOwnershipQualifier::Take);
+  B.createStore(Loc, Src, Dest, StoreOwnershipQualifier::Init);
 
   B.emitDestroyValueOperation(Loc, IncomingVal);
   Inst->eraseFromParent();
@@ -490,11 +490,11 @@ namespace {
     SmallVectorImpl<SILInstruction *> &Destroys;
     std::vector<ConditionalDestroy> ConditionalDestroys;
 
-    llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
+    llvm::SmallDenseMap<SILBasicBlock *, LiveOutBlockState, 32> PerBlockInfo;
 
     /// This is a map of uses that are not loads (i.e., they are Stores,
     /// InOutUses, and Escapes), to their entry in Uses.
-    llvm::SmallDenseMap<SILInstruction*, unsigned, 16> NonLoadUses;
+    llvm::SmallDenseMap<SILInstruction *, unsigned, 16> NonLoadUses;
 
     /// This is true when there is an ambiguous store, which may be an init or
     /// assign, depending on the CFG path.
@@ -1295,7 +1295,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // TODO: Implement the SILGen fixes so this can be removed.
     ClassMethodInst *CMI = nullptr;
     ApplyInst *AI = nullptr;
-    SILInstruction *Release = nullptr;
+    SILInstruction *Destroy = nullptr;
     for (auto UI : UCI->getUses()) {
       auto *User = UI->getUser();
       if (auto *TAI = dyn_cast<ApplyInst>(User)) {
@@ -1311,9 +1311,9 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
         }
       }
 
-      if (isa<ReleaseValueInst>(User) || isa<StrongReleaseInst>(User)) {
-        if (!Release) {
-          Release = User;
+      if (isa<DestroyValueInst>(User)) {
+        if (!Destroy) {
+          Destroy = User;
           continue;
         }
       }
@@ -1328,7 +1328,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // the generic error that we would emit before.
     //
     // That is the only case where we support pattern matching a release.
-    if (Release && AI &&
+    if (Destroy && AI &&
         !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
       CMI = nullptr;
 
@@ -1802,8 +1802,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
 
     if (!consumed) {
       if (Pointer->getType().isAddress())
-        Pointer =
-            B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Unqualified);
+        Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
 
       auto MetatypeTy = CanMetatypeType::get(
           TheMemory.MemorySILType.getSwiftRValueType(),
@@ -1863,8 +1862,8 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   // We only handle strong_release and destroy_addr here.  The former is a
   // release of a class in an initializer, the later is used for local variable
   // destruction.
-  assert(isa<StrongReleaseInst>(Release) || isa<DestroyAddrInst>(Release));
-  
+  assert(isa<DestroyValueInst>(Release) || isa<DestroyAddrInst>(Release));
+
   auto Availability = getLivenessAtInst(Release, 0, TheMemory.NumElements);
   DIKind SelfConsumed =
     getSelfConsumedAtInst(Release);
@@ -1937,7 +1936,7 @@ static void updateControlVariable(SILLocation Loc,
   // load/or/store sequence to mask in the bits.
   if (!Bitmask.isAllOnesValue()) {
     SILValue Tmp =
-        B.createLoad(Loc, ControlVariable, LoadOwnershipQualifier::Unqualified);
+        B.createLoad(Loc, ControlVariable, LoadOwnershipQualifier::Trivial);
     if (!OrFn.get())
       OrFn = getBinaryFunction("or", IVType, B.getASTContext());
       
@@ -1946,7 +1945,7 @@ static void updateControlVariable(SILLocation Loc,
   }
 
   B.createStore(Loc, MaskVal, ControlVariable,
-                StoreOwnershipQualifier::Unqualified);
+                StoreOwnershipQualifier::Trivial);
 }
 
 /// Test a bit in the control variable at the current insertion point.
@@ -1958,8 +1957,8 @@ static SILValue testControlVariable(SILLocation Loc,
                                     Identifier &TruncateFn,
                                     SILBuilder &B) {
   if (!ControlVariable)
-    ControlVariable = B.createLoad(Loc, ControlVariableAddr,
-                                   LoadOwnershipQualifier::Unqualified);
+    ControlVariable =
+        B.createLoad(Loc, ControlVariableAddr, LoadOwnershipQualifier::Trivial);
 
   SILValue CondVal = ControlVariable;
   CanBuiltinIntegerType IVType = CondVal->getType().castTo<BuiltinIntegerType>();
@@ -2032,7 +2031,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   SILValue ControlVariableAddr = ControlVariableBox;
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, ControlVariableAddr,
-                StoreOwnershipQualifier::Unqualified);
+                StoreOwnershipQualifier::Trivial);
 
   Identifier OrFn;
 
@@ -2230,8 +2229,8 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
         // Set up the initialized release block.
         B.setInsertionPoint(ReleaseBlock->begin());
-        if (isa<StrongReleaseInst>(Release))
-          Destroys.push_back(B.emitStrongReleaseAndFold(Loc, Release->getOperand(0)));
+        if (isa<DestroyValueInst>(Release))
+          Destroys.push_back(B.createDestroyValue(Loc, Release->getOperand(0)));
         else
           Destroys.push_back(B.emitDestroyAddrAndFold(Loc, Release->getOperand(0)));
         

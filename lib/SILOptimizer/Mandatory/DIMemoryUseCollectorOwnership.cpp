@@ -204,7 +204,7 @@ SILValue DIMemoryObjectInfo::emitElementAddress(unsigned EltNo, SILLocation Loc,
     if (IsSelf) {
       if (auto *NTD = PointeeType.getNominalOrBoundGenericNominal()) {
         if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress())
-          Ptr = B.createLoad(Loc, Ptr, LoadOwnershipQualifier::Unqualified);
+          Ptr = B.createLoad(Loc, Ptr, LoadOwnershipQualifier::Take);
         for (auto *VD : NTD->getStoredProperties()) {
           auto FieldType = PointeeType.getFieldType(VD, Module);
           unsigned NumFieldElements =
@@ -349,9 +349,9 @@ void DIMemoryObjectInfo::collectRetainCountInfo(
   for (auto *Op : MemoryInst->getUses()) {
     auto *User = Op->getUser();
 
-    // If this is a release or dealloc_stack, then remember it as such.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-        isa<DeallocBoxInst>(User) || isa<DestroyValueInst>(User)) {
+    // If this is a destroy_value or dealloc_stack, then remember it as such.
+    if (isa<DeallocStackInst>(User) || isa<DeallocBoxInst>(User) ||
+        isa<DestroyValueInst>(User)) {
       OutVar.trackDestroy(User);
     }
   }
@@ -463,8 +463,8 @@ static SILValue scalarizeLoad(LoadInst *LI,
   SmallVector<SILValue, 4> ElementTmps;
 
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
-    auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i],
-                               LoadOwnershipQualifier::Unqualified);
+    auto *SubLI = B.createTrivialLoadOr(LI->getLoc(), ElementAddrs[i],
+                                        LI->getOwnershipQualifier());
     ElementTmps.push_back(SubLI);
   }
 
@@ -637,13 +637,21 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
 }
 
 void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
-  for (auto *Op : ABI->getUses()) {
+  llvm::SmallVector<Operand *, 16> Worklist(ABI->use_begin(), ABI->use_end());
+  while (!Worklist.empty()) {
+    auto *Op = Worklist.pop_back_val();
     auto *User = Op->getUser();
 
-    // Deallocations and retain/release don't affect the value directly.
-    if (isa<DeallocBoxInst>(User) || isa<StrongRetainInst>(User) ||
-        isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User))
+    // Deallocations and release don't affect the value directly.
+    if (isa<DeallocBoxInst>(User) || isa<DestroyValueInst>(User))
       continue;
+
+    // Copy value doesn't either, but we need to look through the copy_value.
+    if (isa<CopyValueInst>(User)) {
+      std::copy(User->use_begin(), User->use_end(),
+                std::back_inserter(Worklist));
+      continue;
+    }
 
     if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
       collectUses(User, PBI->getFieldIndex());
@@ -718,8 +726,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // Ignore end_access.
-    if (isa<EndAccessInst>(User)) {
+    // Ignore end_access and end_borrow.
+    if (isa<EndAccessInst>(User) || isa<EndBorrowInst>(User)) {
       continue;
     }
 
@@ -729,6 +737,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         UsesToScalarize.push_back(User);
       else
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
+      continue;
+    }
+
+    // Loads are a use of the value. TODO: Allow for this to be scalarized.
+    if (isa<LoadBorrowInst>(User)) {
+      addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
       continue;
     }
 
@@ -982,9 +996,10 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         SILBuilderWithScope B(User, SI);
         getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
 
-        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                        StoreOwnershipQualifier::Unqualified);
+        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
+          B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                                 SI->getOwnershipQualifier());
+        }
         SI->eraseFromParent();
         continue;
       }
@@ -1068,14 +1083,17 @@ void ElementUseCollector::collectClassSelfUses() {
       continue;
 
     // Loads of the box produce self, so collect uses from them.
-    if (auto *LI = dyn_cast<LoadInst>(User)) {
-      collectClassSelfUses(LI, TheMemory.MemorySILType, EltNumbering);
+    if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
+      collectClassSelfUses(User, TheMemory.MemorySILType, EltNumbering);
       continue;
     }
 
+    // Ignore end_borrow.
+    if (isa<EndBorrowInst>(User))
+      continue;
+
     // destroy_addr on the box is load+release, which is treated as a release.
-    if (isa<DestroyAddrInst>(User) || isa<StrongReleaseInst>(User) ||
-        isa<DestroyValueInst>(User)) {
+    if (isa<DestroyAddrInst>(User) || isa<DestroyValueInst>(User)) {
       trackDestroy(User);
       continue;
     }
@@ -1304,12 +1322,19 @@ static bool shouldIgnoreClassMethodUseError(ClassMethodInst *Method,
 void ElementUseCollector::collectClassSelfUses(
     SILValue ClassPointer, SILType MemorySILType,
     llvm::SmallDenseMap<VarDecl *, unsigned> &EltNumbering) {
-  for (auto *Op : ClassPointer->getUses()) {
+  llvm::SmallVector<Operand *, 16> Worklist(ClassPointer->use_begin(),
+                                            ClassPointer->use_end());
+  while (!Worklist.empty()) {
+    auto *Op = Worklist.pop_back_val();
     auto *User = Op->getUser();
 
     // super_method always looks at the metatype for the class, not at any of
     // its stored properties, so it doesn't have any DI requirements.
     if (isa<SuperMethodInst>(User))
+      continue;
+
+    // Skip end_borrow.
+    if (isa<EndBorrowInst>(User))
       continue;
 
     // ref_element_addr P, #field lookups up a field.
@@ -1323,11 +1348,10 @@ void ElementUseCollector::collectClassSelfUses(
       continue;
     }
 
-    // retains of self in class constructors can be ignored since we do not care
-    // about the retain that we are producing, but rather the consumer of the
-    // retain. This /should/ be true today and will be verified as true in
-    // Semantic SIL.
-    if (isa<StrongRetainInst>(User)) {
+    // Look through copy_value and begin_borrow.
+    if (isa<CopyValueInst>(User) || isa<BeginBorrowInst>(User)) {
+      std::copy(User->use_begin(), User->use_end(),
+                std::back_inserter(Worklist));
       continue;
     }
 
@@ -1335,7 +1359,7 @@ void ElementUseCollector::collectClassSelfUses(
     //
     // *NOTE* In the case of a failing initializer, the release on the exit path
     // needs to cleanup the partially initialized elements.
-    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
+    if (isa<DestroyValueInst>(User)) {
       trackDestroy(User);
       continue;
     }
@@ -1349,7 +1373,7 @@ void ElementUseCollector::collectClassSelfUses(
     // If this is an upcast instruction, it is a conversion of self to the base.
     // This is either part of a super.init sequence, or a general superclass
     // access.
-    if (auto *UCI = dyn_cast<UpcastInst>(User))
+    if (auto *UCI = dyn_cast<UpcastInst>(User)) {
       if (auto *AI = isSuperInitUse(UCI)) {
         // We remember the applyinst as the super.init site, not the upcast.
         trackUse(
@@ -1368,6 +1392,7 @@ void ElementUseCollector::collectClassSelfUses(
         }
         continue;
       }
+    }
 
     // If this is an ApplyInst, check to see if this is part of a self.init
     // call in a delegating initializer.
@@ -1407,7 +1432,7 @@ public:
   void collectClassInitSelfUses();
   void collectValueTypeInitSelfUses();
   void collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
-                                              LoadInst *LI);
+                                              SILInstruction *LI);
 };
 
 } // end anonymous namespace
@@ -1481,10 +1506,13 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     }
 
     // Loads of the box produce self, so collect uses from them.
-    if (auto *LI = dyn_cast<LoadInst>(User)) {
-      collectDelegatingClassInitSelfLoadUses(MUI, LI);
+    if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
+      collectDelegatingClassInitSelfLoadUses(MUI, User);
       continue;
     }
+
+    if (isa<EndBorrowInst>(User))
+      continue;
 
     // destroy_addr on the box is load+release, which is treated as a release.
     if (isa<DestroyAddrInst>(User)) {
@@ -1507,7 +1535,7 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
 
   for (auto UI : ABI->getUses()) {
     SILInstruction *User = UI->getUser();
-    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
+    if (isa<DestroyValueInst>(User)) {
       UseInfo.trackDestroy(User);
     }
   }
@@ -1567,25 +1595,34 @@ void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses() {
 }
 
 void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
-    MarkUninitializedInst *MUI, LoadInst *LI) {
+    MarkUninitializedInst *MUI, SILInstruction *LI) {
+  assert(isa<LoadInst>(LI) || isa<LoadBorrowInst>(LI));
+
   // If we have a load, then this is a use of the box.  Look at the uses of
   // the load to find out more information.
-  for (auto *UI : LI->getUses()) {
-    auto *User = UI->getUser();
+  llvm::SmallVector<Operand *, 16> Worklist(LI->use_begin(), LI->use_end());
+  while (!Worklist.empty()) {
+    auto *User = Worklist.pop_back_val()->getUser();
 
     // super_method always looks at the metatype for the class, not at any of
     // its stored properties, so it doesn't have any DI requirements.
     if (isa<SuperMethodInst>(User))
       continue;
 
-    // We ignore retains of self.
-    if (isa<StrongRetainInst>(User))
+    if (isa<EndBorrowInst>(User))
       continue;
 
-    // A release of a load from the self box in a class delegating
-    // initializer might be releasing an uninitialized self, which requires
-    // special processing.
-    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
+    // We look through copies of self.
+    if (isa<CopyValueInst>(User)) {
+      std::copy(User->use_begin(), User->use_end(),
+                std::back_inserter(Worklist));
+      continue;
+    }
+
+    // A destroy of a load from the self box in a class delegating initializer
+    // might be destroying an uninitialized self, which requires special
+    // processing.
+    if (isa<DestroyValueInst>(User)) {
       UseInfo.trackDestroy(User);
       continue;
     }
