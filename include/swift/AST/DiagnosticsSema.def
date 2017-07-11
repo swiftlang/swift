@@ -3296,6 +3296,8 @@ ERROR(objc_invalid_on_func_curried,none,
       "cannot be represented in Objective-C", (unsigned))
 ERROR(objc_observing_accessor, none,
       "observing accessors are not allowed to be marked @objc", ())
+ERROR(objc_addressor, none,
+      "addressors are not allowed to be marked @objc", ())
 ERROR(objc_invalid_on_func_variadic,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because it has a variadic "
       "parameter", (unsigned))

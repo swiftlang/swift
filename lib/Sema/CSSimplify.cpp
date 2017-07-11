@@ -1375,6 +1375,13 @@ static void enumerateOptionalConversionRestrictions(
   }
 }
 
+/// Determine whether we can bind the given type variable to the given
+/// fixed type.
+static bool isBindable(TypeVariableType *typeVar, Type type) {
+  return !ConstraintSystem::typeVarOccursInType(typeVar, type) &&
+         !type->is<DependentMemberType>();
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -1480,8 +1487,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Simplify the right-hand type and perform the "occurs" check.
         typeVar1 = getRepresentative(typeVar1);
         type2 = simplifyType(type2, flags);
-        if (typeVarOccursInType(typeVar1, type2) ||
-            type2->is<DependentMemberType>())
+        if (!isBindable(typeVar1, type2))
           return formUnsolvedResult();
 
         // Equal constraints allow mixed LValue/RValue bindings, but
@@ -1531,8 +1537,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Simplify the left-hand type and perform the "occurs" check.
       typeVar2 = getRepresentative(typeVar2);
       type1 = simplifyType(type1, flags);
-      if (typeVarOccursInType(typeVar2, type1) ||
-          type1->is<DependentMemberType>())
+      if (!isBindable(typeVar2, type1))
         return formUnsolvedResult();
 
       // Equal constraints allow mixed LValue/RValue bindings, but
@@ -1564,8 +1569,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Simplify the left-hand type and perform the "occurs" check.
         typeVar2 = getRepresentative(typeVar2);
         type1 = simplifyType(type1, flags);
-        if (typeVarOccursInType(typeVar2, type1) ||
-            type1->is<DependentMemberType>())
+        if (!isBindable(typeVar2, type1))
           return formUnsolvedResult();
 
         if (auto *iot = type1->getAs<InOutType>()) {
@@ -1578,8 +1582,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Simplify the right-hand type and perform the "occurs" check.
         typeVar1 = getRepresentative(typeVar1);
         type2 = simplifyType(type2, flags);
-        if (typeVarOccursInType(typeVar1, type2) ||
-            type2->is<DependentMemberType>())
+        if (!isBindable(typeVar1, type2))
           return formUnsolvedResult();
 
         if (auto *lvt = type2->getAs<LValueType>()) {
