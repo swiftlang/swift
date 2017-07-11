@@ -4567,25 +4567,28 @@ public:
     
     
     llvm::PointerIntPair<Expr *, 3, Kind> SubscriptIndexExprAndKind;
+    ArrayRef<Identifier> SubscriptLabels;
     Type ComponentType;
     SourceLoc Loc;
     
-    explicit Component(DeclNameOrRef decl,
+    explicit Component(ASTContext *ctxForCopyingLabels,
+                       DeclNameOrRef decl,
                        Expr *indexExpr,
+                       ArrayRef<Identifier> subscriptLabels,
                        Kind kind,
                        Type type,
-                       SourceLoc loc)
-      : Decl(decl), SubscriptIndexExprAndKind(indexExpr, kind),
-        ComponentType(type), Loc(loc)
-    {}
+                       SourceLoc loc);
     
   public:
-    Component() : Component({}, nullptr, Kind::Invalid, Type(), SourceLoc()) {}
+    Component()
+      : Component(nullptr, {}, nullptr, {}, Kind::Invalid, Type(), SourceLoc())
+    {}
     
     /// Create an unresolved component for a property.
     static Component forUnresolvedProperty(DeclName UnresolvedName,
                                            SourceLoc Loc) {
-      return Component(UnresolvedName, nullptr,
+      return Component(nullptr,
+                       UnresolvedName, nullptr, {},
                        Kind::UnresolvedProperty,
                        Type(),
                        Loc);
@@ -4604,15 +4607,20 @@ public:
     ///
     /// You shouldn't add new uses of this overload; use the one that takes a
     /// list of index arguments.
-    static Component forUnresolvedSubscriptWithPrebuiltIndexExpr(Expr *index,
-                                                                 SourceLoc loc){
+    static Component forUnresolvedSubscriptWithPrebuiltIndexExpr(
+                                         ASTContext &context,
+                                         Expr *index,
+                                         ArrayRef<Identifier> subscriptLabels,
+                                         SourceLoc loc) {
       
-      return Component({}, index, Kind::UnresolvedSubscript, Type(), loc);
+      return Component(&context,
+                       {}, index, subscriptLabels, Kind::UnresolvedSubscript,
+                       Type(), loc);
     }
     
     /// Create an unresolved optional force `!` component.
     static Component forUnresolvedOptionalForce(SourceLoc BangLoc) {
-      return Component({}, nullptr,
+      return Component(nullptr, {}, nullptr, {},
                        Kind::OptionalForce,
                        Type(),
                        BangLoc);
@@ -4620,7 +4628,7 @@ public:
     
     /// Create an unresolved optional chain `?` component.
     static Component forUnresolvedOptionalChain(SourceLoc QuestionLoc) {
-      return Component({}, nullptr,
+      return Component(nullptr, {}, nullptr, {},
                        Kind::OptionalChain,
                        Type(),
                        QuestionLoc);
@@ -4630,7 +4638,8 @@ public:
     static Component forProperty(ConcreteDeclRef property,
                                  Type propertyType,
                                  SourceLoc loc) {
-      return Component(property, nullptr, Kind::Property,
+      return Component(nullptr, property, nullptr, {},
+                       Kind::Property,
                        propertyType,
                        loc);
     }
@@ -4651,20 +4660,21 @@ public:
     /// You shouldn't add new uses of this overload; use the one that takes a
     /// list of index arguments.
     static Component forSubscriptWithPrebuiltIndexExpr(
-      ConcreteDeclRef subscript, Expr *index, Type elementType, SourceLoc loc) {
-      return Component(subscript, index, Kind::Subscript, elementType, loc);
-    }
+       ConcreteDeclRef subscript, Expr *index, ArrayRef<Identifier> labels,
+       Type elementType, SourceLoc loc);
     
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
-      return Component({}, nullptr, Kind::OptionalForce, forcedType,
+      return Component(nullptr, {}, nullptr, {},
+                       Kind::OptionalForce, forcedType,
                        bangLoc);
     }
     
     /// Create an optional-chaining `?` component.
     static Component forOptionalChain(Type unwrappedType,
                                       SourceLoc questionLoc) {
-      return Component({}, nullptr, Kind::OptionalChain, unwrappedType,
+      return Component(nullptr, {}, nullptr, {},
+                       Kind::OptionalChain, unwrappedType,
                        questionLoc);
     }
     
@@ -4672,7 +4682,8 @@ public:
     /// syntax but may appear when the non-optional result of an optional chain
     /// is implicitly wrapped.
     static Component forOptionalWrap(Type wrappedType) {
-      return Component({}, nullptr, Kind::OptionalWrap, wrappedType,
+      return Component(nullptr, {}, nullptr, {},
+                       Kind::OptionalWrap, wrappedType,
                        SourceLoc());
     }
     
@@ -4722,7 +4733,23 @@ public:
         llvm_unreachable("no index expr for this kind");
       }
     }
-    
+
+    ArrayRef<Identifier> getSubscriptLabels() const {
+      switch (getKind()) {
+      case Kind::Subscript:
+      case Kind::UnresolvedSubscript:
+        return SubscriptLabels;
+        
+      case Kind::Invalid:
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+      case Kind::UnresolvedProperty:
+      case Kind::Property:
+        llvm_unreachable("no subscript labels for this kind");
+      }
+    }
+
     DeclName getUnresolvedDeclName() const {
       switch (getKind()) {
       case Kind::UnresolvedProperty:

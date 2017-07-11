@@ -2126,7 +2126,9 @@ KeyPathExpr::Component::forSubscript(ASTContext &ctx,
                                    trailingClosure, /*implicit*/ false,
                                    indexArgLabelsScratch,
                                    indexArgLabelLocsScratch);
-  return forSubscriptWithPrebuiltIndexExpr(subscript, index, elementType,
+  return forSubscriptWithPrebuiltIndexExpr(subscript, index,
+                                           indexArgLabels,
+                                           elementType,
                                            lSquareLoc);
 }
 
@@ -2145,5 +2147,29 @@ KeyPathExpr::Component::forUnresolvedSubscript(ASTContext &ctx,
                                    trailingClosure, /*implicit*/ false,
                                    indexArgLabelsScratch,
                                    indexArgLabelLocsScratch);
-  return forUnresolvedSubscriptWithPrebuiltIndexExpr(index, lSquareLoc);
+  return forUnresolvedSubscriptWithPrebuiltIndexExpr(ctx, index,
+                                               indexArgLabels,
+                                               lSquareLoc);
+}
+
+KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
+                     DeclNameOrRef decl,
+                     Expr *indexExpr,
+                     ArrayRef<Identifier> subscriptLabels,
+                     Kind kind,
+                     Type type,
+                     SourceLoc loc)
+    : Decl(decl), SubscriptIndexExprAndKind(indexExpr, kind),
+      SubscriptLabels(subscriptLabels.empty()
+                       ? subscriptLabels
+                       : ctxForCopyingLabels->AllocateCopy(subscriptLabels)),
+      ComponentType(type), Loc(loc)
+  {}
+
+KeyPathExpr::Component
+KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
+       ConcreteDeclRef subscript, Expr *index, ArrayRef<Identifier> labels,
+       Type elementType, SourceLoc loc) {
+  return Component(&elementType->getASTContext(),
+                   subscript, index, {}, Kind::Subscript, elementType, loc);
 }
