@@ -407,3 +407,48 @@ TEST(TypeMatch, OptionalMismatchFunctions) {
   EXPECT_FALSE(checkOverride(voidToVoid, optVoidToVoid));
   EXPECT_TRUE(checkOpt(voidToVoid, optVoidToVoid));
 }
+
+TEST(TypeMatch, NoEscapeMismatchFunctions) {
+  TestContext C{DeclareOptionalTypes};
+
+  // Note the reversed names here: parameters must be contravariant for the
+  // functions that take them to be covariant.
+  auto checkOverride = [&C](Type paramOfDerived, Type paramOfBase) {
+    return paramOfBase->matches(paramOfDerived, TypeMatchFlags::AllowOverride,
+                                /*resolver*/nullptr);
+  };
+  auto checkMismatch = [&C](Type paramOfDerived, Type paramOfBase) {
+    return paramOfBase->matches(
+        paramOfDerived,
+        TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam,
+        /*resolver*/nullptr);
+  };
+
+  Type voidToVoidFn = FunctionType::get(C.Ctx.TheEmptyTupleType,
+                                        C.Ctx.TheEmptyTupleType);
+  Type nonescapingVoidToVoidFn =
+      FunctionType::get(C.Ctx.TheEmptyTupleType, C.Ctx.TheEmptyTupleType,
+                        FunctionType::ExtInfo().withNoEscape());
+  Type optVoidToVoidFn = OptionalType::get(voidToVoidFn);
+  Type optNonescapingVoidToVoidFn = OptionalType::get(nonescapingVoidToVoidFn);
+
+  EXPECT_FALSE(checkOverride(nonescapingVoidToVoidFn, voidToVoidFn));
+  EXPECT_FALSE(checkMismatch(nonescapingVoidToVoidFn, voidToVoidFn));
+  EXPECT_FALSE(checkOverride(voidToVoidFn, nonescapingVoidToVoidFn));
+  EXPECT_FALSE(checkMismatch(voidToVoidFn, nonescapingVoidToVoidFn));
+
+  EXPECT_FALSE(checkOverride(nonescapingVoidToVoidFn, optVoidToVoidFn));
+  EXPECT_FALSE(checkMismatch(nonescapingVoidToVoidFn, optVoidToVoidFn));
+  EXPECT_FALSE(checkOverride(optVoidToVoidFn, nonescapingVoidToVoidFn));
+  EXPECT_FALSE(checkMismatch(optVoidToVoidFn, nonescapingVoidToVoidFn));
+
+  EXPECT_FALSE(checkOverride(optNonescapingVoidToVoidFn, voidToVoidFn));
+  EXPECT_FALSE(checkMismatch(optNonescapingVoidToVoidFn, voidToVoidFn));
+  EXPECT_FALSE(checkOverride(voidToVoidFn, optNonescapingVoidToVoidFn));
+  EXPECT_FALSE(checkMismatch(voidToVoidFn, optNonescapingVoidToVoidFn));
+
+  EXPECT_FALSE(checkOverride(optNonescapingVoidToVoidFn, optVoidToVoidFn));
+  EXPECT_FALSE(checkMismatch(optNonescapingVoidToVoidFn, optVoidToVoidFn));
+  EXPECT_FALSE(checkOverride(optVoidToVoidFn, optNonescapingVoidToVoidFn));
+  EXPECT_TRUE(checkMismatch(optVoidToVoidFn, optNonescapingVoidToVoidFn));
+}
