@@ -661,10 +661,13 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
   public var words: [UInt] {
     _sanityCheck(UInt.bitWidth % Word.bitWidth == 0)
+    let twosComplementData = _dataAsTwosComplement()
     var words: [UInt] = []
+    words.reserveCapacity((twosComplementData.count * Word.bitWidth 
+      + UInt.bitWidth - 1) / UInt.bitWidth)
     var word: UInt = 0
     var shift = 0
-    for w in _dataAsTwosComplement() {
+    for w in twosComplementData {
       word |= UInt(extendingOrTruncating: w) << shift
       shift += Word.bitWidth
       if shift == UInt.bitWidth {
@@ -1862,6 +1865,14 @@ BigIntBitTests.test("Conformances") {
   expectTrue(set.contains(y))
   expectTrue(set.contains(z))
   expectFalse(set.contains(-x))
+}
+
+BigIntBitTests.test("words") {
+  expectEqualSequence([1], (1 as BigIntBit).words)
+  expectEqualSequence([UInt.max, 0], BigIntBit(UInt.max).words)
+  expectEqualSequence([UInt.max >> 1], BigIntBit(UInt.max >> 1).words)
+  expectEqualSequence([0, 1], (BigIntBit(UInt.max) + 1).words)
+  expectEqualSequence([UInt.max], (-1 as BigIntBit).words)
 }
 
 runAllTests()
