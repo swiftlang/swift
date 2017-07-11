@@ -568,18 +568,20 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     auto reqtSubs = witness.getRequirementToSyntheticSubs();
     auto reqtSubMap = reqtOrigTy->getGenericSignature()
         ->getSubstitutionMap(reqtSubs);
-    auto input = reqtOrigTy->getInput().subst(reqtSubMap);
-    auto result = reqtOrigTy->getResult().subst(reqtSubMap);
+    auto substOrigTy = reqtOrigTy->substGenericArgs(reqtSubMap);
 
     if (genericEnv) {
       auto *genericSig = genericEnv->getGenericSignature();
       reqtSubstTy = cast<GenericFunctionType>(
-        GenericFunctionType::get(genericSig, input, result,
+        GenericFunctionType::get(genericSig,
+                                 substOrigTy->getParams(),
+                                 substOrigTy->getResult(),
                                  reqtOrigTy->getExtInfo())
           ->getCanonicalType());
     } else {
       reqtSubstTy = cast<FunctionType>(
-        FunctionType::get(input, result,
+        FunctionType::get(substOrigTy->getParams(),
+                          substOrigTy->getResult(),
                           reqtOrigTy->getExtInfo())
           ->getCanonicalType());
     }
@@ -607,10 +609,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
         concreteTy,
         ProtocolConformanceRef(specialized));
 
-    auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
-    auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
-
-    reqtSubstTy = CanFunctionType::get(input, result, reqtOrigTy->getExtInfo());
+    reqtSubstTy = cast<FunctionType>(
+                    reqtOrigTy->substGenericArgs(reqtSubs)->getCanonicalType());
   }
 
   // Lower the witness thunk type with the requirement's abstraction level.

@@ -1446,10 +1446,11 @@ class ParenType : public TypeBase {
   ParameterTypeFlags parameterFlags;
 
   friend class ASTContext;
-  ParenType(Type UnderlyingType, RecursiveTypeProperties properties,
+  
+  ParenType(Type ty, RecursiveTypeProperties properties,
             ParameterTypeFlags flags)
-      : TypeBase(TypeKind::Paren, nullptr, properties),
-        UnderlyingType(UnderlyingType), parameterFlags(flags) {}
+    : TypeBase(TypeKind::Paren, nullptr, properties),
+      UnderlyingType(ty), parameterFlags(flags) {}
 
 public:
   Type getUnderlyingType() const { return UnderlyingType; }
@@ -2334,7 +2335,15 @@ public:
     ParameterTypeFlags Flags = {};
     
   public:
+    /// Retrieve a copy of this parameter with the type replaced.
+    Param getWithType(Type ty) const;
+    
     Type getType() const { return Ty; }
+    CanType getCanType() const {
+      assert(Ty->isCanonical());
+      return CanType(Ty);
+    }
+    
     CanType getCanType() const {
       assert(Ty->isCanonical());
       return CanType(Ty);
@@ -2518,6 +2527,7 @@ public:
 
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
+  
   ArrayRef<AnyFunctionType::Param> getParams() const;
   unsigned getNumParams() const { return NumParams; }
   
@@ -2545,7 +2555,7 @@ public:
   bool throws() const {
     return getExtInfo().throws();
   }
-
+  
   /// Determine whether the given function input type is one of the
   /// canonical forms.
   static bool isCanonicalFunctionInputType(Type input);
@@ -2629,7 +2639,8 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   static CanFunctionType get(ArrayRef<AnyFunctionType::Param> params,
                              Type result, const ExtInfo &info) {
     return CanFunctionType(FunctionType::get(params, result, info,
-                                             /*canonicalVararg=*/true));
+                                             /*canonicalVararg=*/true)
+                             ->getCanonicalType()->castTo<FunctionType>());
   }
 
   CanFunctionType withExtInfo(ExtInfo info) const {

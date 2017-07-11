@@ -5391,8 +5391,10 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
 
   auto origAccessType = SGM.Types.getConstantInfo(materializeForSet)
       .FormalInterfaceType;
-
-  auto origSelfType = origAccessType->getInput()
+  
+  assert(origAccessType->getParams().size() == 1 &&
+         "saw accessor without singular metatype?");
+  auto origSelfType = origAccessType->getParams().front().getType()
       ->getInOutObjectType()
       ->getCanonicalType();
 

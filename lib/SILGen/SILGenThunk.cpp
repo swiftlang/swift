@@ -138,9 +138,10 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
            "methods cannot have captures");
     (void) fd;
   }
-
-  auto selfTy = vd->getInterfaceType()->castTo<AnyFunctionType>()
-    ->getInput();
+  
+  auto rawFuncTy = vd->getInterfaceType()->castTo<AnyFunctionType>();
+  auto selfTy = rawFuncTy->getParams().front().getType();
+  
   selfTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
   auto selfArg = F.begin()->createFunctionArgument(getLoweredType(selfTy));
 
