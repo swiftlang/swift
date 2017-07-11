@@ -2744,25 +2744,20 @@ ${assignmentOperatorComment(x.operator, True)}
     public typealias Indices = CountableRange<Int>
     public typealias SubSequence = BidirectionalSlice<${Self}.Words>
 
-    public var _value: ${Self}
+    var _value: ${Self}
 
-    @_transparent
     public init(_ value: ${Self}) {
       self._value = value
     }
 
-    @_transparent
     public var count: Int {
       return (${bits} + ${word_bits} - 1) / ${word_bits}
     }
 
-    @_transparent
     public var startIndex: Int { return 0 }
 
-    @_transparent
     public var endIndex: Int { return count }
 
-    @_transparent
     public var indices: Indices { return startIndex ..< endIndex }
 
     @_transparent
@@ -2772,7 +2767,6 @@ ${assignmentOperatorComment(x.operator, True)}
     public func index(before i: Int) -> Int { return i - 1 }
 
     public subscript(position: Int) -> UInt {
-      @_transparent
       get {
         _precondition(position >= 0, "Negative word index")
         _precondition(position < endIndex, "Word index out of range")
