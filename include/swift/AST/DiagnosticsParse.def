@@ -851,8 +851,10 @@ ERROR(parameter_curry_syntax_removed,none,
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
 
-WARNING(unlabeled_parameter_following_variadic_parameter,none,
+WARNING(swift3_unlabeled_parameter_following_variadic_parameter,none,
         "a parameter following a variadic parameter requires a label", ())
+ERROR(unlabeled_parameter_following_variadic_parameter,none,
+      "a parameter following a variadic parameter requires a label", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
