@@ -38,22 +38,13 @@
 // After removing the space before the '56'
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 12,
-// CHECK-NEXT: key.length: 5,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.number,
-// CHECK-NEXT:     key.offset: 14,
-// CHECK-NEXT:     key.length: 2
-// CHECK-NEXT:   }
 // CHECK-NEXT: ],
 
 // After deleting the identifier 'l'
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 10,
-// CHECK-NEXT: key.length: 1,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
 // CHECK-NEXT: ],
@@ -61,18 +52,6 @@
 // After deleting the last token on the first line
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 0,
-// CHECK-NEXT: key.length: 9,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.keyword,
-// CHECK-NEXT:     key.offset: 0,
-// CHECK-NEXT:     key.length: 3
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
-// CHECK-NEXT:     key.offset: 4,
-// CHECK-NEXT:     key.length: 1
-// CHECK-NEXT:   }
 // CHECK-NEXT: ],

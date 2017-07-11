@@ -43,20 +43,10 @@
 // After removing the '/' from the comment close
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 3,
-// CHECK-NEXT: key.length: 31,
+// CHECK-NEXT: key.offset: 11,
+// CHECK-NEXT: key.length: 23,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.keyword,
-// CHECK-NEXT:     key.offset: 3,
-// CHECK-NEXT:     key.length: 3
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
-// CHECK-NEXT:     key.offset: 7,
-// CHECK-NEXT:     key.length: 1
-// CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.comment,
 // CHECK-NEXT:     key.offset: 11,
@@ -67,20 +57,10 @@
 // After adding the '/' back to the comment close
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 3,
-// CHECK-NEXT: key.length: 31,
+// CHECK-NEXT: key.offset: 11,
+// CHECK-NEXT: key.length: 23,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.keyword,
-// CHECK-NEXT:     key.offset: 3,
-// CHECK-NEXT:     key.length: 3
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
-// CHECK-NEXT:     key.offset: 7,
-// CHECK-NEXT:     key.length: 1
-// CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.comment,
 // CHECK-NEXT:     key.offset: 11,

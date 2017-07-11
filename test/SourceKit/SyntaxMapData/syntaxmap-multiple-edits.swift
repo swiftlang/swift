@@ -133,27 +133,15 @@
 // After replacing a space with a space
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 57,
-// CHECK-NEXT: key.length: 15,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.keyword,
-// CHECK-NEXT:     key.offset: 57,
-// CHECK-NEXT:     key.length: 6
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
-// CHECK-NEXT:     key.offset: 64,
-// CHECK-NEXT:     key.length: 5
-// CHECK-NEXT:   }
 // CHECK-NEXT: ],
 
 // After adding code at the end of the file
 
 // CHECK: {{^}}{
 // CHECK-NEXT: key.offset: 151,
-// CHECK-NEXT: key.length: 10,
+// CHECK-NEXT: key.length: 9,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
 // CHECK-NEXT:   {
@@ -177,20 +165,10 @@
 // After inserting more than we removed
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 89,
-// CHECK-NEXT: key.length: 30,
+// CHECK-NEXT: key.offset: 98,
+// CHECK-NEXT: key.length: 20,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.keyword,
-// CHECK-NEXT:     key.offset: 91,
-// CHECK-NEXT:     key.length: 3
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
-// CHECK-NEXT:     key.offset: 95,
-// CHECK-NEXT:     key.length: 1
-// CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.typeidentifier,
 // CHECK-NEXT:     key.offset: 98,
@@ -221,20 +199,10 @@
 // After inserting less than we removed
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 45,
-// CHECK-NEXT: key.length: 22,
+// CHECK-NEXT: key.offset: 53,
+// CHECK-NEXT: key.length: 13,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.keyword,
-// CHECK-NEXT:     key.offset: 45,
-// CHECK-NEXT:     key.length: 3
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
-// CHECK-NEXT:     key.offset: 49,
-// CHECK-NEXT:     key.length: 1
-// CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.number,
 // CHECK-NEXT:     key.offset: 53,
@@ -256,7 +224,7 @@
 
 // CHECK: {{^}}{
 // CHECK-NEXT: key.offset: 0,
-// CHECK-NEXT: key.length: 27,
+// CHECK-NEXT: key.length: 25,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
 // CHECK-NEXT:   {

@@ -27,20 +27,10 @@
 // After removing 2 chars from number literal
 
 // CHECK: {{^}}{
-// CHECK-NEXT: key.offset: 1,
-// CHECK-NEXT: key.length: 10,
+// CHECK-NEXT: key.offset: 9,
+// CHECK-NEXT: key.length: 1,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.keyword,
-// CHECK-NEXT:     key.offset: 1,
-// CHECK-NEXT:     key.length: 3
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.identifier,
-// CHECK-NEXT:     key.offset: 5,
-// CHECK-NEXT:     key.length: 1
-// CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.number,
 // CHECK-NEXT:     key.offset: 9,

@@ -320,20 +320,14 @@ struct SwiftSyntaxMap {
   /// Adjusts the token offsets and lengths in this syntax map to account for
   /// replacing Len bytes at the given Offset with NewLen bytes. Tokens before
   /// the replacement stay the same, tokens after it are shifted, and tokens
-  /// that intersect it have their length set to 0. It also currently expands
-  /// the start and end of the Affected range to at least the line boundaires of
-  /// the replacement range to support an assumption in existing clients.
+  /// that intersect it have their length set to 0.
   ///
   /// Returns the affected range (the range of the new bytes + any intersected
   /// tokens) in the new buffer.
   SwiftEditorCharRange
-  adjustForReplacement(unsigned Offset, unsigned Len, unsigned NewLen, StringRef NewText) {
-    // Extend the affected range to its nearest line boundaries in the old text,
-    // based on the line boundaries of the new text
-    unsigned AffectedStart = getPrevLineBoundary(NewText, Offset);
-    unsigned NewEndLineBoundary =
-      getNextLineBoundary(NewText, Offset + NewLen, /*hasLength=*/NewLen > 0);
-    unsigned AffectedEnd = NewEndLineBoundary - NewLen + Len;
+  adjustForReplacement(unsigned Offset, unsigned Len, unsigned NewLen) {
+    unsigned AffectedStart = Offset;
+    unsigned AffectedEnd = Offset + Len;
 
     // Adjust the tokens
     auto Token = Tokens.begin();
@@ -375,13 +369,11 @@ struct SwiftSyntaxMap {
   /// Finds the delta between the given SwiftSyntaxMap, Prev, and this one.
   /// It passes each token not in Prev to the given EditorConsumer and also
   /// expands the given Affected range (if needed) to include all non-matching
-  /// tokens in the two lists. It also ensures the start and end of the Affected
-  /// range fall on line boundaires to support an assumption in existing clients.
+  /// tokens in the two lists.
   ///
   /// Returns true if this SwiftSyntaxMap is different to Prev.
   bool forEachChanged(SwiftSyntaxMap &Prev,
                       SwiftEditorCharRange &Affected,
-                      StringRef BufferText,
                       EditorConsumer &Consumer) const {
     unsigned AffectedStart = Affected.Offset, AffectedEnd = Affected.endOffset();
 
@@ -392,14 +384,15 @@ struct SwiftSyntaxMap {
       ++Start.first, ++Start.second;
 
     if (Start.first == Tokens.end() && Start.second == Prev.Tokens.end()) {
-      // We hit the end of both token lists without a mismatch – no-op.
+      // Both lists are identical – exit early with a no-op.
       return false;
     }
 
-    // Adjust the affected bounds to include the mismatched tokens
+    // Extend the affected bounds to include the mismatched tokens
     if (Start.first != Tokens.end())
       AffectedStart = std::min(Start.first->Offset, AffectedStart);
-    if (Start.second != Prev.Tokens.end())
+    // Ignore tokens in Prev that were intersected by the replacement
+    if (Start.second != Prev.Tokens.end() && Start.second->Length)
       AffectedStart = std::min(Start.second->Offset, AffectedStart);
 
     // Find the last tokens that don't match
@@ -408,44 +401,20 @@ struct SwiftSyntaxMap {
            *End.first == *End.second)
       ++End.first, ++End.second;
 
-    // Adjust the affected bounds to include the mismtached tokens
+    // Extend the affected bounds to include the mismtached tokens
     if (End.first != Tokens.rend())
       AffectedEnd = std::max(End.first->endOffset(), AffectedEnd);
-    if (End.second != Prev.Tokens.rend())
+    if (End.second != Prev.Tokens.rend() && End.second->Length)
       AffectedEnd = std::max(End.second->endOffset(), AffectedEnd);
 
     assert(AffectedEnd >= AffectedStart);
+    if (AffectedEnd == AffectedStart) {
+	  // Nothing affected
+      return false;
+    }
 
     auto From = Start.first; // The first mismatched token in this syntax map
     auto To = End.first; // The last mismatched token in this syntax map
-
-    // Extend the affected range to line boundaries
-    AffectedStart = getPrevLineBoundary(BufferText, AffectedStart);
-    AffectedEnd = getNextLineBoundary(BufferText, AffectedEnd,
-                                    /*hasLength=*/AffectedStart < AffectedEnd);
-
-    // Extend From/To to the outermost tokens in the Affected range
-    while (From != Tokens.begin()) {
-      auto Prev = From - 1;
-      while (Prev != Tokens.begin() && Prev->Offset >= AffectedStart)
-        From = Prev--;
-      if (Prev->endOffset() <= AffectedStart)
-        break;
-      // Multi-line token – extend Affected to this token's start line
-      AffectedStart = getPrevLineBoundary(BufferText, Prev->Offset);
-      From = Prev;
-    };
-
-    while (To != Tokens.rbegin()) {
-      auto Prev = To - 1;
-      while (Prev != Tokens.rbegin() && Prev->endOffset() <= AffectedEnd)
-        To = Prev--;
-      if (Prev->Offset >= AffectedEnd)
-        break;
-      // Multi-line token – extend Affected to this token's end line
-      AffectedEnd = getNextLineBoundary(BufferText, Prev->endOffset(), true);
-      To = Prev;
-    }
 
     // Report tokens from From -> To to the given EditorConsumer
     for (; From < To.base(); ++From) {
@@ -457,24 +426,6 @@ struct SwiftSyntaxMap {
     Affected.Offset = AffectedStart;
     Affected.Length = AffectedEnd - AffectedStart;
     return true;
-  }
-
-private:
-  static size_t getPrevLineBoundary(StringRef Text, size_t Offset) {
-    auto Bound = Text.rfind('\n', Offset);
-    if (Bound == StringRef::npos)
-      return 0;
-    return Bound + 1;
-  }
-
-  /// Gets the offset after the next '\n'. If HasLength is true, it will start
-  /// looking one character before the given offset. This is to handle line
-  /// comments and other tokens that include a terminating '\n'.
-  static size_t getNextLineBoundary(StringRef Text, size_t Offset, bool HasLength) {
-    auto Bound = Text.find('\n', HasLength? Offset - 1 : Offset);
-    if (Bound == StringRef::npos)
-      return Text.size();
-    return Bound + 1;
   }
 };
 
@@ -1666,8 +1617,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
 
   // Update the old syntax map offsets to account for the replaced range
   Impl.AffectedRange =
-    Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size(),
-                                        Snapshot->getBuffer()->getText());
+    Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size());
 
   return Snapshot;
 }
@@ -1731,10 +1681,9 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   bool SawChanges = true;
   if (Impl.Edited) {
     // We're ansering an edit request. Report all highlighted token ranges not
-    // in the previous syntax map (and any other tokens on the same lines) to
-    // the Consumer and update the affected range to contain them.
-    auto Text = Impl.EditableBuffer->getBuffer()->getText();
-    SawChanges = NewMap.forEachChanged(Impl.SyntaxMap, Impl.AffectedRange, Text,
+    // in the previous syntax map to the Consumer and extend the AffectedRange
+    // to contain all added/removed token ranges.
+    SawChanges = NewMap.forEachChanged(Impl.SyntaxMap, Impl.AffectedRange,
                                        Consumer);
   } else {
     // The is an open/initialise. Report all highlighted token ranges to the
