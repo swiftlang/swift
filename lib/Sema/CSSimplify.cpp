@@ -2888,7 +2888,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   result.OverallResult = MemberLookupResult::HasResults;
   
   // If we're looking for a subscript, consider key path operations.
-  if (memberName.isSimpleName(getASTContext().Id_subscript)) {
+  if (memberName.isSimpleName() &&
+      memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
     result.ViableCandidates.push_back(
         OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
   }
@@ -2897,7 +2898,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // of the tuple.
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     // Tuples don't have compound-name members.
-    if (!memberName.isSimpleName())
+    if (!memberName.isSimpleName() || memberName.isSpecial())
       return result;  // No result.
 
     StringRef nameStr = memberName.getBaseIdentifier().str();

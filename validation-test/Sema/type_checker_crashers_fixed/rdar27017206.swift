@@ -1,5 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
+// RUN: not %target-swift-frontend %s -typecheck
 
 var str = "Hello"
 String(str.characters.subscript(

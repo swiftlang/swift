@@ -1794,8 +1794,7 @@ DeclName OverloadChoice::getName() const {
       // don't currently pre-filter subscript overload sets by argument
       // keywords, so "subscript" is still the name that keypath subscripts
       // are looked up by.
-      auto &C = getBaseType()->getASTContext();
-      return DeclName(C.Id_subscript);
+      return DeclBaseName::createSubscript();
     }
     case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:

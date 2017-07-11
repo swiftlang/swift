@@ -2526,7 +2526,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     };
 
     // TODO: This should handle tuple member lookups, like x.1231 as well.
-    if (memberName.isSimpleName(CS->getASTContext().Id_subscript)) {
+    if (memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
         .highlight(baseRange);
     } else if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
@@ -5699,7 +5699,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
       CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
 
   return diagnoseMemberFailures(SE, baseExpr, ConstraintKind::ValueMember,
-                                CS->getASTContext().Id_subscript,
+                                DeclBaseName::createSubscript(),
                                 FunctionRefKind::DoubleApply, locator,
                                 callback);
 }
@@ -7540,7 +7540,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
   };
 
   // Local function to perform name lookup for the current index.
-  auto performLookup = [&](Identifier componentName, SourceLoc componentNameLoc,
+  auto performLookup = [&](DeclBaseName componentName, SourceLoc componentNameLoc,
                            Type &lookupType) -> LookupResult {
     assert(currentType && "Non-beginning state must have a type");
     if (!currentType->mayHaveMembers())
@@ -7560,13 +7560,13 @@ static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
 
   // Local function to print a component to the string.
   bool needDot = false;
-  auto printComponent = [&](Identifier component) {
+  auto printComponent = [&](DeclBaseName component) {
     if (needDot)
       keyPathOS << ".";
     else
       needDot = true;
 
-    keyPathOS << component.str();
+    keyPathOS << component;
   };
 
   bool isInvalid = false;
@@ -7574,7 +7574,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
 
   for (auto &component : KPE->getComponents()) {
     auto componentNameLoc = component.getLoc();
-    Identifier componentName;
+    DeclBaseName componentName;
 
     switch (auto kind = component.getKind()) {
     case KeyPathExpr::Component::Kind::UnresolvedProperty: {
@@ -7584,7 +7584,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
     }
 
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
-      componentName = TC.Context.Id_subscript;
+      componentName = DeclBaseName::createSubscript();
       break;
 
     case KeyPathExpr::Component::Kind::Invalid:
