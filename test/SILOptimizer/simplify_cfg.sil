@@ -2862,7 +2862,7 @@ bb6(%44 : $Builtin.Int8):
 
 // CHECK-LABEL: jump_thread_retain_release
 // CHECK: cond_br
-// CHECK:   cond_br %3, bb4, bb3
+// CHECK:   cond_br %3, bb3, bb4
 
 // CHECK: bb3:
 // CHECK:   strong_retain %1 : $foo
