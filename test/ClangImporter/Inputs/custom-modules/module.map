@@ -12,6 +12,11 @@ module CFAndObjC {
   export *
 }
 
+module CInsideObjC {
+  header "CInsideObjC.h"
+  export *
+}
+
 module ClangModuleUser {
   header "ClangModuleUser.h"
   export *
