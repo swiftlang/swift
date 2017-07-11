@@ -44,7 +44,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
     if _fastPath(x < (1 << 16)) {
       return EncodedScalar(_storage: x, _bitCount: 16)
     }
-    let x1 = x - (1 << 16)
+    let x1 = x - UInt32(1 << 16)
     var r = (0xdc00 + (x1 & 0x3ff))
     r &<<= 16
     r |= (0xd800 + (x1 &>> 10 & 0x3ff))
