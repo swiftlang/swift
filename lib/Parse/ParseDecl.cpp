@@ -5850,9 +5850,15 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   SourceLoc lBraceLoc;
   if (consumeIf(tok::l_brace, lBraceLoc)) {
     if (isInfix && !Tok.is(tok::r_brace)) {
-      diagnose(lBraceLoc, diag::deprecated_operator_body_use_group);
+      auto message = Context.isSwiftVersion3()
+                         ? diag::swift3_deprecated_operator_body_use_group
+                         : diag::deprecated_operator_body_use_group;
+      diagnose(lBraceLoc, message);
     } else {
-      auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
+      auto message = Context.isSwiftVersion3()
+                         ? diag::swift3_deprecated_operator_body
+                         : diag::deprecated_operator_body;
+      auto Diag = diagnose(lBraceLoc, message);
       if (Tok.is(tok::r_brace)) {
         SourceLoc lastGoodLoc = precedenceGroupNameLoc;
         if (lastGoodLoc.isInvalid())
