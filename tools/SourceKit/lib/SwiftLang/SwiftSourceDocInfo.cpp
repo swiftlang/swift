@@ -952,8 +952,9 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
 }
 
 /// Returns true for failure to resolve.
-static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
+static bool passNameInfoForDecl(SemaToken SemaTok, NameTranslatingInfo &Info,
                     std::function<void(const NameTranslatingInfo &)> Receiver) {
+  auto *VD = SemaTok.ValueD;
   switch (SwiftLangSupport::getNameKindForUID(Info.NameKind)) {
   case NameKind::Swift: {
     NameTranslatingInfo Result;
@@ -993,6 +994,15 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
 
     const clang::NamedDecl *Named = nullptr;
     auto *BaseDecl = VD;
+
+    // If the given name is not an objc function name, and the cursor points to
+    // a contructor call, we use the type declaration instead of the init
+    // declaration to calculate name translation.
+    if (Info.ArgNames.empty() && !Info.IsZeroArgSelector) {
+      if (auto *TD = SemaTok.CtorTyRef) {
+        BaseDecl = TD;
+      }
+    }
     while (!Named && BaseDecl) {
       Named = dyn_cast_or_null<clang::NamedDecl>(BaseDecl->getClangDecl());
       BaseDecl = BaseDecl->getOverriddenDecl();
@@ -1274,7 +1284,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         return;
 
       case SemaTokenKind::ValueRef: {
-        bool Failed = passNameInfoForDecl(SemaTok.ValueD, Input, Receiver);
+        bool Failed = passNameInfoForDecl(SemaTok, Input, Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
@@ -1504,10 +1514,8 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
         if (Entity.Mod) {
           // Module is ignored
         } else {
-          NameTranslatingInfo NewInput = Input;
           // FIXME: Should pass the main module for the interface but currently
           // it's not necessary.
-          passNameInfoForDecl(Entity.Dcl, NewInput, Receiver);
         }
       } else {
         Receiver({});
