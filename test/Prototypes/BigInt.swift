@@ -1248,7 +1248,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
   }
 
   var trailingZeroBitCount: Int {
-    return value.trailingZeroBitCount
+    return Int(~value & 1)
   }
 
   static var max: Bit {
@@ -1268,7 +1268,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
   }
 
   var leadingZeroBitCount: Int {
-    return value.nonzeroBitCount - 7
+    return Int(~value & 1)
   }
 
   var bigEndian: Bit {
@@ -1489,6 +1489,15 @@ BitTests.test("Basics") {
 
   expectEqual(x, x + y)
   expectGT(x, x &+ x)
+  
+  expectEqual(1, x.nonzeroBitCount)
+  expectEqual(0, y.nonzeroBitCount)
+
+  expectEqual(0, x.leadingZeroBitCount)
+  expectEqual(1, y.leadingZeroBitCount)
+
+  expectEqual(0, x.trailingZeroBitCount)
+  expectEqual(1, y.trailingZeroBitCount)
 }
 
 var BigIntTests = TestSuite("BigInt")
