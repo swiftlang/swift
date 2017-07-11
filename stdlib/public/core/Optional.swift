@@ -190,7 +190,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///   returns `nil`.
   @_inlineable
   public func flatMap<U>(
-    _ transform: (Unwrapped) throws -> U?
+    _ transform: (Wrapped) throws -> U?
   ) rethrows -> U? {
     switch self {
     case .some(let y):
