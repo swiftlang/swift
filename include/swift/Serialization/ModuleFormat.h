@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 349; // Last change: '@autoclosure' and '@noescape' no longer decl attributes.
+const uint16_t VERSION_MINOR = 350; // Last change: special decl names
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -342,18 +342,27 @@ using OptionalTypeKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
-enum SpecialModuleID : uint8_t {
+enum class DeclNameKind: uint8_t {
+  Normal,
+  Subscript
+};
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum SpecialIdentifierID : uint8_t {
   /// Special IdentifierID value for the Builtin module.
   BUILTIN_MODULE_ID = 0,
   /// Special IdentifierID value for the current module.
   CURRENT_MODULE_ID,
   /// Special value for the module for imported Objective-C headers.
   OBJC_HEADER_MODULE_ID,
+  /// Special value for the special subscript name
+  SUBSCRIPT_ID,
 
-  /// The number of special modules. This value should never be encoded;
+  /// The number of special Identifier IDs. This value should never be encoded;
   /// it should only be used to count the number of names above. As such, it
   /// is correct and necessary to add new values above this one.
-  NUM_SPECIAL_MODULES
+  NUM_SPECIAL_IDS
 };
 
 // These IDs must \em not be renumbered or reordered without incrementing

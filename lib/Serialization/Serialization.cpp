@@ -85,16 +85,23 @@ namespace {
     using offset_type = unsigned;
 
     hash_value_type ComputeHash(key_type_ref key) {
-      assert(!key.empty());
-      // TODO: Handle special names
-      return llvm::HashString(key.getIdentifier().str());
+      switch (key.getKind()) {
+        case DeclBaseName::Kind::Normal:
+          assert(!key.empty());
+          return llvm::HashString(key.getIdentifier().str());
+        case DeclBaseName::Kind::Subscript:
+          return static_cast<uint8_t>(DeclNameKind::Subscript);
+      }
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      // TODO: Handle special names
-      uint32_t keyLength = key.getIdentifier().str().size();
+      uint32_t keyLength = sizeof(uint8_t); // For the flag of the name's kind
+      if (key.getKind() == DeclBaseName::Kind::Normal) {
+        keyLength += key.getIdentifier().str().size(); // The name's length
+      }
+
       uint32_t dataLength = (sizeof(uint32_t) + 1) * data.size();
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -103,8 +110,16 @@ namespace {
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      // TODO: Handle special names
-      out << key.getIdentifier().str();
+      endian::Writer<little> writer(out);
+      switch (key.getKind()) {
+      case DeclBaseName::Kind::Normal:
+        writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Normal));
+        writer.OS << key.getIdentifier().str();
+        break;
+      case DeclBaseName::Kind::Subscript:
+        writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Subscript));
+        break;
+      }
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -479,16 +494,22 @@ TypeID Serializer::addTypeRef(Type ty) {
 }
 
 IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
-  if (ident.empty())
-    return 0;
+  switch (ident.getKind()) {
+  case DeclBaseName::Kind::Normal: {
+    if (ident.empty())
+      return 0;
 
-  IdentifierID &id = IdentifierIDs[ident.getIdentifier()];
-  if (id != 0)
+    IdentifierID &id = IdentifierIDs[ident.getIdentifier()];
+    if (id != 0)
+      return id;
+
+    id = ++LastIdentifierID;
+    IdentifiersToWrite.push_back(ident.getIdentifier());
     return id;
-
-  id = ++LastIdentifierID;
-  IdentifiersToWrite.push_back(ident.getIdentifier());
-  return id;
+  }
+  case DeclBaseName::Kind::Subscript:
+    return SUBSCRIPT_ID;
+  }
 }
 
 IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
@@ -1708,12 +1729,9 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
     bool isProtocolExt = SD->getDeclContext()->getAsProtocolExtensionContext();
-    auto iid = addDeclBaseNameRef(SD->getBaseName().getIdentifier());
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                         addTypeRef(ty),
-                                         iid,
-                                         isProtocolExt,
-                                         SD->isStatic());
+                                         addTypeRef(ty), SUBSCRIPT_ID,
+                                         isProtocolExt, SD->isStatic());
     break;
   }
       
@@ -4348,8 +4366,7 @@ static void collectInterestingNestedDeclarations(
         // Add operator methods.
         // Note that we don't have to add operators that are already in the
         // top-level list.
-        auto iid = memberValue->getBaseName().getIdentifier();
-        operatorMethodDecls[iid].push_back({
+        operatorMethodDecls[memberValue->getBaseName()].push_back({
           /*ignored*/0,
           S.addDeclRef(memberValue)
         });

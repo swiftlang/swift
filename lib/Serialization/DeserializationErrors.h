@@ -150,7 +150,7 @@ class XRefTracePath {
 public:
   explicit XRefTracePath(ModuleDecl &M) : baseM(M) {}
 
-  void addValue(Identifier name) {
+  void addValue(DeclBaseName name) {
     path.push_back({ PathPiece::Kind::Value, name });
   }
 

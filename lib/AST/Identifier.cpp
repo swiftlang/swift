@@ -20,6 +20,8 @@
 #include "llvm/Support/ConvertUTF.h"
 using namespace swift;
 
+void *DeclBaseName::SubscriptIdentifierData =
+    &DeclBaseName::SubscriptIdentifierData;
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, Identifier I) {
   if (I.get() == nullptr)

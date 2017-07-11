@@ -400,8 +400,7 @@ private:
         }
 
         SmallVector<char, 64> Buf;
-        // TODO: Handle special names
-        StringRef Name = (VD->getBaseName().getIdentifier().str() +
+        StringRef Name = (VD->getBaseName().userFacingName() +
                           Twine(Kind)).toStringRef(Buf);
         return BumpAllocatedString(Name);
       }
