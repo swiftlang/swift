@@ -257,7 +257,8 @@ private:
     if (AvailableAttr::isUnavailable(D))
       return false;
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      if (FD->isAccessor() && getParentDecl() != FD->getAccessorStorageDecl())
+      auto *Parent = getParentDecl();
+      if (FD->isAccessor() && Parent && Parent != FD->getAccessorStorageDecl())
         return false; // already handled as part of the var decl.
     }
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
