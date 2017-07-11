@@ -4722,11 +4722,15 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     // Within a protocol, recover from a missing 'static'.
     if (Flags & PD_InProtocol) {
       switch (StaticSpelling) {
-      case StaticSpellingKind::None:
-        diagnose(NameLoc, diag::operator_static_in_protocol, SimpleName.str())
-          .fixItInsert(FuncLoc, "static ");
+      case StaticSpellingKind::None: {
+        auto Message = Context.isSwiftVersion3()
+                           ? diag::swift3_operator_static_in_protocol
+                           : diag::operator_static_in_protocol;
+        diagnose(NameLoc, Message, SimpleName.str())
+            .fixItInsert(FuncLoc, "static ");
         StaticSpelling = StaticSpellingKind::KeywordStatic;
         break;
+      }
 
       case StaticSpellingKind::KeywordStatic:
         // Okay, this is correct.
