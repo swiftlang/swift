@@ -955,6 +955,15 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
 static bool passNameInfoForDecl(SemaToken SemaTok, NameTranslatingInfo &Info,
                     std::function<void(const NameTranslatingInfo &)> Receiver) {
   auto *VD = SemaTok.ValueD;
+
+  // If the given name is not a function name, and the cursor points to
+  // a contructor call, we use the type declaration instead of the init
+  // declaration to translate the name.
+  if (Info.ArgNames.empty() && !Info.IsZeroArgSelector) {
+    if (auto *TD = SemaTok.CtorTyRef) {
+      VD = TD;
+    }
+  }
   switch (SwiftLangSupport::getNameKindForUID(Info.NameKind)) {
   case NameKind::Swift: {
     NameTranslatingInfo Result;
@@ -995,14 +1004,6 @@ static bool passNameInfoForDecl(SemaToken SemaTok, NameTranslatingInfo &Info,
     const clang::NamedDecl *Named = nullptr;
     auto *BaseDecl = VD;
 
-    // If the given name is not an objc function name, and the cursor points to
-    // a contructor call, we use the type declaration instead of the init
-    // declaration to calculate name translation.
-    if (Info.ArgNames.empty() && !Info.IsZeroArgSelector) {
-      if (auto *TD = SemaTok.CtorTyRef) {
-        BaseDecl = TD;
-      }
-    }
     while (!Named && BaseDecl) {
       Named = dyn_cast_or_null<clang::NamedDecl>(BaseDecl->getClangDecl());
       BaseDecl = BaseDecl->getOverriddenDecl();
