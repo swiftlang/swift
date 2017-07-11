@@ -67,6 +67,7 @@ namespace swift {
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
+  class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
   class ProtocolDecl;
@@ -4468,6 +4469,9 @@ public:
     VarDeclBits.Specifier = static_cast<unsigned>(Spec);
   }
   
+  bool isInOut() const { return getSpecifier() == Specifier::InOut; }
+  
+  
   /// Is this a type ('static') variable?
   bool isStatic() const { return VarDeclBits.IsStatic; }
   void setStatic(bool IsStatic) { VarDeclBits.IsStatic = IsStatic; }
@@ -4567,7 +4571,11 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
-
+  
+  /// Retrieve the parameter type flags corresponding to the declaration of
+  /// this parameter's argument type.
+  ParameterTypeFlags getParameterFlags() const;
+  
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
 
   bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
