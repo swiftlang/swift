@@ -2738,7 +2738,6 @@ ${assignmentOperatorComment(x.operator, True)}
       )._lowWord._value)
   }
 
-% if Self == 'UInt' or (bits > word_bits and not signed):
   // FIXME should be RandomAccessCollection
   public struct Words : BidirectionalCollection {
     public typealias Indices = CountableRange<Int>
@@ -2781,21 +2780,6 @@ ${assignmentOperatorComment(x.operator, True)}
   public var words: Words {
     return Words(self)
   }
-% elif bits > word_bits:
-  public typealias Words = ${OtherSelf}.Words
-
-  @_transparent
-  public var words: Words {
-    return Words(${OtherSelf}(self._value))
-  }
-% else:
-  public typealias Words = UInt.Words
-
-  @_transparent
-  public var words: Words {
-    return Words(self._lowWord)
-  }
-% end
 
   @_transparent
   public // transparent
