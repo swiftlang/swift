@@ -1551,3 +1551,26 @@ extension Sequence where Iterator.Element == (key: String, value: String?) {
     }
   }
 }
+
+func rdar33043106(_ records: [(Int)], _ other: [((Int))]) -> [Int] {
+  let x: [Int] = records.flatMap { _ in
+    let i = 1
+    return i
+  }
+  let y: [Int] = other.flatMap { _ in
+    let i = 1
+    return i
+  }
+
+  return x + y
+}
+
+func itsFalse(_: Int) -> Bool? {
+  return false
+}
+
+func rdar33159366(s: AnySequence<Int>) {
+  _ = s.flatMap(itsFalse)
+  let a = Array(s)
+  _ = a.flatMap(itsFalse)
+}
