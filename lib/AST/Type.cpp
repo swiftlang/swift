@@ -642,9 +642,9 @@ static Type getStrippedType(const ASTContext &context, Type type,
     bool anyChanged = false;
     unsigned idx = 0;
     for (const auto &elt : tuple->getElements()) {
-      Type eltTy = getStrippedType(context, elt.getType(),
+      Type eltTy = getStrippedType(context, elt.getRawType(),
                                    stripLabels);
-      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
+      if (anyChanged || eltTy.getPointer() != elt.getRawType().getPointer() ||
           (elt.hasName() && stripLabels)) {
         if (!anyChanged) {
           elements.reserve(tuple->getNumElements());
@@ -739,19 +739,21 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
     
     for (auto i : range(0, tupleTy->getNumElements())) {
       const auto &elt = tupleTy->getElement(i);
-      assert((elt.getParameterFlags().isNone() ||
-              elt.getParameterFlags().isInOut()) &&
-             "Vararg, autoclosure, or escaping argument tuple"
-             "doesn't make sense");
-      result.push_back(AnyFunctionType::Param(elt.getType(),
-                                              argumentLabels[i], {}));
+      assert(!(elt.getParameterFlags().isAutoClosure() ||
+              elt.getParameterFlags().isVariadic()) &&
+             "Vararg or autoclosure argument tuple doesn't make sense");
+      result.push_back(AnyFunctionType::Param(elt.getRawType(),
+                                              argumentLabels[i],
+                                              elt.getParameterFlags()));
     }
     return result;
   }
     
   case TypeKind::Paren: {
-    auto ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
-    result.push_back(AnyFunctionType::Param(ty, Identifier(), {}));
+    auto parenTy = cast<ParenType>(type.getPointer());
+    result.push_back(AnyFunctionType::Param(parenTy->getUnderlyingType()->getInOutObjectType(),
+                                            Identifier(),
+                                            parenTy->getParameterFlags()));
     return result;
   }
     
@@ -762,7 +764,8 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
   
   // Just inject this parameter.
   assert(result.empty() && (argumentLabels.size() == 1));
-  result.push_back(AnyFunctionType::Param(type, argumentLabels[0], {}));
+  result.push_back(AnyFunctionType::Param(type->getInOutObjectType(), argumentLabels[0],
+                                          ParameterTypeFlags().withInOut(type->is<InOutType>())));
   return result;
 }
 
@@ -1121,7 +1124,7 @@ CanType TypeBase::getCanonicalType() {
     auto &mod = *ctx.TheBuiltinModule;
     Type inputTy = function->getInput()->getCanonicalType(sig, mod);
     if (!AnyFunctionType::isCanonicalFunctionInputType(inputTy))
-      inputTy = ParenType::get(ctx, inputTy);
+      inputTy = ParenType::get(ctx, inputTy->getInOutObjectType(), ParameterTypeFlags().withInOut(inputTy->is<InOutType>()));
     auto resultTy = function->getResult()->getCanonicalType(sig, mod);
 
     Result = GenericFunctionType::get(sig, inputTy, resultTy,
@@ -1139,7 +1142,7 @@ CanType TypeBase::getCanonicalType() {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
     if (!AnyFunctionType::isCanonicalFunctionInputType(In)) {
-      In = ParenType::get(In->getASTContext(), In);
+      In = ParenType::get(In->getASTContext(), In->getInOutObjectType(), ParameterTypeFlags().withInOut(In->is<InOutType>()));
       assert(AnyFunctionType::isCanonicalFunctionInputType(In));
     }
     Type Out = FT->getResult()->getCanonicalType();
@@ -1285,6 +1288,20 @@ TypeBase *TypeBase::getDesugaredType() {
 
   llvm_unreachable("Unknown type kind");
 }
+
+ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
+                     ParameterTypeFlags flags)
+  : TypeBase(TypeKind::Paren, nullptr, properties),
+    UnderlyingType(flags.isInOut()
+                     ? InOutType::get(baseType)
+                     : baseType),
+    parameterFlags(flags) {
+  if (flags.isInOut())
+    assert(!baseType->is<InOutType>() && "caller did not pass a base type");
+  if (baseType->is<InOutType>())
+    assert(flags.isInOut() && "caller did not set flags correctly");
+}
+
 
 TypeBase *ParenType::getSinglyDesugaredType() {
   return getUnderlyingType().getPointer();
@@ -3686,7 +3703,8 @@ case TypeKind::Id:
     if (underlying.getPointer() == paren->getUnderlyingType().getPointer())
       return *this;
 
-    return ParenType::get(Ptr->getASTContext(), underlying);
+    auto otherFlags = paren->getParameterFlags().withInOut(underlying->is<InOutType>());
+    return ParenType::get(Ptr->getASTContext(), underlying->getInOutObjectType(), otherFlags);
   }
 
   case TypeKind::Tuple: {

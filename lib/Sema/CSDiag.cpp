@@ -3127,11 +3127,15 @@ namespace {
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
       
-      for (auto paramDeclElt : ParamDeclTypes)
-        paramDeclElt.first->setType(paramDeclElt.second);
+      for (auto paramDeclElt : ParamDeclTypes) {
+        assert(!paramDeclElt.first->isLet() || !paramDeclElt.second->is<InOutType>());
+        paramDeclElt.first->setType(paramDeclElt.second->getInOutObjectType());
+      }
       
-      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
-        paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second);
+      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes) {
+        assert(!paramDeclIfaceElt.first->isLet() || !paramDeclIfaceElt.second->is<InOutType>());
+        paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second->getInOutObjectType());
+      }
       
       for (auto CSE : CollectionSemanticExprs)
         CSE.first->setSemanticExpr(CSE.second);
@@ -4550,9 +4554,11 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
             }
           }
 
+          auto resultTy = CS.getType(exprResult);
           resultElts[inArgNo] = exprResult;
-          resultEltTys[inArgNo] = {CS.getType(exprResult),
-                                   TE->getElementName(inArgNo)};
+          resultEltTys[inArgNo] = {resultTy->getInOutObjectType(),
+                                   TE->getElementName(inArgNo),
+                                   ParameterTypeFlags().withInOut(resultTy->is<InOutType>())};
         }
       }
 

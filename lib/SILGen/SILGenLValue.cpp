@@ -2003,7 +2003,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind,
                               AbstractionPattern orig) {
   // First see if we have an lvalue type. If we do, then quickly handle that and
   // return.
-  if (e->getType()->is<LValueType>() || e->getType()->is<InOutType>()) {
+  if (e->getType()->is<LValueType>() || e->isSemanticallyInOutExpr()) {
     auto lv = visit(e, accessKind);
     // If necessary, handle reabstraction with a SubstToOrigComponent that
     // handles

@@ -120,13 +120,15 @@ ParameterList *ParameterList::clone(const ASTContext &C,
 Type ParameterList::getType(const ASTContext &C) const {
   if (size() == 0)
     return TupleType::getEmpty(C);
-  
+
   SmallVector<TupleTypeElt, 8> argumentInfo;
   
   for (auto P : *this) {
+    auto type = P->getType();
+    
     argumentInfo.emplace_back(
-        P->getType(), P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(P->getType(), P->isVariadic()));
+        type->getInOutObjectType(), P->getArgumentName(),
+        ParameterTypeFlags::fromParameterType(type, P->isVariadic()).withInOut(P->isInOut()));
   }
 
   return TupleType::get(argumentInfo, C);
@@ -143,10 +145,10 @@ Type ParameterList::getInterfaceType(const ASTContext &C) const {
   for (auto P : *this) {
     auto type = P->getInterfaceType();
     assert(!type->hasArchetype());
-
+    
     argumentInfo.emplace_back(
-        type, P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(type, P->isVariadic()));
+        type->getInOutObjectType(), P->getArgumentName(),
+        ParameterTypeFlags::fromParameterType(type, P->isVariadic()).withInOut(P->isInOut()));
   }
 
   return TupleType::get(argumentInfo, C);

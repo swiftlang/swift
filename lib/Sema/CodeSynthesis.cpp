@@ -201,6 +201,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
                             storageType,
                             storageInterfaceType,
                             VarDecl::Specifier::Owned);
+
   params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
@@ -304,8 +305,8 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
                   ctx.TheRawPointerType,
                   VarDecl::Specifier::Owned),
     buildArgument(loc, DC, "callbackStorage",
-                  InOutType::get(ctx.TheUnsafeValueBufferType),
-                  InOutType::get(ctx.TheUnsafeValueBufferType),
+                  ctx.TheUnsafeValueBufferType,
+                  ctx.TheUnsafeValueBufferType,
                   VarDecl::Specifier::InOut)
   };
   params.push_back(buildIndexForwardingParamList(storage, bufferElements));
@@ -412,7 +413,7 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
       return nullptr;
     
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
-    if (param->getInterfaceType()->is<InOutType>())
+    if (param->isInOut())
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
     args.push_back(ref);
     
@@ -1501,9 +1502,8 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
       auto lvTy = LValueType::get(selfTy);
       selfExpr->setType(lvTy);
       selfExpr->propagateLValueAccessKind(AccessKind::ReadWrite);
-      auto inoutTy = InOutType::get(selfTy);
       selfExpr = new (Context) InOutExpr(SourceLoc(),
-                                         selfExpr, inoutTy, /*implicit*/ true);
+                                         selfExpr, selfTy, /*implicit*/ true);
     }
     return selfExpr;
   };

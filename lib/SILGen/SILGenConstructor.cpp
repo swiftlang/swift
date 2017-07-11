@@ -376,7 +376,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"), Type(),
                                  element->getDeclContext());
-    VD->setInterfaceType(CanInOutType::get(enumIfaceTy));
+    VD->setInterfaceType(enumIfaceTy);
     auto resultSlot =
         F.begin()->createFunctionArgument(enumTI.getLoweredType(), VD);
     dest = std::unique_ptr<Initialization>(

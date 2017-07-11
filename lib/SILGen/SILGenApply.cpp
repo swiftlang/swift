@@ -2990,9 +2990,9 @@ private:
 
     // If the source of the conversion is an inout, emit the l-value
     // but delay the formal access.
-    if (auto inoutType = arrayExpr->getType()->getAs<InOutType>()) {
+    if (arrayExpr->isSemanticallyInOutExpr()) {
       auto info = SGF.getArrayAccessInfo(pointerExpr->getType(),
-                                         inoutType->getObjectType());
+                                         arrayExpr->getType()->getInOutObjectType());
       LValue lv = SGF.emitLValue(arrayExpr, info.AccessKind);
       DelayedArguments.emplace_back(info, std::move(lv), pointerExpr,
                                     original);
@@ -3470,12 +3470,16 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
                              AbstractionPattern origParamType) {
   ArrayRef<TupleTypeElt> srcElts;
   TupleTypeElt singletonSrcElt;
+  auto srcEltTy = E->getSubExpr()->getType()->getCanonicalType();
   if (E->isSourceScalar()) {
-    singletonSrcElt = E->getSubExpr()->getType()->getCanonicalType();
+    ParameterTypeFlags flags;
+    if (E->getSubExpr()->isSemanticallyInOutExpr()) {
+      flags = flags.withInOut(true);
+    }
+    singletonSrcElt = {srcEltTy->getInOutObjectType(), Identifier(), flags};
     srcElts = singletonSrcElt;
   } else {
-    srcElts = cast<TupleType>(E->getSubExpr()->getType()->getCanonicalType())
-                     ->getElements();
+    srcElts = cast<TupleType>(srcEltTy)->getElements();
   }
 
   TupleShuffleArgEmitter(E, srcElts, origParamType).emit(*this);

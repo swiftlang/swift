@@ -2410,7 +2410,10 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   // Merge inputs and generic parameters from the uncurry levels.
   for (;;) {
-    inputs.push_back(TupleTypeElt(fnType.getInput()));
+    auto canInput = fnType->getInput()->getCanonicalType();
+    auto inputFlags = ParameterTypeFlags().withInOut(isa<InOutType>(canInput));
+    inputs.push_back(TupleTypeElt(canInput->getInOutObjectType(), Identifier(),
+                                  inputFlags));
 
     // The uncurried function calls all of the intermediate function
     // levels and so throws if any of them do.
