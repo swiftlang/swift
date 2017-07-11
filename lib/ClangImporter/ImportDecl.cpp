@@ -7991,8 +7991,10 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
   for (const clang::Decl *m : objcContainer->decls()) {
     auto nd = dyn_cast<clang::NamedDecl>(m);
-    if (!nd || nd != nd->getCanonicalDecl())
+    if (!nd || nd != nd->getCanonicalDecl() ||
+        nd->getDeclContext() != objcContainer) {
       continue;
+    }
 
     forEachDistinctName(nd,
                         [&](ImportedName name, ImportNameVersion nameVersion) {
