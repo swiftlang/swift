@@ -3905,6 +3905,8 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     case KeyPathExpr::Component::Kind::Invalid:
       break;
       
+    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
       // If no choice was made, leave the constraint unsolved.
@@ -3949,10 +3951,11 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       // Forcing an optional preserves its lvalue-ness.
       break;
     
-    case KeyPathExpr::Component::Kind::Property:
-    case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::OptionalWrap:
-      llvm_unreachable("already resolved");
+      // An optional chain should already have forced the entire key path to
+      // be read-only.
+      assert(capability == ReadOnly);
+      break;
     }
   }
 done:
