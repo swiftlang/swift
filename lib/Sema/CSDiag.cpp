@@ -7287,12 +7287,13 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     for (auto param : *params) {
       auto paramType = param->getType();
       // If this is unresolved 'inout' parameter, it's better to drop
-      // 'inout' from type but keep 'mutability' classifier because that
-      // might help to diagnose actual problem e.g. type inference and
-      // doesn't give us much information anyway.
+      // 'inout' from type because that might help to diagnose actual problem
+      // e.g. type inference doesn't give us much information anyway.
       if (paramType->is<InOutType>() && paramType->hasUnresolvedType()) {
+        assert(!param->isLet() || !paramType->is<InOutType>());
         param->setType(CS.getASTContext().TheUnresolvedType);
-        param->setInterfaceType(param->getType());
+        param->setInterfaceType(param->getType()->getInOutObjectType());
+        param->setSpecifier(swift::VarDecl::Specifier::Owned);
       }
     }
 
