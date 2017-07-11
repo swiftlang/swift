@@ -99,6 +99,9 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
     return None;
   }
 
+  // Don't bind to a dependent member type.
+  if (type->is<DependentMemberType>()) return None;
+
   // Okay, allow the binding (with the simplified type).
   return type;
 }
