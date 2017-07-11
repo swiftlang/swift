@@ -413,11 +413,16 @@ ERROR(expected_operator_name_after_operator,PointsToFirstBadToken,
 ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
       "%0 is considered to be an identifier, not an operator", (Identifier))
 
-WARNING(deprecated_operator_body,PointsToFirstBadToken,
+WARNING(swift3_deprecated_operator_body,PointsToFirstBadToken,
         "operator should no longer be declared with body", ())
-WARNING(deprecated_operator_body_use_group,PointsToFirstBadToken,
+ERROR(deprecated_operator_body,PointsToFirstBadToken,
+      "operator should no longer be declared with body", ())
+WARNING(swift3_deprecated_operator_body_use_group,PointsToFirstBadToken,
         "operator should no longer be declared with body; "
         "use a precedence group instead", ())
+ERROR(deprecated_operator_body_use_group,PointsToFirstBadToken,
+      "operator should no longer be declared with body; "
+      "use a precedence group instead", ())
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 
