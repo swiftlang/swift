@@ -793,6 +793,7 @@ extension String._Testable.UTF16View : RangeReplaceableCollection {
   ///
   /// - Returns: `true` if `self` is known to have mutable capacity.
   @inline(__always)
+  @_semantics("inline_late")
   mutating func _reserveCapacity<S: Sequence>(forAppending s: S) -> Bool
   where S.Element == UInt16 {
     let growth = s.underestimatedCount
@@ -820,6 +821,7 @@ extension String._Testable.UTF16View : RangeReplaceableCollection {
   }
 
   @inline(__always)
+  @_semantics("inline_late")
   mutating func _allocateCapacity(_ minCapacity: Int, forcingUTF16: Bool) {
     if let codeUnits = _content._existingUTF16 {
       self._content = .utf16(
