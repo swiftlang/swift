@@ -1314,12 +1314,18 @@ ERROR(attr_noescape_conflicts_escaping_autoclosure,none,
 ERROR(attr_noescape_implied_by_autoclosure,none,
       "@noescape is implied by @autoclosure and should not be "
       "redundantly specified", ())
-WARNING(attr_autoclosure_escaping_deprecated,none,
+WARNING(swift3_attr_autoclosure_escaping_deprecated,none,
         "@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead",
         ())
-WARNING(attr_noescape_deprecated,none,
+ERROR(attr_autoclosure_escaping_deprecated,none,
+      "@autoclosure(escaping) has been removed; use @autoclosure @escaping instead",
+      ())
+WARNING(swift3_attr_noescape_deprecated,none,
         "@noescape is the default and is deprecated",
         ())
+ERROR(attr_noescape_deprecated,none,
+      "@noescape is the default and has been removed",
+      ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,
