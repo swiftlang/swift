@@ -1288,10 +1288,7 @@ static void recordSelfContextType(AbstractFunctionDecl *func) {
   auto selfDecl = func->getImplicitSelfDecl();
   Type selfTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true,
                                                /*wantDynamicSelf*/true);
-  if (auto *FD = dyn_cast<FuncDecl>(func)) {
-    assert(FD->isMutating() == selfTy->is<InOutType>());
-  }
-  
+
   selfTy = func->mapTypeIntoContext(selfTy);
   // FIXME(Remove InOutType): 'computeInterfaceSelfType' should tell us if
   // we need to do this.

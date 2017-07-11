@@ -817,33 +817,33 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
                                          GenericSignature *sig) {
   Type funcTy;
-  Type initFuncTy;
-
+  Type initFuncTy = Type();
+  
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     funcTy = fn->getBodyResultTypeLoc().getType();
     if (!funcTy)
       funcTy = TupleType::getEmpty(Context);
-
+    
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
     auto *dc = ctor->getDeclContext();
-
+    
     funcTy = dc->getSelfInterfaceType();
     if (!funcTy)
       funcTy = ErrorType::get(Context);
-
+    
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
       funcTy = OptionalType::get(ctor->getFailability(), funcTy);
-
+    
     initFuncTy = funcTy;
   } else {
     assert(isa<DestructorDecl>(func));
     funcTy = TupleType::getEmpty(Context);
   }
-
+  
   auto paramLists = func->getParameterLists();
   SmallVector<ParameterList*, 4> storedParamLists;
-
+  
   // FIXME: Destructors don't have the '()' pattern in their signature, so
   // paste it here.
   if (isa<DestructorDecl>(func)) {
@@ -852,39 +852,48 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     storedParamLists.push_back(ParameterList::createEmpty(Context));
     paramLists = storedParamLists;
   }
-
+  
   bool hasSelf = func->getDeclContext()->isTypeContext();
   for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
-    Type argTy;
-    Type initArgTy;
-
-    Type selfTy;
+    SmallVector<AnyFunctionType::Param, 4> argTy;
+    SmallVector<AnyFunctionType::Param, 4> initArgTy;
+    
     if (i == e-1 && hasSelf) {
-      selfTy = ParenType::get(Context, func->computeInterfaceSelfType());
-
+      auto ifTy = func->computeInterfaceSelfType();
+      auto selfTy = AnyFunctionType::Param(ifTy->getInOutObjectType(),
+                                           Identifier(),
+                                           ParameterTypeFlags().withInOut(ifTy->is<InOutType>()));
+      
       // Substitute in our own 'self' parameter.
-
-      argTy = selfTy;
+      
+      argTy.push_back(selfTy);
       if (initFuncTy) {
-        initArgTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
+        auto ifTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
+
+        initArgTy.push_back(
+          AnyFunctionType::Param(
+            ifTy->getInOutObjectType(),
+            Identifier(), ParameterTypeFlags().withInOut(ifTy->is<InOutType>())));
       }
     } else {
-      argTy = paramLists[e - i - 1]->getInterfaceType(Context);
-
+      AnyFunctionType::decomposeInput(paramLists[e - i - 1]->getInterfaceType(Context), argTy);
+      
       if (initFuncTy)
         initArgTy = argTy;
     }
-
+    
     // 'throws' only applies to the innermost function.
     AnyFunctionType::ExtInfo info;
     if (i == 0 && func->hasThrows())
       info = info.withThrows();
-
-    assert(!argTy->hasArchetype());
+    
+    assert(std::all_of(argTy.begin(), argTy.end(), [](const AnyFunctionType::Param &aty){
+      return !aty.getType()->hasArchetype();
+    }));
     assert(!funcTy->hasArchetype());
     if (initFuncTy)
       assert(!initFuncTy->hasArchetype());
-
+    
     if (sig && i == e-1) {
       funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
       if (initFuncTy)
@@ -895,12 +904,12 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
         initFuncTy = FunctionType::get(initArgTy, initFuncTy, info);
     }
   }
-
+  
   // Record the interface type.
   func->setInterfaceType(funcTy);
   if (initFuncTy)
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
-
+  
   // We get bogus errors here with generic subscript materializeForSet.
   if (!isa<FuncDecl>(func) ||
       cast<FuncDecl>(func)->getAccessorKind() !=

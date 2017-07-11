@@ -6328,8 +6328,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
         if (!fd->isMutating() && baseObjectTy->is<ArchetypeType>())
           return baseObjectTy;
 
-      assert(InOutType::get(baseObjectTy)->isEqual(baseTy));
-      return baseTy;
+      return InOutType::get(baseObjectTy);
     }
 
     // Otherwise, return the rvalue type.
