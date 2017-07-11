@@ -287,7 +287,7 @@ struct SwiftSyntaxToken {
 struct SwiftSyntaxMap {
   std::vector<SwiftSyntaxToken> Tokens;
 
-  SwiftSyntaxMap(unsigned Capacity = 0) {
+  explicit SwiftSyntaxMap(unsigned Capacity = 0) {
     if (Capacity)
       Tokens.reserve(Capacity);
   }
@@ -304,6 +304,7 @@ struct SwiftSyntaxMap {
       return;
     }
     auto &LastTok = Tokens.back();
+    assert(LastTok.Offset <= Token.Offset);
     mergeSplitRanges(LastTok.Offset, LastTok.Length, Token.Offset, Token.Length,
                      [&](unsigned BeforeOff, unsigned BeforeLen,
                          unsigned AfterOff, unsigned AfterLen) {
@@ -346,13 +347,22 @@ struct SwiftSyntaxMap {
       ++Token;
     }
 
+
+    // Completely after - shift
     while (Token != Tokens.end()) {
-      Token->Offset += NewLen - Len; // Completely after - shift
+      if (NewLen >= Len) {
+        Token->Offset += NewLen - Len;
+      } else {
+        Token->Offset -= Len - NewLen;
+      }
       ++Token;
     }
-
     // Adjust the AffectedEnd to its position in the NewText
-    AffectedEnd += NewLen - Len;
+    if (NewLen >= Len) {
+      AffectedEnd += NewLen - Len;
+    } else {
+      AffectedEnd -= Len - NewLen;
+    }
 
     // Return the Affected range in NewText
     return {AffectedStart, AffectedEnd - AffectedStart};
@@ -366,13 +376,13 @@ struct SwiftSyntaxMap {
     }
   }
 
-  /// Finds the delta between the given SwiftSyntaxMap, Prev, and this one.
-  /// It passes each token not in Prev to the given EditorConsumer and also
-  /// expands the given Affected range (if needed) to include all non-matching
-  /// tokens in the two lists.
+  /// Finds the delta between the given SwiftSyntaxMap, \p Prev, and this one.
+  /// It passes each token not in \p Prev to the given EditorConsumer and also
+  /// expands the given \p Affected range (if needed) to include all
+  /// non-matching tokens in the two lists.
   ///
-  /// Returns true if this SwiftSyntaxMap is different to Prev.
-  bool forEachChanged(SwiftSyntaxMap &Prev,
+  /// Returns true if this SwiftSyntaxMap is different to \p Prev.
+  bool forEachChanged(const SwiftSyntaxMap &Prev,
                       SwiftEditorCharRange &Affected,
                       EditorConsumer &Consumer) const {
     unsigned AffectedStart = Affected.Offset, AffectedEnd = Affected.endOffset();
