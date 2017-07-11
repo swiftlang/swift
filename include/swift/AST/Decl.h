@@ -4385,10 +4385,7 @@ public:
 
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
-  Type getType() const {
-    assert(!typeInContext.isNull() && "no contextual type set yet");
-    return typeInContext;
-  }
+  Type getType() const;
 
   /// Set the type of the variable within its context.
   void setType(Type t);
@@ -4577,7 +4574,7 @@ public:
   ParameterTypeFlags getParameterFlags() const;
   
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
-
+    
   bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
   void setIsTypeLocImplicit(bool val) { IsTypeLocImplicit = val; }
   

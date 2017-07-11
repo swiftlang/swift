@@ -194,7 +194,7 @@ public:
     case Kind::Invalid: llvm_unreachable("argument source is invalid");
     case Kind::RValue: return false;
     case Kind::LValue: return true;
-    case Kind::Expr: return asKnownExpr()->getType()->is<InOutType>();
+    case Kind::Expr: return asKnownExpr()->isSemanticallyInOutExpr();
     case Kind::Tuple: return false;
     }
     llvm_unreachable("bad kind");    

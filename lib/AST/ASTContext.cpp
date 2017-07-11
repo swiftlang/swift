@@ -946,14 +946,12 @@ FuncDecl *ASTContext::getArrayAppendElementDecl() const {
         return nullptr;
       if (ParamLists[0]->size() != 1)
         return nullptr;
-
-      InOutType *SelfInOutTy =
-        ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
-      if (!SelfInOutTy)
+      if (!ParamLists[0]->get(0)->isInOut())
         return nullptr;
 
+      auto SelfInOutTy = ParamLists[0]->get(0)->getInterfaceType();
       BoundGenericStructType *SelfGenericStructTy =
-        SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+        SelfInOutTy->getInOutObjectType()->getAs<BoundGenericStructType>();
       if (!SelfGenericStructTy)
         return nullptr;
       if (SelfGenericStructTy->getDecl() != getArrayDecl())
@@ -997,14 +995,12 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
         return nullptr;
       if (ParamLists[0]->size() != 1)
         return nullptr;
-
-      InOutType *SelfInOutTy =
-        ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
-      if (!SelfInOutTy)
+      if (!ParamLists[0]->get(0)->isInOut())
         return nullptr;
 
+      auto SelfInOutTy = ParamLists[0]->get(0)->getInterfaceType();
       BoundGenericStructType *SelfGenericStructTy =
-        SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+        SelfInOutTy->getInOutObjectType()->getAs<BoundGenericStructType>();
       if (!SelfGenericStructTy)
         return nullptr;
       if (SelfGenericStructTy->getDecl() != getArrayDecl())
@@ -2665,13 +2661,18 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
 
 ParenType *ParenType::get(const ASTContext &C, Type underlying,
                           ParameterTypeFlags fl) {
-  auto flags = fl.withInOut(underlying->is<InOutType>());
+  if (fl.isInOut())
+    assert(!underlying->is<InOutType>() && "caller did not pass a base type");
+  if (underlying->is<InOutType>())
+    assert(fl.isInOut() && "caller did not set flags correctly");
+  
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
   ParenType *&Result =
-      C.Impl.getArena(arena).ParenTypes[{underlying, flags.toRaw()}];
+      C.Impl.getArena(arena).ParenTypes[{underlying, fl.toRaw()}];
   if (Result == nullptr) {
-    Result = new (C, arena) ParenType(underlying, properties, flags);
+    Result = new (C, arena) ParenType(underlying,
+                                      properties, fl);
   }
   return Result;
 }
@@ -2693,7 +2694,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
-    return ParenType::get(C, Fields[0].getType(),
+    return ParenType::get(C, Fields[0].getRawType(),
                           Fields[0].getParameterFlags());
 
   RecursiveTypeProperties properties;
@@ -2703,7 +2704,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     if (!eltTy) continue;
     
     properties |= eltTy->getRecursiveProperties();
-    hasInOut |= eltTy->is<InOutType>();
+    hasInOut |= Elt.getParameterFlags().isInOut();
   }
 
   auto arena = getArena(properties);
@@ -2740,10 +2741,38 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
 
 TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
                            ParameterTypeFlags fl)
-: Name(name), ElementType(ty), Flags(fl.withInOut(ty->is<InOutType>())) {
-  // FIXME: Re-enable this assertion and hunt down the callers that aren't
-  // setting parameter bits correctly.
-  // assert((ty->is<InOutType>() && fl.isInOut()) && "caller did not set flags");
+  : Name(name), ElementType(ty), Flags(fl) {
+  if (fl.isInOut())
+    assert(!ty->is<InOutType>() && "caller did not pass a base type");
+  if (ty->is<InOutType>())
+    assert(fl.isInOut() && "caller did not set flags correctly");
+}
+
+Type TupleTypeElt::getType() const {
+  if (Flags.isInOut()) return InOutType::get(ElementType);
+  return ElementType;
+}
+
+AnyFunctionType::Param::Param(const TupleTypeElt &tte)
+  : Ty(tte.isVararg() ? tte.getVarargBaseTy() : tte.getRawType()),
+    Label(tte.getName()), Flags(tte.getParameterFlags()) {
+  assert(getType()->is<InOutType>() == Flags.isInOut());
+}
+
+AnyFunctionType::Param::Param(Type t, Identifier l, ParameterTypeFlags f)
+  : Ty(t), Label(l), Flags(f) {
+  if (f.isInOut())
+    assert(!t->is<InOutType>() && "caller did not pass a base type");
+  if (!t.isNull() && t->is<InOutType>())
+    assert(f.isInOut() && "caller did not set flags correctly");
+}
+
+Type AnyFunctionType::Param::getType() const {
+  if (Flags.isInOut()) return InOutType::get(Ty);
+  // FIXME: Callers are inconsistenly setting this flag and retrieving this
+  // type with and without the Array Slice type.
+//  if (Flags.isVariadic()) return ArraySliceType::get(Ty);
+  return Ty;
 }
 
 void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3176,13 +3205,18 @@ void AnyFunctionType::decomposeInput(
   }
       
   case TypeKind::Paren: {
-    auto ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
-    result.push_back(AnyFunctionType::Param(ty));
+    auto pty = cast<ParenType>(type.getPointer());
+    result.push_back(AnyFunctionType::Param(pty->getUnderlyingType()->getInOutObjectType(),
+                                            Identifier(),
+                                            pty->getParameterFlags()));
     return;
   }
       
   default:
-    result.push_back(AnyFunctionType::Param(type));
+//    assert(type->is<InOutType>() && "Found naked inout type");
+    result.push_back(AnyFunctionType::Param(type->getInOutObjectType(),
+                                            Identifier(),
+                                            ParameterTypeFlags::fromParameterType(type, false)));
     return;
   }
 }
@@ -3191,7 +3225,7 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
                                    bool canonicalVararg) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {
-    Type eltType = param.getType();
+    Type eltType = param.getRawType();
     if (param.isVariadic()) {
       if (canonicalVararg)
         eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});

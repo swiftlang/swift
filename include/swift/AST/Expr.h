@@ -592,6 +592,15 @@ public:
   /// a base class.
   bool isSuperExpr() const;
 
+  /// Returns whether the semantically meaningful content of this expression is
+  /// an inout expression.
+  ///
+  /// FIXME(Remove InOutType): This should eventually sub-in for
+  /// 'E->getType()->is<InOutType>()' in all cases.
+  bool isSemanticallyInOutExpr() const {
+    return getSemanticsProvidingExpr()->getKind() == ExprKind::InOut;
+  }
+  
   /// Returns false if this expression needs to be wrapped in parens when
   /// used inside of a any postfix expression, true otherwise.
   ///
@@ -3241,10 +3250,8 @@ class InOutExpr : public Expr {
   SourceLoc OperLoc;
 
 public:
-  InOutExpr(SourceLoc operLoc, Expr *subExpr, Type type,
-                bool isImplicit = false)
-    : Expr(ExprKind::InOut, isImplicit, type),
-      SubExpr(subExpr), OperLoc(operLoc) {}
+  InOutExpr(SourceLoc operLoc, Expr *subExpr, Type baseType,
+            bool isImplicit = false);
 
   SourceLoc getStartLoc() const { return OperLoc; }
   SourceLoc getEndLoc() const { return SubExpr->getEndLoc(); }
