@@ -88,25 +88,11 @@ func setFoo(_ f: Foo, s: String) {
 // CHECK: bb0([[ARG0:%.*]] : $Foo, {{%.*}} : $String):
 // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
 // CHECK:   [[SET_FOO:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.setFoo!1.foreign
-// CHECK:   [[NV:%.*]] = load
-// CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NV]]
-// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
-//
-// CHECK: [[SOME_BB]]([[NATIVE:%.*]] : $String):
-// CHECK-NOT: unchecked_enum_data
+// CHECK:   [[NATIVE:%.*]] = load
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
 // CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
-// CHECK:   end_borrow [[BORROWED_NATIVE]] from [[NATIVE]]
-// CHECK:   destroy_value [[NATIVE]]
-// CHECK:   br [[CONT_BB:bb[0-9]+]]([[OPT_BRIDGED]] : $Optional<NSString>)
-//
-// CHECK: [[NONE_BB]]:
-// CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.none!enumelt
-// CHECK:   br [[CONT_BB]]([[OPT_BRIDGED]] : $Optional<NSString>)
-//
-// CHECK: [[CONT_BB]]([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Optional<NSString>, Foo) -> ()
 // CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
@@ -273,18 +259,12 @@ func callSetBar(_ s: String) {
 // CHECK-LABEL: sil hidden @_T013objc_bridging10callSetBar{{.*}}F
 // CHECK: bb0({{%.*}} : $String):
 // CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
-// CHECK:   [[NV:%.*]] = load
-// CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NV]]
-// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
-
-// CHECK: [[SOME_BB]]([[NATIVE:%.*]] : $String):
-// CHECK-NOT: unchecked_enum_data
+// CHECK:   [[NATIVE:%.*]] = load
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
-// CHECK:    = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
+// CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   end_borrow [[BORROWED_NATIVE]] from [[NATIVE]]
-// CHECK: bb3([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK: }
@@ -650,4 +630,10 @@ func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // XCHECK: end_borrow [[BORROWED_HOME]] from [[HOME]]
   // XCHECK: destroy_value [[HOME]]
   home.fridge.temperature += delta
+}
+
+// CHECK-LABEL: sil hidden @_T013objc_bridging20callNonStandardBlockySi5value_tF
+func callNonStandardBlock(value: Int) {
+  // CHECK: enum $Optional<@convention(block) () -> @owned Optional<AnyObject>>
+  takesNonStandardBlock { return value }
 }

@@ -1556,32 +1556,6 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   return lowering;
 }
 
-CanSILFunctionType TypeConverter::getSILFunctionType(
-    AbstractionPattern origType,
-    CanFunctionType substFnType,
-    unsigned uncurryLevel) {
-  // First, lower at the AST level by uncurrying and substituting
-  // bridged types.
-  auto substLoweredType =
-    getLoweredASTFunctionType(substFnType, 0, None);
-
-  AbstractionPattern origLoweredType = [&] {
-    if (origType.isExactType(substFnType)) {
-      return AbstractionPattern(origType.getGenericSignature(),
-                                substLoweredType);
-    } else if (origType.isTypeParameter()) {
-      return origType;
-    } else {
-      auto origFnType = cast<AnyFunctionType>(origType.getType());
-      return AbstractionPattern(origType.getGenericSignature(),
-                                getLoweredASTFunctionType(origFnType,
-                                                          0, None));
-    }
-  }();
-
-  return getNativeSILFunctionType(M, origLoweredType, substLoweredType);
-}
-
 CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
                                             CanType substType) {
   assert(!substType->hasError() &&
@@ -1592,8 +1566,11 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
   //   - types are turned into their unbridged equivalents, depending
   //     on the abstract CC
   //   - ownership conventions are deduced
-  if (auto substFnType = dyn_cast<FunctionType>(substType))
-    return getSILFunctionType(origType, substFnType, /*uncurryLevel=*/0);
+  if (auto substFnType = dyn_cast<AnyFunctionType>(substType)) {
+    auto bridgedFnType = getBridgedFunctionType(origType, substFnType,
+                                                substFnType->getExtInfo());
+    return getNativeSILFunctionType(M, origType, bridgedFnType);
+  }
 
   // Ignore dynamic self types.
   if (auto selfType = dyn_cast<DynamicSelfType>(substType)) {
@@ -1744,18 +1721,9 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
-  CanGenericSignature sig;
-  if (auto genTy = dyn_cast<GenericFunctionType>(funcInfo.FormalInterfaceType))
-    sig = genTy.getGenericSignature();
-
-  if (sig) {
-    return CanGenericFunctionType::get(sig,
-                                       TupleType::getEmpty(TC.Context),
-                                       canResultTy,
-                                       AnyFunctionType::ExtInfo());
-  }
-  
-  return CanFunctionType::get(TupleType::getEmpty(TC.Context), canResultTy);
+  return CanAnyFunctionType::get(funcInfo.FormalType.getOptGenericSignature(),
+                                 TupleType::getEmpty(TC.Context),
+                                 canResultTy);
 }
 
 /// Get the type of a stored property initializer, () -> T.
@@ -1768,13 +1736,8 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
           ->getCanonicalType();
   auto sig = TC.getEffectiveGenericSignature(DC);
 
-  if (sig)
-    return CanGenericFunctionType::get(sig,
-                                       TupleType::getEmpty(TC.Context),
-                                       resultTy,
-                                       GenericFunctionType::ExtInfo());
-  
-  return CanFunctionType::get(TupleType::getEmpty(TC.Context), resultTy);
+  return CanAnyFunctionType::get(sig, TupleType::getEmpty(TC.Context),
+                                 resultTy);
 }
 
 /// Get the type of a destructor function.
@@ -1804,9 +1767,7 @@ static CanAnyFunctionType getDestructorInterfaceType(TypeConverter &TC,
                       : C.TheNativeObjectType);
 
   auto sig = TC.getEffectiveGenericSignature(dd);
-  if (sig)
-    return CanGenericFunctionType::get(sig, classType, resultTy, extInfo);
-  return CanFunctionType::get(classType, resultTy, extInfo);
+  return CanAnyFunctionType::get(sig, classType, resultTy, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
@@ -1829,11 +1790,7 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(TypeConverter &TC,
 
   resultType = CanFunctionType::get(emptyTupleTy, resultType, extInfo);
   auto sig = TC.getEffectiveGenericSignature(cd);
-  if (sig)
-    return CanGenericFunctionType::get(sig,
-                                       classType, resultType,
-                                       extInfo);
-  return CanFunctionType::get(classType, resultType, extInfo);
+  return CanAnyFunctionType::get(sig, classType, resultType, extInfo);
 }
 
 GenericEnvironment *
@@ -1884,14 +1841,8 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                                funcType->throws());
 
-  if (!genericSig)
-    return CanFunctionType::get(funcType->getParams(), funcType.getResult(),
-                                innerExtInfo);
-
-  return CanGenericFunctionType::get(genericSig,
-                                     funcType->getParams(),
-                                     funcType.getResult(),
-                                     innerExtInfo);
+  return CanAnyFunctionType::get(genericSig, funcType.getParams(),
+                                 funcType.getResult(), innerExtInfo);
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {

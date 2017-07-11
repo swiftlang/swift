@@ -12,6 +12,7 @@
 
 #include "ResultPlan.h"
 #include "Callee.h"
+#include "Conversion.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -92,21 +93,37 @@ public:
 
     // Reabstract the value if the types don't match.  This can happen
     // due to either substitution reabstractions or bridging.
-    if (value.getType().hasAbstractionDifference(rep,
-                                                 substTL.getLoweredType())) {
-      // Assume that a C-language API doesn't have substitution
-      // reabstractions.  This shouldn't be necessary, but
-      // emitOrigToSubstValue can get upset.
-      if (getSILFunctionLanguage(rep) == SILFunctionLanguage::C) {
-        value = SGF.emitBridgedToNativeValue(loc, value, rep, substType);
+    SILType loweredResultTy = substTL.getLoweredType();
+    if (value.getType().hasAbstractionDifference(rep, loweredResultTy)) {
+      Conversion conversion = [&] {
+        // Assume that a C-language API doesn't have substitution
+        // reabstractions.  This shouldn't be necessary, but
+        // emitOrigToSubstValue can get upset.
+        if (getSILFunctionLanguage(rep) == SILFunctionLanguage::C) {
+          return Conversion::getBridging(Conversion::BridgeResultFromObjC,
+                                         origType.getType(), substType,
+                                         loweredResultTy);
+        } else {
+          return Conversion::getOrigToSubst(origType, substType);
+        }
+      }();
 
-      } else {
-        value = SGF.emitOrigToSubstValue(loc, value, origType, substType,
-                                         SGFContext(init));
+      // Attempt to peephole this conversion into the context.
+      if (init) {
+        if (auto outerConversion = init->getAsConversion()) {
+          if (outerConversion->tryPeephole(SGF, loc, value, conversion)) {
+            outerConversion->finishInitialization(SGF);
+            return RValue::forInContext();
+          }
+        }
+      }
 
-        // If that successfully emitted into the initialization, we're done.
-        if (value.isInContext())
-          return RValue::forInContext();
+      // If that wasn't possible, just apply the conversion.
+      value = conversion.emit(SGF, loc, value, SGFContext(init));
+
+      // If that successfully emitted into the initialization, we're done.
+      if (value.isInContext()) {
+        return RValue::forInContext();
       }
     }
 

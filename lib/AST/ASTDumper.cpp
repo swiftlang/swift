@@ -1983,7 +1983,17 @@ public:
   }
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     printCommon(E, "tuple_shuffle_expr");
-    if (E->isSourceScalar()) OS << " source_is_scalar";
+    switch (E->getTypeImpact()) {
+    case TupleShuffleExpr::ScalarToTuple:
+      OS << " scalar_to_tuple";
+      break;
+    case TupleShuffleExpr::TupleToTuple:
+      OS << " tuple_to_tuple";
+      break;
+    case TupleShuffleExpr::TupleToScalar:
+      OS << " tuple_to_scalar";
+      break;
+    }
     OS << " elements=[";
     for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
       if (i) OS << ", ";

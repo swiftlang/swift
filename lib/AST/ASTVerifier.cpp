@@ -1788,11 +1788,12 @@ public:
 
       /// Retrieve the ith element type from the resulting tuple type.
       auto getOuterElementType = [&](unsigned i) -> Type {
-        if (!TT) {
+        if (E->isResultScalar()) {
+          assert(i == 0);
           return E->getType()->getWithoutParens();
+        } else {
+          return TT->getElementType(i);
         }
-
-        return TT->getElementType(i);
       };
 
       Type varargsType;

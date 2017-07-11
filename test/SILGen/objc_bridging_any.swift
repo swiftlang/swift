@@ -217,18 +217,19 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // TODO: Property and subscript setters
 }
 
-// Workaround for rdar://problem/28318984. Skip the peephole for types with
-// nontrivial SIL lowerings because we don't correctly form the substitutions
-// for a generic _bridgeAnythingToObjectiveC call.
+// Once upon a time, as a workaround for rdar://problem/28318984, we had
+// to skip the peephole for types with nontrivial SIL lowerings because we
+// didn't correctly form the substitutions for a generic
+// _bridgeAnythingToObjectiveC call.  That's not true anymore.
 func zim() {}
 struct Zang {}
 // CHECK-LABEL: sil hidden @_T017objc_bridging_any27typesWithNontrivialLoweringySo9NSIdLoverC8receiver_tF
 func typesWithNontrivialLowering(receiver: NSIdLover) {
-  // CHECK: init_existential_addr {{%.*}} : $*Any, $() -> ()
+  // CHECK: apply {{.*}}<() -> ()>
   receiver.takesId(zim)
-  // CHECK: init_existential_addr {{%.*}} : $*Any, $Zang.Type
+  // CHECK: apply {{.*}}<Zang.Type>
   receiver.takesId(Zang.self)
-  // CHECK: init_existential_addr {{%.*}} : $*Any, $(() -> (), Zang.Type)
+  // CHECK: apply {{.*}}<(() -> (), Zang.Type)>
   receiver.takesId((zim, Zang.self))
   // CHECK: apply {{%.*}}<(Int, String)>
   receiver.takesId((0, "one"))
@@ -519,11 +520,10 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:     bb0([[ARG:%.*]] : $AnyObject, [[SELF:%.*]] : $SwiftIdLover):
   // CHECK-NEXT:  [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK-NEXT:  [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK-NEXT:  [[OPTIONAL_ARG_COPY:%.*]] = unchecked_ref_cast [[ARG_COPY]]
-  // CHECK-NEXT:  // function_ref
-  // CHECK-NEXT:  [[BRIDGE_TO_ANY:%.*]] = function_ref [[BRIDGE_TO_ANY_FUNC:@.*]] :
+  // CHECK-NEXT:  [[OPENED_SELF:%.*]] = open_existential_ref [[ARG_COPY]]
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
-  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = apply [[BRIDGE_TO_ANY]]([[RESULT]], [[OPTIONAL_ARG_COPY]])
+  // CHECK-NEXT:  [[INIT:%.*]] = init_existential_addr [[RESULT]] : $*Any
+  // CHECK-NEXT:  store [[OPENED_SELF]] to [init] [[INIT]]
   // CHECK-NEXT:  [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @_T017objc_bridging_any12SwiftIdLoverC15methodTakingAnyyyp1a_tF
@@ -537,7 +537,6 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAnyyypSg1a_tF
 
   // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAnyyypSg1a_tFTo
-  // CHECK: function_ref [[BRIDGE_TO_ANY_FUNC]]
 
   // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyypcF : $@convention(method) (@owned @callee_owned (@in Any) -> (), @guaranteed SwiftIdLover) -> ()
 
@@ -599,11 +598,10 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage [[BLOCK_STORAGE]]
   // CHECK-NEXT:  [[FUNCTION:%.*]] = load [copy] [[BLOCK_STORAGE_ADDR]]
   // CHECK-NEXT:  [[ANY_COPY:%.*]] = copy_value [[ANY]]
-  // CHECK-NEXT:  [[OPTIONAL:%.*]] = unchecked_ref_cast [[ANY_COPY]]
-  // CHECK-NEXT:  // function_ref
-  // CHECK-NEXT:  [[BRIDGE_TO_ANY:%.*]] = function_ref [[BRIDGE_TO_ANY_FUNC:@.*]] :
+  // CHECK-NEXT:  [[OPENED_ANY:%.*]] = open_existential_ref [[ANY_COPY]]
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
-  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = apply [[BRIDGE_TO_ANY]]([[RESULT]], [[OPTIONAL]])
+  // CHECK-NEXT:  [[INIT:%.*]] = init_existential_addr [[RESULT]] : $*Any
+  // CHECK-NEXT:  store [[OPENED_ANY]] to [init] [[INIT]]
   // CHECK-NEXT:  apply [[FUNCTION]]([[RESULT]])
   // CHECK-NEXT:  [[VOID:%.*]] = tuple ()
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
@@ -636,13 +634,8 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[OPTIONAL:%.*]] = unchecked_ref_cast [[BRIDGED]]
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[BRIDGE_TO_ANY:%.*]] = function_ref [[BRIDGE_TO_ANY_FUNC:@.*]] :
-  // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
-  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = apply [[BRIDGE_TO_ANY]]([[RESULT]], [[OPTIONAL]])
-
-  // TODO: Should elide the copy
-  // CHECK-NEXT:  copy_addr [take] [[RESULT]] to [initialization] [[ANY_ADDR]]
+  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = apply [[BRIDGE_TO_ANY]]([[ANY_ADDR]], [[OPTIONAL]])
   // CHECK-NEXT:  [[EMPTY:%.*]] = tuple ()
-  // CHECK-NEXT:  dealloc_stack [[RESULT]]
   // CHECK-NEXT:  destroy_value [[BLOCK]]
   // CHECK-NEXT:  return [[EMPTY]]
 

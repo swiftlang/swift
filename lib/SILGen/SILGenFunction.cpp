@@ -368,17 +368,14 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   // Get the lowered AST types:
   //  - the original type
-  auto origLoweredFormalType =
-      AbstractionPattern(constantInfo.LoweredInterfaceType);
+  auto origFormalType = AbstractionPattern(constantInfo.LoweredType);
 
   // - the substituted type
-  auto substFormalType = cast<FunctionType>(expectedType);
-  auto substLoweredFormalType =
-    SGM.Types.getLoweredASTFunctionType(substFormalType, 0, constant);
+  auto substFormalType = expectedType;
 
   // Generalize if necessary.
-  result = emitOrigToSubstValue(loc, result, origLoweredFormalType,
-                                substLoweredFormalType);
+  result = emitOrigToSubstValue(loc, result, origFormalType,
+                                substFormalType);
 
   return result;
 }
