@@ -74,6 +74,7 @@ class C3: NSObject {
 
 // RUN: %sourcekitd-test -req=translate -swift-name "init(a1:b2:)" -pos=10:16 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK10 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "init(_:_:)" -pos=10:16 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK11 %s
+// RUN: %sourcekitd-test -req=translate -swift-name "C11" -pos=10:16 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK9 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(a1:_:)" -pos=10:16 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK12 %s
 
 // RUN: %sourcekitd-test -req=translate -swift-name "A2" -pos=27:10 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK13 %s
