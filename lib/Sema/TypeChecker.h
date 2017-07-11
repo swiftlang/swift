@@ -741,6 +741,9 @@ private:
   llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ApplyExpr *>>
     FunctionAsEscapingArg;
 
+  /// The # of times we have performed typo correction.
+  unsigned NumTypoCorrections = 0;
+
 public:
   /// Record an occurrence of a function that captures inout values as an
   /// argument.

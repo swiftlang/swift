@@ -295,6 +295,11 @@ def warn_swift3_objc_inference_minimal :
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
 
+def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"<n>">,
+  HelpText<"Limit the number of times the compiler will attempt typo correction to <n>">;
+
 def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Alias<warn_swift3_objc_inference_complete>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
