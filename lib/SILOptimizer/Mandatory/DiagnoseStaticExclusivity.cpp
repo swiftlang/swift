@@ -635,45 +635,11 @@ tryFixItWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
 static std::string getPathDescription(DeclName BaseName, SILType BaseType,
                                       const IndexTrieNode *SubPath,
                                       SILModule &M) {
-  // Walk the trie to the root to collection the sequence (in reverse order).
-  llvm::SmallVector<unsigned, 4> ReversedIndices;
-  const IndexTrieNode *I = SubPath;
-  while (!I->isRoot()) {
-    ReversedIndices.push_back(I->getIndex());
-    I = I->getParent();
-  }
-
   std::string sbuf;
   llvm::raw_string_ostream os(sbuf);
 
   os << "'" << BaseName;
-
-  SILType ContainingType = BaseType;
-  for (unsigned Index : reversed(ReversedIndices)) {
-    os << ".";
-
-    if (StructDecl *D = ContainingType.getStructOrBoundGenericStruct()) {
-      auto Iter = D->getStoredProperties().begin();
-      std::advance(Iter, Index);
-      VarDecl *VD = *Iter;
-      os << VD->getBaseName();
-      ContainingType = ContainingType.getFieldType(VD, M);
-      continue;
-    }
-
-    if (auto TupleTy = ContainingType.getAs<TupleType>()) {
-      Identifier ElementName = TupleTy->getElement(Index).getName();
-      if (ElementName.empty())
-        os << Index;
-      else
-        os << ElementName;
-      ContainingType = ContainingType.getTupleElementType(Index);
-      continue;
-    }
-
-    llvm_unreachable("Unexpected type in projection SubPath!");
-  }
-
+  os << AccessSummaryAnalysis::getSubPathDescription(BaseType, SubPath, M);
   os << "'";
 
   return os.str();
@@ -848,74 +814,56 @@ static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   return FD == Ctx.getSwap(nullptr);
 }
 
-/// If the instruction is a field or tuple projection and it has a single
-/// user return a pair of the single user and the projection index.
-/// Otherwise, return a pair with the component nullptr and the second
-/// unspecified.
-static std::pair<SILInstruction *, unsigned>
-getSingleAddressProjectionUser(SILInstruction *I) {
-  SILInstruction *SingleUser = nullptr;
-  unsigned ProjectionIndex = 0;
-
-  for (Operand *Use : I->getUses()) {
-    SILInstruction *User = Use->getUser();
-    if (isa<BeginAccessInst>(I) && isa<EndAccessInst>(User))
-      continue;
-
-    // We have more than a single user so bail.
-    if (SingleUser)
-      return std::make_pair(nullptr, 0);
-
-    switch (User->getKind()) {
-    case ValueKind::StructElementAddrInst:
-      ProjectionIndex = cast<StructElementAddrInst>(User)->getFieldNo();
-      SingleUser = User;
-      break;
-    case ValueKind::TupleElementAddrInst:
-      ProjectionIndex = cast<TupleElementAddrInst>(User)->getFieldNo();
-      SingleUser = User;
-      break;
-    default:
-      return std::make_pair(nullptr, 0);
-    }
-  }
-
-  return std::make_pair(SingleUser, ProjectionIndex);
-}
-
-/// Returns an IndexTrieNode that represents the single subpath accessed from
-/// BAI or the root if no such node exists.
-static const IndexTrieNode *findSubPathAccessed(BeginAccessInst *BAI,
-                                                IndexTrieNode *Root) {
-  IndexTrieNode *SubPath = Root;
-
-  // For each single-user projection of BAI, construct or get a node
-  // from the trie representing the index of the field or tuple element
-  // accessed by that projection.
-  SILInstruction *Iter = BAI;
-  while (true) {
-    std::pair<SILInstruction *, unsigned> ProjectionUser =
-        getSingleAddressProjectionUser(Iter);
-    if (!ProjectionUser.first)
-      break;
-
-    SubPath = SubPath->getChild(ProjectionUser.second);
-    Iter = ProjectionUser.first;
-  }
-
-  return SubPath;
-}
-
 /// If making an access of the given kind at the given subpath would
 /// would conflict, returns the first recorded access it would conflict
 /// with. Otherwise, returns None.
-Optional<RecordedAccess> shouldReportAccess(const AccessInfo &Info,
-                                            swift::SILAccessKind Kind,
-                                            const IndexTrieNode *SubPath) {
+static Optional<RecordedAccess>
+shouldReportAccess(const AccessInfo &Info,swift::SILAccessKind Kind,
+                   const IndexTrieNode *SubPath) {
   if (Info.alreadyHadConflict())
     return None;
 
   return Info.conflictsWithAccess(Kind, SubPath);
+}
+
+/// For each projection that the summarized function accesses on its
+/// capture, check whether the access conflicts with already-in-progress
+/// access. Returns the most general summarized conflict -- so if there are
+/// two conflicts in the called function and one is for an access to an
+/// aggregate and another is for an access to a projection from the aggregate,
+/// this will return the conflict for the aggregate. This approach guarantees
+/// determinism and makes it more  likely that we'll diagnose the most helpful
+/// conflict.
+static Optional<ConflictingAccess>
+findConflictingArgumentAccess(const AccessSummaryAnalysis::ArgumentSummary &AS,
+                              const AccessedStorage &AccessedStorage,
+                              const AccessInfo &InProgressInfo) {
+  Optional<RecordedAccess> BestInProgressAccess;
+  Optional<RecordedAccess> BestArgAccess;
+
+  for (const auto &MapPair : AS.getSubAccesses()) {
+    const IndexTrieNode *SubPath = MapPair.getFirst();
+    const auto &SubAccess = MapPair.getSecond();
+    SILAccessKind Kind = SubAccess.getAccessKind();
+    auto InProgressAccess = shouldReportAccess(InProgressInfo, Kind, SubPath);
+    if (!InProgressAccess)
+      continue;
+
+    if (!BestArgAccess ||
+        AccessSummaryAnalysis::compareSubPaths(SubPath,
+                                               BestArgAccess->getSubPath())) {
+        SILLocation AccessLoc = SubAccess.getAccessLoc();
+
+        BestArgAccess = RecordedAccess(Kind, AccessLoc, SubPath);
+        BestInProgressAccess = InProgressAccess;
+    }
+  }
+
+  if (!BestArgAccess)
+    return None;
+
+  return ConflictingAccess(AccessedStorage, *BestInProgressAccess,
+                           *BestArgAccess);
 }
 
 /// Use the summary analysis to check whether a call to the given
@@ -939,8 +887,11 @@ static void checkForViolationWithCall(
 
     const AccessSummaryAnalysis::ArgumentSummary &AS =
         FS.getAccessForArgument(CalleeIndex);
-    Optional<SILAccessKind> Kind = AS.getAccessKind();
-    if (!Kind)
+
+    const auto &SubAccesses = AS.getSubAccesses();
+
+    // Is the capture accessed in the callee?
+    if (SubAccesses.size() == 0)
       continue;
 
     SILValue Argument = Arguments[ArgumentIndex];
@@ -948,18 +899,14 @@ static void checkForViolationWithCall(
 
     const AccessedStorage &Storage = findAccessedStorage(Argument);
     auto AccessIt = Accesses.find(Storage);
+
+    // Are there any accesses in progress at the time of the call?
     if (AccessIt == Accesses.end())
       continue;
-    const AccessInfo &Info = AccessIt->getSecond();
 
-    // TODO: For now, treat a summarized access as an access to the whole
-    // address. Once the summary analysis is sensitive to stored properties,
-    // this should be updated look at the subpaths from the summary.
-    const IndexTrieNode *SubPath = ASA->getSubPathTrieRoot();
-    if (auto Conflict = shouldReportAccess(Info, *Kind, SubPath)) {
-      SILLocation AccessLoc = AS.getAccessLoc();
-      const auto &SecondAccess = RecordedAccess(*Kind, AccessLoc, SubPath);
-      ConflictingAccesses.emplace_back(Storage, *Conflict, SecondAccess);
+    const AccessInfo &Info = AccessIt->getSecond();
+    if (auto Conflict = findConflictingArgumentAccess(AS, Storage, Info)) {
+      ConflictingAccesses.push_back(*Conflict);
     }
   }
 }
@@ -1086,8 +1033,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
         SILAccessKind Kind = BAI->getAccessKind();
         const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
         AccessInfo &Info = Accesses[Storage];
-        const IndexTrieNode *SubPath =
-            findSubPathAccessed(BAI, ASA->getSubPathTrieRoot());
+        const IndexTrieNode *SubPath = ASA->findSubPathAccessed(BAI);
         if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
           ConflictingAccesses.emplace_back(Storage, *Conflict,
                                            RecordedAccess(BAI, SubPath));
@@ -1102,8 +1048,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
         AccessInfo &Info = It->getSecond();
 
         BeginAccessInst *BAI = EAI->getBeginAccess();
-        const IndexTrieNode *SubPath =
-            findSubPathAccessed(BAI, ASA->getSubPathTrieRoot());
+        const IndexTrieNode *SubPath = ASA->findSubPathAccessed(BAI);
         Info.endAccess(EAI, SubPath);
 
         // If the storage location has no more in-progress accesses, remove
