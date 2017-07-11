@@ -738,6 +738,18 @@ dwTests.test("inits") {
   _ = DWU16(UInt32.max)
 }
 
+dwTests.test("TwoWords") {
+  typealias DW = DoubleWidth<Int>
+
+  expectEqual(-1 as DW, DW(extendingOrTruncating: -1 as Int8))
+
+  expectNil(Int(exactly: DW(Int.min) - 1))
+  expectNil(Int(exactly: DW(Int.max) + 1))
+
+  expectTrue(DW(Int.min) - 1 < Int.min)
+  expectTrue(DW(Int.max) + 1 > Int.max)
+}
+
 dwTests.test("Bitshifts") {
   typealias DWU16 = DoubleWidth<UInt8>
   typealias DWU32 = DoubleWidth<DWU16>
