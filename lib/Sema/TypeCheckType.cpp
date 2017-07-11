@@ -3515,17 +3515,36 @@ bool TypeChecker::isRepresentableInObjC(
         return false;
       }
 
-      // willSet/didSet implementations are never exposed to objc, they are
-      // always directly dispatched from the synthesized setter.
-      if (FD->isObservingAccessor()) {
+      switch (FD->getAccessorKind()) {
+      case AccessorKind::NotAccessor:
+        llvm_unreachable("already checking for accessor-ness");
+
+      case AccessorKind::IsDidSet:
+      case AccessorKind::IsWillSet:
+          // willSet/didSet implementations are never exposed to objc, they are
+          // always directly dispatched from the synthesized setter.
         if (Diagnose) {
           diagnose(AFD->getLoc(), diag::objc_observing_accessor);
           describeObjCReason(*this, AFD, Reason);
         }
         return false;
+
+      case AccessorKind::IsGetter:
+      case AccessorKind::IsSetter:
+        return true;
+
+      case AccessorKind::IsMaterializeForSet:
+        // materializeForSet is synthesized, so never complain about it
+        return false;
+
+      case AccessorKind::IsAddressor:
+      case AccessorKind::IsMutableAddressor:
+        if (Diagnose) {
+          diagnose(AFD->getLoc(), diag::objc_addressor);
+          describeObjCReason(*this, AFD, Reason);
+        }
+        return false;
       }
-      assert(FD->isGetterOrSetter() && "missing diags for other accessors");
-      return true;
     }
 
     unsigned ExpectedParamPatterns = 1;
