@@ -739,12 +739,18 @@ ERROR(expected_rangle_protocol,PointsToFirstBadToken,
 ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
       "protocol-constrained type is neither allowed nor needed here", ())
 
-WARNING(deprecated_protocol_composition,none,
+WARNING(swift3_deprecated_protocol_composition,none,
         "'protocol<...>' composition syntax is deprecated; join the protocols using '&'", ())
-WARNING(deprecated_protocol_composition_single,none,
+ERROR(deprecated_protocol_composition,none,
+      "'protocol<...>' composition syntax has been removed; join the protocols using '&'", ())
+WARNING(swift3_deprecated_protocol_composition_single,none,
         "'protocol<...>' composition syntax is deprecated and not needed here", ())
-WARNING(deprecated_any_composition,none,
+ERROR(deprecated_protocol_composition_single,none,
+        "'protocol<...>' composition syntax has been removed and is not needed here", ())
+WARNING(swift3_deprecated_any_composition,none,
         "'protocol<>' syntax is deprecated; use 'Any' instead", ())
+ERROR(deprecated_any_composition,none,
+      "'protocol<>' syntax has been removed; use 'Any' instead", ())
 
 // SIL box Types
 ERROR(sil_box_expected_var_or_let,none,
