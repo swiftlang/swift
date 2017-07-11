@@ -1574,3 +1574,7 @@ func rdar33159366(s: AnySequence<Int>) {
   let a = Array(s)
   _ = a.flatMap(itsFalse)
 }
+
+func sr5429<T>(t: T) {
+  _ = AnySequence([t]).first(where: { (t: T) in true })
+}
