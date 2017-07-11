@@ -1048,11 +1048,8 @@ public:
     if (reason.getKind() != PotentialReason::Kind::CallThrows)
       return;
 
-    TC.diagnose(loc, diag::note_forgot_try).fixItInsert(loc, "try ").flush();
-    TC.diagnose(loc, diag::note_error_to_optional)
-        .fixItInsert(loc, "try? ")
-        .flush();
-
+    TC.diagnose(loc, diag::note_forgot_try).fixItInsert(loc, "try ");
+    TC.diagnose(loc, diag::note_error_to_optional).fixItInsert(loc, "try? ");
     TC.diagnose(loc, diag::note_disable_error_propagation)
         .fixItInsert(loc, "try! ");
   }
