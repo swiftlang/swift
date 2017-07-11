@@ -1574,3 +1574,45 @@ func rdar33159366(s: AnySequence<Int>) {
   let a = Array(s)
   _ = a.flatMap(itsFalse)
 }
+
+extension Concrete {
+  typealias T = (Int, Int)
+  typealias F = (T) -> ()
+  func opt1(_ fn: (((Int, Int)) -> ())?) {}
+  func opt2(_ fn: (((Int, Int)) -> ())??) {}
+  func opt3(_ fn: (((Int, Int)) -> ())???) {}
+  func optAliasT(_ fn: ((T) -> ())?) {}
+  func optAliasF(_ fn: F?) {}
+}
+
+extension Generic {
+  typealias F = (T) -> ()
+  func opt1(_ fn: (((Int, Int)) -> ())?) {}
+  func opt2(_ fn: (((Int, Int)) -> ())??) {}
+  func opt3(_ fn: (((Int, Int)) -> ())???) {}
+  func optAliasT(_ fn: ((T) -> ())?) {}
+  func optAliasF(_ fn: F?) {}
+}
+
+func rdar33239714() {
+  Concrete().opt1 { x, y in }
+  Concrete().opt1 { (x, y) in }
+  Concrete().opt2 { x, y in }
+  Concrete().opt2 { (x, y) in }
+  Concrete().opt3 { x, y in }
+  Concrete().opt3 { (x, y) in }
+  Concrete().optAliasT { x, y in }
+  Concrete().optAliasT { (x, y) in }
+  Concrete().optAliasF { x, y in }
+  Concrete().optAliasF { (x, y) in }
+  Generic<(Int, Int)>().opt1 { x, y in }
+  Generic<(Int, Int)>().opt1 { (x, y) in }
+  Generic<(Int, Int)>().opt2 { x, y in }
+  Generic<(Int, Int)>().opt2 { (x, y) in }
+  Generic<(Int, Int)>().opt3 { x, y in }
+  Generic<(Int, Int)>().opt3 { (x, y) in }
+  Generic<(Int, Int)>().optAliasT { x, y in }
+  Generic<(Int, Int)>().optAliasT { (x, y) in }
+  Generic<(Int, Int)>().optAliasF { x, y in }
+  Generic<(Int, Int)>().optAliasF { (x, y) in }
+}

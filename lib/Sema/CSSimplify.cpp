@@ -1068,8 +1068,18 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   auto func1Input = func1->getInput();
   auto func2Input = func2->getInput();
   if (!getASTContext().isSwiftVersion3()) {
-    if (auto elt = locator.last()) {
-      if (elt->getKind() == ConstraintLocator::ApplyArgToParam) {
+    SmallVector<LocatorPathElt, 4> path;
+    locator.getLocatorParts(path);
+
+    // Find the last path element, skipping OptioanlPayload elements
+    // so that we allow this exception in cases of optional injection.
+    auto last = std::find_if(
+        path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
+          return elt.getKind() != ConstraintLocator::OptionalPayload;
+        });
+
+    if (last != path.rend()) {
+      if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer())) {
           if (!isa<ParenType>(func1Input.getPointer()))
             func2Input = paren2->getUnderlyingType();
