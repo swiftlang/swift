@@ -43,6 +43,21 @@ XCTestTestSuite.test("exceptions") {
     dynamic func test_raises() {
       NSException(name: NSExceptionName(rawValue: "XCTestTestSuiteException"), reason: nil, userInfo: nil).raise()
     }
+
+    func test_raisesDuringAssertion() {
+      let exception = NSException(name: NSExceptionName(rawValue: "XCTestTestSuiteException"), reason: nil, userInfo: nil)
+      XCTAssertNoThrow(exception.raise())
+    }
+
+    func test_continueAfterFailureWithAssertions() {
+      self.continueAfterFailure = false
+      func triggerFailure() { XCTFail("I'm outta here!") }
+
+      XCTAssertNoThrow(triggerFailure())
+
+      // Should not be reached:
+      NSException(name: NSExceptionName(rawValue: "XCTestTestSuiteException"), reason: nil, userInfo: nil).raise()
+    }
   }
 
   let testCase = ExceptionTestCase(selector: #selector(ExceptionTestCase.test_raises))
@@ -55,6 +70,20 @@ XCTestTestSuite.test("exceptions") {
   expectEqual(1, testRun.unexpectedExceptionCount)
   expectEqual(1, testRun.totalFailureCount)
   expectFalse(testRun.hasSucceeded)
+
+  let assertionTestCase = ExceptionTestCase(selector: #selector(ExceptionTestCase.test_raisesDuringAssertion))
+  execute(assertionTestCase.run)
+  let assertionTestRun = assertionTestCase.testRun!
+  expectEqual(1, assertionTestRun.executionCount)
+  expectEqual(0, assertionTestRun.failureCount)
+  expectEqual(1, assertionTestRun.unexpectedExceptionCount)
+
+  let continueAfterFailureTestCase = ExceptionTestCase(selector: #selector(ExceptionTestCase.test_continueAfterFailureWithAssertions))
+  execute(continueAfterFailureTestCase.run)
+  let continueAfterFailureTestRun = continueAfterFailureTestCase.testRun!
+  expectEqual(1, continueAfterFailureTestRun.executionCount)
+  expectEqual(1, continueAfterFailureTestRun.failureCount)
+  expectEqual(0, continueAfterFailureTestRun.unexpectedExceptionCount)
 }
 
 XCTestTestSuite.test("XCTAssertEqual/T") {
