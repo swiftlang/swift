@@ -637,3 +637,36 @@ func callNonStandardBlock(value: Int) {
   // CHECK: enum $Optional<@convention(block) () -> @owned Optional<AnyObject>>
   takesNonStandardBlock { return value }
 }
+
+func takeTwoAnys(_ lhs: Any, _ rhs: Any) -> Any { return lhs }
+
+// CHECK-LABEL: sil hidden @_T013objc_bridging22defineNonStandardBlockyyp1x_tF
+func defineNonStandardBlock(x: Any) {
+  // CHECK: function_ref @_T013objc_bridging22defineNonStandardBlockyyp1x_tFypypcfU_
+  // CHECK: function_ref @_T0ypypIxir_yXlyXlIyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+
+  let fn : @convention(block) (Any) -> Any = { y in takeTwoAnys(x, y) }
+}
+
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypypIxir_yXlyXlIyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+// CHECK: bb0(%0 : $*@block_storage @callee_owned (@in Any) -> @out Any, %1 : $AnyObject):
+// CHECK:   [[T0:%.*]] = copy_value %1 : $AnyObject
+// CHECK:   [[T1:%.*]] = open_existential_ref [[T0]] : $AnyObject
+// CHECK:   [[ARG:%.*]] = alloc_stack $Any
+// CHECK:   [[T2:%.*]] = init_existential_addr [[ARG]]
+// CHECK:   store [[T1]] to [init] [[T2]]
+// CHECK:   [[RESULT:%.*]] = alloc_stack $Any
+// CHECK:   apply {{.*}}([[RESULT]], [[ARG]])
+
+// CHECK-LABEL: sil hidden @_T013objc_bridging15castToCFunctionySV3ptr_tF : $@convention(thin) (UnsafeRawPointer) -> () {
+func castToCFunction(ptr: UnsafeRawPointer) {
+  // CHECK: [[CASTFN:%.*]] = function_ref @_T0s13unsafeBitCastq_x_q_m2totr0_lF
+  // CHECK: [[OUT:%.*]] = alloc_stack $@convention(c) (Optional<AnyObject>) -> ()
+  // CHECK: [[IN:%.]] = alloc_stack $UnsafeRawPointer
+  // CHECK: store %0 to [trivial] [[IN]] : $*UnsafeRawPointer
+  // CHECK: [[META:%.*]] = metatype $@thick (@convention(c) (Optional<AnyObject>) -> ()).Type
+  // CHECK: apply [[CASTFN]]<UnsafeRawPointer, @convention(c) (AnyObject?) -> ()>([[OUT]], [[IN]], [[META]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @thick τ_0_1.Type) -> @out τ_0_1
+  // CHECK: [[RESULT:%.*]] = load [trivial] %3 : $*@convention(c) (Optional<AnyObject>) -> ()
+  typealias Fn = @convention(c) (AnyObject?) -> Void
+  unsafeBitCast(ptr, to: Fn.self)(nil)
+}
