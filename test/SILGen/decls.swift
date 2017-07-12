@@ -167,22 +167,3 @@ struct StructWithStaticVar {
   init() {
   }
 }
-
-// <rdar://problem/17405715> lazy property crashes silgen of implicit memberwise initializer
-// CHECK-LABEL: // decls.StructWithLazyField.init
-// CHECK-NEXT: sil hidden @_T05decls19StructWithLazyFieldVACSiSg4once_tcfC : $@convention(method) (Optional<Int>, @thin StructWithLazyField.Type) -> @owned StructWithLazyField {
-struct StructWithLazyField {
-  lazy var once : Int = 42
-  let someProp = "Some value"
-}
-
-// <rdar://problem/21057425> Crash while compiling attached test-app.
-// CHECK-LABEL: // decls.test21057425
-func test21057425() {
-  var x = 0, y: Int = 0
-}
-
-func useImplicitDecls() {
-  _ = StructWithLazyField(once: 55)
-}
-
