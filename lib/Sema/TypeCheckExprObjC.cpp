@@ -166,6 +166,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       return lookupUnqualified(dc, componentName, componentNameLoc);
 
     assert(currentType && "Non-beginning state must have a type");
+    if (!currentType->mayHaveMembers())
+      return LookupResult();
 
     // Determine the type in which the lookup should occur. If we have
     // a bridged value type, this will be the Objective-C class to
