@@ -398,3 +398,14 @@ func useThird() {
 func testNonconforming(bnc: ObjCBridgeNonconforming) {
   let _: Int = bnc.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
 }
+
+func testHashableGenerics(
+    any: ObjCBridgeGeneric<ElementConcrete>,
+    constrained: ObjCBridgeGenericConstrained<ElementConcrete>,
+    insufficient: ObjCBridgeGenericInsufficientlyConstrained<ElementConcrete>,
+    extra: ObjCBridgeGenericConstrainedExtra<ElementConcrete>) {
+  let _: Int = any.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
+  let _: Int = constrained.foo // expected-error{{cannot convert value of type 'Set<ElementConcrete>' to specified type 'Int'}}
+  let _: Int = insufficient.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
+  let _: Int = extra.foo // expected-error{{cannot convert value of type 'Set<ElementConcrete>' to specified type 'Int'}}
+}
