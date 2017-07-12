@@ -911,7 +911,8 @@ ClangImporter::create(ASTContext &ctx,
   clangDiags->setSeverity(clang::diag::err_module_not_built,
                           clang::diag::Severity::Error,
                           clang::SourceLocation());
-  clangDiags->setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
+  clangDiags->setSuppressAfterFatalError(
+                          !ctx.Diags.getShowDiagnosticsAfterFatalError());
 
   // Create an almost-empty memory buffer.
   auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
