@@ -1852,12 +1852,14 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
       Address addr = ti.allocateStack(IGF, paramType, false,
                                       "indirect-temporary").getAddress();
-      // Set the alignment the ABI expects.
+      // Set at least the alignment the ABI expects.
       if (AI.getIndirectByVal()) {
-        auto *AS = cast<llvm::AllocaInst>(addr.getAddress());
-        AS->setAlignment(AI.getIndirectAlign().getQuantity());
-        addr = Address(addr.getAddress(),
-                       Alignment(AI.getIndirectAlign().getQuantity()));
+        auto ABIAlign = AI.getIndirectAlign();
+        if (ABIAlign > addr.getAlignment()) {
+          auto *AS = cast<llvm::AllocaInst>(addr.getAddress());
+          AS->setAlignment(ABIAlign.getQuantity());
+          addr = Address(addr.getAddress(), Alignment(ABIAlign.getQuantity()));
+        }
       }
 
       ti.initialize(IGF, in, addr);
