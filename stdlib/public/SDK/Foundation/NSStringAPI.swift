@@ -472,13 +472,24 @@ extension String {
 
   /// Returns a `Data` containing a representation of
   /// the `String` encoded using a given encoding.
-  public func data(
-    using encoding: Encoding,
-    allowLossyConversion: Bool = false
-  ) -> Data? {
-    return _ns.data(
-      using: encoding.rawValue,
-      allowLossyConversion: allowLossyConversion)
+  func data(using encoding: Encoding, allowLossyConversion: Bool = false) -> Data? {
+    if _core.isASCII {
+      switch encoding {
+      case .ascii: fallthrough
+      case .utf8: fallthrough
+      case .isoLatin1: fallthrough
+      case .nonLossyASCII: fallthrough
+      case .macOSRoman:
+        return Data(bytes: UnsafeRawPointer(_core.startASCII), count: _core.count)
+      default:
+        if !allowLossyConversion {
+          return NSString(bytesNoCopy: _core.startASCII, length: _core.count, encoding: String.Encoding.ascii.rawValue, freeWhenDone: false)?.data(using: encoding.rawValue)
+        }
+      }
+    } else !allowLossyConversion {
+      return NSString(charactersNoCopy: _core.startUTF16, length: _core.count, freeWhenDone: false).data(using: encoding.rawValue)
+    }
+    return _ns.data(using: encoding.rawValue, allowLossyConversion: allowLossyConversion)
   }
 
   // @property NSString* decomposedStringWithCanonicalMapping;

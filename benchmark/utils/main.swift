@@ -71,6 +71,7 @@ import MonteCarloE
 import MonteCarloPi
 import NSDictionaryCastToSwift
 import NSError
+import NSStringAPI
 import NSStringConversion
 import NopDeinit
 import ObjectAllocation
@@ -424,6 +425,7 @@ addTo(&precommitTests, "StringMatch", run_StringMatch)
 addTo(&precommitTests, "StringUTF16Builder", run_StringUTF16Builder)
 addTo(&precommitTests, "StringWalk", run_StringWalk)
 addTo(&precommitTests, "StringWithCString", run_StringWithCString)
+addTo(&precommitTests, "String_dataUsingEncoding", run_String_dataUsingEncoding)
 addTo(&precommitTests, "SubstringComparable", run_SubstringComparable)
 addTo(&precommitTests, "SubstringEqualString", run_SubstringEqualString)
 addTo(&precommitTests, "SubstringEquatable", run_SubstringEquatable)
