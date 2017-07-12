@@ -6,7 +6,7 @@ func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attri
 func wrongParamType(a: @escaping Int) {} // expected-error {{@escaping attribute only applies to function types}}
 
 func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
- // expected-warning@-1{{@noescape is the default and is deprecated}} {{29-39=}}
+ // expected-error@-1{{@noescape is the default and has been removed}} {{29-39=}}
 
 func takesEscaping(_ fn: @escaping () -> Int) {} // ok
 
