@@ -2202,7 +2202,16 @@ public:
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
-
+  
+  /// \brief Subroutine of \c matchFunctionTypes(), which matches up the
+  /// parameter types of two function types.
+  SolutionKind matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1,
+                                       ArrayRef<AnyFunctionType::Param> type2,
+                                       Type argType, Type paramType,
+                                       ConstraintKind kind,
+                                       TypeMatchOptions flags,
+                                       ConstraintLocatorBuilder locator);
+  
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   SolutionKind matchSuperclassTypes(Type type1, Type type2,
