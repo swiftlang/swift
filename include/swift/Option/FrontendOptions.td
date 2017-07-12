@@ -109,6 +109,9 @@ def disable_target_os_checking :
 def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
   HelpText<"Enable ASTScope-based unqualified name lookup">;
 
+def enable_recursive_constraints : Flag<["-"], "enable-recursive-constraints">,
+  HelpText<"Enable SE-0157: Recursive Protocol Constraints">;
+
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
 
