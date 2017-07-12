@@ -1082,6 +1082,29 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         
     }
     
+    // slightly faster paths for common sequences
+    
+    public init<S: Sequence>(_ elements: S) where S.Iterator.Element == UInt8 {
+        if elements is Array<UInt8> {
+            self.init(bytes: _identityCast(elements, to: Array<UInt8>.self))
+        } else if elements is ArraySlice<UInt8> {
+            self.init(bytes: _identityCast(elements, to: ArraySlice<UInt8>.self))
+        } else if elements is UnsafeBufferPointer<UInt8> {
+            self.init(buffer: _identityCast(elements, to: UnsafeBufferPointer<UInt8>.self))
+        } else if let buffer = elements as? UnsafeMutableBufferPointer<UInt8> {
+            self.init(buffer: buffer)
+        } else if let data = elements as? Data {
+            self.init(backing: data._backing.mutableCopy(data._sliceRange), range: 0..<data.count)
+        } else {
+            let underestimatedCount = elements.underestimatedCount
+            self.init(count: underestimatedCount)
+            
+            let (endIterator, _) = UnsafeMutableBufferPointer(start: _backing._bytes?.assumingMemoryBound(to: UInt8.self), count: underestimatedCount).initialize(from: elements)
+            var iter = endIterator
+            while let byte = iter.next() { self.append(byte) }
+        }
+    }
+
     @_versioned
     internal init(backing: _DataStorage, range: Range<Index>) {
         _backing = backing
@@ -1621,11 +1644,24 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
+    public func _copyContents(initializing buffer: UnsafeMutableBufferPointer<UInt8>) -> (Iterator, UnsafeMutableBufferPointer<UInt8>.Index) {
+        guard !isEmpty else { return (makeIterator(), buffer.startIndex) }
+        guard let p = buffer.baseAddress else {
+            preconditionFailure("Attempt to copy contents into nil buffer pointer")
+        }
+        let cnt = count
+        precondition(cnt <= buffer.count, "Insufficient space allocated to copy Data contents")
+        
+        withUnsafeBytes { p.initialize(from: $0, count: cnt) }
+        
+        return (Iterator(endOf: self), buffer.index(buffer.startIndex, offsetBy: cnt))
+    }
+    
     /// An iterator over the contents of the data.
     ///
     /// The iterator will increment byte-by-byte.
     public func makeIterator() -> Data.Iterator {
-        return Iterator(_data: self)
+        return Iterator(self)
     }
     
     public struct Iterator : IteratorProtocol {
@@ -1638,11 +1674,18 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         private var _idx: Data.Index
         private let _endIdx: Data.Index
         
-        fileprivate init(_data: Data) {
-            self._data = _data
+        fileprivate init(_ data: Data) {
+            _data = data
             _buffer = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-            _idx = _data.startIndex
-            _endIdx = _data.endIndex
+            _idx = data.startIndex
+            _endIdx = data.endIndex
+        }
+        
+        fileprivate init(endOf data: Data) {
+            self._data = data
+            _buffer = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+            _idx = data.endIndex
+            _endIdx = data.endIndex
         }
         
         public mutating func next() -> UInt8? {
