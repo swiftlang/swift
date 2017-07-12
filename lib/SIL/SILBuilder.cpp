@@ -427,3 +427,15 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
     OpenedArchetypes.addOpenedArchetypeOperands(I->getTypeDependentOperands());
   }
 }
+
+ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
+                                                   SILType MetatypeTy,
+                                                   SILValue Base) {
+  assert(
+      Base->getType().isLoweringOf(
+          getModule(), MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
+      "value_metatype result must be formal metatype of the lowered operand "
+      "type");
+  return insert(new (F.getModule()) ValueMetatypeInst(getSILDebugLocation(Loc),
+                                                      MetatypeTy, Base));
+}
