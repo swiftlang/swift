@@ -1498,10 +1498,33 @@ namespace {
         KeyPath(std::move(KeyPath))
     {}
   
-    ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) && override {
-      assert(SGF.InWritebackScope &&
-             "offsetting l-value for modification without writeback scope");
+    // An rvalue base object is passed indirectly +1 so needs to be
+    // materialized if the base we have is +0 or a loaded value.
+    void makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              ManagedValue &base) {
+      if (base.isLValue()) {
+        auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
+        SGF.B.createCopyAddr(loc, base.getValue(), tmp,
+                             IsNotTake, IsInitialization);
+        base = SGF.emitManagedBufferWithCleanup(tmp);
+        return;
+      }
+
+      bool isBorrowed = base.isPlusZeroRValueOrTrivial()
+        && !base.getType().isTrivial(SGF.SGM.M);
+      if (!base.getType().isAddress() || isBorrowed) {
+        auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
+        if (isBorrowed)
+          base.copyInto(SGF, tmp, loc);
+        else
+          base.forwardInto(SGF, loc, tmp);
+        base = SGF.emitManagedBufferWithCleanup(tmp);
+      }
+    }
+  
+    ManagedValue mutableOffset(
+                   SILGenFunction &SGF, SILLocation loc, ManagedValue base) && {
       auto &C = SGF.getASTContext();
       auto keyPathTy = KeyPath.getSubstType()->castTo<BoundGenericType>();
 
@@ -1525,18 +1548,7 @@ namespace {
         projectionFunction = C.getProjectKeyPathWritable(nullptr);
       } else if (keyPathTy->getDecl() == C.getReferenceWritableKeyPathDecl()) {
         projectionFunction = C.getProjectKeyPathReferenceWritable(nullptr);
-        // The base value is passed indirectly +1 so needs to be
-        // materialized if the base we have is +0 or a loaded value.
-        bool isBorrowed = base.isPlusZeroRValueOrTrivial()
-          && !base.getType().isTrivial(SGF.SGM.M);
-        if (!base.getType().isAddress() || isBorrowed) {
-          auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
-          if (isBorrowed)
-            base.copyInto(SGF, tmp, loc);
-          else
-            base.forwardInto(SGF, loc, tmp);
-          base = SGF.emitManagedBufferWithCleanup(tmp);
-        }
+        makeBaseConsumableMaterializedRValue(SGF, loc, base);
       } else {
         llvm_unreachable("not a writable key path type?!");
       }
@@ -1580,6 +1592,59 @@ namespace {
       return ManagedValue::forLValue(projectedAddr);
     }
 
+    ManagedValue readOnlyOffset(
+                   SILGenFunction &SGF, SILLocation loc, ManagedValue base) && {
+      auto &C = SGF.getASTContext();
+      
+      makeBaseConsumableMaterializedRValue(SGF, loc, base);
+      auto keyPathValue = std::move(KeyPath).getAsSingleValue(SGF);
+      // Upcast the key path operand to the base KeyPath type, as expected by
+      // the read-only projection function.
+      BoundGenericType *keyPathTy
+        = keyPathValue.getType().castTo<BoundGenericType>();
+      if (keyPathTy->getDecl() != C.getKeyPathDecl()) {
+        keyPathTy = BoundGenericType::get(C.getKeyPathDecl(), Type(),
+                                          keyPathTy->getGenericArgs());
+        keyPathValue = SGF.B.createUpcast(loc, keyPathValue,
+                SILType::getPrimitiveObjectType(keyPathTy->getCanonicalType()));
+      }
+      
+      Substitution args[] = {
+        Substitution(keyPathTy->getGenericArgs()[0], {}),
+        Substitution(keyPathTy->getGenericArgs()[1], {}),
+      };
+      auto projectFn = C.getProjectKeyPathReadOnly(nullptr);
+      auto subMap = projectFn->getGenericSignature()
+        ->getSubstitutionMap(args);
+
+      // Allocate a temporary to own the projected value.
+      auto &resultTL = SGF.getTypeLowering(keyPathTy->getGenericArgs()[1]);
+      auto resultInit = SGF.emitTemporary(loc, resultTL);
+
+      auto result = SGF.emitApplyOfLibraryIntrinsic(loc, projectFn,
+        subMap, {base, keyPathValue}, SGFContext(resultInit.get()));
+      if (!result.isInContext())
+        std::move(result).forwardInto(SGF, loc, resultInit.get());
+      
+      // Result should be a temporary we own. Return its address as an lvalue.
+      return ManagedValue::forLValue(resultInit->getAddress());
+    }
+  
+    ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
+                        AccessKind accessKind) && override {
+      assert(SGF.InWritebackScope &&
+             "offsetting l-value for modification without writeback scope");
+      switch (accessKind) {
+      case AccessKind::ReadWrite:
+      case AccessKind::Write:
+        return std::move(*this).mutableOffset(SGF, loc, base);
+      case AccessKind::Read:
+        // For a read-only access, project the key path as if immutable,
+        // so that we don't trigger captured writebacks or observers or other
+        // operations that might be enqueued by a mutable projection.
+        return std::move(*this).readOnlyOffset(SGF, loc, base);
+      }
+    }
     void print(raw_ostream &OS) const override {
       OS << "KeyPathApplicationComponent";
     }
