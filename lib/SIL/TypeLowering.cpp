@@ -1567,9 +1567,26 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
   //     on the abstract CC
   //   - ownership conventions are deduced
   if (auto substFnType = dyn_cast<AnyFunctionType>(substType)) {
-    auto bridgedFnType = getBridgedFunctionType(origType, substFnType,
-                                                substFnType->getExtInfo());
-    return getNativeSILFunctionType(M, origType, bridgedFnType);
+    // If the formal type uses a C convention, it is not formally
+    // abstractable, and it may be subject to implicit bridging.
+    auto extInfo = substFnType->getExtInfo();
+    if (getSILFunctionLanguage(extInfo.getSILRepresentation())
+          == SILFunctionLanguage::C) {
+      // Bridge the parameters and result of the function type.
+      auto bridgedFnType = getBridgedFunctionType(origType, substFnType,
+                                                  extInfo);
+      substFnType = bridgedFnType;
+
+      // Also rewrite the type of the abstraction pattern.
+      auto signature = getCurGenericContext();
+      if (origType.isTypeParameter()) {
+        origType = AbstractionPattern(signature, bridgedFnType);
+      } else {
+        origType.rewriteType(signature, bridgedFnType);
+      }
+    }
+
+    return getNativeSILFunctionType(M, origType, substFnType);
   }
 
   // Ignore dynamic self types.
