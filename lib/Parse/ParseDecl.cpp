@@ -1647,7 +1647,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       if (Attributes.has(TAK_noescape)) {
         diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
       } else {
-        diagnose(Loc, diag::attr_autoclosure_escaping_deprecated)
+        diagnose(Loc, Context.isSwiftVersion3()
+                          ? diag::swift3_attr_autoclosure_escaping_deprecated
+                          : diag::attr_autoclosure_escaping_deprecated)
             .fixItReplace(autoclosureEscapingParenRange, " @escaping ");
       }
       Attributes.setAttr(TAK_escaping, Loc);
@@ -1669,8 +1671,10 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     }
 
     // @noescape is deprecated and no longer used
-    diagnose(Loc, diag::attr_noescape_deprecated)
-      .fixItRemove({Attributes.AtLoc,Loc});
+    diagnose(Loc, Context.isSwiftVersion3()
+                      ? diag::swift3_attr_noescape_deprecated
+                      : diag::attr_noescape_deprecated)
+        .fixItRemove({Attributes.AtLoc, Loc});
 
     break;
   case TAK_escaping:
@@ -4719,11 +4723,15 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     // Within a protocol, recover from a missing 'static'.
     if (Flags & PD_InProtocol) {
       switch (StaticSpelling) {
-      case StaticSpellingKind::None:
-        diagnose(NameLoc, diag::operator_static_in_protocol, SimpleName.str())
-          .fixItInsert(FuncLoc, "static ");
+      case StaticSpellingKind::None: {
+        auto Message = Context.isSwiftVersion3()
+                           ? diag::swift3_operator_static_in_protocol
+                           : diag::operator_static_in_protocol;
+        diagnose(NameLoc, Message, SimpleName.str())
+            .fixItInsert(FuncLoc, "static ");
         StaticSpelling = StaticSpellingKind::KeywordStatic;
         break;
+      }
 
       case StaticSpellingKind::KeywordStatic:
         // Okay, this is correct.
@@ -5844,9 +5852,15 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   SourceLoc lBraceLoc;
   if (consumeIf(tok::l_brace, lBraceLoc)) {
     if (isInfix && !Tok.is(tok::r_brace)) {
-      diagnose(lBraceLoc, diag::deprecated_operator_body_use_group);
+      auto message = Context.isSwiftVersion3()
+                         ? diag::swift3_deprecated_operator_body_use_group
+                         : diag::deprecated_operator_body_use_group;
+      diagnose(lBraceLoc, message);
     } else {
-      auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
+      auto message = Context.isSwiftVersion3()
+                         ? diag::swift3_deprecated_operator_body
+                         : diag::deprecated_operator_body;
+      auto Diag = diagnose(lBraceLoc, message);
       if (Tok.is(tok::r_brace)) {
         SourceLoc lastGoodLoc = precedenceGroupNameLoc;
         if (lastGoodLoc.isInvalid())
