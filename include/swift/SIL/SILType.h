@@ -496,6 +496,10 @@ public:
   bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
                                 SILType type2);
 
+  /// Returns true if this SILType could be potentially a lowering of the given
+  /// formal type. Meant for verification purposes/assertions.
+  bool isLoweringOf(SILModule &M, CanType formalType);
+
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);
