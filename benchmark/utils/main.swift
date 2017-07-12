@@ -71,6 +71,7 @@ import MonteCarloE
 import MonteCarloPi
 import NSDictionaryCastToSwift
 import NSError
+import NSStringAPI
 import NSStringConversion
 import NopDeinit
 import ObjectAllocation
@@ -424,6 +425,23 @@ addTo(&precommitTests, "StringMatch", run_StringMatch)
 addTo(&precommitTests, "StringUTF16Builder", run_StringUTF16Builder)
 addTo(&precommitTests, "StringWalk", run_StringWalk)
 addTo(&precommitTests, "StringWithCString", run_StringWithCString)
+addTo(&precommitTests, "String_canBeConverted_ascii", run_String_canBeConverted_ascii)
+addTo(&precommitTests, "String_canBeConverted_utf16", run_String_canBeConverted_utf16)
+addTo(&precommitTests, "String_canBeConverted_utf8", run_String_canBeConverted_utf8)
+addTo(&precommitTests, "String_capitalized", run_String_capitalized)
+addTo(&precommitTests, "String_caseInsensitiveCompare_caseDiffering", run_String_caseInsensitiveCompare_caseDiffering)
+addTo(&precommitTests, "String_caseInsensitiveCompare_equal", run_String_caseInsensitiveCompare_equal)
+addTo(&precommitTests, "String_caseInsensitiveCompare_notEqual", run_String_caseInsensitiveCompare_notEqual)
+addTo(&precommitTests, "String_commonPrefix_notShared", run_String_commonPrefix_notShared)
+addTo(&precommitTests, "String_commonPrefix_sharedPrefix", run_String_commonPrefix_sharedPrefix)
+addTo(&precommitTests, "String_commonPrefix_sharedPrefix_caseInsensitive", run_String_commonPrefix_sharedPrefix_caseInsensitive)
+addTo(&precommitTests, "String_components_CharacterSet", run_String_components_CharacterSet)
+addTo(&precommitTests, "String_components_String", run_String_components_String)
+addTo(&precommitTests, "String_dataUsingEncoding", run_String_dataUsingEncoding)
+addTo(&precommitTests, "String_enumerateLines", run_String_enumerateLines)
+addTo(&precommitTests, "String_fastestEncoding_ascii", run_String_fastestEncoding_ascii)
+addTo(&precommitTests, "String_fastestEncoding_unicode", run_String_fastestEncoding_unicode)
+addTo(&precommitTests, "String_localizedCapitalized", run_String_localizedCapitalized)
 addTo(&precommitTests, "SubstringComparable", run_SubstringComparable)
 addTo(&precommitTests, "SubstringEqualString", run_SubstringEqualString)
 addTo(&precommitTests, "SubstringEquatable", run_SubstringEquatable)
