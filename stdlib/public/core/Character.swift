@@ -293,13 +293,14 @@ extension Character : CustomDebugStringConvertible {
 extension Character {
   @_versioned
   internal var _smallUTF16 : _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>? {
-    guard case .smallUTF16(let _63bits) = _representation  else { return nil }
+    guard case .smallUTF16(let _63bits) = _representation else { return nil }
     _onFastPath()
     let bits = UInt64(Builtin.zext_Int63_Int64(_63bits))
-    let nonZeroBitCount = type(of: bits).bitWidth - bits.leadingZeroBitCount
+    let minBitWidth = type(of: bits).bitWidth - bits.leadingZeroBitCount
     return _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(
       _storage: bits,
-      _bitCount: 16 * Swift.max(1, (nonZeroBitCount + 15) / 16)
+      _bitCount: UInt8(
+        extendingOrTruncating: 16 * Swift.max(1, (minBitWidth + 15) / 16))
     )
   }
 
