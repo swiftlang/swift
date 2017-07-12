@@ -359,6 +359,12 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   SILFunctionConventions blockConv(blockTy, SGF.SGM.M);
   SILFunctionConventions funcConv(funcTy, SGF.SGM.M);
 
+  // Make sure we lower the component types of the formal block type.
+  formalBlockType =
+    SGF.SGM.Types.getBridgedFunctionType(AbstractionPattern(formalBlockType),
+                                         formalBlockType,
+                                         formalBlockType->getExtInfo());
+
   // Set up the indirect result.
   SILType blockResultTy = blockTy->getAllResultsType();
   SILValue indirectResult;
