@@ -379,6 +379,14 @@ bb0(%0 : @owned $Optional<SuperKlass>, %1 : @trivial $*@sil_weak Optional<SuperK
   return %9999 : $()
 }
 
+sil @test_dealloc_partial_ref : $@convention(thin) (@owned SuperKlass) -> () {
+bb0(%0 : @owned $SuperKlass):
+  %1 = metatype $@thick SuperKlass.Type
+  dealloc_partial_ref %0 : $SuperKlass, %1 : $@thick SuperKlass.Type
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////

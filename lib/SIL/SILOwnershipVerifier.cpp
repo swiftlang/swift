@@ -441,7 +441,6 @@ CONSTANT_OWNERSHIP_INST(Guaranteed, false, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Owned, true, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocExistentialBox)
-CONSTANT_OWNERSHIP_INST(Owned, true, DeallocPartialRef)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, true, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, ReleaseValue)
@@ -687,7 +686,18 @@ FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitEndBorrowArgumentInst(EndBorrowArgumentInst *I) {
+OwnershipCompatibilityUseChecker::visitDeallocPartialRefInst(
+    DeallocPartialRefInst *I) {
+  if (getValue() == I->getInstance()) {
+    return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
+  }
+
+  return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitEndBorrowArgumentInst(
+    EndBorrowArgumentInst *I) {
   // If we are currently checking an end_borrow_argument as a subobject, then we
   // treat this as just a use.
   if (isCheckingSubObject())
