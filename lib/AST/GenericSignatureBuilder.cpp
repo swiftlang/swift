@@ -3398,17 +3398,20 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                         getFloatingSource(typeRepr, /*forInferred=*/true));
     }
 
-    // Check for direct recursion.
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-      auto proto = assocType->getProtocol();
-      if (auto inheritedProto = inheritedType->getAs<ProtocolType>()) {
-        if (inheritedProto->getDecl() == proto ||
-            inheritedProto->getDecl()->inheritsFrom(proto)) {
-          auto source = getFloatingSource(typeRepr, /*forInferred=*/false);
-          if (auto resolved = resolve(type, source)) {
-            if (auto pa = resolved->getPotentialArchetype()) {
-              markPotentialArchetypeRecursive(pa, proto, source.getSource(pa));
-              return ConstraintResult::Conflicting;
+    if (!decl->getASTContext().LangOpts.EnableRecursiveConstraints) {
+      // Check for direct recursion.
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+        auto proto = assocType->getProtocol();
+        if (auto inheritedProto = inheritedType->getAs<ProtocolType>()) {
+          if (inheritedProto->getDecl() == proto ||
+              inheritedProto->getDecl()->inheritsFrom(proto)) {
+            auto source = getFloatingSource(typeRepr, /*forInferred=*/false);
+            if (auto resolved = resolve(type, source)) {
+              if (auto pa = resolved->getPotentialArchetype()) {
+                markPotentialArchetypeRecursive(pa, proto,
+                                                source.getSource(pa));
+                return ConstraintResult::Conflicting;
+              }
             }
           }
         }
