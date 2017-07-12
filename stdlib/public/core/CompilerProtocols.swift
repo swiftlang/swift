@@ -747,6 +747,17 @@ public protocol _ExpressibleByColorLiteral {
   init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
 }
 
+extension _ExpressibleByColorLiteral {
+  @available(swift, deprecated: 3.2, obsoleted: 4.0,
+    message: "This initializer is only meant to be used by color literals")
+  public init(
+    colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float
+  ) {
+    self.init(
+      _colorLiteralRed: red, green: green, blue: blue, alpha: alpha)
+  }
+}
+
 /// A type that can be initialized using an image literal (e.g.
 /// `#imageLiteral(resourceName: "hi.png")`).
 public protocol _ExpressibleByImageLiteral {
