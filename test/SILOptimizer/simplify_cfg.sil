@@ -2859,3 +2859,45 @@ bb5(%e : $MyError):
 bb6(%44 : $Builtin.Int8):
   return %44 : $Builtin.Int8
 }
+
+// CHECK-LABEL: jump_thread_retain_release
+// CHECK: cond_br
+// CHECK:   cond_br %3, bb3, bb4
+
+// CHECK: bb3:
+// CHECK:   strong_retain %1 : $foo
+// CHECK:   strong_release %1 : $foo
+// CHECK:   br bb5(%1 : $foo)
+
+// CHECK: bb4:
+// CHECK:   strong_retain %2 : $foo
+// CHECK:   strong_release %2 : $foo
+// CHECK:   br bb5(%2 : $foo)
+
+sil @jump_thread_retain_release : $@convention(thin) (Builtin.Int1, foo, foo, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $foo, %2 : $foo, %3 : $Builtin.Int1):
+  cond_br %0, bb2, bb1
+
+bb1:
+  br bb6(%2 : $foo)
+
+bb2:
+  cond_br %3, bb3, bb4
+
+bb3:
+  strong_retain %1 : $foo
+  br bb5(%1 : $foo)
+
+bb4:
+  strong_retain %2 : $foo
+  br bb5(%2 : $foo)
+
+bb5(%11 : $foo):
+  strong_release %11 : $foo
+  br bb6(%11 : $foo)
+
+bb6(%14 : $foo):
+  strong_release %14 : $foo
+  %16 = tuple ()
+  return %16 : $()
+}
