@@ -2413,6 +2413,15 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
   if (!NSObjectType)
     return false;
 
+  // Match generic parameters against their bounds.
+  if (auto *genericTy = type->getAs<GenericTypeParamType>()) {
+    if (auto *generic = genericTy->getDecl()) {
+      type = generic->getSuperclass();
+      if (!type)
+        return false;
+    }
+  }
+
   // Class type or existential that inherits from NSObject.
   if (NSObjectType->isExactSuperclassOf(type))
     return true;
