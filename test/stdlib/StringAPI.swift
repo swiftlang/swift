@@ -366,6 +366,22 @@ StringTests.test("[String].joined() -> String") {
   _ = s == "" // should compile without error
 }
 
+StringTests.test("UnicodeScalarView.Iterator.Lifetime") {
+  // Tests that String.UnicodeScalarView.Iterator is maintaining the lifetime of
+  // an underlying String buffer. https://bugs.swift.org/browse/SR-5401
+  //
+  // WARNING: it is very easy to write this test so it produces false negatives
+  // (i.e. passes even when the code is broken).  The array, for example, seems
+  // to be a requirement.  So perturb this test with care!
+  let sources = ["𝓣his 𝓘s 𝓜uch 𝓛onger 𝓣han 𝓐ny 𝓢mall 𝓢tring 𝓑uffer"]
+  for s in sources {
+    // Append something to s so that it creates a dynamically-allocated buffer.
+    let i = (s + "X").unicodeScalars.makeIterator()
+    expectEqualSequence(s.unicodeScalars, IteratorSequence(i).dropLast(),
+      "Actual Contents: \(Array(IteratorSequence(i)))")
+  }
+}
+
 var CStringTests = TestSuite("CStringTests")
 
 func getNullUTF8() -> UnsafeMutablePointer<UInt8>? {
