@@ -207,8 +207,13 @@ enum: uintptr_t {
 
 /// Debugger hook. Calling this stops the debugger with a message and details
 /// about the issues.
-void reportToDebugger(uintptr_t flags, const char *message,
-                      RuntimeErrorDetails *details = nullptr);
+///
+/// This is not considered a finalized runtime entry point at this time. Do not
+/// emit calls to it from arbitrary Swift code; it's only meant for libraries
+/// that ship with the runtime (i.e. the stdlib and overlays).
+SWIFT_RUNTIME_EXPORT
+void _swift_reportToDebugger(uintptr_t flags, const char *message,
+                             RuntimeErrorDetails *details = nullptr);
 
 SWIFT_RUNTIME_EXPORT
 bool _swift_reportFatalErrorsToDebugger;
