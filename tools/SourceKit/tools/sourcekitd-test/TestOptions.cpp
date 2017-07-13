@@ -179,8 +179,8 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       break;
     }
 
-    case OPT_are_swift_args: {
-      AreSwiftArgs = true;
+    case OPT_using_swift_args: {
+      UsingSwiftArgs = true;
       break;
     }
 
