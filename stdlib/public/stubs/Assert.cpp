@@ -65,7 +65,7 @@ static void logPrefixAndMessageToDebugger(
   } else {
     swift_asprintf(&debuggerMessage, "%.*s", prefixLength, prefix);
   }
-  reportToDebugger(RuntimeErrorFlagFatal, debuggerMessage);
+  _swift_reportToDebugger(RuntimeErrorFlagFatal, debuggerMessage);
   free(debuggerMessage);
 }
 

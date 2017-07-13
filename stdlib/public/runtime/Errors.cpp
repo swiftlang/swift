@@ -252,8 +252,8 @@ void _swift_runtime_on_report(uintptr_t flags, const char *message,
                );
 }
 
-void swift::reportToDebugger(uintptr_t flags, const char *message,
-                             RuntimeErrorDetails *details) {
+void swift::_swift_reportToDebugger(uintptr_t flags, const char *message,
+                                    RuntimeErrorDetails *details) {
   _swift_runtime_on_report(flags, message, details);
 }
 
