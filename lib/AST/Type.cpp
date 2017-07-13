@@ -2922,7 +2922,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   // Error recovery path.
   // FIXME: Generalized existentials will look here.
   if (substBase->isOpenedExistential())
-    return getDependentMemberType(ErrorType::get(substBase));
+    return failed();
 
   // If the parent is an archetype, extract the child archetype with the
   // given name.
@@ -2933,7 +2933,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     // If looking for an associated type and the archetype is constrained to a
     // class, continue to the default associated type lookup
     if (!assocType || !archetypeParent->getSuperclass())
-      return getDependentMemberType(ErrorType::get(substBase));
+      return failed();
   }
 
   // If the parent is a type variable or a member rooted in a type variable,
