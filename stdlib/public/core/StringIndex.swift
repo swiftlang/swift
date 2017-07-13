@@ -72,7 +72,7 @@ extension String.Index {
     _cache = c
   }
   
-  internal static var _strideBits : Int { return 16 }
+  internal static var _strideBits : Int { return 2 }
   internal static var _mask : UInt64 { return (1 &<< _Self._strideBits) &- 1 }
   
   internal mutating func _setEncodedOffset(_ x: Int) {
