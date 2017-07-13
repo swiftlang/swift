@@ -1269,6 +1269,10 @@ public:
     addImplicitConstructors(nominal);
   }
 
+  virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
+    synthesizeMemberForLookup(nominal, member);
+  }
+
   virtual void
   resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {
     handleExternalDecl(nominal);
@@ -1442,6 +1446,11 @@ public:
   /// \brief Add the RawRepresentable, Equatable, and Hashable methods to an
   /// enum with a raw type.
   void addImplicitEnumConformances(EnumDecl *ED);
+
+  /// Synthesize the member with the given name on the target if applicable,
+  /// i.e. if the member is synthesizable and has not yet been added to the
+  /// target.
+  void synthesizeMemberForLookup(NominalTypeDecl *target, DeclName member);
 
   /// The specified AbstractStorageDecl \c storage was just found to satisfy
   /// the protocol property \c requirement.  Ensure that it has the full

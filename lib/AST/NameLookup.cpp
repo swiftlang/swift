@@ -1499,9 +1499,13 @@ bool DeclContext::lookupQualified(Type type,
     if (tracker)
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
-    // Make sure we've resolved implicit constructors, if we need them.
-    if (member.getBaseName() == ctx.Id_init && typeResolver)
-      typeResolver->resolveImplicitConstructors(current);
+    // Make sure we've resolved implicit members, if we need them.
+    if (typeResolver) {
+      if (member.getBaseName() == ctx.Id_init)
+        typeResolver->resolveImplicitConstructors(current);
+
+      typeResolver->resolveImplicitMember(current, member);
+    }
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
