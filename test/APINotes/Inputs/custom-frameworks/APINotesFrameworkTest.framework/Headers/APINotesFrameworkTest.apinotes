@@ -2,6 +2,31 @@ Name: APINotesFrameworkTest
 Classes:
   - Name: A
     SwiftObjCMembers: true
+  - Name: PrintingInterference
+    Methods:
+      - Selector: 'print:'
+        MethodKind: Instance
+        SwiftName: 'printDocument(_:)'
+  - Name: PrintingRenamed
+    Methods:
+      - Selector: 'print'
+        MethodKind: Instance
+        SwiftName: 'printDocument()'
+      - Selector: 'print:'
+        MethodKind: Instance
+        SwiftName: 'printDocument(_:)'
+      - Selector: 'print:options:'
+        MethodKind: Instance
+        SwiftName: 'printDocument(_:options:)'
+      - Selector: 'print'
+        MethodKind: Class
+        SwiftName: 'printDocument()'
+      - Selector: 'print:'
+        MethodKind: Class
+        SwiftName: 'printDocument(_:)'
+      - Selector: 'print:options:'
+        MethodKind: Class
+        SwiftName: 'printDocument(_:options:)'
   - Name: TestProperties
     Properties:
       - Name: accessorsOnly
@@ -43,6 +68,31 @@ Tags:
 SwiftVersions:
   - Version: 3.0
     Classes:
+      - Name: PrintingInterference
+        Methods:
+          - Selector: 'print:'
+            MethodKind: Instance
+            SwiftName: 'print(_:)'
+      - Name: PrintingRenamed
+        Methods:
+          - Selector: 'print'
+            MethodKind: Instance
+            SwiftName: 'print()'
+          - Selector: 'print:'
+            MethodKind: Instance
+            SwiftName: 'print(_:)'
+          - Selector: 'print:options:'
+            MethodKind: Instance
+            SwiftName: 'print(_:options:)'
+          - Selector: 'print'
+            MethodKind: Class
+            SwiftName: 'print()'
+          - Selector: 'print:'
+            MethodKind: Class
+            SwiftName: 'print(_:)'
+          - Selector: 'print:options:'
+            MethodKind: Class
+            SwiftName: 'print(_:options:)'
       - Name: TestProperties
         Methods:
           - Selector: accessorsOnlyRenamedRetyped
