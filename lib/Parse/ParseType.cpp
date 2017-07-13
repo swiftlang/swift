@@ -753,13 +753,16 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
       replacement += TrailingContent;
     }
 
+    auto isThree = Context.isSwiftVersion3();
+#define THREEIFY(MESSAGE) (isThree ? diag::swift3_##MESSAGE : diag::MESSAGE)
     // Replace 'protocol<T1, T2>' with 'T1 & T2'
     diagnose(ProtocolLoc,
-      IsEmpty              ? diag::deprecated_any_composition :
-      Protocols.size() > 1 ? diag::deprecated_protocol_composition :
-                             diag::deprecated_protocol_composition_single)
+      IsEmpty              ? THREEIFY(deprecated_any_composition) :
+      Protocols.size() > 1 ? THREEIFY(deprecated_protocol_composition) :
+                             THREEIFY(deprecated_protocol_composition_single))
       .highlight(composition->getSourceRange())
       .fixItReplace(composition->getSourceRange(), replacement);
+#undef THREEIFY
   }
 
   return makeParserResult(Status, composition);
