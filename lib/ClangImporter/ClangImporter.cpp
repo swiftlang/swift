@@ -682,6 +682,8 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
         triple.getArch() == llvm::Triple::aarch64_be) {
       invocationArgStrs.push_back("-mcpu=cyclone");
     }
+  } else if (triple.getArch() == llvm::Triple::systemz) {
+    invocationArgStrs.push_back("-march=z196");
   }
 
   const std::string &overrideResourceDir = importerOpts.OverrideResourceDir;
