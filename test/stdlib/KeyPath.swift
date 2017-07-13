@@ -495,4 +495,32 @@ keyPath.test("read-only accesses don't trigger writebacks") {
   expectEqual(numberOfNonmutatingWritebacks, 0)
 }
 
+var nestedWritebackLog = 0
+
+struct NoisyNestingWriteback {
+  var value: Int
+
+  var nested: NoisyNestingWriteback {
+    get {
+      return NoisyNestingWriteback(value: value + 1)
+    }
+    set {
+      nestedWritebackLog = nestedWritebackLog << 8 | newValue.value
+      value = newValue.value - 1
+    }
+  }
+}
+
+keyPath.test("writebacks nest properly") {
+  var test = NoisyNestingWriteback(value: 0)
+  nestedWritebackLog = 0
+  test.nested.nested.nested.value = 0x38
+  expectEqual(nestedWritebackLog, 0x383736)
+
+  nestedWritebackLog = 0
+  let kp = \NoisyNestingWriteback.nested.nested.nested
+  test[keyPath: kp].value = 0x38
+  expectEqual(nestedWritebackLog, 0x383736)
+}
+
 runAllTests()
