@@ -91,6 +91,9 @@ public:
   /// Resolve any implicitly-declared constructors within the given nominal.
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
 
+  /// Resolve an implicitly-generated member with the given name.
+  virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
+
   /// Resolve any implicitly-generated members and conformances for generated
   /// external decls.
   virtual void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) = 0;
@@ -154,6 +157,10 @@ public:
 
   void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     Principal.resolveImplicitConstructors(nominal);
+  }
+
+  void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
+    Principal.resolveImplicitMember(nominal, member);
   }
 
   void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {

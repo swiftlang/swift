@@ -393,6 +393,9 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
 /// \param enumDecl The enum to check.
 static bool canSynthesizeCodingKey(TypeChecker &tc, Decl *parentDecl,
                                    EnumDecl *enumDecl) {
+  // Validate the enum and its raw type.
+  tc.validateDecl(enumDecl);
+
   // If the enum has a raw type (optional), it must be String or Int.
   Type rawType = enumDecl->getRawType();
   if (rawType) {
