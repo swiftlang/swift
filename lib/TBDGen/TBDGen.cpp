@@ -109,6 +109,8 @@ public:
 
   void visitClassDecl(ClassDecl *CD);
 
+  void visitConstructorDecl(ConstructorDecl *CD);
+
   void visitExtensionDecl(ExtensionDecl *ED);
 
   void visitProtocolDecl(ProtocolDecl *PD);
@@ -359,10 +361,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/true));
     }
 
-    // The non-allocating forms of the constructors and destructors.
-    if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
-      addSymbol(SILDeclRef(ctor, SILDeclRef::Kind::Initializer));
-    } else if (auto dtor = dyn_cast<DestructorDecl>(value)) {
+    // The non-allocating forms of the destructors.
+    if (auto dtor = dyn_cast<DestructorDecl>(value)) {
       // ObjC classes don't have a symbol for their destructor.
       if (!isObjC)
         addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
@@ -370,6 +370,16 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   }
 
   visitNominalTypeDecl(CD);
+}
+
+void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
+  if (CD->getParent()->getAsClassOrClassExtensionContext()) {
+    // Class constructors come in two forms, allocating and non-allocating. The
+    // default ValueDecl handling gives the allocating one, so we have to
+    // manually include the non-allocating one.
+    addSymbol(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+  }
+  visitAbstractFunctionDecl(CD);
 }
 
 void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
