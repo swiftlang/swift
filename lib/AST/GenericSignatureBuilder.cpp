@@ -1945,9 +1945,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   // If we were asked for a complete, well-formed archetype, make sure we
   // process delayed requirements if anything changed.
   SWIFT_DEFER {
-    ASTContext &ctx = assocType ? assocType->getASTContext()
-                                : concreteDecl->getASTContext();
-    if (ctx.LangOpts.EnableRecursiveConstraints)
+    if (kind == ArchetypeResolutionKind::CompleteWellFormed)
       getBuilder()->processDelayedRequirements();
   };
 
@@ -3474,28 +3472,6 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementDirect(
   }
 }
 
-// Local function to mark the given associated type as recursive,
-// diagnosing it if this is the first such occurrence.
-void GenericSignatureBuilder::markPotentialArchetypeRecursive(
-    PotentialArchetype *pa, ProtocolDecl *proto, const RequirementSource *source) {
-  if (pa->isRecursive())
-    return;
-  pa->setIsRecursive();
-
-  pa->addConformance(proto, source, *this);
-  if (!pa->getParent())
-    return;
-
-  auto assocType = pa->getResolvedAssociatedType();
-  if (!assocType || assocType->isInvalid())
-    return;
-
-  Diags.diagnose(assocType->getLoc(), diag::recursive_requirement_reference);
-
-  // Silence downstream errors referencing this associated type.
-  assocType->setInvalid();
-}
-
 ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                              TypeDecl *decl,
                              UnresolvedType type,
@@ -3544,26 +3520,6 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                         TypeLoc(const_cast<TypeRepr *>(typeRepr),
                                 inheritedType),
                         getFloatingSource(typeRepr, /*forInferred=*/true));
-    }
-
-    if (!decl->getASTContext().LangOpts.EnableRecursiveConstraints) {
-      // Check for direct recursion.
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-        auto proto = assocType->getProtocol();
-        if (auto inheritedProto = inheritedType->getAs<ProtocolType>()) {
-          if (inheritedProto->getDecl() == proto ||
-              inheritedProto->getDecl()->inheritsFrom(proto)) {
-            auto source = getFloatingSource(typeRepr, /*forInferred=*/false);
-            if (auto resolved = resolve(type, source)) {
-              if (auto pa = resolved->getPotentialArchetype()) {
-                markPotentialArchetypeRecursive(pa, proto,
-                                                source.getSource(pa));
-                return ConstraintResult::Conflicting;
-              }
-            }
-          }
-        }
-      }
     }
 
     return addTypeRequirement(type, inheritedType,

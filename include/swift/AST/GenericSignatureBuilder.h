@@ -426,10 +426,6 @@ private:
   template<typename F>
   void visitPotentialArchetypes(F f);
 
-  void markPotentialArchetypeRecursive(PotentialArchetype *pa,
-                                       ProtocolDecl *proto,
-                                       const RequirementSource *source);
-
 public:
   /// Construct a new generic signature builder.
   ///
@@ -1358,23 +1354,20 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// that share a name.
   llvm::MapVector<Identifier, StoredNestedType> NestedTypes;
 
-  /// \brief Recursively conforms to itself.
-  unsigned IsRecursive : 1;
-
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
   PotentialArchetype(PotentialArchetype *parent, Identifier name);
 
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
-    : parentOrBuilder(parent), identifier(assocType), IsRecursive(false)
+    : parentOrBuilder(parent), identifier(assocType)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
 
   /// \brief Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
-    : parentOrBuilder(parent), identifier(concreteDecl), IsRecursive(false)
+    : parentOrBuilder(parent), identifier(concreteDecl)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
@@ -1382,8 +1375,7 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// \brief Construct a new potential archetype for a generic parameter.
   PotentialArchetype(GenericSignatureBuilder *builder,
                      GenericParamKey genericParam)
-    : parentOrBuilder(builder), identifier(genericParam),
-      IsRecursive(false)
+    : parentOrBuilder(builder), identifier(genericParam)
   {
   }
 
@@ -1625,9 +1617,6 @@ public:
 
     return Type();
   }
-
-  void setIsRecursive() { IsRecursive = true; }
-  bool isRecursive() const { return IsRecursive; }
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const,

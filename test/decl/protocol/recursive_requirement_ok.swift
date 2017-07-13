@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-recursive-constraints
+// RUN: %target-typecheck-verify-swift
 
 protocol P {
   associatedtype Assoc : P

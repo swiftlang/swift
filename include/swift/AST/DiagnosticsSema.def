@@ -1668,8 +1668,6 @@ ERROR(requires_generic_param_made_equal_to_concrete,none,
       (Type))
 ERROR(recursive_type_reference,none,
       "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
-ERROR(recursive_requirement_reference,none,
-      "type may not reference itself as a requirement",())
 ERROR(recursive_same_type_constraint,none,
       "same-type constraint %0 == %1 is recursive", (Type, Type))
 ERROR(recursive_superclass_constraint,none,
