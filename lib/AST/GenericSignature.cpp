@@ -422,7 +422,8 @@ getSubstitutionMap(TypeSubstitutionFn subs,
     Type currentReplacement = depTy.subst(subs, lookupConformance,
                                           SubstFlags::UseErrorType);
     if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
-      subMap.addSubstitution(paramTy, currentReplacement);
+      if (!currentReplacement->hasError())
+        subMap.addSubstitution(paramTy, currentReplacement);
 
     // Collect the conformances.
     for (auto req: reqs) {
