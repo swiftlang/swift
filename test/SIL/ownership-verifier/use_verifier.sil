@@ -370,6 +370,23 @@ bb0:
   return %9999 : $()
 }
 
+sil @test_store_weak : $@convention(thin) (@owned Optional<SuperKlass>, @in @sil_weak Optional<SuperKlass>, @guaranteed Optional<SuperKlass>) -> () {
+bb0(%0 : @owned $Optional<SuperKlass>, %1 : @trivial $*@sil_weak Optional<SuperKlass>, %2 : @guaranteed $Optional<SuperKlass>):
+  store_weak %0 to %1 : $*@sil_weak Optional<SuperKlass>
+  store_weak %2 to %1 : $*@sil_weak Optional<SuperKlass>
+  destroy_value %0 : $Optional<SuperKlass>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @test_dealloc_partial_ref : $@convention(thin) (@owned SuperKlass) -> () {
+bb0(%0 : @owned $SuperKlass):
+  %1 = metatype $@thick SuperKlass.Type
+  dealloc_partial_ref %0 : $SuperKlass, %1 : $@thick SuperKlass.Type
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////
