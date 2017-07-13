@@ -1297,10 +1297,7 @@ public:
   }
 
   ValueMetatypeInst *createValueMetatype(SILLocation Loc, SILType Metatype,
-                                         SILValue Base) {
-    return insert(new (F.getModule()) ValueMetatypeInst(
-        getSILDebugLocation(Loc), Metatype, Base));
-  }
+                                         SILValue Base);
 
   ExistentialMetatypeInst *
   createExistentialMetatype(SILLocation Loc, SILType Metatype, SILValue Base) {
