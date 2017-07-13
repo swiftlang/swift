@@ -12,7 +12,8 @@
 
 /// A fixed-width integer that is twice the size of its base type.
 public struct DoubleWidth<Base : FixedWidthInteger> :
-  FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral {
+  FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral
+  where Base.Words : Collection, Base.Magnitude.Words : Collection {
 
   public typealias High = Base
   public typealias Low = Base.Magnitude
@@ -156,30 +157,95 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       self.init(exactly: integerPart)
     }
   }
+
+  public struct Words : Collection {
+    public enum _IndexValue {
+      case low(Base.Magnitude.Words.Index)
+      case high(Base.Words.Index)
+    }
     
-  public func _word(at n: Int) -> UInt {
-    if Base.bitWidth < UInt.bitWidth {
-      if UInt.bitWidth % Base.bitWidth != 0 {
-        fatalError("word(at:) is not supported on this type")
-      }
-      if n > 0 {
-        // Since `Base` is narrower than word, any non-zero word will give us
-        // the correct value here (0 or ~0).
-        return _storage.high._word(at: n)
-      }
-      return _storage.low._word(at: 0) |
-        (_storage.high._word(at: 0) << numericCast(Base.bitWidth))
-    } else {
-      // multiples of word-size only
-      if Base.bitWidth % UInt.bitWidth != 0 {
-        fatalError("word(at:) is not supported on this type")
+    public struct Index : Comparable {
+      public var _value: _IndexValue
+
+      public init(_ _value: _IndexValue) { self._value = _value }
+
+      public static func ==(lhs: Index, rhs: Index) -> Bool {
+        switch (lhs._value, rhs._value) {
+        case let (.low(l), .low(r)): return l == r
+        case let (.high(l), .high(r)): return l == r
+        default: return false
+        }
       }
 
-      // TODO: move to Int128 just like init(_builtinIntegerLiteral:) ?
-      return (n < _storage.low._countRepresentedWords) ?
-        _storage.low._word(at: n) :
-        _storage.high._word(at: n - _storage.low._countRepresentedWords)
+      public static func <(lhs: Index, rhs: Index) -> Bool {
+        switch (lhs._value, rhs._value) {
+        case let (.low(l), .low(r)): return l < r
+        case (.low(_), .high(_)): return true
+        case (.high(_), .low(_)): return false
+        case let (.high(l), .high(r)): return l < r
+        }
+      }
     }
+
+    public var _high: Base.Words
+    public var _low: Base.Magnitude.Words
+
+    public init(_ value: DoubleWidth<Base>) {
+      // multiples of word-size only
+      guard Base.bitWidth == Base.Magnitude.bitWidth &&
+        (UInt.bitWidth % Base.bitWidth == 0 ||
+        Base.bitWidth % UInt.bitWidth == 0) else {
+        fatalError("Access to words is not supported on this type")
+      }
+      self._high = value._storage.high.words
+      self._low = value._storage.low.words
+      _sanityCheck(!_low.isEmpty)
+    }
+
+    public var startIndex: Index {
+      return Index(.low(_low.startIndex))
+    }
+
+    public var endIndex: Index {
+      return Index(.high(_high.endIndex))
+    }
+    
+    public var count: Int {
+      if Base.bitWidth < UInt.bitWidth { return 1 }
+      return Int(_low.count) + Int(_high.count)
+    }
+  
+    public func index(after i: Index) -> Index {
+      switch i._value {
+      case let .low(li):
+        if Base.bitWidth < UInt.bitWidth {
+          return Index(.high(_high.endIndex)) 
+        }
+        let next = _low.index(after: li)
+        if next == _low.endIndex { 
+          return Index(.high(_high.startIndex)) 
+        }
+        return Index(.low(next))
+      case let .high(hi):
+        return Index(.high(_high.index(after: hi)))
+      }
+    }
+  
+    public subscript(_ i: Index) -> UInt {
+      if Base.bitWidth < UInt.bitWidth {
+        _precondition(i == Index(.low(_low.startIndex)), "Invalid index")
+        _sanityCheck(2 * Base.bitWidth <= UInt.bitWidth)
+        return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
+      }
+      switch i._value {
+      case let .low(li): return _low[li]
+      case let .high(hi): return _high[hi]
+      }
+    }
+  }
+
+  public var words: Words {
+    return Words(self)
   }
 
   public static var isSigned: Bool {

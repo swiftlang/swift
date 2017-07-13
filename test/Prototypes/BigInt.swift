@@ -121,8 +121,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // FIXME: This is broken on 32-bit arch w/ Word = UInt64
     let wordRatio = UInt.bitWidth / Word.bitWidth
     _sanityCheck(wordRatio != 0)
-    for i in 0..<source._countRepresentedWords {
-      var sourceWord = source._word(at: i)
+    for var sourceWord in source.words {
       for _ in 0..<wordRatio {
         _data.append(Word(extendingOrTruncating: sourceWord))
         sourceWord >>= Word.bitWidth
@@ -660,36 +659,30 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
   }
 
-  public func _word(at n: Int) -> UInt {
-    let ratio = UInt.bitWidth / Word.bitWidth
-    _sanityCheck(ratio != 0)
-
-    var twosComplementData = _dataAsTwosComplement()
-
-    // Find beginning of range. If we're beyond the value, return 1s or 0s.
-    let start = n * ratio
-    if start >= twosComplementData.count {
-      return isNegative ? UInt.max : 0
+  public var words: [UInt] {
+    _sanityCheck(UInt.bitWidth % Word.bitWidth == 0)
+    let twosComplementData = _dataAsTwosComplement()
+    var words: [UInt] = []
+    words.reserveCapacity((twosComplementData.count * Word.bitWidth 
+      + UInt.bitWidth - 1) / UInt.bitWidth)
+    var word: UInt = 0
+    var shift = 0
+    for w in twosComplementData {
+      word |= UInt(extendingOrTruncating: w) << shift
+      shift += Word.bitWidth
+      if shift == UInt.bitWidth {
+        words.append(word)
+        word = 0
+        shift = 0
+      }
     }
-
-    // Find end of range. If the range extends beyond the representation,
-    // add bits to the end.
-    let end = (n + 1) * ratio
-    if end > twosComplementData.count {
-      twosComplementData.append(contentsOf:
-        repeatElement(isNegative ? Word.max : 0,
-          count: end - twosComplementData.count))
+    if shift != 0 {
+      if isNegative {
+        word |= ~((1 << shift) - 1)
+      }
+      words.append(word)
     }
-
-    // Build the correct word from the range determined above.
-    let wordSlice = twosComplementData[start..<end]
-    var result: UInt = 0
-    for v in wordSlice.reversed() {
-      result <<= Word.bitWidth
-      result |= UInt(extendingOrTruncating: v)
-    }
-
-    return result
+    return words
   }
 
   /// The number of bits used for storage of this value. Always a multiple of
@@ -1258,7 +1251,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
   }
 
   var trailingZeroBitCount: Int {
-    return value.trailingZeroBitCount
+    return Int(~value & 1)
   }
 
   static var max: Bit {
@@ -1278,7 +1271,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
   }
 
   var leadingZeroBitCount: Int {
-    return value.nonzeroBitCount - 7
+    return Int(~value & 1)
   }
 
   var bigEndian: Bit {
@@ -1293,8 +1286,8 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     return self
   }
 
-  func _word(at n: Int) -> UInt {
-    return UInt(value)
+  var words: UInt.Words {
+    return UInt(value).words
   }
 
   // Hashable, CustomStringConvertible
@@ -1499,6 +1492,15 @@ BitTests.test("Basics") {
 
   expectEqual(x, x + y)
   expectGT(x, x &+ x)
+  
+  expectEqual(1, x.nonzeroBitCount)
+  expectEqual(0, y.nonzeroBitCount)
+
+  expectEqual(0, x.leadingZeroBitCount)
+  expectEqual(1, y.leadingZeroBitCount)
+
+  expectEqual(0, x.trailingZeroBitCount)
+  expectEqual(1, y.trailingZeroBitCount)
 }
 
 var BigIntTests = TestSuite("BigInt")
@@ -1863,6 +1865,14 @@ BigIntBitTests.test("Conformances") {
   expectTrue(set.contains(y))
   expectTrue(set.contains(z))
   expectFalse(set.contains(-x))
+}
+
+BigIntBitTests.test("words") {
+  expectEqualSequence([1], (1 as BigIntBit).words)
+  expectEqualSequence([UInt.max, 0], BigIntBit(UInt.max).words)
+  expectEqualSequence([UInt.max >> 1], BigIntBit(UInt.max >> 1).words)
+  expectEqualSequence([0, 1], (BigIntBit(UInt.max) + 1).words)
+  expectEqualSequence([UInt.max], (-1 as BigIntBit).words)
 }
 
 runAllTests()
