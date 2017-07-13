@@ -3,7 +3,7 @@
 // -----
 
 protocol Foo {
-  associatedtype Bar : Foo // expected-error{{type may not reference itself as a requirement}}
+  associatedtype Bar : Foo
 }
 
 struct Oroborous : Foo {
@@ -13,7 +13,7 @@ struct Oroborous : Foo {
 // -----
 
 protocol P {
- associatedtype A : P // expected-error{{type may not reference itself as a requirement}}
+ associatedtype A : P
 }
 
 struct X<T: P> {
@@ -26,7 +26,7 @@ func f<T : P>(_ z: T) {
 // -----
 
 protocol PP2 {
-  associatedtype A : P2 = Self // expected-error{{type may not reference itself as a requirement}}
+  associatedtype A : P2 = Self
 }
 
 protocol P2 : PP2 {
@@ -41,13 +41,13 @@ struct Y2 : P2 {
 }
 
 func f<T : P2>(_ z: T) {
- _ = X2<T.A>() // expected-error{{type 'T.A' does not conform to protocol 'P2'}}
+ _ = X2<T.A>()
 }
 
 // -----
 
 protocol P3 {
- associatedtype A: P4 = Self // expected-error{{type may not reference itself as a requirement}}
+ associatedtype A: P4 = Self
 }
 
 protocol P4 : P3 {}
