@@ -580,6 +580,8 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenSwiftSourceInterface);
     } else {
+      if (Opts.AreSwiftArgs)
+          sourcekitd_request_dictionary_set_int64(Req, KeyAreSwiftArgs, true);
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenHeaderInterface);
     }

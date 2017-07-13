@@ -801,6 +801,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                  StringRef Name,
                                                  StringRef HeaderName,
                                                  ArrayRef<const char *> Args,
+                                                 bool AreSwiftArgs,
                                                  bool SynthesizedExtensions,
                                               Optional<unsigned> swiftVersion) {
   CompilerInstance CI;
@@ -810,13 +811,15 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager().initCompilerInvocation(Invocation, llvm::None, CI.getDiags(),
+
+  ArrayRef<const char *> SwiftArgs = AreSwiftArgs ? Args : llvm::None;
+  if (getASTManager().initCompilerInvocation(Invocation, SwiftArgs, CI.getDiags(),
                                              StringRef(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
 
-  if (initInvocationByClangArguments(Args, Invocation, Error)) {
+  if (!AreSwiftArgs && initInvocationByClangArguments(Args, Invocation, Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
