@@ -154,7 +154,7 @@ extension Dictionary {
 
 // rdar://problem/19245317
 protocol P {
-	associatedtype T: P
+	associatedtype T: P // expected-error{{type may not reference itself as a requirement}}
 }
 
 struct S<A: P> {
