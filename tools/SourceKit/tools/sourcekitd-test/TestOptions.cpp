@@ -179,6 +179,11 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       break;
     }
 
+    case OPT_are_swift_args: {
+      AreSwiftArgs = true;
+      break;
+    }
+
       case OPT_swift_version: {
         unsigned ver;
         if (StringRef(InputArg->getValue()).getAsInteger(10, ver)) {

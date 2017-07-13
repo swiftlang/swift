@@ -445,6 +445,7 @@ public:
                                          StringRef Name,
                                          StringRef HeaderName,
                                          ArrayRef<const char *> Args,
+                                         bool AreSwiftArgs,
                                          bool SynthesizedExtensions,
                                          Optional<unsigned> swiftVersion) = 0;
 
