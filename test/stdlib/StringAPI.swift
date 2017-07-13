@@ -382,6 +382,21 @@ StringTests.test("UnicodeScalarView.Iterator.Lifetime") {
   }
 }
 
+StringTests.test("Regression/rdar-33276845") {
+  // These two cases fail slightly differently when the code is broken
+  // See rdar://33276845
+  do {
+    let s = String(repeating: "x", count: 0xffff)
+    let a = Array(s.utf8)
+    expectNotEqual(0, a.count)
+  }
+  do {
+    let s = String(repeating: "x", count: 0x1_0010)
+    let a = Array(s.utf8)
+    expectNotEqual(0, a.count)
+  }
+}
+
 var CStringTests = TestSuite("CStringTests")
 
 func getNullUTF8() -> UnsafeMutablePointer<UInt8>? {
