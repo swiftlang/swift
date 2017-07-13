@@ -1494,7 +1494,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   uintptr_t runtime_error_flags = RuntimeErrorFlagNone;
   if (reporter == swift::fatalError)
     runtime_error_flags = RuntimeErrorFlagFatal;
-  reportToDebugger(runtime_error_flags, message, &details);
+  _swift_reportToDebugger(runtime_error_flags, message, &details);
 
   reporter(flags,
            "*** %s:%zu:%zu: %s; add explicit '@objc' to the declaration to "
