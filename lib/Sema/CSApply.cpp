@@ -3078,9 +3078,51 @@ namespace {
     };
 
     /// Handle optional operands and results in an explicit cast.
-    Expr *handleOptionalBindings(ExplicitCastExpr *cast, 
-                                 Type finalResultType,
-                                 OptionalBindingsCastKind castKind) {
+    Expr *handleOptionalBindingsForCast(ExplicitCastExpr *cast, 
+                                        Type finalResultType,
+                                        OptionalBindingsCastKind castKind) {
+      return handleOptionalBindings(cast->getSubExpr(), finalResultType,
+                                    castKind,
+        [&](Expr *sub, Type resultType) -> Expr* {
+
+        // Complain about conditional casts to CF class types; they can't
+        // actually be conditionally checked.
+        if (castKind == OptionalBindingsCastKind::Conditional) {
+          Type destValueType = resultType->getAnyOptionalObjectType();
+          auto destObjectType = destValueType;
+          if (auto metaTy = destObjectType->getAs<MetatypeType>())
+            destObjectType = metaTy->getInstanceType();
+          if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
+            if (destClass->getForeignClassKind() ==
+                  ClassDecl::ForeignKind::CFType) {
+              if (SuppressDiagnostics)
+                return nullptr;
+
+              auto &tc = cs.getTypeChecker();
+              tc.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
+                          destValueType);
+            }
+          }
+        }
+
+        // Set the expression as the sub-expression of the cast, then
+        // use the cast as the inner operation.
+        cast->setSubExpr(sub);
+        cs.setType(cast, resultType);
+        return cast;
+      });
+    }
+
+    /// A helper function to build an operation.  The inner result type
+    /// is the expected type of the operation; it will be a non-optional
+    /// type unless the castKind is Conditional.
+    using OperationBuilderRef =
+      llvm::function_ref<Expr*(Expr *subExpr, Type innerResultType)>;
+
+    /// Handle optional operands and results in an explicit cast.
+    Expr *handleOptionalBindings(Expr *subExpr, Type finalResultType,
+                                 OptionalBindingsCastKind castKind,
+                                 OperationBuilderRef buildInnerOperation) {
       auto &tc = cs.getTypeChecker();
 
       unsigned destExtraOptionals;
@@ -3106,7 +3148,6 @@ namespace {
       // properly account for archetypes dynamically being optional
       // types.  For example, if we're casting T to NSView?, that
       // should succeed if T=NSObject? and its value is actually nil.
-      Expr *subExpr = cast->getSubExpr();
       Type srcType = cs.getType(subExpr);
 
       SmallVector<Type, 4> srcOptionals;
@@ -3154,40 +3195,12 @@ namespace {
         return result;
       };
 
-      // Complain about conditional casts to foreign class types; they can't
-      // actually be conditionally checked.
-      if (castKind == OptionalBindingsCastKind::Conditional) {
-        auto destObjectType = destValueType;
-        if (auto metaTy = destObjectType->getAs<MetatypeType>())
-          destObjectType = metaTy->getInstanceType();
-        if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
-          if (destClass->getForeignClassKind() ==
-                ClassDecl::ForeignKind::CFType) {
-            if (SuppressDiagnostics)
-              return nullptr;
-
-            tc.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
-                        destValueType);
-          }
-        }
-      }
-
       // There's nothing special to do if the operand isn't optional
       // and we don't need any bridging.
       if (srcOptionals.empty()) {
-        cs.setType(cast, finalResultType);
-        return addFinalOptionalInjections(cast);
-      }
-
-      // If this is a conditional cast, the result type will always
-      // have at least one level of optional, which should become the
-      // type of the checked-cast expression.
-      if (castKind == OptionalBindingsCastKind::Conditional) {
-        assert(!destOptionals.empty() &&
-               "result of checked cast is not an optional type");
-        cs.setType(cast, destOptionals.back());
-      } else {
-        cs.setType(cast, destValueType);
+        Expr *result = buildInnerOperation(subExpr, finalResultType);
+        if (!result) return nullptr;
+        return addFinalOptionalInjections(result);
       }
 
       // The result type (without the final optional) is a subtype of
@@ -3231,11 +3244,22 @@ namespace {
                                                          depth, valueType));
         subExpr->setImplicit(true);
       }
-      cast->setSubExpr(subExpr);
+
+      // If this is a conditional cast, the result type will always
+      // have at least one level of optional, which should become the
+      // type of the checked-cast expression.
+      Expr *result;
+      if (castKind == OptionalBindingsCastKind::Conditional) {
+        assert(!destOptionals.empty() &&
+               "result of checked cast is not an optional type");
+        result = buildInnerOperation(subExpr, destOptionals.back());
+      } else {
+        result = buildInnerOperation(subExpr, destValueType);
+      }
+      if (!result) return nullptr;
 
       // If we're casting to an optional type, we need to capture the
       // final M bindings.
-      Expr *result = cast;
 
       if (destOptionals.size() > destExtraOptionals) {
         if (castKind == OptionalBindingsCastKind::Conditional) {
@@ -3244,7 +3268,7 @@ namespace {
           // (SILGen should know how to peephole this.)
           result =
             cs.cacheType(new (tc.Context) BindOptionalExpr(result,
-                                                           cast->getEndLoc(),
+                                                           result->getEndLoc(),
                                                            failureDepth,
                                                            destValueType));
           result->setImplicit(true);
@@ -3319,31 +3343,29 @@ namespace {
       assert(*choice == 1 && "should be bridging");
 
       // Handle optional bindings.
-      Expr *result = handleOptionalBindings(expr, toType,
-                                            OptionalBindingsCastKind::Bridged);
-      if (!result)
-        return nullptr;
+      Expr *sub = handleOptionalBindings(expr->getSubExpr(), toType,
+                                         OptionalBindingsCastKind::Bridged,
+                                         [&](Expr *sub, Type toInstanceType) {
+        // Warn about NSNumber and NSValue bridging coercions we accepted in
+        // Swift 3 but which can fail at runtime.
+        if (tc.Context.LangOpts.isSwiftVersion3()
+            && tc.typeCheckCheckedCast(cs.getType(sub), toInstanceType,
+                                       CheckedCastContextKind::None,
+                                       dc, SourceLoc(), sub, SourceRange())
+                 == CheckedCastKind::Swift3BridgingDowncast) {
+          tc.diagnose(expr->getLoc(),
+                      diag::missing_forced_downcast_swift3_compat_warning,
+                      cs.getType(sub), toInstanceType)
+            .fixItReplace(expr->getAsLoc(), "as!");
+        }
+        
+        return buildObjCBridgeExpr(sub, toInstanceType, locator);
+      });
 
-      Expr *sub = expr->getSubExpr();
-      Type toInstanceType = toType->lookThroughAllAnyOptionalTypes();
-      
-      // Warn about NSNumber and NSValue bridging coercions we accepted in
-      // Swift 3 but which can fail at runtime.
-      if (tc.Context.LangOpts.isSwiftVersion3()
-          && tc.typeCheckCheckedCast(cs.getType(sub), toInstanceType,
-                                     CheckedCastContextKind::None,
-                                     dc, SourceLoc(), sub, SourceRange())
-               == CheckedCastKind::Swift3BridgingDowncast) {
-        tc.diagnose(expr->getLoc(),
-                    diag::missing_forced_downcast_swift3_compat_warning,
-                    cs.getType(sub), toInstanceType)
-          .fixItReplace(expr->getAsLoc(), "as!");
-      }
-      
-      sub = buildObjCBridgeExpr(sub, toInstanceType, locator);
       if (!sub) return nullptr;
       expr->setSubExpr(sub);
-      return result;
+      cs.setType(expr, toType);
+      return expr;
     }
 
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
@@ -3408,8 +3430,8 @@ namespace {
         break;
       }
       
-      return handleOptionalBindings(expr, simplifyType(cs.getType(expr)),
-                                    OptionalBindingsCastKind::Forced);
+      return handleOptionalBindingsForCast(expr, simplifyType(cs.getType(expr)),
+                                           OptionalBindingsCastKind::Forced);
     }
 
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr,
@@ -3481,8 +3503,8 @@ namespace {
         break;
       }
       
-      return handleOptionalBindings(expr, simplifyType(cs.getType(expr)),
-                                    OptionalBindingsCastKind::Conditional);
+      return handleOptionalBindingsForCast(expr, simplifyType(cs.getType(expr)),
+                                         OptionalBindingsCastKind::Conditional);
     }
 
     Expr *visitAssignExpr(AssignExpr *expr) {
