@@ -244,6 +244,106 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
       decls.push_back(cast<TypeDecl>(found.getValueDecl()));
   }
 
+  // If we're looking for a type named `CodingKeys`, then we've got some
+  // additional work to do here. CodingKeys is a special type: although not a
+  // protocol requirement of the Encodable/Decodable protocols, it is
+  // synthesized as part of Encodable/Decodable conformance. Unqualified lookup
+  // may occur before the type is synthesized, though, in which case, we need to
+  // make sure it gets synthesized.
+  //
+  // The unqualified lookups above, however, cannot force Encodable/Decodable
+  // synthesis to occur (since they know nothing about typechecking). Thus, we
+  // also need to find the closest qualified type which might contain a
+  // CodingKeys type and synthesize it.
+  //
+  // If this type is "closer" than the closest unqualified type, then we can
+  // use it.
+  if (name.isSimpleName(Context.Id_CodingKeys)) {
+    SmallVector<TypeDecl *, 1> qualifiedDecls;
+
+    auto *currentDC = dc;
+    while (currentDC) {
+      auto *nominal =
+        currentDC->getAsNominalTypeOrNominalTypeExtensionContext();
+      if (nominal) {
+        // We've found a nominal context to look in. Let's perform a qualified
+        // lookup here (which will cause CodingKeys synthesis if possible).
+        auto lookupOptions = options | NameLookupFlags::ProtocolMembers;
+        auto results = lookupMemberType(nominal,
+                                        nominal->getDeclaredInterfaceType(),
+                                        Context.Id_CodingKeys, lookupOptions);
+        if (results.size() > 0) {
+          for (auto &result : results) {
+            qualifiedDecls.push_back(result.first);
+          }
+
+          break;
+        }
+      }
+
+      currentDC = currentDC->getParent();
+    }
+
+    // The results from the unqualified lookup may take precedence if they are
+    // more local than the ones produced from the qualified lookup.
+    //
+    // If either set of lookup results is empty, then there's no comparison to
+    // be done.
+    if (decls.empty()) {
+      return qualifiedDecls;
+    } else if (qualifiedDecls.empty()) {
+      return decls;
+    }
+
+    // All of the types found in the unqualified lookup share the same locality
+    // from here, as do all of the types from the qualified lookup.
+    // It's safe to compare the first element of each.
+    //
+    // To do locality comparison, we look at DeclContexts; if one contains the
+    // other, then the contained one is more local.
+    auto firstDeclContext = [](decltype(decls.begin()) begin,
+                               decltype(decls.end()) end) {
+      auto it = std::find_if(begin, end, [](const TypeDecl *decl) {
+        return dyn_cast<DeclContext>(decl) != nullptr;
+      });
+
+      return it == end ? nullptr : cast<DeclContext>(*it);
+    };
+
+    auto unqualifiedDC = firstDeclContext(decls.begin(), decls.end());
+    if (!unqualifiedDC) {
+      // There wasn't a type in unqualified decls that ended up being a
+      // comparable DeclContext. In this case, we fall back to the the
+      // unqualified decls as the default.
+      return decls;
+    }
+
+    auto qualifiedDC = firstDeclContext(qualifiedDecls.begin(), decls.end());
+    if (!qualifiedDC) {
+      // There wasn't a type in qualified decls that ended up being a comparable
+      // DeclContext. In this case, we fall back to the the unqualified decls as
+      // the default.
+      return decls;
+    }
+
+    // If unqualifiedDC and qualifiedDC share a parent DeclContext, then they
+    // are equally local. Otherwise, if unqualifiedDC is a child of
+    // qualifiedDC's parent context, then it must be more local than
+    // qualifiedDC.
+    const auto *unqualifiedParentDC = unqualifiedDC->getParent();
+    const auto *qualifiedParentDC = qualifiedDC->getParent();
+    if (unqualifiedParentDC == qualifiedParentDC) {
+      // Both equally local. Fall back to the default of unqualified.
+      return decls;
+    }
+
+    if (unqualifiedDC->isChildContextOf(qualifiedParentDC)) {
+      return decls;
+    } else {
+      return qualifiedDecls;
+    }
+  }
+
   return decls;
 }
 
@@ -363,7 +463,59 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (options.contains(NameLookupFlags::IgnoreAccessibility))
     subOptions |= NL_IgnoreAccessibility;
 
-  if (!dc->lookupQualified(type, name, subOptions, this, decls))
+  auto lookupSuccess = dc->lookupQualified(type, name, subOptions, this, decls);
+
+  // If the requested type is a CodingKeys type on something which may require
+  // Encodable/Decodable synthesis, it may not have been synthesized yet. If
+  // this is the case, force synthesis and attempt lookup again.
+  if (!lookupSuccess && name == Context.Id_CodingKeys) {
+    if (auto *targetDecl = type->getAnyNominal()) {
+      auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
+      auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
+
+      ConformanceCheckOptions conformanceOptions;
+      if (options.contains(NameLookupFlags::KnownPrivate))
+        conformanceOptions |= ConformanceCheckFlags::InExpression;
+
+      // If the type either conforms to Encodable/Decodable directly, or
+      // inherits from something which does, the conformance check will force
+      // synthesis, which will allow us to try again.
+      NormalProtocolConformance *conformance = nullptr;
+      Optional<ProtocolConformanceRef> conformanceRef;
+      if ((conformanceRef = conformsToProtocol(type, decodableProto, targetDecl,
+                                               conformanceOptions,
+                                               SourceLoc()))) {
+        if (auto *concrete = conformanceRef->getConcrete()) {
+          conformance = dyn_cast<NormalProtocolConformance>(concrete);
+        }
+      }
+
+      if (!conformance &&
+          (conformanceRef = conformsToProtocol(type, encodableProto, targetDecl,
+                                               conformanceOptions,
+                                               SourceLoc()))) {
+        if (auto *concrete = conformanceRef->getConcrete()) {
+          conformance = dyn_cast<NormalProtocolConformance>(concrete);
+        }
+      }
+
+      if (conformance) {
+        // Check conformance, forcing synthesis.
+        //
+        // If synthesizing conformance fails, this will produce diagnostics.
+        // However, these diagnostics are going to be produced again later when
+        // protocol conformance is being checked in a separate pass. To prevent
+        // this duplication, we'll throw the diagnostics away here.
+        auto diagnosticTransaction = DiagnosticTransaction(Context.Diags);
+        checkConformance(conformance);
+        diagnosticTransaction.abort();
+
+        lookupSuccess = dc->lookupQualified(type, name, subOptions, this, decls);
+      }
+    }
+  }
+
+  if (!lookupSuccess)
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
