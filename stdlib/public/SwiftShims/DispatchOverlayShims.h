@@ -166,7 +166,7 @@ static inline void _swift_dispatch_apply_current(
 }
 
 SWIFT_DISPATCH_RETURNS_RETAINED
-__swift_shims_dispatch_data_t 
+static inline __swift_shims_dispatch_data_t
 _swift_dispatch_data_create(
     const void *buffer,
     size_t size,
@@ -177,7 +177,7 @@ _swift_dispatch_data_create(
 
 typedef unsigned int (^__swift_shims_dispatch_data_applier)(__swift_shims_dispatch_data_t, size_t, const void *, size_t);
 
-unsigned int
+static inline unsigned int
 _swift_dispatch_data_apply(
     __swift_shims_dispatch_data_t data,
     __swift_shims_dispatch_data_applier SWIFT_DISPATCH_NOESCAPE applier) {
@@ -186,19 +186,19 @@ _swift_dispatch_data_apply(
   });
 }
 
-void _swift_dispatch_source_set_event_handler(
+static inline void _swift_dispatch_source_set_event_handler(
     dispatch_source_t source,
     __swift_shims_dispatch_block_t _Nullable block) {
   dispatch_source_set_event_handler(source, block);
 }
 
-void _swift_dispatch_source_set_cancel_handler(
+static inline void _swift_dispatch_source_set_cancel_handler(
     dispatch_source_t source,
     __swift_shims_dispatch_block_t _Nullable block) {
   dispatch_source_set_cancel_handler(source, block);
 }
 
-void _swift_dispatch_source_set_registration_handler(
+static inline void _swift_dispatch_source_set_registration_handler(
     dispatch_source_t source,
     __swift_shims_dispatch_block_t _Nullable block) {
   dispatch_source_set_registration_handler(source, block);
