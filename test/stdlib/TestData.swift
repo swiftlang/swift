@@ -1186,6 +1186,35 @@ class TestData : TestDataSuper {
         let expected = Data(bytes: [9, 8, 7, 6, 5, 4, 3, 2, 1])
         expectEqual(expected, reversedData)
     }
+
+    func test_replaceSubrangeReferencingMutable() {
+        let mdataObj = NSMutableData(bytes: [0x01, 0x02, 0x03, 0x04], length: 4)
+        var data = Data(referencing: mdataObj)
+        let expected = data.count
+        data.replaceSubrange(4 ..< 4, with: Data(bytes: []))
+        expectEqual(expected, data.count)
+        data.replaceSubrange(4 ..< 4, with: Data(bytes: []))
+        expectEqual(expected, data.count)
+    }
+
+    func test_replaceSubrangeReferencingImmutable() {
+        let dataObj = NSData(bytes: [0x01, 0x02, 0x03, 0x04], length: 4)
+        var data = Data(referencing: dataObj)
+        let expected = data.count
+        data.replaceSubrange(4 ..< 4, with: Data(bytes: []))
+        expectEqual(expected, data.count)
+        data.replaceSubrange(4 ..< 4, with: Data(bytes: []))
+        expectEqual(expected, data.count)
+    }
+
+    func test_replaceSubrangeFromBridged() {
+        var data = NSData(bytes: [0x01, 0x02, 0x03, 0x04], length: 4) as Data
+        let expected = data.count
+        data.replaceSubrange(4 ..< 4, with: Data(bytes: []))
+        expectEqual(expected, data.count)
+        data.replaceSubrange(4 ..< 4, with: Data(bytes: []))
+        expectEqual(expected, data.count)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1250,6 +1279,9 @@ DataTests.test("test_sliceOfSliceViaRangeExpression") { TestData().test_sliceOfS
 DataTests.test("test_appendingSlices") { TestData().test_appendingSlices() }
 DataTests.test("test_sequenceInitializers") { TestData().test_sequenceInitializers() }
 DataTests.test("test_reversedDataInit") { TestData().test_reversedDataInit() }
+DataTests.test("test_replaceSubrangeReferencingMutable") { TestData().test_replaceSubrangeReferencingMutable() }
+DataTests.test("test_replaceSubrangeReferencingImmutable") { TestData().test_replaceSubrangeReferencingImmutable() }
+DataTests.test("test_replaceSubrangeFromBridged") { TestData().test_replaceSubrangeFromBridged() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
