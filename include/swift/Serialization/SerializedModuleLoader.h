@@ -132,6 +132,10 @@ public:
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
 
+  virtual TypeDecl *
+  lookupNestedType(Identifier name,
+                   const NominalTypeDecl *parent) const override;
+
   virtual OperatorDecl *lookupOperator(Identifier name,
                                        DeclKind fixity) const override;
 
