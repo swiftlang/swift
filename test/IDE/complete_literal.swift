@@ -62,7 +62,7 @@ func giveMeAString() -> Int {
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: Sequence#})[#Void#]{{; name=.+$}}
 
 struct MyColor: _ExpressibleByColorLiteral {
-  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }
+  init(_colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }
   var red: Float
 }
 public typealias _ColorLiteralType = MyColor
