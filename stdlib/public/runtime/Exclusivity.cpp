@@ -124,7 +124,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   uintptr_t flags = RuntimeErrorFlagNone;
   if (!keepGoing)
     flags = RuntimeErrorFlagFatal;
-  reportToDebugger(flags, message, &details);
+  _swift_reportToDebugger(flags, message, &details);
 
   if (keepGoing) {
     return;
