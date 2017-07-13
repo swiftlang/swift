@@ -76,7 +76,7 @@ func testCombinedConstraints<T: ProtoA & ProtoB where T: ProtoC>(x: T) {} // exp
 func testCombinedConstraints<T: ProtoA & ProtoB where T: ProtoC>(x: T) where T: ProtoD {} // expected-error {{'where' clause next to generic parameters is obsoleted}} {{48-64=}} {{72-77=where T: ProtoC,}}
 
 func testCombinedConstraintsOld<T: protocol<ProtoA, ProtoB> where T: ProtoC>(x: T) {} // expected-error {{'where' clause next to generic parameters is obsoleted}} {{60-76=}} {{83-83= where T: ProtoC}}
-// expected-warning@-1 {{'protocol<...>' composition syntax is deprecated}}
+// expected-error@-1 {{'protocol<...>' composition syntax has been removed}}
 func testCombinedConstraintsOld<T: protocol<ProtoA, ProtoB> where T: ProtoC>(x: T) where T: ProtoD {} // expected-error {{'where' clause next to generic parameters is obsoleted}} {{60-76=}} {{84-89=where T: ProtoC,}}
-// expected-warning@-1 {{'protocol<...>' composition syntax is deprecated}}
+// expected-error@-1 {{'protocol<...>' composition syntax has been removed}}
 

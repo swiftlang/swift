@@ -442,8 +442,11 @@ mapParsedParameters(Parser &parser,
     // Warn when an unlabeled parameter follows a variadic parameter
     if (ellipsisLoc.isValid() && elements.back()->isVariadic() &&
         param.FirstName.empty()) {
-      parser.diagnose(param.FirstNameLoc,
-                      diag::unlabeled_parameter_following_variadic_parameter);
+      auto message =
+          parser.Context.isSwiftVersion3()
+              ? diag::swift3_unlabeled_parameter_following_variadic_parameter
+              : diag::unlabeled_parameter_following_variadic_parameter;
+      parser.diagnose(param.FirstNameLoc, message);
     }
     
     // If this parameter had an ellipsis, check whether it's the last parameter.
