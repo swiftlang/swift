@@ -17,5 +17,20 @@
 @property (nullable) id importantInstanceProperty __attribute__((swift_name("finalInstanceProperty")));
 @end
 
+@interface PrintingRenamed : Base
+- (void)print;
+- (void)print:(id)thing;
+- (void)print:(id)thing options:(id)options;
+
++ (void)print;
++ (void)print:(id)thing;
++ (void)print:(id)thing options:(id)options;
+@end
+
+@interface PrintingInterference : Base
+- (void)print:(id)thing; // Only this one gets renamed.
+- (void)print:(id)thing extra:(id)options;
+@end
+
 #pragma clang assume_nonnull end
 #endif // __OBJC__
