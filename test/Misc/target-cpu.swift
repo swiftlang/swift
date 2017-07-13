@@ -37,3 +37,6 @@
 // RUN: not %swift -typecheck -target x86_64-apple-watchos2 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=WATCHSIMULATOR64_CPU %s
 // WATCHSIMULATOR64_CPU: "-target-cpu" "core2"
 
+// RUN: not %swift -typecheck -target s390x-unknown-linux-gnu -Xcc -### %s 2>&1 | %FileCheck -check-prefix=S390X_CPU %s
+// S390X_CPU: "-target-cpu" "z196"
+
