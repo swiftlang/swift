@@ -12,3 +12,14 @@ func testOverloaded() {
   // CHECK: call void @{{.*}}test_my_log
   test_my_log()
 } // CHECK: {{^}$}}
+
+func test_indirect_by_val_alignment() {
+  let x = a_thing()
+  log_a_thing(x)
+}
+
+// CHECK-LABEL: define hidden swiftcc void  @_T011c_functions30test_indirect_by_val_alignmentyyF()
+// CHECK: %indirect-temporary = alloca %TSC7a_thingV, align [[ALIGN:[0-9]+]]
+// CHECK: [[CAST:%.*]] = bitcast %TSC7a_thingV* %indirect-temporary to %struct.a_thing*
+// CHECK: call void @log_a_thing(%struct.a_thing* byval align [[ALIGN]] [[CAST]])
+// CHECK: define internal void @log_a_thing(%struct.a_thing* byval align [[ALIGN]]
