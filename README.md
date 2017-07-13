@@ -91,8 +91,13 @@ cloning over SSH may provide a better experience (which requires
 
 #### CMake
 [CMake](https://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects; at least version 3.4.3 is required. Your
-favorite Linux distribution likely already has a CMake package you can install.
+Swift and its companion projects.  To get started using CMake, at least version 3.4.3 will be required. 
+Your favorite Linux distribution will most likely already have a CMake package you can install, and was included above in the installation instructions for Linux development dependencies, but in the event CMake is not installed on your Linux system it can be installed with the following command:
+
+``` 
+sudo apt-get install cmake
+```
+
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded
 command line tools to your `PATH`:
