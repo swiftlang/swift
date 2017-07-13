@@ -103,7 +103,13 @@ const Metadata *swift::swift_getObjectType(HeapObject *object) {
     classAsMetadata = classAsMetadata->SuperClass;
   }
 
-  Class objcClass = [reinterpret_cast<id>(object) class];
+  id objcObject = reinterpret_cast<id>(object);
+  Class objcClass = [objcObject class];
+  if (object_isClass(objcObject)) {
+    // Original object is a class. We want a
+    // metaclass but +class doesn't give that to us.
+    objcClass = object_getClass(objcClass);
+  }
   classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
   return swift_getObjCClassMetadata(classAsMetadata);
 #endif
