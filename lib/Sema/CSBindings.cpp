@@ -148,6 +148,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   // coalescing supertype bounds when we are able to compute the meet.
   auto addPotentialBinding = [&](PotentialBinding binding,
                                  bool allowJoinMeet = true) {
+    assert(!binding.BindingType->is<ErrorType>());
     // If this is a non-defaulted supertype binding, check whether we can
     // combine it with another supertype binding by computing the 'join' of the
     // types.
@@ -374,6 +375,10 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
         result.InvolvesTypeVariables = true;
       continue;
     }
+    
+    // Do not attempt to bind to ErrorType.
+    if (type->hasError())
+      continue;
 
     // If the type we'd be binding to is a dependent member, don't try to
     // resolve this type variable yet.
