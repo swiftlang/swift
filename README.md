@@ -90,19 +90,19 @@ cloning over SSH may provide a better experience (which requires
     ./swift/utils/update-checkout --clone-with-ssh
 
 #### CMake
-[CMake](https://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects.  To get started using CMake, at least version 3.4.3 will be required. 
-Your favorite Linux distribution will most likely already have a CMake package you can install, and was included above in the installation instructions for Linux development dependencies, but in the event CMake is not installed on your Linux system it can be installed with the following command:
-
-``` 
-sudo apt-get install cmake
-```
+[CMake](https://cmake.org) is the core infrastructure used to configure builds of Swift and its companion projects; at least version 3.4.3 is required. 
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded
 command line tools to your `PATH`:
 
     export PATH=/Applications/CMake.app/Contents/bin:$PATH
+    
+On Linux, if the CMake package was not downloaded in the development dependencies you can download and install the CMake package on the terminal using the following command:
+
+``` 
+sudo apt-get install cmake
+```
 
 #### Ninja
 [Ninja](https://ninja-build.org) is the current recommended build system
