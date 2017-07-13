@@ -143,7 +143,8 @@ extension _SwiftStringView {
 }
 
 extension StringProtocol {
-  internal var _ephemeralString : String {
+  public // Used in the Foundation overlay
+  var _ephemeralString : String {
     if _fastPath(self is _SwiftStringView) {
       return (self as! _SwiftStringView)._ephemeralContent
     }
