@@ -90,13 +90,6 @@ struct GenericSignatureBuilder::Implementation {
   /// The set of requirements that have been delayed for some reason.
   SmallVector<DelayedRequirement, 4> DelayedRequirements;
 
-  /// The generation number, which is incremented whenever we successfully
-  /// introduce a new constraint.
-  unsigned Generation = 0;
-
-  /// The generation at which we last processed all of the delayed requirements.
-  unsigned LastProcessedGeneration = 0;
-
 #ifndef NDEBUG
   /// Whether we've already finalized the builder.
   bool finalized = false;
@@ -1406,9 +1399,6 @@ bool PotentialArchetype::addConformance(ProtocolDecl *proto,
     return false;
   }
 
-  // Bump the generation.
-  ++builder.Impl->Generation;
-
   // Add the conformance along with this constraint.
   equivClass->conformsTo[proto].push_back({this, proto, source});
   ++NumConformanceConstraints;
@@ -1876,12 +1866,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   if (!assocType && !concreteDecl)
     return nullptr;
 
-  // If we were asked for a complete, well-formed archetype, make sure we
-  // process delayed requirements if anything changed.
-  SWIFT_DEFER {
-    getBuilder()->processDelayedRequirements();
-  };
-
   Identifier name = assocType ? assocType->getName() : concreteDecl->getName();
   ProtocolDecl *proto =
     assocType ? assocType->getProtocol()
@@ -1916,9 +1900,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     switch (kind) {
     case ArchetypeResolutionKind::CompleteWellFormed:
     case ArchetypeResolutionKind::WellFormed: {
-      // Bump the generation count, because we created a new archetype.
-      ++getBuilder()->Impl->Generation;
-
       if (assocType)
         resultPA = new PotentialArchetype(this, assocType);
       else
@@ -2837,9 +2818,6 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
     return ConstraintResult::Resolved;
   }
 
-  // Bump the generation.
-  ++Impl->Generation;
-
   auto pa = resolvedSubject->getPotentialArchetype();
   return addLayoutRequirementDirect(pa, layout, source.getSource(pa));
 }
@@ -2923,9 +2901,6 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
   T->getOrCreateEquivalenceClass()->superclassConstraints
     .push_back(ConcreteConstraint{T, superclass, source});
   ++NumSuperclassConstraints;
-
-  // Bump the generation.
-  ++Impl->Generation;
 
   // Update the equivalence class with the constraint.
   updateSuperclass(T, superclass, source);
@@ -3086,9 +3061,6 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   if (T1 == T2)
     return ConstraintResult::Resolved;
 
-  // Bump the generation.
-  ++Impl->Generation;
-
   unsigned nestingDepth1 = T1->getNestingDepth();
   unsigned nestingDepth2 = T2->getNestingDepth();
 
@@ -3224,9 +3196,6 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
                                       ConcreteConstraint{T, Concrete, Source});
   ++NumConcreteTypeConstraints;
 
-  // Bump the generation.
-  ++Impl->Generation;
-
   // If we've already been bound to a type, match that type.
   if (equivClass->concreteType) {
     return addSameTypeRequirement(equivClass->concreteType, Concrete, Source,
@@ -3357,6 +3326,28 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementDirect(
   }
 }
 
+// Local function to mark the given associated type as recursive,
+// diagnosing it if this is the first such occurrence.
+void GenericSignatureBuilder::markPotentialArchetypeRecursive(
+    PotentialArchetype *pa, ProtocolDecl *proto, const RequirementSource *source) {
+  if (pa->isRecursive())
+    return;
+  pa->setIsRecursive();
+
+  pa->addConformance(proto, source, *this);
+  if (!pa->getParent())
+    return;
+
+  auto assocType = pa->getResolvedAssociatedType();
+  if (!assocType || assocType->isInvalid())
+    return;
+
+  Diags.diagnose(assocType->getLoc(), diag::recursive_requirement_reference);
+
+  // Silence downstream errors referencing this associated type.
+  assocType->setInvalid();
+}
+
 ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                              TypeDecl *decl,
                              UnresolvedType type,
@@ -3405,6 +3396,26 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                         TypeLoc(const_cast<TypeRepr *>(typeRepr),
                                 inheritedType),
                         getFloatingSource(typeRepr, /*forInferred=*/true));
+    }
+
+    if (!decl->getASTContext().LangOpts.EnableRecursiveConstraints) {
+      // Check for direct recursion.
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+        auto proto = assocType->getProtocol();
+        if (auto inheritedProto = inheritedType->getAs<ProtocolType>()) {
+          if (inheritedProto->getDecl() == proto ||
+              inheritedProto->getDecl()->inheritsFrom(proto)) {
+            auto source = getFloatingSource(typeRepr, /*forInferred=*/false);
+            if (auto resolved = resolve(type, source)) {
+              if (auto pa = resolved->getPotentialArchetype()) {
+                markPotentialArchetypeRecursive(pa, proto,
+                                                source.getSource(pa));
+                return ConstraintResult::Conflicting;
+              }
+            }
+          }
+        }
+      }
     }
 
     return addTypeRequirement(type, inheritedType,
@@ -3967,13 +3978,6 @@ static GenericSignatureBuilder::UnresolvedType asUnresolvedType(
 }
 
 void GenericSignatureBuilder::processDelayedRequirements() {
-  // If we're already up-to-date, do nothing.
-  if (Impl->Generation == Impl->LastProcessedGeneration) return;
-
-  SWIFT_DEFER {
-    Impl->LastProcessedGeneration = Impl->Generation;
-  };
-
   bool anySolved = !Impl->DelayedRequirements.empty();
   while (anySolved) {
     // Steal the delayed requirements so we can reprocess them.
