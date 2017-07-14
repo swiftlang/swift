@@ -275,7 +275,7 @@ class TestDecimal : TestDecimalSuper {
         expectEqual(.plus, d.sign)
         var e = Decimal(0)
         e.negate()
-        XCTAssertEqual(e, 0)
+        expectEqual(e, 0)
         expectTrue(Decimal(3.5).isEqual(to: Decimal(3.5)))
         expectTrue(Decimal.nan.isEqual(to: Decimal.nan))
         expectTrue(Decimal(1.28).isLess(than: Decimal(2.24)))
