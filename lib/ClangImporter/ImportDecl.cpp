@@ -1865,6 +1865,23 @@ applyPropertyOwnership(VarDecl *prop,
   }
 }
 
+/// Does this name refer to a method that might shadow Swift.print?
+///
+/// As a heuristic, methods that have a base name of 'print' but more than
+/// one argument are left alone. These can still shadow Swift.print but are
+/// less likely to be confused for it, at least.
+static bool isPrintLikeMethod(DeclName name, const DeclContext *dc) {
+  if (!name || name.isSpecial() || name.isSimpleName())
+    return false;
+  if (name.getBaseIdentifier().str() != "print")
+    return false;
+  if (!dc->isTypeContext())
+    return false;
+  if (name.getArgumentNames().size() > 1)
+    return false;
+  return true;
+}
+
 using MirroredMethodEntry =
   std::pair<const clang::ObjCMethodDecl*, ProtocolDecl*>;
 
@@ -3670,6 +3687,14 @@ namespace {
       // problems for the type checker.
       if (forceClassMethod && decl->hasRelatedResultType())
         return nullptr;
+
+      // Hack: avoid importing methods named "print" that aren't available in
+      // the current version of Swift. We'd rather just let the user use
+      // Swift.print in that case.
+      if (!isActiveSwiftVersion() &&
+          isPrintLikeMethod(importedName.getDeclName(), dc)) {
+        return nullptr;
+      }
 
       // Add the implicit 'self' parameter patterns.
       bool isInstance = decl->isInstanceMethod() && !forceClassMethod;
@@ -7103,15 +7128,10 @@ void ClangImporter::Implementation::importAttributes(
   // Hack: mark any method named "print" with less than two parameters as
   // warn_unqualified_access.
   if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
-    if (!MD->getName().empty() && MD->getName().str() == "print" &&
-        MD->getDeclContext()->isTypeContext()) {
-      auto *formalParams = MD->getParameterList(1);
-      if (formalParams->size() <= 1) {
-        // Use a non-implicit attribute so it shows up in the generated
-        // interface.
-        MD->getAttrs().add(
-            new (C) WarnUnqualifiedAccessAttr(/*implicit*/false));
-      }
+    if (isPrintLikeMethod(MD->getFullName(), MD->getDeclContext())) {
+      // Use a non-implicit attribute so it shows up in the generated
+      // interface.
+      MD->getAttrs().add(new (C) WarnUnqualifiedAccessAttr(/*implicit*/false));
     }
   }
 
