@@ -358,6 +358,7 @@ public:
                                  StringRef Name,
                                  StringRef HeaderName,
                                  ArrayRef<const char *> Args,
+                                 bool UsingSwiftArgs,
                                  bool SynthesizedExtensions,
                                  Optional<unsigned> swiftVersion) override;
 
