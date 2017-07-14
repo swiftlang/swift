@@ -3001,6 +3001,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       auto decl = cast<VarDecl>(component.getDeclRef().getDecl());
       auto oldBaseTy = baseTy;
       baseTy = baseTy->getTypeOfMember(SGF.SGM.SwiftModule, decl)
+        ->getReferenceStorageReferent()
         ->getCanonicalType();
       
       switch (auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
