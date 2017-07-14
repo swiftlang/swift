@@ -386,8 +386,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
     assert(BuiltinName.empty() && "Mismatch with sema");
     
-    IGF.Builder.CreateFence(ordering,
-                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    IGF.Builder.CreateFence(ordering, isSingleThread
+                                          ? llvm::SyncScope::SingleThread
+                                          : llvm::SyncScope::System);
     return;
   }
 
@@ -436,10 +437,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(cmp->getType()));
-    llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(pointer, cmp, newval,
-                                                         successOrdering,
-                                                         failureOrdering,
-                                                         isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(
+        pointer, cmp, newval, successOrdering, failureOrdering,
+        isSingleThread ? llvm::SyncScope::SingleThread
+                       : llvm::SyncScope::System);
     cast<llvm::AtomicCmpXchgInst>(value)->setVolatile(isVolatile);
     cast<llvm::AtomicCmpXchgInst>(value)->setWeak(isWeak);
 
@@ -504,9 +505,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(val->getType()));
-    llvm::Value *value = IGF.Builder.CreateAtomicRMW(SubOpcode, pointer, val,
-                                                      ordering,
-                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    llvm::Value *value = IGF.Builder.CreateAtomicRMW(
+        SubOpcode, pointer, val, ordering,
+        isSingleThread ? llvm::SyncScope::SingleThread
+                       : llvm::SyncScope::System);
     cast<AtomicRMWInst>(value)->setVolatile(isVolatile);
 
     if (origTy->isPointerTy())
@@ -558,8 +560,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     if (Builtin.ID == BuiltinValueKind::AtomicLoad) {
       auto load = IGF.Builder.CreateLoad(pointer,
                                          valueTI.getBestKnownAlignment());
-      load->setAtomic(ordering,
-                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+      load->setAtomic(ordering, isSingleThread ? llvm::SyncScope::SingleThread
+                                               : llvm::SyncScope::System);
       load->setVolatile(isVolatile);
 
       llvm::Value *value = load;
@@ -573,8 +575,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
         value = IGF.Builder.CreateBitCast(value, valueTy);
       auto store = IGF.Builder.CreateStore(value, pointer,
                                            valueTI.getBestKnownAlignment());
-      store->setAtomic(ordering,
-                       isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+      store->setAtomic(ordering, isSingleThread ? llvm::SyncScope::SingleThread
+                                                : llvm::SyncScope::System);
       store->setVolatile(isVolatile);
       return;
     } else {
