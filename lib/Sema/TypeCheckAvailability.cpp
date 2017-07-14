@@ -1628,7 +1628,26 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
     SmallString<64> selfReplace;
     if (needsParens)
       selfReplace.push_back('(');
-    selfReplace += sourceMgr.extractText(selfExprRange);
+
+    // If the base is contextual member lookup and we know the type,
+    // let's just prepend it, otherwise we'll end up with an incorrect fix-it.
+    auto base = sourceMgr.extractText(selfExprRange);
+    if (!base.empty() && base.front() == '.') {
+      auto newName = attr->Rename;
+      // If this is not a rename, let's not
+      // even try to emit a fix-it because
+      // it's going to be invalid.
+      if (newName.empty())
+        return;
+
+      auto parts = newName.split('.');
+      auto nominalName = parts.first;
+      assert(!nominalName.empty());
+
+      selfReplace += nominalName;
+    }
+
+    selfReplace += base;
     if (needsParens)
       selfReplace.push_back(')');
     selfReplace.push_back('.');
