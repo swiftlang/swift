@@ -531,9 +531,15 @@ extension String.UTF8View.Index {
   ///   - sourcePosition: A position in a `String` or one of its views.
   ///   - target: The `UTF8View` in which to find the new position.
   public init?(_ sourcePosition: String.Index, within target: String.UTF8View) {
-    guard String.UnicodeScalarView(target._core)._isOnUnicodeScalarBoundary(
-      sourcePosition) else { return nil }
-    self.init(encodedOffset: sourcePosition.encodedOffset)
+    switch sourcePosition._cache {
+    case .utf8:
+        self.init(encodedOffset: sourcePosition.encodedOffset, transcodedOffset: sourcePosition._transcodedOffset, sourcePosition._cache)
+
+    default:
+        guard String.UnicodeScalarView(target._core)._isOnUnicodeScalarBoundary(
+            sourcePosition) else { return nil }
+        self.init(encodedOffset: sourcePosition.encodedOffset)
+    }
   }
 }
 
