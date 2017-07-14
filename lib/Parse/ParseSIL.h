@@ -20,7 +20,7 @@
 #include <memory>
 
 namespace swift {
-  class DiagnosticEngine;
+  class Parser;
   class SILDebugScope;
   class SILFunction;
   class SILModule;
@@ -44,6 +44,15 @@ namespace swift {
 
     /// Did we parse a sil_stage for this module?
     bool DidParseSILStage = false;
+
+    bool parseDeclSIL(Parser &P);
+    bool parseDeclSILStage(Parser &P);
+    bool parseSILVTable(Parser &P);
+    bool parseSILGlobal(Parser &P);
+    bool parseSILWitnessTable(Parser &P);
+    bool parseSILDefaultWitnessTable(Parser &P);
+    bool parseSILCoverageMap(Parser &P);
+    bool parseSILScope(Parser &P);
   };
 } // end namespace swift
 
