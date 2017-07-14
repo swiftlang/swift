@@ -476,6 +476,14 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
   }
 
+  LoadInst *createTrivialLoadOr(SILLocation Loc, SILValue LV,
+                                LoadOwnershipQualifier Qualifier) {
+    if (LV->getType().isTrivial(getModule())) {
+      return createLoad(Loc, LV, LoadOwnershipQualifier::Trivial);
+    }
+    return createLoad(Loc, LV, Qualifier);
+  }
+
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
@@ -517,6 +525,17 @@ public:
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV) {
     return insert(new (F.getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
+  }
+
+  /// Utility function that returns a trivial store if the stored type is
+  /// trivial and a \p Qualifier store if the stored type is non-trivial.
+  StoreInst *createTrivialStoreOr(SILLocation Loc, SILValue Src,
+                                  SILValue DestAddr,
+                                  StoreOwnershipQualifier Qualifier) {
+    if (Src->getType().isTrivial(getModule())) {
+      return createStore(Loc, Src, DestAddr, StoreOwnershipQualifier::Trivial);
+    }
+    return createStore(Loc, Src, DestAddr, Qualifier);
   }
 
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
