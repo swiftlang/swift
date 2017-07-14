@@ -1791,7 +1791,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     bool isProtocolExt = fn->getDeclContext()->getAsProtocolExtensionContext();
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty),
-                                         addDeclBaseNameRef(fn->getName()),
+                                         addDeclBaseNameRef(fn->getBaseName()),
                                          isProtocolExt,
                                          fn->isStatic());
 

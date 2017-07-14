@@ -3553,8 +3553,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto dtor = createDecl<DestructorDecl>(ctx.Id_deinit, SourceLoc(),
-                                           /*selfpat*/nullptr, DC);
+    auto dtor = createDecl<DestructorDecl>(SourceLoc(), /*selfpat*/nullptr, DC);
     declOrOffset = dtor;
 
     configureGenericEnvironment(dtor, genericEnvID);

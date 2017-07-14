@@ -239,7 +239,8 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
 
   if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
-  } else if (Decl->getBaseName() == "subscript") {
+  } else if (Decl->getBaseName() == "subscript" ||
+             Decl->getBaseName() == "deinit") {
     OS << '`' << Decl->getBaseName() << '`';
   } else {
     OS << Decl->getBaseName();
