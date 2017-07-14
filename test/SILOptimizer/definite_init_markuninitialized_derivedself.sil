@@ -1,0 +1,203 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
+
+// This test only tests mark_uninitialized [derivedself]
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+/////////////////
+// Definitions //
+/////////////////
+
+sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
+sil @makesInt : $@convention(thin) () -> Int
+
+class RootClassWithIVars {
+  var x: Int
+  var y: Int
+  var z: (Int, Int)
+  init()
+}
+
+class DerivedClassWithIVars : RootClassWithIVars {
+  var a: Int
+  override init()
+}
+
+sil @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+
+protocol P {}
+class C : P {}
+
+class SomeClass {}
+
+sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
+sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
+
+///////////
+// Tests //
+///////////
+
+sil @derived_test1 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
+bb0(%0 : $DerivedClassWithIVars):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
+  %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
+  store %0 to %3 : $*DerivedClassWithIVars
+
+  // Get an int
+  %5 = function_ref @makesInt : $@convention(thin) () -> Int
+  %7 = apply %5() : $@convention(thin) () -> Int
+
+  // Initialize the 'a' ivar with the int.
+  %8 = load %3 : $*DerivedClassWithIVars
+  %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
+  assign %7 to %9 : $*Int
+
+
+  %11 = load %3 : $*DerivedClassWithIVars
+  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
+  %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %15 = apply %14(%13) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+
+  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
+  assign %16 to %3 : $*DerivedClassWithIVars
+  %18 = load %3 : $*DerivedClassWithIVars
+  strong_retain %18 : $DerivedClassWithIVars
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  return %18 : $DerivedClassWithIVars
+}
+
+sil @derived_test2 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
+bb0(%0 : $DerivedClassWithIVars):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
+  %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
+  store %0 to %3 : $*DerivedClassWithIVars
+
+  %11 = load %3 : $*DerivedClassWithIVars
+  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
+  %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %15 = apply %14(%13) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars     // expected-error {{property 'self.a' not initialized at super.init call}}
+
+  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
+  assign %16 to %3 : $*DerivedClassWithIVars
+  %18 = load %3 : $*DerivedClassWithIVars
+  strong_retain %18 : $DerivedClassWithIVars
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  return %18 : $DerivedClassWithIVars
+}
+
+struct MyStruct : P {}
+
+struct MyStruct2 {
+  var x: P
+    init(delegate: ())
+    init()
+}
+
+class RootClassWithNontrivialStoredProperties {
+  var x, y: SomeClass
+
+  init()
+}
+
+class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStoredProperties {
+  var a, b: SomeClass
+  override init()
+}
+
+// CHECK-LABEL: sil @test_derived_release
+// CHECK: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
+// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack
+// CHECK-NEXT: store
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thick DerivedClassWithNontrivialStoredProperties.Type
+// CHECK-NEXT: dealloc_partial_ref [[SELF]] : $DerivedClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick DerivedClassWithNontrivialStoredProperties.Type
+// CHECK-NEXT: dealloc_stack [[SELFBOX]]
+
+sil @test_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
+  %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
+
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}
+
+
+// CHECK-LABEL: sil @test_derived_partial_release
+// CHECK: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
+// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack
+// CHECK-NEXT: store
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]
+// CHECK-NEXT: ref_element_addr [[SELF]]
+// CHECK-NEXT: store
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]
+// CHECK-NEXT: ref_element_addr [[SELF]]
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thick DerivedClassWithNontrivialStoredProperties.Type
+// CHECK-NEXT: dealloc_partial_ref [[SELF]] : $DerivedClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick DerivedClassWithNontrivialStoredProperties.Type
+// CHECK-NEXT: dealloc_stack [[SELFBOX]]
+
+sil @test_derived_partial_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
+  %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
+
+  %8 = alloc_ref $SomeClass
+  %9 = load %4 : $*DerivedClassWithNontrivialStoredProperties
+  %10 = ref_element_addr %9 : $DerivedClassWithNontrivialStoredProperties, #DerivedClassWithNontrivialStoredProperties.a
+  assign %8 to %10 : $*SomeClass
+
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// <rdar://problem/18199087> DI doesn't catch use of super properties lexically inside super.init call
+sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
+bb0(%0 : $DerivedClassWithIVars, %i : $Int):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
+  %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
+  store %0 to %3 : $*DerivedClassWithIVars
+
+  // Initialize properties in derived class.
+  %8 = load %3 : $*DerivedClassWithIVars
+  %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
+  assign %i to %9 : $*Int
+
+
+  // Get the super.init function information, but don't apply it.
+  %11 = load %3 : $*DerivedClassWithIVars
+  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
+  %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+
+  // Access a super property before super.init is called.
+  %a = load %3 : $*DerivedClassWithIVars
+  %b = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
+  %c = ref_element_addr %b : $RootClassWithIVars, #RootClassWithIVars.x  // expected-error {{use of 'self' in property access 'x' before super.init initializes self}}
+  load %c : $*Int
+
+  // Call super.init.
+  %15 = apply %14(%13) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+
+  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
+  assign %16 to %3 : $*DerivedClassWithIVars
+  %18 = load %3 : $*DerivedClassWithIVars
+  strong_retain %18 : $DerivedClassWithIVars
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  return %18 : $DerivedClassWithIVars
+}
