@@ -721,7 +721,7 @@ func s340_______captureBox() {
   var mutableAddressOnly: EmptyP = AddressOnlyStruct()
 
   func captureEverything() {
-    s100_________identity((mutableAddressOnly))
+    _ = s100_________identity((mutableAddressOnly))
   }
 
   captureEverything()
@@ -790,6 +790,7 @@ func s350_______addrOnlyIf(x: Bool) -> EmptyP {
 func s360________guardEnum<T>(_ e: IndirectEnum<T>) {
   do {
     guard case .Node(let x) = e else { return }
+    _ = x
   }
 }
 
@@ -819,6 +820,7 @@ func s370_____optToOptCast<T>(_ x : T!) -> T? {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s380___contextualInitySiSgF'
 func s380___contextualInit(_ a : Int?) {
   var x: Int! = a
+  _ = x
 }
 
 // Tests opaque call result types
@@ -842,6 +844,7 @@ func s380___contextualInit(_ a : Int?) {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s390___addrCallResultyxycSglF'
 func s390___addrCallResult<T>(_ f: (() -> T)?) {
   var x = f?()
+  _ = x
 }
 
 // Tests reabstraction / partial apply of protocols under opaque value mode
@@ -980,6 +983,24 @@ func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPo
   return UnsafeBufferPointer(start: p, count: 1)
 }
 
+// Test emitNativeToCBridgedNonoptionalValue
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
+// CHECK: bb0(%0 : $Any):
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Any
+// CHECK: [[SRC:%.*]] = copy_value [[BORROW]] : $Any
+// CHECK: [[OPEN:%.*]] = open_existential_value [[SRC]] : $Any to $@opened
+// CHECK: [[COPY:%.*]] = copy_value [[OPEN]] : $@opened
+// CHECK: [[F:%.*]] = function_ref @_T0s27_bridgeAnythingToObjectiveCyXlxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
+// CHECK: [[RET:%.*]] = apply [[F]]<@opened("{{.*}}") Any>([[COPY]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
+// CHECK: destroy_value [[SRC]] : $Any
+// CHECK: destroy_value %0 : $Any
+// CHECK: return [[RET]] : $AnyObject
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF'
+func s470________nativeToC(fromAny any: Any) -> AnyObject {
+  return any as AnyObject
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
@@ -995,7 +1016,7 @@ func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPo
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF'
 func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
   if let f = x as? (Int, T) -> (Int, T) {
-    f(42, y)
+    _ = f(42, y)
   }
 }
 
