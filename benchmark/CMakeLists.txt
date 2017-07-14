@@ -91,6 +91,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RGBHistogram
     single-source/RangeAssignment
     single-source/RecursiveOwnedParameter
+    single-source/ReduceInto
     single-source/ReversedCollections
     single-source/SetTests
     single-source/SevenBoom

@@ -96,6 +96,7 @@ import RC4
 import RGBHistogram
 import RangeAssignment
 import RecursiveOwnedParameter
+import ReduceInto
 import ReversedCollections
 import SetTests
 import SevenBoom
@@ -274,6 +275,7 @@ addTo(&precommitTests, "EqualSubstringString", run_EqualSubstringString)
 addTo(&precommitTests, "EqualSubstringSubstring", run_EqualSubstringSubstring)
 addTo(&precommitTests, "EqualSubstringSubstringGenericEquatable", run_EqualSubstringSubstringGenericEquatable)
 addTo(&precommitTests, "ErrorHandling", run_ErrorHandling)
+addTo(&precommitTests, "FrequenciesUsingReduceInto", run_FrequenciesUsingReduceInto)
 addTo(&precommitTests, "Hanoi", run_Hanoi)
 addTo(&precommitTests, "HashTest", run_HashTest)
 addTo(&precommitTests, "Histogram", run_Histogram)
@@ -297,6 +299,7 @@ addTo(&precommitTests, "MapReduceSequence", run_MapReduceSequence)
 addTo(&precommitTests, "MapReduceShort", run_MapReduceShort)
 addTo(&precommitTests, "MapReduceShortString", run_MapReduceShortString)
 addTo(&precommitTests, "MapReduceString", run_MapReduceString)
+addTo(&precommitTests, "MapUsingReduceInto", run_MapUsingReduceInto)
 addTo(&precommitTests, "Memset", run_Memset)
 addTo(&precommitTests, "MonteCarloE", run_MonteCarloE)
 addTo(&precommitTests, "MonteCarloPi", run_MonteCarloPi)
@@ -387,6 +390,9 @@ addTo(&precommitTests, "RGBHistogram", run_RGBHistogram)
 addTo(&precommitTests, "RGBHistogramOfObjects", run_RGBHistogramOfObjects)
 addTo(&precommitTests, "RangeAssignment", run_RangeAssignment)
 addTo(&precommitTests, "RecursiveOwnedParameter", run_RecursiveOwnedParameter)
+addTo(&precommitTests, "ReduceIntoArray", run_ReduceIntoArray)
+addTo(&precommitTests, "ReduceIntoDictionary", run_ReduceIntoDictionary)
+addTo(&precommitTests, "ReduceIntoInt", run_ReduceIntoInt)
 addTo(&precommitTests, "ReversedArray", run_ReversedArray)
 addTo(&precommitTests, "ReversedBidirectional", run_ReversedBidirectional)
 addTo(&precommitTests, "ReversedDictionary", run_ReversedDictionary)
