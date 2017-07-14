@@ -1,3 +1,5 @@
+// A similar struct with Codable properties adopting Codable should get a
+// synthesized init(from:), along with the memberwise initializer.
 //===--- TypeCheckDecl.cpp - Type Checking for Declarations ---------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -8311,6 +8313,96 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     defineDefaultConstructor(decl);
+  }
+}
+
+void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
+                                            DeclName member) {
+  auto baseName = member.getBaseName();
+  if (baseName.isSpecial())
+    return;
+
+  // Checks whether the target conforms to the given protocol. If the
+  // conformance is incomplete, check the conformance to force synthesis, if
+  // possible.
+  //
+  // Swallows diagnostics if conformance checking is already in progress (so we
+  // don't display diagnostics twice).
+  //
+  // Returns whether the target conforms to the protocol and the conformance is
+  // complete.
+  auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
+    auto targetType = target->getDeclaredInterfaceType();
+    if (auto ref = conformsToProtocol(targetType, protocol, target,
+                                      ConformanceCheckFlags::Used,
+                                      SourceLoc())) {
+      if (auto *conformance =
+          dyn_cast_or_null<NormalProtocolConformance>(ref->getConcrete())) {
+        if (conformance->isIncomplete()) {
+          // Check conformance, forcing synthesis.
+          //
+          // If synthesizing conformance fails, this will produce diagnostics.
+          // If conformance checking was already in progress elsewhere, though,
+          // this could produce diagnostics twice.
+          //
+          // To prevent this duplication, we swallow the diagnostics if the
+          // state of the conformance is not Incomplete.
+          DiagnosticTransaction transaction(Context.Diags);
+          auto shouldSwallowDiagnostics =
+            conformance->getState() != ProtocolConformanceState::Incomplete;
+
+          checkConformance(conformance);
+          if (shouldSwallowDiagnostics)
+            transaction.abort();
+
+          return conformance->isComplete();
+        }
+      }
+    }
+
+    return false;
+  };
+
+  if (member.isSimpleName()) {
+    if (baseName.getIdentifier() == Context.Id_CodingKeys) {
+      // CodingKeys is a special type which may be synthesized as part of
+      // Encodable/Decodable conformance. If the target conforms to either
+      // protocol and would derive conformance to either, the type may be
+      // synthesized.
+      // If the target conforms to either and the conformance has not yet been
+      // evaluated, then we should do that here.
+      //
+      // Try to synthesize Decodable first. If that fails, try to synthesize
+      // Encodable. If either succeeds and CodingKeys should have been
+      // synthesized, it will be synthesized.
+      auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
+      auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
+      if (!evaluateTargetConformanceTo(decodableProto))
+        (void)evaluateTargetConformanceTo(encodableProto);
+    }
+  } else {
+    auto argumentNames = member.getArgumentNames();
+    if (argumentNames.size() != 1)
+      return;
+
+    auto argumentName = argumentNames.front();
+    if (baseName.getIdentifier() == Context.Id_init &&
+        argumentName == Context.Id_from) {
+      // init(from:) may be synthesized as part of derived confromance to the
+      // Decodable protocol.
+      // If the target should conform to the Decodable protocol, check the
+      // conformance here to attempt synthesis.
+      auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
+      (void)evaluateTargetConformanceTo(decodableProto);
+    } else if (baseName.getIdentifier() == Context.Id_encode &&
+               argumentName == Context.Id_to) {
+      // encode(to:) may be synthesized as part of derived confromance to the
+      // Encodable protocol.
+      // If the target should conform to the Encodable protocol, check the
+      // conformance here to attempt synthesis.
+      auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
+      (void)evaluateTargetConformanceTo(encodableProto);
+    }
   }
 }
 
