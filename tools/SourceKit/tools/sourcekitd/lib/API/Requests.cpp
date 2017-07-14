@@ -163,6 +163,7 @@ editorOpenInterface(StringRef Name, StringRef ModuleName,
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           ArrayRef<const char *> Args,
+                          bool UsingSwiftArgs,
                           bool SynthesizedExtensions,
                           Optional<unsigned> swiftVersion);
 
@@ -463,11 +464,13 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     int64_t SynthesizedExtension = false;
     Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
                  /*isOptional=*/true);
+    Optional<int64_t> UsingSwiftArgs = Req.getOptionalInt64(KeyUsingSwiftArgs);
     Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
     Optional<unsigned> swiftVer;
     if (swiftVerVal.hasValue())
       swiftVer = *swiftVerVal;
     return Rec(editorOpenHeaderInterface(*Name, *HeaderName, Args,
+                                         UsingSwiftArgs.getValueOr(false),
                                          SynthesizedExtension, swiftVer));
   }
 
@@ -1999,6 +2002,7 @@ static sourcekitd_response_t editorConvertMarkupToXML(StringRef Source) {
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           ArrayRef<const char *> Args,
+                          bool UsingSwiftArgs,
                           bool SynthesizedExtensions,
                           Optional<unsigned> swiftVersion) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
@@ -2006,7 +2010,7 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                          /*EnableDiagnostics=*/false,
                          /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorOpenHeaderInterface(EditC, Name, HeaderName, Args,
+  Lang.editorOpenHeaderInterface(EditC, Name, HeaderName, Args, UsingSwiftArgs,
                                  SynthesizedExtensions, swiftVersion);
   return EditC.createResponse();
 }
