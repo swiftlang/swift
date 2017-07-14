@@ -116,6 +116,18 @@ __attribute__((availability(ios,introduced=8.0)))
 @property NSDictionary *dictProperty;
 @property NSSet *setProperty;
 
+- (nonnull NSString*) fetchNonnullString;
+- (nullable NSString*) fetchNullableString;
+- (null_unspecified NSString*) fetchNullproneString;
+
+- (void) takeNonnullString: (nonnull NSString*) string;
+- (void) takeNullableString: (nullable NSString*) string;
+- (void) takeNullproneString: (null_unspecified NSString*) string;
+
+@property (readwrite) __nonnull NSString *nonnullStringProperty;
+@property (readwrite) __nullable NSString *nullableStringProperty;
+@property (readwrite) __null_unspecified NSString *nullproneStringProperty;
+
 @end
 
 @interface DummyClass (Extras)

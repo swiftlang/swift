@@ -490,7 +490,7 @@ namespace {
     RValue visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                                        SGFContext C);
     RValue visitForceValueExpr(ForceValueExpr *E, SGFContext C);
-    RValue emitForceValue(SILLocation loc, Expr *E,
+    RValue emitForceValue(ForceValueExpr *loc, Expr *E,
                           unsigned numOptionalEvaluations,
                           SGFContext C);
     RValue visitOpenExistentialExpr(OpenExistentialExpr *E, SGFContext C);
@@ -513,13 +513,14 @@ namespace {
 namespace {
   struct BridgingConversion {
     Expr *SubExpr;
-    Conversion::KindTy Kind;
+    Optional<Conversion::KindTy> Kind;
     unsigned MaxOptionalDepth;
 
     BridgingConversion() : SubExpr(nullptr) {}
-    BridgingConversion(Expr *sub, Conversion::KindTy kind, unsigned depth)
+    BridgingConversion(Expr *sub, Optional<Conversion::KindTy> kind,
+                       unsigned depth)
       : SubExpr(sub), Kind(kind), MaxOptionalDepth(depth) {
-      assert(Conversion::isBridgingKind(kind));
+      assert(!kind || Conversion::isBridgingKind(*kind));
     }
 
     explicit operator bool() const { return SubExpr != nullptr; }
@@ -592,7 +593,7 @@ static BridgingConversion getBridgingConversion(Expr *E) {
     return { E, kind, 0 };
   }
 
-  return {};
+  return { E, None, 0 };
 }
 
 /// If the given expression represents a bridging conversion, emit it with
@@ -600,10 +601,47 @@ static BridgingConversion getBridgingConversion(Expr *E) {
 static Optional<ManagedValue>
 tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
                             SGFContext C) {
-  // Check whether it's a bridging conversion.
+  // Try to pattern-match a conversion.  This can find bridging
+  // conversions, but it can also find simple optional conversions:
+  // injections and opt-to-opt conversions.
   auto result = getBridgingConversion(E);
-  if (!result) return None;
-  auto kind = result.Kind;
+
+  // If we didn't find a conversion at all, there's nothing special to do.
+  if (!result ||
+      result.SubExpr == E ||
+      result.SubExpr->getType()->isEqual(E->getType()))
+    return None;
+
+  // Even if the conversion doesn't involve bridging, we might still
+  // expose more peephole opportunities by combining it with a contextual
+  // conversion.
+  if (!result.Kind) {
+    // Only do this if the conversion is implicit.
+    if (isExplicit)
+      return None;
+
+    // Look for a contextual conversion.
+    auto conversion = C.getAsConversion();
+    if (!conversion)
+      return None;
+
+    // Adjust the contextual conversion.
+    auto sub = result.SubExpr;
+    auto sourceType = sub->getType()->getCanonicalType();
+    if (auto adjusted = conversion->getConversion()
+                         .adjustForInitialOptionalConversions(sourceType)) {
+      // Emit into the applied conversion.
+      return conversion->emitWithAdjustedConversion(SGF, E, *adjusted,
+                [sub](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
+        return SGF.emitRValueAsSingleValue(sub, C);
+      });
+    }
+
+    // If that didn't work, there's nothing special to do.
+    return None;
+  }
+
+  auto kind = *result.Kind;
   auto subExpr = result.SubExpr;
 
   CanType resultType = E->getType()->getCanonicalType();
@@ -3896,8 +3934,7 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     
     FormalEvaluationScope writeback(SGF);
     LValue destLV = SGF.emitLValue(dest, AccessKind::Write);
-    RValue srcRV = SGF.emitRValue(src);
-    SGF.emitAssignToLValue(loc, std::move(srcRV), std::move(destLV));
+    SGF.emitAssignToLValue(loc, src, std::move(destLV));
     return;
   }
 
@@ -4261,7 +4298,7 @@ RValue RValueEmitter::visitForceValueExpr(ForceValueExpr *E, SGFContext C) {
 /// \param E - the forced expression
 /// \param numOptionalEvaluations - the number of enclosing
 ///   OptionalEvaluationExprs that we've opened.
-RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
+RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
                                      unsigned numOptionalEvaluations,
                                      SGFContext C) {
   auto valueType = E->getType()->getAnyOptionalObjectType();
@@ -4332,6 +4369,23 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
 
     // Otherwise, just emit the injected value directly into the result.
     return SGF.emitRValue(injection->getSubExpr(), C);
+  }
+
+  // If this is an implicit force of an ImplicitlyUnwrappedOptional,
+  // and we're emitting into an unbridging conversion, try adjusting the
+  // context.
+  if (loc->isImplicit() &&
+      E->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
+    if (auto conv = C.getAsConversion()) {
+      if (auto adjusted = conv->getConversion().adjustForInitialForceValue()) {
+        auto value =
+          conv->emitWithAdjustedConversion(SGF, loc, *adjusted,
+                       [E](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
+          return SGF.emitRValueAsSingleValue(E, C);
+        });
+        return RValue(SGF, loc, value);
+      }
+    }
   }
 
   // Otherwise, emit the optional and force its value out.
@@ -4460,9 +4514,9 @@ public:
   }
   
   void set(SILGenFunction &gen, SILLocation loc,
-           RValue &&value, ManagedValue base) && override {
+           ArgumentSource &&value, ManagedValue base) && override {
     // Convert the value back to a +1 strong reference.
-    auto unowned = std::move(value).getAsSingleValue(gen, loc).getUnmanagedValue();
+    auto unowned = std::move(value).getAsSingleValue(gen).getUnmanagedValue();
     auto strongType = SILType::getPrimitiveObjectType(
               unowned->getType().castTo<UnmanagedStorageType>().getReferentType());
     auto owned = gen.B.createUnmanagedToRef(loc, unowned, strongType);

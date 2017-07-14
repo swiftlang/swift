@@ -5164,7 +5164,8 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
                                      SubstitutionList substitutions,
                                      ArgumentSource &&selfValue,
                                      bool isSuper, bool isDirectUse,
-                                     RValue &&subscripts, RValue &&setValue) {
+                                     RValue &&subscripts,
+                                     ArgumentSource &&setValue) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -5184,16 +5185,37 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   // (value)  or (value, indices)
   if (!subscripts.isNull()) {
     // If we have a value and index list, create a new rvalue to represent the
-    // both of them together.  The value goes first.
-    SmallVector<ManagedValue, 4> Elts;
-    std::move(setValue).getAll(Elts);
-    std::move(subscripts).getAll(Elts);
-    setValue = RValue::withPreExplodedElements(Elts, accessType.getInput());
+    // both of them together.
+    auto inputTupleType = cast<TupleType>(accessType.getInput());
+
+    SmallVector<ArgumentSource, 4> eltSources;
+
+    // The value comes first.
+    eltSources.push_back(std::move(setValue));
+
+    // The indices come after.  Whether they are expanded or not depends on
+    // whether they were written as separate parameters, which should be
+    // reflected in the params list.
+    // TODO: we should really take an array of RValues.
+    auto params = accessType.getParams();
+    if (params.size() != 2) {
+      auto subscriptsTupleType = cast<TupleType>(subscripts.getType());
+      assert(inputTupleType->getNumElements()
+              == 1 + subscriptsTupleType->getNumElements());
+      SmallVector<RValue, 8> eltRVs;
+      std::move(subscripts).extractElements(eltRVs);
+      for (auto &elt : eltRVs)
+        eltSources.emplace_back(loc, std::move(elt));
+    } else {
+      subscripts.rewriteType(params[1].getType());
+      eltSources.emplace_back(loc, std::move(subscripts));
+    }
+
+    setValue = ArgumentSource(loc, inputTupleType, eltSources);
   } else {
     setValue.rewriteType(accessType.getInput());
   }
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(setValue)),
-                       accessType);
+  emission.addCallSite(loc, std::move(setValue), accessType);
   // ()
   emission.apply();
 }

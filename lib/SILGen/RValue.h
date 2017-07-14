@@ -227,11 +227,35 @@ public:
 
   /// Rewrite the type of this r-value.
   void rewriteType(CanType newType) & {
+#ifndef NDEBUG
+    static const auto areSimilarTypes = [](CanType l, CanType r) {
+      if (l == r) return true;
+
+      // Allow function types to disagree about 'noescape'.
+      if (auto lf = dyn_cast<FunctionType>(l)) {
+        if (auto rf = dyn_cast<FunctionType>(r)) {
+          return lf.getInput() == rf.getInput()
+              && lf.getResult() == rf.getResult()
+              && lf->getExtInfo().withNoEscape(false) ==
+                 lf->getExtInfo().withNoEscape(false);
+        }
+      }
+      return false;
+    };
+
+    static const auto isSingleElementTuple = [](CanType type, CanType eltType) {
+      if (auto tupleType = dyn_cast<TupleType>(type)) {
+        return tupleType->getNumElements() == 1 &&
+               areSimilarTypes(tupleType.getElementType(0), eltType);
+      }
+      return false;
+    };
+
     // We only allow a very modest set of changes to a type.
-    assert(newType == type ||
-           (isa<TupleType>(newType) &&
-            cast<TupleType>(newType)->getNumElements() == 1 &&
-            cast<TupleType>(newType).getElementType(0) == type));
+    assert(areSimilarTypes(newType, type) ||
+           isSingleElementTuple(newType, type) ||
+           isSingleElementTuple(type, newType));
+#endif
     type = newType;
   }
   

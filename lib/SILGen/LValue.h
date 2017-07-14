@@ -28,6 +28,7 @@
 namespace swift {
 namespace Lowering {
 
+class ArgumentSource;
 class LogicalPathComponent;
 class ManagedValue;
 class PhysicalPathComponent;
@@ -154,6 +155,12 @@ public:
   TranslationPathComponent &asTranslation();
   const TranslationPathComponent &asTranslation() const;
 
+  /// Is this some form of open-existential component?
+  bool isOpenExistential() const {
+    return getKind() == OpenOpaqueExistentialKind ||
+           getKind() == OpenNonOpaqueExistentialKind;
+  }
+
   /// Return the appropriate access kind to use when producing the
   /// base value.
   virtual AccessKind getBaseAccessKind(SILGenFunction &SGF,
@@ -234,7 +241,7 @@ public:
   ///
   /// \param base - always an address, but possibly an r-value
   virtual void set(SILGenFunction &SGF, SILLocation loc,
-                   RValue &&value, ManagedValue base) && = 0;
+                   ArgumentSource &&value, ManagedValue base) && = 0;
 
   /// Get the property.
   ///
@@ -304,7 +311,7 @@ public:
              ManagedValue base, SGFContext c) && override;
 
   void set(SILGenFunction &SGF, SILLocation loc,
-           RValue &&value, ManagedValue base) && override;
+           ArgumentSource &&value, ManagedValue base) && override;
 
   /// Transform from the original pattern.
   virtual RValue translate(SILGenFunction &SGF, SILLocation loc,
@@ -383,6 +390,13 @@ public:
   /// peel it off.
   void dropLastTranslationComponent() & {
     assert(isLastComponentTranslation());
+    Path.pop_back();
+  }
+
+  /// Assert that the given component is the last component in the
+  /// l-value, drop it.
+  void dropLastComponent(PathComponent &component) & {
+    assert(&component == Path.back().get());
     Path.pop_back();
   }
   

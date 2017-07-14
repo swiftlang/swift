@@ -353,7 +353,8 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
   std::unique_ptr<LogicalPathComponent> clonedComponent =
     (isFinal ? nullptr : clone(SGF, loc));
   LogicalPathComponent *component = (isFinal ? this : &*clonedComponent);
-  std::move(*component).set(SGF, loc, std::move(rvalue), base);
+  std::move(*component).set(SGF, loc, ArgumentSource(loc, std::move(rvalue)),
+                            base);
 }
 
 InOutConversionScope::InOutConversionScope(SILGenFunction &SGF)
@@ -449,7 +450,7 @@ namespace {
       llvm_unreachable("called get on a pseudo-component");
     }
     void set(SILGenFunction &SGF, SILLocation loc,
-             RValue &&value, ManagedValue base) && override {
+             ArgumentSource &&value, ManagedValue base) && override {
       llvm_unreachable("called set on a pseudo-component");
     }
     ManagedValue getMaterialized(SILGenFunction &SGF, SILLocation loc,
@@ -725,8 +726,8 @@ namespace {
     }
 
     void set(SILGenFunction &SGF, SILLocation loc,
-             RValue &&value, ManagedValue base) && override {
-      auto payload = std::move(value).forwardAsSingleValue(SGF, loc);
+             ArgumentSource &&value, ManagedValue base) && override {
+      auto payload = std::move(value).getAsSingleValue(SGF).forward(SGF);
 
       SmallVector<ProtocolConformanceRef, 2> conformances;
       for (auto proto : OpenedArchetype->getConformsTo())
@@ -901,6 +902,11 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
   return false;
 }
 
+static ArgumentSource emitBaseValueForAccessor(SILGenFunction &SGF,
+                                               SILLocation loc, LValue &&dest,
+                                               CanType baseFormalType,
+                                               SILDeclRef accessor);
+
 namespace {
   /// A helper class for implementing a component that involves
   /// calling accessors.
@@ -1033,8 +1039,51 @@ namespace {
       }
     }
 
+    void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
+                              LValue &&dest, ArgumentSource &&value) {
+      SILDeclRef setter = SGF.getSetterDeclRef(decl, IsDirectAccessorUse);
+
+      // Pull everything out of this that we'll need, because we're
+      // about to modify the LValue and delete this component.
+      auto subs = this->substitutions;
+      bool isSuper = this->IsSuper;
+      bool isDirectAccessorUse = this->IsDirectAccessorUse;
+      RValue indices = std::move(this->subscripts);
+      auto baseFormalType = this->baseFormalType;
+
+      // Drop this component from the l-value.
+      dest.dropLastComponent(*this);
+
+      return emitAssignWithSetter(SGF, loc, std::move(dest), baseFormalType,
+                                  isSuper, setter, isDirectAccessorUse, subs,
+                                  std::move(indices), std::move(value));
+    }
+
+    static void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
+                                     LValue &&baseLV, CanType baseFormalType,
+                                     bool isSuper, SILDeclRef setter,
+                                     bool isDirectAccessorUse,
+                                     SubstitutionList subs,
+                                     RValue &&indices, ArgumentSource &&value) {
+      ArgumentSource self = [&] {
+        if (!baseLV.isValid()) {
+          return ArgumentSource();
+        } else if (cast<FuncDecl>(setter.getDecl())->computeInterfaceSelfType()
+                     ->is<InOutType>()) {
+          return ArgumentSource(loc, std::move(baseLV));
+        } else {
+          return emitBaseValueForAccessor(SGF, loc, std::move(baseLV),
+                                          baseFormalType, setter);
+        }
+      }();
+
+      return SGF.emitSetAccessor(loc, setter, subs, std::move(self), isSuper,
+                                 isDirectAccessorUse,
+                                 std::move(indices), std::move(value));
+    }
+
     void set(SILGenFunction &SGF, SILLocation loc,
-             RValue &&value, ManagedValue base) && override {
+             ArgumentSource &&value, ManagedValue base) && override {
       SILDeclRef setter = SGF.getSetterDeclRef(decl, IsDirectAccessorUse);
 
       FormalEvaluationScope scope(SGF);
@@ -1677,7 +1726,10 @@ TranslationPathComponent::get(SILGenFunction &SGF, SILLocation loc,
 }
 
 void TranslationPathComponent::set(SILGenFunction &SGF, SILLocation loc,
-                                   RValue &&value, ManagedValue base) && {
+                                   ArgumentSource &&valueSource,
+                                   ManagedValue base) && {
+  RValue value = std::move(valueSource).getAsRValue(SGF);
+
   // Map the value to the original pattern.
   RValue newValue = std::move(*this).untranslate(SGF, loc, std::move(value));
 
@@ -1799,13 +1851,13 @@ namespace {
     }
 
     void set(SILGenFunction &SGF, SILLocation loc,
-             RValue &&value, ManagedValue base) && override {
+             ArgumentSource &&valueSource, ManagedValue base) && override {
       assert(base && "ownership component must not be root of lvalue path");
       auto &TL = SGF.getTypeLowering(base.getType());
 
-      SGF.emitSemanticStore(loc,
-                            std::move(value).forwardAsSingleValue(SGF, loc),
-                            base.getValue(), TL, IsNotInitialization);
+      auto value = std::move(valueSource).getAsSingleValue(SGF).forward(SGF);
+      SGF.emitSemanticStore(loc, value, base.getValue(), TL,
+                            IsNotInitialization);
     }
 
     std::unique_ptr<LogicalPathComponent>
@@ -2609,9 +2661,10 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                                 substFormalType, rvalueTL.getLoweredType())
       : Conversion::getOrigToSubst(origFormalType, substFormalType);
 
-  return emitConvertedRValue(loc, conversion, C, [&](SGFContext C) {
-    return emitLoad(loc, addr, getTypeLowering(addrRValueType),
-                    C, isTake, isGuaranteedValid);
+  return emitConvertedRValue(loc, conversion, C,
+      [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
+    return SGF.emitLoad(loc, addr, getTypeLowering(addrRValueType),
+                        C, isTake, isGuaranteedValid);
   });
 }
 
@@ -2819,19 +2872,6 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
     // SEMANTIC ARC TODO: Does this need a cleanup?
     return SGF.B.createCopyValue(loc, result);
   }
-
-#if 0
-  // NSString * must be bridged to String.
-  if (storageType.getSwiftRValueType() == SGF.SGM.Types.getNSStringType()) {
-    auto nsstr = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Copy);
-    auto str = SGF.emitBridgedToNativeValue(loc,
-                                ManagedValue::forUnmanaged(nsstr),
-                                storageType.getSwiftRValueType(),
-                                SGF.SGM.Types.getStringType(),
-                                );
-    return str.forward(SGF);
-  }
-#endif
 
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
 }
@@ -3052,6 +3092,22 @@ drillToLastComponent(SILGenFunction &SGF,
   return std::move(**(lv.end() - 1));
 }
 
+static ArgumentSource emitBaseValueForAccessor(SILGenFunction &SGF,
+                                               SILLocation loc, LValue &&lvalue,
+                                               CanType baseFormalType,
+                                               SILDeclRef accessor) {
+  auto decl = cast<FuncDecl>(accessor.getDecl());
+  auto finalAccessKind = getBaseAccessKindForAccessor(decl);
+
+  ManagedValue base;
+  PathComponent &&component =
+    drillToLastComponent(SGF, loc, std::move(lvalue), base, finalAccessKind);
+  base = drillIntoComponent(SGF, loc, std::move(component), base,
+                            finalAccessKind, TSanKind::None);
+
+  return SGF.prepareAccessorBaseArg(loc, base, baseFormalType, accessor);
+}
+
 RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
                                         SGFContext C, bool isGuaranteedValid) {
   // Any writebacks should be scoped to after the load.
@@ -3127,18 +3183,61 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
   return std::move(lv);
 }
 
+static bool trySetterPeephole(SILGenFunction &SGF, SILLocation loc,
+                              ArgumentSource &&src, LValue &&dest) {
+  // The last component must be a getter/setter.
+  // TODO: allow reabstraction here, too.
+  auto &component = **(dest.end() - 1);
+  if (component.getKind() != PathComponent::GetterSetterKind)
+    return false;
+
+  // We cannot apply the peephole if the l-value includes an
+  // open-existential component because we need to make sure that
+  // the opened archetype is available everywhere during emission.
+  // TODO: should we instead just immediately open the existential
+  // during emitLValue and simply leave the opened address in the LValue?
+  // Or is there some reasonable way to detect that this is happening
+  // and avoid affecting cases where it is not necessary?
+  for (auto &componentPtr : dest) {
+    if (componentPtr->isOpenExistential())
+      return false;
+  }
+
+  auto &setterComponent = static_cast<GetterSetterComponent&>(component);
+  setterComponent.emitAssignWithSetter(SGF, loc, std::move(dest),
+                                       std::move(src));
+  return true;;
+}
+
 void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
                                         LValue &&dest) {
+  emitAssignToLValue(loc, ArgumentSource(loc, std::move(src)), std::move(dest));
+}
+
+void SILGenFunction::emitAssignToLValue(SILLocation loc,
+                                        ArgumentSource &&src,
+                                        LValue &&dest) {
   FormalEvaluationScope scope(*this);
+
+  // If the last component is a getter/setter component, use a special
+  // generation pattern that allows us to peephole the emission of the RHS.
+  if (trySetterPeephole(*this, loc, std::move(src), std::move(dest)))
+    return;
+
+  // Otherwise, force the RHS now to preserve evaluation order.
+  auto srcLoc = src.getLocation();
+  RValue srcValue = std::move(src).getAsRValue(*this);
 
   // Peephole: instead of materializing and then assigning into a
   // translation component, untransform the value first.
   while (dest.isLastComponentTranslation()) {
-    src = std::move(dest.getLastTranslationComponent())
-                 .untranslate(*this, loc, std::move(src));
+    srcValue = std::move(dest.getLastTranslationComponent())
+                 .untranslate(*this, loc, std::move(srcValue));
     dest.dropLastTranslationComponent();
   }
-  
+
+  src = ArgumentSource(srcLoc, std::move(srcValue));
+
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
   ManagedValue destAddr;
@@ -3151,8 +3250,9 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
     auto finalDestAddr =
       std::move(component.asPhysical()).offset(*this, loc, destAddr,
                                                AccessKind::Write);
-    
-    std::move(src).assignInto(*this, loc, finalDestAddr.getValue());
+
+    auto value = std::move(src).getAsRValue(*this);
+    std::move(value).assignInto(*this, loc, finalDestAddr.getValue());
   } else {
     std::move(component.asLogical()).set(*this, loc, std::move(src), destAddr);
   }

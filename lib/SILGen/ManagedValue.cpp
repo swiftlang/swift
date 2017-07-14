@@ -126,6 +126,12 @@ void ManagedValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                         IsNotInitialization);
 }
 
+void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
+                               Initialization *dest) {
+  dest->copyOrInitValueInto(SGF, loc, *this, /*isInit*/ true);
+  dest->finishInitialization(SGF);
+}
+
 ManagedValue ManagedValue::borrow(SILGenFunction &SGF, SILLocation loc) const {
   assert(getValue() && "cannot borrow an invalid or in-context value");
   if (isLValue())

@@ -29,13 +29,16 @@ namespace Lowering {
 class Conversion {
 public:
   enum KindTy {
-    /// An implicit bridging conversion to a foreign type.
+    /// A bridging conversion to a foreign type.
     BridgeToObjC,
 
-    /// An implicit bridging conversion from a foreign type.
+    /// A bridging conversion to a foreign type following a force.
+    ForceAndBridgeToObjC,
+
+    /// A bridging conversion from a foreign type.
     BridgeFromObjC,
 
-    /// An implicit bridging conversion for a function result.
+    /// A bridging conversion for a function result.
     BridgeResultFromObjC,
 
     /// An erasure to Any (possibly wrapped in optional conversions).
@@ -73,6 +76,7 @@ private:
   static int getStorageIndexForKind(KindTy kind) {
     switch (kind) {
     case BridgeToObjC:
+    case ForceAndBridgeToObjC:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
@@ -155,21 +159,63 @@ public:
   ManagedValue emit(SILGenFunction &SGF, SILLocation loc,
                     ManagedValue source, SGFContext ctxt) const;
 
-  Optional<Conversion> tryPeepholeOptionalInjection() const;
+  /// Try to form a conversion that does an optional injection
+  /// or optional-to-optional conversion followed by this conversion.
+  Optional<Conversion>
+  adjustForInitialOptionalConversions(CanType newSourceType) const;
+
+  /// Try to form a conversion that does a force-value followed by
+  /// this conversion.
+  Optional<Conversion> adjustForInitialForceValue() const;
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(llvm::raw_ostream &out) const;
 };
 
-bool canPeepholeConversions(SILGenFunction &SGF,
-                            const Conversion &outerConversion,
-                            const Conversion &innerConversion);
+/// Information about how to peephole two conversions.
+///
+/// This is really the private state of SILGenConvert.
+class ConversionPeepholeHint {
+public:
+  enum Kind : uint8_t {
+    /// The value will be exactly the right type.
+    Identity,
+
+    /// The value needs to be bridged to AnyObject (possibly optionally).
+    BridgeToAnyObject,
+
+    /// The value just needs to undergo a subtype conversion.
+    Subtype
+  };
+
+private:
+  Kind TheKind;
+  bool Forced;
+
+public:
+  ConversionPeepholeHint(Kind kind, bool forced)
+    : TheKind(kind), Forced(forced) {
+  }
+
+  Kind getKind() const { return TheKind; }
+
+  /// Does the value need to be forced before the conversion?
+  /// This comes up with result conversions where the result was imported
+  /// as non-optional, as well as with implicitly unwrapped optionals.
+  bool isForced() const { return Forced; }
+};
+
+Optional<ConversionPeepholeHint>
+canPeepholeConversions(SILGenFunction &SGF,
+                       const Conversion &outerConversion,
+                       const Conversion &innerConversion);
 
 ManagedValue emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
                                       const Conversion &outerConversion,
                                       const Conversion &innerConversion,
+                                      ConversionPeepholeHint hint,
                                       SGFContext C,
-                   llvm::function_ref<ManagedValue(SGFContext)> produceValue);
+                                      ValueProducerRef produceValue);
 
 /// An initialization where we ultimately want to apply a conversion to
 /// the value before completing the initialization.
@@ -234,8 +280,7 @@ public:
   /// initialization.  The initialization will not yet be finished.
   bool tryPeephole(SILGenFunction &SGF, Expr *E, Conversion innerConversion);
   bool tryPeephole(SILGenFunction &SGF, SILLocation loc,
-                   Conversion innerConversion,
-                   llvm::function_ref<ManagedValue(SGFContext)> generate);
+                   Conversion innerConversion, ValueProducerRef producer);
   bool tryPeephole(SILGenFunction &SGF, SILLocation loc, ManagedValue value,
                    Conversion innerConversion);
 
@@ -246,6 +291,13 @@ public:
     Value = value;
     State = Initialized;
   }
+
+  /// Given that an emitter was able to adjust the conversion when
+  /// emitting into this initialization, continue emission into the
+  /// new conversion.
+  ManagedValue emitWithAdjustedConversion(SILGenFunction &SGF, SILLocation loc,
+                                          Conversion adjustedConversion,
+                                          ValueProducerRef producer);
 
   /// Given the unconverted result, i.e. the result of emitting a
   /// value formally of the unconverted type with this initialization

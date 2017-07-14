@@ -19,10 +19,10 @@ func test1() {
   // CHECK: [[CTOR:%.*]] = function_ref @_T010assignment1DC{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[T0:%.*]] = metatype $@thick D.Type
   // CHECK: [[D:%.*]] = apply [[CTOR]]([[T0]])
+  // CHECK: [[SETTER:%.*]] = class_method [[D]] : $D,  #D.child!setter.1
   // CHECK: [[CTOR:%.*]] = function_ref @_T010assignment1CC{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[T0:%.*]] = metatype $@thick C.Type
   // CHECK: [[C:%.*]] = apply [[CTOR]]([[T0]])
-  // CHECK: [[SETTER:%.*]] = class_method [[D]] : $D,  #D.child!setter.1
   // CHECK: apply [[SETTER]]([[C]], [[D]])
   D().child = C()
 }
