@@ -417,6 +417,20 @@ extension StringProtocol where Index == String.Index {
     return self._ephemeralString as NSString
   }
 
+  func _withCore<Result>(_ apply: (_StringCore) throws -> Result) rethrows -> Result {
+    return try apply(self._ephemeralString._core)
+  }
+
+  func _withReference<Result>(_ apply: (NSString) throws -> Result) rethrows -> Result {
+    return try _withCore { (core) throws -> Result in
+      if core.isASCII {
+        return try apply(NSString(bytesNoCopy: core.startASCII, length: core.count, encoding: String.Encoding.ascii.rawValue, freeWhenDone: false)!)
+      } else {
+        return try apply(NSString(charactersNoCopy: core.startUTF16, length: core.count, freeWhenDone: false))
+      }
+    }
+  }
+
   /// Return an `Index` corresponding to the given offset in our UTF-16
   /// representation.
   func _index(_ utf16Index: Int) -> Index {
@@ -479,7 +493,7 @@ extension StringProtocol where Index == String.Index {
   /// - Returns: `true` if the string can be encoded in `encoding` without loss
   ///   of information; otherwise, `false`.
   public func canBeConverted(to encoding: String.Encoding) -> Bool {
-    return _ns.canBeConverted(to: encoding.rawValue)
+    return _withReference { $0.canBeConverted(to: encoding.rawValue) }
   }
 
   // @property NSString* capitalizedString
@@ -530,7 +544,7 @@ extension StringProtocol where Index == String.Index {
   public func caseInsensitiveCompare<
     T : StringProtocol
   >(_ aString: T) -> ComparisonResult {
-    return _ns.caseInsensitiveCompare(aString._ephemeralString)
+    return _withReference { $0.caseInsensitiveCompare(aString._ephemeralString) }
   }
 
   //===--- Omitted by agreement during API review 5/20/2014 ---------------===//
@@ -549,7 +563,7 @@ extension StringProtocol where Index == String.Index {
   public func commonPrefix<
     T : StringProtocol
   >(with aString: T, options: String.CompareOptions = []) -> String {
-    return _ns.commonPrefix(with: aString._ephemeralString, options: options)
+    return _withReference { $0.commonPrefix(with: aString._ephemeralString, options: options) }
   }
 
   // - (NSComparisonResult)
@@ -715,13 +729,27 @@ extension StringProtocol where Index == String.Index {
 
   /// Returns a `Data` containing a representation of
   /// the `String` encoded using a given encoding.
-  public func data(
-    using encoding: String.Encoding,
-    allowLossyConversion: Bool = false
-  ) -> Data? {
-    return _ns.data(
-      using: encoding.rawValue,
-      allowLossyConversion: allowLossyConversion)
+  public func data(using encoding: String.Encoding, allowLossyConversion: Bool = false) -> Data? {
+    return _withCore { (core) -> Data? in
+      if core.isASCII {
+        switch encoding {
+        case .ascii: fallthrough
+        case .utf8: fallthrough
+        case .isoLatin1: fallthrough
+        case .nonLossyASCII: fallthrough
+        case .macOSRoman:
+          return Data(bytes: UnsafeRawPointer(core.startASCII), count: core.count)
+        default:
+          if !allowLossyConversion {
+            return NSString(bytesNoCopy: core.startASCII, length: core.count, encoding: String.Encoding.ascii.rawValue, freeWhenDone: false)?.data(using: encoding.rawValue)
+          }
+          break
+        }
+      } else if !allowLossyConversion {
+        return NSString(charactersNoCopy: core.startUTF16, length: core.count, freeWhenDone: false).data(using: encoding.rawValue)
+      }
+      return _withReference { $0.data(using: encoding.rawValue, allowLossyConversion: allowLossyConversion) }
+    }
   }
 
   // @property NSString* decomposedStringWithCanonicalMapping;
@@ -770,7 +798,7 @@ extension StringProtocol where Index == String.Index {
   /// The fastest encoding to which the string can be converted without loss
   /// of information.
   public var fastestEncoding: String.Encoding {
-    return String.Encoding(rawValue: _ns.fastestEncoding)
+    return _withReference { String.Encoding(rawValue: $0.fastestEncoding) }
   }
 
   // - (BOOL)
