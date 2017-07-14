@@ -41,11 +41,15 @@ SILParserState::SILParserState(SILModule *M)
 SILParserState::~SILParserState() = default;
 
 SILParserTUState::~SILParserTUState() {
-  if (!ForwardRefFns.empty())
-    for (auto Entry : ForwardRefFns)
-      if (Entry.second.second.isValid())
-        Diags->diagnose(Entry.second.second, diag::sil_use_of_undefined_value,
-                        Entry.first.str());
+  if (!ForwardRefFns.empty()) {
+    for (auto Entry : ForwardRefFns) {
+      if (Entry.second.second.isValid()) {
+        M.getASTContext().Diags.diagnose(Entry.second.second,
+                                         diag::sil_use_of_undefined_value,
+                                         Entry.first.str());
+      }
+    }
+  }
 
   // Turn any debug-info-only function declarations into zombies.
   for (auto *Fn : PotentialZombieFns)
@@ -516,7 +520,6 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
                                    IsNotTransparent, IsNotSerialized);
   Fn->setDebugScope(new (SILMod) SILDebugScope(loc, Fn));
   TUState.ForwardRefFns[Name] = { Fn, IgnoreFwdRef ? SourceLoc() : Loc };
-  TUState.Diags = &P.Diags;
   return Fn;
 }
 

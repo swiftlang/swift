@@ -44,8 +44,6 @@ namespace swift {
 
     /// Did we parse a sil_stage for this module?
     bool DidParseSILStage = false;
-
-    DiagnosticEngine *Diags = nullptr;
   };
 } // end namespace swift
 
