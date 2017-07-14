@@ -22,7 +22,7 @@
 #ifndef SWIFT_BASIC_EXTERNALUNION_H
 #define SWIFT_BASIC_EXTERNALUNION_H
 
-#include "llvm/Support/Compiler.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "swift/Basic/type_traits.h"
 #include <utility>
 #include <assert.h>
@@ -160,6 +160,26 @@ public:
     return reinterpret_cast<const T &>(Storage);
   }
 
+  /// Destruct the current union member.
+  template <class T>
+  void resetToEmptyWithoutIndex() {
+    constexpr int typeIndex = indexOf<T, Members...>::value;
+    static_assert(typeIndex != -1, "type not in union");
+
+    reinterpret_cast<T&>(Storage).T::~T();
+  }
+
+  /// Destroy the current union member.
+  template <class T>
+  void resetToEmpty(int oldIndex, int newIndex) {
+    constexpr int typeIndex = indexOf<T, Members...>::value;
+    static_assert(typeIndex != -1, "type not in union");
+    assert(oldIndex == typeIndex && "current kind is wrong for value");
+    assert(newIndex == -1 && "new kind is not in union");
+
+    reinterpret_cast<T&>(Storage).T::~T();
+  }
+
   /// Copy-construct the union from another union.
   void copyConstruct(int index, const BasicExternalUnion &other) {
     if (index != -1) {
@@ -252,6 +272,18 @@ public:
 #endif
   }
 
+  /// Destroy the current member of the union and switch to a member
+  /// that has no storage.
+  template <class T>
+  void resetToEmpty(Kind curKind, Kind newKind) {
+#ifndef NDEBUG
+    return Union.template resetToEmpty<T>(GetIndexForKind(curKind),
+                                          GetIndexForKind(newKind));
+#else
+    return Union.template resetToEmptyWithoutIndex<T>();
+#endif
+  }
+
   /// Return a reference to a union member, asserting that the current
   /// kind is right.
   template <class T>
@@ -299,7 +331,7 @@ public:
   /// Destroy the union from another union.
   void destruct(Kind kind) {
     Union.destruct(GetIndexForKind(kind));
-  }  
+  }
 };
 
 /// A helper class for defining special members.
