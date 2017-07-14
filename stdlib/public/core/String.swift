@@ -15,22 +15,24 @@ import SwiftShims
 /// A type that can represent a string as a collection of characters.
 public protocol StringProtocol
   : BidirectionalCollection,
-  CustomDebugStringConvertible,
-  CustomReflectable, CustomPlaygroundQuickLookable,
   TextOutputStream, TextOutputStreamable,
   LosslessStringConvertible, ExpressibleByStringLiteral,
   Hashable, Comparable
   where Iterator.Element == Character {
 
-  associatedtype UTF8Index
-  var utf8: String.UTF8View { get }
-  associatedtype UTF16Index
-  var utf16: String.UTF16View { get }
-  associatedtype UnicodeScalarIndex
-  var unicodeScalars: String.UnicodeScalarView { get }
-  /*associatedtype CharacterIndex*/
-  var characters: String.CharacterView { get }
+  associatedtype UTF8View : /*Bidirectional*/Collection
+  where UTF8View.Element == UInt8 // Unicode.UTF8.CodeUnit
+  
+  associatedtype UTF16View : BidirectionalCollection
+  where UTF16View.Element == UInt16 // Unicode.UTF16.CodeUnit
 
+  associatedtype UnicodeScalarView : BidirectionalCollection
+  where UnicodeScalarView.Element == Unicode.Scalar
+  
+  var utf8: UTF8View { get }
+  var utf16: UTF16View { get }
+  var unicodeScalars: UnicodeScalarView { get }
+  
 #if _runtime(_ObjC)
   func hasPrefix(_ prefix: String) -> Bool
   func hasSuffix(_ prefix: String) -> Bool
@@ -110,6 +112,18 @@ public protocol StringProtocol
   ) rethrows -> Result
 }
 
+extension StringProtocol {
+  //@available(swift, deprecated: 3.2, obsoleted: 4.0, message: "Please use the StringProtocol itself")
+  //public var characters: Self { return self }
+
+  @available(swift, deprecated: 3.2, obsoleted: 4.0, renamed: "UTF8View.Index")
+  public typealias UTF8Index = UTF8View.Index
+  @available(swift, deprecated: 3.2, obsoleted: 4.0, renamed: "UTF16View.Index")
+  public typealias UTF16Index = UTF16View.Index
+  @available(swift, deprecated: 3.2, obsoleted: 4.0, renamed: "UnicodeScalarView.Index")
+  public typealias UnicodeScalarIndex = UnicodeScalarView.Index
+}
+
 /// A protocol that provides fast access to a known representation of String.
 ///
 /// Can be used to specialize generic functions that would otherwise end up
@@ -129,7 +143,8 @@ extension _SwiftStringView {
 }
 
 extension StringProtocol {
-  internal var _ephemeralString : String {
+  public // Used in the Foundation overlay
+  var _ephemeralString : String {
     if _fastPath(self is _SwiftStringView) {
       return (self as! _SwiftStringView)._ephemeralContent
     }
