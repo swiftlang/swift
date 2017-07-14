@@ -742,7 +742,9 @@ public struct ${Self}<Element>
     set(rhs) {
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
-      if self[bounds]._buffer.identity != rhs._buffer.identity {
+      // If the replacement buffer has same identity, and the ranges match,
+      // then this was a pinned in-place modification, nothing further needed.
+      if self[bounds]._buffer.identity != rhs._buffer.identity || bounds != rhs.startIndex..<rhs.endIndex {
         self.replaceSubrange(bounds, with: rhs)
       }
     }
