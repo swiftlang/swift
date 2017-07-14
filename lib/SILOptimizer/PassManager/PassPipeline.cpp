@@ -86,8 +86,8 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
 
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
-  P.addOwnershipModelEliminator();
   P.addMarkUninitializedFixup();
+  P.addOwnershipModelEliminator();
   P.addDefiniteInitialization();
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
