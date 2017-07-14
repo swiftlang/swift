@@ -2184,7 +2184,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   case ValueKind::OpenExistentialBoxInst:
   case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::OpenExistentialRefInst:
-  case ValueKind::OpenExistentialOpaqueInst: {
+  case ValueKind::OpenExistentialValueInst: {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
@@ -2230,8 +2230,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     case ValueKind::OpenExistentialBoxInst:
       ResultVal = B.createOpenExistentialBox(InstLoc, Val, Ty);
       break;
-    case ValueKind::OpenExistentialOpaqueInst:
-      ResultVal = B.createOpenExistentialOpaque(InstLoc, Val, Ty);
+    case ValueKind::OpenExistentialValueInst:
+      ResultVal = B.createOpenExistentialValue(InstLoc, Val, Ty);
       break;
 
     default:
@@ -4253,10 +4253,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     ResultVal = B.createDeinitExistentialAddr(InstLoc, Val);
     break;
   }
-  case ValueKind::DeinitExistentialOpaqueInst: {
+  case ValueKind::DeinitExistentialValueInst: {
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createDeinitExistentialOpaque(InstLoc, Val);
+    ResultVal = B.createDeinitExistentialValue(InstLoc, Val);
     break;
   }
   case ValueKind::InitExistentialAddrInst: {
@@ -4287,7 +4287,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
                                         conformances);
     break;
   }
-  case ValueKind::InitExistentialOpaqueInst: {
+  case ValueKind::InitExistentialValueInst: {
     CanType FormalConcreteTy;
     SILType ExistentialTy;
     SourceLoc TyLoc;
@@ -4304,7 +4304,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         collectExistentialConformances(P, FormalConcreteTy, TyLoc,
                                        ExistentialTy.getSwiftRValueType());
 
-    ResultVal = B.createInitExistentialOpaque(
+    ResultVal = B.createInitExistentialValue(
         InstLoc, ExistentialTy, FormalConcreteTy, Val, conformances);
     break;
   }

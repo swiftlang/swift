@@ -745,7 +745,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // opaque values mode: This is a case of an opaque value that we can
       // "treat" as a by-value one
       ManagedValue sub = F(SGFContext());
-      SILValue v = B.createInitExistentialOpaque(
+      SILValue v = B.createInitExistentialValue(
           loc, existentialTL.getLoweredType(), concreteFormalType,
           sub.getValue(), conformances);
       return ManagedValue(v, sub.getCleanup());
@@ -860,7 +860,7 @@ SILGenFunction::emitOpenExistential(
           B.createOpenExistentialAddr(loc, existentialValue.forward(*this),
                                       loweredOpenedType, allowedAccess);
     } else {
-      archetypeValue = B.createOpenExistentialOpaque(
+      archetypeValue = B.createOpenExistentialValue(
           loc, existentialValue.forward(*this), loweredOpenedType);
     }
 

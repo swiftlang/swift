@@ -4700,11 +4700,11 @@ public:
 /// Given an opaque value referring to an existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
-class OpenExistentialOpaqueInst
-    : public UnaryInstructionBase<ValueKind::OpenExistentialOpaqueInst> {
+class OpenExistentialValueInst
+    : public UnaryInstructionBase<ValueKind::OpenExistentialValueInst> {
   friend SILBuilder;
 
-  OpenExistentialOpaqueInst(SILDebugLocation DebugLoc, SILValue Operand,
+  OpenExistentialValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                             SILType SelfTy);
 };
 
@@ -4794,16 +4794,16 @@ public:
 /// initializes its existential container to contain a concrete
 /// value of the given type, and returns the uninitialized
 /// concrete value inside the existential container.
-class InitExistentialOpaqueInst final
+class InitExistentialValueInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
-          ValueKind::InitExistentialOpaqueInst, InitExistentialOpaqueInst,
+          ValueKind::InitExistentialValueInst, InitExistentialValueInst,
           SILInstruction, true> {
   friend SILBuilder;
 
   CanType ConcreteType;
   ArrayRef<ProtocolConformanceRef> Conformances;
 
-  InitExistentialOpaqueInst(SILDebugLocation DebugLoc, SILType ExistentialType,
+  InitExistentialValueInst(SILDebugLocation DebugLoc, SILType ExistentialType,
                             CanType FormalConcreteType, SILValue Instance,
                             ArrayRef<SILValue> TypeDependentOperands,
                             ArrayRef<ProtocolConformanceRef> Conformances)
@@ -4811,7 +4811,7 @@ class InitExistentialOpaqueInst final
             DebugLoc, Instance, TypeDependentOperands, ExistentialType),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
-  static InitExistentialOpaqueInst *
+  static InitExistentialValueInst *
   create(SILDebugLocation DebugLoc, SILType ExistentialType,
          CanType ConcreteType, SILValue Instance,
          ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent,
@@ -4928,12 +4928,12 @@ class DeinitExistentialAddrInst
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 
-class DeinitExistentialOpaqueInst
-    : public UnaryInstructionBase<ValueKind::DeinitExistentialOpaqueInst,
+class DeinitExistentialValueInst
+    : public UnaryInstructionBase<ValueKind::DeinitExistentialValueInst,
                                   SILInstruction, /*HAS_RESULT*/ false> {
   friend SILBuilder;
 
-  DeinitExistentialOpaqueInst(SILDebugLocation DebugLoc, SILValue Existential)
+  DeinitExistentialValueInst(SILDebugLocation DebugLoc, SILValue Existential)
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 

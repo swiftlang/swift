@@ -1292,7 +1292,7 @@ namespace {
         if (gen.silConv.useLoweredAddresses()) {
           gen.B.createDeinitExistentialAddr(l, existentialAddr);
         } else {
-          gen.B.createDeinitExistentialOpaque(l, existentialAddr);
+          gen.B.createDeinitExistentialValue(l, existentialAddr);
         }
         break;
       case ExistentialRepresentation::Boxed:

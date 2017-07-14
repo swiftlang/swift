@@ -501,10 +501,10 @@ bool OpaqueStorageAllocation::canProjectFrom(SILInstruction *innerVal,
     return false;
   case ValueKind::EnumInst:
     break;
-  case ValueKind::InitExistentialOpaqueInst: {
+  case ValueKind::InitExistentialValueInst: {
     // Ensure that all opened archetypes are available at the inner value's
     // definition.
-    auto *initExistential = cast<InitExistentialOpaqueInst>(composingUse);
+    auto *initExistential = cast<InitExistentialValueInst>(composingUse);
     for (Operand &operand : initExistential->getTypeDependentOperands()) {
       if (!pass.domInfo->properlyDominates(operand.get(), innerVal))
         return false;
@@ -663,15 +663,15 @@ SILValue AddressMaterialization::materializeProjection(Operand *operand) {
                                     enumInst->getElement(),
                                     operand->get()->getType().getAddressType());
   }
-  case ValueKind::InitExistentialOpaqueInst: {
-    auto *initExistentialOpaque = cast<InitExistentialOpaqueInst>(user);
-    SILValue containerAddr = materializeAddress(initExistentialOpaque);
-    auto canTy = initExistentialOpaque->getFormalConcreteType();
+  case ValueKind::InitExistentialValueInst: {
+    auto *initExistentialValue = cast<InitExistentialValueInst>(user);
+    SILValue containerAddr = materializeAddress(initExistentialValue);
+    auto canTy = initExistentialValue->getFormalConcreteType();
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     auto &concreteTL = pass.F->getModule().Types.getTypeLowering(opaque, canTy);
     return B.createInitExistentialAddr(
-        initExistentialOpaque->getLoc(), containerAddr, canTy,
-        concreteTL.getLoweredType(), initExistentialOpaque->getConformances());
+        initExistentialValue->getLoc(), containerAddr, canTy,
+        concreteTL.getLoweredType(), initExistentialValue->getConformances());
   }
   case ValueKind::ReturnInst: {
     assert(pass.loweredFnConv.hasIndirectSILResults());
@@ -1215,10 +1215,10 @@ protected:
   // loadable operands.
   void visitEnumInst(EnumInst *enumInst) {}
 
-  // Handle InitExistentialOpaque on the def side to handle both opaque and
+  // Handle InitExistentialValue on the def side to handle both opaque and
   // loadable operands.
   void
-  visitInitExistentialOpaqueInst(InitExistentialOpaqueInst *initExistential) {}
+  visitInitExistentialValueInst(InitExistentialValueInst *initExistential) {}
 
   void visitReturnInst(ReturnInst *returnInst) {
     // Returns are rewritten for any function with indirect results after opaque
@@ -1340,11 +1340,11 @@ protected:
     storage->markRewritten();
   }
 
-  void visitInitExistentialOpaqueInst(
-      InitExistentialOpaqueInst *initExistentialOpaque) {
+  void visitInitExistentialValueInst(
+      InitExistentialValueInst *initExistentialValue) {
 
     // Initialize memory for the operand which may be opaque or loadable.
-    addrMat.initializeOperandMem(&initExistentialOpaque->getOperandRef());
+    addrMat.initializeOperandMem(&initExistentialValue->getOperandRef());
 
     assert(storage->storageAddress);
     storage->markRewritten();

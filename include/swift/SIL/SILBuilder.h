@@ -1188,10 +1188,10 @@ public:
     return I;
   }
 
-  OpenExistentialOpaqueInst *createOpenExistentialOpaque(SILLocation Loc,
+  OpenExistentialValueInst *createOpenExistentialValue(SILLocation Loc,
                                                          SILValue Operand,
                                                          SILType SelfTy) {
-    auto *I = insert(new (F.getModule()) OpenExistentialOpaqueInst(
+    auto *I = insert(new (F.getModule()) OpenExistentialValueInst(
         getSILDebugLocation(Loc), Operand, SelfTy));
     if (OpenedArchetypesTracker)
       OpenedArchetypesTracker->registerOpenedArchetypes(I);
@@ -1236,11 +1236,11 @@ public:
         LoweredConcreteType, Conformances, &F, OpenedArchetypes));
   }
 
-  InitExistentialOpaqueInst *
-  createInitExistentialOpaque(SILLocation Loc, SILType ExistentialType,
+  InitExistentialValueInst *
+  createInitExistentialValue(SILLocation Loc, SILType ExistentialType,
                               CanType FormalConcreteType, SILValue Concrete,
                               ArrayRef<ProtocolConformanceRef> Conformances) {
-    return insert(InitExistentialOpaqueInst::create(
+    return insert(InitExistentialValueInst::create(
         getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
         Conformances, &F, OpenedArchetypes));
   }
@@ -1269,9 +1269,9 @@ public:
         getSILDebugLocation(Loc), Existential));
   }
 
-  DeinitExistentialOpaqueInst *
-  createDeinitExistentialOpaque(SILLocation Loc, SILValue Existential) {
-    return insert(new (F.getModule()) DeinitExistentialOpaqueInst(
+  DeinitExistentialValueInst *
+  createDeinitExistentialValue(SILLocation Loc, SILValue Existential) {
+    return insert(new (F.getModule()) DeinitExistentialValueInst(
         getSILDebugLocation(Loc), Existential));
   }
 

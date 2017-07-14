@@ -1586,8 +1586,8 @@ SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitOpenExistentialOpaqueInst(
-    OpenExistentialOpaqueInst *Inst) {
+void SILCloner<ImplClass>::visitOpenExistentialValueInst(
+    OpenExistentialValueInst *Inst) {
   // Create a new archetype for this opened existential type.
   auto archetypeTy =
       Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
@@ -1596,7 +1596,7 @@ void SILCloner<ImplClass>::visitOpenExistentialOpaqueInst(
       ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createOpenExistentialOpaque(
+  doPostProcess(Inst, getBuilder().createOpenExistentialValue(
                           getOpLocation(Inst->getLoc()),
                           getOpValue(Inst->getOperand()),
                           getOpType(Inst->getType())));
@@ -1689,8 +1689,8 @@ SILCloner<ImplClass>::visitInitExistentialAddrInst(InitExistentialAddrInst *Inst
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitInitExistentialOpaqueInst(
-    InitExistentialOpaqueInst *Inst) {
+void SILCloner<ImplClass>::visitInitExistentialValueInst(
+    InitExistentialValueInst *Inst) {
   CanType origFormalType = Inst->getFormalConcreteType();
 
   auto conformances = getOpConformances(origFormalType,
@@ -1698,7 +1698,7 @@ void SILCloner<ImplClass>::visitInitExistentialOpaqueInst(
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
-                getBuilder().createInitExistentialOpaque(
+                getBuilder().createInitExistentialValue(
                     getOpLocation(Inst->getLoc()), getOpType(Inst->getType()),
                     getOpASTType(origFormalType),
                     getOpValue(Inst->getOperand()), conformances));
@@ -1747,11 +1747,11 @@ SILCloner<ImplClass>::visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitDeinitExistentialOpaqueInst(
-    DeinitExistentialOpaqueInst *Inst) {
+void SILCloner<ImplClass>::visitDeinitExistentialValueInst(
+    DeinitExistentialValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(
-      Inst, getBuilder().createDeinitExistentialOpaque(
+      Inst, getBuilder().createDeinitExistentialValue(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 

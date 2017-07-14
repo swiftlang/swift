@@ -2455,19 +2455,19 @@ public:
         "SILFunction");
   }
 
-  void checkOpenExistentialOpaqueInst(OpenExistentialOpaqueInst *OEI) {
+  void checkOpenExistentialValueInst(OpenExistentialValueInst *OEI) {
     SILType operandType = OEI->getOperand()->getType();
     require(!operandType.isAddress(),
-            "open_existential_opaque must not be applied to address");
+            "open_existential_value must not be applied to address");
     require(operandType.canUseExistentialRepresentation(
                 F.getModule(), ExistentialRepresentation::Opaque),
-            "open_existential_opaque must be applied to opaque existential");
+            "open_existential_value must be applied to opaque existential");
 
     require(!OEI->getType().isAddress(),
-            "open_existential_opaque result must not be an address");
+            "open_existential_value result must not be an address");
 
     auto archetype = getOpenedArchetypeOf(OEI->getType().getSwiftRValueType());
-    require(archetype, "open_existential_opaque result must be an opened "
+    require(archetype, "open_existential_value result must be an opened "
                        "existential archetype");
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
             "Archetype opened by open_existential should be registered in "
@@ -2523,12 +2523,12 @@ public:
     verifyOpenedArchetype(AEI, AEI->getFormalConcreteType());
   }
 
-  void checkInitExistentialOpaqueInst(InitExistentialOpaqueInst *IEI) {
+  void checkInitExistentialValueInst(InitExistentialValueInst *IEI) {
     SILType concreteType = IEI->getOperand()->getType();
     require(!concreteType.isAddress(),
-            "init_existential_opaque must not be used on addresses");
+            "init_existential_value must not be used on addresses");
     require(!IEI->getType().isAddress(),
-            "init_existential_opaque result must not be an address");
+            "init_existential_value result must not be an address");
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
     auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
@@ -2536,12 +2536,12 @@ public:
         Lowering::AbstractionPattern(archetype), IEI->getFormalConcreteType());
     requireSameType(
         concreteType, loweredTy,
-        "init_existential_opaque operand must be lowered to the right "
+        "init_existential_value operand must be lowered to the right "
         "abstraction level for the existential");
 
     require(isLoweringOf(IEI->getOperand()->getType(),
                          IEI->getFormalConcreteType()),
-            "init_existential_opaque operand must be a lowering of the formal "
+            "init_existential_value operand must be a lowering of the formal "
             "concrete type");
 
     checkExistentialProtocolConformances(exType,
@@ -2591,14 +2591,14 @@ public:
             "deinit_existential_addr must be applied to an opaque existential");
   }
 
-  void checkDeinitExistentialOpaqueInst(DeinitExistentialOpaqueInst *DEI) {
+  void checkDeinitExistentialValueInst(DeinitExistentialValueInst *DEI) {
     SILType exType = DEI->getOperand()->getType();
     require(!exType.isAddress(),
-            "deinit_existential_opaque must not be applied to an address");
+            "deinit_existential_value must not be applied to an address");
     require(
         exType.canUseExistentialRepresentation(
             F.getModule(), ExistentialRepresentation::Opaque),
-        "deinit_existential_opaque must be applied to an opaque existential");
+        "deinit_existential_value must be applied to an opaque existential");
   }
   
   void checkDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEBI) {

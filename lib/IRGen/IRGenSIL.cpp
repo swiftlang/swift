@@ -932,13 +932,13 @@ public:
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
-  void visitOpenExistentialOpaqueInst(OpenExistentialOpaqueInst *i);
+  void visitOpenExistentialValueInst(OpenExistentialValueInst *i);
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
-  void visitInitExistentialOpaqueInst(InitExistentialOpaqueInst *i);
+  void visitInitExistentialValueInst(InitExistentialValueInst *i);
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
-  void visitDeinitExistentialOpaqueInst(DeinitExistentialOpaqueInst *i);
+  void visitDeinitExistentialValueInst(DeinitExistentialValueInst *i);
 
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *i);
   void visitOpenExistentialBoxInst(OpenExistentialBoxInst *i);
@@ -4768,8 +4768,8 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
                            *this, destType, srcType, container, genericEnv));
 }
 
-void IRGenSILFunction::visitInitExistentialOpaqueInst(
-    swift::InitExistentialOpaqueInst *i) {
+void IRGenSILFunction::visitInitExistentialValueInst(
+    swift::InitExistentialValueInst *i) {
   llvm_unreachable("unsupported instruction during IRGen");
 }
 
@@ -4806,8 +4806,8 @@ void IRGenSILFunction::visitDeinitExistentialAddrInst(
                                              container);
 }
 
-void IRGenSILFunction::visitDeinitExistentialOpaqueInst(
-    swift::DeinitExistentialOpaqueInst *i) {
+void IRGenSILFunction::visitDeinitExistentialValueInst(
+    swift::DeinitExistentialValueInst *i) {
   llvm_unreachable("unsupported instruction during IRGen");
 }
 
@@ -4854,8 +4854,8 @@ void IRGenSILFunction::visitOpenExistentialMetatypeInst(
   setLoweredExplosion(i, result);
 }
 
-void IRGenSILFunction::visitOpenExistentialOpaqueInst(
-    OpenExistentialOpaqueInst *i) {
+void IRGenSILFunction::visitOpenExistentialValueInst(
+    OpenExistentialValueInst *i) {
   llvm_unreachable("unsupported instruction during IRGen");
 }
 
