@@ -466,6 +466,28 @@ extension GenericSubscriptProtocol {
 
 struct GenericSubscriptDefaultWitness : GenericSubscriptProtocol { }
 
+// Make sure we correctly infer the 'T : Magic' requirement on all the accessors
+// of the subscript.
+
+struct GenericTypeWithRequirement<T : Magic> {}
+
+protocol InferredRequirementOnSubscriptProtocol {
+  subscript<T>(i: Int) -> GenericTypeWithRequirement<T> { get set }
+}
+
+struct InferredRequirementOnSubscript : InferredRequirementOnSubscriptProtocol {
+  subscript<T>(i: Int) -> GenericTypeWithRequirement<T> {
+    get { }
+    set { }
+  }
+}
+
+// CHECK-LABEL: sil hidden @_T017materializeForSet30InferredRequirementOnSubscriptV9subscriptAA015GenericTypeWithE0VyxGSicAA5MagicRzlufg : $@convention(method) <T where T : Magic> (Int, InferredRequirementOnSubscript) -> GenericTypeWithRequirement<T>
+
+// CHECK-LABEL: sil hidden @_T017materializeForSet30InferredRequirementOnSubscriptV9subscriptAA015GenericTypeWithE0VyxGSicAA5MagicRzlufs : $@convention(method) <T where T : Magic> (GenericTypeWithRequirement<T>, Int, @inout InferredRequirementOnSubscript) -> ()
+
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet30InferredRequirementOnSubscriptV9subscriptAA015GenericTypeWithE0VyxGSicAA5MagicRzlufm : $@convention(method) <T where T : Magic> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @inout InferredRequirementOnSubscript) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+
 // Test for materializeForSet vs static properties of structs.
 
 protocol Beverage {
