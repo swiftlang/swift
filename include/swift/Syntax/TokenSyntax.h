@@ -29,7 +29,7 @@ namespace syntax {
 
 class TokenSyntax final : public Syntax {
 protected:
-  virtual void validate() const override {
+  void validate() const {
     assert(getRaw()->isToken());
   }
 public:

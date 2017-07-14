@@ -1,0 +1,70 @@
+%{
+  from gyb_syntax_support import *
+  from gyb_syntax_support.kinds import SYNTAX_BASE_KINDS
+  grouped_nodes = { kind: [] for kind in SYNTAX_BASE_KINDS }
+  for node in SYNTAX_NODES:
+    grouped_nodes[node.base_kind].append(node)
+  print(grouped_nodes)
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From SyntaxKind.h.gyb.
+//// Do Not Edit Directly!
+//===--------------- SyntaxKind.h - Syntax Kind definitions ---------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_SYNTAX_KIND_H
+#define SWIFT_SYNTAX_KIND_H
+
+#include "swift/Basic/JSONSerialization.h"
+
+namespace swift {
+namespace syntax {
+
+enum class SyntaxKind {
+  Token,
+  Unknown,
+% for name, nodes in grouped_nodes.items():
+%   for node in nodes:
+  ${node.syntax_kind},
+%   end
+%   if name not in ["Syntax", "SyntaxCollection"]:
+%     first_kind = nodes[0].syntax_kind
+%     last_kind = nodes[-1].syntax_kind
+  First_${name} = ${first_kind},
+  Last_${name} = ${last_kind},
+%   end
+% end
+};
+
+void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind);
+
+} // end namespace syntax
+
+namespace json {
+
+/// Serialization traits for SyntaxKind.
+template <>
+struct ScalarEnumerationTraits<syntax::SyntaxKind> {
+  static void enumeration(Output &out, syntax::SyntaxKind &value) {
+    out.enumCase(value, "Token", syntax::SyntaxKind::Token);
+    out.enumCase(value, "Unknown", syntax::SyntaxKind::Unknown);
+% for node in SYNTAX_NODES:
+    out.enumCase(value, "${node.syntax_kind}", syntax::SyntaxKind::${node.syntax_kind});
+% end
+  }
+};
+
+} // end namespace json
+} // end namespace swift
+
+#endif // SWIFT_SYNTAX_KIND_H

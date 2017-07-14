@@ -176,10 +176,10 @@ StructDeclSyntaxBuilder Builder;
 Builder.useStructKeyword(StructKeyword);
 
 // Hm, we didn't see an identifier, but saw a left brace. Let's keep going.
-Builder.useLeftBraceToken(ParsedLeftBrace)
+Builder.useLeftBrace(ParsedLeftBrace)
 
 // No members of the struct; we saw a right brace.
-Builder.useRightBraceToken(ParsedRightBrace);
+Builder.useRightBrace(ParsedRightBrace);
 ```
 
 Let's see what we have so far.
@@ -196,7 +196,7 @@ struct {}
 Whoops! You forgot an identifier. Let's add one here for fun.
 
 ```c++
-auto MyStructID = SyntaxFactory::createIdentifier("MyStruct", {}, Trivia::spaces(1));
+auto MyStructID = SyntaxFactory::makeIdentifier("MyStruct", {}, Trivia::spaces(1));
 Builder.useIdentifier(MyStructID);
 
 auto StructWithIdentifier = Builder.build();
@@ -243,7 +243,7 @@ grammar. Aside from the token kind and the text, they have two very important
 pieces of information for full-fidelity source: leading and trailing source
 *trivia* surrounding the token.
 
-#### TokenSyntax summary
+#### RawTokenSyntax summary
 
 - `RawTokenSyntax` are `RawSyntax` and represent the terminals in the Swift
   grammar.
@@ -419,35 +419,36 @@ code:
 ```c++
 auto LeftBrace = SyntaxFactory::makeLeftBraceToken({}, Trivia::spaces(1));
 
-auto IntegerTok = SyntaxFactory::makeIntegerLiteralToken("1", {}, Trivia::spaces(1));
+auto IntegerTok = SyntaxFactory::makeIntegerLiteral("1", {}, Trivia::spaces(1));
 auto Integer = SyntaxFactory::makeIntegerLiteralExpr(IntegerTok);
 
 auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
 
 // This ReturnStmtSyntax is floating, with no root.
-auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer);
+auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer, 
+                                            /*Semicolon=*/ None);
 
 auto RightBrace = SyntaxFactory::makeLeftBraceToken({}, {});
 
 auto Statements = SyntaxFactory::makeBlankStmtList()
-  .addExpr(Return);
+  .addStmt(Return);
 
 auto Block = SyntaxFactory::makeBlankCodeBlockStmt()
   // Takes a reference of the token directly and increments the
   // reference count.
-  .withLeftBraceToken(LeftBrace)
+  .withLeftBrace(LeftBrace)
 
   // Only takes a strong reference to the RawSyntax of the
   // ReturnStmtSyntax above.
-  .withStatements(Statements)
+  .withStatementList(Statements)
 
   // Takes a reference of the token directly and increments the
   // reference count.
-  .withRightBraceToken(RightBrace);
+  .withRightBrace(RightBrace);
 
 // Returns a new ReturnStmtSyntax with the root set to the Block
 // above, and the parent set to the StmtListSyntax.
-auto MyReturn = Block.getStatement(0).castTo<ReturnStmt>();
+auto MyReturn = Block.getChild(0);
 ```
 
 Here's what the corresponding object diagram would look like starting with
@@ -473,6 +474,59 @@ A couple of interesting points and reminders:
 - Clients only work with `Syntax` (blue) nodes and `Trivia` (gray), and should
   never see `SyntaxData` (red) or `RawSyntax` (green) nodes.
 
+## API Generation
+
+The libSyntax APIs are generated automatically from a set of description files
+written in Python. These files are located in `utils/gyb_syntax_support/`, and
+all follow the same schema.
+
+### Class Schema
+
+#### Nodes
+
+A `Node` represents a production in the Swift grammar that has zero or more
+children. Each file contains a top-level array containing each node. The `Node`
+class has the following fields:
+
+| Key | Type | Description |
+| --- | ---- | ----------- |
+| `kind` | `String` | The "base class" for this node. Must be one of `["Syntax", "SyntaxCollection", "Expr", "Stmt", "Decl", "Pattern", "Type"]`. |
+| `element` | `String?` | If the node is a `SyntaxCollection`, then this is the `SyntaxKind` of the element of this collection. If this is not a `SyntaxCollection`, then this value is ignored. |
+| `element_name` | `String?` | If the node is a `SyntaxCollection`, then this is a different name for the element that you wish to appear in the generated API. Some nodes cannot find a good upper-bound for the element, and so must defer to `Syntax` -- those nodes use this field to populate a better name for `add${element_name}` APIs.
+| `children` | `[[String: Child]]?` | The children of this node.
+
+#### Children
+
+A `Child` represents a child of a given `Node` object. A `Child` has the
+following fields:
+
+| Key | Type | Description |
+| --- | ---- | ----------- |
+| `kind` | `String` | The `SyntaxKind` of this child. This must have a corresponding `Node` with that kind. |
+| `is_optional` | `Bool?` | Whether this child is required in a fully-formed object, or if it is allowed to remain `missing`. Defaults to `false` if not present.
+| `token_choices` | `[String]?` | A list of `Token`s which are considered "valid" values for `Token` children. |
+| `text_choices` | `[String]?` | A list of valid textual values for tokens. If this is not provided, any textual value is accepted for tokens like `IdentifierToken`. |
+
+#### Tokens
+
+A `Token` represents one of the `tok::` enums in
+`include/Syntax/TokenKinds.def`. `Token.py` has a top-level array of token
+declarations. The `Token` class has the following fields.
+
+| Key | Type | Description |f
+| --- | ---- | ----------- |
+| `kind` | `String` | The name of the token in the C++ `tok::` namespace. This is what we use to map these nodes to C++ tokens. |
+| `text` | `String?` | If the text of this node is fixed, then this field contains that text. For example, `Struct` has text `"struct"` and kind `"kw_struct"`. |
+| `is_keyword` | `Bool?` | Whether this node is a keyword. Defaults to `false` if not present. |
+
+### C++ File Generation
+
+libSyntax uses Swift's `gyb` tool to generate the `Syntax` subclasses,
+`SyntaxFactory` methods, `SyntaxKind` enum entry, and `SyntaxBuilder` class.
+These files rely on a support library located at `utils/gyb_syntax_support.py`
+which holds some common logic used inside the `gyb` files. These `gyb` files
+will be re-generated whenever any Python files are changed.
+
 ## Adding new Syntax Nodes
 
 Here's a handy checklist when implementing a production in the grammar.
@@ -483,49 +537,20 @@ Here's a handy checklist when implementing a production in the grammar.
   [file a Swift bug][NewSwiftBug], noting which grammar productions
   are affected.
   - **Add the `Syntax` bug label!**
-- Add a *kind* to include/swift/Syntax/SyntaxKinds.def
-- Create the `${KIND}Syntax` class.  
-  Be sure to implement the following:
-  - Define the `Cursor` enum for the syntax node. This specifies all of the
-    terms of the production, including optional terms. For example, a same-type
-    generic requirement is:  
-    `same-type-requirement -> type-identifier '==' type`
-
-    That's three terms in the production, and you can see this reflected in the
-    `SameTypeRequirementSyntax` class:
-
-    ```c++
-    enum Cursor : CursorIndex {
-      LeftTypeIdentifier,
-      EqualityToken,
-      RightType,
-    };
-    ```
-  - With APIs for all layout elements (e.g. `withLeftTypeIdentifier(...)`)
-    - Add C++ unit tests.
-      - Check that the resulting `Syntax` node has identical content except for
-        what you changed. `print` the new node and check the text.
-      - Check that the new node has a different parent.
-  - Getters for all layout elements (e.g. `getLeftTypeIdentifier()`)
-    - Add a C++ unit test.
-      - After `get`ing the child, verify:
-        - The child's parent and root are correct
-        - The child's content is correct
-        - The child `print`s the expected text.
-- Implement static Make APIs in `SyntaxFactory`
-  - `make${KIND}Syntax(... all elements ...)`
-    - Add a C++ unit test.
-      - Supply various inputs, some missing, some not.
-      - Supply incorrect token kinds for elements that are `RC<TokenSyntax>`.
-        Check that the asserts are as expected.
-  - `makeBlank${KIND}Syntax()`
-    - Add a C++ unit test.
-- If applicable, create a `${KIND}SyntaxBuilder`.
-  - `use____(...)` methods for each layout element - takes a `${KIND}Syntax` for
-    that child type.
-  - `${KIND}Syntax build() const`
-    - Add a C++ unit test.
-      - `build()` at all stages of building, followed by `print()`.
+- Create the `${KIND}` entry in the appropriate Python file (Expr, Stmt, 
+  Pattern, etc.).
+  - Add C++ unit tests for `with` APIs for all layout elements
+      (e.g. `withLeftTypeIdentifier(...)`).
+    - Check that the resulting `Syntax` node has identical content except for
+      what you changed. `print` the new node and check the text.
+  - Add a C++ unit test for the getters for all layout elements
+    (e.g. `getLeftTypeIdentifier()`)
+    - After `get`ing the child, verify:
+      - The child's parent and root are correct
+      - The child's content is correct
+      - The child `print`s the expected text
+  - Add a C++ unit test for the `Builder` of that node.
+  - Add a C++ unit test for the `SyntaxFactory::make` APIs for that node.
 - Add a round-trip test for the grammar production
   - Create a .swift file in test/Syntax with all possible configurations of the
     piece of syntax, with two `RUN` lines:
