@@ -2435,6 +2435,23 @@ static bool isVisibleClangEntry(clang::ASTContext &ctx,
 TypeDecl *
 ClangModuleUnit::lookupNestedType(Identifier name,
                                   const NominalTypeDecl *baseType) const {
+  // Special case for error code enums: try looking directly into the struct
+  // first. But only if it looks like a synthesized error wrapped struct.
+  if (name == getASTContext().Id_Code && !baseType->hasClangNode() &&
+      isa<StructDecl>(baseType) && !baseType->hasLazyMembers() &&
+      baseType->isChildContextOf(this)) {
+    auto *mutableBase = const_cast<NominalTypeDecl *>(baseType);
+    auto codeEnum = mutableBase->lookupDirect(name,/*ignoreNewExtensions*/true);
+    // Double-check that we actually have a good result. It's possible what we
+    // found is /not/ a synthesized error struct, but just something that looks
+    // like it. But if we still found a good result we should return that.
+    if (codeEnum.size() == 1 && isa<TypeDecl>(codeEnum.front()))
+      return cast<TypeDecl>(codeEnum.front());
+    if (codeEnum.size() > 1)
+      return nullptr;
+    // Otherwise, fall back and try via lookup table.
+  }
+
   auto lookupTable = owner.findLookupTable(clangModule);
   if (!lookupTable)
     return nullptr;
@@ -2491,9 +2508,13 @@ ClangModuleUnit::lookupNestedType(Identifier name,
     });
   }
 
-  if (results.size() == 1)
-    return results.front();
-  return nullptr;
+  if (results.size() != 1) {
+    // It's possible that two types were import-as-member'd onto the same base
+    // type with the same name. In this case, fall back to regular lookup.
+    return nullptr;
+  }
+
+  return results.front();
 }
 
 void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
