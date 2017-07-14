@@ -115,7 +115,7 @@ DECL_NODES = [
              Child('AccessLevelModifier', kind='AccessLevelModifier',
                    is_optional=True),
              Child('StructKeyword', kind='StructToken'),
-             Child('Name', kind='IdentifierToken'),
+             Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -125,6 +125,23 @@ DECL_NODES = [
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Members', kind='StructMembers'),
              Child('RightBrace', kind='RightBraceToken'),
+         ]),
+    
+    # decl-list = decl decl-list?
+    Node('DeclList', kind='SyntaxCollection',
+         element='Decl'),
+
+    # source-file = decl-list eof
+    Node('SourceFile', kind='Syntax',
+         children=[
+             Child('TopLevelDecls', kind='DeclList'),
+             Child('EOFToken', kind='EOFToken')
+         ]),
+
+    # top-level-code-decl = stmt-list
+    Node('TopLevelCodeDecl', kind='Decl',
+         children=[
+             Child('Body', kind='StmtList')
          ]),
 
     # parameter ->
