@@ -30,8 +30,9 @@ To read the documentation, start by installing the
 `easy_install -U Sphinx`
 
 Once complete, you can build the Swift documentation by changing directory into
-[docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs) directory
-into HTML in the `docs/_build/html` directory.
+[docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This
+compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs)
+directory into HTML in the `docs/_build/html` directory.
 
 Many of the docs are out of date, but you can see some historical design
 documents in the `docs` directory.
@@ -56,7 +57,8 @@ supported host development operating systems.
 
 For macOS, you need [Xcode 9.0 beta 2](https://developer.apple.com/xcode/downloads/).
 
-For Ubuntu, you'll need the following development dependencies:
+<a name="linux-dependencies"></a>For Ubuntu, you'll need the following
+development dependencies:
 
     sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev autoconf libtool systemtap-sdt-dev tzdata
 
@@ -99,9 +101,9 @@ command line tools to your `PATH`:
 
     export PATH=/Applications/CMake.app/Contents/bin:$PATH
     
-On Linux, if the CMake package was not downloaded in the development dependencies you can download and 
-install the CMake package using the following command:
-
+On Linux, if you have not already installed Swift's [development
+dependencies](#linux-dependencies), you can download and install the CMake
+package separately using the following command:
 
     sudo apt-get install cmake
     
@@ -170,13 +172,14 @@ See [docs/Testing.md](docs/Testing.md).
 
 ## Contributing to Swift
 
-Contributions to Swift are welcomed and encouraged! Please see the [Contributing to Swift guide](https://swift.org/contributing/).
+Contributions to Swift are welcomed and encouraged! Please see the
+[Contributing to Swift guide](https://swift.org/contributing/).
 
-To be a truly great community, [Swift.org](https://swift.org/) needs to welcome developers from all
-walks of life, with different backgrounds, and with a wide range of experience.
-A diverse and friendly community will have more great ideas, more unique
-perspectives, and produce more great code. We will work diligently to make the
-Swift community welcoming to everyone.
+To be a truly great community, [Swift.org](https://swift.org/) needs to welcome
+developers from all walks of life, with different backgrounds, and with a wide
+range of experience. A diverse and friendly community will have more great
+ideas, more unique perspectives, and produce more great code. We will work
+diligently to make the Swift community welcoming to everyone.
 
 To give clarity of what is expected of our members, Swift has adopted the
 code of conduct defined by the Contributor Covenant. This document is used
