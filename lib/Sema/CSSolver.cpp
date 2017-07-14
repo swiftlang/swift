@@ -1640,52 +1640,6 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   return !anySolutions;
 }
 
-/// Whether we should short-circuit a disjunction that already has a
-/// solution when we encounter the given constraint.
-static bool shortCircuitDisjunctionAt(Constraint *constraint,
-                                      Constraint *successfulConstraint,
-                                      ASTContext &ctx) {
-
-  // If the successfully applied constraint is favored, we'll consider that to
-  // be the "best".
-  if (successfulConstraint->isFavored() && !constraint->isFavored()) {
-#if !defined(NDEBUG)
-    if (successfulConstraint->getKind() == ConstraintKind::BindOverload) {
-      auto overloadChoice = successfulConstraint->getOverloadChoice();
-      assert((!overloadChoice.isDecl() ||
-              !overloadChoice.getDecl()->getAttrs().isUnavailable(ctx)) &&
-             "Unavailable decl should not be favored!");
-    }
-#endif
-
-    return true;
-  }
-  
-  // Anything without a fix is better than anything with a fix.
-  if (constraint->getFix() && !successfulConstraint->getFix())
-    return true;
-
-  if (auto restriction = constraint->getRestriction()) {
-    // Non-optional conversions are better than optional-to-optional
-    // conversions.
-    if (*restriction == ConversionRestrictionKind::OptionalToOptional)
-      return true;
-    
-    // Array-to-pointer conversions are better than inout-to-pointer conversions.
-    if (auto successfulRestriction = successfulConstraint->getRestriction()) {
-      if (*successfulRestriction == ConversionRestrictionKind::ArrayToPointer
-          && *restriction == ConversionRestrictionKind::InoutToPointer)
-        return true;
-    }
-  }
-
-  // Implicit conversions are better than checked casts.
-  if (constraint->getKind() == ConstraintKind::CheckedCast)
-    return true;
-
-  return false;
-}
-
 void ConstraintSystem::collectDisjunctions(
     SmallVectorImpl<Constraint *> &disjunctions) {
   for (auto &constraint : InactiveConstraints) {
@@ -1778,8 +1732,9 @@ bool ConstraintSystem::solveSimplified(
   CG.removeConstraint(disjunction);
 
   Score initialScore = CurrentScore;
-  Optional<DisjunctionChoice> lastSolvedChoice;
   Optional<Score> bestNonGenericScore;
+
+  bool foundSolution = false;
 
   ++solverState->NumDisjunctions;
   auto constraints = disjunction->getNestedConstraints();
@@ -1813,15 +1768,6 @@ bool ConstraintSystem::solveSimplified(
         continue;
     }
 
-    // We already have a solution; check whether we should
-    // short-circuit the disjunction.
-    if (lastSolvedChoice) {
-      auto *lastChoice = lastSolvedChoice->getConstraint();
-      if (shortCircuitDisjunctionAt(&currentChoice, lastChoice,
-                                    getASTContext()))
-        break;
-    }
-
     // If the expression was deemed "too complex", stop now and salvage.
     if (getExpressionTooComplex(solutions))
       break;
@@ -1852,7 +1798,7 @@ bool ConstraintSystem::solveSimplified(
           bestNonGenericScore = score;
       }
 
-      lastSolvedChoice = currentChoice;
+      foundSolution = true;
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
       // FIXME: This should be more general.
@@ -1879,7 +1825,7 @@ bool ConstraintSystem::solveSimplified(
   auto tooComplex = getExpressionTooComplex(solutions) &&
     !getASTContext().isSwiftVersion3();
 
-  return tooComplex || !lastSolvedChoice;
+  return tooComplex || !foundSolution;
 }
 
 Optional<Score>
