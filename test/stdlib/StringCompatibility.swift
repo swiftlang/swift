@@ -185,7 +185,18 @@ let swift = 3
 
 #endif
 
-var Tests = TestSuite("SubstringCompatibility")
+var Tests = TestSuite("StringCompatibility")
+
+#if !swift(>=4) && _runtime(_ObjC)
+import Foundation
+
+Tests.test("String/Legacy/UTF16View.Index/StrideableAPIs") {
+  let i = String.UTF16View.Index(0)
+  expectEqual(0, i.distance(to: i))
+  expectEqual(0, i.distance(to: i.samePosition(in: "")))
+  expectEqual(i, i.advanced(by: 0))
+}
+#endif
 
 Tests.test("String/Range/Slice/ExpectedType/\(swift)") {
   var s = "hello world"
