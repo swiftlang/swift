@@ -193,8 +193,9 @@ extension String {
     /// collection.
     public struct Iterator : IteratorProtocol {
       init(_ _base: _StringCore) {
+        self._iterator = _base.makeIterator()
         if _base.hasContiguousStorage {
-            self._baseSet = true
+          self._baseSet = true
           if _base.isASCII {
             self._ascii = true
             self._asciiBase = UnsafeBufferPointer(
@@ -211,7 +212,6 @@ extension String {
         } else {
           self._ascii = false
           self._baseSet = false
-          self._iterator = _base.makeIterator()
         }
       }
 
@@ -236,7 +236,7 @@ extension String {
             result = _decoder.decode(&(self._base!))
           }
         } else {
-          result = _decoder.decode(&(self._iterator!))
+          result = _decoder.decode(&(self._iterator))
         }
         switch result {
         case .scalarValue(let us):
@@ -252,7 +252,7 @@ extension String {
       internal let _ascii: Bool
       internal var _asciiBase: UnsafeBufferPointerIterator<UInt8>!
       internal var _base: UnsafeBufferPointerIterator<UInt16>!
-      internal var _iterator: IndexingIterator<_StringCore>!
+      internal var _iterator: IndexingIterator<_StringCore>
     }
 
     /// Returns an iterator over the Unicode scalars that make up this view.
