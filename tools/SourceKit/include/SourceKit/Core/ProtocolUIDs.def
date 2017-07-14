@@ -110,6 +110,7 @@ KEY(EnableDiagnostics, "key.enablediagnostics")
 KEY(GroupName, "key.groupname")
 KEY(ActionName, "key.actionname")
 KEY(SynthesizedExtension, "key.synthesizedextensions")
+KEY(UsingSwiftArgs, "key.usingswiftargs")
 
 KEY(Names, "key.names")
 KEY(UIDs, "key.uids")
