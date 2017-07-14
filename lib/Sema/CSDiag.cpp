@@ -8969,6 +8969,8 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       if (hasUnresolvedParams)
         continue;
 
+      CS->TC.preCheckExpression(resultExpr, CS->DC);
+
       // Obtain type of the result expression without applying solutions,
       // because otherwise this might result in leaking of type variables,
       // since we are not resetting result statement and if expression is
