@@ -39,6 +39,26 @@ func s020__________bitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
 }
 
+// Test emitBuiltinCastReference
+// ---
+// CHECK-LABEL: sil hidden @_T0s21s030__________refCastq_x_q_m2totr0_lF : $@convention(thin) <T, U> (@in T, @thick U.Type) -> @out U {
+// CHECK: bb0(%0 : $T, %1 : $@thick U.Type):
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $T
+// CHECK: [[COPY:%.*]] = copy_value [[BORROW]] : $T
+// CHECK: [[SRC:%.*]] = alloc_stack $T
+// CHECK: store [[COPY]] to [init] [[SRC]] : $*T
+// CHECK: [[DEST:%.*]] = alloc_stack $U
+// CHECK: unchecked_ref_cast_addr  T in [[SRC]] : $*T to U in [[DEST]] : $*U
+// CHECK: [[LOAD:%.*]] = load [take] [[DEST]] : $*U
+// CHECK: dealloc_stack [[DEST]] : $*U
+// CHECK: dealloc_stack [[SRC]] : $*T
+// CHECK: destroy_value %0 : $T
+// CHECK: return [[LOAD]] : $U
+// CHECK-LABEL: } // end sil function '_T0s21s030__________refCastq_x_q_m2totr0_lF'
+func s030__________refCast<T, U>(_ x: T, to: U.Type) -> U {
+  return Builtin.castReference(x)
+}
+
 // Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
 // ---
 // CHECK-LABEL: sil shared [transparent] @_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmF : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum {

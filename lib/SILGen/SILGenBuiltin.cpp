@@ -572,7 +572,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
   auto &toTL = gen.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
-  if (fromTL.isLoadable() || toTL.isLoadable()) { 
+  if (!fromTL.isAddress() || !toTL.isAddress()) { 
     if (auto refCast = gen.B.tryCreateUncheckedRefCast(loc, args[0].getValue(),
                                                        toTL.getLoweredType())) {
       // Create a reference cast, forwarding the cleanup.
@@ -593,7 +593,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
   // more information to the optimizer.
   SILValue srcVal = args[0].forward(gen);
   SILValue fromAddr;
-  if (fromTL.isLoadable()) {
+  if (!fromTL.isAddress()) {
     // Move the loadable value into a "source temp".  Since the source and
     // dest are RC identical, store the reference into the source temp without
     // a retain. The cast will load the reference from the source temp and
@@ -610,7 +610,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
   gen.B.createUncheckedRefCastAddr(loc, fromAddr, fromTy->getCanonicalType(),
                                    toAddr, toTy->getCanonicalType());
   // Forward it along and register a cleanup.
-  if (toTL.isAddressOnly())
+  if (toTL.isAddress())
     return gen.emitManagedBufferWithCleanup(toAddr);
 
   // Load the destination value.
@@ -630,11 +630,11 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
   auto &fromTL = gen.getTypeLowering(substitutions[0].getReplacement());
   auto &toTL = gen.getTypeLowering(substitutions[1].getReplacement());
   
-  // If casting between address-only types, cast the address.
+  // If casting between address types, cast the address.
   if (fromTL.isAddress() || toTL.isAddress()) {
     SILValue fromAddr;
 
-    // If the from value is loadable, move it to a buffer.
+    // If the from value is not an address, move it to a buffer.
     if (!fromTL.isAddress()) {
       fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue()->getType());
       fromTL.emitStore(gen.B, loc, args[0].getValue(), fromAddr,
