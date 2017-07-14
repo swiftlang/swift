@@ -334,6 +334,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
 
 static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl,
                                           EnumDecl *enumDecl) {
+  // Validate the enum and its raw type.
+  tc.validateDecl(enumDecl);
 
   // It must have a valid raw type.
   Type rawType = enumDecl->getRawType();
