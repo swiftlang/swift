@@ -2432,6 +2432,70 @@ static bool isVisibleClangEntry(clang::ASTContext &ctx,
   return true;
 }
 
+TypeDecl *
+ClangModuleUnit::lookupNestedType(Identifier name,
+                                  const NominalTypeDecl *baseType) const {
+  auto lookupTable = owner.findLookupTable(clangModule);
+  if (!lookupTable)
+    return nullptr;
+
+  auto baseTypeContext = owner.getEffectiveClangContext(baseType);
+  if (!baseTypeContext)
+    return nullptr;
+
+  auto &clangCtx = owner.getClangASTContext();
+
+  // FIXME: This is very similar to what's in Implementation::lookupValue and
+  // Implementation::loadAllMembers.
+  SmallVector<TypeDecl *, 2> results;
+  for (auto entry : lookupTable->lookup(SerializedSwiftName(name.str()),
+                                        baseTypeContext)) {
+    // If the entry is not visible, skip it.
+    if (!isVisibleClangEntry(clangCtx, entry)) continue;
+
+    auto clangDecl = entry.dyn_cast<clang::NamedDecl *>();
+    auto clangTypeDecl = dyn_cast_or_null<clang::TypeDecl>(clangDecl);
+    if (!clangTypeDecl)
+      continue;
+
+    clangTypeDecl = cast<clang::TypeDecl>(clangTypeDecl->getMostRecentDecl());
+
+    bool anyMatching = false;
+    TypeDecl *originalDecl = nullptr;
+    owner.forEachDistinctName(clangTypeDecl, [&](ImportedName newName,
+                                                 ImportNameVersion nameVersion){
+      if (anyMatching)
+        return;
+      if (!newName.getDeclName().isSimpleName(name))
+        return;
+
+      auto decl = dyn_cast_or_null<TypeDecl>(
+          owner.importDeclReal(clangTypeDecl, nameVersion));
+      if (!decl)
+        return;
+
+      if (!originalDecl)
+        originalDecl = decl;
+      else if (originalDecl == decl)
+        return;
+
+      auto *importedContext = decl->getDeclContext()->
+          getAsNominalTypeOrNominalTypeExtensionContext();
+      if (importedContext != baseType)
+        return;
+
+      assert(decl->getFullName().matchesRef(name) &&
+             "importFullName behaved differently from importDecl");
+      results.push_back(decl);
+      anyMatching = true;
+    });
+  }
+
+  if (results.size() == 1)
+    return results.front();
+  return nullptr;
+}
+
 void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
                                    unsigned previousGeneration) {
   // Determine the effective Clang context for this Swift nominal type.
@@ -3127,7 +3191,7 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 }
 
 EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
-                        NominalTypeDecl *nominal) {
+    const NominalTypeDecl *nominal) {
   // If we have a Clang declaration, look at it to determine the
   // effective Clang context.
   if (auto constClangDecl = nominal->getClangDecl()) {
@@ -3142,7 +3206,7 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
 
   // Resolve the type.
   if (auto typeResolver = getTypeResolver())
-    typeResolver->resolveDeclSignature(nominal);
+    typeResolver->resolveDeclSignature(const_cast<NominalTypeDecl *>(nominal));
 
   // If it's an @objc entity, go look for it.
   if (nominal->isObjC()) {
