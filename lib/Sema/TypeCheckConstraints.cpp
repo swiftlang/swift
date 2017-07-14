@@ -1602,8 +1602,8 @@ CleanupIllFormedExpressionRAII::~CleanupIllFormedExpressionRAII() {
 
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
-static bool preCheckExpression(TypeChecker &tc, Expr *&expr, DeclContext *dc) {
-  PreCheckExpression preCheck(tc, dc);
+bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
+  PreCheckExpression preCheck(*this, dc);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;
@@ -1611,7 +1611,7 @@ static bool preCheckExpression(TypeChecker &tc, Expr *&expr, DeclContext *dc) {
   }
 
   // Pre-check failed. Clean up and return.
-  CleanupIllFormedExpressionRAII::doIt(expr, tc.Context);
+  CleanupIllFormedExpressionRAII::doIt(expr, Context);
   return true;
 }
 
@@ -1647,11 +1647,6 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    ExprTypeCheckListener *listener, ConstraintSystem &cs,
                    SmallVectorImpl<Solution> &viable,
                    TypeCheckExprOptions options) {
-  // First, pre-check the expression, validating any types that occur in the
-  // expression and folding sequence expressions.
-  if (preCheckExpression(*this, expr, dc))
-    return true;
-
   // Attempt to solve the constraint system.
   auto solution = cs.solve(expr,
                            convertType,
@@ -1786,6 +1781,11 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+
+  // First, pre-check the expression, validating any types that occur in the
+  // expression and folding sequence expressions.
+  if (preCheckExpression(expr, dc))
+    return true;
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
