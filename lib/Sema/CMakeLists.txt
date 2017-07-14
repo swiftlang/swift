@@ -57,6 +57,7 @@ add_swift_library(swiftSema STATIC
   LINK_LIBRARIES
     swiftParse
     swiftAST
+    swiftSerialization
   ${EXTRA_TYPECHECKER_FLAGS}
 )
 
