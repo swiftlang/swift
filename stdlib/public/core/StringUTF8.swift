@@ -159,7 +159,7 @@ extension String {
     /// - Precondition: The next position is representable.
     @inline(__always)
     public func index(after i: Index) -> Index {
-      if _fastPath(_core.isASCII) {
+      if _core.isASCII {
         precondition(i.encodedOffset < _core.count)
         return Index(encodedOffset: i.encodedOffset + 1)
       }
@@ -167,7 +167,6 @@ extension String {
       var j = i
       while true {
         if case .utf8(let buffer) = j._cache {
-          _onFastPath()
           var scalarLength16 = 1
           let b0 = buffer.first._unsafelyUnwrappedUnchecked
           var nextBuffer = buffer
@@ -179,7 +178,7 @@ extension String {
           else {
             let n8 = j._transcodedOffset + 1
             // If we haven't reached a scalar boundary...
-            if _fastPath(n8 < leading1s) {
+            if n8 < leading1s {
               return Index(
                 encodedOffset: j.encodedOffset,
                 transcodedOffset: n8, .utf8(buffer: nextBuffer))
@@ -187,7 +186,7 @@ extension String {
             scalarLength16 = n8 >> 2 + 1
             nextBuffer.removeFirst(n8)
           }
-          if _fastPath(!nextBuffer.isEmpty) {
+          if !nextBuffer.isEmpty {
             return Index(
               encodedOffset: j.encodedOffset + scalarLength16,
               .utf8(buffer: nextBuffer))
