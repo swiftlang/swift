@@ -2742,6 +2742,19 @@ private:
       return;
     }
 
+    // If we're working with a tuple source, expand it.
+    if (arg.isTuple()) {
+      (void) std::move(arg).withKnownTupleElementSources<int>(
+                          [&](SILLocation loc, CanTupleType type,
+                              MutableArrayRef<ArgumentSource> elts) {
+        for (auto i : indices(elts)) {
+          emit(std::move(elts[i]), origParamType.getTupleElementType(i));
+        }
+        return 0; // We need a fake return value because <void> won't compile.
+      });
+      return;
+    }
+
     // Otherwise, we're working with an expression.
     Expr *e = std::move(arg).asKnownExpr();
     e = e->getSemanticsProvidingExpr();
@@ -2865,6 +2878,7 @@ private:
                   AbstractionPattern origParamType,
                   SILParameterInfo param) {
     ManagedValue value;
+    auto loc = arg.getLocation();
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
     if (contexts.RequiresReabstraction) {
       auto conversion = [&] {
@@ -2898,7 +2912,7 @@ private:
 
     if (param.isConsumed() &&
         value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-      value = value.copyUnmanaged(SGF, arg.getLocation());
+      value = value.copyUnmanaged(SGF, loc);
       Args.push_back(value);
       return;
     }
@@ -2906,7 +2920,7 @@ private:
     if (SGF.F.getModule().getOptions().EnableSILOwnership) {
       if (param.isDirectGuaranteed() &&
           value.getOwnershipKind() == ValueOwnershipKind::Owned) {
-        value = value.borrow(SGF, arg.getLocation());
+        value = value.borrow(SGF, loc);
         Args.push_back(value);
         return;
       }
