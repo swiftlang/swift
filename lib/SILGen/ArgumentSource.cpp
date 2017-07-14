@@ -345,3 +345,38 @@ SILType ArgumentSource::getSILSubstType(SILGenFunction &SGF) const & {
   AbstractionPattern origType(funcType->getGenericSignature(), substType);
   return SGF.getLoweredType(origType, substType);
 }
+
+void ArgumentSource::dump() const {
+  dump(llvm::errs());
+}
+void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
+  out.indent(indent) << "ArgumentSource::";
+  switch (StoredKind) {
+  case Kind::Invalid:
+    out << "Invalid\n";
+    return;
+  case Kind::LValue:
+    out << "LValue\n";
+    Storage.get<LValueStorage>(StoredKind).Value.dump(out, indent + 2);
+    return;
+  case Kind::Tuple: {
+    out << "Tuple\n";
+    auto &storage = Storage.get<TupleStorage>(StoredKind);
+    storage.SubstType.dump(out, indent + 2);
+    for (auto &elt : storage.Elements) {
+      elt.dump(out, indent + 2);
+      out << '\n';
+    }
+    return;
+  }
+  case Kind::RValue:
+    out << "RValue\n";
+    Storage.get<RValueStorage>(StoredKind).Value.dump(out, indent + 2);
+    return;
+  case Kind::Expr:
+    out << "Expr\n";
+    Storage.get<Expr*>(StoredKind)->dump(out); // FIXME: indent
+    return;
+  }
+  llvm_unreachable("bad kind");
+}

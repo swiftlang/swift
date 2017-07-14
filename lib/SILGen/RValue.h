@@ -242,6 +242,9 @@ public:
 
   static bool areObviouslySameValue(SILValue lhs, SILValue rhs);
   bool isObviouslyEqual(const RValue &rhs) const;
+
+  void dump() const;
+  void dump(raw_ostream &OS, unsigned indent = 0) const;
 };
 
 } // end namespace Lowering

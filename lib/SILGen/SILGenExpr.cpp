@@ -4501,8 +4501,8 @@ public:
     //      auto &rhs = (GetterSetterComponent&)*RHS;
   }
 
-  void print(raw_ostream &OS) const override {
-    OS << "AutoreleasingWritebackComponent()\n";
+  void dump(raw_ostream &OS, unsigned indent) const override {
+    OS.indent(indent) << "AutoreleasingWritebackComponent()\n";
   }
 };
 } // end anonymous namespace

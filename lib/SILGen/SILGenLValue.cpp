@@ -376,7 +376,7 @@ void PhysicalPathComponent::_anchor() {}
 void LogicalPathComponent::_anchor() {}
 
 void PathComponent::dump() const {
-  print(llvm::errs());
+  dump(llvm::errs());
 }
 
 /// Return the LValueTypeData for a SIL value with the given AST formal type.
@@ -479,8 +479,8 @@ namespace {
       SGF.B.createEndAccess(loc, base.getValue(), /*abort*/ false);
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "EndAccessPseudoComponent";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "EndAccessPseudoComponent\n";
     }
   };
 } // end anonymous namespace
@@ -557,8 +557,8 @@ namespace {
       return ManagedValue::forLValue(result);
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "RefElementComponent(" << Field->getName() << ")\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "RefElementComponent(" << Field->getName() << ")\n";
     }
   };
 
@@ -579,8 +579,8 @@ namespace {
       return ManagedValue::forLValue(Res);
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "TupleElementComponent(" << ElementIndex << ")\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "TupleElementComponent(" << ElementIndex << ")\n";
     }
   };
 
@@ -601,8 +601,9 @@ namespace {
                                                Field, SubstFieldType);
       return ManagedValue::forLValue(Res);
     }
-    void print(raw_ostream &OS) const override {
-      OS << "StructElementComponent(" << Field->getName() << ")\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "StructElementComponent("
+                        << Field->getName() << ")\n";
     }
   };
 
@@ -620,8 +621,8 @@ namespace {
       return SGF.emitPreconditionOptionalHasValue(loc, base);
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "ForceOptionalObjectComponent()\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "ForceOptionalObjectComponent()\n";
     }
   };
 
@@ -665,8 +666,9 @@ namespace {
       return ManagedValue::forLValue(addr);
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "OpenOpaqueExistentialComponent(" << getSubstFormalType() << ")\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "OpenOpaqueExistentialComponent("
+                        << getSubstFormalType() << ")\n";
     }
   };
 
@@ -758,9 +760,9 @@ namespace {
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "OpenNonOpaqueExistentialComponent(" << OpenedArchetype
-         << ", ...)\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "OpenNonOpaqueExistentialComponent("
+                        << OpenedArchetype << ", ...)\n";
     }
   };
 
@@ -799,8 +801,16 @@ namespace {
       return IsRValue;
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "ValueComponent()\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS << "ValueComponent(";
+      if (IsRValue) OS << "rvalue, ";
+      if (Enforcement) {
+        OS << getSILAccessEnforcementName(*Enforcement);
+      } else {
+        OS << "unenforced";
+      }
+      OS << "):\n";
+      Value.dump(OS, indent + 2);
     }
   };
 } // end anonymous namespace
@@ -977,8 +987,8 @@ namespace {
       }
     }
 
-    void printBase(raw_ostream &OS, StringRef name) const {
-      OS << name << "(" << decl->getBaseName() << ")";
+    void printBase(raw_ostream &OS, unsigned indent, StringRef name) const {
+      OS.indent(indent) << name << "(" << decl->getBaseName() << ")";
       if (IsSuper) OS << " isSuper";
       if (IsDirectAccessorUse) OS << " isDirectAccessorUse";
       if (subscriptIndexExpr) {
@@ -1300,8 +1310,8 @@ namespace {
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
-    void print(raw_ostream &OS) const override {
-      printBase(OS, "GetterSetterComponent");
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      printBase(OS, indent, "GetterSetterComponent");
     }
 
     /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
@@ -1411,8 +1421,8 @@ namespace {
       SGF.B.createStrongUnpin(loc, baseValue, SGF.B.getDefaultAtomicity());
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "UnpinPseudoComponent";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "UnpinPseudoComponent";
     }
   };
 
@@ -1485,8 +1495,8 @@ namespace {
       llvm_unreachable("bad addressor kind");
     }
 
-    void print(raw_ostream &OS) const override {
-      printBase(OS, "AddressorComponent");
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      printBase(OS, indent, "AddressorComponent");
     }
   };
   
@@ -1647,8 +1657,8 @@ namespace {
         return std::move(*this).readOnlyOffset(SGF, loc, base);
       }
     }
-    void print(raw_ostream &OS) const override {
-      OS << "KeyPathApplicationComponent";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "KeyPathApplicationComponent\n";
     }
   };
 } // end anonymous namespace
@@ -1711,11 +1721,11 @@ namespace {
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "OrigToSubstComponent("
-         << getOrigFormalType() << ", "
-         << getSubstFormalType() << ", "
-         << getTypeOfRValue() << ")\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "OrigToSubstComponent("
+                        << getOrigFormalType() << ", "
+                        << getSubstFormalType() << ", "
+                        << getTypeOfRValue() << ")\n";
     }
   };
 
@@ -1750,11 +1760,11 @@ namespace {
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "SubstToOrigComponent("
-         << getOrigFormalType() << ", "
-         << getSubstFormalType() << ", "
-         << getTypeOfRValue() << ")\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "SubstToOrigComponent("
+                        << getOrigFormalType() << ", "
+                        << getSubstFormalType() << ", "
+                        << getTypeOfRValue() << ")\n";
     }
   };
 
@@ -1804,8 +1814,8 @@ namespace {
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
-    void print(raw_ostream &OS) const override {
-      OS << "OwnershipComponent(...)\n";
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "OwnershipComponent(...)\n";
     }
   };
 } // end anonymous namespace
@@ -1908,12 +1918,12 @@ void LValue::addSubstToOrigComponent(AbstractionPattern origType,
 }
 
 void LValue::dump() const {
-  print(llvm::errs());
+  dump(llvm::errs());
 }
 
-void LValue::print(raw_ostream &OS) const {
+void LValue::dump(raw_ostream &OS, unsigned indent) const {
   for (const auto &component : *this) {
-    component->print(OS);
+    component->dump(OS, indent);
   }
 }
 

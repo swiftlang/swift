@@ -306,6 +306,9 @@ public:
   /// Whether this argument source requires the callee to evaluate.
   bool requiresCalleeToEvaluate() const;
 
+  void dump() const;
+  void dump(raw_ostream &os, unsigned indent = 0) const;
+
 private:
   // Make the non-move accessors private to make it more difficult
   // to accidentally re-emit values.

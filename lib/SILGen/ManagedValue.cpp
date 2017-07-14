@@ -172,7 +172,20 @@ void ManagedValue::print(raw_ostream &os) const {
 }
 
 void ManagedValue::dump() const {
-#ifndef NDEBUG
-  print(llvm::dbgs());
-#endif
+  dump(llvm::errs());
+}
+
+void ManagedValue::dump(raw_ostream &os, unsigned indent) const {
+  os.indent(indent);
+  if (isInContext()) {
+    os << "InContext\n";
+    return;
+  }
+  if (isLValue()) os << "[lvalue] ";
+  if (hasCleanup()) os << "[cleanup] ";
+  if (SILValue v = getValue()) {
+    v->print(os);
+  } else {
+    os << "<null>\n";
+  }
 }

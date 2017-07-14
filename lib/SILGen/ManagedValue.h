@@ -302,6 +302,7 @@ public:
   }
 
   void dump() const;
+  void dump(raw_ostream &os, unsigned indent = 0) const;
   void print(raw_ostream &os) const;
 };
 

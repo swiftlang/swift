@@ -174,7 +174,7 @@ public:
   KindTy getKind() const { return Kind; }
 
   void dump() const;
-  virtual void print(raw_ostream &OS) const = 0;
+  virtual void dump(raw_ostream &OS, unsigned indent = 0) const = 0;
 };
 
 /// An abstract class for "physical" path components, i.e. path
@@ -466,7 +466,7 @@ public:
                                  AccessKind otherAccess);
 
   void dump() const;
-  void print(raw_ostream &OS) const;
+  void dump(raw_ostream &os, unsigned indent = 0) const;
 };
   
 /// RAII object used to enter an inout conversion scope. Writeback scopes formed
