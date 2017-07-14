@@ -196,6 +196,60 @@ Tests.test("String/Legacy/UTF16View.Index/StrideableAPIs") {
   expectEqual(0, i.distance(to: i.samePosition(in: "")))
   expectEqual(i, i.advanced(by: 0))
 }
+
+Tests.test("String/Legacy/UTF16View/OptionalIndices") {
+  let s = "somethingToTest".utf16
+  let i = s.startIndex
+  let j = Optional(i)
+  expectEqual(s.index(after: i), s.index(after: j))
+  expectEqual(s.index(i, offsetBy: 2), s.index(j, offsetBy: 2))
+  expectEqual(
+    s.distance(from: i, to: s.endIndex),
+    s.distance(from: j, to: s.endIndex))
+  expectEqual(
+    s.distance(from: i, to: s.endIndex),
+    s.distance(from: j, to: Optional(s.endIndex)))
+  expectEqual(
+    s.distance(from: i, to: s.endIndex),
+    s.distance(from: i, to: Optional(s.endIndex)))
+  expectEqual(s[i], s[j])
+}
+
+Tests.test("String/Legacy/UTF8View/OptionalIndices") {
+  let s = "somethingToTest".utf8
+  let i = s.startIndex
+  let j = Optional(i)
+  expectEqual(s.index(after: i), s.index(after: j))
+  expectEqual(s.index(i, offsetBy: 2), s.index(j, offsetBy: 2))
+  expectEqual(
+    s.distance(from: i, to: s.endIndex),
+    s.distance(from: j, to: s.endIndex))
+  expectEqual(
+    s.distance(from: i, to: s.endIndex),
+    s.distance(from: j, to: Optional(s.endIndex)))
+  expectEqual(
+    s.distance(from: i, to: s.endIndex),
+    s.distance(from: i, to: Optional(s.endIndex)))
+  expectEqual(s[i], s[j])
+}
+
+Tests.test("String/Legacy/UnicodeScalarView/OptionalIndices") {
+  let s = "somethingToTest".unicodeScalars
+  let i = s.startIndex
+  let j = Optional(i)
+  expectEqual(s.index(after: i), s.index(after: j))
+  expectEqual(s.index(i, offsetBy: 2), s.index(j, offsetBy: 2))
+  expectEqual(
+    s.distance(from: i, to: s.endIndex),
+    s.distance(from: j, to: s.endIndex))
+  expectEqual(
+    s.distance(from: i, to: s.endIndex),
+    s.distance(from: j, to: Optional(s.endIndex)))
+  expectEqual(
+    s.distance(from: i, to: s.endIndex),
+    s.distance(from: i, to: Optional(s.endIndex)))
+  expectEqual(s[i], s[j])
+}
 #endif
 
 Tests.test("String/Range/Slice/ExpectedType/\(swift)") {
