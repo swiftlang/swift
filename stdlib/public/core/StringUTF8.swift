@@ -533,12 +533,13 @@ extension String.UTF8View.Index {
   public init?(_ sourcePosition: String.Index, within target: String.UTF8View) {
     switch sourcePosition._cache {
     case .utf8:
-        self.init(encodedOffset: sourcePosition.encodedOffset, transcodedOffset: sourcePosition._transcodedOffset, sourcePosition._cache)
+      self.init(encodedOffset: sourcePosition.encodedOffset,
+        transcodedOffset:sourcePosition._transcodedOffset, sourcePosition._cache)
 
     default:
-        guard String.UnicodeScalarView(target._core)._isOnUnicodeScalarBoundary(
-            sourcePosition) else { return nil }
-        self.init(encodedOffset: sourcePosition.encodedOffset)
+      guard String.UnicodeScalarView(target._core)._isOnUnicodeScalarBoundary(
+        sourcePosition) else { return nil }
+      self.init(encodedOffset: sourcePosition.encodedOffset)
     }
   }
 }
