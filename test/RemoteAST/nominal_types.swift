@@ -50,26 +50,31 @@ enum G {
   case Gwhatever
 
   struct Foo {}
+  struct Bar<T> {}
 }
 printType(G.self)
 // CHECK: G
 printType(G.Foo.self)
 // CHECK: G.Foo
+printType(G.Bar<A>.self)
+// CHECK: G.Bar<A>
 
-struct H<T, U> {}
+struct H<T, U> {
+  struct Foo {}
+  struct Bar<V, W> {}
+}
 printType(H<A,A>.self)
 // CHECK: H<A, A>
 printType(H<B.Foo, H<B, A>>.self)
 // CHECK: H<B.Foo, H<B, A>>
+printType(H<B, B>.Foo.self)
+// CHECK: H<B, B>.Foo
+printType(H<A, B>.Bar<B, A>.self)
+// CHECK: H<A, B>.Bar<B, A>
 
 class I<T> {}
 printType(I<Int>.self)
 // CHECK: I<Int>
-
-// None of these are currently permitted by Sema.
-// TODO: non-generic types nested in generic types
-// TODO: generic types nested in generic types
-// TODO: generic types nested in non-generic types
 
 protocol J {}
 
