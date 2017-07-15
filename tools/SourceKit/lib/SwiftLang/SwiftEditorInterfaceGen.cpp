@@ -318,7 +318,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
     }
   }
 
-  PrintOptions Options = PrintOptions::printInterface();
+  PrintOptions Options = PrintOptions::printModuleInterface();
   ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
@@ -345,7 +345,7 @@ static bool getHeaderInterfaceInfo(ASTContext &Ctx,
     return true;
   }
 
-  PrintOptions Options = PrintOptions::printInterface();
+  PrintOptions Options = PrintOptions::printModuleInterface();
 
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);

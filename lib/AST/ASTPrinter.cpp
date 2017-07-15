@@ -36,7 +36,6 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
@@ -51,17 +50,6 @@
 #include <queue>
 
 using namespace swift;
-
-PrintOptions PrintOptions::printTypeInterface(Type T) {
-  PrintOptions result = printInterface();
-  result.PrintExtensionFromConformingProtocols = true;
-  result.TransformContext = TypeTransformContext(T);
-  result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
-    return isExtensionApplied(*T->getNominalOrBoundGenericNominal()->
-                              getDeclContext(), T, ED);
-  };
-  return result;
-}
 
 void PrintOptions::setBaseType(Type T) {
   TransformContext = TypeTransformContext(T);
@@ -830,17 +818,17 @@ static const unsigned ErrorDepth = ~0U;
 /// A helper function to return the depth of a type.
 static unsigned getDepthOfType(Type ty) {
   unsigned depth = ErrorDepth;
-  
+
   auto combineDepth = [&depth](unsigned newDepth) -> bool {
     // If there is no current depth (depth == ErrorDepth), then assign to
     // newDepth; otherwise, choose the deeper of the current and new depth.
-    
+
     // Since ErrorDepth == ~0U, ErrorDepth + 1 == 0, which is smaller than any
     // valid depth + 1.
     depth = std::max(depth+1U, newDepth+1U) - 1U;
     return false;
   };
-  
+
   ty.findIf([combineDepth](Type t) -> bool {
     if (auto paramTy = t->getAs<GenericTypeParamType>())
       return combineDepth(paramTy->getDepth());
@@ -856,7 +844,7 @@ static unsigned getDepthOfType(Type ty) {
 
     return false;
   });
-  
+
   return depth;
 }
 
@@ -1222,16 +1210,8 @@ void PrintAST::printRequirement(const Requirement &req) {
   printType(req.getSecondType());
 }
 
-bool swift::shouldPrintPattern(const Pattern *P, PrintOptions &Options) {
-  bool ShouldPrint = false;
-  P->forEachVariable([&](VarDecl *VD) {
-    ShouldPrint |= shouldPrint(VD, Options);
-  });
-  return ShouldPrint;
-}
-
 bool PrintAST::shouldPrintPattern(const Pattern *P) {
-  return swift::shouldPrintPattern(P, Options);
+  return Options.shouldPrint(P);
 }
 
 void PrintAST::printPatternType(const Pattern *P) {
@@ -1241,24 +1221,15 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
-static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
-  if (!Options.TransformContext || !D->getDeclContext()->isExtensionContext() ||
-      !Options.TransformContext->isPrintingSynthesizedExtension())
-    return true;
-  NominalTypeDecl *Target = Options.TransformContext->getNominal();
-  Type BaseTy = Target->getDeclaredTypeInContext();
-  const auto *FD = dyn_cast<FuncDecl>(D);
-  if (!FD)
-    return true;
-  ResolvedMemberResult Result = resolveValueMember(*Target->getDeclContext(),
-                                                  BaseTy,
-                                                  FD->getEffectiveFullName());
-  return !(Result.hasBestOverload() && Result.getBestOverload() != D);
+bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
+  bool ShouldPrint = false;
+  P->forEachVariable([&](const VarDecl *VD) {
+    ShouldPrint |= shouldPrint(VD, Options);
+  });
+  return ShouldPrint;
 }
 
-bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
-  if (!shouldPrintAsFavorable(D, Options))
-    return false;
+bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -1358,7 +1329,7 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
   if (auto *PD = dyn_cast<PatternBindingDecl>(D)) {
     auto ShouldPrint = false;
     for (auto entry : PD->getPatternList()) {
-      ShouldPrint |= shouldPrintPattern(entry.getPattern(), Options);
+      ShouldPrint |= shouldPrint(entry.getPattern(), Options);
       if (ShouldPrint)
         return true;
     }
@@ -1368,7 +1339,7 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
 }
 
 bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
-  auto Result = swift::shouldPrint(D, Options);
+  auto Result = Options.shouldPrint(D);
   if (!Result && Notify)
     Printer.callAvoidPrintDeclPost(D);
   return Result;
@@ -3600,7 +3571,7 @@ public:
     };
 
     printFunctionExtInfo(T->getExtInfo());
-    
+
     // If we're stripping argument labels from types, do it when printing.
     Type inputType = T->getInput();
     if (auto tupleTy = dyn_cast<TupleType>(inputType.getPointer())) {
@@ -3614,15 +3585,15 @@ public:
     bool needsParens =
       !isa<ParenType>(inputType.getPointer()) &&
       !inputType->is<TupleType>();
-    
+
     if (needsParens)
       Printer << "(";
 
     visit(inputType);
-    
+
     if (needsParens)
       Printer << ")";
-    
+
     if (T->throws())
       Printer << " " << tok::kw_throws;
 
@@ -3653,7 +3624,7 @@ public:
     bool needsParens =
       !isa<ParenType>(T->getInput().getPointer()) &&
       !T->getInput()->is<TupleType>();
-      
+
     if (needsParens)
       Printer << "(";
 
@@ -3742,7 +3713,7 @@ public:
       PrintOptions subOptions = Options;
       subOptions.GenericEnv = nullptr;
       TypePrinter sub(Printer, subOptions);
-      
+
       // Capture list used here to ensure we don't print anything using `this`
       // printer, but only the sub-Printer.
       [&sub, T]{
@@ -3764,7 +3735,7 @@ public:
         sub.Printer << " }";
       }();
     }
-    
+
     // The arguments to the layout, if any, do come from the outer environment.
     if (!T->getGenericArgs().empty()) {
       Printer << " <";

@@ -664,7 +664,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   if (BaseType) {
     if (auto Target = BaseType->getAnyNominal()) {
       SynthesizedExtensionAnalyzer Analyzer(Target,
-                                            PrintOptions::printInterface());
+                                          PrintOptions::printModuleInterface());
       InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
     }
   }

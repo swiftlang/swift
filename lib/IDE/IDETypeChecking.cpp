@@ -25,6 +25,62 @@
 
 using namespace swift;
 
+static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
+  if (!Options.TransformContext ||
+      !D->getDeclContext()->isExtensionContext() ||
+      !Options.TransformContext->isPrintingSynthesizedExtension())
+    return true;
+  NominalTypeDecl *Target = Options.TransformContext->getNominal();
+  Type BaseTy = Target->getDeclaredTypeInContext();
+  const auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD)
+    return true;
+  ResolvedMemberResult Result =
+  resolveValueMember(*Target->getDeclContext(), BaseTy,
+                     FD->getEffectiveFullName());
+  return !(Result.hasBestOverload() && Result.getBestOverload() != D);
+}
+
+class ModulePrinterPrintableChecker: public ShouldPrintChecker {
+  bool shouldPrint(const Decl *D, PrintOptions &Options) override {
+    if (!shouldPrintAsFavorable(D, Options))
+      return false;
+    return ShouldPrintChecker::shouldPrint(D, Options);
+  }
+};
+
+PrintOptions PrintOptions::printModuleInterface() {
+  PrintOptions result = printInterface();
+  result.CurrentPrintabilityChecker.reset(new ModulePrinterPrintableChecker());
+  return result;
+}
+
+PrintOptions PrintOptions::printTypeInterface(Type T) {
+  PrintOptions result = printModuleInterface();
+  result.PrintExtensionFromConformingProtocols = true;
+  result.TransformContext = TypeTransformContext(T);
+  result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
+    return isExtensionApplied(*T->getNominalOrBoundGenericNominal()->
+                              getDeclContext(), T, ED);
+  };
+  result.CurrentPrintabilityChecker.reset(new ModulePrinterPrintableChecker());
+  return result;
+}
+
+PrintOptions PrintOptions::printDocInterface() {
+  PrintOptions result = PrintOptions::printModuleInterface();
+  result.PrintAccessibility = false;
+  result.SkipUnavailable = false;
+  result.ExcludeAttrList.push_back(DAK_Available);
+  result.ArgAndParamPrinting =
+  PrintOptions::ArgAndParamPrintingMode::BothAlways;
+  result.PrintDocumentationComments = false;
+  result.PrintRegularClangComments = false;
+  result.PrintAccessibility = false;
+  result.PrintFunctionRepresentationAttrs = false;
+  return result;
+}
+
 struct SynthesizedExtensionAnalyzer::Implementation {
   static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
     DeclContext* DC = Target->getInnermostDeclContext();
@@ -177,7 +233,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     unsigned Count = 0;
     for (auto TL : ED->getInherited()) {
       auto *nominal = TL.getType()->getAnyNominal();
-      if (nominal && shouldPrint(nominal, Options))
+      if (nominal && Options.shouldPrint(nominal))
         Count ++;
     }
     return Count;
@@ -272,7 +328,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
     ExtensionMergeInfoMap MergeInfoMap;
     for (auto *E : Target->getExtensions()) {
-      if (!shouldPrint(E, Options))
+      if (!Options.shouldPrint(E))
         continue;
       auto Pair = isApplicable(E, /*Synthesized*/false);
       if (Pair.first) {
@@ -314,7 +370,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     };
 
     auto handleExtension = [&](ExtensionDecl *E, bool Synthesized) {
-      if (shouldPrint(E, Options)) {
+      if (Options.shouldPrint(E)) {
         auto Pair = isApplicable(E, Synthesized);
         if (Pair.first) {
           InfoMap->insert({E, Pair.first});
