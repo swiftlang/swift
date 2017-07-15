@@ -151,14 +151,14 @@ int getSyntaxTree(const char *MainExecutablePath,
 
   SmallVector<Decl *, 256> FileDecls;
   SF->getTopLevelDecls(FileDecls);
-  sema::Semantics Sema;
+  SyntaxASTMap ASTMap;
   // Convert the old ASTs to the new full-fidelity syntax tree and print
   // them out.
   for (auto *Decl : FileDecls) {
     if (Decl->escapedFromIfConfig()) {
       continue;
     }
-    auto NewNode = transformAST(ASTNode(Decl), Sema, SourceMgr,
+    auto NewNode = transformAST(ASTNode(Decl), ASTMap, SourceMgr,
                                 BufferID, Tokens);
     if (NewNode.hasValue()) {
       TopLevelDecls.push_back(NewNode.getValue());

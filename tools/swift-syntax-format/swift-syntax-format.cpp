@@ -69,12 +69,12 @@ int doFormat(ArrayRef<StringRef> InputFiles) {
 
     SmallVector<Decl *, 256> FileDecls;
     SF.getTopLevelDecls(FileDecls);
-    sema::Semantics Sema;
+    SyntaxASTMap ASTMap;
     for (auto *Decl : FileDecls) {
       if (Decl->escapedFromIfConfig()) {
         continue;
       }
-      auto NewNode = transformAST(ASTNode(Decl), Sema, SourceMgr,
+      auto NewNode = transformAST(ASTNode(Decl), ASTMap, SourceMgr,
                                   BufferID, Tokens);
       if (NewNode.hasValue()) {
         auto Reformatted = format(NewNode.getValue());

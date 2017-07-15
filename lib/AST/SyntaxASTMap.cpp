@@ -1,4 +1,4 @@
-//===--- Semantics.cpp - Semantics manager --------------------------------===//
+//===--- SyntaxASTMap.cpp - Syntax -> AST Map manager ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,19 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Sema/Semantics.h"
+#include "swift/AST/SyntaxASTMap.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Syntax/Syntax.h"
 
 using namespace swift;
-using namespace swift::sema;
 using namespace swift::syntax;
 
 void
-Semantics::recordSyntaxMapping(RC<syntax::SyntaxData> FromNode,
-                               ASTNode ToNode) {
+SyntaxASTMap::recordSyntaxMapping(RC<syntax::SyntaxData> FromNode,
+                                  ASTNode ToNode) {
   if (FromNode->getKind() == SyntaxKind::Unknown) {
     return;
   }
@@ -32,7 +31,7 @@ Semantics::recordSyntaxMapping(RC<syntax::SyntaxData> FromNode,
 
 
 llvm::Optional<ASTNode>
-Semantics::getNodeForSyntax(syntax::Syntax SyntaxNode) const {
+SyntaxASTMap::getNodeForSyntax(syntax::Syntax SyntaxNode) const {
   auto Found = SyntaxMap.find(SyntaxNode.Root);
   if (Found == SyntaxMap.end()) {
     return None;
@@ -40,11 +39,11 @@ Semantics::getNodeForSyntax(syntax::Syntax SyntaxNode) const {
   return Found->getSecond();
 }
 
-void Semantics::clearSyntaxMap() {
+void SyntaxASTMap::clearSyntaxMap() {
   SyntaxMap.shrink_and_clear();
 }
 
-void Semantics::dumpSyntaxMap() const {
+void SyntaxASTMap::dumpSyntaxMap() const {
   for (const auto &SyntaxAndSemaNode : SyntaxMap) {
     auto SyntaxNode = SyntaxAndSemaNode.getFirst();
     auto SemanticNode = SyntaxAndSemaNode.getSecond();

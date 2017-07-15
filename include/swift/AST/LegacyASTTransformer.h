@@ -18,12 +18,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SYNTAX_LEGACYASTTRANSFORMER_H
-#define SWIFT_SYNTAX_LEGACYASTTRANSFORMER_H
+#ifndef SWIFT_AST_LEGACYASTTRANSFORMER_H
+#define SWIFT_AST_LEGACYASTTRANSFORMER_H
 
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/Sema/Semantics.h"
+#include "swift/AST/SyntaxASTMap.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -47,16 +47,17 @@ class LegacyASTTransformer : public ASTVisitor<LegacyASTTransformer,
     RC<SyntaxData>, // TypeRepr return type
     RC<SyntaxData>> // Attribute return type
   {
-  sema::Semantics &Sema;
+  SyntaxASTMap &ASTMap;
   SourceManager &SourceMgr;
   const unsigned BufferID;
   const TokenPositionList &Tokens;
 public:
-  LegacyASTTransformer(sema::Semantics &Sema,
+  LegacyASTTransformer(SyntaxASTMap &ASTMap,
                        SourceManager &SourceMgr,
                        const unsigned BufferID,
                        const TokenPositionList &Tokens)
-      : Sema(Sema), SourceMgr(SourceMgr), BufferID(BufferID), Tokens(Tokens) {}
+      : ASTMap(ASTMap), SourceMgr(SourceMgr),
+        BufferID(BufferID), Tokens(Tokens) {}
 
   /// If the Decl has attributes, provide the start SourceLoc for them;
   /// otherwise, just ask the Decl for its usual start SourceLoc.
@@ -102,7 +103,7 @@ public:
 /// If the node isn't expressible in a `Syntax`, then `None` is returned.
 Optional<Syntax>
 transformAST(ASTNode Node,
-             sema::Semantics &Sema,
+             SyntaxASTMap &Sema,
              SourceManager &SourceMgr,
              const unsigned BufferID,
              const TokenPositionList &Tokens);
@@ -121,4 +122,4 @@ TokenSyntax findTokenSyntax(tok ExpectedKind,
 } // end namespace syntax
 } // end namespace swift
 
-#endif // SWIFT_SYNTAX_LEGACYASTTRANSFORMER_H
+#endif // SWIFT_AST_LEGACYASTTRANSFORMER_H
