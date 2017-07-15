@@ -267,8 +267,7 @@ ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
 
-// FIXME: make this an error when we've fixed the Dispatch problem.
-WARNING(err_noescape_param_call,none,
+ERROR(err_noescape_param_call,none,
       "passing a %select{|closure which captures a }1non-escaping function "
       "parameter %0 to a call to a non-escaping function parameter can allow "
       "re-entrant modification of a variable",
