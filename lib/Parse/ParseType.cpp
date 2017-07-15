@@ -35,27 +35,8 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
     ty = new (Context) AttributedTypeRepr(attrs, ty);
 
   // Apply 'inout'
-  if (InOutLoc.isValid()) {
-    if (auto *fnTR = dyn_cast<FunctionTypeRepr>(ty)) {
-      // If the input to the function isn't parenthesized, apply the inout
-      // to the first (only) parameter, as we would in Swift 2. (This
-      // syntax is deprecated in Swift 3.)
-      TypeRepr *argsTR = fnTR->getArgsTypeRepr();
-      if (!isa<TupleTypeRepr>(argsTR)) {
-        auto *newArgsTR =
-          new (Context) InOutTypeRepr(argsTR, InOutLoc);
-        auto *newTR =
-          new (Context) FunctionTypeRepr(fnTR->getGenericParams(),
-              newArgsTR,
-              fnTR->getThrowsLoc(),
-              fnTR->getArrowLoc(),
-              fnTR->getResultTypeRepr());
-        newTR->setGenericEnvironment(fnTR->getGenericEnvironment());
-        return newTR;
-      }
-    }
+  if (InOutLoc.isValid())
     ty = new (Context) InOutTypeRepr(ty, InOutLoc);
-  }
 
   return ty;
 }
