@@ -45,7 +45,7 @@ namespace swift {
   class ScopeInfo;
   struct TypeLoc;
   class TupleType;
-  class SILParserState;
+  class SILParserTUState;
   class SourceManager;
   class PersistentParserState;
   class CodeCompletionCallbacks;
@@ -85,7 +85,7 @@ public:
   DiagnosticEngine &Diags;
   SourceFile &SF;
   Lexer *L;
-  SILParserState *SIL;    // Non-null when parsing a .sil file.
+  SILParserTUState *SIL; // Non-null when parsing a .sil file.
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
@@ -304,10 +304,10 @@ public:
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
 public:
-  Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
+  Parser(unsigned BufferID, SourceFile &SF, SILParserTUState *SIL,
          PersistentParserState *PersistentState = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-         SILParserState *SIL = nullptr,
+         SILParserTUState *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr);
   ~Parser();
 

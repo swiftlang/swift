@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ParseSIL.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -34,38 +35,10 @@ using namespace swift;
 // SILParserState implementation
 //===----------------------------------------------------------------------===//
 
-namespace swift {
-  class SILParserTUState {
-  public:
-    SILParserTUState(SILModule &M) : M(M) {}
-    ~SILParserTUState();
+SILParserState::SILParserState(SILModule *M)
+    : Impl(M ? new SILParserTUState(*M) : nullptr) { }
 
-    SILModule &M;
-    
-    /// This is all of the forward referenced functions with
-    /// the location for where the reference is.
-    llvm::DenseMap<Identifier,
-                   std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
-    /// A list of all functions forward-declared by a sil_scope.
-    llvm::DenseSet<SILFunction *> PotentialZombieFns;
-
-    /// A map from textual .sil scope number to SILDebugScopes.
-    llvm::DenseMap<unsigned, SILDebugScope *> ScopeSlots;
-
-    /// Did we parse a sil_stage for this module?
-    bool DidParseSILStage = false;
-    
-    DiagnosticEngine *Diags = nullptr;
-  };
-} // namespace swift
-
-SILParserState::SILParserState(SILModule *M) : M(M) {
-  S = M ? new SILParserTUState(*M) : nullptr;
-}
-
-SILParserState::~SILParserState() {
-  delete S;
-}
+SILParserState::~SILParserState() = default;
 
 SILParserTUState::~SILParserTUState() {
   if (!ForwardRefFns.empty())
@@ -138,7 +111,7 @@ namespace {
                                    bool localScope);
   public:
     SILParser(Parser &P)
-        : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S),
+        : P(P), SILMod(P.SIL->M), TUState(*P.SIL),
           ParsedTypeCallback([](Type ty) {}) {}
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
@@ -4885,13 +4858,13 @@ bool Parser::parseDeclSILStage() {
     return true;
   }
   
-  if (SIL->S->DidParseSILStage) {
+  if (SIL->DidParseSILStage) {
     diagnose(stageLoc, diag::multiple_sil_stage_decls);
     return false;
   }
   
-  SIL->M->setStage(stage);
-  SIL->S->DidParseSILStage = true;
+  SIL->M.setStage(stage);
+  SIL->DidParseSILStage = true;
   return false;
 }
 
@@ -4927,7 +4900,7 @@ bool Parser::parseSILGlobal() {
     GlobalLinkage = SILLinkage::DefaultForDefinition;
 
   // FIXME: check for existing global variable?
-  auto *GV = SILGlobalVariable::create(*SIL->M, GlobalLinkage.getValue(),
+  auto *GV = SILGlobalVariable::create(SIL->M, GlobalLinkage.getValue(),
                                        isSerialized,
                                        GlobalName.str(),GlobalType,
                                        RegularLocation(NameLoc));
@@ -5011,7 +4984,7 @@ bool Parser::parseSILVTable() {
           VTableState.parseSILIdentifier(FuncName, FuncLoc,
                                          diag::expected_sil_value_name))
         return true;
-        Func = SIL->M->lookUpFunction(FuncName.str());
+        Func = SIL->M.lookUpFunction(FuncName.str());
         if (!Func) {
           diagnose(FuncLoc, diag::sil_vtable_func_not_found, FuncName);
           return true;
@@ -5027,7 +5000,7 @@ bool Parser::parseSILVTable() {
   parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                      LBraceLoc);
 
-  SILVTable::create(*SIL->M, theClass, vtableEntries);
+  SILVTable::create(SIL->M, theClass, vtableEntries);
   return false;
 }
 
@@ -5309,7 +5282,7 @@ bool Parser::parseSILWitnessTable() {
 
   SILWitnessTable *wt = nullptr;
   if (theConformance) {
-    wt = SIL->M->lookUpWitnessTable(theConformance, false);
+    wt = SIL->M.lookUpWitnessTable(theConformance, false);
     assert((!wt || wt->isDeclaration()) &&
            "Attempting to create duplicate witness table.");
   }
@@ -5321,7 +5294,7 @@ bool Parser::parseSILWitnessTable() {
       Linkage = SILLinkage::PublicExternal;
     // We ignore empty witness table without normal protocol conformance.
     if (!wt && theConformance)
-      wt = SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
+      wt = SILWitnessTable::create(SIL->M, *Linkage, theConformance);
     BodyScope.reset();
     return false;
   }
@@ -5441,7 +5414,7 @@ bool Parser::parseSILWitnessTable() {
                                         diag::expected_sil_value_name))
           return true;
 
-        Func = SIL->M->lookUpFunction(FuncName.str());
+        Func = SIL->M.lookUpFunction(FuncName.str());
         if (!Func) {
           diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
           return true;
@@ -5462,7 +5435,7 @@ bool Parser::parseSILWitnessTable() {
     Linkage = SILLinkage::Public;
 
   if (!wt)
-    wt = SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
+    wt = SILWitnessTable::create(SIL->M, *Linkage, theConformance);
   wt->convertToDefinition(witnessEntries, isSerialized);
   BodyScope.reset();
   return false;
@@ -5532,7 +5505,7 @@ bool Parser::parseSILDefaultWitnessTable() {
                                       diag::expected_sil_value_name))
         return true;
 
-      SILFunction *Func = SIL->M->lookUpFunction(FuncName.str());
+      SILFunction *Func = SIL->M.lookUpFunction(FuncName.str());
       if (!Func) {
         diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
         return true;
@@ -5549,7 +5522,7 @@ bool Parser::parseSILDefaultWitnessTable() {
   if (!Linkage)
     Linkage = SILLinkage::Public;
 
-  SILDefaultWitnessTable::create(*SIL->M, *Linkage, protocol, witnessEntries);
+  SILDefaultWitnessTable::create(SIL->M, *Linkage, protocol, witnessEntries);
   BodyScope.reset();
   return false;
 }
@@ -5632,7 +5605,7 @@ bool Parser::parseSILCoverageMap() {
                                diag::expected_sil_value_name))
     return true;
 
-  SILFunction *Func = SIL->M->lookUpFunction(FuncName.str());
+  SILFunction *Func = SIL->M.lookUpFunction(FuncName.str());
   if (!Func) {
     diagnose(FuncLoc, diag::sil_coverage_func_not_found, FuncName);
     return true;
@@ -5688,7 +5661,7 @@ bool Parser::parseSILCoverageMap() {
                      LBraceLoc);
 
   if (!BodyHasError)
-    SILCoverageMap::create(*SIL->M, Filename.str(), FuncName.str(),
+    SILCoverageMap::create(SIL->M, Filename.str(), FuncName.str(),
                            Func->isPossiblyUsedExternally(), Hash, Regions,
                            Builder.getExpressions());
   return false;
@@ -5763,12 +5736,12 @@ bool Parser::parseSILScope() {
   parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                      LBraceLoc);
 
-  auto &Scope = SIL->S->ScopeSlots[Slot];
+  auto &Scope = SIL->ScopeSlots[Slot];
   if (Scope) {
     diagnose(SlotLoc, diag::sil_scope_redefined, Slot);
     return true;
   }
 
-  Scope = new (*SIL->M) SILDebugScope(Loc, ParentFn, Parent, InlinedAt);
+  Scope = new (SIL->M) SILDebugScope(Loc, ParentFn, Parent, InlinedAt);
   return false;
 }

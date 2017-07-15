@@ -65,12 +65,12 @@ namespace swift {
   struct TypeLoc;
   class UnifiedStatsReporter;
 
-  /// SILParserState - This is a context object used to optionally maintain SIL
-  /// parsing context for the parser.
+  /// Used to optionally maintain SIL parsing context for the parser.
+  ///
+  /// When not parsing SIL, this has no overhead.
   class SILParserState {
   public:
-    SILModule *M;
-    SILParserTUState *S;
+    std::unique_ptr<SILParserTUState> Impl;
 
     explicit SILParserState(SILModule *M);
     ~SILParserState();

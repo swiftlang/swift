@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
+#include "ParseSIL.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
@@ -141,7 +142,7 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB) {
   SharedTimer timer("Parsing");
-  Parser P(BufferID, SF, SIL, PersistentState);
+  Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens, true);
@@ -312,7 +313,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
+Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUState *SIL,
                PersistentParserState *PersistentState)
   : Parser(std::unique_ptr<Lexer>(
              new Lexer(SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -320,11 +321,11 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
                    /*InSILMode=*/SIL != nullptr,
                    SF.getASTContext().LangOpts.AttachCommentsToDecls
                    ? CommentRetentionMode::AttachToNextToken
-                   : CommentRetentionMode::None)), SF, SIL, PersistentState) {
+                   : CommentRetentionMode::None)), SF, SIL, PersistentState){
 }
 
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-               SILParserState *SIL, PersistentParserState *PersistentState)
+               SILParserTUState *SIL, PersistentParserState *PersistentState)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
