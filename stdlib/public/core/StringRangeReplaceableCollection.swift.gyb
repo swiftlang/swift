@@ -44,7 +44,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   
   // This initializer satisfies the LosslessStringConvertible conformance
   @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
-  public init?(_ other: String) {
+  public init?(_ other: String, obsoletedInSwift4: () = ()) {
     self.init(other._core)
   }
 

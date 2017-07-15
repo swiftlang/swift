@@ -81,7 +81,7 @@ extension String.Index {
   
   /// The offset into a string's UTF-16 encoding for this index.
   public var encodedOffset : Int {
-    return Int(_compoundOffset >> numericCast(_Self._strideBits))
+    return Int(_compoundOffset >> _Self._strideBits)
   }
 
   /// The offset of this index within whatever encoding this is being viewed as
