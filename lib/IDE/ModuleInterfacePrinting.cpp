@@ -12,6 +12,7 @@
 
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -522,7 +523,7 @@ void swift::ide::printSubmoduleInterface(
 
   auto PrintDecl = [&](Decl *D) -> bool {
     ASTPrinter &Printer = *PrinterToUse;
-    if (!shouldPrint(D, AdjustedOptions)) {
+    if (!AdjustedOptions.shouldPrint(D)) {
       Printer.callAvoidPrintDeclPost(D);
       return false;
     }
@@ -564,7 +565,7 @@ void swift::ide::printSubmoduleInterface(
           // Print Ext and add sub-types of Ext.
           for (auto Ext : NTD->getExtensions()) {
             if (!PrintSynthesizedExtensions) {
-              if (!shouldPrint(Ext, AdjustedOptions)) {
+              if (!AdjustedOptions.shouldPrint(Ext)) {
                 Printer.callAvoidPrintDeclPost(Ext);
                 continue;
               }
@@ -772,7 +773,7 @@ void swift::ide::printHeaderInterface(
 
   for (auto *D : ClangDecls) {
     ASTPrinter &Printer = *PrinterToUse;
-    if (!shouldPrint(D, AdjustedOptions)) {
+    if (!AdjustedOptions.shouldPrint(D)) {
       Printer.callAvoidPrintDeclPost(D);
       continue;
     }

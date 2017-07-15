@@ -3056,7 +3056,7 @@ int main(int argc, char *argv[]) {
 
   PrintOptions PrintOpts;
   if (options::PrintInterface) {
-    PrintOpts = PrintOptions::printInterface();
+    PrintOpts = PrintOptions::printModuleInterface();
   } else if (options::PrintInterfaceForDoc) {
     PrintOpts = PrintOptions::printDocInterface();
   } else {

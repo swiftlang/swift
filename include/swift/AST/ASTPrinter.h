@@ -305,9 +305,6 @@ public:
   }
 };
 
-bool shouldPrint(const Decl *D, PrintOptions &Options);
-bool shouldPrintPattern(const Pattern *P, PrintOptions &Options);
-
 void printContext(raw_ostream &os, DeclContext *dc);
 
 bool printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
