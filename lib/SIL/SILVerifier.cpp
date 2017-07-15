@@ -2409,6 +2409,28 @@ public:
             "SILFunction");
   }
 
+  void checkOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *OEI) {
+    SILType operandType = OEI->getOperand()->getType();
+    require(operandType.isObject(),
+            "open_existential_box operand must not be address");
+
+    require(operandType.canUseExistentialRepresentation(F.getModule(),
+                                              ExistentialRepresentation::Boxed),
+            "open_existential_box operand must be boxed existential");
+
+    CanType resultInstanceTy = OEI->getType().getSwiftRValueType();
+
+    require(!OEI->getType().isAddress(),
+            "open_existential_box_value result must not be an address");
+
+    auto archetype = getOpenedArchetypeOf(resultInstanceTy);
+    require(archetype,
+        "open_existential_box_value result not an opened existential archetype");
+    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+            "Archetype opened by open_existential_box_value should be "
+            "registered in SILFunction");
+  }
+
   void checkOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *I) {
     SILType operandType = I->getOperand()->getType();
     require(operandType.isObject(),

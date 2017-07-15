@@ -942,6 +942,7 @@ public:
 
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *i);
   void visitOpenExistentialBoxInst(OpenExistentialBoxInst *i);
+  void visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *i);
   void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i);
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *i);
   
@@ -4923,6 +4924,11 @@ void IRGenSILFunction::visitOpenExistentialBoxInst(OpenExistentialBoxInst *i) {
   auto addr = emitOpenExistentialBox(*this, box, i->getOperand()->getType(),
                                      openedArchetype);
   setLoweredAddress(i, addr);
+}
+
+void IRGenSILFunction::visitOpenExistentialBoxValueInst(
+  OpenExistentialBoxValueInst *i) {
+  llvm_unreachable("unsupported instruction during IRGen");
 }
 
 void

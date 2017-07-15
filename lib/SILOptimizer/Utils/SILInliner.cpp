@@ -400,6 +400,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialAddrInst:
     case ValueKind::OpenExistentialBoxInst:
+    case ValueKind::OpenExistentialBoxValueInst:
     case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::OpenExistentialRefInst:
     case ValueKind::OpenExistentialValueInst:

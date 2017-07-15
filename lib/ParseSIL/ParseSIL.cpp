@@ -2182,6 +2182,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   }
   case ValueKind::OpenExistentialAddrInst:
   case ValueKind::OpenExistentialBoxInst:
+  case ValueKind::OpenExistentialBoxValueInst:
   case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::OpenExistentialValueInst: {
@@ -2229,6 +2230,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
     case ValueKind::OpenExistentialBoxInst:
       ResultVal = B.createOpenExistentialBox(InstLoc, Val, Ty);
+      break;
+    case ValueKind::OpenExistentialBoxValueInst:
+      ResultVal = B.createOpenExistentialBoxValue(InstLoc, Val, Ty);
       break;
     case ValueKind::OpenExistentialValueInst:
       ResultVal = B.createOpenExistentialValue(InstLoc, Val, Ty);

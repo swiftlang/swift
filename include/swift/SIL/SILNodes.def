@@ -245,6 +245,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(OpenExistentialMetatypeInst, SILInstruction, open_existential_metatype, None, DoesNotRelease)
   INST(OpenExistentialBoxInst, SILInstruction, open_existential_box, MayRead, DoesNotRelease)
   INST(OpenExistentialValueInst, SILInstruction, open_existential_value, MayRead, DoesNotRelease)
+  INST(OpenExistentialBoxValueInst, SILInstruction, open_existential_box_value, MayRead, DoesNotRelease)
 
   // Blocks
   INST(ProjectBlockStorageInst, SILInstruction, project_block_storage, None, DoesNotRelease)

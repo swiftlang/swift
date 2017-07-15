@@ -63,6 +63,17 @@ bb0(%0 : $T):
   return %t : $()
 }
 
+// CHECK-LABEL: sil @openExistentialBoxValue : $@convention(thin) (@in Error) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Error):
+// CHECK:  open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}) Error
+// CHECK-LABEL: } // end sil function 'openExistentialBoxValue'
+sil @openExistentialBoxValue : $@convention(thin) (@in Error) -> () {
+bb0(%0 : $Error):
+  %o = open_existential_box_value %0 : $Error to $@opened("2E9EACA6-FD59-11E6-B016-685B3593C495") Error
+  %t = tuple ()
+  return %t : $()
+}
+
 // CHECK-LABEL: sil @openExistentialValue : $@convention(thin) (@in Foo) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Foo):
 // CHECK:  open_existential_value [[ARG]] : $Foo to $@opened({{.*}}) Foo

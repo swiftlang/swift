@@ -1226,6 +1226,15 @@ public:
     return I;
   }
 
+  OpenExistentialBoxValueInst *
+  createOpenExistentialBoxValue(SILLocation Loc, SILValue Operand, SILType Ty) {
+    auto *I = insert(new (F.getModule()) OpenExistentialBoxValueInst(
+        getSILDebugLocation(Loc), Operand, Ty));
+    if (OpenedArchetypesTracker)
+      OpenedArchetypesTracker->registerOpenedArchetypes(I);
+    return I;
+  }
+
   InitExistentialAddrInst *
   createInitExistentialAddr(SILLocation Loc, SILValue Existential,
                             CanType FormalConcreteType,

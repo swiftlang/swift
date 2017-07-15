@@ -4745,6 +4745,17 @@ class OpenExistentialBoxInst
                          SILType ty);
 };
 
+/// Given a boxed existential container, "opens" the existential by returning a
+/// fresh archetype T, which also captures the (dynamic) conformances.
+class OpenExistentialBoxValueInst
+  : public UnaryInstructionBase<ValueKind::OpenExistentialBoxValueInst>
+{
+  friend SILBuilder;
+
+  OpenExistentialBoxValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                              SILType ty);
+};
+
 /// Given an address to an uninitialized buffer of
 /// a protocol type, initializes its existential container to contain a concrete
 /// value of the given type, and returns the address of the uninitialized

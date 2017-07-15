@@ -1777,6 +1777,11 @@ OpenExistentialBoxInst::OpenExistentialBoxInst(
     : UnaryInstructionBase(DebugLoc, operand, ty) {
 }
 
+OpenExistentialBoxValueInst::OpenExistentialBoxValueInst(
+    SILDebugLocation DebugLoc, SILValue operand, SILType ty)
+    : UnaryInstructionBase(DebugLoc, operand, ty) {
+}
+
 OpenExistentialValueInst::OpenExistentialValueInst(SILDebugLocation DebugLoc,
                                                      SILValue Operand,
                                                      SILType SelfTy)
