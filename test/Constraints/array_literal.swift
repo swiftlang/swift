@@ -155,6 +155,15 @@ func defaultToAny(i: Int, s: String) {
   let _: Int = a6 // expected-error{{value of type '[A]'}}
 }
 
+func noInferAny(iob: inout B, ioc: inout C) {
+  var b = B()
+  var c = C()
+  let _ = [b, c, iob, ioc] // do not infer [Any] when elements are lvalues or inout
+  let _: [A] = [b, c, iob, ioc] // do not infer [Any] when elements are lvalues or inout
+  b = B()
+  c = C()
+}
+
 /// Check handling of 'nil'.
 protocol Proto1 {}
 protocol Proto2 {}
