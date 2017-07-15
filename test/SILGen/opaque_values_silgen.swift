@@ -489,10 +489,9 @@ func s210______compErasure(_ x: Foo & Error) -> Error {
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s220_____openExistBoxSSs5Error_pF : $@convention(thin) (@owned Error) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : $Error):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $*@opened({{.*}}) Error
-// CHECK:   [[LOAD_ALLOC:%.*]] = load [copy] [[OPAQUE_ARG]]
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[BORROWED_ARG]] : $Error to $@opened({{.*}}) Error
 // CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
-// CHECK:   store [[LOAD_ALLOC]] to [init] [[ALLOC_OPEN]]
+// CHECK:   store_borrow [[OPAQUE_ARG]] to [[ALLOC_OPEN]]
 // CHECK:   dealloc_stack [[ALLOC_OPEN]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]] : $Error
@@ -1002,6 +1001,21 @@ func s470________nativeToC(fromAny any: Any) -> AnyObject {
   return any as AnyObject
 }
 #endif
+
+// Test emitOpenExistential
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s480_________getErroryps0F0_p04someF0_tF : $@convention(thin) (@owned Error) -> @out Any {
+// CHECK: bb0(%0 : $Error):
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Error
+// CHECK: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened("{{.*}}") Error
+// CHECK: [[COPY:%.*]] = copy_value [[VAL]] : $@opened("{{.*}}") Error
+// CHECK: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened("{{.*}}") Error, $@opened("{{.*}}") Error, $Any
+// CHECK: destroy_value %0 : $Error
+// CHECK: return [[ANY]] : $Any
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s480_________getErroryps0F0_p04someF0_tF'
+func s480_________getError(someError: Error) -> Any {
+  return someError
+}
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
