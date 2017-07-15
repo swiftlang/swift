@@ -21,8 +21,8 @@ extension String.UTF16View.Index {
 
   @available(swift, deprecated: 3.2)
   @available(swift, obsoleted: 4.0)
-  public func distance(to other: String.UTF16View.Index) -> Int {
-    return _offset.distance(to: other._offset)
+  public func distance(to other: String.UTF16View.Index?) -> Int {
+    return _offset.distance(to: other!._offset)
   }
 
   @available(swift, deprecated: 3.2)
