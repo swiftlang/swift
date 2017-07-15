@@ -135,7 +135,7 @@ public:
 
   Type createNominalType(NominalTypeDecl *decl, Type parent) {
     // If the declaration is generic, fail.
-    if (decl->getGenericSignature())
+    if (decl->getGenericParams())
       return Type();
 
     // Validate the parent type.
@@ -148,7 +148,7 @@ public:
   Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args,
                               Type parent) {
     // If the declaration isn't generic, fail.
-    if (!decl->getGenericSignature())
+    if (!decl->getGenericParams())
       return Type();
 
     // Validate the parent type.
@@ -212,9 +212,11 @@ public:
           auto nominal = p->castTo<NominalType>();
           simpleComponents.emplace_back(SourceLoc(),
                                         nominal->getDecl()->getName());
+          simpleComponents.back().setValue(nominal->getDecl());
           componentReprs.push_back(&simpleComponents.back());
         }
       }
+      componentReprs.push_back(&genericRepr);
 
       CompoundIdentTypeRepr compoundRepr(componentReprs);
       genericType = checkTypeRepr(&compoundRepr);
