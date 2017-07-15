@@ -10,15 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ParseSIL.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/ParseSILSupport.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -35,10 +36,39 @@ using namespace swift;
 // SILParserState implementation
 //===----------------------------------------------------------------------===//
 
-SILParserState::SILParserState(SILModule *M)
-    : Impl(M ? new SILParserTUState(*M) : nullptr) { }
+namespace swift {
+// This has to be in the 'swift' namespace because it's forward-declared for
+// SILParserState.
+class SILParserTUState : public SILParserTUStateBase {
+public:
+  explicit SILParserTUState(SILModule &M) : M(M) {}
+  ~SILParserTUState();
 
-SILParserState::~SILParserState() = default;
+  SILModule &M;
+
+  /// This is all of the forward referenced functions with
+  /// the location for where the reference is.
+  llvm::DenseMap<Identifier,
+                 std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
+  /// A list of all functions forward-declared by a sil_scope.
+  llvm::DenseSet<SILFunction *> PotentialZombieFns;
+
+  /// A map from textual .sil scope number to SILDebugScopes.
+  llvm::DenseMap<unsigned, SILDebugScope *> ScopeSlots;
+
+  /// Did we parse a sil_stage for this module?
+  bool DidParseSILStage = false;
+
+  bool parseDeclSIL(Parser &P) override;
+  bool parseDeclSILStage(Parser &P) override;
+  bool parseSILVTable(Parser &P) override;
+  bool parseSILGlobal(Parser &P) override;
+  bool parseSILWitnessTable(Parser &P) override;
+  bool parseSILDefaultWitnessTable(Parser &P) override;
+  bool parseSILCoverageMap(Parser &P) override;
+  bool parseSILScope(Parser &P) override;
+};
+} // end namespace swift
 
 SILParserTUState::~SILParserTUState() {
   if (!ForwardRefFns.empty()) {
@@ -57,6 +87,32 @@ SILParserTUState::~SILParserTUState() {
       Fn->setInlined();
       M.eraseFunction(Fn);
     }
+}
+
+SILParserState::SILParserState(SILModule *M)
+    : Impl(M ? llvm::make_unique<SILParserTUState>(*M) : nullptr) {}
+
+SILParserState::~SILParserState() = default;
+
+bool swift::parseIntoSourceFile(SourceFile &SF,
+                                unsigned BufferID,
+                                bool *Done,
+                                SILParserState *SIL,
+                                PersistentParserState *PersistentState,
+                                DelayedParsingCallbacks *DelayedParseCB) {
+  SharedTimer timer("Parsing");
+  Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
+  PrettyStackTraceParser StackTrace(P);
+
+  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens, true);
+
+  if (DelayedParseCB)
+    P.setDelayedParsingCallbacks(DelayedParseCB);
+
+  bool FoundSideEffects = P.parseTopLevel();
+  *Done = P.Tok.is(tok::eof);
+
+  return FoundSideEffects;
 }
 
 
@@ -115,7 +171,8 @@ namespace {
                                    bool localScope);
   public:
     SILParser(Parser &P)
-        : P(P), SILMod(P.SIL->M), TUState(*P.SIL),
+        : P(P), SILMod(static_cast<SILParserTUState *>(P.SIL)->M),
+          TUState(*static_cast<SILParserTUState *>(P.SIL)),
           ParsedTypeCallback([](Type ty) {}) {}
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics

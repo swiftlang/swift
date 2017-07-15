@@ -9,4 +9,5 @@ target_link_libraries(SwiftASTTests
    swiftAST
    # FIXME: Circular dependencies.
    swiftParse
+   swiftSema
 )
