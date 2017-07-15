@@ -25,6 +25,11 @@ Type Type::join(Type type1, Type type2) {
   assert(!type1->hasTypeVariable() && !type2->hasTypeVariable() &&
          "Cannot compute join of types involving type variables");
 
+  assert(type1->getWithoutSpecifierType()->isEqual(type1) &&
+         "Expected simple type!");
+  assert(type2->getWithoutSpecifierType()->isEqual(type2) &&
+         "Expected simple type!");
+
   // FIXME: This algorithm is woefully incomplete, and is only currently used
   // for optimizing away extra exploratory work in the constraint solver. It
   // should eventually encompass all of the subtyping rules of the language.

@@ -480,12 +480,12 @@ public final class _DataStorage {
             let data = d.mutableCopy() as! NSMutableData
             data.replaceBytes(in: range, withBytes: replacementBytes, length: replacementLength)
             _backing = .mutable(data)
-            _length = replacementLength
+            _length = data.length
             _bytes = data.mutableBytes
         case .mutable(let d):
             d.replaceBytes(in: range, withBytes: replacementBytes, length: replacementLength)
             _backing = .mutable(d)
-            _length = replacementLength
+            _length = d.length
             _bytes = d.mutableBytes
         case .customReference(let d):
             let data = d.mutableCopy() as! NSMutableData

@@ -1493,8 +1493,15 @@ public:
                                      SubstitutionList SelfInterfaceSubs,
                                      SubstitutionList SelfContextSubs);
 
+  /// Pre-check the expression, validating any types that occur in the
+  /// expression and folding sequence expressions.
+  bool preCheckExpression(Expr *&expr, DeclContext *dc);
+
   /// Sets up and solves the constraint system \p cs to type check the given
   /// expression.
+  ///
+  /// The expression should have already been pre-checked with
+  /// preCheckExpression().
   ///
   /// \returns true if an error occurred, false otherwise.
   ///
