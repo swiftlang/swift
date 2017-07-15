@@ -22,8 +22,7 @@ var gInThread2: () -> () = { }
 func testRace(name: String, thread inThread1: @escaping () -> (), thread inThread2: @escaping () -> ()) {
   var thread1: pthread_t?
   var thread2: pthread_t?
-  print("Running \(name)")
-  fflush(stdout)
+  fputs("Running \(name)\n", stderr)
 
   // Store these in globals so the closure passed to pthread_create
   // can be turned into a C function pointer.
@@ -43,8 +42,7 @@ func testRace(name: String, thread inThread1: @escaping () -> (), thread inThrea
   _ = pthread_join(thread2!, nil)
 
   // TSan reports go to stderr
-  fflush(stderr)
-  print("Done \(name)")
+  fputs("Done \(name)\n", stderr)
 }
 
 
