@@ -157,10 +157,11 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       if (lastSupertypeIndex) {
         // Can we compute a join?
         auto &lastBinding = result.Bindings[*lastSupertypeIndex];
-        if (auto meet =
-                Type::join(lastBinding.BindingType, binding.BindingType)) {
+        auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
+        auto bindingType = binding.BindingType->getWithoutSpecifierType();
+        if (auto join = Type::join(lastType, bindingType)) {
           // Replace the last supertype binding with the join. We're done.
-          lastBinding.BindingType = meet;
+          lastBinding.BindingType = join;
           return;
         }
       }
