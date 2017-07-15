@@ -302,25 +302,13 @@ extension UIFocusItem {
 
 #if os(iOS)
 
-public protocol _SwiftDragDropItemProvider {
-  associatedtype _FoundationType : NSObject
-}
-
-extension String : _SwiftDragDropItemProvider {
-  public typealias _FoundationType = NSString
-}
-
-extension URL : _SwiftDragDropItemProvider {
-  public typealias _FoundationType = NSURL
-}
-
 @available(iOS 11.0, *)
 extension UIDragDropSession {
   @available(iOS 11.0, *)
   public func canLoadObjects<
-    T : _SwiftDragDropItemProvider
-  >(ofClass: T.Type) -> Bool where T._FoundationType : NSItemProviderReading {
-    return self.canLoadObjects(ofClass: T._FoundationType.self);
+    T : _ObjectiveCBridgeable
+  >(ofClass: T.Type) -> Bool where T._ObjectiveCType : NSItemProviderReading {
+    return self.canLoadObjects(ofClass: T._ObjectiveCType.self);
   }
 }
 
@@ -328,12 +316,12 @@ extension UIDragDropSession {
 extension UIDropSession {
   @available(iOS 11.0, *)
   public func loadObjects<
-    T : _SwiftDragDropItemProvider
+    T : _ObjectiveCBridgeable
   >(
     ofClass: T.Type,
     completion: @escaping ([T]) -> Void
-  ) -> Progress where T._FoundationType : NSItemProviderReading {
-    return self.loadObjects(ofClass: T._FoundationType.self) { nss in
+  ) -> Progress where T._ObjectiveCType : NSItemProviderReading {
+    return self.loadObjects(ofClass: T._ObjectiveCType.self) { nss in
       let natives = nss.map { $0 as! T }
       completion(natives)
     }
@@ -344,17 +332,17 @@ extension UIDropSession {
 extension UIPasteConfiguration {
   @available(iOS 11.0, *)
   public convenience init<
-    T : _SwiftDragDropItemProvider
-  >(forAccepting _: T.Type) where T._FoundationType : NSItemProviderReading {
-    self.init(forAccepting: T._FoundationType.self)
+    T : _ObjectiveCBridgeable
+  >(forAccepting _: T.Type) where T._ObjectiveCType : NSItemProviderReading {
+    self.init(forAccepting: T._ObjectiveCType.self)
   }
 
   @available(iOS 11.0, *)
   public func addTypeIdentifiers<
-    T : _SwiftDragDropItemProvider
+    T : _ObjectiveCBridgeable
   >(forAccepting aClass: T.Type)
-  where T._FoundationType : NSItemProviderReading {
-    self.addTypeIdentifiers(forAccepting: T._FoundationType.self)
+  where T._ObjectiveCType : NSItemProviderReading {
+    self.addTypeIdentifiers(forAccepting: T._ObjectiveCType.self)
   }
 }
 
@@ -362,21 +350,25 @@ extension UIPasteConfiguration {
 extension UIPasteboard {
   @available(iOS 11.0, *)
   public func setObjects<
-    T : _SwiftDragDropItemProvider
-  >(_ objects: [T]) where T._FoundationType : NSItemProviderWriting {
-    self.setObjects(objects.map { $0 as! T._FoundationType })
+    T : _ObjectiveCBridgeable
+  >(_ objects: [T]) where T._ObjectiveCType : NSItemProviderWriting {
+    // Using a simpler `$0 as! T._ObjectiveCType` triggers and assertion in
+    // the compiler.
+    self.setObjects(objects.map { $0._bridgeToObjectiveC() })
   }
 
   @available(iOS 11.0, *)
   public func setObjects<
-    T : _SwiftDragDropItemProvider
+    T : _ObjectiveCBridgeable
   >(
     _ objects: [T],
     localOnly: Bool,
     expirationDate: Date?
-  ) where T._FoundationType : NSItemProviderWriting {
+  ) where T._ObjectiveCType : NSItemProviderWriting {
     self.setObjects(
-      objects.map { $0 as! T._FoundationType },
+      // Using a simpler `$0 as! T._ObjectiveCType` triggers and assertion in
+      // the compiler.
+      objects.map { $0._bridgeToObjectiveC() },
       localOnly: localOnly,
       expirationDate: expirationDate)
   }
