@@ -2125,7 +2125,7 @@ extension FixedWidthInteger {
   ///
   /// [identity element]:http://en.wikipedia.org/wiki/Identity_element
   /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
-  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
+  @available(swift, deprecated: 3.1, obsoleted: 4.1, message: "Use 0")
   public static var allZeros: Self { return 0 }
 
   @_inlineable
