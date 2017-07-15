@@ -1600,8 +1600,8 @@ CleanupIllFormedExpressionRAII::~CleanupIllFormedExpressionRAII() {
 
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
-static bool preCheckExpression(TypeChecker &tc, Expr *&expr, DeclContext *dc) {
-  PreCheckExpression preCheck(tc, dc);
+bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
+  PreCheckExpression preCheck(*this, dc);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;
@@ -1609,7 +1609,7 @@ static bool preCheckExpression(TypeChecker &tc, Expr *&expr, DeclContext *dc) {
   }
 
   // Pre-check failed. Clean up and return.
-  CleanupIllFormedExpressionRAII::doIt(expr, tc.Context);
+  CleanupIllFormedExpressionRAII::doIt(expr, Context);
   return true;
 }
 
@@ -1645,11 +1645,6 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    ExprTypeCheckListener *listener, ConstraintSystem &cs,
                    SmallVectorImpl<Solution> &viable,
                    TypeCheckExprOptions options) {
-  // First, pre-check the expression, validating any types that occur in the
-  // expression and folding sequence expressions.
-  if (preCheckExpression(*this, expr, dc))
-    return true;
-
   // Attempt to solve the constraint system.
   auto solution = cs.solve(expr,
                            convertType,
@@ -1707,6 +1702,7 @@ namespace {
     llvm::SmallVector<Expr*,4> Exprs;
     llvm::SmallVector<TypeLoc*, 4> TypeLocs;
     llvm::SmallVector<Pattern*, 4> Patterns;
+    llvm::SmallVector<VarDecl*, 4> Vars;
   public:
 
     ExprCleanser(Expr *E) {
@@ -1727,6 +1723,13 @@ namespace {
         std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
           TS->Patterns.push_back(P);
           return { true, P };
+        }
+
+        bool walkToDeclPre(Decl *D) override {
+          if (auto VD = dyn_cast<VarDecl>(D))
+            TS->Vars.push_back(VD);
+
+          return true;
         }
 
         // Don't walk into statements.  This handles the BraceStmt in
@@ -1757,6 +1760,13 @@ namespace {
         if (P->hasType() && P->getType()->hasTypeVariable())
           P->setType(Type());
       }
+
+      for (auto VD : Vars) {
+        if (VD->hasType() && VD->getType()->hasTypeVariable()) {
+          VD->setType(Type());
+          VD->setInterfaceType(Type());
+        }
+      }
     }
   };
 } // end anonymous namespace
@@ -1769,6 +1779,11 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+
+  // First, pre-check the expression, validating any types that occur in the
+  // expression and folding sequence expressions.
+  if (preCheckExpression(expr, dc))
+    return true;
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
@@ -1839,8 +1854,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
       return true;
   }
 
-  if (options.contains(TypeCheckExprFlags::SkipApplyingSolution))
+  if (options.contains(TypeCheckExprFlags::SkipApplyingSolution)) {
+    cleanup.disable();
     return false;
+  }
 
   // Apply the solution to the expression.
   bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
