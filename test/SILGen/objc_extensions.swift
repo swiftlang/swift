@@ -75,16 +75,17 @@ extension Sub {
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
+    // CHECK:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF_COPY]] : $Base
+    // CHECK:   [[SUPERREF_DOWNCAST:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF]] : $Base to $Sub
+    // CHECK:   [[SET_SUPER_METHOD:%.*]] = super_method [volatile] [[SUPERREF_DOWNCAST]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
+    // CHECK:   end_borrow [[BORROWED_UPCAST_SELF]]
     // CHECK:   [[BORROWED_NEW_VALUE:%.*]] = begin_borrow [[NEW_VALUE]]
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[BORROWED_NEW_VALUE]]
-    // CHECK:   [[BORROWED_SELF_COPY_FOR_SUPERREF:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
-    // CHECK:   [[SUPERREF_DOWNCAST:%.*]] = unchecked_ref_cast [[BORROWED_SELF_COPY_FOR_SUPERREF]] : $Base to $Sub
-    // CHECK:   [[SET_SUPER_METHOD:%.*]] = super_method [volatile] [[SUPERREF_DOWNCAST]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
-    // CHECK:   end_borrow [[BORROWED_SELF_COPY_FOR_SUPERREF]] from [[UPCAST_SELF_COPY]]
     // CHECK:   switch_enum [[NEW_VALUE_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
     //
     // CHECK: bb4([[OLD_STRING:%.*]] : $String):
     // CHECK: bb6([[BRIDGED_NEW_STRING:%.*]] : $Optional<NSString>):
+    // CHECK:    end_borrow [[BORROWED_NEW_VALUE]]
     // CHECK:    apply [[SET_SUPER_METHOD]]([[BRIDGED_NEW_STRING]], [[UPCAST_SELF_COPY]])
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
     // CHECK:    destroy_value [[SELF_COPY]]

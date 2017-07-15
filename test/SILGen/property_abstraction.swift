@@ -140,10 +140,10 @@ func setBuilder<F: Factory where F.Product == MyClass>(_ factory: inout F) {
 }
 // CHECK: sil hidden @_T020property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
 // CHECK: bb0(%0 : $*F):
+// CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
 // CHECK:   [[F0:%.*]] = function_ref @_T020property_abstraction10setBuilder{{[_0-9a-zA-Z]*}} : $@convention(thin) () -> @owned MyClass
 // CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]
-// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*F
-// CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
 // CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_T0{{.*}}TR :
 // CHECK:   [[F2:%.*]] = partial_apply [[REABSTRACTOR]]([[F1]])
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*F
 // CHECK:   apply [[SETTER]]<F>([[F2]], [[WRITE]])

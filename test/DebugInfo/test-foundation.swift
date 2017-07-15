@@ -55,12 +55,10 @@ public func err() {
 public func date() {
   // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L1:.*]]
   let d1 = DateFormatter()
-  // LOC-CHECK: br{{.*}}, !dbg ![[L2:.*]]
-  d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2]]
+  d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2:.*]]
   // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L3:.*]]
   let d2 = DateFormatter()
-  // LOC-CHECK: br{{.*}}, !dbg ![[L4:.*]]
-  d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4]]
+  d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4:.*]]
 }
 
 // Make sure we build some witness tables for enums.

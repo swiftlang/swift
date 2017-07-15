@@ -793,10 +793,6 @@ public:
                                       ValueTransformRef transform,
                                       SGFContext C = SGFContext());
 
-  using ValueProducerRef =
-    llvm::function_ref<ManagedValue(SILGenFunction &gen, SILLocation loc,
-                                    SGFContext context)>;
-
   ManagedValue emitOptionalSome(SILLocation loc, SILType optionalTy,
                                 ValueProducerRef injector,
                                 SGFContext C = SGFContext());
@@ -933,7 +929,7 @@ public:
   ManagedValue emitConvertedRValue(SILLocation loc,
                                    const Conversion &conversion,
                                    SGFContext C,
-                llvm::function_ref<ManagedValue(SGFContext)> produceValue);
+                                   ValueProducerRef produceValue);
 
   /// Emit the given expression as an r-value that follows the
   /// abstraction patterns of the original type.
@@ -1050,7 +1046,8 @@ public:
                        SubstitutionList substitutions,
                        ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
-                       RValue &&optionalSubscripts, RValue &&value);
+                       RValue &&optionalSubscripts,
+                       ArgumentSource &&value);
 
   SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl,
                                          bool isDirectAccessorUse);  
@@ -1174,8 +1171,8 @@ public:
                                     IsTake_t isTake,
                                     bool isGuaranteedValid = false);
 
-  void emitAssignToLValue(SILLocation loc, RValue &&src,
-                          LValue &&dest);
+  void emitAssignToLValue(SILLocation loc, ArgumentSource &&src, LValue &&dest);
+  void emitAssignToLValue(SILLocation loc, RValue &&src, LValue &&dest);
   void emitAssignLValueToLValue(SILLocation loc,
                                 LValue &&src, LValue &&dest);
   void emitCopyLValueInto(SILLocation loc, LValue &&src,

@@ -179,8 +179,8 @@ func logical_struct_get() -> Int {
 func logical_struct_set(_ value: inout Val, z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
-  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}fs
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
   // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[WRITE]])
   // CHECK: return
 }
@@ -189,9 +189,9 @@ func logical_struct_set(_ value: inout Val, z: Int) {
 func logical_struct_in_tuple_set(_ value: inout (Int, Val), z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
+  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}fs
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
   // CHECK: [[VAL_1:%[0-9]+]] = tuple_element_addr [[WRITE]] : {{.*}}, 1
-  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}fs
   // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[VAL_1]])
   // CHECK: return
 }
@@ -202,7 +202,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   value.ref.val_prop.z_tuple.1 = z1
   // -- val.ref
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[VAL]]
-  // CHECK: [[VAL_REF_ADDR:%[0-9]+]] = struct_element_addr [[WRITE]] : $*Val, #Val.ref
+  // CHECK: [[VAL_REF_ADDR:%[0-9]+]] = struct_element_addr [[READ]] : $*Val, #Val.ref
   // CHECK: [[VAL_REF:%[0-9]+]] = load [copy] [[VAL_REF_ADDR]]
   // -- getters and setters
   // -- val.ref.val_prop
@@ -398,8 +398,8 @@ func val_subscript_set(_ v: Val, i: Int, x: Float) {
   v[i] = x
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var Val }
   // CHECK: [[PB:%.*]] = project_box [[VADDR]]
-  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV9subscript{{[_0-9a-zA-Z]*}}fs
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: apply [[SUBSCRIPT_SET_METHOD]]([[X]], [[I]], [[WRITE]])
 }
 

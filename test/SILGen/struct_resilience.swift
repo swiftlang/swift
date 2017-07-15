@@ -16,12 +16,12 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%[0-9]*]] : $*Size
   var s2 = s
 
+// CHECK:         [[SETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifs : $@convention(method) (Int, @inout Size) -> ()
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
-// CHECK:         [[FN:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifg : $@convention(method) (@in_guaranteed Size) -> Int
-// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
+// CHECK:         [[GETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifg : $@convention(method) (@in_guaranteed Size) -> Int
+// CHECK:         [[RESULT:%.*]] = apply [[GETTER]]([[SIZE_BOX]])
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] [[OTHER_SIZE_BOX]] : $*Size
-// CHECK:         [[FN:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifs : $@convention(method) (Int, @inout Size) -> ()
-// CHECK:         apply [[FN]]([[RESULT]], [[WRITE]])
+// CHECK:         apply [[SETTER]]([[RESULT]], [[WRITE]])
   s2.w = s.w
 
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size

@@ -23,10 +23,10 @@ class SwiftGizmo : Gizmo {
   // Make sure that we're calling through the @objc entry points.
   // CHECK-LABEL: sil hidden @_T019objc_attr_NSManaged10SwiftGizmoC7modifyX{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed SwiftGizmo) -> () {
   func modifyX() {
-    // CHECK:   [[GETTER:%[0-9]+]] = class_method [volatile] [[SELF:%.*]] : $SwiftGizmo, #SwiftGizmo.x!getter.1.foreign : (SwiftGizmo) -> () -> X, $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
+    // CHECK:   [[SETTER:%[0-9]+]] = class_method [volatile] [[SELF:%.*]] : $SwiftGizmo, #SwiftGizmo.x!setter.1.foreign : (SwiftGizmo) -> (X) -> (), $@convention(objc_method) (X, SwiftGizmo) -> ()
+    // CHECK:   [[GETTER:%[0-9]+]] = class_method [volatile] [[SELF]] : $SwiftGizmo, #SwiftGizmo.x!getter.1.foreign : (SwiftGizmo) -> () -> X, $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
     // CHECK-NEXT: apply [[GETTER]]([[SELF]]) : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
     // CHECK-NOT: return
-    // CHECK:   [[SETTER:%[0-9]+]] = class_method [volatile] [[SELF]] : $SwiftGizmo, #SwiftGizmo.x!setter.1.foreign : (SwiftGizmo) -> (X) -> (), $@convention(objc_method) (X, SwiftGizmo) -> ()
     // CHECK:  apply [[SETTER]]([[XMOD:%.*]], [[SELF]]) : $@convention(objc_method) (X, SwiftGizmo) -> ()
     x = x.foo()
     // CHECK: return
