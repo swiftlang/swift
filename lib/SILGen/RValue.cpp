@@ -727,3 +727,18 @@ static SILValue getCanonicalValueSource(SILValue value) {
 bool RValue::areObviouslySameValue(SILValue lhs, SILValue rhs) {
   return getCanonicalValueSource(lhs) == getCanonicalValueSource(rhs);
 }
+
+void RValue::dump() const {
+  dump(llvm::errs());
+}
+void RValue::dump(raw_ostream &OS, unsigned indent) const {
+  if (isInContext()) {
+    OS.indent(indent) << "InContext\n";
+    return;
+  }
+
+  getType().dump(OS, indent);
+  for (auto &value : values) {
+    value.dump(OS, indent + 2);
+  }
+}

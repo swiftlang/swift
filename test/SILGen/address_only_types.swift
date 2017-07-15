@@ -194,8 +194,8 @@ var global_prop : Unloadable {
 func address_only_assignment_from_temp_to_property() {
   // CHECK: bb0:
   global_prop = some_address_only_function_1()
-  // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: [[SETTER:%[0-9]+]] = function_ref @_T018address_only_types11global_propAA10Unloadable_pfs
+  // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: apply [[SETTER]]([[TEMP]])
   // CHECK: dealloc_stack [[TEMP]]
 }
@@ -204,9 +204,9 @@ func address_only_assignment_from_temp_to_property() {
 func address_only_assignment_from_lv_to_property(_ v: Unloadable) {
   // CHECK: bb0([[VARG:%[0-9]+]] : @trivial $*Unloadable):
   // CHECK: debug_value_addr [[VARG]] : $*Unloadable
+  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_T018address_only_types11global_propAA10Unloadable_pfs
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: copy_addr [[VARG]] to [initialization] [[TEMP]]
-  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_T018address_only_types11global_propAA10Unloadable_pfs
   // CHECK: apply [[SETTER]]([[TEMP]])
   // CHECK: dealloc_stack [[TEMP]]
   global_prop = v

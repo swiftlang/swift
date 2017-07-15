@@ -158,6 +158,10 @@ public:
   }
 };
 
+using ValueProducerRef =
+  llvm::function_ref<ManagedValue(SILGenFunction &gen, SILLocation loc,
+                                  SGFContext context)>;
+
 } // end namespace Lowering
 } // end namespace swift
 

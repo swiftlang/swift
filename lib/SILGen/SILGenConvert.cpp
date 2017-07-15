@@ -315,15 +315,16 @@ SILGenFunction::emitOptionalSome(SILLocation loc, SILType optTy,
   // do a bridging conversion from the non-optional type instead.
   // TODO: should this be a general thing for all conversions?
   if (auto optInit = C.getAsConversion()) {
-    if (auto valueConversion =
-          optInit->getConversion().tryPeepholeOptionalInjection()) {
-      ConvertingInitialization valueInit(*valueConversion,
-                                         optInit->getFinalContext());
-      auto result = produceValue(*this, loc, SGFContext(&valueInit));
-      result = valueInit.finishEmission(*this, loc, result);
-      optInit->setConvertedValue(result);
-      optInit->finishInitialization(*this);
-      return ManagedValue::forInContext();
+    const auto &optConversion = optInit->getConversion();
+    if (optConversion.isBridging()) {
+      auto sourceValueType =
+        optConversion.getBridgingSourceType().getAnyOptionalObjectType();
+      assert(sourceValueType);
+      if (auto valueConversion =
+            optConversion.adjustForInitialOptionalConversions(sourceValueType)){
+        return optInit->emitWithAdjustedConversion(*this, loc, *valueConversion,
+                                                   produceValue);
+      }
     }
   }
 
@@ -964,7 +965,8 @@ ManagedValue SILGenFunction::manageOpaqueValue(OpaqueValueState &entry,
 ManagedValue SILGenFunction::emitConvertedRValue(Expr *E,
                                                  const Conversion &conversion,
                                                  SGFContext C) {
-  return emitConvertedRValue(E, conversion, C, [&](SGFContext C) {
+  return emitConvertedRValue(E, conversion, C,
+      [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
     return emitRValueAsSingleValue(E, C);
   });
 }
@@ -972,7 +974,7 @@ ManagedValue SILGenFunction::emitConvertedRValue(Expr *E,
 ManagedValue SILGenFunction::emitConvertedRValue(SILLocation loc,
                                                  const Conversion &conversion,
                                                  SGFContext C,
-                    llvm::function_ref<ManagedValue(SGFContext)> produceValue) {
+                                                 ValueProducerRef produceValue){
   // If we're emitting into a converting context, check whether we can
   // peephole the conversions together.
   if (auto outerConversion = C.getAsConversion()) {
@@ -984,7 +986,7 @@ ManagedValue SILGenFunction::emitConvertedRValue(SILLocation loc,
 
   // Otherwise, set up a reabstracting context and try to emit into that.
   ConvertingInitialization init(conversion, C);
-  auto result = produceValue(SGFContext(&init));
+  auto result = produceValue(*this, loc, SGFContext(&init));
   auto finishedResult = init.finishEmission(*this, loc, result);
   return finishedResult;
 }
@@ -1018,7 +1020,8 @@ bool ConvertingInitialization::tryPeephole(SILGenFunction &SGF,
                                            SILLocation loc,
                                            ManagedValue origValue,
                                            Conversion innerConversion) {
-  return tryPeephole(SGF, loc, innerConversion, [&](SGFContext C) {
+  return tryPeephole(SGF, loc, innerConversion,
+      [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
     return origValue;
   });
 }
@@ -1026,21 +1029,23 @@ bool ConvertingInitialization::tryPeephole(SILGenFunction &SGF,
 bool ConvertingInitialization::tryPeephole(SILGenFunction &SGF,
                                            Expr *E,
                                            Conversion innerConversion) {
-  return tryPeephole(SGF, E, innerConversion, [&](SGFContext C) {
+  return tryPeephole(SGF, E, innerConversion,
+      [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
     return SGF.emitRValueAsSingleValue(E, C);
   });
 }
 
 bool ConvertingInitialization::tryPeephole(SILGenFunction &SGF, SILLocation loc,
                                            Conversion innerConversion,
-                        llvm::function_ref<ManagedValue(SGFContext)> generator){
+                                           ValueProducerRef produceValue) {
   const auto &outerConversion = getConversion();
-  if (!canPeepholeConversions(SGF, outerConversion, innerConversion))
+  auto hint = canPeepholeConversions(SGF, outerConversion, innerConversion);
+  if (!hint)
     return false;
 
   ManagedValue value = emitPeepholedConversions(SGF, loc, outerConversion,
-                                                innerConversion, FinalContext,
-                                                generator);
+                                                innerConversion, *hint,
+                                                FinalContext, produceValue);
   setConvertedValue(value);
   return true;
 }
@@ -1057,6 +1062,19 @@ void ConvertingInitialization::copyOrInitValueInto(SILGenFunction &SGF,
   Value = TheConversion.emit(SGF, loc, formalValue, FinalContext);
 }
 
+ManagedValue
+ConvertingInitialization::emitWithAdjustedConversion(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          Conversion adjustedConversion,
+                                          ValueProducerRef produceValue) {
+  ConvertingInitialization init(adjustedConversion, getFinalContext());
+  auto result = produceValue(SGF, loc, SGFContext(&init));
+  result = init.finishEmission(SGF, loc, result);
+  setConvertedValue(result);
+  finishInitialization(SGF);
+  return ManagedValue::forInContext();
+}
+
 ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
                               ManagedValue value, SGFContext C) const {
   switch (getKind()) {
@@ -1069,6 +1087,15 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
                                         getBridgingSourceType(),
                                         getBridgingResultType(),
                                         getBridgingLoweredResultType(), C);
+
+  case ForceAndBridgeToObjC: {
+    auto &tl = SGF.getTypeLowering(value.getType());
+    auto sourceValueType = getBridgingSourceType().getAnyOptionalObjectType();
+    value = SGF.emitCheckedGetOptionalValueFrom(loc, value, tl, SGFContext());
+    return SGF.emitNativeToBridgedValue(loc, value, sourceValueType,
+                                        getBridgingResultType(),
+                                        getBridgingLoweredResultType(), C);
+  }
 
   case BridgeFromObjC:
     return SGF.emitBridgedToNativeValue(loc, value,
@@ -1096,17 +1123,51 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
   llvm_unreachable("bad kind");
 }
 
-Optional<Conversion> Conversion::tryPeepholeOptionalInjection() const {
-  if (isBridging()) {
-    auto sourceValueType = getBridgingSourceType().getAnyOptionalObjectType();
-    return Conversion::getBridging(getKind(), sourceValueType,
+Optional<Conversion>
+Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
+  switch (getKind()) {
+  case SubstToOrig:
+  case OrigToSubst:
+    // TODO: handle reabstraction conversions here, too.
+    return None;
+
+  case ForceAndBridgeToObjC:
+    return None;
+
+  case AnyErasure:
+  case BridgeToObjC:
+  case BridgeFromObjC:
+  case BridgeResultFromObjC:
+    return Conversion::getBridging(getKind(), newSourceType,
                                    getBridgingResultType(),
                                    getBridgingLoweredResultType(),
                                    isBridgingExplicit());
   }
+  llvm_unreachable("bad kind");
+}
 
-  // TODO: handle reabstraction conversions here, too.
-  return None;
+Optional<Conversion> Conversion::adjustForInitialForceValue() const {
+  switch (getKind()) {
+  case SubstToOrig:
+  case OrigToSubst:
+  case AnyErasure:
+  case BridgeFromObjC:
+  case BridgeResultFromObjC:
+  case ForceAndBridgeToObjC:
+    return None;
+
+  case BridgeToObjC: {
+    auto sourceOptType =
+      ImplicitlyUnwrappedOptionalType::get(getBridgingSourceType())
+        ->getCanonicalType();
+    return Conversion::getBridging(ForceAndBridgeToObjC,
+                                   sourceOptType,
+                                   getBridgingResultType(),
+                                   getBridgingLoweredResultType(),
+                                   isBridgingExplicit());
+  }
+  }
+  llvm_unreachable("bad kind");
 }
 
 void Conversion::dump() const {
@@ -1142,6 +1203,8 @@ void Conversion::print(llvm::raw_ostream &out) const {
     return printBridging(*this, out, "AnyErasure");
   case BridgeToObjC:
     return printBridging(*this, out, "BridgeToObjC");
+  case ForceAndBridgeToObjC:
+    return printBridging(*this, out, "ForceAndBridgeToObjC");
   case BridgeFromObjC:
     return printBridging(*this, out, "BridgeFromObjC");
   case BridgeResultFromObjC:
@@ -1150,7 +1213,6 @@ void Conversion::print(llvm::raw_ostream &out) const {
   llvm_unreachable("bad kind");
 }
 
-#if 0
 static bool areRelatedTypesForBridgingPeephole(CanType sourceType,
                                                CanType resultType) {
   if (sourceType == resultType)
@@ -1189,78 +1251,6 @@ static bool areRelatedTypesForBridgingPeephole(CanType sourceType,
   // Otherwise, we don't know how to do this conversion.
   return false;
 }
-#endif
-
-bool Lowering::canPeepholeConversions(SILGenFunction &SGF,
-                                      const Conversion &outerConversion,
-                                      const Conversion &innerConversion) {
-  switch (outerConversion.getKind()) {
-  case Conversion::OrigToSubst:
-  case Conversion::SubstToOrig:
-    // TODO: peephole these when the abstraction patterns are the same!
-    return false;
-
-  case Conversion::AnyErasure:
-  case Conversion::BridgeFromObjC:
-  case Conversion::BridgeResultFromObjC:
-    // TODO: maybe peephole bridging through a Swift type?
-    // This isn't actually something that happens in normal code generation.
-    return false;
-
-  case Conversion::BridgeToObjC:
-    switch (innerConversion.getKind()) {
-    case Conversion::AnyErasure:
-    case Conversion::BridgeFromObjC:
-    case Conversion::BridgeResultFromObjC: {
-#if 0
-      CanType sourceType = innerConversion.getBridgingSourceType();
-#endif
-      CanType intermediateType = innerConversion.getBridgingResultType();
-      assert(intermediateType == outerConversion.getBridgingSourceType());
-      CanType resultType = outerConversion.getBridgingResultType();
-
-      bool outerExplicit = outerConversion.isBridgingExplicit();
-      bool innerExplicit = innerConversion.isBridgingExplicit();
-
-      // Never peephole if both conversions are explicit; there might be
-      // something the user's trying to do which we don't understand.
-      if (outerExplicit && innerExplicit)
-        return false;
-
-      // If that doesn't apply, we can always convert through Any,
-      // because the conversion to/from Any doesn't change semantics.
-      if (intermediateType->lookThroughAllAnyOptionalTypes()->isAny()) {
-        assert(resultType->lookThroughAllAnyOptionalTypes()->isAnyObject());
-        return true;
-      }
-
-      // Otherwise, we should not peephole two implicit bridging conversions
-      // conversions because the result might not be semantically equivalent,
-      // due to copying.
-      // TODO: use special SILGen for implicitly bridging through a Swift
-      // type when we can do so without breaking semantics; in many cases
-      // this just means making a copy.
-      if (!outerExplicit && !innerExplicit) {
-        return false;
-      }
-
-      // Temporarily disable the bridging peephole so that I can submit
-      // it as a separate patch.
-#if 0
-      // The mandatory bridging peephole: an explicit bridging conversion
-      // can cancel out an implicit bridge between related types.
-      return areRelatedTypesForBridgingPeephole(sourceType, resultType);
-#else
-      return false;
-#endif
-    }
-
-    default:
-      return false;
-    }
-  }
-  llvm_unreachable("bad kind");
-}
 
 /// Does the given conversion turn a non-class type into Any, taking into
 /// account optional-to-optional conversions?
@@ -1272,67 +1262,184 @@ static bool isValueToAnyConversion(CanType from, CanType to) {
     }
   }
 
-  return to->isAny() && !from->isAnyClassReferenceType();
+  assert(to->isAny());
+  return !from->isAnyClassReferenceType();
 }
 
-static ManagedValue emitBridgingPeephole(SILGenFunction &SGF, SILLocation loc,
-                                         ManagedValue value,
-                                         const Conversion &outerConversion,
-                                         const Conversion &innerConversion,
-                                         SGFContext C) {
-  CanType sourceType = innerConversion.getBridgingSourceType();
-  CanType intermediateType = innerConversion.getBridgingResultType();
-  CanType resultType = outerConversion.getBridgingResultType();
-  SILType loweredResultTy = outerConversion.getBridgingLoweredResultType();
+Optional<ConversionPeepholeHint>
+Lowering::canPeepholeConversions(SILGenFunction &SGF,
+                                 const Conversion &outerConversion,
+                                 const Conversion &innerConversion) {
+  switch (outerConversion.getKind()) {
+  case Conversion::OrigToSubst:
+  case Conversion::SubstToOrig:
+    // TODO: peephole these when the abstraction patterns are the same!
+    return None;
 
-  // Nothing to do if the value already has the right representation.
-  if (value.getType().getObjectType() == loweredResultTy.getObjectType())
-    return value;
+  case Conversion::AnyErasure:
+  case Conversion::BridgeFromObjC:
+  case Conversion::BridgeResultFromObjC:
+    // TODO: maybe peephole bridging through a Swift type?
+    // This isn't actually something that happens in normal code generation.
+    return None;
 
-  // If we're converting a value type to Any, we need to apply a
-  // native-to-bridged conversion instead of a simple subtype transform.
-  if (isValueToAnyConversion(sourceType, intermediateType)) {
-    return SGF.emitNativeToBridgedValue(loc, value, sourceType, resultType,
-                                        loweredResultTy, C);
+  case Conversion::ForceAndBridgeToObjC:
+  case Conversion::BridgeToObjC:
+    switch (innerConversion.getKind()) {
+    case Conversion::AnyErasure:
+    case Conversion::BridgeFromObjC:
+    case Conversion::BridgeResultFromObjC: {
+      bool outerExplicit = outerConversion.isBridgingExplicit();
+      bool innerExplicit = innerConversion.isBridgingExplicit();
+
+      // Never peephole if both conversions are explicit; there might be
+      // something the user's trying to do which we don't understand.
+      if (outerExplicit && innerExplicit)
+        return None;
+
+      // Otherwise, we can peephole if we understand the resulting conversion
+      // and applying the peephole doesn't change semantics.
+
+      CanType sourceType = innerConversion.getBridgingSourceType();
+      CanType intermediateType = innerConversion.getBridgingResultType();
+      assert(intermediateType == outerConversion.getBridgingSourceType());
+
+      // If we're doing a peephole involving a force, we want to propagate
+      // the force to the source value.  If it's not in fact optional, that
+      // won't work.
+      bool forced =
+        outerConversion.getKind() == Conversion::ForceAndBridgeToObjC;
+      if (forced) {
+        sourceType = sourceType.getAnyOptionalObjectType();
+        if (!sourceType) return None;
+        intermediateType = intermediateType.getAnyOptionalObjectType();
+        assert(intermediateType);
+      }
+
+      CanType resultType = outerConversion.getBridgingResultType();
+      SILType loweredSourceTy = SGF.getLoweredType(sourceType);
+      SILType loweredResultTy = outerConversion.getBridgingLoweredResultType();
+
+      auto applyPeephole = [&](ConversionPeepholeHint::Kind kind) {
+        return ConversionPeepholeHint(kind, forced);
+      };
+
+      // Converting to Any doesn't do anything semantically special, so we
+      // can apply the peephole unconditionally.
+      if (intermediateType->lookThroughAllAnyOptionalTypes()->isAny()) {
+        assert(resultType->lookThroughAllAnyOptionalTypes()->isAnyObject());
+        if (loweredSourceTy == loweredResultTy) {
+          return applyPeephole(ConversionPeepholeHint::Identity);
+        } else if (isValueToAnyConversion(sourceType, intermediateType)) {
+          return applyPeephole(ConversionPeepholeHint::BridgeToAnyObject);
+        } else {
+          return applyPeephole(ConversionPeepholeHint::Subtype);
+        }
+      }
+
+      // Otherwise, undoing a bridging conversions can change semantics by
+      // e.g. removing a copy, so we shouldn't do it unless the special
+      // syntactic bridging peephole applies.  That requires one of the
+      // conversions to be explicit.
+      // TODO: use special SILGen to preserve semantics in this case,
+      // e.g. by making a copy.
+      if (!outerExplicit && !innerExplicit) {
+        return None;
+      }
+
+      // Okay, now we're in the domain of the bridging peephole: an
+      // explicit bridging conversion can cancel out an implicit bridge
+      // between related types.
+
+      // If the source and destination types have exactly the same
+      // representation, then (1) they're related and (2) we can directly
+      // emit into the context.
+      if (loweredSourceTy.getObjectType() == loweredResultTy.getObjectType()) {
+        return applyPeephole(ConversionPeepholeHint::Identity);
+      }
+
+      // Look for a subtype relationship between the source and destination.
+      if (areRelatedTypesForBridgingPeephole(sourceType, resultType)) {
+        return applyPeephole(ConversionPeepholeHint::Subtype);
+      }
+
+      // If the inner conversion is a result conversion that removes
+      // optionality, and the non-optional source type is a subtype of the
+      // value type, this is just an implicit force.
+      if (!forced &&
+          innerConversion.getKind() == Conversion::BridgeResultFromObjC) {
+        if (auto sourceValueType = sourceType.getAnyOptionalObjectType()) {
+          if (areRelatedTypesForBridgingPeephole(sourceValueType, resultType)) {
+            forced = true;
+            return applyPeephole(ConversionPeepholeHint::Subtype);
+          }
+        }
+      }
+
+      return None;
+    }
+
+    default:
+      return None;
+    }
   }
-
-  return SGF.emitTransformedValue(loc, value, sourceType, resultType, C);
+  llvm_unreachable("bad kind");
 }
 
 ManagedValue
 Lowering::emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
                                    const Conversion &outerConversion,
                                    const Conversion &innerConversion,
+                                   ConversionPeepholeHint hint,
                                    SGFContext C,
-                llvm::function_ref<ManagedValue(SGFContext)> produceValue) {
-  assert(canPeepholeConversions(SGF, outerConversion, innerConversion));
+                                   ValueProducerRef produceOrigValue) {
+  auto produceValue = [&](SGFContext C) {
+    if (!hint.isForced()) {
+      return produceOrigValue(SGF, loc, C);
+    }
 
-  switch (outerConversion.getKind()) {
-  case Conversion::OrigToSubst:
-  case Conversion::SubstToOrig:
+    auto value = produceOrigValue(SGF, loc, SGFContext());
+    auto &optTL = SGF.getTypeLowering(value.getType());
+    return SGF.emitCheckedGetOptionalValueFrom(loc, value, optTL, C);
+  };
+
+  auto getBridgingSourceType = [&] {
+    CanType sourceType = innerConversion.getBridgingSourceType();
+    if (hint.isForced())
+      sourceType = sourceType.getAnyOptionalObjectType();
+    return sourceType;
+  };
+  auto getBridgingResultType = [&] {
+    return outerConversion.getBridgingResultType();
+  };
+  auto getBridgingLoweredResultType = [&] {
+    return outerConversion.getBridgingLoweredResultType();
+  };
+
+  switch (hint.getKind()) {
+  case ConversionPeepholeHint::Identity:
     return produceValue(C);
 
-  case Conversion::AnyErasure:
-  case Conversion::BridgeFromObjC:
-  case Conversion::BridgeResultFromObjC:
-    llvm_unreachable("no such peephole yet");
+  case ConversionPeepholeHint::BridgeToAnyObject: {
+    auto value = produceValue(SGFContext());
+    return SGF.emitNativeToBridgedValue(loc, value, getBridgingSourceType(),
+                                        getBridgingResultType(),
+                                        getBridgingLoweredResultType(), C);
+  }
 
-  case Conversion::BridgeToObjC: {
-    // If the source and destination types match exactly, emit the
-    // expression directly in the final context.
-    CanType sourceType = innerConversion.getBridgingSourceType();
-    SILType loweredSourceTy = SGF.getLoweredType(sourceType);
-    SILType loweredResultTy = outerConversion.getBridgingLoweredResultType();
-
-    if (loweredSourceTy.getObjectType() == loweredResultTy.getObjectType())
-      return produceValue(C);
-
+  case ConversionPeepholeHint::Subtype: {
     // Otherwise, emit and convert.
     // TODO: if the context allows +0, use it in more situations.
     auto value = produceValue(SGFContext());
+    SILType loweredResultTy = getBridgingLoweredResultType();
 
-    return emitBridgingPeephole(SGF, loc, value, outerConversion,
-                                innerConversion, C);
+    // Nothing to do if the value already has the right representation.
+    if (value.getType().getObjectType() == loweredResultTy.getObjectType())
+      return value;
+
+    CanType sourceType = getBridgingSourceType();
+    CanType resultType = getBridgingResultType();
+    return SGF.emitTransformedValue(loc, value, sourceType, resultType, C);
   }
   }
   llvm_unreachable("bad kind");

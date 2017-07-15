@@ -131,8 +131,8 @@ public func foo(_ x: Double) {
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetAltitude : $@convention(c) (Struct1) -> Double
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.altitude
-  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
   // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
   // CHECK: apply [[SET]]([[WRITE]], [[X]])
   z.altitude = x
   

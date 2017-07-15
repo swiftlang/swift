@@ -103,8 +103,8 @@ func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(_ generic: inou
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!setter.1
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
 // CHECK-NEXT: apply [[METH]]<T>(%1, %1, [[WRITE]])
 
 
@@ -199,8 +199,8 @@ func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(_ generic: 
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetterSetter.b!setter.1
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
 // CHECK-NEXT: apply [[METH]]<T>(%1, [[WRITE]])
 
 //===----------------------------------------------------------------------===//
