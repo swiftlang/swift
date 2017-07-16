@@ -71,7 +71,7 @@ extension CodingKey {
     /// A textual representation of this key.
     public var description: String {
         let intValue = self.intValue?.description ?? "nil"
-        return "\(String(describing: type(of: self)))(stringValue: \(stringValue), intValue: \(intValue))"
+        return "\(String(describing: type(of: self)))(stringValue: \"\(stringValue)\", intValue: \(intValue))"
     }
 
     /// A textual representation of this key, suitable for debugging.
