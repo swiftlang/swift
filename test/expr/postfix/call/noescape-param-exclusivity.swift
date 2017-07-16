@@ -3,13 +3,13 @@
 // FIXME: make these errors
 
 func test0(fn: (() -> ()) -> ()) {
-  fn { fn {} } // expected-warning {{passing a closure which captures a non-escaping function parameter 'fn' to a call to a non-escaping function parameter can allow re-entrant modification of a variable}}
+  fn { fn {} } // expected-error {{passing a closure which captures a non-escaping function parameter 'fn' to a call to a non-escaping function parameter can allow re-entrant modification of a variable}}
 }
 
 func test1(fn: (() -> ()) -> ()) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
   // TODO: infer that this function is noescape from its captures
   func foo() {
-    fn { fn {} } // expected-warning {{can allow re-entrant modification}}
+    fn { fn {} } // expected-error {{can allow re-entrant modification}}
     // expected-error@-1 {{declaration closing over non-escaping parameter 'fn' may allow it to escape}}
   }
 }
@@ -25,7 +25,7 @@ func test2(x: inout Int, fn: (() -> ()) -> ()) {
 }
 
 func test3(fn: (() -> ()) -> ()) {
-  { myfn in myfn { fn {} } }(fn) // expected-warning {{can allow re-entrant modification}}
+  { myfn in myfn { fn {} } }(fn) // expected-error {{can allow re-entrant modification}}
 }
 
 func test4(fn: (() -> ()) -> ()) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
