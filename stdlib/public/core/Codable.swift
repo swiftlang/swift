@@ -47,7 +47,7 @@ public typealias Codable = Encodable & Decodable
 //===----------------------------------------------------------------------===//
 
 /// A type that can be used as a key for encoding and decoding.
-public protocol CodingKey: CustomStringConvertible {
+public protocol CodingKey: CustomStringConvertible, CustomDebugStringConvertible {
     /// The string to use in a named collection (e.g. a string-keyed dictionary).
     var stringValue: String { get }
 
@@ -68,8 +68,15 @@ public protocol CodingKey: CustomStringConvertible {
 }
 
 extension CodingKey {
+    /// A textual representation of this key.
     public var description: String {
-        return stringValue
+        let intValue = self.intValue?.description ?? "nil"
+        return "\(String(describing: type(of: self)))(stringValue: \(stringValue), intValue: \(intValue))"
+    }
+
+    /// A textual representation of this key, suitable for debugging.
+    public var debugDescription: String {
+        return description
     }
 }
 
