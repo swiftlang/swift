@@ -1609,9 +1609,6 @@ bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
     expr = result;
     return false;
   }
-
-  // Pre-check failed. Clean up and return.
-  CleanupIllFormedExpressionRAII::doIt(expr, Context);
   return true;
 }
 
