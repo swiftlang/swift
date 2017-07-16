@@ -1939,75 +1939,78 @@ LValue SILGenFunction::emitLValue(Expr *e, AccessKind accessKind) {
 
 LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind,
                               AbstractionPattern orig) {
-  // Non-lvalue types (references, values, metatypes, etc) form the root of a
-  // logical l-value.
-  if (!e->getType()->is<LValueType>() && !e->getType()->is<InOutType>()) {
-    // Decide if we can evaluate this expression at +0 for the rest of the
-    // lvalue.
-    SGFContext Ctx;
-    ManagedValue rv;
-
-    // Calls through opaque protocols can be done with +0 rvalues.  This allows
-    // us to avoid materializing copies of existentials.
-    if (SGF.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType()))
-      Ctx = SGFContext::AllowGuaranteedPlusZero;
-    else if (auto *DRE = dyn_cast<DeclRefExpr>(e)) {
-      // Any reference to "self" can be done at +0 so long as it is a direct
-      // access, since we know it is guaranteed.
-      // TODO: it would be great to factor this even lower into SILGen to the
-      // point where we can see that the parameter is +0 guaranteed.  Note that
-      // this handles the case in initializers where there is actually a stack
-      // allocation for it as well.
-      if (isa<ParamDecl>(DRE->getDecl()) &&
-          DRE->getDecl()->getFullName() == SGF.getASTContext().Id_self &&
-          DRE->getDecl()->isImplicit()) {
-        Ctx = SGFContext::AllowGuaranteedPlusZero;
-        if (SGF.SelfInitDelegationState != SILGenFunction::NormalSelf) {
-          // This needs to be inlined since there is a Formal Evaluation Scope
-          // in emitRValueForDecl that causing any borrow for this LValue to be
-          // popped too soon.
-          auto *vd = cast<ParamDecl>(DRE->getDecl());
-          ManagedValue selfLValue = SGF.emitLValueForDecl(
-              DRE, vd, DRE->getType()->getCanonicalType(), AccessKind::Read,
-              DRE->getAccessSemantics());
-          rv = SGF.emitRValueForSelfInDelegationInit(
-                      e, DRE->getType()->getCanonicalType(),
-                      selfLValue.getLValueAddress(), Ctx)
-                   .getScalarValue();
-        }
-      } else if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-        // All let values are guaranteed to be held alive across their lifetime,
-        // and won't change once initialized.  Any loaded value is good for the
-        // duration of this expression evaluation.
-        if (VD->isLet())
-          Ctx = SGFContext::AllowGuaranteedPlusZero;
-      }
+  // First see if we have an lvalue type. If we do, then quickly handle that and
+  // return.
+  if (e->getType()->is<LValueType>() || e->getType()->is<InOutType>()) {
+    auto lv = visit(e, accessKind);
+    // If necessary, handle reabstraction with a SubstToOrigComponent that
+    // handles
+    // writeback in the original representation.
+    if (orig.isValid()) {
+      auto &origTL = SGF.getTypeLowering(orig, e->getType()->getRValueType());
+      if (lv.getTypeOfRValue() != origTL.getLoweredType().getObjectType())
+        lv.addSubstToOrigComponent(orig,
+                                   origTL.getLoweredType().getObjectType());
     }
-
-    if (!rv) {
-      // For an rvalue base, apply the reabstraction (if any) eagerly, since
-      // there's no need for writeback.
-      if (orig.isValid())
-        rv = SGF.emitRValueAsOrig(e, orig,
-                      SGF.getTypeLowering(orig, e->getType()->getRValueType()));
-      else
-        rv = SGF.emitRValueAsSingleValue(e, Ctx);
-    }
-    CanType formalType = getSubstFormalRValueType(e);
-    auto typeData = getValueTypeData(formalType, rv.getValue());
-    LValue lv;
-    lv.add<ValueComponent>(rv, None, typeData, /*isRValue=*/true);
     return lv;
   }
 
-  auto lv = visit(e, accessKind);
-  // If necessary, handle reabstraction with a SubstToOrigComponent that handles
-  // writeback in the original representation.
-  if (orig.isValid()) {
-    auto &origTL = SGF.getTypeLowering(orig, e->getType()->getRValueType());
-    if (lv.getTypeOfRValue() != origTL.getLoweredType().getObjectType())
-      lv.addSubstToOrigComponent(orig, origTL.getLoweredType().getObjectType());
+  // Otherwise we have a non-lvalue type (references, values, metatypes,
+  // etc). These act as the root of a logical lvalue.
+  SGFContext Ctx;
+  ManagedValue rv;
+
+  // Calls through opaque protocols can be done with +0 rvalues.  This allows
+  // us to avoid materializing copies of existentials.
+  if (SGF.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType()))
+    Ctx = SGFContext::AllowGuaranteedPlusZero;
+  else if (auto *DRE = dyn_cast<DeclRefExpr>(e)) {
+    // Any reference to "self" can be done at +0 so long as it is a direct
+    // access, since we know it is guaranteed.
+    // TODO: it would be great to factor this even lower into SILGen to the
+    // point where we can see that the parameter is +0 guaranteed.  Note that
+    // this handles the case in initializers where there is actually a stack
+    // allocation for it as well.
+    if (isa<ParamDecl>(DRE->getDecl()) &&
+        DRE->getDecl()->getFullName() == SGF.getASTContext().Id_self &&
+        DRE->getDecl()->isImplicit()) {
+      Ctx = SGFContext::AllowGuaranteedPlusZero;
+      if (SGF.SelfInitDelegationState != SILGenFunction::NormalSelf) {
+        // This needs to be inlined since there is a Formal Evaluation Scope
+        // in emitRValueForDecl that causing any borrow for this LValue to be
+        // popped too soon.
+        auto *vd = cast<ParamDecl>(DRE->getDecl());
+        ManagedValue selfLValue =
+            SGF.emitLValueForDecl(DRE, vd, DRE->getType()->getCanonicalType(),
+                                  AccessKind::Read, DRE->getAccessSemantics());
+        rv = SGF.emitRValueForSelfInDelegationInit(
+                    e, DRE->getType()->getCanonicalType(),
+                    selfLValue.getLValueAddress(), Ctx)
+                 .getScalarValue();
+      }
+    } else if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      // All let values are guaranteed to be held alive across their lifetime,
+      // and won't change once initialized.  Any loaded value is good for the
+      // duration of this expression evaluation.
+      if (VD->isLet())
+        Ctx = SGFContext::AllowGuaranteedPlusZero;
+    }
   }
+
+  if (!rv) {
+    // For an rvalue base, apply the reabstraction (if any) eagerly, since
+    // there's no need for writeback.
+    if (orig.isValid())
+      rv = SGF.emitRValueAsOrig(
+          e, orig, SGF.getTypeLowering(orig, e->getType()->getRValueType()));
+    else
+      rv = SGF.emitRValueAsSingleValue(e, Ctx);
+  }
+
+  CanType formalType = getSubstFormalRValueType(e);
+  auto typeData = getValueTypeData(formalType, rv.getValue());
+  LValue lv;
+  lv.add<ValueComponent>(rv, None, typeData, /*isRValue=*/true);
   return lv;
 }
 
