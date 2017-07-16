@@ -783,9 +783,9 @@ bool ConstraintSystem::Candidate::solve(
 
   auto cleanupImplicitExprs = [&](Expr *expr) {
     expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-      Type type = childExpr->getType();
+      Type type = CS.getType(childExpr);
       if (childExpr->isImplicit() && type && type->hasTypeVariable())
-        childExpr->setType(Type());
+        CS.setType(childExpr, Type());
       return childExpr;
     });
   };
