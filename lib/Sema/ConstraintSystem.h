@@ -1019,6 +1019,7 @@ private:
   /// to reduce scopes of the overload sets (disjunctions) in the system.
   class Candidate {
     Expr *E;
+    ConstraintSystem &CS;
     TypeChecker &TC;
     DeclContext *DC;
 
@@ -1029,7 +1030,7 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), TC(cs.TC), DC(cs.DC), CT(ct), CTP(ctp) {}
+        : E(expr), CS(cs), TC(cs.TC), DC(cs.DC), CT(ct), CTP(ctp) {}
 
     /// \brief Return underlying expression.
     Expr *getExpr() const { return E; }
