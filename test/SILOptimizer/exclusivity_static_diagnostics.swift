@@ -27,9 +27,9 @@ func inoutOnInoutParameter(p: inout Int) {
 func swapNoSuppression(_ i: Int, _ j: Int) {
   var a: [Int] = [1, 2, 3]
 
-  // expected-error@+2{{overlapping accesses to 'a', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@+2{{overlapping accesses to 'a', but modification requires exclusive access; consider calling MutableCollection.swapAt(_:_:)}}
   // expected-note@+1{{conflicting access is here}}
-  swap(&a[i], &a[j]) // no-warning
+  swap(&a[i], &a[j])
 }
 
 class SomeClass { }
