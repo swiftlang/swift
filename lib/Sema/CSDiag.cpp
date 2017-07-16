@@ -7333,7 +7333,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     if (!bodyExpr)
       return true;
 
-    if (resultTypeProcessor(bodyExpr->getType(), expectedResultType))
+    if (resultTypeProcessor(CS.getType(bodyExpr), expectedResultType))
       return true;
   }
 
