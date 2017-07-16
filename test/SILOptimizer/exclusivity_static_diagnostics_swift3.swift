@@ -28,3 +28,11 @@ func diagnoseOnSameField() {
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&x.f, &x.f)
 }
+
+func diagnoseSwapOnMutableCollection(_ i: Int, _ j: Int) {
+  var a: [Int] = [1, 2, 3]
+
+  // expected-warning@+2{{overlapping accesses to 'a', but modification requires exclusive access; consider calling MutableCollection.swapAt(_:_:)}}
+  // expected-note@+1{{conflicting access is here}}
+  swap(&a[i], &a[j])
+}
