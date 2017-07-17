@@ -1389,8 +1389,8 @@ namespace {
 
       // Figure out the index and result types.
       auto subscriptTy = simplifyType(selected->openedType);
-      auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
-      auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
+      auto subscriptFnTy = subscriptTy->castTo<AnyFunctionType>();
+      auto resultTy = subscriptFnTy->getResult();
 
       // If we opened up an existential when performing the subscript, open
       // the base accordingly.
@@ -1404,9 +1404,10 @@ namespace {
       }
 
       // Coerce the index argument.
-      index = coerceToType(index, indexTy,
-                           locator.withPathElement(
-                             ConstraintLocator::SubscriptIndex));
+      index = coerceCallArguments(index, subscriptFnTy, nullptr,
+                                  argLabels, hasTrailingClosure,
+                                  locator.withPathElement(
+                                    ConstraintLocator::SubscriptIndex));
       if (!index)
         return nullptr;
 
@@ -5265,7 +5266,7 @@ Expr *ExprRewriter::coerceCallArguments(
     findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine the level,
-  unsigned level = computeCallLevel(cs, callee, apply);
+  unsigned level = apply ? computeCallLevel(cs, callee, apply) : 0;
 
   // Determine the parameter bindings.
   auto params = funcType->getParams();
