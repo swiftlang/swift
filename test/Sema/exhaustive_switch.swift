@@ -533,3 +533,30 @@ func infinitelySized() -> Bool {
   case (.two, .two): return true
   }
 }
+
+func switchNever1(x: Never) -> Bool {
+  switch x {
+    default: return true
+  }
+
+  switch x {
+    // FIXME: Bad diagnostics.
+    case let _b: // expected-warning {{case is already handled by previous patterns; consider removing it}}
+      print(_b)
+      return true
+  }
+
+  switch x { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; do you want to add a default case?}} {{3-3=default:\n<#code#>\n}}
+  }
+}
+
+struct Generic<T> {
+  let value: T
+}
+
+extension Generic where T == Never {
+  func switchNever2() {
+    switch value { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; do you want to add a default case?}} {{5-5=default:\n<#code#>\n}}
+    }
+  }
+}

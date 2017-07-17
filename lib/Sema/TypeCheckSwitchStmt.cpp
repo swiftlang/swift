@@ -957,8 +957,13 @@ namespace {
       }
       
       Space totalSpace(Switch->getSubjectExpr()->getType(), Identifier());
-      Space coveredSpace(spaces);
       size_t totalSpaceSize = totalSpace.getSize(TC);
+      if (totalSpaceSize == 0 && spaces.empty()) {
+        diagnoseMissingCases(TC, Switch, /*justNeedsDefault*/true, Space());
+        return;
+      }
+
+      Space coveredSpace(spaces);
       if (totalSpaceSize > Space::getMaximumSize()) {
         // Because the space is large, we have to extend the size
         // heuristic to compensate for actually exhaustively pattern matching
