@@ -688,21 +688,21 @@ class SuperSub : SuperBase {
 // CHECK:         [[UNOWNED_SELF:%.*]] = ref_to_unowned [[SELF_COPY]] :
 // -- TODO: A lot of fussy r/r traffic and owned/unowned conversions here.
 // -- strong +2, unowned +1
-// CHECK:         unowned_retain [[UNOWNED_SELF]]
-// CHECK:         store [[UNOWNED_SELF]] to [init] [[PB]]
+// CHECK:         [[UNOWNED_SELF_COPY:%.*]] = copy_value [[UNOWNED_SELF]]
+// CHECK:         store [[UNOWNED_SELF_COPY]] to [init] [[PB]]
 // SEMANTIC ARC TODO: This destroy_value should probably be /after/ the load from PB on the next line.
 // CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         [[UNOWNED_SELF:%.*]] = load [take] [[PB]]
+// CHECK:         [[UNOWNED_SELF:%.*]] = load_borrow [[PB]]
 // -- strong +2, unowned +1
-// CHECK:         strong_retain_unowned [[UNOWNED_SELF]]
-// CHECK:         [[SELF:%.*]] = unowned_to_ref [[UNOWNED_SELF]]
+// CHECK:         [[SELF:%.*]] = copy_unowned_value [[UNOWNED_SELF]]
+// CHECK:         end_borrow [[UNOWNED_SELF]] from [[PB]]
 // CHECK:         [[UNOWNED_SELF2:%.*]] = ref_to_unowned [[SELF]]
 // -- strong +2, unowned +2
-// CHECK:         unowned_retain [[UNOWNED_SELF2]]
+// CHECK:         [[UNOWNED_SELF2_COPY:%.*]] = copy_value [[UNOWNED_SELF2]]
 // -- strong +1, unowned +2
 // CHECK:         destroy_value [[SELF]]
 // -- closure takes unowned ownership
-// CHECK:         [[OUTER_CLOSURE:%.*]] = partial_apply {{%.*}}([[UNOWNED_SELF2]])
+// CHECK:         [[OUTER_CLOSURE:%.*]] = partial_apply {{%.*}}([[UNOWNED_SELF2_COPY]])
 // -- call consumes closure
 // -- strong +1, unowned +1
 // CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CLOSURE]]
@@ -732,8 +732,7 @@ class SuperSub : SuperBase {
 // CHECK: sil private @[[INNER_CLOSURE_FUN:_T08closures24UnownedSelfNestedCaptureC06nestedE0yyFACycycfU_ACycfU_]] : $@convention(thin) (@owned @sil_unowned UnownedSelfNestedCapture) -> @owned UnownedSelfNestedCapture {
 // CHECK: bb0([[CAPTURED_SELF:%.*]] : $@sil_unowned UnownedSelfNestedCapture):
 // -- strong +1, unowned +1
-// CHECK:         strong_retain_unowned [[CAPTURED_SELF:%.*]] :
-// CHECK:         [[SELF:%.*]] = unowned_to_ref [[CAPTURED_SELF]]
+// CHECK:         [[SELF:%.*]] = copy_unowned_value [[CAPTURED_SELF:%.*]] :
 // -- strong +1, unowned +0 (claimed by return)
 // CHECK:         destroy_value [[CAPTURED_SELF]]
 // CHECK:         return [[SELF]]
