@@ -286,9 +286,6 @@ def disable_deserialization_recovery :
   Flag<["-"], "disable-deserialization-recovery">,
   HelpText<"Don't attempt to recover from missing xrefs (etc) in swiftmodules">;
 
-def enable_cow_existentials : Flag<["-"], "enable-cow-existentials">,
-  HelpText<"Enable the copy-on-write existential implementation">;
-
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
