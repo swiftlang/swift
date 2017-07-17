@@ -26,7 +26,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
-#include "swift/Syntax/LegacyASTTransformer.h"
+#include "swift/AST/LegacyASTTransformer.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "llvm/Support/CommandLine.h"
