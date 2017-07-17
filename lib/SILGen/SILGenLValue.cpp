@@ -2798,9 +2798,7 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
     assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
     (void) unownedType;
 
-    B.createStrongRetainUnowned(loc, src, B.getDefaultAtomicity());
-    return B.createUnownedToRef(loc, src,
-                SILType::getPrimitiveObjectType(unownedType.getReferentType()));
+    return B.createCopyUnownedValue(loc, src);
   }
 
   // For @unowned(unsafe) types, we need to strip the unmanaged box
@@ -2857,14 +2855,20 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
       return SGF.B.createLoadUnowned(loc, src, isTake);
     }
 
+    // If we are not performing a take, use a load_borrow.
+    if (!isTake) {
+      SILValue unownedValue = SGF.B.createLoadBorrow(loc, src);
+      SILValue strongValue = SGF.B.createCopyUnownedValue(loc, unownedValue);
+      SGF.B.createEndBorrow(loc, unownedValue, src);
+      return strongValue;
+    }
+
+    // Otherwise, we need to perform a load take and destroy the stored value.
     auto unownedValue =
         SGF.B.emitLoadValueOperation(loc, src, LoadOwnershipQualifier::Take);
-    SGF.B.createStrongRetainUnowned(loc, unownedValue, SGF.B.getDefaultAtomicity());
-    if (isTake)
-      SGF.B.createUnownedRelease(loc, unownedValue, SGF.B.getDefaultAtomicity());
-    return SGF.B.createUnownedToRef(
-        loc, unownedValue,
-        SILType::getPrimitiveObjectType(unownedType.getReferentType()));
+    SILValue strongValue = SGF.B.createCopyUnownedValue(loc, unownedValue);
+    SGF.B.createDestroyValue(loc, unownedValue);
+    return strongValue;
   }
 
   // For @unowned(unsafe) types, we need to strip the unmanaged box.
@@ -2914,8 +2918,8 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
 
     auto unownedValue =
       SGF.B.createRefToUnowned(loc, value, storageType.getObjectType());
-    SGF.B.createUnownedRetain(loc, unownedValue, SGF.B.getDefaultAtomicity());
-    emitUnloweredStoreOfCopy(SGF.B, loc, unownedValue, dest, isInit);
+    auto copiedVal = SGF.B.createCopyValue(loc, unownedValue);
+    emitUnloweredStoreOfCopy(SGF.B, loc, copiedVal, dest, isInit);
     SGF.B.emitDestroyValueOperation(loc, value);
     return;
   }
@@ -3016,7 +3020,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     (void) unownedType;
 
     SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
-    B.createUnownedRetain(loc, unowned, B.getDefaultAtomicity());
+    unowned = B.createCopyValue(loc, unowned);
     B.emitDestroyValueOperation(loc, semanticValue);
     return unowned;
   }

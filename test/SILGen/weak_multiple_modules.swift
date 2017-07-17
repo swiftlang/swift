@@ -8,8 +8,9 @@ import weak_other
 func doSomething(ui: UI) -> Bool {
   // CHECK: ref_element_addr
   // CHECK-objc: load_unowned
-  // CHECK-native: load [take]
-  // CHECK-native: strong_retain_unowned
+  // CHECK-native: load_borrow
+  // CHECK-native: copy_unowned_value
+  // CHECK-native: end_borrow
   // CHECK: open_existential_ref
   // CHECK: witness_method
   // CHECK: apply
