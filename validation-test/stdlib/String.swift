@@ -59,10 +59,10 @@ StringTests.test("AssociatedTypes-UTF8View") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: View.Iterator.self,
-    subSequenceType: Slice<View>.self,
+    subSequenceType: BidirectionalSlice<View>.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
-    indicesType: DefaultIndices<View>.self)
+    indicesType: DefaultBidirectionalIndices<View>.self)
 }
 
 StringTests.test("AssociatedTypes-UTF16View") {
