@@ -495,9 +495,10 @@ namespace {
                   refExpr = declRefExpr;
                 }
 
-                if (tc.typeCheckExpression(refExpr, cs.DC,
-                                           TypeLoc::withoutLoc(expectedFnType),
-                                           CTP_CannotFail))
+                auto resultTy = tc.typeCheckExpression(
+                    refExpr, cs.DC, TypeLoc::withoutLoc(expectedFnType),
+                    CTP_CannotFail);
+                if (!resultTy)
                   return nullptr;
 
                 cs.cacheExprTypes(refExpr);
@@ -3635,14 +3636,12 @@ namespace {
       Expr *callExpr = CallExpr::createImplicit(ctx, fnRef, { argExpr },
                                                 { Identifier() });
 
-      bool invalid = tc.typeCheckExpression(callExpr, cs.DC,
-                                            TypeLoc::withoutLoc(valueType),
-                                            CTP_CannotFail);
+      auto resultTy = tc.typeCheckExpression(
+          callExpr, cs.DC, TypeLoc::withoutLoc(valueType), CTP_CannotFail);
+      assert(resultTy && "Conversion cannot fail!");
+      (void)resultTy;
+
       cs.cacheExprTypes(callExpr);
-
-      (void) invalid;
-      assert(!invalid && "conversion cannot fail");
-
       E->setSemanticExpr(callExpr);
       return E;
     }
@@ -4537,13 +4536,12 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
 
   // Convert the literal to the appropriate type.
   auto defArgType = ownerFn->mapTypeIntoContext(defArg.second);
-  bool invalid = tc.typeCheckExpression(init, dc, 
-                                        TypeLoc::withoutLoc(defArgType),
-                                        CTP_CannotFail);
-  cs.cacheExprTypes(init);
+  auto resultTy = tc.typeCheckExpression(
+      init, dc, TypeLoc::withoutLoc(defArgType), CTP_CannotFail);
+  assert(resultTy && "Conversion cannot fail");
+  (void)resultTy;
 
-  assert(!invalid && "conversion cannot fail");
-  (void)invalid;
+  cs.cacheExprTypes(init);
 
   return {init, defArg.first};
 }

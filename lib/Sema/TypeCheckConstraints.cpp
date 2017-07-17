@@ -1771,7 +1771,7 @@ namespace {
 } // end anonymous namespace
 
 #pragma mark High-level entry points
-bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
+Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
                                       ContextualTypePurpose convertTypePurpose,
                                       TypeCheckExprOptions options,
@@ -1782,7 +1782,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (preCheckExpression(expr, dc))
-    return true;
+    return Type();
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
@@ -1833,7 +1833,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   SmallVector<Solution, 4> viable;
   if (solveForExpression(expr, dc, convertType.getType(),
                          allowFreeTypeVariables, listener, cs, viable, options))
-    return true;
+    return Type();
 
   // If the client allows the solution to have unresolved type expressions,
   // check for them now.  We cannot apply the solution with unresolved TypeVars,
@@ -1841,8 +1841,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
       (viable.size() != 1 ||
        (convertType.getType() && convertType.getType()->hasUnresolvedType()))) {
-    expr->setType(ErrorType::get(Context));
-    return false;
+    return ErrorType::get(Context);
   }
 
   auto result = expr;
@@ -1850,12 +1849,12 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   if (listener) {
     result = listener->foundSolution(solution, result);
     if (!result)
-      return true;
+      return Type();
   }
 
   if (options.contains(TypeCheckExprFlags::SkipApplyingSolution)) {
     cleanup.disable();
-    return false;
+    return cs.getType(expr);
   }
 
   // Apply the solution to the expression.
@@ -1866,7 +1865,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                             skipClosures);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
-    return true;
+    return Type();
   }
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -1879,7 +1878,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   if (listener) {
     result = listener->appliedSolution(solution, result);
     if (!result) {
-      return true;
+      return Type();
     }
   }
 
@@ -1893,7 +1892,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   expr = result;
   cleanup.disable();
-  return false;
+  return cs.getType(expr);
 }
 
 Optional<Type> TypeChecker::
@@ -2241,12 +2240,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   if (skipApplyingSolution)
     flags |= TypeCheckExprFlags::SkipApplyingSolution;
 
-  bool hadError = typeCheckExpression(initializer, DC, contextualType,
-                                     contextualPurpose,
-                                     flags,
-                                     &listener);
-
-  if (!hadError) {
+  auto resultTy = typeCheckExpression(initializer, DC, contextualType,
+                                      contextualPurpose, flags, &listener);
+  if (resultTy) {
     TypeResolutionOptions options;
     options |= TR_OverrideType;
     options |= TR_InExpression;
@@ -2260,15 +2256,14 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     }
   }
 
-  if (hadError && !initializer->getType())
+  if (!resultTy && !initializer->getType())
     initializer->setType(ErrorType::get(Context));
 
   // If the type of the pattern is inferred, assign error types to the pattern
   // and its variables, to prevent it from being referenced by the constraint
   // system.
-  if (hadError &&
-      (!pattern->hasType() ||
-       pattern->getType()->hasUnboundGenericType())) {
+  if (!resultTy &&
+      (!pattern->hasType() || pattern->getType()->hasUnboundGenericType())) {
     pattern->setType(ErrorType::get(Context));
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
@@ -2282,7 +2277,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     });
   }
 
-  return hadError;
+  return !resultTy;
 }
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
@@ -2484,7 +2479,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   assert(seq && "type-checking an uninitialized for-each statement?");
 
   // Type-check the for-each loop sequence and element pattern.
-  return typeCheckExpression(seq, dc, &listener);
+  auto resultTy = typeCheckExpression(seq, dc, &listener);
+  return !resultTy;
 }
 
 /// \brief Compute the rvalue type of the given expression, which is the
@@ -2545,9 +2541,11 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // If this expression is already typechecked and has an i1 type, then it has
   // already got its conversion from Boolean back to i1.  Just re-typecheck
   // it.
-  if (expr->getType() && expr->getType()->isBuiltinIntegerType(1))
-    return typeCheckExpression(expr, dc);
-  
+  if (expr->getType() && expr->getType()->isBuiltinIntegerType(1)) {
+    auto resultTy = typeCheckExpression(expr, dc);
+    return !resultTy;
+  }
+
   /// Expression type checking listener for conditions.
   class ConditionListener : public ExprTypeCheckListener {
     Expr *OrigExpr = nullptr;
@@ -2585,7 +2583,8 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   };
 
   ConditionListener listener;
-  return typeCheckExpression(expr, dc, &listener);
+  auto resultTy = typeCheckExpression(expr, dc, &listener);
+  return !resultTy;
 }
 
 bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
