@@ -982,7 +982,7 @@ func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPo
   return UnsafeBufferPointer(start: p, count: 1)
 }
 
-// Test emitNativeToCBridgedNonoptionalValue
+// Test emitNativeToCBridgedNonoptionalValue.
 // ---
 // CHECK-objc-LABEL: sil hidden @_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
 // CHECK-objc bb0(%0 : $Any):
@@ -1002,7 +1002,7 @@ func s470________nativeToC(fromAny any: Any) -> AnyObject {
 }
 #endif
 
-// Test emitOpenExistential
+// Test emitOpenExistential.
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s480_________getErroryps0F0_p04someF0_tF : $@convention(thin) (@owned Error) -> @out Any {
 // CHECK: bb0(%0 : $Error):
@@ -1015,6 +1015,39 @@ func s470________nativeToC(fromAny any: Any) -> AnyObject {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s480_________getErroryps0F0_p04someF0_tF'
 func s480_________getError(someError: Error) -> Any {
   return someError
+}
+
+// Test SILBuilder.createLoadBorrow.
+// ---
+// CHECK-LABEL: sil private @_T020opaque_values_silgen21s490_______loadBorrowyyF3FooL_V3foo7ElementQzSg5IndexQz3pos_tF : $@convention(method) <Elements where Elements : Collection> (@in Elements.Index, @inout Foo<Elements>) -> @out Optional<Elements.Element> {
+// CHECK: bb0(%0 : $Elements.Index, %1 : $*Foo<Elements>):
+// CHECK: [[READ:%.*]] = begin_access [read] [unknown] %1 : $*Foo<Elements>
+// CHECK: [[LOAD:%.*]] = load_borrow [[READ]] : $*Foo<Elements>
+// CHECK: end_access [[READ]] : $*Foo<Elements>
+// CHECK: [[EXTRACT:%.*]] = struct_extract [[LOAD]] : $Foo<Elements>, #<abstract function>Foo._elements
+// CHECK: [[COPYELT:%.*]] = copy_value [[EXTRACT]] : $Elements
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Elements.Index
+// CHECK: [[COPYIDX:%.*]] = copy_value [[BORROW]] : $Elements.Index
+// CHECK: [[WT:%.*]] = witness_method $Elements, #Collection.subscript!getter.1 : <Self where Self : Collection> (Self) -> (Self.Index) -> Self.Element : $@convention(witness_method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0.Index, @in_guaranteed τ_0_0) -> @out τ_0_0.Element
+// CHECK: %{{.*}} = apply [[WT]]<Elements>([[COPYIDX]], [[COPYELT]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0.Index, @in_guaranteed τ_0_0) -> @out τ_0_0.Element
+// CHECK: destroy_value [[COPYELT]] : $Elements
+// CHECK: [[ENUM:%.*]] = enum $Optional<Elements.Element>, #Optional.some!enumelt.1, %12 : $Elements.Element
+// CHECK: end_borrow [[BORROW]] from %0 : $Elements.Index, $Elements.Index
+// CHECK: end_borrow [[LOAD]] from [[READ]] : $Foo<Elements>, $*Foo<Elements>
+// CHECK: destroy_value %0 : $Elements.Index
+// CHECK: return %14 : $Optional<Elements.Element>
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s490_______loadBorrowyyF3FooL_V3foo7ElementQzSg5IndexQz3pos_tF'
+
+func s490_______loadBorrow() {
+  struct Foo<Elements : Collection> {
+    internal let _elements: Elements
+
+    public mutating func foo(pos: Elements.Index) -> Elements.Element? {
+      return _elements[pos]
+    }
+  }
+  var foo = Foo(_elements: [])
+  _ = foo.foo(pos: 1)
 }
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
