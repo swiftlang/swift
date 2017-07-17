@@ -555,6 +555,18 @@ public:
     return nullptr;
   }
 
+  /// Directly look for a nested type declared within this module inside the
+  /// given nominal type (including any extensions).
+  ///
+  /// This is a fast-path hack to avoid circular dependencies in deserialization
+  /// and the Clang importer.
+  ///
+  /// Private and fileprivate types should not be returned by this lookup.
+  virtual TypeDecl *lookupNestedType(Identifier name,
+                                     const NominalTypeDecl *parent) const {
+    return nullptr;
+  }
+
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

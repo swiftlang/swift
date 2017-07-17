@@ -1,3 +1,3 @@
-struct IAMOuter { int x; };
+struct IAMSOuter { int x; };
 
-struct IAMInner { int y; };
+struct IAMSInner { int y; };

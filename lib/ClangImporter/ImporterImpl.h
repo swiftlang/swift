@@ -1180,7 +1180,8 @@ public:
                             VisibleDeclConsumer &consumer);
 
   /// Determine the effective Clang context for the given Swift nominal type.
-  EffectiveClangContext getEffectiveClangContext(NominalTypeDecl *nominal);
+  EffectiveClangContext
+  getEffectiveClangContext(const NominalTypeDecl *nominal);
 
   /// Attempts to import the name of \p decl with each possible
   /// ImportNameVersion. \p action will be called with each unique name.
