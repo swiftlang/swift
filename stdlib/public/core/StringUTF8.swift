@@ -134,15 +134,14 @@ extension String {
     ///
     /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
     public var endIndex: Index {
-      var r = Index(encodedOffset: _core.endIndex)
+    var r = Index(encodedOffset: _core.endIndex)
       switch _legacyOffsets.end {
       case 0: return r
       case -3: r = index(before: r); fallthrough
       case -2: r = index(before: r); fallthrough
-      case -1: r = index(before: r); fallthrough
-      default: break
+      case -1: return index(before: r)
+      default: Builtin.unreachable()
       }
-      return r
     }
 
     @_versioned
