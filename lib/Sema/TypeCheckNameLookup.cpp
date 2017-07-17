@@ -204,43 +204,42 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
   return result;
 }
 
-SmallVector<TypeDecl *, 1>
+LookupResult
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
-  SmallVector<TypeDecl *, 1> decls;
-
-  // Try lookup without ProtocolMembers first.
-  UnqualifiedLookup lookup(
+  {
+    // Try lookup without ProtocolMembers first.
+    UnqualifiedLookup lookup(
       name, dc, this,
-      options.contains(NameLookupFlags::KnownPrivate),
-      loc,
-      /*IsTypeLookup=*/true,
-      /*AllowProtocolMembers=*/false,
-      options.contains(NameLookupFlags::IgnoreAccessibility));
-  for (auto found : lookup.Results)
-    decls.push_back(cast<TypeDecl>(found.getValueDecl()));
+        options.contains(NameLookupFlags::KnownPrivate),
+        loc,
+        /*IsTypeLookup=*/true,
+        /*AllowProtocolMembers=*/false,
+        options.contains(NameLookupFlags::IgnoreAccessibility));
 
-  if (decls.empty() &&
-      options.contains(NameLookupFlags::ProtocolMembers)) {
+    if (!lookup.Results.empty() ||
+        !options.contains(NameLookupFlags::ProtocolMembers)) {
+      return LookupResult(lookup.Results);
+    }
+  }
+
+  {
     // Try again, this time with protocol members.
     //
     // FIXME: Fix the problem where if NominalTypeDecl::getAllProtocols()
     // is called too early, we start resolving extensions -- even those
-    // which do provide conformances.
+    // which do provide not conformances.
     UnqualifiedLookup lookup(
-        name, dc, this,
+      name, dc, this,
         options.contains(NameLookupFlags::KnownPrivate),
         loc,
         /*IsTypeLookup=*/true,
         /*AllowProtocolMembers=*/true,
         options.contains(NameLookupFlags::IgnoreAccessibility));
 
-    for (auto found : lookup.Results)
-      decls.push_back(cast<TypeDecl>(found.getValueDecl()));
+    return LookupResult(lookup.Results);
   }
-
-  return decls;
 }
 
 LookupResult TypeChecker::lookupMember(DeclContext *dc,

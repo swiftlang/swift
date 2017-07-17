@@ -87,6 +87,12 @@ private:
   SmallVector<LookupResultEntry, 4> Results;
 
 public:
+  LookupResult() {}
+
+  explicit
+  LookupResult(const SmallVectorImpl<LookupResultEntry> &Results)
+    : Results(Results.begin(), Results.end()) {}
+
   typedef SmallVectorImpl<LookupResultEntry>::iterator iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
@@ -2012,7 +2018,7 @@ public:
   /// \param name The name of the entity to look for.
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
-  SmallVector<TypeDecl *, 1>
+  LookupResult
   lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
                         NameLookupOptions options
                           = defaultUnqualifiedLookupOptions);

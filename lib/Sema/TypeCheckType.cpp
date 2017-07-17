@@ -900,14 +900,14 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                  relookupOptions);
     if (!inaccessibleResults.empty()) {
       // FIXME: What if the unviable candidates have different levels of access?
-      auto first = cast<TypeDecl>(inaccessibleResults.front());
+      auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
       tc.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
                   comp->getIdentifier(), first->getFormalAccess());
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
       for (auto lookupResult : inaccessibleResults)
-        tc.diagnose(lookupResult, diag::type_declared_here);
+        tc.diagnose(lookupResult.getValueDecl(), diag::type_declared_here);
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if we do.
@@ -1202,7 +1202,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   Type current;
   TypeDecl *currentDecl = nullptr;
   bool isAmbiguous = false;
-  for (const auto &typeDecl : globals) {
+  for (const auto entry : globals) {
+    auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
 
     // If necessary, add delayed members to the declaration.
     if (auto nomDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
@@ -1243,8 +1244,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       TC.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
                   comp->getIdentifier())
         .highlight(comp->getIdLoc());
-      for (auto typeDecl : globals) {
-        TC.diagnose(typeDecl, diag::found_candidate);
+      for (auto entry : globals) {
+        TC.diagnose(entry.getValueDecl(), diag::found_candidate);
       }
     }
 
