@@ -744,7 +744,8 @@ public struct ${Self}<Element>
       _checkIndex(bounds.upperBound)
       // If the replacement buffer has same identity, and the ranges match,
       // then this was a pinned in-place modification, nothing further needed.
-      if self[bounds]._buffer.identity != rhs._buffer.identity || bounds != rhs.startIndex..<rhs.endIndex {
+      if self[bounds]._buffer.identity != rhs._buffer.identity
+      || bounds != rhs.startIndex..<rhs.endIndex {
         self.replaceSubrange(bounds, with: rhs)
       }
     }
