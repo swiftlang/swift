@@ -1561,7 +1561,8 @@ public:
   /// another constraint system, set the original constraint system. \c null
   /// otherwise
   ///
-  /// \returns true if an error occurred, false otherwise.
+  /// \returns The type of the top-level expression, or Type() if an
+  ///          error occurred.
   Type
   typeCheckExpression(Expr *&expr, DeclContext *dc,
                       TypeLoc convertType = TypeLoc(),
