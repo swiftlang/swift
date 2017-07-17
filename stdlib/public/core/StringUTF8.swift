@@ -16,12 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)#72 : The UTF-8 string view should conform to
-// `BidirectionalCollection`.
-
-// FIXME(ABI)#73 : The UTF-8 string view should have a custom iterator type to
-// allow performance optimizations of linear traversals.
-
 extension String {
   /// A view of a string's contents as a collection of UTF-8 code units.
   ///
@@ -102,11 +96,24 @@ extension String {
       CustomStringConvertible, 
       CustomDebugStringConvertible {
 
+    /// Underlying UTF-16-compatible representation
     @_versioned
     internal let _core: _StringCore
 
-    init(_ _core: _StringCore) {
+    /// Distances to `(startIndex, endIndex)` from the endpoints of _core,
+    /// measured in UTF-8 code units.
+    ///
+    /// Note: this is *only* here to support legacy Swift3-style slicing where
+    /// `s.utf8[i..<j]` produces a `String.UTF8View`, and should be removed when
+    /// those semantics are no longer supported.
+    @_versioned
+    internal let _legacyOffsets: (start: Int8, end: Int8)
+
+    init(_ _core: _StringCore,
+      legacyOffsets: (Int, Int) = (0, 0)
+    ) {
       self._core = _core
+      self._legacyOffsets = (Int8(legacyOffsets.0), Int8(legacyOffsets.1))
     }
 
     public typealias Index = String.Index
@@ -117,7 +124,9 @@ extension String {
     ///
     /// If the UTF-8 view is empty, `startIndex` is equal to `endIndex`.
     public var startIndex: Index {
-      return _index(atEncodedOffset: _core.startIndex)
+      let r = _index(atEncodedOffset: _core.startIndex)
+      if _legacyOffsets.start == 0 { return r }
+      return index(r, offsetBy: numericCast(_legacyOffsets.start))
     }
 
     /// The "past the end" position---that is, the position one
@@ -125,7 +134,15 @@ extension String {
     ///
     /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
     public var endIndex: Index {
-      return Index(encodedOffset: _core.endIndex)
+      var r = Index(encodedOffset: _core.endIndex)
+      switch _legacyOffsets.end {
+      case 0: return r
+      case -3: r = index(before: r); fallthrough
+      case -2: r = index(before: r); fallthrough
+      case -1: r = index(before: r); fallthrough
+      default: break
+      }
+      return r
     }
 
     @_versioned
@@ -231,7 +248,7 @@ extension String {
       case .valid(let u16):
         u8 = Unicode.UTF8.transcode(
           u16, from: Unicode.UTF16.self)._unsafelyUnwrappedUnchecked
-      case .error(let stride):
+      case .error:
         u8 = Unicode.UTF8.encodedReplacementCharacter
       case .emptyInput:
         _preconditionFailure("index out of bounds")
@@ -631,7 +648,6 @@ extension String.UTF8View {
   }
 }
 
-/*
 //===--- Slicing Support --------------------------------------------------===//
 /// In Swift 3.2, in the absence of type context,
 ///
@@ -641,17 +657,30 @@ extension String.UTF8View {
 /// Swift-3-only `subscript` overload that continues to produce
 /// `String.UTF8View`.
 extension String.UTF8View {
+  public typealias SubSequence = BidirectionalSlice<String.UTF8View>
+
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> String.UTF8View.SubSequence {
     return String.UTF8View.SubSequence(base: self, bounds: r)
   }
 
   @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String.UTF8View {
-    var r = self
-    r._startIndex = bounds.lowerBound
-    r._endIndex = bounds.upperBound
-    return r
+  public subscript(r: Range<Index>) -> String.UTF8View {
+    if r.upperBound._transcodedOffset == 0 {
+      return String.UTF8View(
+        _core[r.lowerBound.encodedOffset..<r.upperBound.encodedOffset],
+        legacyOffsets: (r.lowerBound._transcodedOffset, 0))
+    }
+
+    let b0 = r.upperBound._cache.utf8!.first!
+    let scalarLength8 = (~b0).leadingZeroBitCount
+    let scalarLength16 = scalarLength8 == 4 ? 2 : 1
+    let coreEnd = r.upperBound.encodedOffset + scalarLength16
+    return String.UTF8View(
+      _core[r.lowerBound.encodedOffset..<coreEnd],
+      legacyOffsets: (
+        r.lowerBound._transcodedOffset,
+        r.upperBound._transcodedOffset - scalarLength8))
   }
 
   @available(swift, obsoleted: 4)
@@ -660,4 +689,3 @@ extension String.UTF8View {
   }
 }
 
-*/
