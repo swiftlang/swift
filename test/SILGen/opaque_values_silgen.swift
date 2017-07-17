@@ -1050,6 +1050,29 @@ func s490_______loadBorrow() {
   _ = foo.foo(pos: 1)
 }
 
+protocol ConvertibleToP {
+  func asP() -> P
+}
+
+// Test visitBindOptionalExpr
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s500_______getAnyHashAA1P_pSgAA14ConvertibleToP_pSgF : $@convention(thin) (@in Optional<ConvertibleToP>) -> @out Optional<P> {
+// CHECK: bb0(%0 : $Optional<ConvertibleToP>):
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Optional<ConvertibleToP>
+// CHECK: [[COPY:%.*]] = copy_value [[BORROW]] : $Optional<ConvertibleToP>
+// CHECK: [[DATA:%.*]] = unchecked_enum_data [[COPY]] : $Optional<ConvertibleToP>, #Optional.some!enumelt.1
+// CHECK: [[VAL:%.*]] = open_existential_value [[DATA]] : $ConvertibleToP to $@opened("{{.*}}") ConvertibleToP
+// CHECK: [[WT:%.*]] = witness_method $@opened("{{.*}}") ConvertibleToP, #ConvertibleToP.asP!1 : <Self where Self : ConvertibleToP> (Self) -> () -> P, %12 : $@opened("{{.*}}") ConvertibleToP : $@convention(witness_method) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
+// CHECK: [[AS_P:%.*]] = apply [[WT]]<@opened("{{.*}}") ConvertibleToP>(%12) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
+// CHECK: [[ENUM:%.*]] = enum $Optional<P>, #Optional.some!enumelt.1, [[AS_P]] : $P
+// CHECK: destroy_value [[DATA]] : $ConvertibleToP
+// CHECK: end_borrow [[BORROW]] from %0 : $Optional<ConvertibleToP>, $Optional<ConvertibleToP>
+// CHECK: br bb{{.*}}([[ENUM]] : $Optional<P>)
+// CHECK: // end sil function '_T020opaque_values_silgen21s500_______getAnyHashAA1P_pSgAA14ConvertibleToP_pSgF'
+func s500_______getAnyHash(_ value: ConvertibleToP?) -> P? {
+  return value?.asP()
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
