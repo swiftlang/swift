@@ -156,7 +156,7 @@ getNewResults(GenericEnvironment *GenericEnv,
               ArrayRef<SILResultInfo> origResults, irgen::IRGenModule &Mod) {
   // Get new SIL Function results - same as old results UNLESS:
   // 1) Function type results might have a different signature
-  // 2) Large loadables are replaced by empty tuples
+  // 2) Large loadables are replaced by @out version
   SmallVector<SILResultInfo, 2> newResults;
   for (auto result : origResults) {
     SILType currResultTy = result.getSILStorageType();
@@ -170,10 +170,8 @@ getNewResults(GenericEnvironment *GenericEnv,
       newResults.push_back(newResult);
     } else if (newSILType != currResultTy) {
       // Case (2) Above
-      auto emptyTy = Mod.getSILModule().Types.getLoweredType(
-          TupleType::getEmpty(Mod.getSILModule().getASTContext()));
-      SILResultInfo newSILResultInfo(emptyTy.getSwiftRValueType(),
-                                     ResultConvention::Unowned);
+      SILResultInfo newSILResultInfo(newSILType.getSwiftRValueType(),
+                                     ResultConvention::Indirect);
       newResults.push_back(newSILResultInfo);
     } else {
       newResults.push_back(result);
@@ -290,17 +288,6 @@ getNewArgTys(GenericEnvironment *GenericEnv,
              SILFunctionType *currSILFunctionType, irgen::IRGenModule &Mod) {
   ArrayRef<SILParameterInfo> params = currSILFunctionType->getParameters();
   SmallVector<SILParameterInfo, 4> newArgTys;
-  auto canFuncType = CanSILFunctionType(currSILFunctionType);
-  if (modResultType(GenericEnv, canFuncType, Mod)) {
-    // Make a new param
-    auto singleResult = canFuncType->getSingleResult();
-    auto resultStorageType = singleResult.getSILStorageType();
-    assert(resultStorageType.isObject() && "Expected an Object return Type");
-    auto newType = resultStorageType.getAddressType();
-    auto newParam = SILParameterInfo(newType.getSwiftRValueType(),
-                                     ParameterConvention::Indirect_Inout);
-    newArgTys.push_back(newParam);
-  }
   for (SILParameterInfo param : params) {
     SILType storageType = param.getSILStorageType();
     SILType newOptFuncType =
@@ -2016,9 +2003,9 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     }
   }
   SILFunctionType *origSILFunctionType = applySite.getSubstCalleeType();
+  auto origCanType = CanSILFunctionType(origSILFunctionType);
   Lowering::GenericContextScope GenericScope(
-      getModule()->Types,
-      CanSILFunctionType(origSILFunctionType)->getGenericSignature());
+      getModule()->Types, origCanType->getGenericSignature());
   GenericEnvironment *genEnv = nullptr;
   if (origSILFunctionType->isPolymorphic()) {
     genEnv = getGenericEnvironment(applyInst->getModule(),
@@ -2035,8 +2022,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   // If we turned a direct result into an indirect parameter
   // Find the new alloc we created earlier.
   // and pass it as first parameter:
-  if (origSILFunctionType->getParameters().size() !=
-      newSILFunctionType->getParameters().size()) {
+  if (modResultType(genEnv, origCanType, *currIRMod)) {
     assert(allApplyRetToAllocMap.find(applyInst) !=
            allApplyRetToAllocMap.end());
     auto newAlloc = allApplyRetToAllocMap[applyInst];
