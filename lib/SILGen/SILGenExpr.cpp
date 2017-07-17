@@ -1426,7 +1426,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // If it turns out there are no uses of the catch block, just drop it.
   if (catchBB->pred_empty()) {
     // Remove the dead failureBB.
-    catchBB->eraseFromParent();
+    SGF.eraseBasicBlock(catchBB);
 
     // The value we provide is the one we've already got.
     if (!isByAddress)
