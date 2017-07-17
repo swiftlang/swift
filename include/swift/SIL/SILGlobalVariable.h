@@ -163,7 +163,10 @@ public:
   
   /// Pretty-print the variable.
   void dump(bool Verbose) const;
-  void dump() const LLVM_ATTRIBUTE_USED { dump(false); }
+  /// Pretty-print the variable.
+  ///
+  /// This is a separate entry point for ease of debugging.
+  void dump() const LLVM_ATTRIBUTE_USED;
 
   /// Pretty-print the variable to the designated stream as a 'sil_global'
   /// definition.

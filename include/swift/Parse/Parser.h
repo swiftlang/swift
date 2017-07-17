@@ -45,7 +45,7 @@ namespace swift {
   class ScopeInfo;
   struct TypeLoc;
   class TupleType;
-  class SILParserState;
+  class SILParserTUStateBase;
   class SourceManager;
   class PersistentParserState;
   class CodeCompletionCallbacks;
@@ -71,7 +71,10 @@ namespace swift {
     ActiveConditionalBlock,
   };
 
-  
+/// The main class used for parsing a source file (.swift or .sil).
+///
+/// Rather than instantiating a Parser yourself, use one of the parsing APIs
+/// provided in Subsystems.h.
 class Parser {
   Parser(const Parser&) = delete;
   void operator=(const Parser&) = delete;
@@ -85,7 +88,7 @@ public:
   DiagnosticEngine &Diags;
   SourceFile &SF;
   Lexer *L;
-  SILParserState *SIL;    // Non-null when parsing a .sil file.
+  SILParserTUStateBase *SIL; // Non-null when parsing a .sil file.
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
@@ -304,10 +307,10 @@ public:
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
 public:
-  Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
+  Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-         SILParserState *SIL = nullptr,
+         SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr);
   ~Parser();
 
@@ -865,18 +868,6 @@ public:
 
   ParserResult<PrecedenceGroupDecl>
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
-
-  //===--------------------------------------------------------------------===//
-  // SIL Parsing.
-
-  bool parseDeclSIL();
-  bool parseDeclSILStage();
-  bool parseSILVTable();
-  bool parseSILGlobal();
-  bool parseSILWitnessTable();
-  bool parseSILDefaultWitnessTable();
-  bool parseSILCoverageMap();
-  bool parseSILScope();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

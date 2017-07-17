@@ -3989,6 +3989,19 @@ namespace {
             }
           }
           
+          // Unwrap if we needed to look through an IUO to find the
+          // property.
+          if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(
+                              baseTy->getRValueType())) {
+            if (baseTy->is<LValueType>())
+              baseTy = LValueType::get(objTy);
+            else
+              baseTy = objTy;
+
+            resolvedComponents.push_back(
+                 KeyPathExpr::Component::forOptionalForce(baseTy, SourceLoc()));
+          }
+          
           auto dc = property->getInnermostDeclContext();
           SmallVector<Substitution, 4> subs;
           if (auto sig = dc->getGenericSignatureOfContext()) {
@@ -4019,6 +4032,19 @@ namespace {
             cs.TC.diagnose(origComponent.getLoc(),
                            diag::expr_keypath_mutating_getter,
                            subscript->getFullName());
+          }
+
+          // Unwrap if we needed to look through an IUO to find the
+          // subscript.
+          if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(
+                              baseTy->getRValueType())) {
+            if (baseTy->is<LValueType>())
+              baseTy = LValueType::get(objTy);
+            else
+              baseTy = objTy;
+
+            resolvedComponents.push_back(
+                 KeyPathExpr::Component::forOptionalForce(baseTy, SourceLoc()));
           }
           
           auto dc = subscript->getInnermostDeclContext();

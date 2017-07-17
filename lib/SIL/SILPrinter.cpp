@@ -2126,6 +2126,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
 void SILGlobalVariable::dump(bool Verbose) const {
   print(llvm::errs(), Verbose);
 }
+void SILGlobalVariable::dump() const {
+   dump(false);
+}
 
 void SILGlobalVariable::printName(raw_ostream &OS) const {
   OS << "@" << Name;

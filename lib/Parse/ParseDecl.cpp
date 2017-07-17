@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/Parse/ParseSILSupport.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DebuggerClient.h"
@@ -200,28 +201,33 @@ bool Parser::parseTopLevel() {
   // that SIL bodies can only be at the top level.
   if (Tok.is(tok::kw_sil)) {
     assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    parseDeclSIL();
+    SIL->parseDeclSIL(*this);
   } else if (Tok.is(tok::kw_sil_stage)) {
-    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    parseDeclSILStage();
+    assert(isInSILMode() && "'sil_stage' should only be a keyword in SIL mode");
+    SIL->parseDeclSILStage(*this);
   } else if (Tok.is(tok::kw_sil_vtable)) {
-    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    parseSILVTable();
+    assert(isInSILMode() &&
+           "'sil_vtable' should only be a keyword in SIL mode");
+    SIL->parseSILVTable(*this);
   } else if (Tok.is(tok::kw_sil_global)) {
-    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    parseSILGlobal();
+    assert(isInSILMode() &&
+           "'sil_global' should only be a keyword in SIL mode");
+    SIL->parseSILGlobal(*this);
   } else if (Tok.is(tok::kw_sil_witness_table)) {
-    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    parseSILWitnessTable();
+    assert(isInSILMode() &&
+           "'sil_witness_table' should only be a keyword in SIL mode");
+    SIL->parseSILWitnessTable(*this);
   } else if (Tok.is(tok::kw_sil_default_witness_table)) {
-    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    parseSILDefaultWitnessTable();
+    assert(isInSILMode() &&
+           "'sil_default_witness_table' should only be a keyword in SIL mode");
+    SIL->parseSILDefaultWitnessTable(*this);
   } else if (Tok.is(tok::kw_sil_coverage_map)) {
-    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    parseSILCoverageMap();
+    assert(isInSILMode() &&
+           "'sil_coverage_map' should only be a keyword in SIL mode");
+    SIL->parseSILCoverageMap(*this);
   } else if (Tok.is(tok::kw_sil_scope)) {
-    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    parseSILScope();
+    assert(isInSILMode() && "'sil_scope' should only be a keyword in SIL mode");
+    SIL->parseSILScope(*this);
   } else {
     parseBraceItems(Items,
                     allowTopLevelCode() ? BraceItemListKind::TopLevelCode
