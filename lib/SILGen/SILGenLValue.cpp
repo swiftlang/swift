@@ -3127,7 +3127,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   PathComponent &&component =
     drillToLastComponent(*this, loc, std::move(src), addr, AccessKind::Read);
 
-  // If the last component is physical, just drill down and load from it.
+  // If the last component is physical, drill down and load from it.
   if (component.isPhysical()) {
     addr = std::move(component.asPhysical())
              .offset(*this, loc, addr, AccessKind::Read);
@@ -3137,7 +3137,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
                            isGuaranteedValid));
   }
 
-  // If the last component is logical, just emit a get.
+  // If the last component is logical, emit a get.
   return std::move(component.asLogical()).get(*this, loc, addr, C);
 }
 
