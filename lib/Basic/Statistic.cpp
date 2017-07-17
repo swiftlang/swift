@@ -12,7 +12,6 @@
 
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/DependencyGraph.h"
-#include "swift/SIL/SILModule.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
