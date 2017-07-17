@@ -472,3 +472,13 @@ func testNullproneSubscriptSet(object: NullproneSubscript, index: AnyObject) {
   // CHECK:      end_borrow [[SELF]] from %0
   object[index] = makeOptNS() as String?
 }
+
+/*** Bugfixes ***************************************************************/
+
+protocol P {
+  var title : String { get }
+}
+
+func foo(p: P) {
+  DummyClass().takeNullableString(p.title)
+}
