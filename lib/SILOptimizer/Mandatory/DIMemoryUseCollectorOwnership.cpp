@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "definite-init"
 #include "DIMemoryUseCollectorOwnership.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/StringExtras.h"
@@ -168,8 +169,9 @@ SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
 
 /// computeTupleElementAddress - Given a tuple element number (in the flattened
 /// sense) return a pointer to a leaf element of the specified number.
-SILValue DIMemoryObjectInfo::emitElementAddress(unsigned EltNo, SILLocation Loc,
-                                                SILBuilder &B) const {
+SILValue DIMemoryObjectInfo::emitElementAddress(
+    unsigned EltNo, SILLocation Loc, SILBuilder &B,
+    llvm::SmallVectorImpl<std::pair<SILValue, SILValue>> &EndBorrowList) const {
   SILValue Ptr = getAddress();
   bool IsSelf = isNonDelegatingInit();
   auto &Module = MemoryInst->getModule();
@@ -203,8 +205,14 @@ SILValue DIMemoryObjectInfo::emitElementAddress(unsigned EltNo, SILLocation Loc,
     // lifetimes for each of the tuple members.
     if (IsSelf) {
       if (auto *NTD = PointeeType.getNominalOrBoundGenericNominal()) {
-        if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress())
-          Ptr = B.createLoad(Loc, Ptr, LoadOwnershipQualifier::Unqualified);
+        // If we have a class, we can use a borrow directly and avoid ref count
+        // traffic.
+        if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress()) {
+          SILValue Original = Ptr;
+          SILValue Borrowed = Ptr = B.createLoadBorrow(Loc, Ptr);
+          EndBorrowList.emplace_back(Borrowed, Original);
+        }
+
         for (auto *VD : NTD->getStoredProperties()) {
           auto FieldType = PointeeType.getFieldType(VD, Module);
           unsigned NumFieldElements =
@@ -214,7 +222,16 @@ SILValue DIMemoryObjectInfo::emitElementAddress(unsigned EltNo, SILLocation Loc,
               Ptr = B.createStructElementAddr(Loc, Ptr, VD);
             else {
               assert(isa<ClassDecl>(NTD));
+              SILValue Original, Borrowed;
+              if (Ptr.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
+                Original = Ptr;
+                Borrowed = Ptr = B.createBeginBorrow(Loc, Ptr);
+              }
               Ptr = B.createRefElementAddr(Loc, Ptr, VD);
+              if (Original) {
+                assert(Borrowed);
+                EndBorrowList.emplace_back(Borrowed, Original);
+              }
             }
 
             PointeeType = FieldType;
@@ -463,8 +480,8 @@ static SILValue scalarizeLoad(LoadInst *LI,
   SmallVector<SILValue, 4> ElementTmps;
 
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
-    auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i],
-                               LoadOwnershipQualifier::Unqualified);
+    auto *SubLI = B.createTrivialLoadOr(LI->getLoc(), ElementAddrs[i],
+                                        LI->getOwnershipQualifier());
     ElementTmps.push_back(SubLI);
   }
 
@@ -557,6 +574,11 @@ private:
   void collectClassSelfUses();
   void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                             llvm::SmallDenseMap<VarDecl *, unsigned> &EN);
+  // FIXME: This method name is horrible. If you have a better name, please
+  // rename it.
+  void checkClassSelfUpcastUsedBySuperInit(
+      SILValue ClassPointer, UpcastInst *UCI, SILInstruction *User,
+      llvm::SmallDenseMap<VarDecl *, unsigned> &EN);
 
   void addElementUses(unsigned BaseEltNo, SILType UseTy, SILInstruction *User,
                       DIUseKind Kind);
@@ -712,14 +734,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // Look through begin_access.
-    if (isa<BeginAccessInst>(User)) {
+    // Look through begin_access and begin_borrow
+    if (isa<BeginAccessInst>(User) || isa<BeginBorrowInst>(User)) {
       collectUses(User, BaseEltNo);
       continue;
     }
 
-    // Ignore end_access.
-    if (isa<EndAccessInst>(User)) {
+    // Ignore end_access and end_borrow.
+    if (isa<EndAccessInst>(User) || isa<EndBorrowInst>(User)) {
       continue;
     }
 
@@ -729,6 +751,13 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         UsesToScalarize.push_back(User);
       else
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
+      continue;
+    }
+
+    // Load borrows are similar to loads except that we do not support
+    // scalarizing them now.
+    if (isa<LoadBorrowInst>(User)) {
+      addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
       continue;
     }
 
@@ -983,8 +1012,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
 
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                        StoreOwnershipQualifier::Unqualified);
+          B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                                 SI->getOwnershipQualifier());
         SI->eraseFromParent();
         continue;
       }
@@ -1067,9 +1096,14 @@ void ElementUseCollector::collectClassSelfUses() {
     if (isa<StoreInst>(User) && Op->getOperandNumber() == 1)
       continue;
 
+    // Ignore end_borrows. These can only come from us being the source of a
+    // load_borrow.
+    if (isa<EndBorrowInst>(User))
+      continue;
+
     // Loads of the box produce self, so collect uses from them.
-    if (auto *LI = dyn_cast<LoadInst>(User)) {
-      collectClassSelfUses(LI, TheMemory.MemorySILType, EltNumbering);
+    if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
+      collectClassSelfUses(User, TheMemory.MemorySILType, EltNumbering);
       continue;
     }
 
@@ -1129,10 +1163,10 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
       // If we're reading a .sil file, treat a call to "superinit" as a
       // super.init call as a hack to allow us to write testcases.
       auto *AI = dyn_cast<ApplyInst>(User);
-      if (AI && User->getLoc().isSILFile())
+      if (AI && AI->getLoc().isSILFile())
         if (auto *Fn = AI->getReferencedFunction())
           if (Fn->getName() == "superinit")
-            return User;
+            return AI;
       continue;
     }
 
@@ -1280,36 +1314,119 @@ static bool isSelfInitUse(SILArgument *Arg) {
   return isSelfInitUse(Pred->getTerminator());
 }
 
+static SILValue stripUpcastsAndBorrows(SILValue Arg) {
+  while (true) {
+    if (auto *BBI = dyn_cast<BeginBorrowInst>(Arg)) {
+      Arg = BBI->getOperand();
+      continue;
+    }
+
+    if (auto *Upcast = dyn_cast<UpcastInst>(Arg)) {
+      Arg = Upcast->getOperand();
+      continue;
+    }
+
+    return Arg;
+  }
+}
+
 /// Returns true if \p Method is a callee of a full apply site that takes in \p
 /// Pointer as an argument. In such a case, we want to ignore the class method
 /// use and allow for the use by the apply inst to take precedence.
 static bool shouldIgnoreClassMethodUseError(ClassMethodInst *Method,
                                             SILValue Pointer) {
-
   // In order to work around use-list ordering issues, if this method is called
   // by an apply site that has I as an argument, we want to process the apply
   // site for errors to emit, not the class method. If we do not obey these
   // conditions, then continue to treat the class method as an escape.
-  auto CheckFullApplySite = [&](Operand *Op) -> bool {
+  auto CheckFullApplySite = [&Method, &Pointer](Operand *Op) -> bool {
     FullApplySite FAS(Op->getUser());
     if (!FAS || (FAS.getCallee() != Method))
       return false;
+
     return llvm::any_of(FAS.getArgumentsWithoutIndirectResults(),
-                        [&](SILValue Arg) -> bool { return Arg == Pointer; });
+                        [&Pointer](SILValue Arg) -> bool {
+                          return stripUpcastsAndBorrows(Arg) == Pointer;
+                        });
   };
 
   return llvm::any_of(Method->getUses(), CheckFullApplySite);
 }
 
+void ElementUseCollector::checkClassSelfUpcastUsedBySuperInit(
+    SILValue ClassPointer, UpcastInst *UCI, SILInstruction *SuperInitUse,
+    llvm::SmallDenseMap<VarDecl *, unsigned> &EltNumbering) {
+  // We remember the applyinst as the super.init site, not the upcast.
+  trackUse(DIMemoryUse(SuperInitUse, DIUseKind::SuperInit, 0,
+                       TheMemory.NumElements));
+  UseInfo.trackFailableInitCall(TheMemory, SuperInitUse);
+
+  // We know that the super.init is the consuming point for the
+  // upcast. But we /can/ still write to the class if we borrow the upcast
+  // or escape it using perhaps an unowned convention. So add all other
+  // users of the upcast as a load. This ensures that any such uses before
+  // the super.init point is flagged as being a use before super.init.
+  llvm::SmallVector<Operand *, 32> Worklist(UCI->use_begin(), UCI->use_end());
+  while (!Worklist.empty()) {
+    auto *UCIOpUser = Worklist.pop_back_val()->getUser();
+
+    // Skip the AI.
+    if (UCIOpUser == SuperInitUse)
+      continue;
+
+    // Ignore any super_method use.
+    if (isa<SuperMethodInst>(UCIOpUser))
+      continue;
+
+    // We don't care about end_borrow.
+    if (isa<EndBorrowInst>(UCIOpUser))
+      continue;
+
+    // Look through begin_borrow and unchecked_ref_cast.
+    if (isa<BeginBorrowInst>(UCIOpUser) ||
+        isa<UncheckedRefCastInst>(UCIOpUser)) {
+      copy(UCIOpUser->getUses(), std::back_inserter(Worklist));
+      continue;
+    }
+
+    // ref_element_addr P, #field lookups up a field.
+    if (auto *REAI = dyn_cast<RefElementAddrInst>(UCIOpUser)) {
+      assert(EltNumbering.count(REAI->getField()) &&
+             "ref_element_addr not a local field?");
+      // Recursively collect uses of the fields.  Note that fields of the class
+      // could be tuples, so they may be tracked as independent elements.
+      llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
+      collectUses(REAI, EltNumbering[REAI->getField()]);
+      continue;
+    }
+
+    if (auto *Method = dyn_cast<ClassMethodInst>(UCIOpUser)) {
+      if (shouldIgnoreClassMethodUseError(Method, ClassPointer)) {
+        continue;
+      }
+    }
+
+    // Treat all other uses as loads.
+    trackUse(DIMemoryUse(UCIOpUser, DIUseKind::Load, 0, TheMemory.NumElements));
+  }
+}
+
 void ElementUseCollector::collectClassSelfUses(
     SILValue ClassPointer, SILType MemorySILType,
     llvm::SmallDenseMap<VarDecl *, unsigned> &EltNumbering) {
-  for (auto *Op : ClassPointer->getUses()) {
+  llvm::SmallVector<Operand *, 16> Worklist(ClassPointer->use_begin(),
+                                            ClassPointer->use_end());
+  while (!Worklist.empty()) {
+    auto *Op = Worklist.pop_back_val();
     auto *User = Op->getUser();
 
     // super_method always looks at the metatype for the class, not at any of
     // its stored properties, so it doesn't have any DI requirements.
     if (isa<SuperMethodInst>(User))
+      continue;
+
+    // Skip end_borrow.
+    if (isa<EndBorrowInst>(User))
       continue;
 
     // ref_element_addr P, #field lookups up a field.
@@ -1349,25 +1466,25 @@ void ElementUseCollector::collectClassSelfUses(
     // If this is an upcast instruction, it is a conversion of self to the base.
     // This is either part of a super.init sequence, or a general superclass
     // access.
-    if (auto *UCI = dyn_cast<UpcastInst>(User))
+    if (auto *UCI = dyn_cast<UpcastInst>(User)) {
       if (auto *AI = isSuperInitUse(UCI)) {
-        // We remember the applyinst as the super.init site, not the upcast.
-        trackUse(
-            DIMemoryUse(AI, DIUseKind::SuperInit, 0, TheMemory.NumElements));
-        UseInfo.trackFailableInitCall(TheMemory, AI);
-
-        // Now that we know that we have a super.init site, check if our upcast
-        // has any borrow users. These used to be represented by a separate
-        // load, but now with sil ownership, they are represented as borrows
-        // from the same upcast as the super init user upcast.
-        llvm::SmallVector<UpcastInst *, 4> ExtraUpcasts;
-        collectBorrowedSuperUses(UCI, ExtraUpcasts);
-        for (auto *Upcast : ExtraUpcasts) {
-          trackUse(
-              DIMemoryUse(Upcast, DIUseKind::Load, 0, TheMemory.NumElements));
-        }
+        checkClassSelfUpcastUsedBySuperInit(ClassPointer, UCI, AI,
+                                            EltNumbering);
         continue;
       }
+
+      // Otherwise, look through the upcast and continue.
+      std::copy(User->use_begin(), User->use_end(),
+                std::back_inserter(Worklist));
+      continue;
+    }
+
+    // Look through begin_borrow and copy_value.
+    if (isa<BeginBorrowInst>(User) || isa<CopyValueInst>(User)) {
+      std::copy(User->use_begin(), User->use_end(),
+                std::back_inserter(Worklist));
+      continue;
+    }
 
     // If this is an ApplyInst, check to see if this is part of a self.init
     // call in a delegating initializer.
@@ -1406,8 +1523,11 @@ public:
 
   void collectClassInitSelfUses();
   void collectValueTypeInitSelfUses();
+
+  // *NOTE* Even though this takes a SILInstruction it actually only accepts
+  // load_borrow and load instructions. This is enforced via an assert.
   void collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
-                                              LoadInst *LI);
+                                              SILInstruction *LI);
 };
 
 } // end anonymous namespace
@@ -1431,6 +1551,11 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   //
   for (auto *UI : MUI->getUses()) {
     SILInstruction *User = UI->getUser();
+
+    // Ignore end_borrow. If we see an end_borrow it can only come from a
+    // load_borrow from ourselves.
+    if (isa<EndBorrowInst>(User))
+      continue;
 
     // Stores to self are initializations store or the rebind of self as
     // part of the super.init call.  Ignore both of these.
@@ -1481,8 +1606,8 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     }
 
     // Loads of the box produce self, so collect uses from them.
-    if (auto *LI = dyn_cast<LoadInst>(User)) {
-      collectDelegatingClassInitSelfLoadUses(MUI, LI);
+    if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
+      collectDelegatingClassInitSelfLoadUses(MUI, User);
       continue;
     }
 
@@ -1567,10 +1692,14 @@ void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses() {
 }
 
 void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
-    MarkUninitializedInst *MUI, LoadInst *LI) {
+    MarkUninitializedInst *MUI, SILInstruction *LI) {
+  assert(isa<LoadBorrowInst>(LI) || isa<LoadInst>(LI));
+
   // If we have a load, then this is a use of the box.  Look at the uses of
   // the load to find out more information.
-  for (auto *UI : LI->getUses()) {
+  llvm::SmallVector<Operand *, 8> Worklist(LI->use_begin(), LI->use_end());
+  while (!Worklist.empty()) {
+    auto *UI = Worklist.pop_back_val();
     auto *User = UI->getUser();
 
     // super_method always looks at the metatype for the class, not at any of
@@ -1580,6 +1709,17 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
 
     // We ignore retains of self.
     if (isa<StrongRetainInst>(User))
+      continue;
+
+    // Look through begin_borrow.
+    if (isa<BeginBorrowInst>(User)) {
+      std::copy(User->use_begin(), User->use_end(),
+                std::back_inserter(Worklist));
+      continue;
+    }
+
+    // Ignore end_borrow.
+    if (isa<EndBorrowInst>(User))
       continue;
 
     // A release of a load from the self box in a class delegating
