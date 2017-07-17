@@ -1346,7 +1346,7 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
 }
 
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
-                                       const ValueDecl *parent) {
+                                       const NominalTypeDecl *parent) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   if (!NestedTypeDecls)

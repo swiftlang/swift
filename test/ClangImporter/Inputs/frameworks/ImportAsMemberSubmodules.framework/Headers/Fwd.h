@@ -1,3 +1,3 @@
 // The order of these forward-declarations affects whether there was a bug.
-struct IAMOuter;
-struct IAMInner;
+struct IAMSOuter;
+struct IAMSInner;
