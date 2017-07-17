@@ -3766,7 +3766,7 @@ public:
           break;
         }
         case KeyPathPatternComponent::Kind::OptionalChain: {
-          require(OptionalType::get(componentTy)->isEqual(baseTy),
+          require(baseTy->getAnyOptionalObjectType()->isEqual(componentTy),
                   "chaining component should unwrap optional");
           require(leafTy->getAnyOptionalObjectType(),
                   "key path with chaining component should have optional "
@@ -3774,12 +3774,12 @@ public:
           break;
         }
         case KeyPathPatternComponent::Kind::OptionalForce: {
-          require(OptionalType::get(componentTy)->isEqual(baseTy),
+          require(baseTy->getAnyOptionalObjectType()->isEqual(componentTy),
                   "forcing component should unwrap optional");
           break;
         }
         case KeyPathPatternComponent::Kind::OptionalWrap: {
-          require(OptionalType::get(baseTy)->isEqual(componentTy),
+          require(componentTy->getAnyOptionalObjectType()->isEqual(baseTy),
                   "wrapping component should wrap optional");
           break;
         }

@@ -523,4 +523,27 @@ keyPath.test("writebacks nest properly") {
   expectEqual(nestedWritebackLog, 0x383736)
 }
 
+struct IUOWrapper {
+  var wrapped: IUOWrapped!
+}
+
+struct IUOWrapped {
+  var value: Int
+}
+
+keyPath.test("IUO and key paths") {
+  var subject = IUOWrapper(wrapped: IUOWrapped(value: 1989))
+  let kp1 = \IUOWrapper.wrapped.value
+
+  expectEqual(subject[keyPath: kp1], 1989)
+  subject[keyPath: kp1] = 1738
+  expectEqual(subject[keyPath: kp1], 1738)
+  expectEqual(subject.wrapped.value, 1738)
+
+  let kp2 = \IUOWrapper.wrapped!.value
+
+  expectEqual(kp1, kp2)
+  expectEqual(kp1.hashValue, kp2.hashValue)
+}
+
 runAllTests()
