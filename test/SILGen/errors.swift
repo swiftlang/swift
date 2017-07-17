@@ -778,6 +778,15 @@ func testOptionalTry() {
   _ = try? make_a_cat()
 }
 
+func sudo_make_a_cat() {}
+
+// CHECK-LABEL: sil hidden @{{.*}}testOptionalTryThatNeverThrows
+func testOptionalTryThatNeverThrows() {
+  guard let _ = try? sudo_make_a_cat() else { // expected-warning{{no calls to throwing}}
+    return
+  }
+}
+
 // CHECK-LABEL: sil hidden @_T06errors18testOptionalTryVaryyF
 // CHECK-NEXT: bb0:
 // CHECK-NEXT: [[BOX:%.+]] = alloc_box ${ var Optional<Cat> }
