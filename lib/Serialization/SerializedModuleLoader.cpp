@@ -525,6 +525,12 @@ TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{
   return File.lookupLocalType(MangledName);
 }
 
+TypeDecl *
+SerializedASTFile::lookupNestedType(Identifier name,
+                                    const NominalTypeDecl *parent) const {
+  return File.lookupNestedType(name, parent);
+}
+
 OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
                                                 DeclKind fixity) const {
   return File.lookupOperator(name, fixity);

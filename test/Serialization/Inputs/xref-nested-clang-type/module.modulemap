@@ -1,0 +1,3 @@
+module NestedClangTypes {
+  header "NestedClangTypes.h"
+}

@@ -603,7 +603,7 @@ public:
 
   /// Searches the module's nested type decls table for the given member of
   /// the given type.
-  TypeDecl *lookupNestedType(Identifier name, const ValueDecl *parent);
+  TypeDecl *lookupNestedType(Identifier name, const NominalTypeDecl *parent);
 
   /// Searches the module's operators for one with the given name and fixity.
   ///

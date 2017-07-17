@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -I %S/Inputs/custom-modules %s -verify
 
+import ImportAsMember
 import ImportAsMemberSubmodules
 
-let _: IAMOuter.Inner?
+let _: IAMSOuter.Inner?
+let _: IAMMultipleNested.Inner? // expected-error {{ambiguous type name 'Inner' in 'IAMMultipleNested'}}
