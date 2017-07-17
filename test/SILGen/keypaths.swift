@@ -240,3 +240,29 @@ func keyPathForStorageQualified() {
   // CHECK-SAME: settable_property $StorageQualified, id ##FinalStorageQualified.disowned
   _ = \FinalStorageQualified.disowned
 }
+
+struct IUOProperty {
+  var iuo: IUOBlob!
+}
+
+struct IUOBlob {
+  var x: Int
+  subscript(y: String) -> String {
+    get { return y }
+    set {}
+  }
+}
+
+// CHECK-LABEL: sil hidden @{{.*}}iuoKeyPaths
+func iuoKeyPaths() {
+  // CHECK: = keypath $WritableKeyPath<IUOProperty, Int>,
+  // CHECK-SAME: stored_property #IUOProperty.iuo
+  // CHECK-SAME: optional_force
+  // CHECK-SAME: stored_property #IUOBlob.x
+  _ = \IUOProperty.iuo.x
+  // CHECK: = keypath $WritableKeyPath<IUOProperty, Int>,
+  // CHECK-SAME: stored_property #IUOProperty.iuo
+  // CHECK-SAME: optional_force
+  // CHECK-SAME: stored_property #IUOBlob.x
+  _ = \IUOProperty.iuo!.x
+}
