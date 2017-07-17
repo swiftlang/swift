@@ -34,8 +34,8 @@ namespace swift {
   class TypeDecl;
   class ValueDecl;
 
-/// UnqualifiedLookupResult - One result of unqualified lookup.
-struct UnqualifiedLookupResult {
+/// LookupResultEntry - One result of unqualified lookup.
+struct LookupResultEntry {
 private:
 
   /// The declaration through where we find Value. For instance,
@@ -66,9 +66,9 @@ private:
   ValueDecl *Value;
 
 public:
-  UnqualifiedLookupResult(ValueDecl *value) : Base(nullptr), Value(value) { }
+  LookupResultEntry(ValueDecl *value) : Base(nullptr), Value(value) { }
 
-  UnqualifiedLookupResult(ValueDecl *base, ValueDecl *value)
+  LookupResultEntry(ValueDecl *base, ValueDecl *value)
     : Base(base), Value(value) { }
 
   ValueDecl *getValueDecl() const {
@@ -96,7 +96,7 @@ public:
                     bool AllowProtocolMembers = false,
                     bool IgnoreAccessControl = false);
 
-  SmallVector<UnqualifiedLookupResult, 4> Results;
+  SmallVector<LookupResultEntry, 4> Results;
 
   /// \brief Return true if anything was found by the name lookup.
   bool isSuccess() const { return !Results.empty(); }
@@ -219,11 +219,11 @@ class NamedDeclConsumer : public VisibleDeclConsumer {
   virtual void anchor() override;
 public:
   DeclName name;
-  SmallVectorImpl<UnqualifiedLookupResult> &results;
+  SmallVectorImpl<LookupResultEntry> &results;
   bool isTypeLookup;
 
   NamedDeclConsumer(DeclName name,
-                    SmallVectorImpl<UnqualifiedLookupResult> &results,
+                    SmallVectorImpl<LookupResultEntry> &results,
                     bool isTypeLookup)
     : name(name), results(results), isTypeLookup(isTypeLookup) {}
 
@@ -233,7 +233,7 @@ public:
     if (isTypeLookup && !isa<TypeDecl>(VD))
       return;
     if (VD->getFullName().matchesRef(name))
-      results.push_back(UnqualifiedLookupResult(VD));
+      results.push_back(LookupResultEntry(VD));
   }
 };
 

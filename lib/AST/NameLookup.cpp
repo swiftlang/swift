@@ -345,7 +345,7 @@ static DiscriminatorMatch matchDiscriminator(Identifier discriminator,
 
 static DiscriminatorMatch
 matchDiscriminator(Identifier discriminator,
-                   UnqualifiedLookupResult lookupResult) {
+                   LookupResultEntry lookupResult) {
   return matchDiscriminator(discriminator, lookupResult.getValueDecl());
 }
 
@@ -449,7 +449,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   if (IsKnownNonCascading)
     isCascadingUse = false;
 
-  SmallVector<UnqualifiedLookupResult, 4> UnavailableInnerResults;
+  SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
 
   if (Loc.isValid() &&
       DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
@@ -579,14 +579,14 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         ValueDecl *baseDecl = nominal;
         if (selfDecl) baseDecl = selfDecl;
         for (auto result : lookup) {
-          Results.push_back(UnqualifiedLookupResult(baseDecl, result));
+          Results.push_back(LookupResultEntry(baseDecl, result));
         }
 
         if (!Results.empty()) {
           // Predicate that determines whether a lookup result should
           // be unavailable except as a last-ditch effort.
           auto unavailableLookupResult =
-              [&](const UnqualifiedLookupResult &result) {
+              [&](const LookupResultEntry &result) {
             auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
             return result.getValueDecl()->getAttrs()
                 .isUnavailableInSwiftVersion(effectiveVersion);
@@ -818,20 +818,20 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // Types are local or metatype members.
             if (auto TD = dyn_cast<TypeDecl>(Result)) {
               if (isa<GenericTypeParamDecl>(TD))
-                Results.push_back(UnqualifiedLookupResult(Result));
+                Results.push_back(LookupResultEntry(Result));
               else
-                Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
+                Results.push_back(LookupResultEntry(MetaBaseDecl, Result));
               continue;
             }
 
-            Results.push_back(UnqualifiedLookupResult(BaseDecl, Result));
+            Results.push_back(LookupResultEntry(BaseDecl, Result));
           }
 
           if (FoundAny) {
             // Predicate that determines whether a lookup result should
             // be unavailable except as a last-ditch effort.
             auto unavailableLookupResult =
-              [&](const UnqualifiedLookupResult &result) {
+              [&](const LookupResultEntry &result) {
               auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
               return result.getValueDecl()->getAttrs()
                   .isUnavailableInSwiftVersion(effectiveVersion);
@@ -915,7 +915,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                  resolutionKind, TypeResolver, DC, extraImports);
 
   for (auto VD : CurModuleResults)
-    Results.push_back(UnqualifiedLookupResult(VD));
+    Results.push_back(LookupResultEntry(VD));
 
   if (DebugClient)
     filterForDiscriminator(Results, DebugClient);
@@ -942,7 +942,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   // Look for a module with the given name.
   if (Name.isSimpleName(M.getName())) {
-    Results.push_back(UnqualifiedLookupResult(&M));
+    Results.push_back(LookupResultEntry(&M));
     return;
   }
 
@@ -952,7 +952,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   if (desiredModule) {
     forAllVisibleModules(DC, [&](const ModuleDecl::ImportedModule &import) -> bool {
       if (import.second == desiredModule) {
-        Results.push_back(UnqualifiedLookupResult(import.second));
+        Results.push_back(LookupResultEntry(import.second));
         return false;
       }
       return true;
