@@ -46,7 +46,7 @@ namespace {
     SmallVector<ValueDecl *, 4> FoundDecls;
 
     /// The set of known declarations.
-    llvm::SmallDenseMap<std::pair<ValueDecl *, ValueDecl *>, bool, 4> Known;
+    llvm::SmallDenseMap<std::pair<ValueDecl *, DeclContext *>, bool, 4> Known;
 
   public:
     LookupResultBuilder(TypeChecker &tc, LookupResult &result, DeclContext *dc,
@@ -96,12 +96,12 @@ namespace {
     ///
     /// \param found The declaration we found.
     ///
-    /// \param base The base declaration through which we found the
+    /// \param baseDC The declaration context through which we found the
     /// declaration.
     ///
     /// \param foundInType The type through which we found the
     /// declaration.
-    void add(ValueDecl *found, ValueDecl *base, Type foundInType) {
+    void add(ValueDecl *found, DeclContext *baseDC, Type foundInType) {
       ConformanceCheckOptions conformanceOptions;
       if (Options.contains(NameLookupFlags::KnownPrivate))
         conformanceOptions |= ConformanceCheckFlags::InExpression;
@@ -110,8 +110,8 @@ namespace {
       auto foundProto = foundDC->getAsProtocolOrProtocolExtensionContext();
 
       auto addResult = [&](ValueDecl *result) {
-        if (Known.insert({{result, base}, false}).second) {
-          Result.add(LookupResultEntry(base, result));
+        if (Known.insert({{result, baseDC}, false}).second) {
+          Result.add(LookupResultEntry(baseDC, result));
           FoundDecls.push_back(result);
         }
       };
@@ -189,22 +189,17 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
     // Determine which type we looked through to find this result.
     Type foundInType;
 
-    if (!found.getBaseDecl()) {
-      // Not found within a type.
-    } else {
-      DeclContext *baseDC = nullptr;
-      if (auto baseParam = dyn_cast<ParamDecl>(found.getBaseDecl())) {
-        baseDC = baseParam->getDeclContext()->getParent();
-      } else {
-        baseDC = cast<NominalTypeDecl>(found.getBaseDecl());
+    if (auto *baseDC = found.getDeclContext()) {
+      if (!baseDC->isTypeContext()) {
+        baseDC = baseDC->getParent();
+        assert(baseDC->isTypeContext());
       }
-
       foundInType = dc->mapTypeIntoContext(
         baseDC->getDeclaredInterfaceType());
       assert(foundInType && "bogus base declaration?");
     }
 
-    builder.add(found.getValueDecl(), found.getBaseDecl(), foundInType);
+    builder.add(found.getValueDecl(), found.getDeclContext(), foundInType);
   }
   return result;
 }
@@ -281,6 +276,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     dc->lookupQualified(type, name, subOptions, this, lookupResults);
 
     for (auto found : lookupResults) {
+      // FIXME: This should pass in 'dc'
       builder.add(found, nominalLookupType, type);
     }
   };
@@ -623,7 +619,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);
 
   for (auto &entry : entries)
-    result.add(LookupResultEntry(nullptr, entry.Value));
+    result.add(LookupResultEntry(entry.Value));
 }
 
 static InFlightDiagnostic

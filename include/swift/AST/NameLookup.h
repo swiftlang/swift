@@ -38,8 +38,7 @@ namespace swift {
 struct LookupResultEntry {
 private:
 
-  /// The declaration through where we find Value. For instance,
-  ///
+  /// The declaration context through which we found Value. For instance,
   /// class BaseClass {
   ///   func foo() {}
   /// }
@@ -48,7 +47,7 @@ private:
   ///   func bar() {}
   /// }
   ///
-  /// When finding foo() from the body of DerivedClass, Base is DerivedClass.
+  /// When finding foo() from the body of DerivedClass, BaseDC is DerivedClass.
   ///
   /// Another example:
   ///
@@ -57,27 +56,29 @@ private:
   ///   func foo() {}
   /// }
   ///
-  /// When finding bar() from the function body of foo(), Base is the implicit
-  /// self parameter in foo().
-  ValueDecl *Base;
+  /// When finding bar() from the function body of foo(), BaseDC is the method
+  /// foo().
+  DeclContext *BaseDC;
 
   /// The declaration corresponds to the given name; i.e. the decl we are
   /// looking up.
   ValueDecl *Value;
 
 public:
-  LookupResultEntry(ValueDecl *value) : Base(nullptr), Value(value) { }
+  LookupResultEntry(ValueDecl *value) : BaseDC(nullptr), Value(value) { }
 
-  LookupResultEntry(ValueDecl *base, ValueDecl *value)
-    : Base(base), Value(value) { }
+  LookupResultEntry(DeclContext *baseDC, ValueDecl *value)
+    : BaseDC(baseDC), Value(value) { }
 
   ValueDecl *getValueDecl() const {
     return Value;
   }
-  
-  ValueDecl *getBaseDecl() const {
-    return Base;
+
+  DeclContext *getDeclContext() const {
+    return BaseDC;
   }
+
+  ValueDecl *getBaseDecl() const;
 };
 
 /// \brief This class implements and represents the result of performing
