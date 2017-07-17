@@ -663,8 +663,9 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
     // Need to generate `try super.encode(to: container.superEncoder())`
 
     // superEncoder()
-    auto *method = new (C) UnresolvedDeclRefExpr(
-        DeclName(C.Id_superEncoder), DeclRefKind::Ordinary, DeclNameLoc());
+    auto *method = new (C) UnresolvedDeclRefExpr(DeclName(C.Id_superEncoder),
+                                                 DeclRefKind::Ordinary,
+                                                 DeclNameLoc());
 
     // container.superEncoder()
     auto *superEncoderRef = new (C) DotSyntaxCallExpr(containerExpr,
@@ -944,9 +945,10 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
                                       /*Implicit=*/true);
 
       auto *selfRef = createSelfDeclRef(initDecl);
-      auto *varExpr = new (C) UnresolvedDotExpr(
-          selfRef, SourceLoc(), DeclName(varDecl->getName()), DeclNameLoc(),
-          /*implicit=*/true);
+      auto *varExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
+                                                DeclName(varDecl->getName()),
+                                                DeclNameLoc(),
+                                                /*implicit=*/true);
       auto *assignExpr = new (C) AssignExpr(varExpr, SourceLoc(), tryExpr,
                                             /*Implicit=*/true);
       statements.push_back(assignExpr);
@@ -1053,12 +1055,10 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   // Func name: init(from: Decoder)
   DeclName name(C, C.Id_init, paramList);
 
-  auto *initDecl = new (C) ConstructorDecl(
-      name, SourceLoc(),
-      /*Failability=*/OTK_None,
-      /*FailabilityLoc=*/SourceLoc(),
-      /*Throws=*/true, /*ThrowsLoc=*/SourceLoc(), selfDecl, paramList,
-      /*GenericParams=*/nullptr, target);
+  auto *initDecl = new (C) ConstructorDecl(name, SourceLoc(), OTK_None,
+                                           SourceLoc(), /*Throws=*/true,
+                                           SourceLoc(), selfDecl, paramList,
+                                           /*GenericParams=*/nullptr, target);
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(deriveBodyDecodable_init);
 
@@ -1087,8 +1087,8 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
 
   initDecl->setInterfaceType(interfaceType);
   initDecl->setInitializerInterfaceType(initializerType);
-  initDecl->setAccessibility(
-      std::max(target->getFormalAccess(), Accessibility::Internal));
+  initDecl->setAccessibility(std::max(target->getFormalAccess(),
+                                      Accessibility::Internal));
 
   // If the type was not imported, the derived conformance is either from the
   // type itself or an extension, in which case we will emit the declaration
