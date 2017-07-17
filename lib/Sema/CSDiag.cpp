@@ -3357,7 +3357,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // important, isn't itself sufficient because of AST mutation.
   eraseOpenedExistentials(subExpr);
 
-  bool hadError = CS.TC.typeCheckExpression(
+  auto resultTy = CS.TC.typeCheckExpression(
       subExpr, CS.DC, TypeLoc::withoutLoc(convertType), convertTypePurpose,
       TCEOptions, listener, &CS);
 
@@ -3371,12 +3371,12 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   
   // If recursive type checking failed, then an error was emitted.  Return
   // null to indicate this to the caller.
-  if (hadError)
+  if (!resultTy)
     return nullptr;
 
   // If we type checked the result but failed to get a usable output from it,
   // just pretend as though nothing happened.
-  if (subExpr->getType()->is<ErrorType>()) {
+  if (resultTy->is<ErrorType>()) {
     subExpr = preCheckedExpr;
     SavedTypeData.restore();
   }
