@@ -593,6 +593,11 @@ static BridgingConversion getBridgingConversion(Expr *E) {
     return { E, kind, 0 };
   }
 
+  // If we peeked through an opening, and we didn't recognize a specific
+  // pattern above involving the opaque value, make sure we use the opening
+  // as the final expression instead of accidentally look through it.
+  if (open) return { open, None, 0 };
+
   return { E, None, 0 };
 }
 
