@@ -1089,3 +1089,44 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
     print("default")
   }
 }
+
+// All cases are unreachable, either structurally (tuples involving Never) or
+// nominally (empty enums).  We fold all of these to 'unreachable'.
+enum MyNever {}
+func ~= (_ : MyNever, _ : MyNever) -> Bool { return true }
+func myFatalError() -> MyNever { fatalError("asdf") }
+
+func testUninhabitedSwitchScrutinee() {
+  func test1(x : MyNever) {
+    // CHECK: bb0(%0 : $MyNever):
+    // CHECK-NEXT: debug_value %0 : $MyNever, let, name "x"
+    // CHECK-NEXT: unreachable
+    switch x {
+    case myFatalError(): break
+    case myFatalError(): break
+    case myFatalError(): break
+    }
+  }
+  func test2(x : Never) {
+    // CHECK: bb0(%0 : $Never):
+    // CHECK-NEXT: debug_value %0 : $Never, let, name "x"
+    // CHECK-NEXT: unreachable
+    switch (x, x) {}
+  }
+  func test3(x : Never) {
+    // CHECK: unreachable
+    // CHECK-NEXT: } // end sil function '_T06switch30testUninhabitedSwitchScrutineeyyF5test3L_ys5NeverO1x_tF'
+    switch (x, 5, x) {}
+  }
+  func test4(x : Never) {
+    // CHECK: unreachable
+    // CHECK-NEXT: } // end sil function '_T06switch30testUninhabitedSwitchScrutineeyyF5test4L_ys5NeverO1x_tF'
+    switch ((8, 6, 7), (5, 3, (0, x))) {}
+  }
+  func test5() {
+    // CHECK: %0 = function_ref @_T06switch12myFatalErrorAA7MyNeverOyF : $@convention(thin) () -> MyNever
+    // CHECK-NEXT: %1 = apply %0() : $@convention(thin) () -> MyNever
+    // CHECK-NEXT: unreachable
+    switch myFatalError() {}
+  }
+}

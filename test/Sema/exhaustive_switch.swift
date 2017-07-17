@@ -332,6 +332,31 @@ func checkPatternCasts() {
   }
 }
 
+enum MyNever {}
+func ~= (_ : MyNever, _ : MyNever) -> Bool { return true }
+func myFatalError() -> MyNever { fatalError() }
+
+func checkUninhabited() {
+  // Scrutinees of uninhabited type may match any number and kind of patterns
+  // that Sema is willing to accept at will.  After all, it's quite a feat to
+  // productively inhabit the type of crashing programs.
+  func test1(x : Never) {
+    switch x {} // No diagnostic.
+  }
+  
+  func test2(x : Never) {
+    switch (x, x) {} // No diagnostic.
+  }
+  
+  func test3(x : MyNever) {
+    switch x { // No diagnostic.
+    case myFatalError(): break
+    case myFatalError(): break
+    case myFatalError(): break
+    }
+  }
+}
+
 enum Runcible {
   case spoon
   case hat
