@@ -53,9 +53,9 @@ public func f3_uses_f2() {
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10f3_uses_f2yyF()
-// CHECK:call swiftcc void @_T022big_types_corner_cases9BigStructVACycfC(%T22big_types_corner_cases9BigStructV* nocapture dereferenceable
+// CHECK: call swiftcc void @_T022big_types_corner_cases9BigStructVACycfC(%T22big_types_corner_cases9BigStructV* noalias nocapture sret 
 // CHECK: call swiftcc { i8*, %swift.refcounted* } @_T022big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF()
-// CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* nocapture dereferenceable({{.*}}) {{.*}}, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) {{.*}}, %swift.refcounted* swiftself {{.*}})
+// CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture sret {{.*}}, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK: ret void
 
 public func f4_tuple_use_of_f2() {
@@ -69,7 +69,7 @@ public func f4_tuple_use_of_f2() {
 // CHECK: [[TUPLE:%.*]] = call swiftcc { i8*, %swift.refcounted* } @_T022big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF()
 // CHECK: [[TUPLE_EXTRACT:%.*]] = extractvalue { i8*, %swift.refcounted* } [[TUPLE]], 0
 // CHECK: [[CAST_EXTRACT:%.*]] = bitcast i8* [[TUPLE_EXTRACT]] to void (%T22big_types_corner_cases9BigStructV*, %T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*
-// CHECK:  call swiftcc void [[CAST_EXTRACT]](%T22big_types_corner_cases9BigStructV* nocapture dereferenceable({{.*}}) {{.*}}, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) {{.*}}, %swift.refcounted* swiftself %{{.*}})
+// CHECK:  call swiftcc void [[CAST_EXTRACT]](%T22big_types_corner_cases9BigStructV* noalias nocapture sret {{.*}}, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) {{.*}}, %swift.refcounted* swiftself %{{.*}})
 // CHECK: ret void
 
 public class BigClass {
