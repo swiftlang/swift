@@ -3193,12 +3193,15 @@ namespace {
 /// This is done in the case of a typecheck failure, after we re-typecheck
 /// partially-typechecked subexpressions in a context-free manner.
 ///
-static void eraseOpenedExistentials(Expr *&expr) {
+static void eraseOpenedExistentials(Expr *&expr, ConstraintSystem &CS) {
 
   class ExistentialEraser : public ASTWalker {
+    ConstraintSystem &CS;
     llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
 
   public:
+    ExistentialEraser(ConstraintSystem &CS) : CS(CS) {}
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
         auto archetypeVal = OOE->getOpaqueValue();
@@ -3236,8 +3239,11 @@ static void eraseOpenedExistentials(Expr *&expr) {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
-      Type type = expr->getType();
-      if (!type || !type->hasOpenedExistential())
+      if (!CS.hasType(expr))
+        return expr;
+
+      Type type = CS.getType(expr);
+      if (!type->hasOpenedExistential())
         return expr;
 
       type = type.transform([&](Type type) -> Type {
@@ -3247,7 +3253,7 @@ static void eraseOpenedExistentials(Expr *&expr) {
 
         return type;
       });
-      expr->setType(type);
+      CS.setType(expr, type);
 
       return expr;
     }
@@ -3259,7 +3265,7 @@ static void eraseOpenedExistentials(Expr *&expr) {
     }
   };
 
-  expr = expr->walk(ExistentialEraser());
+  expr = expr->walk(ExistentialEraser(CS));
 }
 
 /// Unless we've already done this, retypecheck the specified subexpression on
@@ -3355,11 +3361,13 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // anything that the type-checker doesn't expect to see.  This can happen
   // because of repeated type-checking; the removal below, while independently
   // important, isn't itself sufficient because of AST mutation.
-  eraseOpenedExistentials(subExpr);
+  eraseOpenedExistentials(subExpr, CS);
 
   auto resultTy = CS.TC.typeCheckExpression(
       subExpr, CS.DC, TypeLoc::withoutLoc(convertType), convertTypePurpose,
       TCEOptions, listener, &CS);
+
+  CS.cacheExprTypes(subExpr);
 
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,
@@ -3367,7 +3375,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // holding on to an expression containing open existential types but
   // no OpenExistentialExpr, which breaks invariants enforced by the
   // ASTChecker.
-  eraseOpenedExistentials(subExpr);
+  eraseOpenedExistentials(subExpr, CS);
   
   // If recursive type checking failed, then an error was emitted.  Return
   // null to indicate this to the caller.
@@ -3378,10 +3386,11 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // just pretend as though nothing happened.
   if (resultTy->is<ErrorType>()) {
     subExpr = preCheckedExpr;
+    if (subExpr->getType())
+      CS.cacheType(subExpr);
     SavedTypeData.restore();
   }
 
-  CS.cacheExprTypes(subExpr);
   CS.TC.addExprForDiagnosis(preCheckedExpr, std::make_pair(subExpr, &CS));
 
   return subExpr;
