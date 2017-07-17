@@ -1561,8 +1561,8 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       auto ctors = CS.TC.lookupConstructors(
           CS.DC, instanceType, NameLookupFlags::IgnoreAccessibility);
       for (auto ctor : ctors)
-        if (ctor->hasInterfaceType())
-          candidates.push_back({ ctor, 1 });
+        if (ctor.getValueDecl()->hasInterfaceType())
+          candidates.push_back({ ctor.getValueDecl(), 1 });
     }
 
     declName = instanceType->getString();
@@ -2490,10 +2490,10 @@ findCorrectEnumCaseName(Type Ty, LookupResult &Result,
     return DeclName();
   llvm::SmallVector<DeclName, 4> candidates;
   for (auto &correction : Result) {
-    DeclName correctName = correction.Decl->getFullName();
+    DeclName correctName = correction.getValueDecl()->getFullName();
     if (!correctName.isSimpleName())
       continue;
-    if (!isa<EnumElementDecl>(correction.Decl))
+    if (!isa<EnumElementDecl>(correction.getValueDecl()))
       continue;
     if (correctName.getBaseIdentifier().str().equals_lower(
             memberName.getBaseIdentifier().str()))
@@ -2571,7 +2571,8 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
 
     // Note all the correction candidates.
     for (auto &correction : correctionResults) {
-      CS.TC.noteTypoCorrection(memberName, nameLoc, correction);
+      CS.TC.noteTypoCorrection(memberName, nameLoc,
+                               correction.getValueDecl());
     }
 
     // TODO: recover?
@@ -2967,7 +2968,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     auto LookupResult = CS.TC.lookupMember(
         CS.DC, fromType, DeclName(CS.TC.Context.getIdentifier("boolValue")));
     if (!LookupResult.empty()) {
-      if (isa<VarDecl>(LookupResult.begin()->Decl)) {
+      if (isa<VarDecl>(LookupResult.begin()->getValueDecl())) {
         if (anchor->canAppendPostfixExpression())
           diagnose(anchor->getLoc(), diag::types_not_convertible_use_bool_value,
                    fromType, toType).fixItInsertAfter(anchor->getEndLoc(),
@@ -4776,8 +4777,9 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
 
     CandidateMap candidates;
     for (const auto &candidate : result) {
-      auto base = candidate.Base;
-      if ((base && base->isInvalid()) || candidate->isInvalid())
+      auto base = candidate.getBaseDecl();
+      auto decl = candidate.getValueDecl();
+      if ((base && base->isInvalid()) || decl->isInvalid())
         continue;
 
       // If base is present but it doesn't represent a valid nominal,
@@ -4785,14 +4787,14 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
       if (base && !base->getInterfaceType()->getNominalOrBoundGenericNominal())
         continue;
 
-      auto context = candidate->getDeclContext();
+      auto context = decl->getDeclContext();
       // We are only interested in static or global functions, because
       // there is no way to call anything else properly.
-      if (!candidate->isStatic() && !context->isModuleScopeContext())
+      if (!decl->isStatic() && !context->isModuleScopeContext())
         continue;
 
       OverloadChoice choice(base ? base->getInterfaceType() : nullptr,
-                            candidate, UDE->getFunctionRefKind());
+                            decl, UDE->getFunctionRefKind());
 
       if (base) { // Let's group all of the candidates have a common base.
         candidates[base].push_back(choice);
@@ -7637,7 +7639,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
       // Note all the correction candidates.
       for (auto &result : lookup) {
         TC.noteTypoCorrection(componentName, DeclNameLoc(componentNameLoc),
-                              result);
+                              result.getValueDecl());
       }
 
       isInvalid = true;
@@ -7651,13 +7653,14 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
     // If we have more than one result, filter out unavailable or
     // obviously unusable candidates.
     if (lookup.size() > 1) {
-      lookup.filter([&](LookupResult::Result result) -> bool {
+      lookup.filter([&](LookupResultEntry result) -> bool {
         // Drop unavailable candidates.
-        if (result->getAttrs().isUnavailable(TC.Context))
+        if (result.getValueDecl()->getAttrs().isUnavailable(TC.Context))
           return false;
 
         // Drop non-property, non-type candidates.
-        if (!isa<VarDecl>(result.Decl) && !isa<TypeDecl>(result.Decl))
+        if (!isa<VarDecl>(result.getValueDecl()) &&
+            !isa<TypeDecl>(result.getValueDecl()))
           return false;
 
         return true;
@@ -7677,13 +7680,14 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
         TC.diagnose(componentNameLoc, diag::ambiguous_decl_ref, componentName);
 
       for (auto result : lookup) {
-        TC.diagnose(result, diag::decl_declared_here, result->getFullName());
+        TC.diagnose(result.getValueDecl(), diag::decl_declared_here,
+                    result.getValueDecl()->getFullName());
       }
       isInvalid = true;
       break;
     }
 
-    auto found = lookup.front().Decl;
+    auto found = lookup.front().getValueDecl();
 
     // Handle property references.
     if (auto var = dyn_cast<VarDecl>(found)) {

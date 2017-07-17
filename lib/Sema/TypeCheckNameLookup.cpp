@@ -24,9 +24,9 @@
 
 using namespace swift;
 
-void LookupResult::filter(const std::function<bool(Result)> &pred) {
+void LookupResult::filter(const std::function<bool(LookupResultEntry)> &pred) {
   Results.erase(std::remove_if(Results.begin(), Results.end(),
-                               [&](Result result) -> bool {
+                               [&](LookupResultEntry result) -> bool {
                                  return !pred(result);
                                }),
                 Results.end());
@@ -64,8 +64,8 @@ namespace {
       // that it hasn't been seen yet.
       if (!IsMemberLookup &&
           std::find_if(Result.begin(), Result.end(),
-                       [](const LookupResult::Result &found) {
-                         return found.Base != nullptr;
+                       [](const LookupResultEntry &found) {
+                         return found.getBaseDecl() != nullptr;
                        }) == Result.end())
         return;
 
@@ -78,10 +78,11 @@ namespace {
       // Filter out those results that have been removed from the
       // found-declarations set.
       unsigned foundIdx = 0, foundSize = FoundDecls.size();
-      Result.filter([&](LookupResult::Result result) -> bool {
+      Result.filter([&](LookupResultEntry result) -> bool {
           // If the current result matches the remaining found declaration,
           // keep it and move to the next found declaration.
-          if (foundIdx < foundSize && result.Decl == FoundDecls[foundIdx]) {
+          if (foundIdx < foundSize &&
+              result.getValueDecl() == FoundDecls[foundIdx]) {
             ++foundIdx;
             return true;
           }
@@ -110,7 +111,7 @@ namespace {
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, base}, false}).second) {
-          Result.add({result, base});
+          Result.add(LookupResultEntry(base, result));
           FoundDecls.push_back(result);
         }
       };
@@ -622,7 +623,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);
 
   for (auto &entry : entries)
-    result.add({ entry.Value, nullptr });
+    result.add(LookupResultEntry(nullptr, entry.Value));
 }
 
 static InFlightDiagnostic
@@ -655,8 +656,7 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
 }
 
 void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
-                                     const LookupResult::Result &suggestion) {
-  auto decl = suggestion.Decl;
+                                     ValueDecl *decl) {
   auto &&diagnostic = diagnoseTypoCorrection(*this, loc, decl);
 
   DeclName declName = decl->getFullName();

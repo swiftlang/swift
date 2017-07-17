@@ -3119,7 +3119,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // Introduce a new overload set.
   retry_ctors_after_fail:
     bool labelMismatch = false;
-    for (auto ctor : ctors) {
+    for (auto entry : ctors) {
+      auto *ctor = entry.getValueDecl();
+
       // If the constructor is invalid, we fail entirely to avoid error cascade.
       TC.validateDecl(ctor);
       if (ctor->isInvalid())
@@ -3162,7 +3164,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                   fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
           
             auto argType = fnType->getInput()->getWithoutParens();
-            argType = ctor.Decl->getInnermostDeclContext()
+            argType = ctor->getInnermostDeclContext()
                 ->mapTypeIntoContext(argType);
             if (argType->isEqual(favoredType))
               if (!ctor->getAttrs().isUnavailable(getASTContext()))
@@ -3339,7 +3341,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 retry_after_fail:
   labelMismatch = false;
   for (auto result : lookup)
-    addChoice(result, /*isBridged=*/false, /*isUnwrappedOptional=*/false);
+    addChoice(result.getValueDecl(),
+              /*isBridged=*/false,
+              /*isUnwrappedOptional=*/false);
 
   // If the instance type is a bridged to an Objective-C type, perform
   // a lookup into that Objective-C type.
@@ -3350,7 +3354,7 @@ retry_after_fail:
       // Ignore results from the Objective-C "Foundation"
       // module. Those core APIs are explicitly provided by the
       // Foundation module overlay.
-      auto module = result->getModuleContext();
+      auto module = result.getValueDecl()->getModuleContext();
       if (foundationModule) {
         if (module == foundationModule)
           continue;
@@ -3362,7 +3366,9 @@ retry_after_fail:
         continue;
       }
       
-      addChoice(result, /*isBridged=*/true, /*isUnwrappedOptional=*/false);
+      addChoice(result.getValueDecl(),
+                /*isBridged=*/true,
+                /*isUnwrappedOptional=*/false);
     }
   }
 
@@ -3376,7 +3382,9 @@ retry_after_fail:
       if (objectType->mayHaveMembers()) {
         LookupResult &optionalLookup = lookupMember(objectType, memberName);
         for (auto result : optionalLookup)
-          addChoice(result, /*bridged*/false, /*isUnwrappedOptional=*/true);
+          addChoice(result.getValueDecl(),
+                    /*bridged*/false,
+                    /*isUnwrappedOptional=*/true);
       }
     }
   }
@@ -3404,7 +3412,9 @@ retry_after_fail:
     
     auto lookup = TC.lookupMember(DC, instanceTy,
                                   memberName, lookupOptions);
-    for (auto cand : lookup) {
+    for (auto entry : lookup) {
+      auto *cand = entry.getValueDecl();
+
       // If the result is invalid, skip it.
       TC.validateDecl(cand);
       if (cand->isInvalid()) {

@@ -78,14 +78,15 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
 
-  for (LookupResult::Result result : foundElements) {
-    ValueDecl *e = result.Decl;
+  for (LookupResultEntry result : foundElements) {
+    ValueDecl *e = result.getValueDecl();
     assert(e);
     if (e->isInvalid()) {
       continue;
     }
     // Skip if the enum element was referenced as an instance member
-    if (!result.Base || !result.Base->getInterfaceType()->is<MetatypeType>()) {
+    if (!result.getBaseDecl() ||
+        !result.getBaseDecl()->getInterfaceType()->is<MetatypeType>()) {
       continue;
     }
 

@@ -1016,7 +1016,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
     // Looks like this is not a member type, but simply a member of parent type.
     if (!memberLookup.empty()) {
-      auto &member = memberLookup[0];
+      auto member = memberLookup[0].getValueDecl();
       tc.diagnose(comp->getIdLoc(), diag::invalid_member_reference,
                   member->getDescriptiveKind(), comp->getIdentifier(),
                   parentType)

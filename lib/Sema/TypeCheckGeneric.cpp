@@ -148,8 +148,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                              corrections, &Builder);
 
     // Filter out non-types.
-    corrections.filter([](const LookupResult::Result &result) {
-      return isa<TypeDecl>(result.Decl);
+    corrections.filter([](const LookupResultEntry &result) {
+      return isa<TypeDecl>(result.getValueDecl());
     });
 
     // Check whether we have a single type result.
@@ -162,7 +162,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
       TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
         .highlight(baseRange);
       for (const auto &suggestion : corrections)
-        TC.noteTypoCorrection(name, DeclNameLoc(nameLoc), suggestion);
+        TC.noteTypoCorrection(name, DeclNameLoc(nameLoc),
+                              suggestion.getValueDecl());
 
       return ErrorType::get(TC.Context);
     }

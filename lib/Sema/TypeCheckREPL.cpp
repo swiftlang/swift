@@ -50,7 +50,7 @@ struct REPLContext {
       if (!lookup)
         return true;
       for (auto result : lookup)
-        PrintDecls.push_back(result.Decl);
+        PrintDecls.push_back(result.getValueDecl());
     }
     {
       Identifier Id(Context.getIdentifier("_replDebugPrintln"));
@@ -59,7 +59,7 @@ struct REPLContext {
       if (!lookup)
         return true;
       for (auto result : lookup)
-        DebugPrintlnDecls.push_back(result.Decl);
+        DebugPrintlnDecls.push_back(result.getValueDecl());
     }
 
     return false;

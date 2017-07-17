@@ -1232,7 +1232,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
                                          SourceLoc(), lookupOptions);
 
   for (const auto &result : lookupMain) {
-    TC.validateDecl(result.Decl);
+    TC.validateDecl(result.getValueDecl());
   }
   auto Foundation = TC.Context.getLoadedModule(C.Id_Foundation);
   if (Foundation) {
@@ -1242,7 +1242,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
                           SourceLoc(),
                           lookupOptions);
     for (const auto &result : lookupString) {
-      TC.validateDecl(result.Decl);
+      TC.validateDecl(result.getValueDecl());
     }
   }
 }

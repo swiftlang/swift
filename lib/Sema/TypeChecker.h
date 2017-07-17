@@ -25,6 +25,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Basic/OptionSet.h"
@@ -81,36 +82,26 @@ enum class DeclTypeCheckingSemantics {
 
 /// The result of name lookup.
 class LookupResult {
-public:
-  struct Result {
-    /// The declaration we found.
-    ValueDecl *Decl;
-
-    /// The base declaration through which we found the declaration.
-    ValueDecl *Base;
-
-    operator ValueDecl*() const { return Decl; }
-    ValueDecl *operator->() const { return Decl; }
-  };
-
 private:
   /// The set of results found.
-  SmallVector<Result, 4> Results;
+  SmallVector<LookupResultEntry, 4> Results;
 
 public:
-  typedef SmallVectorImpl<Result>::iterator iterator;
+  typedef SmallVectorImpl<LookupResultEntry>::iterator iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
   unsigned size() const { return Results.size(); }
   bool empty() const { return Results.empty(); }
 
-  const Result& operator[](unsigned index) const { return Results[index]; }
+  const LookupResultEntry& operator[](unsigned index) const {
+    return Results[index];
+  }
 
-  Result front() const { return Results.front(); }
-  Result back() const { return Results.back(); }
+  LookupResultEntry front() const { return Results.front(); }
+  LookupResultEntry back() const { return Results.back(); }
 
   /// Add a result to the set of results.
-  void add(Result result) { Results.push_back(result); }
+  void add(LookupResultEntry result) { Results.push_back(result); }
 
   void clear() { Results.clear(); }
 
@@ -123,11 +114,11 @@ public:
     if (size() != 1)
       return nullptr;
 
-    return dyn_cast<TypeDecl>(front().Decl);
+    return dyn_cast<TypeDecl>(front().getValueDecl());
   }
 
   /// Filter out any results that aren't accepted by the given predicate.
-  void filter(const std::function<bool(Result)> &pred);
+  void filter(const std::function<bool(LookupResultEntry)> &pred);
 };
 
 /// The result of name lookup for types.
@@ -2397,7 +2388,7 @@ public:
                              unsigned maxResults = 4);
 
   void noteTypoCorrection(DeclName name, DeclNameLoc nameLoc,
-                          const LookupResult::Result &suggestion);
+                          ValueDecl *decl);
   
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.

@@ -3409,7 +3409,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         FuncDecl *defaultInitStorageDecl = nullptr;
         FuncDecl *parameterizedInitStorageDecl = nullptr;
         for (auto found : lookup) {
-          if (auto foundFunc = dyn_cast<FuncDecl>(found.Decl)) {
+          if (auto foundFunc = dyn_cast<FuncDecl>(found.getValueDecl())) {
             if (!foundFunc->isStatic())
               continue;
             auto methodTy = foundFunc->getInterfaceType()
@@ -3442,7 +3442,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                       expectedDefaultInitStorageTy,
                       expectedParameterizedInitStorageTy);
           for (auto found : lookup)
-            TC.diagnose(found.Decl->getLoc(),
+            TC.diagnose(found.getValueDecl()->getLoc(),
                         diag::found_candidate);
           conformance->setInvalid();
           continue;
@@ -5731,7 +5731,7 @@ public:
       }
 
       for (auto memberResult : members) {
-        auto member = memberResult.Decl;
+        auto member = memberResult.getValueDecl();
 
         if (member->isInvalid())
           continue;
@@ -8244,7 +8244,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
                                     NameLookupFlags::IgnoreAccessibility);
 
     for (auto memberResult : ctors) {
-      auto member = memberResult.Decl;
+      auto member = memberResult.getValueDecl();
 
       // Skip unavailable superclass initializers.
       if (AvailableAttr::isUnavailable(member))
@@ -8468,7 +8468,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
       // tuple.
       bool foundDefaultConstructor = false;
       for (auto memberResult : ctors) {
-        auto member = memberResult.Decl;
+        auto member = memberResult.getValueDecl();
 
         // Dig out the parameter tuple for this constructor.
         auto ctor = dyn_cast<ConstructorDecl>(member);

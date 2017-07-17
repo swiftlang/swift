@@ -249,7 +249,9 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
 
   // We are performing dynamic lookup. Filter out redundant results early.
   llvm::DenseSet<std::tuple<char, ObjCSelector, CanType>> known;
-  result->filter([&](ValueDecl *decl) -> bool {
+  result->filter([&](LookupResultEntry entry) -> bool {
+    auto *decl = entry.getValueDecl();
+
     if (decl->isInvalid())
       return false;
 

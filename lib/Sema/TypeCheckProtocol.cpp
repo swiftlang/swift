@@ -1303,7 +1303,7 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
                                        SourceLoc(),
                                        lookupOptions);
     for (auto candidate : lookup) {
-      witnesses.push_back(candidate.Decl);
+      witnesses.push_back(candidate.getValueDecl());
     }
   } else {
     // Variable/function/subscript requirements.
@@ -1322,7 +1322,7 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     }
 
     for (auto candidate : candidates) {
-      witnesses.push_back(candidate);
+      witnesses.push_back(candidate.getValueDecl());
     }
   }
 
@@ -1374,7 +1374,7 @@ bool WitnessChecker::findBestWitness(
       auto lookup = TC.lookupUnqualified(overlay, requirement->getBaseName(),
                                          SourceLoc(), lookupOptions);
       for (auto candidate : lookup)
-        witnesses.push_back(candidate.Decl);
+        witnesses.push_back(candidate.getValueDecl());
       break;
     }
     case Done:
