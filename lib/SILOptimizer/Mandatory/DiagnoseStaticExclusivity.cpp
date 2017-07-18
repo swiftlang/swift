@@ -500,38 +500,45 @@ static bool isCallToStandardLibrarySwap(CallExpr *CE, ASTContext &Ctx) {
 }
 #endif
 
-/// Do a sytactic pattern match to try to safely suggest a Fix-It to rewrite
-/// calls like swap(&collection[index1], &collection[index2]) to
+/// Do a syntactic pattern match to determine whether the call is a call
+/// to swap(&base[index1], &base[index2]), which can
+/// be replaced with a call to MutableCollection.swapAt(_:_:) on base.
+///
+/// Returns true if the call can be replaced. Returns the call expression,
+/// the base expression, and the two indices as out expressions.
 ///
 /// This method takes an array of all the ApplyInsts for calls to swap()
-/// in the function to avoid need to construct a parent map over the AST
+/// in the function to avoid needing to construct a parent map over the AST
 /// to find the CallExpr for the inout accesses.
-static void
-tryFixItWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
-                                  const BeginAccessInst *Access2,
-                                  ArrayRef<ApplyInst *> CallsToSwap,
-                                  ASTContext &Ctx,
-                                  InFlightDiagnostic &Diag) {
+static bool
+canReplaceWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
+                                     const BeginAccessInst *Access2,
+                                     ArrayRef<ApplyInst *> CallsToSwap,
+                                     ASTContext &Ctx,
+                                     CallExpr *&FoundCall,
+                                     Expr *&Base,
+                                     Expr *&Index1,
+                                     Expr *&Index2) {
   if (CallsToSwap.empty())
-    return;
+    return false;
 
   // Inout arguments must be modifications.
   if (Access1->getAccessKind() != SILAccessKind::Modify ||
       Access2->getAccessKind() != SILAccessKind::Modify) {
-    return;
+    return false;
   }
 
   SILLocation Loc1 = Access1->getLoc();
   SILLocation Loc2 = Access2->getLoc();
   if (Loc1.isNull() || Loc2.isNull())
-    return;
+    return false;
 
   auto *InOut1 = Loc1.getAsASTNode<InOutExpr>();
   auto *InOut2 = Loc2.getAsASTNode<InOutExpr>();
   if (!InOut1 || !InOut2)
-    return;
+    return false;
 
-  CallExpr *FoundCall = nullptr;
+  FoundCall = nullptr;
   // Look through all the calls to swap() recorded in the function to find
   // which one we're diagnosing.
   for (ApplyInst *AI : CallsToSwap) {
@@ -554,22 +561,22 @@ tryFixItWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
     }
   }
   if (!FoundCall)
-    return;
+    return false;
 
   // We found a call to swap(&e1, &e2). Now check to see whether it
   // matches the form swap(&someCollection[index1], &someCollection[index2]).
   auto *SE1 = dyn_cast<SubscriptExpr>(InOut1->getSubExpr());
   if (!SE1)
-    return;
+    return false;
   auto *SE2 = dyn_cast<SubscriptExpr>(InOut2->getSubExpr());
   if (!SE2)
-    return;
+    return false;
 
   // Do the two subscripts refer to the same subscript declaration?
   auto *Decl1 = cast<SubscriptDecl>(SE1->getDecl().getDecl());
   auto *Decl2 = cast<SubscriptDecl>(SE2->getDecl().getDecl());
   if (Decl1 != Decl2)
-    return;
+    return false;
 
   ProtocolDecl *MutableCollectionDecl = Ctx.getMutableCollectionDecl();
 
@@ -594,7 +601,7 @@ tryFixItWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
   }
 
   if (!IsSubscriptOnMutableCollection)
-    return;
+    return false;
 
   // We're swapping two subscripts on mutable collections -- but are they
   // the same collection? Approximate this by checking for textual
@@ -605,24 +612,33 @@ tryFixItWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
   StringRef Base2Text = extractExprText(SE2->getBase(), SM);
 
   if (Base1Text != Base2Text)
-    return;
+    return false;
 
-  auto *Index1 = dyn_cast<ParenExpr>(SE1->getIndex());
-  if (!Index1)
-    return;
+  auto *Index1Paren = dyn_cast<ParenExpr>(SE1->getIndex());
+  if (!Index1Paren)
+    return false;
 
-  auto *Index2 = dyn_cast<ParenExpr>(SE2->getIndex());
-  if (!Index2)
-    return;
+  auto *Index2Paren = dyn_cast<ParenExpr>(SE2->getIndex());
+  if (!Index2Paren)
+    return false;
 
-  StringRef Index1Text = extractExprText(Index1->getSubExpr(), SM);
-  StringRef Index2Text = extractExprText(Index2->getSubExpr(), SM);
+  Base = SE1->getBase();
+  Index1 = Index1Paren->getSubExpr();
+  Index2 = Index2Paren->getSubExpr();
+  return true;
+}
 
-  // Suggest replacing with call with a call to swapAt().
+/// Suggest replacing with call with a call to swapAt().
+static void addSwapAtFixit(InFlightDiagnostic &Diag, CallExpr *&FoundCall,
+                           Expr *Base, Expr *&Index1, Expr *&Index2,
+                           SourceManager &SM) {
+  StringRef BaseText = extractExprText(Base, SM);
+  StringRef Index1Text = extractExprText(Index1, SM);
+  StringRef Index2Text = extractExprText(Index2, SM);
   SmallString<64> FixItText;
   {
     llvm::raw_svector_ostream Out(FixItText);
-    Out << Base1Text << ".swapAt(" << Index1Text << ", " << Index2Text << ")";
+    Out << BaseText << ".swapAt(" << Index1Text << ", " << Index2Text << ")";
   }
 
   Diag.fixItReplace(FoundCall->getSourceRange(), FixItText);
@@ -686,15 +702,27 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
     SILModule &M = FirstAccess.getInstruction()->getModule();
     std::string PathDescription = getPathDescription(
         VD->getBaseName(), BaseType, MainAccess.getSubPath(), M);
+
+    // Determine whether we can safely suggest replacing the violation with
+    // a call to MutableCollection.swapAt().
+    bool SuggestSwapAt = false;
+    CallExpr *CallToReplace = nullptr;
+    Expr *Base = nullptr;
+    Expr *SwapIndex1 = nullptr;
+    Expr *SwapIndex2 = nullptr;
+    if (SecondAccess.getRecordKind() == RecordedAccessKind::BeginInstruction) {
+        SuggestSwapAt = canReplaceWithCallToCollectionSwapAt(
+            FirstAccess.getInstruction(), SecondAccess.getInstruction(),
+            CallsToSwap, Ctx, CallToReplace, Base, SwapIndex1, SwapIndex2);
+    }
+
     auto D =
         diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
-                 PathDescription, AccessKindForMain);
+                 PathDescription, AccessKindForMain, SuggestSwapAt);
     D.highlight(RangeForMain);
-    if (SecondAccess.getRecordKind() == RecordedAccessKind::BeginInstruction) {
-      tryFixItWithCallToCollectionSwapAt(FirstAccess.getInstruction(),
-                                         SecondAccess.getInstruction(),
-                                         CallsToSwap, Ctx, D);
-    }
+    if (SuggestSwapAt)
+      addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
+                     Ctx.SourceMgr);
   } else {
     auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
                          diag::exclusivity_access_required_unknown_decl_swift3 :
