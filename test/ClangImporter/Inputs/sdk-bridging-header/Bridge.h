@@ -1,5 +1,8 @@
 @import ObjectiveC;
 
+@import TheModuleNextDoor;
+#import "TheTextualHeaderNextDoor.h"
+
 @class NSArray;
 
 @interface MyPredicate : NSObject

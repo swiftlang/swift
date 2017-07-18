@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -import-objc-header %S/Inputs/sdk-bridging-header.h
+// RUN: %target-swift-frontend -typecheck -verify %s -import-objc-header %S/Inputs/sdk-bridging-header/Bridge.h
 // RUN: not %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/bad-bridging-header.h 2>&1 | %FileCheck -check-prefix=CHECK-FATAL %s
 
-// RUN: %target-swift-frontend -typecheck -verify %s -Xcc -include -Xcc %S/Inputs/sdk-bridging-header.h -import-objc-header %S/../Inputs/empty.swift
+// RUN: %target-swift-frontend -typecheck -verify %s -Xcc -include -Xcc %S/Inputs/sdk-bridging-header/Bridge.h -import-objc-header %S/../Inputs/empty.swift -DINCLUDE_ONLY
 
 // RUN: not %target-swift-frontend -typecheck %s -Xcc -include -Xcc %S/Inputs/bad-bridging-header.h 2>&1 | %FileCheck -check-prefix=CHECK-INCLUDE %s
 // RUN: not %target-swift-frontend -typecheck %s -Xcc -include -Xcc %S/Inputs/bad-bridging-header.h -import-objc-header %S/../Inputs/empty.swift 2>&1 | %FileCheck -check-prefix=CHECK-INCLUDE %s
-// RUN: not %target-swift-frontend -typecheck %s -Xcc -include -Xcc %S/Inputs/bad-bridging-header.h -import-objc-header %S/Inputs/sdk-bridging-header.h 2>&1 | %FileCheck -check-prefix=CHECK-INCLUDE %s
+// RUN: not %target-swift-frontend -typecheck %s -Xcc -include -Xcc %S/Inputs/bad-bridging-header.h -import-objc-header %S/Inputs/sdk-bridging-header/Bridge.h 2>&1 | %FileCheck -check-prefix=CHECK-INCLUDE %s
 
 // CHECK-FATAL: failed to import bridging header
 
@@ -22,3 +22,9 @@ let and = MyPredicate.and([])
 let or = MyPredicate.or([not, and])
 
 _ = MyPredicate.foobar() // expected-error{{type 'MyPredicate' has no member 'foobar'}}
+
+#if !INCLUDE_ONLY
+_ = TheModuleNextDoorVersion
+#endif
+_ = TheTextualHeaderNextDoorVersion
+_ = checkThatThereAreStillErrors // expected-error{{}}

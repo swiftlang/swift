@@ -119,6 +119,22 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
   }
 
+  // HACK: Add an -iquote Clang search path (using -Xcc) in order to cope with
+  // differences between precompiled and non-precompiled bridging headers.
+  //
+  // In non-PCH contexts, a module map in the same directory as the bridging
+  // header is read in by the Clang importer. To replicate that behavior with
+  // PCH, add an extra -iquote search path at the start of the search list.
+  // This won't affect any textual header resolution because the directory of
+  // the current file is already searched for quoted includes.
+  if (auto *A = inputArgs.getLastArgNoClaim(options::OPT_import_objc_header)) {
+    arguments.push_back("-Xcc");
+    arguments.push_back("-iquote");
+    arguments.push_back("-Xcc");
+    StringRef textualHeaderDir = llvm::sys::path::parent_path(A->getValue());
+    arguments.push_back(inputArgs.MakeArgString(textualHeaderDir));
+  }
+
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
 
@@ -159,6 +175,9 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
   // Pass through any subsystem flags.
+  //
+  // This must happen after the search path hack for bridging headers described
+  // above.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
 
