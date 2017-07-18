@@ -2181,7 +2181,6 @@ extension FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 ${operatorComment(x.nonMaskingOperator, True)}
-  @available(swift, introduced: 4)
   @_transparent
   public static func ${x.nonMaskingOperator} <
     Other : BinaryInteger
@@ -2205,7 +2204,6 @@ ${operatorComment(x.nonMaskingOperator, True)}
   }
 #endif
 
-  @available(swift, introduced: 4)
   @_transparent
   public static func ${x.nonMaskingOperator}= <
     Other : BinaryInteger
