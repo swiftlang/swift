@@ -33,7 +33,6 @@ add_swift_library(swiftSema STATIC
   PCMacro.cpp
   PlaygroundTransform.cpp
   ResilienceDiagnostics.cpp
-  Semantics.cpp
   SourceLoader.cpp
   TypeCheckAttr.cpp
   TypeCheckAvailability.cpp

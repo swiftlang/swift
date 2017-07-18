@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/LegacyASTTransformer.h"
 #include "swift/Syntax/DeclSyntax.h"
 #include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/GenericSyntax.h"
-#include "swift/Syntax/LegacyASTTransformer.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/StmtSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
@@ -74,11 +74,11 @@ namespace {
 
 Optional<Syntax>
 syntax::transformAST(ASTNode Node,
-                     sema::Semantics &Sema,
+                     SyntaxASTMap &ASTMap,
                      SourceManager &SourceMgr,
                      const unsigned BufferID,
                      const TokenPositionList &Tokens) {
-  LegacyASTTransformer Transformer { Sema, SourceMgr, BufferID, Tokens };
+  LegacyASTTransformer Transformer { ASTMap, SourceMgr, BufferID, Tokens };
 
   if (Node.is<Expr *>()) {
     auto E = Node.get<Expr *>();
@@ -86,7 +86,7 @@ syntax::transformAST(ASTNode Node,
       return None;
     }
     auto Transformed = Transformer.visit(E);
-    Sema.recordSyntaxMapping(Transformed, Node);
+    ASTMap.recordSyntaxMapping(Transformed, Node);
     return Syntax { Transformed, Transformed.get() };
   } else if (Node.is<Decl *>()) {
     auto D = Node.get<Decl *>();
@@ -103,7 +103,7 @@ syntax::transformAST(ASTNode Node,
       return None;
     }
     auto Transformed = Transformer.visit(D);
-    Sema.recordSyntaxMapping(Transformed, Node);
+    ASTMap.recordSyntaxMapping(Transformed, Node);
     return Syntax { Transformed, Transformed.get() };
   } else if (Node.is<Stmt *>()) {
     auto S = Node.get<Stmt *>();
@@ -111,7 +111,7 @@ syntax::transformAST(ASTNode Node,
       return None;
     }
     auto Transformed = Transformer.visit(S);
-    Sema.recordSyntaxMapping(Transformed, Node);
+    ASTMap.recordSyntaxMapping(Transformed, Node);
     return Syntax { Transformed, Transformed.get() };
   }
   return None;
@@ -350,7 +350,7 @@ LegacyASTTransformer::visitStructDecl(StructDecl *D,
 
   DeclMembersSyntaxBuilder MemberBuilder;
   for (auto Member : D->getMembers()) {
-    auto TransformedMember = transformAST(Member, Sema,
+    auto TransformedMember = transformAST(Member, ASTMap,
                                           SourceMgr, BufferID, Tokens);
     if (TransformedMember.hasValue()) {
       if (auto MD = TransformedMember.getValue().getAs<DeclSyntax>()) {
@@ -454,7 +454,7 @@ LegacyASTTransformer::visitBraceStmt(BraceStmt *S,
 
   std::vector<StmtSyntax> Stmts;
   for (auto Node : S->getElements()) {
-    auto Transformed = transformAST(Node, Sema, SourceMgr, BufferID, Tokens);
+    auto Transformed = transformAST(Node, ASTMap, SourceMgr, BufferID, Tokens);
     if (Transformed.hasValue()) {
       Stmts.push_back(Transformed.getValue().castTo<StmtSyntax>());
     }
@@ -476,7 +476,7 @@ LegacyASTTransformer::visitReturnStmt(ReturnStmt *S,
                                       const CursorIndex IndexInParent) {
   auto ReturnKW = findTokenSyntax(tok::kw_return, "return", SourceMgr,
                                   S->getReturnLoc(), BufferID, Tokens);
-  auto Result = transformAST(S->getResult(), Sema, SourceMgr, BufferID,
+  auto Result = transformAST(S->getResult(), ASTMap, SourceMgr, BufferID,
                              Tokens);
 
   if (!Result.hasValue()) {

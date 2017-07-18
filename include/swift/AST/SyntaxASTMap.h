@@ -1,4 +1,4 @@
-//===--- Semantics.h - Swift Container for Semantic Info --------*- C++ -*-===//
+//===--- SyntaxASTMap.h - Swift Container for Semantic Info -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the interface for Semantics, the top-level container
-// and manager for semantic analysis.
+// This file declares the interface for SyntaxASTMap, a container mapping Syntax
+// nodes to the Semantic AST.
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_SEMANTICMODEL_H
-#define SWIFT_SEMA_SEMANTICMODEL_H
+#ifndef SWIFT_AST_SYNTAXASTMAP_H
+#define SWIFT_AST_SYNTAXASTMAP_H
 
 #include "swift/AST/ASTNode.h"
 #include "swift/Syntax/Syntax.h"
@@ -28,15 +28,13 @@ namespace syntax {
   class LegacyASTTransformer;
 }
 
-namespace sema {
-
 /// The top-level container and manager for semantic analysis.
 ///
 /// Eventually, this should contain cached semantic information such as
 /// resolved symbols and types for Syntax nodes. For now, it only maintains
 /// a mapping from lib/AST nodes to lib/Syntax nodes while we integrate
 /// the infrastructure into the compiler.
-class Semantics final {
+class SyntaxASTMap final {
   friend class LegacyASTTransformer;
   llvm::DenseMap<RC<syntax::SyntaxData>, ASTNode> SyntaxMap;
 public:
@@ -59,7 +57,6 @@ public:
   void dumpSyntaxMap() const;
 };
 
-} // end namespace sema
 } // end namespace swift
 
-#endif // SWIFT_SEMA_SEMANTICMODEL_H
+#endif // SWIFT_AST_SYNTAXASTMAP_H
