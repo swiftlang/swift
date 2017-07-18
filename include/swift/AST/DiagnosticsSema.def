@@ -2081,6 +2081,14 @@ NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
      "cannot automatically synthesize %0 because 'CodingKeys' is not an enum", (Type))
 NOTE(codable_codingkeys_type_does_not_conform_here,none,
      "cannot automatically synthesize %0 because 'CodingKeys' does not conform to CodingKey", (Type))
+NOTE(decodable_no_super_init_here,none,
+     "cannot automatically synthesize %0 because superclass does not have a callable 'init()' or 'init(from:)'", (DeclName))
+NOTE(decodable_super_init_not_designated_here,none,
+     "cannot automatically synthesize %0 because required superclass initializer %1 is not designated", (DeclName, DeclName))
+NOTE(decodable_inaccessible_super_init_here,none,
+     "cannot automatically synthesize %0 because required superclass initializer %1 is inaccessible due to "
+     "'%select{private|fileprivate|internal|%error|%error}2' protection level",
+     (DeclName, DeclName, Accessibility))
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
