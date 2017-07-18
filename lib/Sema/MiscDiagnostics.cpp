@@ -2616,9 +2616,37 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
 namespace {
 enum class OperatorKind : char {
   Greater,
+  GreaterEqual,
   Smaller,
+  SmallerEqual,
   NotEqual,
 };
+
+static ValueDecl *getReferencedDecl(Expr *expr) {
+  if (auto inoutExpr = dyn_cast<InOutExpr>(expr))
+    expr = inoutExpr->getSubExpr();
+  if (auto declRefExpr = dyn_cast<DeclRefExpr>(expr))
+    return declRefExpr->getDecl();
+  return nullptr;
+}
+
+static DeclBaseName getOperatorName(ApplyExpr *expr) {
+  auto fnExpr = expr->getFn();
+  if (auto dotSyntaxExpr = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
+    if (!isa<TypeExpr>(dotSyntaxExpr->getBase()))
+      return DeclBaseName();
+    fnExpr = dotSyntaxExpr->getFn();
+  }
+  if (auto fnRefExpr = dyn_cast<DeclRefExpr>(fnExpr)) {
+    return fnRefExpr->getDecl()->getBaseName();
+  }
+  if (auto fnRefExpr = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
+    auto decls = fnRefExpr->getDecls();
+    if (decls.empty()) return DeclBaseName();
+    return decls.front()->getBaseName();
+  }
+  return DeclBaseName();
+}
 
 static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
                                         VarDecl *loopVar, OperatorKind &OpKind) {
@@ -2634,18 +2662,19 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
   auto binaryExpr = dyn_cast<BinaryExpr>(dotSyntaxExpr->getBase());
   if (!binaryExpr)
     return nullptr;
-  auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
-  if (!binaryFuncExpr)
-    return nullptr;
 
   // Verify that the condition is a simple != or < comparison to the loop variable.
-  auto comparisonOpName = binaryFuncExpr->getDecl()->getBaseName();
+  auto comparisonOpName = getOperatorName(binaryExpr);
   if (comparisonOpName == "!=")
     OpKind = OperatorKind::NotEqual;
   else if (comparisonOpName == "<")
     OpKind = OperatorKind::Smaller;
+  else if (comparisonOpName == "<=")
+    OpKind = OperatorKind::SmallerEqual;
   else if (comparisonOpName == ">")
     OpKind = OperatorKind::Greater;
+  else if (comparisonOpName == ">=")
+    OpKind = OperatorKind::GreaterEqual;
   else
     return nullptr;
 
@@ -2653,17 +2682,14 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
   auto loadExpr = dyn_cast<LoadExpr>(args[0]);
   if (!loadExpr)
     return nullptr;
-  auto declRefExpr = dyn_cast<DeclRefExpr>(loadExpr->getSubExpr());
-  if (!declRefExpr)
-    return nullptr;
-  if (declRefExpr->getDecl() != loopVar)
+  if (getReferencedDecl(loadExpr->getSubExpr()) != loopVar)
     return nullptr;
   return args[1];
 }
 
 static bool unaryOperatorCheckForConvertingCStyleForLoop(const ForStmt *FS,
                                                          VarDecl *loopVar,
-                                                         StringRef OpName) {
+                                                         StringRef opName) {
   auto *Increment = FS->getIncrement().getPtrOrNull();
   if (!Increment)
     return false;
@@ -2672,20 +2698,10 @@ static bool unaryOperatorCheckForConvertingCStyleForLoop(const ForStmt *FS,
     unaryExpr = dyn_cast<PostfixUnaryExpr>(Increment);
   if (!unaryExpr)
     return false;
-  auto inoutExpr = dyn_cast<InOutExpr>(unaryExpr->getArg());
-  if (!inoutExpr)
+  if (getOperatorName(unaryExpr) != opName)
     return false;
-  auto incrementDeclRefExpr = dyn_cast<DeclRefExpr>(inoutExpr->getSubExpr());
-  if (!incrementDeclRefExpr)
-    return false;
-  auto unaryFuncExpr = dyn_cast<DeclRefExpr>(unaryExpr->getFn());
-  if (!unaryFuncExpr)
-    return false;
-  if (unaryFuncExpr->getDecl()->getBaseName() != OpName)
-    return false;
-  return incrementDeclRefExpr->getDecl() == loopVar;
+  return getReferencedDecl(unaryExpr->getArg()) == loopVar;
 }
-
 
 static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS,
                                                      VarDecl *loopVar) {
@@ -2707,10 +2723,7 @@ static bool binaryOperatorCheckForConvertingCStyleForLoop(TypeChecker &TC,
   ApplyExpr *binaryExpr = dyn_cast<BinaryExpr>(Increment);
   if (!binaryExpr)
     return false;
-  auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
-  if (!binaryFuncExpr)
-    return false;
-  if (binaryFuncExpr->getDecl()->getBaseName() != OpName)
+  if (getOperatorName(binaryExpr) != OpName)
     return false;
   auto argTupleExpr = dyn_cast<TupleExpr>(binaryExpr->getArg());
   if (!argTupleExpr)
@@ -2724,14 +2737,7 @@ static bool binaryOperatorCheckForConvertingCStyleForLoop(TypeChecker &TC,
   if (range.str() != "1")
     return false;
 
-  auto inoutExpr = dyn_cast<InOutExpr>(argTupleExpr->getElement(0));
-  if (!inoutExpr)
-    return false;
-  auto declRefExpr = dyn_cast<DeclRefExpr>(inoutExpr->getSubExpr());
-  if (!declRefExpr)
-    return false;
-  return declRefExpr->getDecl() == loopVar;
-
+  return getReferencedDecl(argTupleExpr->getElement(0)) == loopVar;
 }
 
 static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC,
@@ -2794,15 +2800,19 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
     Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                FS->getIncrement().getPtrOrNull()->getEndLoc());
 
-  if (strideByOne && OpKind != OperatorKind::Greater) {
+  if (strideByOne &&
+      (OpKind == OperatorKind::Smaller ||
+       OpKind == OperatorKind::SmallerEqual)) {
     diagnostic
       .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
       .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
       .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
-                       " ..< ")
+                         OpKind == OperatorKind::Smaller ? " ..< " : " ... ")
       .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
     return;
-  } else if (strideBackByOne && OpKind != OperatorKind::Smaller) {
+  } else if (strideBackByOne &&
+             (OpKind == OperatorKind::Greater ||
+              OpKind == OperatorKind::GreaterEqual)) {
     SourceLoc startValueEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                                          startValue->getEndLoc());
 
@@ -2812,7 +2822,10 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
     diagnostic
       .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
       .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
-      .fixItInsert(startValue->getStartLoc(), (llvm::Twine("((") + endValueStr + " + 1)...").str())
+      .fixItInsert(startValue->getStartLoc(),
+                   OpKind == OperatorKind::Greater
+                     ? (llvm::Twine("((") + endValueStr + " + 1)...").str()
+                     : (llvm::Twine("(") + endValueStr + "...").str())
       .fixItInsert(startValueEnd, ").reversed()")
       .fixItRemoveChars(FS->getFirstSemicolonLoc(), endOfIncrementLoc);
   }
