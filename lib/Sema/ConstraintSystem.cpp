@@ -128,7 +128,9 @@ bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
                                        bool updateState) {
-  
+  assert(!type->hasError() &&
+         "Should not be assigning a type involving ErrorType!");
+
   typeVar->getImpl().assignFixedType(type, getSavedBindings());
 
   if (!updateState)
