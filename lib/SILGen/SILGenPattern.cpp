@@ -2535,6 +2535,19 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   DEBUG(llvm::dbgs() << "emitting switch stmt\n";
         S->print(llvm::dbgs());
         llvm::dbgs() << '\n');
+  auto failure = [&](SILLocation location) {
+    // If we fail to match anything, we can just emit unreachable.
+    // This will be a dataflow error if we can reach here.
+    B.createUnreachable(S);
+  };
+  
+  // If the subject expression is uninhabited, we're already dead.
+  // Emit an unreachable in place of the switch statement.
+  if (S->getSubjectExpr()->getType()->isStructurallyUninhabited()) {
+    emitIgnoredExpr(S->getSubjectExpr());
+    return failure(SILLocation(S));
+  }
+  
   SILBasicBlock *contBB = createBasicBlock();
   emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
@@ -2651,12 +2664,6 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Set up an initial clause matrix.
   ClauseMatrix clauses(clauseRows);
-
-  auto failure = [&](SILLocation location) {
-    // If we fail to match anything, we can just emit unreachable.
-    // This will be a dataflow error if we can reach here.
-    B.createUnreachable(S);
-  };
 
   // Recursively specialize and emit the clause matrix.
   emission.emitDispatch(clauses, subject, failure);

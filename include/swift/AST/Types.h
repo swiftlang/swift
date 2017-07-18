@@ -449,9 +449,12 @@ public:
   /// semantics?
   bool hasReferenceSemantics();
 
-  /// Is this an uninhabited type, such as 'Never'?
+  /// Is this a nominally uninhabited type, such as 'Never'?
   bool isUninhabited();
 
+  /// Is this an uninhabited type, such as 'Never' or '(Never, Int)'?
+  bool isStructurallyUninhabited();
+  
   /// Is this the 'Any' type?
   bool isAny();
 
