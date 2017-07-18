@@ -675,7 +675,11 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
     // Put the value into memory if necessary.
     assert(v.getType().isTrivial(SGF.SGM.M) || v.hasCleanup());
-    if (v.getType().isObject()) {
+    SILModuleConventions silConv(SGF.SGM.M);
+    // bridgeAnything always takes an indirect argument as @in.
+    // Since we don't have the SIL type here, check the current SIL stage/mode
+    // to determine the convention.
+    if (v.getType().isObject() && silConv.useLoweredAddresses()) {
       auto tmp = SGF.emitTemporaryAllocation(loc, v.getType());
       v.forwardInto(SGF, loc, tmp);
       v = SGF.emitManagedBufferWithCleanup(tmp);

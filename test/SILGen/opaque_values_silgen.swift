@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // UNSUPPORTED: resilient_stdlib
 
@@ -721,7 +721,7 @@ func s340_______captureBox() {
   var mutableAddressOnly: EmptyP = AddressOnlyStruct()
 
   func captureEverything() {
-    s100_________identity((mutableAddressOnly))
+    _ = s100_________identity((mutableAddressOnly))
   }
 
   captureEverything()
@@ -790,6 +790,7 @@ func s350_______addrOnlyIf(x: Bool) -> EmptyP {
 func s360________guardEnum<T>(_ e: IndirectEnum<T>) {
   do {
     guard case .Node(let x) = e else { return }
+    _ = x
   }
 }
 
@@ -819,6 +820,7 @@ func s370_____optToOptCast<T>(_ x : T!) -> T? {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s380___contextualInitySiSgF'
 func s380___contextualInit(_ a : Int?) {
   var x: Int! = a
+  _ = x
 }
 
 // Tests opaque call result types
@@ -842,6 +844,7 @@ func s380___contextualInit(_ a : Int?) {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s390___addrCallResultyxycSglF'
 func s390___addrCallResult<T>(_ f: (() -> T)?) {
   var x = f?()
+  _ = x
 }
 
 // Tests reabstraction / partial apply of protocols under opaque value mode
@@ -956,6 +959,50 @@ func s440__cleanupEmission<T>(_ x: T) {
   _ = x2
 }
 
+// Test SILGenBuilder.loadCopy().
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s450__________lastValxSayxGd_tlF : $@convention(thin) <T> (@owned Array<T>) -> @out T
+// CHECK: [[LOAD:%.*]] = load [copy] %34 : $*T
+// CHECK: return [[LOAD]] : $T
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s450__________lastValxSayxGd_tlF'
+func s450__________lastVal<T>(_ rest: T...) -> T {
+  var minValue: T
+  for value in rest {
+    minValue = value
+  }
+  return minValue
+}
+
+// Test SILGenFunction::emitPointerToPointer.
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s460______________fooSRyxGSPyxG1p_tlF : $@convention(thin) <Element> (UnsafePointer<Element>) -> UnsafeBufferPointer<Element> {
+// CHECK: [[F:%.*]] = function_ref @_T0s017_convertPointerToB8Argumentq_xs01_B0RzsABR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : _Pointer, τ_0_1 : _Pointer> (@in τ_0_0) -> @out τ_0_1
+// CHECK: apply [[F]]<UnsafePointer<Element>, UnsafePointer<Element>>(%0) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : _Pointer, τ_0_1 : _Pointer> (@in τ_0_0) -> @out τ_0_1
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s460______________fooSRyxGSPyxG1p_tlF'
+func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPointer<Element> {
+  return UnsafeBufferPointer(start: p, count: 1)
+}
+
+// Test emitNativeToCBridgedNonoptionalValue
+// ---
+// CHECK-objc-LABEL: sil hidden @_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
+// CHECK-objc bb0(%0 : $Any):
+// CHECK-objc [[BORROW:%.*]] = begin_borrow %0 : $Any
+// CHECK-objc [[SRC:%.*]] = copy_value [[BORROW]] : $Any
+// CHECK-objc [[OPEN:%.*]] = open_existential_opaque [[SRC]] : $Any to $@opened
+// CHECK-objc [[COPY:%.*]] = copy_value [[OPEN]] : $@opened
+// CHECK-objc [[F:%.*]] = function_ref @_T0s27_bridgeAnythingToObjectiveCyXlxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
+// CHECK-objc [[RET:%.*]] = apply [[F]]<@opened("{{.*}}") Any>([[COPY]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
+// CHECK-objc destroy_value [[SRC]] : $Any
+// CHECK-objc destroy_value %0 : $Any
+// CHECK-objc return [[RET]] : $AnyObject
+// CHECK-objc-LABEL: } // end sil function '_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF'
+#if _runtime(_ObjC)
+func s470________nativeToC(fromAny any: Any) -> AnyObject {
+  return any as AnyObject
+}
+#endif
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
@@ -971,7 +1018,7 @@ func s440__cleanupEmission<T>(_ x: T) {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF'
 func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
   if let f = x as? (Int, T) -> (Int, T) {
-    f(42, y)
+    _ = f(42, y)
   }
 }
 
