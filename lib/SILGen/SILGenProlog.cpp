@@ -79,16 +79,16 @@ class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
                                               /*RetTy*/ ManagedValue>
 {
 public:
-  SILGenFunction &gen;
+  SILGenFunction &SGF;
   SILBasicBlock *parent;
   SILLocation loc;
   bool functionArgs;
   ArrayRef<SILParameterInfo> &parameters;
 
-  EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent,
+  EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent,
                   SILLocation l, bool functionArgs,
                   ArrayRef<SILParameterInfo> &parameters)
-    : gen(gen), parent(parent), loc(l), functionArgs(functionArgs),
+    : SGF(sgf), parent(parent), loc(l), functionArgs(functionArgs),
       parameters(parameters) {}
 
   ManagedValue getManagedValue(SILValue arg, CanType t,
@@ -105,7 +105,7 @@ public:
       // An unowned parameter is passed at +0, like guaranteed, but it isn't
       // kept alive by the caller, so we need to retain and manage it
       // regardless.
-      return gen.emitManagedRetain(loc, arg);
+      return SGF.emitManagedRetain(loc, arg);
 
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
@@ -117,20 +117,20 @@ public:
     case ParameterConvention::Indirect_In_Constant:
       // An owned or 'in' parameter is passed in at +1. We can claim ownership
       // of the parameter and clean it up when it goes out of scope.
-      return gen.emitManagedRValueWithCleanup(arg);
+      return SGF.emitManagedRValueWithCleanup(arg);
     }
     llvm_unreachable("bad parameter convention");
   }
 
   ManagedValue visitType(CanType t) {
-    auto argType = gen.getLoweredType(t);
+    auto argType = SGF.getLoweredType(t);
     // Pop the next parameter info.
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
     assert(
         argType
             == parent->getParent()->mapTypeIntoContext(
-                   gen.getSILType(parameterInfo))
+                   SGF.getSILType(parameterInfo))
         && "argument does not have same type as specified by parameter info");
 
     SILValue arg =
@@ -148,8 +148,8 @@ public:
         && isa<FunctionType>(objectType)
         && cast<FunctionType>(objectType)->getRepresentation()
               == FunctionType::Representation::Block) {
-      SILValue blockCopy = gen.B.createCopyBlock(loc, mv.getValue());
-      mv = gen.emitManagedRValueWithCleanup(blockCopy);
+      SILValue blockCopy = SGF.B.createCopyBlock(loc, mv.getValue());
+      mv = SGF.emitManagedRValueWithCleanup(blockCopy);
     }
     return mv;
   }
@@ -157,7 +157,7 @@ public:
   ManagedValue visitTupleType(CanTupleType t) {
     SmallVector<ManagedValue, 4> elements;
 
-    auto &tl = gen.getTypeLowering(t);
+    auto &tl = SGF.getTypeLowering(t);
     bool canBeGuaranteed = tl.isLoadable();
 
     // Collect the exploded elements.
@@ -170,7 +170,7 @@ public:
       elements.push_back(elt);
     }
 
-    if (tl.isLoadable() || !gen.silConv.useLoweredAddresses()) {
+    if (tl.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
       SmallVector<SILValue, 4> elementValues;
       if (canBeGuaranteed) {
         // If all of the elements were guaranteed, we can form a guaranteed tuple.
@@ -180,32 +180,32 @@ public:
         // Otherwise, we need to move or copy values into a +1 tuple.
         for (auto element : elements) {
           SILValue value = element.hasCleanup()
-            ? element.forward(gen)
-            : element.copyUnmanaged(gen, loc).forward(gen);
+            ? element.forward(SGF)
+            : element.copyUnmanaged(SGF, loc).forward(SGF);
           elementValues.push_back(value);
         }
       }
-      auto tupleValue = gen.B.createTuple(loc, tl.getLoweredType(),
+      auto tupleValue = SGF.B.createTuple(loc, tl.getLoweredType(),
                                           elementValues);
       return canBeGuaranteed
         ? ManagedValue::forUnmanaged(tupleValue)
-        : gen.emitManagedRValueWithCleanup(tupleValue);
+        : SGF.emitManagedRValueWithCleanup(tupleValue);
     } else {
       // If the type is address-only, we need to move or copy the elements into
       // a tuple in memory.
       // TODO: It would be a bit more efficient to use a preallocated buffer
       // in this case.
-      auto buffer = gen.emitTemporaryAllocation(loc, tl.getLoweredType());
+      auto buffer = SGF.emitTemporaryAllocation(loc, tl.getLoweredType());
       for (auto i : indices(elements)) {
         auto element = elements[i];
-        auto elementBuffer = gen.B.createTupleElementAddr(loc, buffer,
+        auto elementBuffer = SGF.B.createTupleElementAddr(loc, buffer,
                                         i, element.getType().getAddressType());
         if (element.hasCleanup())
-          element.forwardInto(gen, loc, elementBuffer);
+          element.forwardInto(SGF, loc, elementBuffer);
         else
-          element.copyInto(gen, elementBuffer, loc);
+          element.copyInto(SGF, elementBuffer, loc);
       }
-      return gen.emitManagedRValueWithCleanup(buffer);
+      return SGF.emitManagedRValueWithCleanup(buffer);
     }
   }
 };
