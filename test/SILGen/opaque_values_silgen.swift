@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // UNSUPPORTED: resilient_stdlib
 
@@ -985,21 +985,23 @@ func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPo
 
 // Test emitNativeToCBridgedNonoptionalValue
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
-// CHECK: bb0(%0 : $Any):
-// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Any
-// CHECK: [[SRC:%.*]] = copy_value [[BORROW]] : $Any
-// CHECK: [[OPEN:%.*]] = open_existential_opaque [[SRC]] : $Any to $@opened
-// CHECK: [[COPY:%.*]] = copy_value [[OPEN]] : $@opened
-// CHECK: [[F:%.*]] = function_ref @_T0s27_bridgeAnythingToObjectiveCyXlxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
-// CHECK: [[RET:%.*]] = apply [[F]]<@opened("{{.*}}") Any>([[COPY]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
-// CHECK: destroy_value [[SRC]] : $Any
-// CHECK: destroy_value %0 : $Any
-// CHECK: return [[RET]] : $AnyObject
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF'
+// CHECK-objc-LABEL: sil hidden @_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
+// CHECK-objc bb0(%0 : $Any):
+// CHECK-objc [[BORROW:%.*]] = begin_borrow %0 : $Any
+// CHECK-objc [[SRC:%.*]] = copy_value [[BORROW]] : $Any
+// CHECK-objc [[OPEN:%.*]] = open_existential_opaque [[SRC]] : $Any to $@opened
+// CHECK-objc [[COPY:%.*]] = copy_value [[OPEN]] : $@opened
+// CHECK-objc [[F:%.*]] = function_ref @_T0s27_bridgeAnythingToObjectiveCyXlxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
+// CHECK-objc [[RET:%.*]] = apply [[F]]<@opened("{{.*}}") Any>([[COPY]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
+// CHECK-objc destroy_value [[SRC]] : $Any
+// CHECK-objc destroy_value %0 : $Any
+// CHECK-objc return [[RET]] : $AnyObject
+// CHECK-objc-LABEL: } // end sil function '_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF'
+#if _runtime(_ObjC)
 func s470________nativeToC(fromAny any: Any) -> AnyObject {
   return any as AnyObject
 }
+#endif
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
