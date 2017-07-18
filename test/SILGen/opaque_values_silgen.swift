@@ -489,10 +489,9 @@ func s210______compErasure(_ x: Foo & Error) -> Error {
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s220_____openExistBoxSSs5Error_pF : $@convention(thin) (@owned Error) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : $Error):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $*@opened({{.*}}) Error
-// CHECK:   [[LOAD_ALLOC:%.*]] = load [copy] [[OPAQUE_ARG]]
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[BORROWED_ARG]] : $Error to $@opened({{.*}}) Error
 // CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
-// CHECK:   store [[LOAD_ALLOC]] to [init] [[ALLOC_OPEN]]
+// CHECK:   store_borrow [[OPAQUE_ARG]] to [[ALLOC_OPEN]]
 // CHECK:   dealloc_stack [[ALLOC_OPEN]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]] : $Error
@@ -983,7 +982,7 @@ func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPo
   return UnsafeBufferPointer(start: p, count: 1)
 }
 
-// Test emitNativeToCBridgedNonoptionalValue
+// Test emitNativeToCBridgedNonoptionalValue.
 // ---
 // CHECK-objc-LABEL: sil hidden @_T020opaque_values_silgen21s470________nativeToCyXlyp7fromAny_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
 // CHECK-objc bb0(%0 : $Any):
@@ -1002,6 +1001,77 @@ func s470________nativeToC(fromAny any: Any) -> AnyObject {
   return any as AnyObject
 }
 #endif
+
+// Test emitOpenExistential.
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s480_________getErroryps0F0_p04someF0_tF : $@convention(thin) (@owned Error) -> @out Any {
+// CHECK: bb0(%0 : $Error):
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Error
+// CHECK: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened("{{.*}}") Error
+// CHECK: [[COPY:%.*]] = copy_value [[VAL]] : $@opened("{{.*}}") Error
+// CHECK: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened("{{.*}}") Error, $@opened("{{.*}}") Error, $Any
+// CHECK: destroy_value %0 : $Error
+// CHECK: return [[ANY]] : $Any
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s480_________getErroryps0F0_p04someF0_tF'
+func s480_________getError(someError: Error) -> Any {
+  return someError
+}
+
+// Test SILBuilder.createLoadBorrow.
+// ---
+// CHECK-LABEL: sil private @_T020opaque_values_silgen21s490_______loadBorrowyyF3FooL_V3foo7ElementQzSg5IndexQz3pos_tF : $@convention(method) <Elements where Elements : Collection> (@in Elements.Index, @inout Foo<Elements>) -> @out Optional<Elements.Element> {
+// CHECK: bb0(%0 : $Elements.Index, %1 : $*Foo<Elements>):
+// CHECK: [[READ:%.*]] = begin_access [read] [unknown] %1 : $*Foo<Elements>
+// CHECK: [[LOAD:%.*]] = load_borrow [[READ]] : $*Foo<Elements>
+// CHECK: end_access [[READ]] : $*Foo<Elements>
+// CHECK: [[EXTRACT:%.*]] = struct_extract [[LOAD]] : $Foo<Elements>, #<abstract function>Foo._elements
+// CHECK: [[COPYELT:%.*]] = copy_value [[EXTRACT]] : $Elements
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Elements.Index
+// CHECK: [[COPYIDX:%.*]] = copy_value [[BORROW]] : $Elements.Index
+// CHECK: [[WT:%.*]] = witness_method $Elements, #Collection.subscript!getter.1 : <Self where Self : Collection> (Self) -> (Self.Index) -> Self.Element : $@convention(witness_method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0.Index, @in_guaranteed τ_0_0) -> @out τ_0_0.Element
+// CHECK: %{{.*}} = apply [[WT]]<Elements>([[COPYIDX]], [[COPYELT]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0.Index, @in_guaranteed τ_0_0) -> @out τ_0_0.Element
+// CHECK: destroy_value [[COPYELT]] : $Elements
+// CHECK: [[ENUM:%.*]] = enum $Optional<Elements.Element>, #Optional.some!enumelt.1, %12 : $Elements.Element
+// CHECK: end_borrow [[BORROW]] from %0 : $Elements.Index, $Elements.Index
+// CHECK: end_borrow [[LOAD]] from [[READ]] : $Foo<Elements>, $*Foo<Elements>
+// CHECK: destroy_value %0 : $Elements.Index
+// CHECK: return %14 : $Optional<Elements.Element>
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s490_______loadBorrowyyF3FooL_V3foo7ElementQzSg5IndexQz3pos_tF'
+
+func s490_______loadBorrow() {
+  struct Foo<Elements : Collection> {
+    internal let _elements: Elements
+
+    public mutating func foo(pos: Elements.Index) -> Elements.Element? {
+      return _elements[pos]
+    }
+  }
+  var foo = Foo(_elements: [])
+  _ = foo.foo(pos: 1)
+}
+
+protocol ConvertibleToP {
+  func asP() -> P
+}
+
+// Test visitBindOptionalExpr
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s500_______getAnyHashAA1P_pSgAA14ConvertibleToP_pSgF : $@convention(thin) (@in Optional<ConvertibleToP>) -> @out Optional<P> {
+// CHECK: bb0(%0 : $Optional<ConvertibleToP>):
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Optional<ConvertibleToP>
+// CHECK: [[COPY:%.*]] = copy_value [[BORROW]] : $Optional<ConvertibleToP>
+// CHECK: [[DATA:%.*]] = unchecked_enum_data [[COPY]] : $Optional<ConvertibleToP>, #Optional.some!enumelt.1
+// CHECK: [[VAL:%.*]] = open_existential_value [[DATA]] : $ConvertibleToP to $@opened("{{.*}}") ConvertibleToP
+// CHECK: [[WT:%.*]] = witness_method $@opened("{{.*}}") ConvertibleToP, #ConvertibleToP.asP!1 : <Self where Self : ConvertibleToP> (Self) -> () -> P, %12 : $@opened("{{.*}}") ConvertibleToP : $@convention(witness_method) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
+// CHECK: [[AS_P:%.*]] = apply [[WT]]<@opened("{{.*}}") ConvertibleToP>(%12) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
+// CHECK: [[ENUM:%.*]] = enum $Optional<P>, #Optional.some!enumelt.1, [[AS_P]] : $P
+// CHECK: destroy_value [[DATA]] : $ConvertibleToP
+// CHECK: end_borrow [[BORROW]] from %0 : $Optional<ConvertibleToP>, $Optional<ConvertibleToP>
+// CHECK: br bb{{.*}}([[ENUM]] : $Optional<P>)
+// CHECK: // end sil function '_T020opaque_values_silgen21s500_______getAnyHashAA1P_pSgAA14ConvertibleToP_pSgF'
+func s500_______getAnyHash(_ value: ConvertibleToP?) -> P? {
+  return value?.asP()
+}
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---

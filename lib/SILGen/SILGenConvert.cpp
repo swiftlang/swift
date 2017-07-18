@@ -907,12 +907,20 @@ SILGenFunction::emitOpenExistential(
 
     existentialType = existentialValue.getType();
     assert(existentialType.isObject());
+    if (loweredOpenedType.isAddress()) {
+      archetypeMV = ManagedValue::forUnmanaged(
+        B.createOpenExistentialBox(loc, existentialValue.getValue(),
+                                   loweredOpenedType));
+    } else {
+      assert(!silConv.useLoweredAddresses());
+      archetypeMV = ManagedValue::forUnmanaged(
+        B.createOpenExistentialBoxValue(loc, existentialValue.getValue(),
+                                        loweredOpenedType));
+    }
     // NB: Don't forward the cleanup, because consuming a boxed value won't
     // consume the box reference.
-    archetypeMV = ManagedValue::forUnmanaged(B.createOpenExistentialBox(
-        loc, existentialValue.getValue(), loweredOpenedType.getAddressType()));
-    // The boxed value can't be assumed to be uniquely referenced. We can never
-    // consume it.
+    // The boxed value can't be assumed to be uniquely referenced.
+    // We can never consume it.
     // TODO: We could use isUniquelyReferenced to shorten the duration of
     // the box to the point that the opaque value is copied out.
     isUnique = false;

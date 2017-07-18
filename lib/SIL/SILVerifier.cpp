@@ -1236,7 +1236,8 @@ public:
         F.hasQualifiedOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
     require(LBI->getType().isObject(), "Result of load must be an object");
-    require(LBI->getType().isLoadable(LBI->getModule()),
+    require(!fnConv.useLoweredAddresses()
+            || LBI->getType().isLoadable(LBI->getModule()),
             "Load must have a loadable type");
     require(LBI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
