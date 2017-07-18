@@ -13,12 +13,27 @@
 import TestsUtils
 import Foundation
 
-@inline(never)
-public func run_ReduceIntoInt(_ N: Int) {
-  let numbers = [Int](0..<1000)
+// Sum
 
+@inline(never)
+public func run_SumUsingReduce(_ N: Int) {
+  let numbers = [Int](0..<1000)
+  
   var c = 0
-  for _ in 1...N*100 {
+  for _ in 1...N*1000 {
+    c = c &+ numbers.reduce(0) { (acc: Int, num: Int) -> Int in
+      acc &+ num
+    }
+  }
+  CheckResults(c != 0)
+}
+
+@inline(never)
+public func run_SumUsingReduceInto(_ N: Int) {
+  let numbers = [Int](0..<1000)
+  
+  var c = 0
+  for _ in 1...N*1000 {
     c = c &+ numbers.reduce(into: 0) { (acc: inout Int, num: Int) in
       acc = acc &+ num
     }
@@ -26,14 +41,20 @@ public func run_ReduceIntoInt(_ N: Int) {
   CheckResults(c != 0)
 }
 
+// Filter
+
 @inline(never)
-public func run_ReduceIntoArray(_ N: Int) {
+public func run_FilterEvenUsingReduce(_ N: Int) {
   let numbers = [Int](0..<100)
   
   var c = 0
   for _ in 1...N*100 {
-    let a = numbers.reduce(into: []) { (acc: inout [Int], num: Int) in
-      acc.append(num)
+    let a = numbers.reduce([]) { (acc: [Int], num: Int) -> [Int] in
+      var a = acc
+      if num % 2 == 0 {
+        a.append(num)
+      }
+      return a
     }
     c = c &+ a.count
   }
@@ -41,28 +62,34 @@ public func run_ReduceIntoArray(_ N: Int) {
 }
 
 @inline(never)
-public func run_ReduceIntoDictionary(_ N: Int) {
+public func run_FilterEvenUsingReduceInto(_ N: Int) {
   let numbers = [Int](0..<100)
   
   var c = 0
   for _ in 1...N*100 {
-    let d = numbers.reduce(into: [:]) { (acc: inout [Int: Int], num: Int) in
-      acc[num] = num
+    let a = numbers.reduce(into: []) { (acc: inout [Int], num: Int) in
+      if num % 2 == 0 {
+        acc.append(num)
+      }
     }
-    c = c &+ d.count
+    c = c &+ a.count
   }
   CheckResults(c != 0)
 }
 
+// Frequencies
+
 @inline(never)
-public func run_MapUsingReduceInto(_ N: Int) {
-  let numbers = [Int](0..<100)
+public func run_FrequenciesUsingReduce(_ N: Int) {
+  let s = "thequickbrownfoxjumpsoverthelazydogusingasmanycharacteraspossible123456789"
   
   var c = 0
-  let f: (Int) -> Int = { $0 &+ 5 }
   for _ in 1...N*100 {
-    let a = numbers.reduce(into: []) { (acc: inout [Int], x: Int) in
-      acc.append(f(x))
+    let a = s.reduce([:]) {
+      (acc: [Character: Int], c: Character) -> [Character: Int] in
+      var d = acc
+      d[c, default: 0] += 1
+      return d
     }
     c = c &+ a.count
   }
@@ -75,7 +102,8 @@ public func run_FrequenciesUsingReduceInto(_ N: Int) {
   
   var c = 0
   for _ in 1...N*100 {
-    let a = s.reduce(into: [:]) { (acc: inout [Character: Int], c: Character) in
+    let a = s.reduce(into: [:]) {
+      (acc: inout [Character: Int], c: Character) in
       acc[c, default: 0] += 1
     }
     c = c &+ a.count
