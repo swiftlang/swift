@@ -52,7 +52,7 @@ class StackPromoter {
   //
   // We want to get bb2 as immediate post-dominator of bb1. This is not the case
   // with the regular post-dominator tree.
-  llvm::DominatorTreeBase<SILBasicBlock> PostDomTree;
+  PostDominatorTreeBase PostDomTree;
 
   bool PostDomTreeValid;
 
@@ -168,7 +168,7 @@ public:
 
   StackPromoter(SILFunction *F, EscapeAnalysis::ConnectionGraph *ConGraph,
                 DominanceInfo *DT, EscapeAnalysis *EA) :
-    F(F), ConGraph(ConGraph), DT(DT), EA(EA), PostDomTree(true),
+    F(F), ConGraph(ConGraph), DT(DT), EA(EA),
     PostDomTreeValid(false) { }
 
   SILFunction *getFunction() const { return F; }
