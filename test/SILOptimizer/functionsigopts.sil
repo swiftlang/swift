@@ -1743,7 +1743,7 @@ bb0(%0 : $*T):
 // Check that we specialized this function by removing the dead argument and
 // copied everything appropriately.
 
-// CHECK-LABEL: sil [serialized] @_T023dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @_T023dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0([[INPUT_ARG:%[0-9]+]] : $Builtin.NativeObject):
 // CHECK: cond_br undef, bb1, bb2
 // CHECK: bb1:
@@ -1757,16 +1757,16 @@ bb0(%0 : $*T):
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
-// CHECK-LABEL: sil private [serialized] @_T031private_dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @_T031private_dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0(
 
-// CHECK-LABEL: sil [serialized] @_T037owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error Error) {
+// CHECK-LABEL: sil shared [serialized] @_T037owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error Error) {
 // CHECK-NOT: release
 // CHECK: throw
 
-// CHECK-LABEL: sil [serialized] @_T042owned_to_guaranteed_simple_singlebb_calleeTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @_T042owned_to_guaranteed_simple_singlebb_calleeTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 
-// CHECK-LABEL: sil [serialized] @_T055owned_to_guaranteed_multibb_callee_with_release_in_exitTfq4dg_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @_T055owned_to_guaranteed_multibb_callee_with_release_in_exitTfq4dg_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(
 // CHECK:  function_ref user
 // CHECK:  function_ref @user
@@ -1784,7 +1784,7 @@ bb0(%0 : $*T):
 // Also make sure we have change the calling convention to freestanding from
 // method because we have changed the self argument.
 
-// CHECK-LABEL: sil [serialized] @_T014array_semanticTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @_T014array_semanticTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : $Builtin.NativeObject)
 // CHECK:  function_ref user
 // CHECK:  function_ref @user
