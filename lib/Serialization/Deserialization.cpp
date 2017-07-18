@@ -1353,9 +1353,13 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
             nestedType = containingFile->lookupNestedType(memberName, baseType);
           }
         } else {
-          // Fault in extensions, then ask every serialized AST in the module.
+          // Fault in extensions, then ask every file in the module.
+          ModuleDecl *extensionModule = M;
+          if (!extensionModule)
+            extensionModule = baseType->getModuleContext();
+
           (void)baseType->getExtensions();
-          for (FileUnit *file : baseType->getModuleContext()->getFiles()) {
+          for (FileUnit *file : extensionModule->getFiles()) {
             if (file == getFile())
               continue;
             nestedType = file->lookupNestedType(memberName, baseType);

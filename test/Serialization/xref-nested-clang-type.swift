@@ -4,24 +4,25 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp %S/Inputs/xref-nested-clang-type/NestedClangTypes.h %t
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t -import-objc-header %t/NestedClangTypes.h %s -module-name Lib -DNO_MODULE
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %t -import-objc-header %t/NestedClangTypes.h %s -DCLIENT -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t -import-objc-header %t/NestedClangTypes.h -I %S/Inputs/xref-nested-clang-type/ %s -module-name Lib -DNO_MODULE
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %t -I %S/Inputs/xref-nested-clang-type/ -import-objc-header %t/NestedClangTypes.h %s -DCLIENT -verify
 
 // RUN: %empty-directory(%t)
 // RUN: cp %S/Inputs/xref-nested-clang-type/NestedClangTypes.h %t
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t -import-objc-header %t/NestedClangTypes.h -pch-output-dir %t/PCHCache %s -module-name Lib -DNO_MODULE
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %t -pch-output-dir %t/PCHCache -import-objc-header %t/NestedClangTypes.h %s -DCLIENT -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t -import-objc-header %t/NestedClangTypes.h -I %S/Inputs/xref-nested-clang-type/ -pch-output-dir %t/PCHCache %s -module-name Lib -DNO_MODULE
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %t -I %S/Inputs/xref-nested-clang-type/ -pch-output-dir %t/PCHCache -import-objc-header %t/NestedClangTypes.h %s -DCLIENT -verify
+
+#if _runtime(_ObjC)
+import Foundation
+#endif // ObjC
 
 #if CLIENT
 
 import Lib
 
 func test(x: MyInner) {}
-
-#if _runtime(_ObjC)
-import Foundation
+func test(x: MyOtherInner) {}
 func test(x: MyCode) {}
-#endif // ObjC
 
 #else // CLIENT
 
@@ -36,13 +37,18 @@ extension MyOuter {
   public func use(inner: MyInner) {}
 }
 
-#if _runtime(_ObjC)
-import Foundation
+public typealias MyOtherInner = OuterFromOtherModule.InterestingValue
+extension OuterFromOtherModule {
+  public func use(inner: MyOtherInner) {}
+}
 
+#if _runtime(_ObjC)
 public typealias MyCode = ErrorCodeEnum.Code
 extension ErrorCodeEnum {
   public func whatever(code: MyCode) {}
 }
+#else
+public typealias MyCode = Int
 #endif // ObjC
 
 #endif // CLIENT
