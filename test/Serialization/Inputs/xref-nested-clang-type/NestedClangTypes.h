@@ -1,3 +1,5 @@
+#include "NestedClangTypesHelper.h"
+
 struct Outer {
   int value;
 };
@@ -5,6 +7,12 @@ struct Outer {
 struct __attribute__((swift_name("Outer.InterestingValue"))) Inner {
   int value;
 };
+
+struct OuterFromOtherModule;
+struct __attribute__((swift_name("OuterFromOtherModule.InterestingValue"))) InnerCrossModule {
+  int value;
+};
+
 
 #if __OBJC__
 
