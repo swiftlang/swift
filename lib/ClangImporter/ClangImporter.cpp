@@ -2461,7 +2461,7 @@ ClangModuleUnit::lookupNestedType(Identifier name,
   // FIXME: This is very similar to what's in Implementation::lookupValue and
   // Implementation::loadAllMembers.
   SmallVector<TypeDecl *, 2> results;
-  for (auto entry : lookupTable->lookup(SerializedSwiftName(name.str()),
+  for (auto entry : lookupTable->lookup(name.str(),
                                         baseTypeContext)) {
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, entry)) continue;
