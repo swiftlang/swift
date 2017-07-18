@@ -989,7 +989,7 @@ func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPo
 // CHECK: bb0(%0 : $Any):
 // CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Any
 // CHECK: [[SRC:%.*]] = copy_value [[BORROW]] : $Any
-// CHECK: [[OPEN:%.*]] = open_existential_value [[SRC]] : $Any to $@opened
+// CHECK: [[OPEN:%.*]] = open_existential_opaque [[SRC]] : $Any to $@opened
 // CHECK: [[COPY:%.*]] = copy_value [[OPEN]] : $@opened
 // CHECK: [[F:%.*]] = function_ref @_T0s27_bridgeAnythingToObjectiveCyXlxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
 // CHECK: [[RET:%.*]] = apply [[F]]<@opened("{{.*}}") Any>([[COPY]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned AnyObject
