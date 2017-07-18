@@ -26,6 +26,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SILGen/SILGenMaterializeForSet.h"
 #include "llvm/ADT/StringSet.h"
 
 using namespace swift;
@@ -108,6 +109,8 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
 
   void visitClassDecl(ClassDecl *CD);
+
+  void visitConstructorDecl(ConstructorDecl *CD);
 
   void visitExtensionDecl(ExtensionDecl *ED);
 
@@ -285,6 +288,15 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   InsideAbstractStorageDecl = true;
   visitMembers(ASD);
   InsideAbstractStorageDecl = false;
+
+  // IRGen currently promotes serialized private functions to public, which
+  // includes the closures inside materializeForSets of computed properties.
+  if (auto MFS = ASD->getMaterializeForSetFunc()) {
+    if (!isPrivateDecl(MFS)) {
+      addSymbol(Lowering::getMaterializeForSetCallbackName(
+          /*conformance=*/nullptr, MFS));
+    }
+  }
 }
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   // statically/globally stored variables have some special handling.
@@ -350,8 +362,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       continue;
 
     auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset =
-        !isGeneric && var && var->hasStorage() && !var->isStatic();
+    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {
       // FIXME: a field only has one sort of offset, but it is moderately
       // non-trivial to compute which one. Including both is less painful than
@@ -360,10 +371,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/true));
     }
 
-    // The non-allocating forms of the constructors and destructors.
-    if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
-      addSymbol(SILDeclRef(ctor, SILDeclRef::Kind::Initializer));
-    } else if (auto dtor = dyn_cast<DestructorDecl>(value)) {
+    // The non-allocating forms of the destructors.
+    if (auto dtor = dyn_cast<DestructorDecl>(value)) {
       // ObjC classes don't have a symbol for their destructor.
       if (!isObjC)
         addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
@@ -371,6 +380,16 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   }
 
   visitNominalTypeDecl(CD);
+}
+
+void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
+  if (CD->getParent()->getAsClassOrClassExtensionContext()) {
+    // Class constructors come in two forms, allocating and non-allocating. The
+    // default ValueDecl handling gives the allocating one, so we have to
+    // manually include the non-allocating one.
+    addSymbol(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+  }
+  visitAbstractFunctionDecl(CD);
 }
 
 void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
@@ -386,14 +405,15 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
 #ifndef NDEBUG
-  // There's no (currently) relevant information about members of a protocol
-  // at individual protocols, each conforming type has to handle them
-  // individually. Let's assert this fact:
+  // There's no (currently) relevant information about members of a protocol at
+  // individual protocols, each conforming type has to handle them individually
+  // (NB. anything within an active IfConfigDecls also appears outside). Let's
+  // assert this fact:
   for (auto *member : PD->getMembers()) {
     auto isExpectedKind =
         isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
         isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
-        isa<AbstractFunctionDecl>(member);
+        isa<AbstractFunctionDecl>(member) || isa<IfConfigDecl>(member);
     assert(isExpectedKind &&
            "unexpected member of protocol during TBD generation");
   }
