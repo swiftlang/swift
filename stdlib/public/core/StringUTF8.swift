@@ -98,9 +98,10 @@ extension String {
   ///     print(String(s1.utf8.prefix(15)))
   ///     // Prints "They call me 'B"
   public struct UTF8View
-    : Collection, 
+    : BidirectionalCollection,
       CustomStringConvertible, 
       CustomDebugStringConvertible {
+
     @_versioned
     internal let _core: _StringCore
 
@@ -163,42 +164,85 @@ extension String {
         precondition(i.encodedOffset < _core.count)
         return Index(encodedOffset: i.encodedOffset + 1)
       }
-      
+
       var j = i
-      while true {
-        if case .utf8(let buffer) = j._cache {
-          _onFastPath()
-          var scalarLength16 = 1
-          let b0 = buffer.first._unsafelyUnwrappedUnchecked
-          var nextBuffer = buffer
-          
-          let leading1s = (~b0).leadingZeroBitCount
-          if leading1s == 0 {
-            nextBuffer.removeFirst()
-          }
-          else {
-            let n8 = j._transcodedOffset + 1
-            // If we haven't reached a scalar boundary...
-            if _fastPath(n8 < leading1s) {
-              return Index(
-                encodedOffset: j.encodedOffset,
-                transcodedOffset: n8, .utf8(buffer: nextBuffer))
-            }
-            scalarLength16 = n8 >> 2 + 1
-            nextBuffer.removeFirst(n8)
-          }
-          if _fastPath(!nextBuffer.isEmpty) {
-            return Index(
-              encodedOffset: j.encodedOffset + scalarLength16,
-              .utf8(buffer: nextBuffer))
-          }
-          return _index(atEncodedOffset: j.encodedOffset + scalarLength16)
-        }
+      
+      // Ensure j's cache is utf8
+      if _slowPath(j._cache.utf8 == nil) {
         j = _index(atEncodedOffset: j.encodedOffset)
         precondition(j != endIndex, "index out of bounds")
       }
+      
+      let buffer = j._cache.utf8._unsafelyUnwrappedUnchecked
+      
+      var scalarLength16 = 1
+      let b0 = buffer.first._unsafelyUnwrappedUnchecked
+      var nextBuffer = buffer
+
+      let leading1s = (~b0).leadingZeroBitCount
+      if _fastPath(leading1s == 0) { // ASCII in buffer; just consume it
+        nextBuffer.removeFirst()
+      }
+      else {
+        // Number of bytes consumed in this scalar
+        let n8 = j._transcodedOffset + 1
+        // If we haven't reached a scalar boundary...
+        if _fastPath(n8 < leading1s) {
+          // Advance to the next position in this scalar
+          return Index(
+            encodedOffset: j.encodedOffset,
+            transcodedOffset: n8, .utf8(buffer: buffer))
+        }
+        // We reached a scalar boundary; compute the underlying utf16's width
+        // based on the number of utf8 code units
+        scalarLength16 = n8 >> 2 + 1
+        nextBuffer.removeFirst(n8)
+      }
+
+      if _fastPath(!nextBuffer.isEmpty) {        
+        return Index(
+          encodedOffset: j.encodedOffset + scalarLength16,
+          .utf8(buffer: nextBuffer))
+      }
+      // If nothing left in the buffer, refill it.
+      return _index(atEncodedOffset: j.encodedOffset + scalarLength16)
     }
 
+    public func index(before i: Index) -> Index {
+      if _fastPath(_core.isASCII) {
+        precondition(i.encodedOffset > 0)
+        return Index(encodedOffset: i.encodedOffset - 1)
+      }
+      
+      if i._transcodedOffset != 0 {
+        _sanityCheck(i._cache.utf8 != nil)
+        var r = i
+        r._compoundOffset = r._compoundOffset &- 1
+        return r
+      }
+      
+      // Handle the scalar boundary the same way as the not-a-utf8-index case.
+      
+      // Parse a single scalar
+      var p =  Unicode.UTF16.ReverseParser()
+      var s = _core[..<i.encodedOffset].reversed().makeIterator()
+      let u8: Unicode.UTF8.EncodedScalar
+      switch p.parseScalar(from: &s) {
+      case .valid(let u16):
+        u8 = Unicode.UTF8.transcode(
+          u16, from: Unicode.UTF16.self)._unsafelyUnwrappedUnchecked
+      case .error(let stride):
+        u8 = Unicode.UTF8.encodedReplacementCharacter
+      case .emptyInput:
+        _preconditionFailure("index out of bounds")
+      }
+      return Index(
+        encodedOffset: i.encodedOffset &- (u8.count < 4 ? 1 : 2),
+        transcodedOffset: u8.count &- 1,
+        .utf8(buffer: String.Index._UTF8Buffer(u8))
+      )
+    }
+    
     public func distance(from i: Index, to j: Index) -> IndexDistance {
       if _fastPath(_core.isASCII) {
         return j.encodedOffset - i.encodedOffset
@@ -586,3 +630,34 @@ extension String.UTF8View {
     return self[i!]
   }
 }
+
+/*
+//===--- Slicing Support --------------------------------------------------===//
+/// In Swift 3.2, in the absence of type context,
+///
+///     someString.utf8[someString.startIndex..<someString.endIndex]
+///
+/// was deduced to be of type `String.UTF8View`.  Provide a more-specific
+/// Swift-3-only `subscript` overload that continues to produce
+/// `String.UTF8View`.
+extension String.UTF8View {
+  @available(swift, introduced: 4)
+  public subscript(r: Range<Index>) -> String.UTF8View.SubSequence {
+    return String.UTF8View.SubSequence(base: self, bounds: r)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<Index>) -> String.UTF8View {
+    var r = self
+    r._startIndex = bounds.lowerBound
+    r._endIndex = bounds.upperBound
+    return r
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: ClosedRange<Index>) -> String.UTF8View {
+    return self[bounds.relative(to: self)]
+  }
+}
+
+*/

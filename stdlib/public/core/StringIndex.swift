@@ -29,15 +29,19 @@ extension String {
 
 /// Convenience accessors
 extension String.Index._Cache {
+  @_versioned
   var utf16: Void? {
     if case .utf16 = self { return () } else { return nil }
   }
+  @_versioned
   var utf8: String.Index._UTF8Buffer? {
     if case .utf8(let r) = self { return r } else { return nil }
   }
+  @_versioned
   var character: UInt16? {
     if case .character(let r) = self { return r } else { return nil }
   }
+  @_versioned
   var unicodeScalar: UnicodeScalar? {
     if case .unicodeScalar(let r) = self { return r } else { return nil }
   }
