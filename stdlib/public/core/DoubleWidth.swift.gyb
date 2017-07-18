@@ -89,7 +89,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       // At this point we know source's bitWidth > Base.bitWidth, or else
       // we would've taken the first branch.
       let lowInT = source & T(~0 as Low)
-      let highInT = source &>> numericCast(High.bitWidth)
+      let highInT = source >> High.bitWidth
       
       let low = Low(lowInT.magnitude)
       guard let high = High(exactly: highInT) else { return nil }
