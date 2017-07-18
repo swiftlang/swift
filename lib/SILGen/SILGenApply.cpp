@@ -5197,8 +5197,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     // whether they were written as separate parameters, which should be
     // reflected in the params list.
     // TODO: we should really take an array of RValues.
-    auto params = accessType.getParams();
-    if (params.size() != 2) {
+    if (accessType->getNumParams() != 2) {
       auto subscriptsTupleType = cast<TupleType>(subscripts.getType());
       assert(inputTupleType->getNumElements()
               == 1 + subscriptsTupleType->getNumElements());
@@ -5207,7 +5206,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
       for (auto &elt : eltRVs)
         eltSources.emplace_back(loc, std::move(elt));
     } else {
-      subscripts.rewriteType(params[1].getType());
+      subscripts.rewriteType(inputTupleType.getElementType(1));
       eltSources.emplace_back(loc, std::move(subscripts));
     }
 
