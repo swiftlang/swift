@@ -8114,14 +8114,48 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   bool FoundMemberwiseInitializedProperty = false;
   bool SuppressDefaultInitializer = false;
   bool SuppressMemberwiseInitializer = false;
+  bool FoundSynthesizedInit = false;
   bool FoundDesignatedInit = false;
   decl->setAddedImplicitInitializers();
+
+  // Before we look for constructors, we need to make sure that all synthesized
+  // initializers are properly synthesized.
+  //
+  // NOTE: Lookups of synthesized initializers MUST come after
+  //       decl->setAddedImplicitInitializers() in case synthesis requires
+  //       protocol conformance checking, which might be recursive here.
+  DeclName synthesizedInitializers[1] = {
+    // init(from:) is synthesized by derived conformance to Decodable.
+    DeclName(Context, DeclBaseName(Context.Id_init),
+             (Identifier[1]) { Context.Id_from })
+  };
+
+  auto initializerIsSynthesized = [=](ConstructorDecl *initializer) {
+    if (!initializer->isImplicit())
+      return false;
+
+    for (auto &name : synthesizedInitializers)
+      if (initializer->getFullName() == name)
+        return true;
+
+    return false;
+  };
+
+  for (auto &name : synthesizedInitializers) {
+    synthesizeMemberForLookup(decl, name);
+  }
+
   SmallPtrSet<CanType, 4> initializerParamTypes;
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      if (ctor->isDesignatedInit())
+      // Synthesized initializers others than the default initializer should
+      // not prevent default initializer synthesis.
+      if (initializerIsSynthesized(ctor)) {
+        FoundSynthesizedInit = true;
+      } else if (ctor->isDesignatedInit()) {
         FoundDesignatedInit = true;
+      }
 
       if (!ctor->isInvalid())
         initializerParamTypes.insert(getInitializerParamType(ctor));
@@ -8216,7 +8250,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
     // We can't define these overrides if we have any uninitialized
     // stored properties.
-    if (SuppressDefaultInitializer && !FoundDesignatedInit) {
+    if (SuppressDefaultInitializer && !FoundDesignatedInit
+        && !FoundSynthesizedInit) {
       diagnoseClassWithoutInitializers(*this, classDecl);
       return;
     }
@@ -8308,7 +8343,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
     // ... unless there are uninitialized stored properties.
     if (SuppressDefaultInitializer) {
-      diagnoseClassWithoutInitializers(*this, classDecl);
+      if (!FoundSynthesizedInit)
+        diagnoseClassWithoutInitializers(*this, classDecl);
+
       return;
     }
 
