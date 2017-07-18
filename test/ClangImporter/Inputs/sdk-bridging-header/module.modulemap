@@ -1,0 +1,3 @@
+module TheModuleNextDoor {
+  header "TheModuleNextDoor.h"
+}
