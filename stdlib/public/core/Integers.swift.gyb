@@ -1488,7 +1488,7 @@ ${assignmentOperatorComment(x.operator, False)}
   /// - Complexity: O(1).
   static prefix func ~ (_ x: Self) -> Self
 
-% for x in binaryBitwise + maskingShifts:
+% for x in binaryBitwise:
 ${operatorComment(x.operator, False)}
   static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
 
@@ -1496,6 +1496,17 @@ ${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
+% for x in maskingShifts:
+${operatorComment(x.nonMaskingOperator, False)}
+  static func ${x.nonMaskingOperator}<RHS: BinaryInteger>(
+    _ lhs: Self, _ rhs: RHS
+  ) -> Self
+
+${assignmentOperatorComment(x.nonMaskingOperator, False)}
+  static func ${x.nonMaskingOperator}=<RHS: BinaryInteger>(
+    _ lhs: inout Self, _ rhs: RHS)
+% end
+ 
   /// Returns the quotient and remainder of this value divided by the given
   /// value.
   ///
@@ -1548,8 +1559,9 @@ extension BinaryInteger {
     return (self / rhs, self % rhs)
   }
 
-  % for x in binaryBitwise + maskingShifts:
+  % for x in binaryBitwise:
 
+  // Homogeneous
 ${operatorComment(x.operator, False)}
   @_transparent
   public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
@@ -1560,24 +1572,18 @@ ${operatorComment(x.operator, False)}
 
   % end
 
-  % for x in maskingShifts:
-
-${operatorComment(x.operator, False)}
-  public static func ${x.operator} <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Self {
-    return lhs ${x.operator} Self(extendingOrTruncating: rhs)
+% for x in maskingShifts:
+  // Heterogeneous non-masking shift in terms of shift-assignment
+${operatorComment(x.nonMaskingOperator, False)}
+  public static func ${x.nonMaskingOperator}<RHS: BinaryInteger>(
+    _ lhs: Self, _ rhs: RHS
+  ) -> Self {
+    var r = lhs
+    r ${x.nonMaskingOperator}= rhs
+    return r
   }
+% end
 
-${assignmentOperatorComment(x.operator, False)}
-  @_transparent
-  public static func ${x.operator}= <
-    Other : BinaryInteger
-  >(lhs: inout Self, rhs: Other) {
-    lhs = lhs ${x.operator} rhs
-  }
-
-  % end
 }
 
 // Strideable conformance
@@ -1835,50 +1841,6 @@ extension BinaryInteger {
 }
 
 //===----------------------------------------------------------------------===//
-//===--- BinaryInteger smart shifts ---------------------------------------===//
-//===----------------------------------------------------------------------===//
-// FIXME(integers): uncomment once <rdar://problem/29643515> gets fixed
-#if false
-extension BinaryInteger {
-%   for x in maskingShifts:
-  @_transparent
-  public static func ${x.nonMaskingOperator} <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Self {
-    var lhs = lhs
-    lhs ${x.nonMaskingOperator}= rhs
-    return lhs
-  }
-
-  // It is hard to imagine overshift to the left in an arbitrarily sized
-  // integer, but shifting too far to the right and negative shift cases are
-  // supported.
-%     reversedOperator = x.operator.translate(maketrans('<>', '><'))
-%     isRightShift = '>' in x.operator
-  @_transparent
-  public static func ${x.nonMaskingOperator}= <
-    Other : BinaryInteger
-  >(lhs: inout Self, rhs: Other) {
-    if rhs < (0 as Other) {
-      lhs ${reversedOperator}= (0 - rhs)
-      return
-    }
-%     if isRightShift:
-    let overshift = Self.isSigned
-      ? (lhs < (0 as Self) ? ~(0 as Self) : 0 )
-      : 0
-    if rhs >= lhs.bitWidth {
-      lhs = overshift
-      return
-    }
-%     end
-    lhs ${x.operator}= Self(extendingOrTruncating: rhs)
-  }
-%   end
-}
-#endif
-
-//===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
@@ -2102,6 +2064,15 @@ ${overflowOperationComment(x.operator)}
 
   /// A representation of this integer with the byte order swapped.
   var byteSwapped: Self { get }
+
+% for x in maskingShifts:
+${operatorComment(x.operator, False)}
+  static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
+
+${assignmentOperatorComment(x.operator, False)}
+  static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
+% end
+
 }
 
 extension FixedWidthInteger {
@@ -2128,6 +2099,67 @@ extension FixedWidthInteger {
   @_inlineable
   public var bitWidth: Int { return Self.bitWidth }
 
+  public init(littleEndian value: Self) {
+#if _endian(little)
+    self = value
+#else
+    self = value.byteSwapped
+#endif
+  }
+  
+  public init(bigEndian value: Self) {
+#if _endian(big)
+    self = value
+#else
+    self = value.byteSwapped
+#endif
+  }
+  
+  public var littleEndian: Self {
+#if _endian(little)
+    return self
+#else
+    return byteSwapped
+#endif
+  }
+  
+  public var bigEndian: Self {
+#if _endian(big)
+    return self
+#else
+    return byteSwapped
+#endif
+  }
+  
+  % for x in maskingShifts:
+  
+  // Homogeneous masking shift
+${operatorComment(x.operator, False)}
+  @_transparent
+  public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
+  }
+
+  // Heterogeneous masking shift
+${operatorComment(x.operator, False)}
+  public static func ${x.operator} <
+    Other : BinaryInteger
+  >(lhs: Self, rhs: Other) -> Self {
+    return lhs ${x.operator} Self(extendingOrTruncating: rhs)
+  }
+
+  // Heterogeneous masking shift assignment
+${assignmentOperatorComment(x.operator, False)}
+  @_transparent
+  public static func ${x.operator}= <
+    Other : BinaryInteger
+  >(lhs: inout Self, rhs: Other) {
+    lhs = lhs ${x.operator} rhs
+  }
+
+  % end
 }
 
 //===----------------------------------------------------------------------===//
@@ -2147,7 +2179,6 @@ extension FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 ${operatorComment(x.nonMaskingOperator, True)}
-  @available(swift, introduced: 4)
   @_transparent
   public static func ${x.nonMaskingOperator} <
     Other : BinaryInteger
@@ -2157,21 +2188,6 @@ ${operatorComment(x.nonMaskingOperator, True)}
     return lhs
   }
 
-// FIXME(integers): uncommenting this overload results in a compiler not being
-// able to typecheck expression like `(int64 >> 8) & 0xFF`.
-#if false
-  @_transparent
-  public static func ${x.nonMaskingOperator} (_ lhs: Self, _ rhs: Int) -> Self {
-    return ${x.helper}(lhs, rhs)
-  }
-
-  @_transparent
-  public static func ${x.nonMaskingOperator}= (_ lhs: inout Self, _ rhs: Int) {
-    lhs = ${x.helper}(lhs, rhs)
-  }
-#endif
-
-  @available(swift, introduced: 4)
   @_transparent
   public static func ${x.nonMaskingOperator}= <
     Other : BinaryInteger
@@ -2863,86 +2879,6 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.truncOrBitCast_Int${dbits}_Int${bits}(remainder_))
 
     return (quotient: quotient, remainder: remainder)
-%   end
-  }
-
-  /// Creates an integer using the specified big-endian representation,
-  /// changing the byte order if necessary.
-  ///
-  /// On a big-endian platform, for any integer `x`,
-  /// `x == ${Self}(bigEndian: x)`.
-  ///
-  /// - Parameter value: A value to use as the big-endian representation of the
-  ///   new integer.
-  @_transparent
-  public init(bigEndian value: ${Self}) {
-%   if bits <= 8:
-    self = value
-%   else:
-#if _endian(big)
-    self = value
-#else
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
-#endif
-%   end
-  }
-
-  /// Creates an integer using the specified little-endian representation,
-  /// changing the byte order if necessary.
-  ///
-  /// On a little-endian platform, for any integer `x`,
-  /// `x == ${Self}(littleEndian: x)`.
-  ///
-  /// - Parameter value: A value to use as the little-endian representation of
-  ///   the new integer.
-  @_transparent
-  public init(littleEndian value: ${Self}) {
-%   if bits <= 8:
-    self = value
-%   else:
-#if _endian(little)
-    self = value
-#else
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
-#endif
-%   end
-  }
-
-  /// The big-endian representation of this integer.
-  ///
-  /// If necessary, the byte order of this value is reversed from the typical
-  /// byte order of this integer type. On a big-endian platform, for any
-  /// integer `x`, `x == x.bigEndian`.
-  ///
-  /// - SeeAlso: `littleEndian`
-  public var bigEndian: ${Self} {
-%   if bits <= 8:
-    return self
-%   else:
-#if _endian(big)
-    return self
-#else
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
-#endif
-%   end
-  }
-
-  /// The little-endian representation of this integer.
-  ///
-  /// If necessary, the byte order of this value is reversed from the typical
-  /// byte order of this integer type. On a little-endian platform, for any
-  /// integer `x`, `x == x.littleEndian`.
-  ///
-  /// - SeeAlso: `bigEndian`
-  public var littleEndian: ${Self} {
-%   if bits <= 8:
-    return self
-%   else:
-#if _endian(little)
-    return self
-#else
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
-#endif
 %   end
   }
 
