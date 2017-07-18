@@ -66,7 +66,6 @@ set(SWIFT_BENCH_MODULES
     single-source/MonteCarloPi
     single-source/NSDictionaryCastToSwift
     single-source/NSError
-    single-source/NSStringAPI
     single-source/NSStringConversion
     single-source/NopDeinit
     single-source/ObjectAllocation
