@@ -1042,7 +1042,8 @@ bool SILInstruction::isTriviallyDuplicatable() const {
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
-      isa<OpenExistentialOpaqueInst>(this)) {
+      isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
+      isa<OpenExistentialBoxValueInst>(this)) {
     // Don't know how to duplicate these properly yet. Inst.clone() per
     // instruction does not work. Because the follow-up instructions need to
     // reuse the same archetype uuid which would only work if we used a

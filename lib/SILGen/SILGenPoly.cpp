@@ -1146,7 +1146,7 @@ namespace {
       // We are under opaque value(s) mode - load the any and init an opaque
       auto loadedPayload = SGF.emitManagedLoadCopy(Loc, payload.getValue());
       auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
-      SILValue loadedOpaque = SGF.B.createInitExistentialOpaque(
+      SILValue loadedOpaque = SGF.B.createInitExistentialValue(
           Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload.getValue(),
           /*Conformances=*/{});
       return ManagedValue(loadedOpaque, loadedPayload.getCleanup());

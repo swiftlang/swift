@@ -1619,7 +1619,7 @@ InitExistentialAddrInst *InitExistentialAddrInst::create(
                                                 Conformances);
 }
 
-InitExistentialOpaqueInst *InitExistentialOpaqueInst::create(
+InitExistentialValueInst *InitExistentialValueInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F, SILOpenedArchetypesState &OpenedArchetypes) {
@@ -1635,7 +1635,7 @@ InitExistentialOpaqueInst *InitExistentialOpaqueInst::create(
     declareWitnessTable(Mod, C);
 
   return ::new (Buffer)
-      InitExistentialOpaqueInst(Loc, ExistentialType, ConcreteType, Instance,
+      InitExistentialValueInst(Loc, ExistentialType, ConcreteType, Instance,
                                 TypeDependentOperands, Conformances);
 }
 
@@ -1778,7 +1778,12 @@ OpenExistentialBoxInst::OpenExistentialBoxInst(
     : UnaryInstructionBase(DebugLoc, operand, ty) {
 }
 
-OpenExistentialOpaqueInst::OpenExistentialOpaqueInst(SILDebugLocation DebugLoc,
+OpenExistentialBoxValueInst::OpenExistentialBoxValueInst(
+    SILDebugLocation DebugLoc, SILValue operand, SILType ty)
+    : UnaryInstructionBase(DebugLoc, operand, ty) {
+}
+
+OpenExistentialValueInst::OpenExistentialValueInst(SILDebugLocation DebugLoc,
                                                      SILValue Operand,
                                                      SILType SelfTy)
     : UnaryInstructionBase(DebugLoc, Operand, SelfTy) {}

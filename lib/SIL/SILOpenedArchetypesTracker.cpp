@@ -138,8 +138,8 @@ void SILOpenedArchetypesTracker::handleDeleteNotification(
 /// \returns The found archetype or empty type otherwise.
 CanArchetypeType swift::getOpenedArchetypeOf(const SILInstruction *I) {
   if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
-      isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialMetatypeInst>(I) ||
-      isa<OpenExistentialOpaqueInst>(I)) {
+      isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialBoxValueInst>(I) ||
+      isa<OpenExistentialMetatypeInst>(I) || isa<OpenExistentialValueInst>(I)) {
     auto Ty = getOpenedArchetypeOf(I->getType().getSwiftRValueType());
     assert(Ty && Ty->isOpenedExistential() &&
            "Type should be an opened archetype");
