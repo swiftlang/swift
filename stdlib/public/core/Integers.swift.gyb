@@ -2588,13 +2588,18 @@ public struct ${Self}
 
   @_transparent
   public init(_ source: ${FloatType}) {
+    ${Self}._convertFrom${FloatType}Checks(source)
+    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
+  }
+
+  @inline(never)
+  public static func _convertFrom${FloatType}Checks(_ source: ${FloatType}) {
     _precondition(source.isFinite,
       "${FloatType} value cannot be converted to ${Self} because it is either infinite or NaN")
     _precondition(source > ${str(lower)}.0,
       "${FloatType} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
     _precondition(source < ${str(upper)}.0,
       "${FloatType} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
-    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
   }
 
   @_transparent
