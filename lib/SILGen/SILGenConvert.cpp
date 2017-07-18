@@ -462,13 +462,15 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
                                      SGFContext C) {
   auto converter = getASTContext().getConvertPointerToPointerArgument(nullptr);
 
-  // The generic function currently always requires indirection, but pointers
-  // are always loadable.
-  auto origBuf = emitTemporaryAllocation(loc, input.getType());
-  B.emitStoreValueOperation(loc, input.forward(*this), origBuf,
-                            StoreOwnershipQualifier::Init);
-  auto origValue = emitManagedBufferWithCleanup(origBuf);
-  
+  auto origValue = input;
+  if (silConv.useLoweredAddresses()) {
+    // The generic function currently always requires indirection, but pointers
+    // are always loadable.
+    auto origBuf = emitTemporaryAllocation(loc, input.getType());
+    B.emitStoreValueOperation(loc, input.forward(*this), origBuf,
+                              StoreOwnershipQualifier::Init);
+    origValue = emitManagedBufferWithCleanup(origBuf);
+  }
   // Invoke the conversion intrinsic to convert to the destination type.
   auto *M = SGM.M.getSwiftModule();
   auto *proto = getPointerProtocol();
