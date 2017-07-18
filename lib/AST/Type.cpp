@@ -134,9 +134,21 @@ bool TypeBase::hasReferenceSemantics() {
 }
 
 bool TypeBase::isUninhabited() {
+  // Empty enum declarations are uninhabited
   if (auto nominalDecl = getAnyNominal())
     if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
       if (enumDecl->getAllElements().empty())
+        return true;
+  return false;
+}
+
+bool TypeBase::isStructurallyUninhabited() {
+  if (isUninhabited()) return true;
+  
+  // Tuples of uninhabited types are uninhabited
+  if (auto *TTy = getAs<TupleType>())
+    for (auto eltTy : TTy->getElementTypes())
+      if (eltTy->isStructurallyUninhabited())
         return true;
   return false;
 }

@@ -918,6 +918,13 @@ namespace {
     SpaceEngine(TypeChecker &C, SwitchStmt *SS) : TC(C), Switch(SS) {}
 
     void checkExhaustiveness(bool limitedChecking) {
+      // If the type of the scrutinee is uninhabited, we're already dead.
+      // Allow any well-typed patterns through.
+      auto subjectType = Switch->getSubjectExpr()->getType();
+      if (subjectType && subjectType->isStructurallyUninhabited()) {
+        return;
+      }
+      
       if (limitedChecking) {
         // Reject switch statements with empty blocks.
         if (Switch->getCases().empty()) {
@@ -956,7 +963,7 @@ namespace {
         }
       }
       
-      Space totalSpace(Switch->getSubjectExpr()->getType(), Identifier());
+      Space totalSpace(subjectType, Identifier());
       Space coveredSpace(spaces);
       size_t totalSpaceSize = totalSpace.getSize(TC);
       if (totalSpaceSize > Space::getMaximumSize()) {
