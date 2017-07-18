@@ -120,6 +120,12 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
     }
   }
 
+  if (error) {
+    // Inform the user how to silence this error (and request they file a bug)
+    // so they can continue working while us compiler folk fix it properly.
+    diags.diagnose(SourceLoc(), diag::pass_validate_tbd_against_ir_none);
+  }
+
   return error;
 }
 

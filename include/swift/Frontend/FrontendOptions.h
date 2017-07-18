@@ -291,7 +291,7 @@ public:
   };
 
   /// Compare the symbols in the IR against the TBD file we would generate.
-  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::None;
+  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::MissingFromTBD;
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {

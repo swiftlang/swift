@@ -974,6 +974,12 @@ static bool performCompile(CompilerInstance &Instance,
       break;
 
     const auto &silOpts = Invocation.getSILOptions();
+
+    // -sil-serialize-all is problematic and not what we intend to do long term,
+    // so we don't try to get the public symbols to line up.
+    if (silOpts.SILSerializeAll)
+      break;
+
     auto hasMultipleIRGenThreads = silOpts.NumThreads > 1;
     bool error;
     if (PrimarySourceFile)
