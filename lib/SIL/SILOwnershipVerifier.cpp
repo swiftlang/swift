@@ -449,7 +449,7 @@ CONSTANT_OWNERSHIP_INST(Owned, true, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, StrongUnpin)
 CONSTANT_OWNERSHIP_INST(Owned, true, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, InitExistentialRef)
-CONSTANT_OWNERSHIP_INST(Owned, true, OpenExistentialOpaque)
+CONSTANT_OWNERSHIP_INST(Owned, true, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Trivial, false, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, false, BeginAccess)
@@ -527,8 +527,8 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, DeallocValueBuffer)
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastValueBranch)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialOpaque)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, DeinitExistentialOpaque)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialValue)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, DeinitExistentialValue)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
@@ -585,6 +585,7 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, BridgeObjectToWord)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBoxValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefTailAddr)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToRawPointer)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToUnmanaged)

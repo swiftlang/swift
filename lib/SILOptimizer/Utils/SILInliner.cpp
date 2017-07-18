@@ -370,7 +370,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DeallocStackInst:
     case ValueKind::DeallocValueBufferInst:
     case ValueKind::DeinitExistentialAddrInst:
-    case ValueKind::DeinitExistentialOpaqueInst:
+    case ValueKind::DeinitExistentialValueInst:
     case ValueKind::DestroyAddrInst:
     case ValueKind::ProjectValueBufferInst:
     case ValueKind::ProjectBoxInst:
@@ -389,7 +389,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::IndexRawPointerInst:
     case ValueKind::InitEnumDataAddrInst:
     case ValueKind::InitExistentialAddrInst:
-    case ValueKind::InitExistentialOpaqueInst:
+    case ValueKind::InitExistentialValueInst:
     case ValueKind::InitExistentialMetatypeInst:
     case ValueKind::InitExistentialRefInst:
     case ValueKind::InjectEnumAddrInst:
@@ -400,9 +400,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialAddrInst:
     case ValueKind::OpenExistentialBoxInst:
+    case ValueKind::OpenExistentialBoxValueInst:
     case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::OpenExistentialRefInst:
-    case ValueKind::OpenExistentialOpaqueInst:
+    case ValueKind::OpenExistentialValueInst:
     case ValueKind::PartialApplyInst:
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::RefElementAddrInst:

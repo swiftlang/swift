@@ -233,10 +233,10 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Protocol and Protocol Composition Types
   INST(InitExistentialAddrInst, SILInstruction, init_existential_addr, MayWrite, DoesNotRelease)
-  INST(InitExistentialOpaqueInst, SILInstruction, init_existential_opaque, MayWrite, DoesNotRelease)
+  INST(InitExistentialValueInst, SILInstruction, init_existential_value, MayWrite, DoesNotRelease)
   INST(DeinitExistentialAddrInst, SILInstruction, deinit_existential_addr, MayHaveSideEffects,
        DoesNotRelease)
-  INST(DeinitExistentialOpaqueInst, SILInstruction, deinit_existential_opaque, MayHaveSideEffects,
+  INST(DeinitExistentialValueInst, SILInstruction, deinit_existential_value, MayHaveSideEffects,
        DoesNotRelease)
   INST(OpenExistentialAddrInst, SILInstruction, open_existential_addr, MayRead, DoesNotRelease)
   INST(InitExistentialRefInst, SILInstruction, init_existential_ref, None, DoesNotRelease)
@@ -244,7 +244,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(InitExistentialMetatypeInst, SILInstruction, init_existential_metatype, None, DoesNotRelease)
   INST(OpenExistentialMetatypeInst, SILInstruction, open_existential_metatype, None, DoesNotRelease)
   INST(OpenExistentialBoxInst, SILInstruction, open_existential_box, MayRead, DoesNotRelease)
-  INST(OpenExistentialOpaqueInst, SILInstruction, open_existential_opaque, MayRead, DoesNotRelease)
+  INST(OpenExistentialValueInst, SILInstruction, open_existential_value, MayRead, DoesNotRelease)
+  INST(OpenExistentialBoxValueInst, SILInstruction, open_existential_box_value, MayRead, DoesNotRelease)
 
   // Blocks
   INST(ProjectBlockStorageInst, SILInstruction, project_block_storage, None, DoesNotRelease)

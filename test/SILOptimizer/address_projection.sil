@@ -435,7 +435,7 @@ sil @f101_passAny : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $T):
   %2 = function_ref @f100_any : $@convention(thin) (@in Any) -> ()
   %3 = copy_value %0 : $T
-  %4 = init_existential_opaque %3 : $T, $T, $Any
+  %4 = init_existential_value %3 : $T, $T, $Any
   %5 = apply %2(%4) : $@convention(thin) (@in Any) -> ()
   destroy_value %0 : $T
   %7 = tuple ()
