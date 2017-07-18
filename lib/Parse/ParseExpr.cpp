@@ -2067,7 +2067,9 @@ Expr *Parser::parseExprIdentifier() {
     auto refKind = DeclRefKind::Ordinary;
     E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
   } else if (auto TD = dyn_cast<TypeDecl>(D)) {
-    E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*implicit*/false);
+    assert(!TD->getDeclContext()->isTypeContext());
+    E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*DC*/nullptr,
+                                /*implicit*/false);
   } else {
     E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
   }

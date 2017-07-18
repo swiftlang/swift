@@ -162,7 +162,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
       components.push_back(
         new (C) SimpleIdentTypeRepr(dre->getLoc(), td->getName()));
-      components.back()->setValue(td);
+      components.back()->setValue(td, nullptr);
       return true;
     }
     return false;

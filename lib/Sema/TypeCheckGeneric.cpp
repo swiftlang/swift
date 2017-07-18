@@ -177,12 +177,12 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 
     // Correct to the single type result.
     ref->overwriteIdentifier(singleType->getBaseName().getIdentifier());
-    ref->setValue(singleType);
+    ref->setValue(singleType, nullptr);
   } else if (auto assocType = nestedPA->getResolvedAssociatedType()) {
-    ref->setValue(assocType);
+    ref->setValue(assocType, nullptr);
   } else {
     assert(nestedPA->getConcreteTypeDecl());
-    ref->setValue(nestedPA->getConcreteTypeDecl());
+    ref->setValue(nestedPA->getConcreteTypeDecl(), nullptr);
   }
 
   // If the nested type has been resolved to an associated type, use it.

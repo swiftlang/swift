@@ -510,6 +510,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
 
     return TypeExpr::createForDecl(Loc, D,
+                                   Lookup[0].getDeclContext(),
                                    UDRE->isImplicit());
   }
 
@@ -589,6 +590,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   ResultValues.clear();
   bool AllMemberRefs = true;
   ValueDecl *Base = nullptr;
+  DeclContext *BaseDC = nullptr;
   for (auto Result : Lookup) {
     // Track the base for member declarations.
     if (Result.getBaseDecl() &&
@@ -600,6 +602,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       }
 
       Base = Result.getBaseDecl();
+      BaseDC = Result.getDeclContext();
       continue;
     }
 
@@ -612,9 +615,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     if (auto PD = dyn_cast<ProtocolDecl>(Base)) {
       BaseExpr = TypeExpr::createForDecl(Loc,
                                          PD->getGenericParams()->getParams().front(),
+                                         /*DC*/nullptr,
                                          /*isImplicit=*/true);
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*isImplicit=*/true);
+      BaseExpr = TypeExpr::createForDecl(Loc, NTD, BaseDC, /*isImplicit=*/true);
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
                                            /*Implicit=*/true);

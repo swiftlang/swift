@@ -806,7 +806,7 @@ namespace {
       auto Comp = T->getComponentRange().front();
       if (auto Entry = P.lookupInScope(Comp->getIdentifier()))
         if (auto *TD = dyn_cast<TypeDecl>(Entry)) {
-          Comp->setValue(TD);
+          Comp->setValue(TD, nullptr);
           return false;
         }
       return true;

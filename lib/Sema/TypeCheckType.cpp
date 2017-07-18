@@ -407,6 +407,7 @@ findDeclContextForType(TypeChecker &TC,
 
 Type TypeChecker::resolveTypeInContext(
        TypeDecl *typeDecl,
+       DeclContext *foundDC,
        DeclContext *fromDC,
        TypeResolutionOptions options,
        bool isSpecialized,
@@ -753,12 +754,13 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
 
 /// \brief Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
-                            DeclContext *dc,
+                            DeclContext *foundDC,
+                            DeclContext *fromDC,
                             GenericIdentTypeRepr *generic,
                             TypeResolutionOptions options,
                             GenericTypeResolver *resolver,
                             UnsatisfiedDependency *unsatisfiedDependency) {
-  assert(dc && "No declaration context for type resolution?");
+  assert(fromDC && "No declaration context for type resolution?");
 
   // If we have a callback to report dependencies, do so.
   if (unsatisfiedDependency) {
@@ -781,7 +783,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
   Type type =
-      TC.resolveTypeInContext(typeDecl, dc, options, generic, resolver);
+    TC.resolveTypeInContext(typeDecl, foundDC, fromDC, options,
+                            generic, resolver);
 
   if (type->is<UnboundGenericType>() && !generic &&
       !options.contains(TR_AllowUnboundGenerics) &&
@@ -793,7 +796,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (generic && !options.contains(TR_ResolveStructure)) {
     // Apply the generic arguments to the type.
-    type = TC.applyGenericArguments(type, typeDecl, loc, dc, generic,
+    type = TC.applyGenericArguments(type, typeDecl, loc, fromDC, generic,
                                     options, resolver, unsatisfiedDependency);
     if (!type)
       return nullptr;
@@ -875,7 +878,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
         tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
           .fixItReplace(comp->getIdLoc(), name);
         comp->overwriteIdentifier(nominal->getName());
-        comp->setValue(nominal);
+        comp->setValue(nominal, nominalDC->getParent());
         return type;
       } else {
         // Attempt to refer to 'Self' from a free function.
@@ -1060,7 +1063,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
     if (matchingParam == genericParams->end())
       return Type();
 
-    comp->setValue(*matchingParam);
+    comp->setValue(*matchingParam, nullptr);
     return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
                                              diagnoseErrors, resolver,
                                              unsatisfiedDependency);
@@ -1079,7 +1082,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
                    });
 
     if (matchingParam != outerParams->end()) {
-      comp->setValue(*matchingParam);
+      comp->setValue(*matchingParam, nullptr);
       return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
                                                diagnoseErrors, resolver,
                                                unsatisfiedDependency);
@@ -1111,7 +1114,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-          comp->setValue(assocType);
+          comp->setValue(assocType, DC);
           return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
                                                    diagnoseErrors, resolver,
                                                    unsatisfiedDependency);
@@ -1142,7 +1145,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // that now.
   if (auto *typeDecl = comp->getBoundDecl()) {
     // Resolve the type declaration within this context.
-    return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
+    return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
+                           comp->getDeclContext(), DC,
                            dyn_cast<GenericIdentTypeRepr>(comp), options,
                            resolver, unsatisfiedDependency);
   }
@@ -1201,8 +1205,10 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // Process the names we found.
   Type current;
   TypeDecl *currentDecl = nullptr;
+  DeclContext *currentDC = nullptr;
   bool isAmbiguous = false;
   for (const auto entry : globals) {
+    auto *foundDC = entry.getDeclContext();
     auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
 
     // If necessary, add delayed members to the declaration.
@@ -1210,7 +1216,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       TC.forceExternalDeclMembers(nomDecl);
     }
 
-    Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
+    Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
+                                foundDC, DC,
                                 dyn_cast<GenericIdentTypeRepr>(comp), options,
                                 resolver, unsatisfiedDependency);
 
@@ -1224,6 +1231,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (current.isNull()) {
       current = type;
       currentDecl = typeDecl;
+      currentDC = foundDC;
       continue;
     }
 
@@ -1264,7 +1272,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                lookupOptions, resolver, unsatisfiedDependency);
   }
 
-  comp->setValue(currentDecl);
+  comp->setValue(currentDecl, currentDC);
   return current;
 }
 
@@ -1465,7 +1473,7 @@ static Type resolveNestedIdentTypeComponent(
   } else {
     memberType = memberTypes.back().second;
     member = memberTypes.back().first;
-    comp->setValue(member);
+    comp->setValue(member, nullptr);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType);

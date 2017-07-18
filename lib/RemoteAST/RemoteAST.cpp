@@ -159,7 +159,8 @@ public:
     TypeReprList genericArgReprs(args);
     GenericIdentTypeRepr genericRepr(SourceLoc(), decl->getName(),
                                      genericArgReprs.getList(), SourceRange());
-    genericRepr.setValue(decl);
+    // FIXME
+    genericRepr.setValue(decl, nullptr);
 
     Type genericType;
 
@@ -182,7 +183,8 @@ public:
           : GenericArgs(type->getGenericArgs()),
             Ident(SourceLoc(), type->getDecl()->getName(),
                   GenericArgs.getList(), SourceRange()) {
-          Ident.setValue(type->getDecl());
+          // FIXME
+          Ident.setValue(type->getDecl(), nullptr);
         }
 
         // SmallVector::emplace_back will never need to call this because
@@ -212,7 +214,8 @@ public:
           auto nominal = p->castTo<NominalType>();
           simpleComponents.emplace_back(SourceLoc(),
                                         nominal->getDecl()->getName());
-          simpleComponents.back().setValue(nominal->getDecl());
+          // FIXME
+          simpleComponents.back().setValue(nominal->getDecl(), nullptr);
           componentReprs.push_back(&simpleComponents.back());
         }
       }

@@ -859,7 +859,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TC.resolveTypeInContext(typeDecl, DC,
+    auto type = TC.resolveTypeInContext(typeDecl, nullptr, DC,
                                         TR_InExpression,
                                         /*isSpecialized=*/false);
 

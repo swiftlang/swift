@@ -1955,11 +1955,12 @@ Type TypeExpr::getInstanceType(
 
 
 TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
+                                  DeclContext *DC,
                                   bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid() || isImplicit);
   auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
-  Repr->setValue(Decl);
+  Repr->setValue(Decl, DC);
   auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
   if (isImplicit)
     result->setImplicit();
@@ -1980,13 +1981,13 @@ TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
   // The first component is the parent type.
   auto *ParentComp = new (C) SimpleIdentTypeRepr(ParentNameLoc,
                                                  Parent->getName());
-  ParentComp->setValue(Parent);
+  ParentComp->setValue(Parent, nullptr);
   Components.push_back(ParentComp);
 
   // The second component is the member we just found.
   auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc,
                                               Decl->getName());
-  NewComp->setValue(Decl);
+  NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
   auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
@@ -2003,9 +2004,11 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
   for (auto *Component : ParentTR->getComponentRange())
     Components.push_back(Component);
 
+  assert(!Components.empty());
+
   // Add a new component for the member we just found.
   auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->getName());
-  NewComp->setValue(Decl);
+  NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
   auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
@@ -2054,7 +2057,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
     auto *genericComp = new (C) GenericIdentTypeRepr(
       last->getIdLoc(), last->getIdentifier(),
       Args, AngleLocs);
-    genericComp->setValue(last->getBoundDecl());
+    genericComp->setValue(last->getBoundDecl(), last->getDeclContext());
     components.push_back(genericComp);
 
     auto *genericRepr = IdentTypeRepr::create(C, components);
