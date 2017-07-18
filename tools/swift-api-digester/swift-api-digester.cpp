@@ -2643,6 +2643,7 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   void visitDecl(SDKNodeDecl *D);
   void visit(NodePtr Node) override;
   SDKNodeDecl *findAddedDecl(const SDKNodeDecl *Node);
+  bool findTypeAliasDecl(const SDKNodeDecl *Node);
   static StringRef printName(StringRef Name);
   static StringRef printDiagKeyword(StringRef Name);
   static void collectAddedDecls(NodePtr Root, std::set<SDKNodeDecl*> &Results);
@@ -2766,6 +2767,16 @@ SDKNodeDecl *DiagnosisEmitter::findAddedDecl(const SDKNodeDecl *Root) {
   return nullptr;
 }
 
+bool DiagnosisEmitter::findTypeAliasDecl(const SDKNodeDecl *Node) {
+  if (Node->getKind() != SDKNodeKind::TypeDecl)
+    return false;
+  return std::any_of(AddedDecls.begin(), AddedDecls.end(),
+      [&](SDKNodeDecl *Added) {
+    return Added->getKind() == SDKNodeKind::TypeAlias &&
+           Added->getPrintedName() == Node->getPrintedName();
+  });
+}
+
 StringRef DiagnosisEmitter::printName(StringRef Name) {
   OSColor Color(llvm::outs(), llvm::raw_ostream::CYAN);
   Color << Name;
@@ -2861,6 +2872,10 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   auto &Ctx = Node->getSDKContext();
   switch(Anno) {
   case NodeAnnotation::Removed: {
+    // If we can find a type alias decl with the same name of this type, we
+    // consider the type is not removed.
+    if (findTypeAliasDecl(Node))
+      return;
     if (auto *Added = findAddedDecl(Node)) {
       if (Node->getDeclKind() != DeclKind::Constructor) {
         MovedDecls.Diags.emplace_back(Node->getDeclKind(),
