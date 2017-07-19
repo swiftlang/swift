@@ -1022,20 +1022,21 @@ func s480_________getError(someError: Error) -> Any {
 // CHECK-LABEL: sil private @_T020opaque_values_silgen21s490_______loadBorrowyyF3FooL_V3foo7ElementQzSg5IndexQz3pos_tF : $@convention(method) <Elements where Elements : Collection> (@in Elements.Index, @inout Foo<Elements>) -> @out Optional<Elements.Element> {
 // CHECK: bb0(%0 : $Elements.Index, %1 : $*Foo<Elements>):
 // CHECK: [[READ:%.*]] = begin_access [read] [unknown] %1 : $*Foo<Elements>
-// CHECK: [[LOAD:%.*]] = load_borrow [[READ]] : $*Foo<Elements>
+// CHECK: [[LOAD:%.*]] = load [copy] [[READ]] : $*Foo<Elements>
 // CHECK: end_access [[READ]] : $*Foo<Elements>
-// CHECK: [[EXTRACT:%.*]] = struct_extract [[LOAD]] : $Foo<Elements>, #<abstract function>Foo._elements
+// CHECK: [[BORROW_LOAD:%.*]] = begin_borrow [[LOAD]]
+// CHECK: [[EXTRACT:%.*]] = struct_extract [[BORROW_LOAD]] : $Foo<Elements>, #<abstract function>Foo._elements
 // CHECK: [[COPYELT:%.*]] = copy_value [[EXTRACT]] : $Elements
 // CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Elements.Index
 // CHECK: [[COPYIDX:%.*]] = copy_value [[BORROW]] : $Elements.Index
 // CHECK: [[WT:%.*]] = witness_method $Elements, #Collection.subscript!getter.1 : <Self where Self : Collection> (Self) -> (Self.Index) -> Self.Element : $@convention(witness_method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0.Index, @in_guaranteed τ_0_0) -> @out τ_0_0.Element
 // CHECK: %{{.*}} = apply [[WT]]<Elements>([[COPYIDX]], [[COPYELT]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0.Index, @in_guaranteed τ_0_0) -> @out τ_0_0.Element
 // CHECK: destroy_value [[COPYELT]] : $Elements
-// CHECK: [[ENUM:%.*]] = enum $Optional<Elements.Element>, #Optional.some!enumelt.1, %12 : $Elements.Element
+// CHECK: [[ENUM:%.*]] = enum $Optional<Elements.Element>, #Optional.some!enumelt.1, %13 : $Elements.Element
 // CHECK: end_borrow [[BORROW]] from %0 : $Elements.Index, $Elements.Index
-// CHECK: end_borrow [[LOAD]] from [[READ]] : $Foo<Elements>, $*Foo<Elements>
+// CHECK: destroy_value [[LOAD]]
 // CHECK: destroy_value %0 : $Elements.Index
-// CHECK: return %14 : $Optional<Elements.Element>
+// CHECK: return %15 : $Optional<Elements.Element>
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s490_______loadBorrowyyF3FooL_V3foo7ElementQzSg5IndexQz3pos_tF'
 
 func s490_______loadBorrow() {
