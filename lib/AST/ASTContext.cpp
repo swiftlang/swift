@@ -3225,7 +3225,7 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
                                    bool canonicalVararg) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {
-    Type eltType = param.getRawType();
+    Type eltType = param.getPlainType();
     if (param.isVariadic()) {
       if (canonicalVararg)
         eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});

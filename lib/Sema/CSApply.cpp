@@ -5441,10 +5441,10 @@ Expr *ExprRewriter::coerceCallArguments(
     auto paramType = param.getType();
     if (argType->isEqual(paramType)) {
       toSugarFields.push_back(
-          TupleTypeElt(param.getRawType(), getArgLabel(argIdx),
+          TupleTypeElt(param.getPlainType(), getArgLabel(argIdx),
                        param.getParameterFlags()));
       fromTupleExprFields[argIdx] =
-          TupleTypeElt(param.getRawType(), getArgLabel(argIdx),
+          TupleTypeElt(param.getPlainType(), getArgLabel(argIdx),
                        param.getParameterFlags());
       fromTupleExpr[argIdx] = arg;
       continue;
@@ -6327,7 +6327,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
       if (auto *fd = dyn_cast<FuncDecl>(func))
         if (!fd->isMutating() && baseObjectTy->is<ArchetypeType>())
           return baseObjectTy;
-
+      
       return InOutType::get(baseObjectTy);
     }
 

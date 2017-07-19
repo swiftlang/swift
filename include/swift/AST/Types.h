@@ -2335,7 +2335,9 @@ public:
       return CanType(getType());
     }
     
-    Type getRawType() const { return Ty; }
+    /// FIXME(Remove InOutType): This is mostly for copying between param
+    /// types and should go away.
+    Type getPlainType() const { return Ty; }
     
     Identifier getLabel() const { return Label; }
     

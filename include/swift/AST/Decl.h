@@ -4466,7 +4466,15 @@ public:
     VarDeclBits.Specifier = static_cast<unsigned>(Spec);
   }
   
-  bool isInOut() const { return getSpecifier() == Specifier::InOut; }
+  /// Is the type of this parameter 'inout'?
+  ///
+  /// FIXME(Remove InOut): This is only valid on ParamDecls but multiple parts
+  /// of the compiler check ParamDecls and VarDecls along the same paths.
+  bool isInOut() const {
+    // FIXME: Re-enable this assertion and fix callers.
+//    assert((getKind() == DeclKind::Param) && "querying 'inout' on var decl?");
+    return getSpecifier() == Specifier::InOut;
+  }
   
   
   /// Is this a type ('static') variable?

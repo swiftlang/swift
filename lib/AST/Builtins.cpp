@@ -496,15 +496,22 @@ namespace {
     }
 
     template <class G>
-    void addParameter(const G &generator, bool isInOut = false) {
+    void addParameter(const G &generator) {
       Type gTyIface = generator.build(*this, false);
-      assert(isInOut || !gTyIface->is<InOutType>());
-      auto iFaceflags = ParameterTypeFlags().withInOut(isInOut);
+      InterfaceParams.push_back({gTyIface->getInOutObjectType(),
+                                 Identifier(), ParameterTypeFlags()});
+      BodyParams.push_back(generator.build(*this, true));
+    }
+
+    template <class G>
+    void addInOutParameter(const G &generator) {
+      Type gTyIface = generator.build(*this, false);
+      auto iFaceflags = ParameterTypeFlags().withInOut(true);
       InterfaceParams.push_back(TupleTypeElt(gTyIface->getInOutObjectType(),
                                              Identifier(), iFaceflags));
       BodyParams.push_back(generator.build(*this, true));
     }
-
+    
     template <class G>
     void setResult(const G &generator) {
       InterfaceResult = generator.build(*this, false);
@@ -663,7 +670,7 @@ static ValueDecl *getIsUniqueOperation(ASTContext &Context, Identifier Id) {
   Type Int1Ty = BuiltinIntegerType::get(1, Context);
 
   BuiltinGenericSignatureBuilder builder(Context);
-  builder.addParameter(makeGenericParam(), /*isInOut*/true);
+  builder.addInOutParameter(makeGenericParam());
   builder.setResult(makeConcrete(Int1Ty));
   return builder.build(Id);
 }
@@ -932,7 +939,7 @@ static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   BuiltinGenericSignatureBuilder builder(Context);
-  builder.addParameter(makeGenericParam(), /*isInOut*/true);
+  builder.addInOutParameter(makeGenericParam());
   builder.setResult(makeConcrete(Context.TheRawPointerType));
   return builder.build(Id);
 }

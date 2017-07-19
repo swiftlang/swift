@@ -201,7 +201,6 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
                             storageType,
                             storageInterfaceType,
                             VarDecl::Specifier::Owned);
-
   params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
