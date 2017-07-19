@@ -3034,29 +3034,37 @@ ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 /// their type variables, and we don't want pointers into the original AST to
 /// dereference these now-dangling types.
 class ExprCleaner {
-  llvm::SmallDenseMap<Expr *, Type> Exprs;
-  llvm::SmallDenseMap<TypeLoc *, Type> TypeLocs;
-  llvm::SmallDenseMap<Pattern *, Type> Patterns;
+  llvm::SmallVector<Expr*,4> Exprs;
+  llvm::SmallVector<TypeLoc*, 4> TypeLocs;
+  llvm::SmallVector<Pattern*, 4> Patterns;
+  llvm::SmallVector<VarDecl*, 4> Vars;
 public:
 
   ExprCleaner(Expr *E) {
-    struct ExprCleanserImpl : public ASTWalker {
+    struct ExprCleanerImpl : public ASTWalker {
       ExprCleaner *TS;
-      ExprCleanserImpl(ExprCleaner *TS) : TS(TS) {}
+      ExprCleanerImpl(ExprCleaner *TS) : TS(TS) {}
 
       std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-        TS->Exprs.insert({ expr, expr->getType() });
+        TS->Exprs.push_back(expr);
         return { true, expr };
       }
 
       bool walkToTypeLocPre(TypeLoc &TL) override {
-        TS->TypeLocs.insert({ &TL, TL.getType() });
+        TS->TypeLocs.push_back(&TL);
         return true;
       }
 
       std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-        TS->Patterns.insert({ P, P->hasType() ? P->getType() : Type() });
+        TS->Patterns.push_back(P);
         return { true, P };
+      }
+
+      bool walkToDeclPre(Decl *D) override {
+        if (auto VD = dyn_cast<VarDecl>(D))
+          TS->Vars.push_back(VD);
+
+        return true;
       }
 
       // Don't walk into statements.  This handles the BraceStmt in
@@ -3066,22 +3074,33 @@ public:
       }
     };
 
-    E->walk(ExprCleanserImpl(this));
+    E->walk(ExprCleanerImpl(this));
   }
 
   ~ExprCleaner() {
     // Check each of the expression nodes to verify that there are no type
     // variables hanging out.  If so, just nuke the type.
     for (auto E : Exprs) {
-      E.getFirst()->setType(E.getSecond());
+      if (E->getType() && E->getType()->hasTypeVariable())
+        E->setType(Type());
     }
 
     for (auto TL : TypeLocs) {
-      TL.getFirst()->setType(TL.getSecond(), false);
+      if (TL->getTypeRepr() && TL->getType() &&
+          TL->getType()->hasTypeVariable())
+        TL->setType(Type(), false);
     }
 
     for (auto P : Patterns) {
-      P.getFirst()->setType(P.getSecond());
+      if (P->hasType() && P->getType()->hasTypeVariable())
+        P->setType(Type());
+    }
+
+    for (auto VD : Vars) {
+      if (VD->hasType() && VD->getType()->hasTypeVariable()) {
+        VD->setType(Type());
+        VD->setInterfaceType(Type());
+      }
     }
   }
 };
