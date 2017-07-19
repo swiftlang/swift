@@ -4635,14 +4635,27 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
   // If argument wasn't properly type-checked, let's retry without changing AST.
   if (!argType || argType->hasUnresolvedType() || argType->hasTypeVariable() ||
       argType->hasTypeParameter()) {
-    // Let's type check argument expression without any contextual information.
-    ConcreteDeclRef ref = nullptr;
-    auto typeResult =
-        TC.getTypeOfExpressionWithoutApplying(argExpr, CS.DC, ref);
-    if (!typeResult.hasValue())
+    auto *argTuple = dyn_cast<TupleExpr>(argExpr);
+    if (!argTuple) {
+      // Bail out if we don't have a well-formed argument list.
       return false;
+    }
+    
+    // Let's type check individual argument expressions without any
+    // contextual information to try to recover an argument type that
+    // matches what the user actually wrote instead of what the typechecker
+    // expects.
+    SmallVector<TupleTypeElt, 4> elts;
+    for (auto *el : argTuple->getElements()) {
+      ConcreteDeclRef ref = nullptr;
+      auto typeResult =
+        TC.getTypeOfExpressionWithoutApplying(el, CS.DC, ref);
+      if (!typeResult.hasValue())
+        return false;
+      elts.push_back(typeResult.getValue());
+    }
 
-    argType = typeResult.getValue();
+    argType = TupleType::get(elts, CS.getASTContext());
   }
 
   auto typeKind = argType->getKind();
@@ -8758,6 +8771,10 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     // `Pair<Any, Any>`.
     // Right now we only handle this when the type that's at fault is the
     // top-level type passed to this function.
+    if (loc.getType().isNull()) {
+      return;
+    }
+    
     ArrayRef<Type> genericArgs;
     if (auto *boundGenericTy = loc.getType()->getAs<BoundGenericType>()) {
       if (boundGenericTy->getDecl() == FoundDecl)
