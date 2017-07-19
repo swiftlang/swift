@@ -501,6 +501,7 @@ enum class CompletionKind {
   AssignmentRHS,
   CallArg,
   ReturnStmtExpr,
+  ForEachSequence,
   AfterPound,
   GenericParams,
   SwiftKeyPath,

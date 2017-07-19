@@ -593,6 +593,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
           CCInfo.Contexts |= CustomCompletionInfo::Stmt;
         } else if (context == KindType) {
           CCInfo.Contexts |= CustomCompletionInfo::Type;
+        } else if (context == KindForEachSequence) {
+          CCInfo.Contexts |= CustomCompletionInfo::ForEachSequence;
         } else {
           err = createErrorRequestInvalid("invalid value for 'key.context'");
           return true;
