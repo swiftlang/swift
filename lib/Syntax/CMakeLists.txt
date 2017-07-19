@@ -4,7 +4,6 @@ add_swift_library(swiftSyntax STATIC
   Format.cpp
   RawTokenSyntax.cpp
   GenericSyntax.cpp
-  LegacyASTTransformer.cpp
   Trivia.cpp
   RawSyntax.cpp
   StmtSyntax.cpp

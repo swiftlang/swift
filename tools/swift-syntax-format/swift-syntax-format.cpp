@@ -19,10 +19,10 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/LegacyASTTransformer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Syntax/Format.h"
-#include "swift/Syntax/LegacyASTTransformer.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -69,12 +69,12 @@ int doFormat(ArrayRef<StringRef> InputFiles) {
 
     SmallVector<Decl *, 256> FileDecls;
     SF.getTopLevelDecls(FileDecls);
-    sema::Semantics Sema;
+    SyntaxASTMap ASTMap;
     for (auto *Decl : FileDecls) {
       if (Decl->escapedFromIfConfig()) {
         continue;
       }
-      auto NewNode = transformAST(ASTNode(Decl), Sema, SourceMgr,
+      auto NewNode = transformAST(ASTNode(Decl), ASTMap, SourceMgr,
                                   BufferID, Tokens);
       if (NewNode.hasValue()) {
         auto Reformatted = format(NewNode.getValue());

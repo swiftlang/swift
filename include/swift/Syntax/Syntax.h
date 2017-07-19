@@ -32,9 +32,9 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
-namespace sema {
-  class Semantics;
-}
+
+class SyntaxASTMap;
+
 namespace syntax {
 
 template <typename SyntaxNode>
@@ -55,7 +55,7 @@ const auto NoParent = llvm::None;
 class Syntax {
   friend struct SyntaxFactory;
   friend class LegacyASTTransformer;
-  friend class sema::Semantics;
+  friend class swift::SyntaxASTMap;
 
 #define SYNTAX(Id, Parent) friend class Id##Syntax;
 #include "swift/Syntax/SyntaxKinds.def"

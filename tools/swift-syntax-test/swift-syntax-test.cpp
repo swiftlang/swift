@@ -26,7 +26,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
-#include "swift/Syntax/LegacyASTTransformer.h"
+#include "swift/AST/LegacyASTTransformer.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "llvm/Support/CommandLine.h"
@@ -151,14 +151,14 @@ int getSyntaxTree(const char *MainExecutablePath,
 
   SmallVector<Decl *, 256> FileDecls;
   SF->getTopLevelDecls(FileDecls);
-  sema::Semantics Sema;
+  SyntaxASTMap ASTMap;
   // Convert the old ASTs to the new full-fidelity syntax tree and print
   // them out.
   for (auto *Decl : FileDecls) {
     if (Decl->escapedFromIfConfig()) {
       continue;
     }
-    auto NewNode = transformAST(ASTNode(Decl), Sema, SourceMgr,
+    auto NewNode = transformAST(ASTNode(Decl), ASTMap, SourceMgr,
                                 BufferID, Tokens);
     if (NewNode.hasValue()) {
       TopLevelDecls.push_back(NewNode.getValue());
