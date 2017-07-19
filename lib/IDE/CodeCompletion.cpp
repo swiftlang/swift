@@ -1574,6 +1574,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   OwnedResolver TypeResolver;
   const DeclContext *CurrDeclContext;
   ClangImporter *Importer;
+  CodeCompletionContext *CompletionContext;
 
   enum class LookupKind {
     ValueExpr,
@@ -1719,11 +1720,13 @@ public:
 public:
   CompletionLookup(CodeCompletionResultSink &Sink,
                    ASTContext &Ctx,
-                   const DeclContext *CurrDeclContext)
+                   const DeclContext *CurrDeclContext,
+                   CodeCompletionContext *CompletionContext = nullptr)
       : Sink(Sink), Ctx(Ctx),
         TypeResolver(createLazyResolver(Ctx)), CurrDeclContext(CurrDeclContext),
         Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
-          getClangModuleLoader())) {
+          getClangModuleLoader())),
+        CompletionContext(CompletionContext) {
 
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
@@ -3650,6 +3653,19 @@ public:
       }
     }
 
+    if (CompletionContext) {
+      // FIXME: this is an awful simplification that says all and only enums can
+      // use implicit member syntax (leading dot). Computing the accurate answer
+      // using lookup (e.g. getUnresolvedMemberCompletions) is too expensive,
+      // and for some clients this approximation is good enough.
+      CompletionContext->MayUseImplicitMemberExpr =
+          std::any_of(ExpectedTypes.begin(), ExpectedTypes.end(), [](Type T) {
+            if (auto *NTD = T->getAnyNominal())
+              return isa<EnumDecl>(NTD);
+            return false;
+          });
+    }
+
     if (LiteralCompletions)
       addValueLiteralCompletions();
 
@@ -5106,7 +5122,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     return;
 
   CompletionLookup Lookup(CompletionContext.getResultSink(), P.Context,
-                          CurDeclContext);
+                          CurDeclContext, &CompletionContext);
   if (ExprType) {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
