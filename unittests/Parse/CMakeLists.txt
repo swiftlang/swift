@@ -6,9 +6,10 @@ add_swift_unittest(SwiftParseTests
 
 target_link_libraries(SwiftParseTests
     swiftSIL
-    swiftSema
     swiftClangImporter
     swiftParse
     swiftAST
+    # FIXME: Sema must go last because of circular dependencies with AST.
+    swiftSema
 )
 
