@@ -4650,9 +4650,9 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
       ConcreteDeclRef ref = nullptr;
       auto typeResult =
         TC.getTypeOfExpressionWithoutApplying(el, CS.DC, ref);
-      if (!typeResult.hasValue())
+      if (!typeResult)
         return false;
-      elts.push_back(typeResult.getValue());
+      elts.push_back(typeResult);
     }
 
     argType = TupleType::get(elts, CS.getASTContext());
@@ -6387,12 +6387,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
              "unexpected declaration reference");
 
       ConcreteDeclRef decl = nullptr;
-      Optional<Type> type = CS.TC.getTypeOfExpressionWithoutApplying(
+      Type type = CS.TC.getTypeOfExpressionWithoutApplying(
           fnExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType,
           &listener);
 
-      if (type.hasValue())
-        fnType = getFuncType(type.getValue());
+      if (type)
+        fnType = getFuncType(type);
     } else {
       fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
                                            CTP_CalleeResult, TCC_ForceRecheck,
@@ -7336,7 +7336,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       auto type = CS.TC.getTypeOfExpressionWithoutApplying(
           closure, CS.DC, decl, FreeTypeVariableBinding::Disallow);
 
-      if (type && resultTypeProcessor(*type, expectedResultType))
+      if (type && resultTypeProcessor(type, expectedResultType))
         return true;
     }
 
@@ -7821,7 +7821,7 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
         &listener);
 
     if (derivedType) {
-      if (auto *BGT = (*derivedType)->getAs<BoundGenericClassType>()) {
+      if (auto *BGT = derivedType->getAs<BoundGenericClassType>()) {
         auto derivedValueType = BGT->getGenericArgs().back();
         if (!CS.TC.isConvertibleTo(valueType, derivedValueType, CS.DC)) {
           diagnose(KPE->getLoc(),
@@ -8982,7 +8982,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       auto type = CS.TC.getTypeOfExpressionWithoutApplying(
           resultExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType);
       if (type)
-        resultType = type.getValue();
+        resultType = type;
     }
     
     // If we found a type, presuppose it was the intended result and insert a
