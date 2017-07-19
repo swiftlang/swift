@@ -51,8 +51,7 @@ internal extension DecodingError {
         } else if value is [String : Any] {
             return "a dictionary"
         } else {
-            // This should never happen -- we somehow have a non-JSON type here.
-            preconditionFailure("Invalid storage type \(type(of: value)).")
+            return "\(type(of: value))"
         }
     }
 }
