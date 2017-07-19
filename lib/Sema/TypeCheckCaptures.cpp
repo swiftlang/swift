@@ -25,6 +25,29 @@
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
 
+static SourceLoc getCaptureLoc(AnyFunctionRef AFR) {
+  if (auto AFD = AFR.getAbstractFunctionDecl()) {
+    if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+      if (FD->isDeferBody()) {
+        // HACK: Defer statements generate implicit FuncDecls, and hence do
+        // not have valid source locations.  Instead, use the location of
+        // the body.
+        return FD->getBody()->getLBraceLoc();
+      }
+    }
+
+    return AFD->getLoc();
+  } else {
+    auto ACE = AFR.getAbstractClosureExpr();
+    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
+      if (!CE->getInLoc().isInvalid())
+        return CE->getInLoc();
+    }
+
+    return ACE->getLoc();
+  }
+}
+
 namespace {
 
 class FindCapturedVars : public ASTWalker {
@@ -50,27 +73,7 @@ public:
         DynamicSelfCaptureLoc(DynamicSelfCaptureLoc),
         DynamicSelf(DynamicSelf),
         AFR(AFR) {
-    if (auto AFD = AFR.getAbstractFunctionDecl()) {
-      if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-        if (FD->isDeferBody()) {
-          // HACK: Defer statements generate implicit FuncDecls, and hence do
-          // not have valid source locations.  Instead, use the location of
-          // the body.
-          CaptureLoc = FD->getBody()->getLBraceLoc();
-        } else {
-          CaptureLoc = AFD->getLoc();
-        }
-      } else {
-        CaptureLoc = AFD->getLoc();
-      }
-    } else {
-      auto ACE = AFR.getAbstractClosureExpr();
-      if (auto closure = dyn_cast<ClosureExpr>(ACE))
-        CaptureLoc = closure->getInLoc();
-
-      if (CaptureLoc.isInvalid())
-        CaptureLoc = ACE->getLoc();
-    }
+    CaptureLoc = getCaptureLoc(AFR);
   }
 
   /// \brief Check if the type of an expression references any generic
@@ -418,11 +421,11 @@ public:
 
     if (GenericParamCaptureLoc.isInvalid())
       if (captureInfo.hasGenericParamCaptures())
-        GenericParamCaptureLoc = innerClosure.getLoc();
+        GenericParamCaptureLoc = getCaptureLoc(innerClosure);
 
     if (DynamicSelfCaptureLoc.isInvalid())
       if (captureInfo.hasDynamicSelfCapture()) {
-        DynamicSelfCaptureLoc = innerClosure.getLoc();
+        DynamicSelfCaptureLoc = getCaptureLoc(innerClosure);
         DynamicSelf = captureInfo.getDynamicSelfType();
       }
   }
@@ -702,7 +705,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   }
 
   if (AFR.hasType() && !AFR.isObjC()) {
-    finder.checkType(AFR.getType(), AFR.getLoc());
+    finder.checkType(AFR.getType(), getCaptureLoc(AFR));
   }
 
   // If this is an init(), explicitly walk the initializer values for members of
