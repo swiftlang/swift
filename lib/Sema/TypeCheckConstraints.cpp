@@ -1830,7 +1830,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  CleanupIllFormedExpressionRAII cleanup(Context, expr);
+  ExprCleaner cleanup(expr);
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
@@ -1925,7 +1925,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   // If the previous checking gives the expr error type,
   // clear the result and re-check.
   {
-    CleanupIllFormedExpressionRAII cleanup(Context, expr);
+    ExprCleaner cleanup(expr);
 
     const Type originalType = expr->getType();
     if (originalType && originalType->hasError())
@@ -1948,7 +1948,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
 
   // Construct a constraint system from this expression.
   ConstraintSystem CS(*this, DC, ConstraintSystemFlags::AllowFixes);
-  CleanupIllFormedExpressionRAII cleanup(Context, expr);
+  ExprCleaner cleanup(expr);
 
   auto *SE = cast<SequenceExpr>(expr);
   assert(SE->getNumElements() >= 3);
