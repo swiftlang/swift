@@ -349,6 +349,10 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
       // destructors might be called.
       FInfo->FE.setWorstEffects();
       return;
+    case ValueKind::UnconditionalCheckedCastInst:
+      FInfo->FE.getEffectsOn(cast<UnconditionalCheckedCastInst>(I)->getOperand())->Reads = true;
+      FInfo->FE.Traps = true;
+      return;
     case ValueKind::LoadInst:
       FInfo->FE.getEffectsOn(cast<LoadInst>(I)->getOperand())->Reads = true;
       return;
