@@ -2619,7 +2619,7 @@ private:
   std::pair<PotentialBindings, TypeVariableType *> determineBestBindings();
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
-  bool
+  Optional<Score>
   tryTypeVariableBindings(unsigned depth, TypeVariableType *typeVar,
                           ArrayRef<ConstraintSystem::PotentialBinding> bindings,
                           SmallVectorImpl<Solution> &solutions,
@@ -2643,8 +2643,9 @@ private:
   /// the solution.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool solveSimplified(SmallVectorImpl<Solution> &solutions,
-                       FreeTypeVariableBinding allowFreeTypeVariables);
+  Optional<Score>
+  solveSimplified(SmallVectorImpl<Solution> &solutions,
+                  FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
   /// expression, this is achieved to solving individual sub-expressions
@@ -2706,8 +2707,8 @@ public:
   /// the solution.
   ///
   /// \returns true if there are no solutions
-  bool solveRec(SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables);
+  Optional<Score> solveRec(SmallVectorImpl<Solution> &solutions,
+                           FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Solve the system of constraints.
   ///
