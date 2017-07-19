@@ -364,6 +364,21 @@ func testLabeledSubscript() {
   let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error{{}}
 }
 
+func testInvalidKeyPathComponents() {
+  let _ = \.{return 0} // expected-error* {{}}
+}
+
+class X {
+  class var a: Int { return 1 }
+  static var b = 2
+}
+
+func testStaticKeyPathComponent() {
+  _ = \X.a // expected-error{{}}
+  _ = \X.Type.a // expected-error{{cannot refer to static member}}
+  _ = \X.b // expected-error{{}}
+  _ = \X.Type.b // expected-error{{cannot refer to static member}}
+}
 
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
