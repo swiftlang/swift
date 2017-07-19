@@ -1518,7 +1518,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   llvm::sys::path::remove_filename(AbsMainFile);
   MainModule = getOrCreateModule(IGM.getSwiftModule(), TheCU, Opts.ModuleName,
                                  AbsMainFile);
-  DBuilder.createImportedModule(MainFile, MainModule, 1);
+  DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the
   // command line. This does not include any macros defined by ClangImporter.
@@ -1549,7 +1549,8 @@ void IRGenDebugInfoImpl::finalize() {
                                            ModuleDecl::ImportFilter::All);
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.second))
-      DBuilder.createImportedModule(MainFile, getOrCreateModule(M), 0);
+      DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
+                                    0);
 
   // Finalize all replaceable forward declarations.
   for (auto &Ty : ReplaceMap) {
@@ -1720,7 +1721,8 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
   ModuleDecl::ImportedModule Imported = {D->getModulePath(), M};
   auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
-  DBuilder.createImportedModule(getOrCreateFile(L.Filename), DIMod, L.Line);
+  auto *File = getOrCreateFile(L.Filename);
+  DBuilder.createImportedModule(File, DIMod, File, L.Line);
   ImportedModules.insert(Imported.second);
 }
 
