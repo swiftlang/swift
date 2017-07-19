@@ -50,6 +50,35 @@ open class PropertyListEncoder {
     /// - throws: `EncodingError.invalidValue` if a non-comforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
     /// - throws: An error if any value throws an error during encoding.
     open func encode<Value : Encodable>(_ value: Value) throws -> Data {
+      let topLevel = try encodeToTopLevelContainer(value)
+      if topLevel is NSNumber {
+          throw EncodingError.invalidValue(value,
+                                           EncodingError.Context(codingPath: [],
+                                                                 debugDescription: "Top-level \(Value.self) encoded as number property list fragment."))
+      } else if topLevel is NSString {
+          throw EncodingError.invalidValue(value,
+                                           EncodingError.Context(codingPath: [],
+                                                                 debugDescription: "Top-level \(Value.self) encoded as string property list fragment."))
+      } else if topLevel is NSDate {
+          throw EncodingError.invalidValue(value,
+                                           EncodingError.Context(codingPath: [],
+                                                                 debugDescription: "Top-level \(Value.self) encoded as date property list fragment."))
+      }
+      
+      do {
+          return try PropertyListSerialization.data(fromPropertyList: topLevel, format: self.outputFormat, options: 0)
+      } catch {
+          throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value as a property list", underlyingError: error))
+      }
+    }
+
+    /// Encodes the given top-level value and returns its plist-type representation.
+    ///
+    /// - parameter value: The value to encode.
+    /// - returns: A new top-level array or dictionary representing the value.
+    /// - throws: `EncodingError.invalidValue` if a non-conforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
+    /// - throws: An error if any value throws an error during encoding.
+    internal func encodeToTopLevelContainer<Value : Encodable>(_ value: Value) throws -> Any {
         let encoder = _PlistEncoder(options: self.options)
         try value.encode(to: encoder)
 
@@ -60,25 +89,7 @@ open class PropertyListEncoder {
         }
 
         let topLevel = encoder.storage.popContainer()
-        if topLevel is NSNumber {
-            throw EncodingError.invalidValue(value,
-                                             EncodingError.Context(codingPath: [],
-                                                                   debugDescription: "Top-level \(Value.self) encoded as number property list fragment."))
-        } else if topLevel is NSString {
-            throw EncodingError.invalidValue(value,
-                                             EncodingError.Context(codingPath: [],
-                                                                   debugDescription: "Top-level \(Value.self) encoded as string property list fragment."))
-        } else if topLevel is NSDate {
-            throw EncodingError.invalidValue(value,
-                                             EncodingError.Context(codingPath: [],
-                                                                   debugDescription: "Top-level \(Value.self) encoded as date property list fragment."))
-        }
-
-        do {
-            return try PropertyListSerialization.data(fromPropertyList: topLevel, format: self.outputFormat, options: 0)
-        } catch {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value as a property list", underlyingError: error))
-        }
+        return topLevel
     }
 }
 
@@ -620,7 +631,19 @@ open class PropertyListDecoder {
         } catch {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "The given data was not a valid property list.", underlyingError: error))
         }
-        let decoder = _PlistDecoder(referencing: topLevel, options: self.options)
+
+        return try decode(T.self, fromTopLevel: topLevel)
+    }
+
+    /// Decodes a top-level value of the given type from the given property list container (top-level array or dictionary).
+    ///
+    /// - parameter type: The type of the value to decode.
+    /// - parameter container: The top-level plist container.
+    /// - returns: A value of the requested type.
+    /// - throws: `DecodingError.dataCorrupted` if values requested from the payload are corrupted, or if the given data is not a valid property list.
+    /// - throws: An error if any value throws an error during decoding.
+    internal func decode<T : Decodable>(_ type: T.Type, fromTopLevel container: Any) throws -> T {
+        let decoder = _PlistDecoder(referencing: container, options: self.options)
         return try T(from: decoder)
     }
 }
