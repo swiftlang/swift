@@ -141,6 +141,7 @@ class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
   std::vector<Completion *> sortedCompletions;
   CompletionKind completionKind;
   bool completionHasExpectedTypes;
+  bool completionMayUseImplicitMemberExpr;
   FilterRules filterRules;
   llvm::sys::Mutex mtx;
 
@@ -148,10 +149,12 @@ public:
   SessionCache(CompletionSink &&sink,
                std::unique_ptr<llvm::MemoryBuffer> &&buffer,
                std::vector<std::string> &&args, CompletionKind completionKind,
-               bool hasExpectedTypes, FilterRules filterRules)
+               bool hasExpectedTypes, bool mayUseImplicitMemberExpr,
+               FilterRules filterRules)
       : buffer(std::move(buffer)), args(std::move(args)), sink(std::move(sink)),
         completionKind(completionKind),
         completionHasExpectedTypes(hasExpectedTypes),
+        completionMayUseImplicitMemberExpr(mayUseImplicitMemberExpr),
         filterRules(std::move(filterRules)) {}
   void setSortedCompletions(std::vector<Completion *> &&completions);
   ArrayRef<Completion *> getSortedCompletions();
@@ -160,6 +163,7 @@ public:
   const FilterRules &getFilterRules();
   CompletionKind getCompletionKind();
   bool getCompletionHasExpectedTypes();
+  bool getCompletionMayUseImplicitMemberExpr();
 };
 typedef RefPtr<SessionCache> SessionCacheRef;
 
