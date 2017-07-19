@@ -283,6 +283,10 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(ObjCMetatypeToObjectInst, ConversionInst, objc_metatype_to_object, None, DoesNotRelease)
     INST(ObjCExistentialMetatypeToObjectInst, ConversionInst, objc_existential_metatype_to_object, None,
          DoesNotRelease)
+    // We have to use a MayRead here to block moving the ultimate release
+    // accross the cast (which reads the type metadata). With Semantic SIL we
+    // should be able to move this back to None - it should model the scoping
+    // and forbid the compiler from moving the ultimate retain.
     INST(UnconditionalCheckedCastValueInst, ConversionInst, unconditional_checked_cast_value, MayRead, DoesNotRelease)
     INST(UnconditionalCheckedCastInst, ConversionInst, unconditional_checked_cast, MayRead, DoesNotRelease)
     VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
