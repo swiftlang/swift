@@ -24,6 +24,7 @@
 #include "WeakReference.h"
 #include "llvm/Support/Compiler.h"
 #include <cassert>
+#include <cinttypes>
 #include <cstdio>
 #include <cstring>
 #include <new>
@@ -382,7 +383,7 @@ void swift_TupleMirror_subscript(String *outString,
   if (!hasLabel) {
     // The name is the stringized element number '.0'.
     char buf[32];
-    snprintf(buf, sizeof(buf), ".%zd", i);
+    snprintf(buf, sizeof(buf), ".%" PRIdPTR, i);
     new (outString) String(buf, strlen(buf));
   }
 
