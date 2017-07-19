@@ -892,9 +892,8 @@ void ASTMangler::appendType(Type type) {
       for (auto &field : layout->getFields()) {
         auto fieldTy = field.getLoweredType();
         // Use the `inout` mangling to represent a mutable field.
-        if (field.isMutable())
-          fieldTy = CanInOutType::get(fieldTy);
-        fieldsList.push_back(TupleTypeElt(fieldTy));
+        auto fieldFlag = ParameterTypeFlags().withInOut(field.isMutable());
+        fieldsList.push_back(TupleTypeElt(fieldTy, Identifier(), fieldFlag));
       }
       appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
                        ->getCanonicalType());

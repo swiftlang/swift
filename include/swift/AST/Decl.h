@@ -67,6 +67,7 @@ namespace swift {
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
+  class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
   class ProtocolDecl;
@@ -4384,10 +4385,7 @@ public:
 
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
-  Type getType() const {
-    assert(!typeInContext.isNull() && "no contextual type set yet");
-    return typeInContext;
-  }
+  Type getType() const;
 
   /// Set the type of the variable within its context.
   void setType(Type t);
@@ -4467,6 +4465,17 @@ public:
   void setSpecifier(Specifier Spec) {
     VarDeclBits.Specifier = static_cast<unsigned>(Spec);
   }
+  
+  /// Is the type of this parameter 'inout'?
+  ///
+  /// FIXME(Remove InOut): This is only valid on ParamDecls but multiple parts
+  /// of the compiler check ParamDecls and VarDecls along the same paths.
+  bool isInOut() const {
+    // FIXME: Re-enable this assertion and fix callers.
+//    assert((getKind() == DeclKind::Param) && "querying 'inout' on var decl?");
+    return getSpecifier() == Specifier::InOut;
+  }
+  
   
   /// Is this a type ('static') variable?
   bool isStatic() const { return VarDeclBits.IsStatic; }
@@ -4567,9 +4576,13 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
-
+  
+  /// Retrieve the parameter type flags corresponding to the declaration of
+  /// this parameter's argument type.
+  ParameterTypeFlags getParameterFlags() const;
+  
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
-
+    
   bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
   void setIsTypeLocImplicit(bool val) { IsTypeLocImplicit = val; }
   

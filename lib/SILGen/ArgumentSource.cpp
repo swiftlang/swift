@@ -183,7 +183,7 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
   }
   case Kind::Expr: {
     auto e = std::move(*this).asKnownExpr();
-    if (e->getType()->is<InOutType>()) {
+    if (e->isSemanticallyInOutExpr()) {
       return SGF.emitAddressOfLValue(e, SGF.emitLValue(e, AccessKind::ReadWrite),
                                      AccessKind::ReadWrite);
     } else {

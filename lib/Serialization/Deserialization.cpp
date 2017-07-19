@@ -2793,7 +2793,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    param->setInterfaceType(paramTy);
+    param->setInterfaceType(paramTy->getInOutObjectType());
     break;
   }
 
@@ -3805,7 +3805,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return underlyingTy.takeError();
     
     typeOrOffset = ParenType::get(
-        ctx, underlyingTy.get(),
+        ctx, underlyingTy.get()->getInOutObjectType(),
         ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping, isInOut));
     break;
   }
@@ -3835,7 +3835,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
         return elementTy.takeError();
       
       elements.emplace_back(
-          elementTy.get(), getIdentifier(nameID),
+          elementTy.get()->getInOutObjectType(), getIdentifier(nameID),
           ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping, isInOut));
     }
 

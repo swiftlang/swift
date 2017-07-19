@@ -2244,7 +2244,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this is a vardecl with 'inout' type, then it is an inout argument to a
     // function, never diagnose anything related to it.
-    if (var->getType()->is<InOutType>())
+    if (var->isInOut())
       continue;    
     
     // Consider parameters to always have been read.  It is common to name a

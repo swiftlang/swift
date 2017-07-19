@@ -755,11 +755,15 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     if (param->isInvalid() || type->hasError()) {
       param->markInvalid();
       hadError = true;
-    } else
-      resolver.recordParamType(param, type);
+    } else {
+      if (!type->isMaterializable()) {
+        param->setSpecifier(VarDecl::Specifier::InOut);
+      }
+      resolver.recordParamType(param, type->getInOutObjectType());
+    }
     
     checkTypeModifyingDeclAttributes(param);
-    if (!hadError && type->is<InOutType>()) {
+    if (!hadError && param->getTypeLoc().getTypeRepr()->getKind() == TypeReprKind::InOut) {
       param->setSpecifier(VarDecl::Specifier::InOut);
     }
   }
@@ -951,7 +955,8 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
 bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       TypeResolutionOptions options,
                                       GenericTypeResolver *resolver,
-                                      TypeLoc tyLoc) {
+                                      TypeLoc tyLoc,
+                                      bool forceInOut) {
 recur:
   if (tyLoc.isNull()) {
     tyLoc = TypeLoc::withoutLoc(type);
@@ -1037,7 +1042,10 @@ recur:
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
       type = ErrorType::get(Context);
-    var->setType(type);
+    if (forceInOut) {
+      var->setSpecifier(VarDecl::Specifier::InOut);
+    }
+    var->setType(type->getInOutObjectType());
     // FIXME: wtf
     if (type->hasTypeParameter())
       var->setInterfaceType(type);
@@ -1045,9 +1053,6 @@ recur:
       var->setInterfaceType(var->getDeclContext()->mapTypeOutOfContext(type));
 
     checkTypeModifyingDeclAttributes(var);
-    if (type->is<InOutType>()) {
-      NP->getDecl()->setSpecifier(VarDecl::Specifier::InOut);
-    }
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
       type = var->getType()->getReferenceStorageReferent();
     else if (!var->isInvalid())
@@ -1545,7 +1550,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   GenericTypeToArchetypeResolver resolver(CE);
 
   // Sometimes a scalar type gets applied to a single-argument parameter list.
-  auto handleParameter = [&](ParamDecl *param, Type ty) -> bool {
+  auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) -> bool {
     bool hadError = false;
     
     // Check that the type, if explicitly spelled, is ok.
@@ -1559,13 +1564,14 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       // Coerce explicitly specified argument type to contextual type
       // only if both types are valid and do not match.
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
-        param->setType(ty);
-        param->setInterfaceType(CE->mapTypeOutOfContext(ty));
+        assert(!param->isLet() || !ty->is<InOutType>());
+        param->setType(ty->getInOutObjectType());
+        param->setInterfaceType(CE->mapTypeOutOfContext(ty)->getInOutObjectType());
       }
     }
     
     assert(!ty->hasLValueType() && "Bound param type to @lvalue?");
-    if (ty->is<InOutType>()) {
+    if (forceMutable) {
       param->setSpecifier(VarDecl::Specifier::InOut);
     } else if (auto *TTy = ty->getAs<TupleType>()) {
       if (param->hasName() && TTy->hasInOutElement()) {
@@ -1578,8 +1584,9 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      param->setType(ty);
-      param->setInterfaceType(CE->mapTypeOutOfContext(ty));
+      assert(!param->isLet() || !ty->is<InOutType>());
+      param->setType(ty->getInOutObjectType());
+      param->setInterfaceType(CE->mapTypeOutOfContext(ty)->getInOutObjectType());
     }
     
     checkTypeModifyingDeclAttributes(param);
@@ -1598,7 +1605,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (underlyingTy->is<TupleType>() &&
         !underlyingTy->castTo<TupleType>()->getVarArgsBaseType()) {
       if (P->size() == 1)
-        return handleParameter(P->get(0), underlyingTy);
+        return handleParameter(P->get(0), underlyingTy, /*mutable*/false);
     }
     
     //pass
@@ -1607,8 +1614,11 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   // The context type must be a tuple.
   TupleType *tupleTy = paramListType->getAs<TupleType>();
   if (!tupleTy && !hadError) {
-    if (P->size() == 1)
-      return handleParameter(P->get(0), paramListType);
+    if (P->size() == 1) {
+      assert(P->size() == FN->getParams().size());
+      return handleParameter(P->get(0), paramListType,
+                             /*mutable*/FN->getParams().front().isInOut());
+    }
     diagnose(P->getStartLoc(), diag::tuple_pattern_in_non_tuple_context,
              paramListType);
     hadError = true;
@@ -1630,15 +1640,18 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     auto &param = P->get(i);
     
     Type CoercionType;
-    if (hadError)
+    bool isMutableParam = false;
+    if (hadError) {
       CoercionType = ErrorType::get(Context);
-    else
+    } else {
       CoercionType = tupleTy->getElement(i).getType();
+      isMutableParam = tupleTy->getElement(i).isInOut();
+    }
     
     assert(param->getArgumentName().empty() &&
            "Closures cannot have API names");
     
-    hadError |= handleParameter(param, CoercionType);
+    hadError |= handleParameter(param, CoercionType, isMutableParam);
     assert(!param->isDefaultArgument() && "Closures cannot have default args");
   }
   

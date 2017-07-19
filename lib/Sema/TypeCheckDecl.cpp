@@ -1279,7 +1279,7 @@ static void configureImplicitSelf(TypeChecker &tc,
                  : VarDecl::Specifier::Owned;
   selfDecl->setSpecifier(specifier);
 
-  selfDecl->setInterfaceType(selfIfaceTy);
+  selfDecl->setInterfaceType(selfIfaceTy->getInOutObjectType());
 }
 
 /// Record the context type of 'self' after the generic environment of
@@ -1288,8 +1288,14 @@ static void recordSelfContextType(AbstractFunctionDecl *func) {
   auto selfDecl = func->getImplicitSelfDecl();
   Type selfTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true,
                                                /*wantDynamicSelf*/true);
+
   selfTy = func->mapTypeIntoContext(selfTy);
-  selfDecl->setType(selfTy);
+  // FIXME(Remove InOutType): 'computeInterfaceSelfType' should tell us if
+  // we need to do this.
+  if (selfTy->is<InOutType>()) {
+    selfDecl->setSpecifier(VarDecl::Specifier::InOut);
+  }
+  selfDecl->setType(selfTy->getInOutObjectType());
 }
 
 namespace {

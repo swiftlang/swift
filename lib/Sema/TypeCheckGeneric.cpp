@@ -817,7 +817,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
                                          GenericSignature *sig) {
   Type funcTy;
-  Type initFuncTy;
+  Type initFuncTy = Type();
 
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     funcTy = fn->getBodyResultTypeLoc().getType();
@@ -855,21 +855,28 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
 
   bool hasSelf = func->getDeclContext()->isTypeContext();
   for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
-    Type argTy;
-    Type initArgTy;
-
-    Type selfTy;
+    SmallVector<AnyFunctionType::Param, 4> argTy;
+    SmallVector<AnyFunctionType::Param, 4> initArgTy;
+    
     if (i == e-1 && hasSelf) {
-      selfTy = ParenType::get(Context, func->computeInterfaceSelfType());
-
+      auto ifTy = func->computeInterfaceSelfType();
+      auto selfTy = AnyFunctionType::Param(ifTy->getInOutObjectType(),
+                                           Identifier(),
+                                           ParameterTypeFlags().withInOut(ifTy->is<InOutType>()));
+      
       // Substitute in our own 'self' parameter.
-
-      argTy = selfTy;
+      
+      argTy.push_back(selfTy);
       if (initFuncTy) {
-        initArgTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
+        auto ifTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
+
+        initArgTy.push_back(
+          AnyFunctionType::Param(
+            ifTy->getInOutObjectType(),
+            Identifier(), ParameterTypeFlags().withInOut(ifTy->is<InOutType>())));
       }
     } else {
-      argTy = paramLists[e - i - 1]->getInterfaceType(Context);
+      AnyFunctionType::decomposeInput(paramLists[e - i - 1]->getInterfaceType(Context), argTy);
 
       if (initFuncTy)
         initArgTy = argTy;
@@ -879,8 +886,10 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     AnyFunctionType::ExtInfo info;
     if (i == 0 && func->hasThrows())
       info = info.withThrows();
-
-    assert(!argTy->hasArchetype());
+    
+    assert(std::all_of(argTy.begin(), argTy.end(), [](const AnyFunctionType::Param &aty){
+      return !aty.getType()->hasArchetype();
+    }));
     assert(!funcTy->hasArchetype());
     if (initFuncTy)
       assert(!initFuncTy->hasArchetype());

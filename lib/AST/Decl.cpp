@@ -1623,13 +1623,11 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
 
     // For the 'self' of a method, strip off 'inout'.
     if (isMethod) {
-      if (auto inoutType = newParamType->getAs<InOutType>())
-        newParamType = inoutType->getObjectType();
-
       newFlags = newFlags.withInOut(false);
     }
 
-    AnyFunctionType::Param newParam(newParamType, param.getLabel(), newFlags);
+    AnyFunctionType::Param newParam(newParamType->getInOutObjectType(),
+                                    param.getLabel(), newFlags);
     newParams.push_back(newParam);
   }
 
@@ -1792,10 +1790,20 @@ bool ValueDecl::hasInterfaceType() const {
 
 Type ValueDecl::getInterfaceType() const {
   assert(hasInterfaceType() && "No interface type was set");
-  return TypeAndAccess.getPointer();
+  auto ty = TypeAndAccess.getPointer();
+  // FIXME(Remove InOutType): This grossness will go away when Sema is weaned
+  // off of InOutType.  Until then we should respect our parameter flags and
+  // return the type it expects.
+  if (auto *VD = dyn_cast<ParamDecl>(this)) {
+    ty = VD->isInOut() ? InOutType::get(ty) : ty;
+  }
+  return ty;
 }
 
 void ValueDecl::setInterfaceType(Type type) {
+  if (!type.isNull() && isa<ParamDecl>(this)) {
+    assert(!type->is<InOutType>() && "caller did not pass a base type");
+  }
   // lldb creates global typealiases with archetypes in them.
   // FIXME: Add an isDebugAlias() flag, like isDebugVar().
   //
@@ -1810,7 +1818,6 @@ void ValueDecl::setInterfaceType(Type type) {
     assert(!type->hasTypeVariable() &&
            "Archetype in interface type");
   }
-
   TypeAndAccess.setPointer(type);
 }
 
@@ -3841,7 +3848,17 @@ static bool isSettable(const AbstractStorageDecl *decl) {
   llvm_unreachable("bad storage kind");
 }
 
+Type VarDecl::getType() const {
+  assert(!typeInContext.isNull() && "no contextual type set yet");
+  // FIXME(Remove InOutType): This grossness will go away when Sema is weaned
+  // off of InOutType.  Until then we should respect our parameter flags and
+  // return the type it expects.
+  if (isInOut()) return InOutType::get(typeInContext);
+  return typeInContext;
+}
+
 void VarDecl::setType(Type t) {
+  assert(t.isNull() || !t->is<InOutType>());
   typeInContext = t;
   if (t && t->hasError())
     setInvalid();
@@ -4226,8 +4243,6 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   }
     
   if (isInOut) {
-    selfType = InOutType::get(selfType);
-    selfInterfaceType = InOutType::get(selfInterfaceType);
     specifier = VarDecl::Specifier::InOut;
   }
 
@@ -4236,6 +4251,11 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   selfDecl->setImplicit();
   selfDecl->setInterfaceType(selfInterfaceType);
   return selfDecl;
+}
+
+ParameterTypeFlags ParamDecl::getParameterFlags() const {
+  return ParameterTypeFlags::fromParameterType(getType(), isVariadic())
+            .withInOut(isInOut());
 }
 
 /// Return the full source range of this parameter.

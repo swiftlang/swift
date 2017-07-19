@@ -669,7 +669,7 @@ public:
           useJustFirst = true;
         } else {
           for (Expr *Arg : TE->getElements()) {
-            if (Arg->getType()->is<InOutType>()) {
+            if (Arg->isSemanticallyInOutExpr()) {
               useJustFirst = true;
               break;
             }

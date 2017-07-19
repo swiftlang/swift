@@ -1495,10 +1495,12 @@ namespace {
       resultTy = resultTy->replaceCovariantResultType(
         selfTy, ctor->getNumParameterLists());
 
+      ParameterTypeFlags flags;
       if (!selfTy->hasReferenceSemantics())
-        selfTy = InOutType::get(selfTy);
+        flags = flags.withInOut(true);
 
-      resultTy = FunctionType::get(selfTy,
+      auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
+      resultTy = FunctionType::get({selfParam},
                                    resultTy->castTo<FunctionType>()->getResult(),
                                    resultTy->castTo<FunctionType>()->getExtInfo());
 
@@ -2641,7 +2643,9 @@ namespace {
 
     Expr *visitParenExpr(ParenExpr *expr) {
       auto &ctx = cs.getASTContext();
-      cs.setType(expr, ParenType::get(ctx, cs.getType(expr->getSubExpr())));
+      auto pty = cs.getType(expr->getSubExpr());
+      cs.setType(expr, ParenType::get(ctx, pty->getInOutObjectType(),
+                                      ParameterTypeFlags().withInOut(pty->is<InOutType>())));
       return expr;
     }
 
@@ -4594,7 +4598,8 @@ static Type rebuildIdentityExprs(ConstraintSystem &cs, Expr *expr, Type type) {
   ASTContext &ctx = cs.getASTContext();
   if (auto paren = dyn_cast<ParenExpr>(expr)) {
     type = rebuildIdentityExprs(cs, paren->getSubExpr(), type);
-    cs.setType(paren, ParenType::get(ctx, type));
+    cs.setType(paren, ParenType::get(ctx, type->getInOutObjectType(),
+                                     ParameterTypeFlags().withInOut(type->is<InOutType>())));
     return cs.getType(paren);
   }
 
@@ -5436,9 +5441,11 @@ Expr *ExprRewriter::coerceCallArguments(
     auto paramType = param.getType();
     if (argType->isEqual(paramType)) {
       toSugarFields.push_back(
-          TupleTypeElt(argType, getArgLabel(argIdx), param.getParameterFlags()));
+          TupleTypeElt(param.getPlainType(), getArgLabel(argIdx),
+                       param.getParameterFlags()));
       fromTupleExprFields[argIdx] =
-          TupleTypeElt(paramType, getArgLabel(argIdx), param.getParameterFlags());
+          TupleTypeElt(param.getPlainType(), getArgLabel(argIdx),
+                       param.getParameterFlags());
       fromTupleExpr[argIdx] = arg;
       continue;
     }
@@ -5452,9 +5459,11 @@ Expr *ExprRewriter::coerceCallArguments(
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;
     fromTupleExprFields[argIdx] = TupleTypeElt(
-        cs.getType(convertedArg), getArgLabel(argIdx), param.getParameterFlags());
+        cs.getType(convertedArg)->getInOutObjectType(),
+        getArgLabel(argIdx), param.getParameterFlags());
     toSugarFields.push_back(
-        TupleTypeElt(argType, param.getLabel(), param.getParameterFlags()));
+        TupleTypeElt(argType->getInOutObjectType(), param.getLabel(),
+                     param.getParameterFlags()));
   }
 
   // Compute a new 'arg', from the bits we have.  We have three cases: the
@@ -6131,13 +6140,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // coercion.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
     if (auto *toIO = toType->getAs<InOutType>()) {
-      (void)toIO;
       // In an 'inout' operator like "++i", the operand is converted from
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
       cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
       return cs.cacheType(new (tc.Context)
-                              InOutExpr(expr->getStartLoc(), expr, toType,
+                              InOutExpr(expr->getStartLoc(), expr,
+                                        toIO->getObjectType(),
                                         /*isImplicit*/ true));
     }
 
@@ -6147,7 +6156,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (auto toTuple = toType->getAs<TupleType>()) {
       int scalarIdx = toTuple->getElementForScalarInit();
       if (scalarIdx >= 0 &&
-          toTuple->getElementType(scalarIdx)->is<InOutType>())
+          toTuple->getElement(scalarIdx).isInOut())
         performLoad = false;
     }
 
@@ -6309,8 +6318,9 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
   if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
     // If 'self' is an inout type, turn the base type into an lvalue
     // type with the same qualifiers.
-    auto selfTy = func->getInterfaceType()->getAs<AnyFunctionType>()->getInput();
-    if (selfTy->is<InOutType>()) {
+    auto selfParam = func->getInterfaceType()->getAs<AnyFunctionType>()->getParams();
+    assert(selfParam.size() == 1 && "found invalid arity of self param");
+    if (selfParam[0].getParameterFlags().isInOut()) {
       // Unless we're looking at a nonmutating existential member.  In which
       // case, the member will be modeled as an inout but ExistentialMemberRef
       // and ArchetypeMemberRef want to take the base as an rvalue.
@@ -6369,7 +6379,8 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
     return expr;
 
   // If we're coercing to an rvalue type, just do it.
-  if (!toType->is<InOutType>())
+  auto toInOutTy = toType->getAs<InOutType>();
+  if (!toInOutTy)
     return coerceToType(expr, toType, locator);
 
   assert(fromType->is<LValueType>() && "Can only convert lvalues to inout");
@@ -6379,7 +6390,8 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
   // Use InOutExpr to convert it to an explicit inout argument for the
   // receiver.
   cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
-  return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, toType,
+  return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, 
+                                          toInOutTy->getInOutObjectType(),
                                           /*isImplicit*/ true));
 }
 

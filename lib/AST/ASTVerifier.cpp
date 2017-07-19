@@ -2076,7 +2076,7 @@ public:
 
       // Variables must have materializable type, unless they are parameters,
       // in which case they must either have l-value type or be anonymous.
-      if (!var->getInterfaceType()->isMaterializable()) {
+      if (!var->getInterfaceType()->isMaterializable() || var->isInOut()) {
         if (!isa<ParamDecl>(var)) {
           Out << "Non-parameter VarDecl has non-materializable type: ";
           var->getType().print(Out);

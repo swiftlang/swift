@@ -805,7 +805,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
                                             /*implicit*/ true);
     auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
-      InOutType::get(importedUnionDecl->getDeclaredType()), /*implicit*/ true);
+      importedUnionDecl->getDeclaredType(), /*implicit*/ true);
 
     auto newValueDecl = setterDecl->getParameterList(1)->get(0);
 
