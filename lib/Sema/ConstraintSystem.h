@@ -3076,6 +3076,13 @@ public:
 
     E->walk(ExprCleanerImpl(this));
   }
+  
+  void disable() {
+    Exprs.clear();
+    TypeLocs.clear();
+    Patterns.clear();
+    Vars.clear();
+  }
 
   ~ExprCleaner() {
     // Check each of the expression nodes to verify that there are no type
@@ -3086,9 +3093,8 @@ public:
     }
 
     for (auto TL : TypeLocs) {
-      if (TL->getTypeRepr() && TL->getType() &&
-          TL->getType()->hasTypeVariable())
-        TL->setType(Type(), false);
+      if (TL->getType() && TL->getType()->hasTypeVariable())
+        TL->setType(Type(), /*was validated*/false);
     }
 
     for (auto P : Patterns) {
