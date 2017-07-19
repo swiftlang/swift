@@ -103,7 +103,7 @@ struct IAMResult {
   }
 
   bool isInit() const {
-    return isStaticMember() && name.getBaseName().str() == "init";
+    return isStaticMember() && name.getBaseName() == "init";
   }
 };
 }

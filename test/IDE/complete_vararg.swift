@@ -89,7 +89,7 @@ func testGenericFreeFunc() {
   genericFreeFunc1(#^GENERIC_FREE_FUNC_1^#
 }
 // GENERIC_FREE_FUNC_1: Begin completions, 1 items
-// GENERIC_FREE_FUNC_1: Pattern/ExprSpecific:               ['(']{#t: τ_0_0...#})[#Void#]{{; name=.+$}}
+// GENERIC_FREE_FUNC_1: Pattern/ExprSpecific:               ['(']{#t: _...#})[#Void#]{{; name=.+$}}
 // GENERIC_FREE_FUNC_1: End completions
 
 

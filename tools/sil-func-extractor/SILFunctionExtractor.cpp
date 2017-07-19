@@ -177,7 +177,7 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
     StringRef MangledName = F.getName();
     std::string DemangledName =
         swift::Demangle::demangleSymbolAsString(MangledName);
-    DemangledName = DemangledName.substr(0, DemangledName.find(' '));
+    DemangledName = DemangledName.substr(0, DemangledName.find_first_of(" <("));
     DEBUG(llvm::dbgs() << "Visiting New Func:\n"
                        << "    Mangled: " << MangledName
                        << "\n    Demangled: " << DemangledName << "\n");

@@ -204,6 +204,10 @@ namespace irgen {
                                            SILType objectType,
                                            bool suppressCast = false);
 
+  /// Given a non-tagged object pointer, load a pointer to its class object.
+  llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
+                                             llvm::Value *object);
+
   /// Given a heap-object instance, with some heap-object type, produce a
   /// reference to its heap metadata by dynamically asking the runtime for it.
   llvm::Value *emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
@@ -232,6 +236,9 @@ namespace irgen {
                                       CanSILFunctionType methodType,
                                       bool useSuperVTable);
 
+  /// Get the offset of the given class method within the class's vtables.
+  unsigned getVirtualMethodIndex(IRGenModule &IGM, SILDeclRef method);
+  
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///
   /// For Swift protocols, this is a constant reference to the protocol

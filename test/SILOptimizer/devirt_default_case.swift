@@ -132,7 +132,7 @@ class Base4 {
 func foo(_ a: A3) -> Int {
 // Check that call to A3.f() can be devirtualized.
 //
-// CHECK-NORMAL: sil{{( hidden)?}} [noinline] @_T019devirt_default_case3fooSiAA2A3CFTf4g_n
+// CHECK-NORMAL: sil{{( shared)?}} [noinline] @_T019devirt_default_case3fooSiAA2A3CFTf4g_n
 // CHECK-NORMAL: function_ref @_T019devirt_default_case2B3C1fSiyFTf4d_n
 // CHECK-NORMAL: function_ref @_T019devirt_default_case2A3C1fSiyFTf4d_n
 // CHECK-NORMAL-NOT: class_method
@@ -168,7 +168,7 @@ class D6 : C6 {
 func check_static_class_devirt(_ c: C6) -> Int { 
 // Check that C.bar() and D.bar() are devirtualized.
 //
-// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_T019devirt_default_case019check_static_class_A0SiAA2C6CFTf4g_n
+// CHECK-LABEL: sil shared [noinline] @_T019devirt_default_case019check_static_class_A0SiAA2C6CFTf4g_n
 // CHECK: checked_cast_br [exact] %0 : $C6 to $C6
 // CHECK: checked_cast_br [exact] %0 : $C6 to $D6
 // CHECK: class_method

@@ -1,0 +1,20 @@
+module ClangModuleA {
+  header "ClangModuleA.h"
+  export *
+}
+module ClangModuleB {
+  header "ClangModuleB.h"
+  export *
+}
+
+module ClangModuleC {
+  module Sub1 {
+    header "ClangModuleCSub1.h"
+    export *
+  }
+
+  module Sub2 {
+    header "ClangModuleCSub2.h"
+    export *
+  }
+}

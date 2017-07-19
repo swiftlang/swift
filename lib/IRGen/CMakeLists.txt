@@ -20,6 +20,7 @@ add_swift_library(swiftIRGen STATIC
   GenFunc.cpp
   GenHeap.cpp
   GenInit.cpp
+  GenKeyPath.cpp
   GenMeta.cpp
   GenObjC.cpp
   GenOpaque.cpp
@@ -37,6 +38,7 @@ add_swift_library(swiftIRGen STATIC
   IRGenModule.cpp
   IRGenSIL.cpp
   Linking.cpp
+  LoadableByAddress.cpp
   LocalTypeData.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp

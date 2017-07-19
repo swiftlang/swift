@@ -16,161 +16,80 @@
 using namespace swift;
 using namespace swift::syntax;
 
-#pragma mark - expression Data
-
-RC<ExprSyntaxData> ExprSyntaxData::make(RC<RawSyntax> Raw,
-                                        const SyntaxData *Parent,
-                                        CursorIndex IndexInParent) {
-  return RC<ExprSyntaxData> {
-    new ExprSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<ExprSyntaxData> ExprSyntaxData::makeBlank() {
-  return make(RawSyntax::missing(SyntaxKind::MissingExpr));
-}
-
 #pragma mark - expression API
 
-ExprSyntax::ExprSyntax(const RC<SyntaxData> Root, const ExprSyntaxData *Data)
-  : Syntax(Root, Data) {}
-
-#pragma mark - unknown-expression Data
-
-UnknownExprSyntaxData::UnknownExprSyntaxData(RC<RawSyntax> Raw,
-                                             const SyntaxData *Parent,
-                                             CursorIndex IndexInParent)
-  : UnknownSyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Kind == SyntaxKind::UnknownExpr);
-}
-
-RC<UnknownExprSyntaxData>
-UnknownExprSyntaxData::make(RC<RawSyntax> Raw,
-                            const SyntaxData *Parent,
-                            CursorIndex IndexInParent) {
-  auto UnknownRaw = RawSyntax::make(SyntaxKind::UnknownExpr, Raw->Layout,
-                                    Raw->Presence);
-  return RC<UnknownExprSyntaxData> {
-    new UnknownExprSyntaxData {
-      UnknownRaw, Parent, IndexInParent
-    }
-  };
+ExprSyntax ExprSyntax::makeBlank() {
+  return make<ExprSyntax>(RawSyntax::missing(SyntaxKind::MissingExpr));
 }
 
 #pragma mark - unknown-expression API
 
-UnknownExprSyntax::UnknownExprSyntax(const RC<SyntaxData> Root,
-                                     const UnknownExprSyntaxData *Data)
-  : UnknownSyntax(Root, Data) {}
-
-#pragma mark - integer-literal-expression Data
-
-IntegerLiteralExprSyntaxData::
-IntegerLiteralExprSyntaxData(RC<RawSyntax> Raw,
-                             const SyntaxData *Parent,
-                             CursorIndex IndexInParent)
-  : ExprSyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Kind == SyntaxKind::IntegerLiteralExpr);
-  assert(Raw->Layout.size() == 2);
-  syntax_assert_child_token(Raw, IntegerLiteralExprSyntax::Cursor::Sign,
-                            tok::oper_prefix);
-  syntax_assert_child_token(Raw, IntegerLiteralExprSyntax::Cursor::Digits,
-                            tok::integer_literal);
-}
-
-RC<IntegerLiteralExprSyntaxData>
-IntegerLiteralExprSyntaxData::make(RC<RawSyntax> Raw,
-                                   const SyntaxData *Parent,
-                                   CursorIndex IndexInParent) {
-  return RC<IntegerLiteralExprSyntaxData> {
-    new IntegerLiteralExprSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-RC<IntegerLiteralExprSyntaxData> IntegerLiteralExprSyntaxData::makeBlank() {
-  auto Raw = RawSyntax::make(SyntaxKind::IntegerLiteralExpr,
-    {
-      TokenSyntax::missingToken(tok::oper_prefix, ""),
-      TokenSyntax::missingToken(tok::integer_literal, "")
-    },
-    SourcePresence::Present);
-  return make(Raw);
+void UnknownExprSyntax::validate() const {
+  assert(Data->Raw->Kind == SyntaxKind::UnknownExpr);
 }
 
 #pragma mark - integer-literal-expression API
 
-IntegerLiteralExprSyntax::
-IntegerLiteralExprSyntax(const RC<SyntaxData> Root,
-                         const IntegerLiteralExprSyntaxData *Data)
-  : ExprSyntax(Root, Data) {}
+void IntegerLiteralExprSyntax::validate() const {
+  assert(Data->Raw->Kind == SyntaxKind::IntegerLiteralExpr);
+  assert(Data->Raw->Layout.size() == 2);
+  syntax_assert_child_token(Data->Raw, Cursor::Sign,
+                            tok::oper_prefix);
+  syntax_assert_child_token(Data->Raw, Cursor::Digits,
+                            tok::integer_literal);
+}
+
+IntegerLiteralExprSyntax IntegerLiteralExprSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::IntegerLiteralExpr,
+    {
+      RawTokenSyntax::missingToken(tok::oper_prefix, ""),
+      RawTokenSyntax::missingToken(tok::integer_literal, "")
+    },
+    SourcePresence::Present);
+  return make<IntegerLiteralExprSyntax>(Raw);
+}
 
 IntegerLiteralExprSyntax
-IntegerLiteralExprSyntax::withDigits(RC<TokenSyntax> NewDigits) const {
-  assert(NewDigits->getTokenKind() == tok::integer_literal);
-  return Data->replaceChild<IntegerLiteralExprSyntax>(NewDigits,
+IntegerLiteralExprSyntax::withDigits(TokenSyntax NewDigits) const {
+  assert(NewDigits.getTokenKind() == tok::integer_literal);
+  return Data->replaceChild<IntegerLiteralExprSyntax>(NewDigits.getRaw(),
                                                       Cursor::Digits);
 }
 
 IntegerLiteralExprSyntax
-IntegerLiteralExprSyntax::withSign(RC<swift::syntax::TokenSyntax> NewSign)
-    const {
-    assert(NewSign->getTokenKind() == tok::oper_prefix);
-    return Data->replaceChild<IntegerLiteralExprSyntax>(NewSign, Cursor::Sign);
-}
-
-#pragma mark - symbolic-reference Data
-
-SymbolicReferenceExprSyntaxData::
-SymbolicReferenceExprSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent,
-                                CursorIndex IndexInParent)
-  : ExprSyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Layout.size() == 2);
-  syntax_assert_child_token(Raw,
-    SymbolicReferenceExprSyntax::Cursor::Identifier, tok::identifier);
-  syntax_assert_child_kind(Raw,
-    SymbolicReferenceExprSyntax::Cursor::GenericArgumentClause,
-    SyntaxKind::GenericArgumentClause);
-}
-
-RC<SymbolicReferenceExprSyntaxData>
-SymbolicReferenceExprSyntaxData::make(RC<RawSyntax> Raw,
-                                      const SyntaxData *Parent,
-     CursorIndex IndexInParent) {
-  return RC<SymbolicReferenceExprSyntaxData> {
-    new SymbolicReferenceExprSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<SymbolicReferenceExprSyntaxData>
-SymbolicReferenceExprSyntaxData::makeBlank() {
-  auto Raw = RawSyntax::make(SyntaxKind::SymbolicReferenceExpr,
-    {
-      TokenSyntax::missingToken(tok::identifier, ""),
-      RawSyntax::missing(SyntaxKind::GenericArgumentClause),
-    },
-    SourcePresence::Present);
-  return make(Raw);
+IntegerLiteralExprSyntax::withSign(TokenSyntax NewSign) const {
+    assert(NewSign.getTokenKind() == tok::oper_prefix);
+    return Data->replaceChild<IntegerLiteralExprSyntax>(NewSign.getRaw(),
+                                                        Cursor::Sign);
 }
 
 #pragma mark - symbolic-reference API
 
-SymbolicReferenceExprSyntax::
-SymbolicReferenceExprSyntax(const RC<SyntaxData> Root, const DataType *Data)
-  : ExprSyntax(Root, Data) {}
+void SymbolicReferenceExprSyntax::validate() const {
+  assert(Data->Raw->Layout.size() == 2);
+  syntax_assert_child_token(Data->Raw, Cursor::Identifier, tok::identifier);
+  syntax_assert_child_kind(Data->Raw, Cursor::GenericArgumentClause,
+                           SyntaxKind::GenericArgumentClause);
+}
 
-RC<TokenSyntax> SymbolicReferenceExprSyntax::getIdentifier() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Identifier));
+SymbolicReferenceExprSyntax SymbolicReferenceExprSyntax::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::SymbolicReferenceExpr,
+    {
+      RawTokenSyntax::missingToken(tok::identifier, ""),
+      RawSyntax::missing(SyntaxKind::GenericArgumentClause),
+    },
+    SourcePresence::Present);
+  return make<SymbolicReferenceExprSyntax>(Raw);
+}
+
+TokenSyntax SymbolicReferenceExprSyntax::getIdentifier() const {
+  return { Root, Data->getChild(Cursor::Identifier).get() };
 }
 
 SymbolicReferenceExprSyntax SymbolicReferenceExprSyntax::
-withIdentifier(RC<TokenSyntax> NewIdentifier) const {
-  assert(NewIdentifier->getTokenKind() == tok::identifier);
-  return Data->replaceChild<SymbolicReferenceExprSyntax>(NewIdentifier,
+withIdentifier(TokenSyntax NewIdentifier) const {
+  assert(NewIdentifier.getTokenKind() == tok::identifier);
+  return Data->replaceChild<SymbolicReferenceExprSyntax>(NewIdentifier.getRaw(),
                                                          Cursor::Identifier);
 }
 
@@ -181,17 +100,10 @@ SymbolicReferenceExprSyntax::getGenericArgumentClause() const {
     return llvm::None;
   }
 
-  auto *MyData = getUnsafeData<SymbolicReferenceExprSyntax>();
-  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
-    &MyData->CachedGenericArgClause);
-  SyntaxData::realizeSyntaxNode<GenericArgumentClauseSyntax>(ChildPtr,
-                                                             RawClause, MyData,
-    cursorIndex(Cursor::GenericArgumentClause));
-
   return llvm::Optional<GenericArgumentClauseSyntax> {
     GenericArgumentClauseSyntax {
       Root,
-      MyData->CachedGenericArgClause.get()
+      Data->getChild(Cursor::GenericArgumentClause).get()
     }
   };
 }
@@ -204,72 +116,51 @@ withGenericArgumentClause(GenericArgumentClauseSyntax NewGenericArgs) const {
 
 #pragma mark - function-call-argument Data
 
-FunctionCallArgumentSyntaxData::
-FunctionCallArgumentSyntaxData(RC<RawSyntax> Raw,
-                               const SyntaxData *Parent,
-                               CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
-    syntax_assert_child_token(Raw, FunctionCallArgumentSyntax::Cursor::Label,
-                              tok::identifier);
-    syntax_assert_child_token_text(Raw,
-                                   FunctionCallArgumentSyntax::Cursor::Colon,
-                                   tok::colon, ":");
-    assert(
-      Raw->getChild(FunctionCallArgumentSyntax::Cursor::Expression)->isExpr());
+void FunctionCallArgumentSyntax::validate() const {
+  syntax_assert_child_token(Data->Raw, Cursor::Label,
+                            tok::identifier);
+  syntax_assert_child_token_text(Data->Raw, Cursor::Colon,
+                                 tok::colon, ":");
+  assert(Data->Raw->getChild(Cursor::Expression)->isExpr());
 
-    syntax_assert_child_token_text(Raw,
-                                   FunctionCallArgumentSyntax::Cursor::Comma,
-                                   tok::comma, ",");
+  syntax_assert_child_token_text(Data->Raw,
+                                 Cursor::Comma,
+                                 tok::comma, ",");
 }
 
-RC<FunctionCallArgumentSyntaxData>
-FunctionCallArgumentSyntaxData::make(RC<RawSyntax> Raw,
-                                     const SyntaxData *Parent,
-                                     CursorIndex IndexInParent) {
-  return RC<FunctionCallArgumentSyntaxData> {
-    new FunctionCallArgumentSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<FunctionCallArgumentSyntaxData> FunctionCallArgumentSyntaxData::makeBlank() {
+FunctionCallArgumentSyntax FunctionCallArgumentSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionCallArgument,
                              {
-                               TokenSyntax::missingToken(tok::identifier, ""),
-                               TokenSyntax::missingToken(tok::colon, ":"),
+                               RawTokenSyntax::missingToken(tok::identifier, ""),
+                               RawTokenSyntax::missingToken(tok::colon, ":"),
                                RawSyntax::missing(SyntaxKind::MissingExpr),
-                               TokenSyntax::missingToken(tok::comma, ",")
+                               RawTokenSyntax::missingToken(tok::comma, ",")
                              },
                              SourcePresence::Present);
-  return make(Raw);
+  return make<FunctionCallArgumentSyntax>(Raw);
 }
 
 #pragma mark - function-call-argument API
 
-FunctionCallArgumentSyntax::
-FunctionCallArgumentSyntax(const RC<SyntaxData> Root, const DataType *Data)
-  : Syntax(Root, Data) {}
-
-RC<TokenSyntax> FunctionCallArgumentSyntax::getLabel() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Label));
+TokenSyntax FunctionCallArgumentSyntax::getLabel() const {
+  return { Root, Data->getChild(Cursor::Label).get() };
 }
 
 FunctionCallArgumentSyntax
-FunctionCallArgumentSyntax::withLabel(RC<TokenSyntax> NewLabel) const {
-  assert(NewLabel->getTokenKind() == tok::identifier);
-  return Data->replaceChild<FunctionCallArgumentSyntax>(NewLabel,
+FunctionCallArgumentSyntax::withLabel(TokenSyntax NewLabel) const {
+  assert(NewLabel.getTokenKind() == tok::identifier);
+  return Data->replaceChild<FunctionCallArgumentSyntax>(NewLabel.getRaw(),
                                                         Cursor::Label);
 }
 
-RC<TokenSyntax> FunctionCallArgumentSyntax::getColonToken() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Colon));
+TokenSyntax FunctionCallArgumentSyntax::getColonToken() const {
+  return { Root, Data->getChild(Cursor::Colon).get() };
 }
 
 FunctionCallArgumentSyntax
-FunctionCallArgumentSyntax::withColonToken(RC<TokenSyntax> NewColon) const {
+FunctionCallArgumentSyntax::withColonToken(TokenSyntax NewColon) const {
   syntax_assert_token_is(NewColon, tok::colon, ":");
-  return Data->replaceChild<FunctionCallArgumentSyntax>(NewColon,
+  return Data->replaceChild<FunctionCallArgumentSyntax>(NewColon.getRaw(),
                                                         Cursor::Colon);
 }
 
@@ -279,16 +170,10 @@ llvm::Optional<ExprSyntax> FunctionCallArgumentSyntax::getExpression() const {
   if (RawExpression->isMissing()) {
     return llvm::None;
   }
-
-  auto *MyData = getUnsafeData<FunctionCallArgumentSyntax>();
-
-  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
-    &MyData->CachedExpression);
-
-  SyntaxData::realizeSyntaxNode<ExprSyntax>(ChildPtr, RawExpression, MyData,
-                                            cursorIndex(Cursor::Expression));
   
-  return ExprSyntax { Root, MyData->CachedExpression.get() };
+  return llvm::Optional<ExprSyntax> {
+    ExprSyntax { Root, Data->getChild(Cursor::Expression).get() }
+  };
 }
 
 FunctionCallArgumentSyntax
@@ -297,87 +182,50 @@ FunctionCallArgumentSyntax::withExpression(ExprSyntax NewExpression) const {
                                                         Cursor::Expression);
 }
 
-RC<TokenSyntax> FunctionCallArgumentSyntax::getTrailingComma() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Comma));
+TokenSyntax FunctionCallArgumentSyntax::getTrailingComma() const {
+  return { Root, Data->getChild(Cursor::Comma).get() };
 }
 
 FunctionCallArgumentSyntax FunctionCallArgumentSyntax::
-withTrailingComma(RC<TokenSyntax> NewTrailingComma) const {
+withTrailingComma(TokenSyntax NewTrailingComma) const {
   syntax_assert_token_is(NewTrailingComma, tok::comma, ",");
-  return Data->replaceChild<FunctionCallArgumentSyntax>(NewTrailingComma,
-    FunctionCallArgumentSyntax::Cursor::Comma);
+  return Data->replaceChild<FunctionCallArgumentSyntax>(
+            NewTrailingComma.getRaw(), Cursor::Comma);
 }
-
-#pragma mark - function-call-argument-list API
-
-FunctionCallArgumentListSyntax::
-FunctionCallArgumentListSyntax(const RC<SyntaxData> Root,
-                               const DataType *Data)
-  : SyntaxCollection(Root, Data) {}
 
 #pragma mark - function-call-expression Data
 
-RC<FunctionCallArgumentListSyntaxData> CachedArgumentList;
-
-FunctionCallExprSyntaxData::FunctionCallExprSyntaxData(RC<RawSyntax> Raw,
-                           const SyntaxData *Parent,
-                           CursorIndex IndexInParent)
-    : ExprSyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Layout.size() == 4);
-  assert(Raw->getChild(FunctionCallExprSyntax::Cursor::CalledExpression)
+void FunctionCallExprSyntax::validate() const {
+  auto Raw = Data->Raw;
+  assert(Raw->getChild(Cursor::CalledExpression)
            ->isExpr());
-  syntax_assert_child_token_text(Raw, FunctionCallExprSyntax::Cursor::LeftParen,
+  syntax_assert_child_token_text(Raw, Cursor::LeftParen,
                                  tok::l_paren, "(");
-  syntax_assert_child_kind(Raw, FunctionCallExprSyntax::Cursor::ArgumentList,
+  syntax_assert_child_kind(Raw, Cursor::ArgumentList,
                            SyntaxKind::FunctionCallArgumentList);
   syntax_assert_child_token_text(Raw,
-                                 FunctionCallExprSyntax::Cursor::RightParen,
+                                 Cursor::RightParen,
                                  tok::r_paren, ")");
 }
 
-RC<FunctionCallExprSyntaxData>
-FunctionCallExprSyntaxData::make(RC<RawSyntax> Raw, const SyntaxData *Parent,
-                                 CursorIndex IndexInParent) {
-  return RC<FunctionCallExprSyntaxData> {
-    new FunctionCallExprSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<FunctionCallExprSyntaxData> FunctionCallExprSyntaxData::makeBlank() {
+FunctionCallExprSyntax FunctionCallExprSyntax::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::FunctionCallExpr,
   {
     RawSyntax::missing(SyntaxKind::MissingExpr),
-    TokenSyntax::missingToken(tok::l_paren, "("),
+    RawTokenSyntax::missingToken(tok::l_paren, "("),
     RawSyntax::missing(SyntaxKind::FunctionCallArgumentList),
-    TokenSyntax::missingToken(tok::r_paren, ")"),
+    RawTokenSyntax::missingToken(tok::r_paren, ")"),
   },
   SourcePresence::Present);
-  return make(Raw);
+  return make<FunctionCallExprSyntax>(Raw);
 }
-
 
 #pragma mark - function-call-expression API
 
-FunctionCallExprSyntax::FunctionCallExprSyntax(const RC<SyntaxData> Root,
-                                               const DataType *Data)
-  : ExprSyntax(Root, Data) {}
-
 ExprSyntax FunctionCallExprSyntax::getCalledExpression() const {
-  auto RawArg = getRaw()->getChild(Cursor::CalledExpression);
-
-  auto *MyData = getUnsafeData<FunctionCallExprSyntax>();
-
-  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
-    &MyData->CachedCalledExpression);
-
-  SyntaxData::realizeSyntaxNode<ExprSyntax>(
-    ChildPtr, RawArg, MyData, cursorIndex(Cursor::CalledExpression));
-
-  return ExprSyntax {
+  return {
     Root,
-    MyData->CachedCalledExpression.get(),
+    Data->getChild(Cursor::CalledExpression).get(),
   };
 }
 
@@ -387,31 +235,21 @@ withCalledExpression(ExprSyntax NewBaseExpression) const {
                                                     Cursor::CalledExpression);
 }
 
-RC<TokenSyntax> FunctionCallExprSyntax::getLeftParen() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::LeftParen));
+TokenSyntax FunctionCallExprSyntax::getLeftParen() const {
+  return { Root, Data->getChild(Cursor::LeftParen).get() };
 }
 
 FunctionCallExprSyntax
-FunctionCallExprSyntax::withLeftParen(RC<TokenSyntax> NewLeftParen) const {
+FunctionCallExprSyntax::withLeftParen(TokenSyntax NewLeftParen) const {
   syntax_assert_token_is(NewLeftParen, tok::l_paren, "(");
-  return Data->replaceChild<FunctionCallExprSyntax>(NewLeftParen,
+  return Data->replaceChild<FunctionCallExprSyntax>(NewLeftParen.getRaw(),
                                                     Cursor::LeftParen);
 }
 
 FunctionCallArgumentListSyntax FunctionCallExprSyntax::getArgumentList() const {
-  auto RawArg = getRaw()->getChild(Cursor::ArgumentList);
-
-  auto *MyData = getUnsafeData<FunctionCallExprSyntax>();
-
-  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
-    &MyData->CachedArgumentList);
-
-  SyntaxData::realizeSyntaxNode<FunctionCallArgumentListSyntax>(
-    ChildPtr, RawArg, MyData, cursorIndex(Cursor::ArgumentList));
-  
   return FunctionCallArgumentListSyntax {
     Root,
-    MyData->CachedArgumentList.get(),
+    Data->getChild(Cursor::ArgumentList).get(),
   };
 }
 
@@ -421,29 +259,28 @@ withArgumentList(FunctionCallArgumentListSyntax NewArgumentList) const {
                                                     Cursor::ArgumentList);
 }
 
-RC<TokenSyntax> FunctionCallExprSyntax::getRightParen() const {
-  return cast<TokenSyntax>(getRaw()->getChild(Cursor::RightParen));
+TokenSyntax FunctionCallExprSyntax::getRightParen() const {
+  return { Root, Data->getChild(Cursor::RightParen).get() };
 }
 
 FunctionCallExprSyntax
-FunctionCallExprSyntax::withRightParen(RC<TokenSyntax> NewRightParen) const {
+FunctionCallExprSyntax::withRightParen(TokenSyntax NewRightParen) const {
   syntax_assert_token_is(NewRightParen, tok::r_paren, ")");
-  return Data->replaceChild<FunctionCallExprSyntax>(NewRightParen,
+  return Data->replaceChild<FunctionCallExprSyntax>(NewRightParen.getRaw(),
                                                     Cursor::RightParen);
 }
 
 #pragma mark - function-call-expression Builder
 
 FunctionCallExprSyntaxBuilder::FunctionCallExprSyntaxBuilder()
-  : CallLayout(FunctionCallExprSyntaxData::makeBlank()->getRaw()->Layout),
-    ListLayout(
-      FunctionCallArgumentListSyntaxData::makeBlank()->getRaw()->Layout) {}
+  : CallLayout(FunctionCallExprSyntax::makeBlank().getRaw()->Layout),
+    ListLayout(FunctionCallArgumentListSyntax::makeBlank().getRaw()->Layout) {}
 
 FunctionCallExprSyntaxBuilder &
-FunctionCallExprSyntaxBuilder::useLeftParen(RC<TokenSyntax> LeftParen) {
+FunctionCallExprSyntaxBuilder::useLeftParen(TokenSyntax LeftParen) {
   syntax_assert_token_is(LeftParen, tok::l_paren, "(");
   CallLayout[cursorIndex(FunctionCallExprSyntax::Cursor::LeftParen)]
-    = LeftParen;
+    = LeftParen.getRaw();
   return *this;
 }
 
@@ -461,10 +298,10 @@ useCalledExpression(ExprSyntax CalledExpression) {
 }
 
 FunctionCallExprSyntaxBuilder &
-FunctionCallExprSyntaxBuilder::useRightParen(RC<TokenSyntax> RightParen) {
+FunctionCallExprSyntaxBuilder::useRightParen(TokenSyntax RightParen) {
   syntax_assert_token_is(RightParen, tok::r_paren, ")");
   CallLayout[cursorIndex(FunctionCallExprSyntax::Cursor::RightParen)]
-    = RightParen;
+    = RightParen.getRaw();
   return *this;
 }
 
@@ -474,6 +311,6 @@ FunctionCallExprSyntax FunctionCallExprSyntaxBuilder::build() const {
   auto RawCall = RawSyntax::make(SyntaxKind::FunctionCallExpr, CallLayout,
                                  SourcePresence::Present)
     ->replaceChild(FunctionCallExprSyntax::Cursor::ArgumentList, RawArgs);
-  auto Data = FunctionCallExprSyntaxData::make(RawCall);
+  auto Data = SyntaxData::make(RawCall);
   return { Data, Data.get() };
 }

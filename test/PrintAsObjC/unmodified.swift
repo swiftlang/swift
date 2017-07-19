@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -emit-objc-header-path %t/out.h
 // RUN: touch -t 201401240005 %t/out.h
 // RUN: %S/../Inputs/getmtime.py %t/out.h > %t/orig-mtime.txt

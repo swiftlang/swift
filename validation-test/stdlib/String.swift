@@ -42,6 +42,12 @@ extension String {
   }
 }
 
+extension Substring {
+  var bufferID: UInt {
+    return _ephemeralContent.bufferID
+  }
+}
+
 var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
@@ -52,11 +58,11 @@ StringTests.test("AssociatedTypes-UTF8View") {
   typealias View = String.UTF8View
   expectCollectionAssociatedTypes(
     collectionType: View.self,
-    iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
+    iteratorType: View.Iterator.self,
+    subSequenceType: BidirectionalSlice<View>.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
-    indicesType: DefaultIndices<View>.self)
+    indicesType: DefaultBidirectionalIndices<View>.self)
 }
 
 StringTests.test("AssociatedTypes-UTF16View") {
@@ -171,7 +177,7 @@ StringTests.test("ForeignIndexes/Valid") {
   do {
     let donor = "abcdef"
     let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
-    expectEqual("\u{fffd}", acceptor[donor.startIndex])
+    expectEqual("\u{1f601}", acceptor[donor.startIndex])
     expectEqual("\u{fffd}", acceptor[donor.index(after: donor.startIndex)])
     expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
       acceptor[donor.index(_nth: 1)..<donor.index(_nth: 5)])
@@ -188,8 +194,12 @@ StringTests.test("ForeignIndexes/UnexpectedCrash")
 
   let donor = "\u{1f601}\u{1f602}\u{1f603}"
   let acceptor = "abcdef"
+
+  // Adjust donor.startIndex to ensure it caches a stride
+  let start = donor.index(before: donor.index(after: donor.startIndex))
+  
   // FIXME: this traps right now when trying to construct Character("ab").
-  expectEqual("a", acceptor[donor.startIndex])
+  expectEqual("a", acceptor[start])
 }
 
 StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {
@@ -314,13 +324,6 @@ StringTests.test("ForeignIndexes/removeSubrange/OutOfBoundsTrap/2") {
   acceptor.removeSubrange(r)
 }
 
-StringTests.test("_splitFirst") {
-  var (before, after, found) = "foo.bar"._splitFirst(separator: ".")
-  expectTrue(found)
-  expectEqual("foo", before)
-  expectEqual("bar", after)
-}
-
 StringTests.test("hasPrefix")
   .skip(.nativeRuntime("String.hasPrefix undefined without _runtime(_ObjC)"))
   .code {
@@ -413,15 +416,8 @@ StringTests.test("appendToSubstring") {
         s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
         expectEqual(originalIdentity, s0.bufferID)
         s0 += "x"
-        // For a small string size, the allocator could round up the allocation
-        // and we could get some unused capacity in the buffer.  In that case,
-        // the identity would not change.
-        if sliceEnd != initialSize {
-          if sliceStart != sliceEnd {
-            expectNotEqual(originalIdentity, s0.bufferID)
-          } else {
-            expectEqual(0, s0.bufferID)
-          }
+        if sliceStart == sliceEnd {
+          expectEqual(0, s0.bufferID)
         }
         expectEqual(
           String(
@@ -449,39 +445,64 @@ StringTests.test("appendToSubstringBug") {
   // unused capacity (length of the prefix "abcdef" plus truly unused elements
   // at the end).
 
-  let size = 1024 * 16
-  let suffixSize = 16
-  let prefixSize = size - suffixSize
-  for i in 1..<10 {
-    // We will be overflowing s0 with s1.
-    var s0 = String(repeating: "x", count: size)
-    let s1 = String(repeating: "x", count: prefixSize)
-    let originalIdentity = s0.bufferID
-
-    // Turn s0 into a slice that points to the end.
-    s0 = s0[s0.index(_nth: prefixSize)..<s0.endIndex]
-
-    // Slicing should not reallocate.
-    expectEqual(originalIdentity, s0.bufferID)
-
-    let originalCapacity = s0.capacity
-
-    // Overflow.
-    s0 += s1
-
-    // We should correctly determine if the storage is too small and
-    // reallocate.
-    if size + prefixSize >= originalCapacity {
-      expectNotEqual(originalIdentity, s0.bufferID)
-    } else {
-      expectEqual(originalIdentity, s0.bufferID)
-    }
-
+  func unusedCapacity(_ s: String) -> Int {
+    let core = s._core
+    guard let buf = core.nativeBuffer else { return 0 }
+    let offset = (core._baseAddress! - buf.start) / core.elementWidth
+    return buf.capacity - core.count - offset
+  }
+  
+  func stringWithUnusedCapacity() -> (String, Int) {
+    var s0 = String(repeating: "x", count: 17)
+    if unusedCapacity(s0) == 0 { s0 += "y" }
+    let cap = unusedCapacity(s0)
+    expectNotEqual(0, cap)
+    
+    // This sorta checks for the original bug
     expectEqual(
-      String(
-        repeating: "x",
-        count: suffixSize + prefixSize),
-      s0)
+      cap, unusedCapacity(s0[s0.index(_nth: 1)..<s0.endIndex]))
+    
+    return (s0, cap)
+  }
+
+  do {
+    var (s, unused) = { ()->(String, Int) in
+      let (s0, unused) = stringWithUnusedCapacity()
+      return (s0[s0.index(_nth: 5)..<s0.endIndex], unused)
+    }()
+    let originalID = s.bufferID
+    // Appending to a String always results in storage that 
+    // starts at the beginning of its native buffer
+    s += "z"
+    expectNotEqual(originalID, s.bufferID)
+  }
+
+  do {
+    var (s, unused) = { ()->(Substring, Int) in
+      let (s0, unused) = stringWithUnusedCapacity()
+      return (s0[s0.index(_nth: 5)..<s0.endIndex], unused)
+    }()
+    let originalID = s.bufferID
+    // FIXME: Ideally, appending to a Substring with a unique buffer reference
+    // does not reallocate unless necessary.  Today, however, it appears to do
+    // so unconditionally unless the slice falls at the beginning of its buffer.
+    s += "z"
+    expectNotEqual(originalID, s.bufferID)
+  }
+
+  // Try again at the beginning of the buffer
+  do {
+    var (s, unused) = { ()->(Substring, Int) in
+      let (s0, unused) = stringWithUnusedCapacity()
+      return (s0[...], unused)
+    }()
+    let originalID = s.bufferID
+    s += "z"
+    expectEqual(originalID, s.bufferID)
+    s += String(repeating: "z", count: unused - 1)
+    expectEqual(originalID, s.bufferID)
+    s += "."
+    expectNotEqual(originalID, s.bufferID)
   }
 }
 
@@ -1089,14 +1110,25 @@ StringTests.test("unicodeViews") {
   let winter = "\u{1F3C2}\u{2603}"
 
   // slices
-  // It is 4 bytes long, so it should return a replacement character.
+  // First scalar is 4 bytes long, so this should be invalid
+  expectNil(
+    String(winter.utf8[
+        winter.utf8.startIndex
+        ..<
+        winter.utf8.index(after: winter.utf8.index(after: winter.utf8.startIndex))
+      ]))
+
+  /*
+  // FIXME: note changed String(describing:) results
   expectEqual(
-    "\u{FFFD}", String(describing: 
+    "\u{FFFD}",
+    String(describing: 
       winter.utf8[
         winter.utf8.startIndex
         ..<
         winter.utf8.index(after: winter.utf8.index(after: winter.utf8.startIndex))
       ]))
+  */
   
   expectEqual(
     "\u{1F3C2}", String(
@@ -1153,8 +1185,8 @@ StringTests.test("indexConversion")
     result, flags, stop
   in
     let r = result!.rangeAt(1)
-    let start = String.UTF16Index(_offset: r.location)
-    let end = String.UTF16Index(_offset: r.location + r.length)
+    let start = String.UTF16Index(encodedOffset: r.location)
+    let end = String.UTF16Index(encodedOffset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)
   }
 
@@ -1250,10 +1282,9 @@ StringTests.test("String.append(_: Character)") {
 internal func decodeCString<
   C : UnicodeCodec
 >(_ s: String, as codec: C.Type)
--> (result: String, repairsMade: Bool)?
-where C.CodeUnit : UnsignedInteger {
+-> (result: String, repairsMade: Bool)? {
   let units = s.unicodeScalars.map({ $0.value }) + [0]
-  return units.map({ C.CodeUnit(numericCast($0)) }).withUnsafeBufferPointer {
+  return units.map({ C.CodeUnit($0) }).withUnsafeBufferPointer {
     String.decodeCString($0.baseAddress, as: C.self)
   }
 }

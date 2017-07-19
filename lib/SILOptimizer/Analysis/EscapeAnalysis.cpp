@@ -1023,7 +1023,7 @@ static bool isOrContainsReference(SILType Ty, SILModule *Mod) {
   }
   if (auto En = Ty.getEnumOrBoundGenericEnum()) {
     for (auto *ElemDecl : En->getAllElements()) {
-      if (ElemDecl->getArgumentInterfaceType() &&
+      if (ElemDecl->hasAssociatedValues() &&
           isOrContainsReference(Ty.getEnumElementType(ElemDecl, *Mod), Mod))
         return true;
     }
@@ -1354,6 +1354,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::DeallocRefInst:
     case ValueKind::SetDeallocatingInst:
+    case ValueKind::FixLifetimeInst:
       // These instructions don't have any effect on escaping.
       return;
     case ValueKind::StrongReleaseInst:

@@ -45,7 +45,7 @@ namespace swift {
   class ScopeInfo;
   struct TypeLoc;
   class TupleType;
-  class SILParserState;
+  class SILParserTUStateBase;
   class SourceManager;
   class PersistentParserState;
   class CodeCompletionCallbacks;
@@ -71,7 +71,10 @@ namespace swift {
     ActiveConditionalBlock,
   };
 
-  
+/// The main class used for parsing a source file (.swift or .sil).
+///
+/// Rather than instantiating a Parser yourself, use one of the parsing APIs
+/// provided in Subsystems.h.
 class Parser {
   Parser(const Parser&) = delete;
   void operator=(const Parser&) = delete;
@@ -85,7 +88,7 @@ public:
   DiagnosticEngine &Diags;
   SourceFile &SF;
   Lexer *L;
-  SILParserState *SIL;    // Non-null when parsing a .sil file.
+  SILParserTUStateBase *SIL; // Non-null when parsing a .sil file.
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
@@ -130,6 +133,9 @@ public:
 
   bool InPoundLineEnvironment = false;
   bool InPoundIfEnvironment = false;
+  bool InSwiftKeyPath = false;
+  Expr* SwiftKeyPathRoot = nullptr;
+  SourceLoc SwiftKeyPathSlashLoc = SourceLoc();
 
   LocalContext *CurLocalContext = nullptr;
 
@@ -301,10 +307,10 @@ public:
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
 public:
-  Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
+  Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-         SILParserState *SIL = nullptr,
+         SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr);
   ~Parser();
 
@@ -517,16 +523,16 @@ public:
   /// Add a camel-cased option if it is different than the first option.
   void diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
                               StringRef DeclKindName);
-     
-  /// \brief Check whether the current token starts with '<'.
-  bool startsWithLess(Token Tok) {
-    return Tok.isAnyOperator() && Tok.getText()[0] == '<';
+
+  bool startsWithSymbol(Token Tok, char symbol) {
+    return (Tok.isAnyOperator() || Tok.isPunctuation()) &&
+           Tok.getText()[0] == symbol;
   }
+  /// \brief Check whether the current token starts with '<'.
+  bool startsWithLess(Token Tok) { return startsWithSymbol(Tok, '<'); }
 
   /// \brief Check whether the current token starts with '>'.
-  bool startsWithGreater(Token Tok) {
-    return Tok.isAnyOperator() && Tok.getText()[0] == '>';
-  }
+  bool startsWithGreater(Token Tok) { return startsWithSymbol(Tok, '>'); }
 
   /// \brief Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
@@ -713,7 +719,11 @@ public:
   ParserResult<TypeDecl> parseDeclAssociatedType(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   
-  ParserResult<IfConfigDecl> parseDeclIfConfig(ParseDeclOptions Flags);
+  /// Parse a #if ... #endif directive.
+  /// Delegate callback function to parse elements in the blocks.
+  ParserResult<IfConfigDecl> parseIfConfig(
+    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
+
   /// Parse a #line/#sourceLocation directive.
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
@@ -729,6 +739,11 @@ public:
   /// \p Attr is where to store the parsed attribute
   bool parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
                                 SourceLoc Loc, SpecializeAttr *&Attr);
+
+  /// Parse the @_implements attribute.
+  /// \p Attr is where to store the parsed attribute
+  ParserResult<ImplementsAttr> parseImplementsAttribute(SourceLoc AtLoc,
+                                                        SourceLoc Loc);
 
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -855,18 +870,6 @@ public:
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
 
   //===--------------------------------------------------------------------===//
-  // SIL Parsing.
-
-  bool parseDeclSIL();
-  bool parseDeclSILStage();
-  bool parseSILVTable();
-  bool parseSILGlobal();
-  bool parseSILWitnessTable();
-  bool parseSILDefaultWitnessTable();
-  bool parseSILCoverageMap();
-  bool parseSILScope();
-
-  //===--------------------------------------------------------------------===//
   // Type Parsing
   
   ParserResult<TypeRepr> parseType();
@@ -965,15 +968,11 @@ public:
     /// Any declaration attributes attached to the parameter.
     DeclAttributes Attrs;
 
-    /// The location of the 'let', 'var', or 'inout' keyword, if present.
-    SourceLoc LetVarInOutLoc;
-
-    enum SpecifierKindTy {
-      Let,
-      Var,
-      InOut
-    };
-    SpecifierKindTy SpecifierKind = Let; // Defaults to let.
+    /// The location of the 'inout' keyword, if present.
+    SourceLoc SpecifierLoc;
+    
+    /// The parsed specifier kind, if present.
+    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::Owned;
 
     /// The location of the first name.
     ///
@@ -1085,7 +1084,8 @@ public:
                                                        bool isExprBasic);
   
 
-  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
+  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name,
+                                    VarDecl::Specifier specifier);
   
 
   /// \brief Determine whether this token can only start a matching pattern
@@ -1136,8 +1136,13 @@ public:
                                        bool isForConditionalDirective = false);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
                                               bool isExprBasic);
+  ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,
+                                            bool isExprBasic,
+                                            bool periodHasKeyPathBehavior,
+                                            bool &hasBindOptional);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprKeyPathObjC();
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper(bool isExprBasic);
@@ -1162,8 +1167,12 @@ public:
   /// enables '.init' and '.default' like expressions.
   /// \param loc Will be populated with the location of the name.
   /// \param diag The diagnostic to emit if this is not a name.
+  /// \param allowOperators Whether to allow operator basenames too.
+  /// \param allowZeroArgCompoundNames Whether to allow empty argument lists.
   DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
-                                    const Diagnostic &diag);
+                                    const Diagnostic &diag,
+                                    bool allowOperators=false,
+                                    bool allowZeroArgCompoundNames=false);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
@@ -1248,6 +1257,8 @@ public:
   // Statement Parsing
 
   bool isStartOfStmt();
+  bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
+                                        ArrayRef<ASTNode> ParsedDecls);
   ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtBreak();
@@ -1260,8 +1271,6 @@ public:
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
   ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtGuard();
-  ParserResult<Stmt> parseStmtIfConfig(BraceItemListKind Kind
-                                        = BraceItemListKind::Brace);
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo);
@@ -1272,16 +1281,8 @@ public:
   ParserResult<Stmt> parseStmtForEach(SourceLoc ForLoc,
                                       LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
-  ParserResult<CaseStmt> parseStmtCase();
-
-  /// Classify the condition of an #if directive according to whether it can
-  /// be evaluated statically.  The first member of the pair indicates whether
-  /// parsing of the condition body should occur, the second contains the result
-  /// of evaluating the conditional expression.
-  static ConditionalCompilationExprState
-  classifyConditionalCompilationExpr(Expr *condition,
-                                     ASTContext &context,
-                                     DiagnosticEngine &diags);
+  ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
+  ParserResult<CaseStmt> parseStmtCase(bool IsActive);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

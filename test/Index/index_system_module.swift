@@ -8,10 +8,10 @@
 // CHECK: class/Swift | SubCls | [[SUBCLS_USR:.*]] | Def | rel: 0
 // CHECK: class/Swift | BaseCls | [[BASECLS_USR:.*]] | Ref,RelBase | rel: 1
 // CHECK-NEXT: RelBase | class/Swift | SubCls | [[SUBCLS_USR]]
-// CHECK: instance-method/Swift | theMeth() | [[SUBCLSMETH_USR:.*]] | Def,RelChild,RelOver | rel: 2
+// CHECK: instance-method/Swift | theMeth() | [[SUBCLSMETH_USR:.*]] | Def,Dyn,RelChild,RelOver | rel: 2
 // CHECK-NEXT: RelOver | instance-method/Swift | theMeth() | [[BASECLSMETH_USR:.*]]
 // CHECK-NEXT: RelChild | class/Swift | SubCls | [[SUBCLS_USR]]
 // CHECK: class/Swift | BaseCls | [[BASECLS_USR]] | Def | rel: 0
-// CHECK: instance-method/Swift | theMeth() | [[BASECLSMETH_USR]] | Def,RelChild | rel: 1
+// CHECK: instance-method/Swift | theMeth() | [[BASECLSMETH_USR]] | Def,Dyn,RelChild | rel: 1
 // CHECK-NEXT: RelChild | class/Swift | BaseCls | [[BASECLS_USR]]
 // CHECK: function/Swift | some_func() | [[SOMEFUNC_USR:.*]] | Def | rel: 0

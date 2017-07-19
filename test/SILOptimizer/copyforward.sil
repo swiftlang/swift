@@ -450,7 +450,7 @@ bb0:
 // CHECK-LABEL: sil @nil_comparison
 // CHECK:  alloc_stack
 // CHECK-NOT: copy_addr
-// CHECK-NOT destroy_addr
+// CHECK-NOT: destroy_addr
 // CHECK: switch_enum_addr %0
 // CHECK: [[D:%.*]] = unchecked_take_enum_data_addr %0
 // CHECK: destroy_addr [[D]]
@@ -598,4 +598,90 @@ bb0(%0 : $*P, %1 : $*T):
   dealloc_stack %2 : $*T
   %27 = tuple ()
   return %27 : $()
+}
+
+public struct S<T> {
+  @sil_stored var f: T { get set }
+  @sil_stored var g: T { get set }
+  init(f: T, g: T)
+}
+
+// Test a dead copy that initializes a stack local.
+// CHECK-LABEL: deadtemp
+// CHECK: %[[G:.*]] = struct_element_addr %0 : $*S<T>, #S.g
+// CHECK-NOT: copy_addr
+// CHECK: %[[F:.*]] = struct_element_addr %0 : $*S<T>, #S.f
+// CHECK: copy_addr %[[G]] to %[[F]] : $*T
+// CHECK: return
+sil @deadtemp : $@convention(thin) <T> (@inout S<T>) -> () {
+bb0(%0 : $*S<T>):
+  %1 = struct_element_addr %0 : $*S<T>, #S.g
+  %2 = alloc_stack $T
+  copy_addr %1 to [initialization] %2 : $*T
+  %4 = struct_element_addr %0 : $*S<T>, #S.f
+  copy_addr [take] %2 to %4 : $*T
+  dealloc_stack %2 : $*T
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Test assigning into a stack local.
+// CHECK-LABEL: deadtemp_assign
+// CHECK: %[[G:.*]] = struct_element_addr %0 : $*S<T>, #S.g
+// CHECK-NOT: copy_addr
+// CHECK: destroy_addr %2 : $*T
+// CHECK: %[[F:.*]] = struct_element_addr %0 : $*S<T>, #S.f
+// CHECK: copy_addr %[[G]] to %[[F]] : $*T
+// CHECK: return
+sil @deadtemp_assign : $@convention(thin) <T> (@inout S<T>) -> () {
+bb0(%0 : $*S<T>):
+  %1 = struct_element_addr %0 : $*S<T>, #S.g
+  %2 = alloc_stack $T
+  copy_addr %1 to %2 : $*T
+  %4 = struct_element_addr %0 : $*S<T>, #S.f
+  copy_addr [take] %2 to %4 : $*T
+  dealloc_stack %2 : $*T
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Test a dead copy that initializes a stack local,
+// taking the source, and initializing the destination.
+// CHECK-LABEL: deadtemp_take_init
+// CHECK: %[[G:.*]] = struct_element_addr %0 : $*S<T>, #S.g
+// CHECK-NOT: copy_addr
+// CHECK: %[[F:.*]] = struct_element_addr %0 : $*S<T>, #S.f
+// CHECK: copy_addr [take] %[[G]] to [initialization] %[[F]] : $*T
+// CHECK: return
+sil @deadtemp_take_init : $@convention(thin) <T> (@inout S<T>) -> () {
+bb0(%0 : $*S<T>):
+  %1 = struct_element_addr %0 : $*S<T>, #S.g
+  %2 = alloc_stack $T
+  copy_addr [take] %1 to [initialization] %2 : $*T
+  %4 = struct_element_addr %0 : $*S<T>, #S.f
+  copy_addr [take] %2 to [initialization] %4 : $*T
+  dealloc_stack %2 : $*T
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Test a dead copy that initializes a stack local and destroy's it later.
+// CHECK-LABEL: deadtemp_destroy
+// CHECK: %[[G:.*]] = struct_element_addr %0 : $*S<T>, #S.g
+// CHECK-NOT: copy_addr
+// CHECK: %[[F:.*]] = struct_element_addr %0 : $*S<T>, #S.f
+// CHECK: copy_addr %[[G]] to %[[F]] : $*T
+// CHECK-NOT: destroy_addr
+// CHECK: return
+sil @deadtemp_destroy : $@convention(thin) <T> (@inout S<T>) -> () {
+bb0(%0 : $*S<T>):
+  %1 = struct_element_addr %0 : $*S<T>, #S.g
+  %2 = alloc_stack $T
+  copy_addr %1 to [initialization] %2 : $*T
+  %4 = struct_element_addr %0 : $*S<T>, #S.f
+  copy_addr %2 to %4 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %7 = tuple ()
+  return %7 : $()
 }

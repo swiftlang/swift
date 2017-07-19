@@ -20,6 +20,7 @@ class AbstractStorageDecl;
 class ValueDecl;
 class ExtensionDecl;
 enum class AccessorKind;
+class Type;
 
 namespace ide {
 

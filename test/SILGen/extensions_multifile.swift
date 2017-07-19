@@ -8,3 +8,15 @@
 extension HasInitValue {
   init(z: Int) {}
 }
+
+// CHECK-LABEL: sil hidden_external [transparent] @_T020extensions_multifile19HasPrivateInitValueV1x33_0A683B047698EED319CF48214D7F519DLLSivfi : $@convention(thin) () -> Int
+
+extension HasPrivateInitValue {
+  init(z: Int) {}
+}
+
+// CHECK-LABEL: sil hidden_external [transparent] @_T020extensions_multifile24PublicStructHasInitValueV1xSivfi : $@convention(thin) () -> Int
+
+extension PublicStructHasInitValue {
+  init(z: Int) {}
+}

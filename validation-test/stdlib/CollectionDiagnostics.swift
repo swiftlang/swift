@@ -23,17 +23,15 @@ struct CollectionWithBadSubSequence : Collection {
     fatalError("unreachable")
   }
 
-  // expected-note@+3 {{possibly intended match 'CollectionWithBadSubSequence.SubSequence' (aka 'OpaqueValue<Int8>') does not conform to 'Sequence'}}
+  // expected-note@+3 {{possibly intended match}}
   // expected-note@+2 {{possibly intended match}}
   // expected-note@+1 {{possibly intended match}}
   typealias SubSequence = OpaqueValue<Int8>
 }
 
-func useCollectionTypeSubSequenceIndex<C : Collection>(_ c: C)
-  where C.SubSequence.Index == C.Index {}
+func useCollectionTypeSubSequenceIndex<C : Collection>(_ c: C) {}
 
-func useCollectionTypeSubSequenceGeneratorElement<C : Collection>(_ c: C)
-  where C.SubSequence.Iterator.Element == C.Iterator.Element {}
+func useCollectionTypeSubSequenceGeneratorElement<C : Collection>(_ c: C) {}
 
 func sortResultIgnored<
   S : Sequence,

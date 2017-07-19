@@ -201,7 +201,7 @@ func testTuple2() {
 // TUPLE_2: Literal[Tuple]/None/TypeRelation[Identical]: ({#(values)#})[#(MyInt1, MyString1, MyDouble1)#];
 
 struct MyColor1: _ExpressibleByColorLiteral {
-  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
+  init(_colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
 }
 func testColor0() {
   let x: Int = #^COLOR_0^#

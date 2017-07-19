@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c %S/../Inputs/resilient_protocol.swift -o %t/resilient_protocol.o
 // RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_protocol.swift -o %t/resilient_protocol.o
 // RUN: %target-build-swift %s -Xlinker %t/resilient_protocol.o -I %t -L %t -o %t/main

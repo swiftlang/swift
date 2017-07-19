@@ -1,8 +1,7 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-object -emit-module -o %t %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module
 // RUN: llvm-bcanalyzer %t/def_class.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-disable-pass="External Defs To Decls" -sil-debug-serialization -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-disable-pass="External Definition To Declaration" -sil-debug-serialization -I %t %s | %FileCheck %s -check-prefix=SIL
 // RUN: echo "import def_class; struct A : ClassProto {}" | not %target-swift-frontend -typecheck -I %t - 2>&1 | %FileCheck %s -check-prefix=CHECK-STRUCT
 
 // CHECK-NOT: UnknownCode
@@ -77,7 +76,7 @@ var rsrc = Resource()
 
 getReqPairLike()
 
-// SIL-LABEL: sil public_external [transparent] [serialized] @_T0s1poiS2i_SitF : $@convention(thin) (Int, Int) -> Int {
+// SIL-LABEL: sil public_external [transparent] [serialized] @_T0Si1poiS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
 
 func test(_ sharer: ResourceSharer) {}
 

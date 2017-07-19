@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -c -parse-as-library -module-name test -validate-tbd-against-ir %s
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
 
 public let publicLet: Int = 0
 internal let internalLet: Int = 0

@@ -46,9 +46,7 @@ static bool seemsUseful(SILInstruction *I) {
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
     // Although the onFastPath builtin has no side-effects we don't want to
     // remove it.
-    if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
-      return true;
-    return false;
+    return BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath;
   }
 
   if (isa<ReturnInst>(I) || isa<UnreachableInst>(I) || isa<ThrowInst>(I))
@@ -109,7 +107,7 @@ class DCE : public SILFunctionTransform {
 
     SILFunction *F = getFunction();
 
-    auto* DA = PM->getAnalysis<PostDominanceAnalysis>();
+    auto *DA = PM->getAnalysis<PostDominanceAnalysis>();
     PDT = DA->get(F);
 
     // If we have a function that consists of nothing but a
@@ -176,7 +174,6 @@ class DCE : public SILFunctionTransform {
   SILBasicBlock *nearestUsefulPostDominator(SILBasicBlock *Block);
   void replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block);
 
-  StringRef getName() override { return "Dead Code Elimination"; }
 };
 
 // Keep track of the fact that V is live and add it to our worklist

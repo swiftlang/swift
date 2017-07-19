@@ -52,7 +52,7 @@ func test0() -> Bool {
 // the compiler does not statically know if this object
 // is NSNumber can be converted into Int.
 
-// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftSis9AnyObject_pF
+// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftSiyXlF
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)
@@ -64,7 +64,7 @@ public func testMayBeBridgedCastFromObjCtoSwift(_ o: AnyObject) -> Int {
 // the compiler does not statically know if this object
 // is NSString can be converted into String.
 
-// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftSSSgs9AnyObject_pF
+// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftSSSgyXlF
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)
@@ -196,6 +196,38 @@ public func testCastEveryToNonClassType<T>(_ o: T) -> Int.Type {
   return o as! Int.Type
 }
 
+func cast<U, V>(_ u: U.Type) -> V? {
+  return u as? V
+}
+
+public protocol P {
+}
+
+// Any casts from P.Protocol to P.Type should fail.
+@inline(never)
+public func testCastPProtocolToPType() -> ObjCP.Type? {
+  return cast(ObjCP.self)
+}
+
+@objc
+public protocol ObjCP {
+}
+
+@inline(never)
+public func testCastObjCPProtocolToObjCPType() -> ObjCP.Type? {
+  return cast(ObjCP.self)
+}
+
+@inline(never)
+public func testCastProtocolCompositionProtocolToProtocolCompositionType() -> (P & ObjCP).Type? {
+  return cast((P & ObjCP).self)
+}
+
+@inline(never)
+public func testCastProtocolCompositionProtocolToProtocolType () -> P.Type? {
+  return (P & ObjCP).self as? P.Type
+}
+
 print("test0=\(test0())")
 
 
@@ -241,7 +273,17 @@ print("test0=\(test0())")
 // CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToNonClassType
 // CHECK:         unconditional_checked_cast_addr
 
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastPProtocolToPType
+// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %0
 
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastObjCPProtocolTo{{.*}}PType
+// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %0
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastProtocolComposition{{.*}}Type
+// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %0
 
 // Check that compiler understands that this cast always succeeds.
 // Since it is can be statically proven that NSString is bridgeable to String,
@@ -265,3 +307,37 @@ public func testBridgedCastFromSwiftToObjC(_ s: String) -> NSString {
   return s as NSString
 }
 
+public class MyString: NSString {}
+
+// Check that the cast-optimizer bails out on a conditional downcast to a subclass of a
+// bridged ObjC class.
+// CHECK-LABEL: sil [noinline] @{{.*}}testConditionalBridgedCastFromSwiftToNSObjectDerivedClass{{.*}}
+// CHECK: function_ref @_T0SS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK: apply
+// CHECK-NOT: apply
+// CHECK-NOT: unconditional_checked_cast
+// CHECK: checked_cast_br
+// CHECK-NOT: apply
+// CHECK-NOT: unconditional
+// CHECK: return
+@inline(never)
+public func testConditionalBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) -> MyString? {
+  return s as? MyString
+}
+
+// Check that the cast-optimizer does not bail out on an unconditional downcast to a subclass of a
+// bridged ObjC class.
+// CHECK-LABEL: sil [noinline] @{{.*}}testForcedBridgedCastFromSwiftToNSObjectDerivedClass{{.*}}
+// CHECK: function_ref @_T0SS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK: apply
+// CHECK-NOT: apply
+// CHECK-NOT: checked_cast_br
+// CHECK: unconditional_checked_cast
+// CHECK-NOT: apply
+// CHECK-NOT: unconditional
+// CHECK-NOT: checked_cast
+// CHECK: return
+@inline(never)
+public func testForcedBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) -> MyString {
+    return s as! MyString
+}

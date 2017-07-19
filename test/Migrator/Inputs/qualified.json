@@ -1,0 +1,34 @@
+[
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(cs)PropertyUserInterface(cm)fieldPlus",
+    "OldPrintedName": "fieldPlus",
+    "OldTypeName": "PropertyUserInterface",
+    "NewPrintedName": "newFieldPlus",
+    "NewTypeName": "NewPropertyUserInterface"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(cs)PropertyUserInterface(cm)methodPlus:",
+    "OldPrintedName": "methodPlus(_:)",
+    "OldTypeName": "PropertyUserInterface",
+    "NewPrintedName": "newMethodPlus(_:)",
+    "NewTypeName": "NewPropertyUserInterface"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@FooComparisonResult@FooOrderedSame",
+    "OldPrintedName": "FooOrderedSame",
+    "OldTypeName": "FooComparisonResult",
+    "NewPrintedName": "NewFooOrderedSame",
+    "NewTypeName": "NewFooComparisonResult"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6CitiesAAC8CityKindV4TownSivZ",
+    "OldPrintedName": "town",
+    "OldTypeName": "Cities.CityKind",
+    "NewPrintedName": "NewTown",
+    "NewTypeName": "NewCityKind"
+  }
+]

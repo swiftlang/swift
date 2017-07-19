@@ -23,16 +23,25 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/IR/GlobalValue.h"
 
+namespace llvm {
+class Triple;
+}
+
 namespace swift {
 namespace irgen {
 class IRGenModule;
 
+/// Determine if the triple uses the DLL storage.
+bool useDllStorage(const llvm::Triple &triple);
+
 class UniversalLinkageInfo {
 public:
-  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule,
-      IsWholeModuleSerialized;
+  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule;
 
   UniversalLinkageInfo(IRGenModule &IGM);
+
+  UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
+                       bool isWholeModule);
 };
 
 /// Selector for type metadata symbol kinds.
@@ -84,11 +93,6 @@ class LinkEntity {
     /// A function.
     /// The pointer is a FuncDecl*.
     Function,
-
-    /// The offset to apply to a witness table or metadata object
-    /// in order to find the information for a declaration.  The
-    /// pointer is a ValueDecl*.
-    WitnessTableOffset,
 
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
@@ -308,8 +312,8 @@ class LinkEntity {
                                                 CanType associatedType,
                                                 ProtocolDecl *requirement) {
     unsigned index = 0;
-    for (auto &reqt : conformance->getProtocol()->getRequirementSignature()
-                                                ->getRequirements()) {
+    for (const auto &reqt :
+           conformance->getProtocol()->getRequirementSignature()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
           reqt.getSecondType()->castTo<ProtocolType>()->getDecl() ==
@@ -324,9 +328,7 @@ class LinkEntity {
   static std::pair<CanType, ProtocolDecl*>
   getAssociatedConformanceByIndex(const ProtocolConformance *conformance,
                                   unsigned index) {
-    auto &reqt =
-      conformance->getProtocol()->getRequirementSignature()
-                                ->getRequirements()[index];
+    auto &reqt = conformance->getProtocol()->getRequirementSignature()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
              reqt.getSecondType()->castTo<ProtocolType>()->getDecl() };
@@ -347,12 +349,6 @@ public:
 
     LinkEntity entity;
     entity.setForDecl(Kind::Other, decl);
-    return entity;
-  }
-
-  static LinkEntity forWitnessTableOffset(ValueDecl *decl) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::WitnessTableOffset, decl);
     return entity;
   }
 
@@ -572,8 +568,7 @@ public:
   /// Returns true if this function or global variable may be inlined into
   /// another module.
   ///
-  bool isFragile(ForDefinition_t isDefinition,
-                 bool wholeModuleSerialized) const;
+  bool isFragile(ForDefinition_t isDefinition) const;
 
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
@@ -685,6 +680,14 @@ public:
 
   static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
                       ForDefinition_t forDefinition);
+  
+  static LinkInfo get(const UniversalLinkageInfo &linkInfo,
+                      StringRef name,
+                      SILLinkage linkage,
+                      bool isFragile,
+                      bool isSILOnly,
+                      ForDefinition_t isDefinition,
+                      bool isWeakImported);
 
   StringRef getName() const {
     return Name.str();

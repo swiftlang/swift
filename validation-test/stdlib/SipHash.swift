@@ -214,13 +214,13 @@ func loadUnalignedUInt64LE(
 ) -> UInt64 {
   return
     UInt64(p.load(fromByteOffset: 0, as: UInt8.self)) |
-    (UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) << 8) |
-    (UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) << 16) |
-    (UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) << 24) |
-    (UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) << 32) |
-    (UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) << 40) |
-    (UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) << 48) |
-    (UInt64(p.load(fromByteOffset: 7, as: UInt8.self)) << 56)
+    (UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<<  8 as UInt64) |
+    (UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16 as UInt64) |
+    (UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24 as UInt64) |
+    (UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< 32 as UInt64) |
+    (UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< 40 as UInt64) |
+    (UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< 48 as UInt64) |
+    (UInt64(p.load(fromByteOffset: 7, as: UInt8.self)) &<< 56 as UInt64)
 }
 
 func loadUnalignedUInt32LE(
@@ -228,9 +228,9 @@ func loadUnalignedUInt32LE(
 ) -> UInt32 {
   return
     UInt32(p.load(fromByteOffset: 0, as: UInt8.self)) |
-    (UInt32(p.load(fromByteOffset: 1, as: UInt8.self)) << 8) |
-    (UInt32(p.load(fromByteOffset: 2, as: UInt8.self)) << 16) |
-    (UInt32(p.load(fromByteOffset: 3, as: UInt8.self)) << 24)
+    (UInt32(p.load(fromByteOffset: 1, as: UInt8.self)) &<<  8 as UInt32) |
+    (UInt32(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16 as UInt32) |
+    (UInt32(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24 as UInt32)
 }
 
 func loadUnalignedUIntLE(

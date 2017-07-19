@@ -37,7 +37,6 @@ namespace swift {
     extern detail::DiagWithArguments<void Signature>::type ID;
 #include "DiagnosticsSema.def"
   }
-  void diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS);
 }
 
 #endif

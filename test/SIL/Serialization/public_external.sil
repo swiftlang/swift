@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -Xllvm -sil-disable-pass="External Defs To Decls" -parse-sil -emit-module -module-name Swift -module-link-name swiftCore -parse-stdlib -parse-as-library -sil-serialize-all -o - | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift -emit-sorted-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-disable-pass="External Definition To Declaration" -parse-sil -emit-module -module-name Swift -module-link-name swiftCore -parse-stdlib -parse-as-library -sil-serialize-all -o - | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift -emit-sorted-sil | %FileCheck %s
 
 sil_stage raw
 import Builtin

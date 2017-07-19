@@ -23,6 +23,7 @@ add_swift_library(swiftAST STATIC
   DeclContext.cpp
   DeclNameLoc.cpp
   DefaultArgumentKind.cpp
+  DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
   DiagnosticList.cpp
   DocComment.cpp
@@ -32,6 +33,7 @@ add_swift_library(swiftAST STATIC
   GenericSignatureBuilder.cpp
   Identifier.cpp
   LayoutConstraint.cpp
+  LegacyASTTransformer.cpp
   LookupVisibleDecls.cpp
   Module.cpp
   ModuleLoader.cpp
@@ -43,6 +45,7 @@ add_swift_library(swiftAST STATIC
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
+  SyntaxASTMap.cpp
   SILLayout.cpp
   Stmt.cpp
   SourceEntityWalker.cpp

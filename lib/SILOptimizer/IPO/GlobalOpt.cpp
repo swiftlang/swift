@@ -176,7 +176,7 @@ static void removeToken(SILValue Op) {
       ATPI->eraseFromParent();
   }
 
-  if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(Op)) {
+  if (auto *GAI = dyn_cast<GlobalAddrInst>(Op)) {
     auto *Global = GAI->getReferencedGlobal();
     // If "global_addr token" is used more than one time, bail.
     if (!(GAI->use_empty() || GAI->hasOneUse()))
@@ -256,7 +256,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
       I.eraseFromParent();
       continue;
     }
-    if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+    if (auto *SI = dyn_cast<StoreInst>(&I)) {
       Val = SI->getSrc();
       SILBuilderWithScope B(SI);
       B.createReturn(SI->getLoc(), Val);
@@ -348,11 +348,11 @@ bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
 /// Returns true if the block \p BB is terminated with a cond_br based on an
 /// availability check.
 static bool isAvailabilityCheck(SILBasicBlock *BB) {
-  CondBranchInst *CBR = dyn_cast<CondBranchInst>(BB->getTerminator());
+  auto *CBR = dyn_cast<CondBranchInst>(BB->getTerminator());
   if (!CBR)
     return false;
   
-  ApplyInst *AI = dyn_cast<ApplyInst>(CBR->getCondition());
+  auto *AI = dyn_cast<ApplyInst>(CBR->getCondition());
   if (!AI)
     return false;
 
@@ -511,13 +511,13 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
       continue;
     }
 
-    if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+    if (auto *SI = dyn_cast<StoreInst>(&I)) {
       Val = SI->getSrc();
       Store = SI;
       continue;
     }
 
-    if (ReturnInst *RI = dyn_cast<ReturnInst>(&I)) {
+    if (auto *RI = dyn_cast<ReturnInst>(&I)) {
       SILBuilderWithScope B(RI);
       B.createReturn(RI->getLoc(), Val);
       eraseUsesOfInstruction(RI);
@@ -542,7 +542,7 @@ static SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
   SILBasicBlock *BB = &AddrF->front();
   for (auto &I : *BB) {
     // Find the builtin "once" call.
-    if (BuiltinInst *BI = dyn_cast<BuiltinInst>(&I)) {
+    if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
       const BuiltinInfo &Builtin = Module->getBuiltinInfo(BI->getName());
       if (Builtin.ID != BuiltinValueKind::Once)
         continue;
@@ -895,12 +895,12 @@ bool SILGlobalOpt::run() {
     for (auto &BB : F) {
       bool IsCold = ColdBlocks.isCold(&BB);
       for (auto &I : BB)
-        if (BuiltinInst *BI = dyn_cast<BuiltinInst>(&I)) {
+        if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
           collectOnceCall(BI);
-        } else if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
+        } else if (auto *AI = dyn_cast<ApplyInst>(&I)) {
           if (!IsCold)
             collectGlobalInitCall(AI);
-        } else if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(&I)) {
+        } else if (auto *GAI = dyn_cast<GlobalAddrInst>(&I)) {
             collectGlobalAccess(GAI);
         }
     }
@@ -930,7 +930,6 @@ class SILGlobalOptPass : public SILModuleTransform
     }
   }
 
-  StringRef getName() override { return "SIL Global Optimization"; }
 };
 } // end anonymous namespace
 

@@ -413,12 +413,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ")";
     break;
   }
-  case DAK_AutoClosure:
-    Printer.printAttrName("@autoclosure");
-    if (cast<AutoClosureAttr>(this)->isEscaping())
-      Printer << "(escaping)";
-    break;
-      
+
   case DAK_CDecl:
     Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
     break;
@@ -484,6 +479,32 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Implements: {
+    Printer.printAttrName("@_implements");
+    Printer << "(";
+    auto *attr = cast<ImplementsAttr>(this);
+    attr->getProtocolType().getType().print(Printer, Options);
+    Printer << ", " << attr->getMemberName() << ")";
+    break;
+  }
+
+  case DAK_ObjCRuntimeName: {
+    Printer.printAttrName("@objc");
+    Printer << "(";
+    auto *attr = cast<ObjCRuntimeNameAttr>(this);
+    Printer << "\"" << attr->Name << "\"";
+    Printer << ")";
+    break;
+  }
+
+  case DAK_StaticInitializeObjCMetadata:
+    Printer.printAttrName("@_staticInitializeObjCMetadata");
+    break;
+
+  case DAK_DowngradeExhaustivityCheck:
+    Printer.printAttrName("@_downgrade_exhaustivity_check");
+    break;
+    
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -542,9 +563,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_semantics";
   case DAK_Available:
     return "availability";
-  case DAK_AutoClosure:
-    return "autoclosure";
   case DAK_ObjC:
+  case DAK_ObjCRuntimeName:
     return "objc";
   case DAK_Inline: {
     switch (cast<InlineAttr>(this)->getKind()) {
@@ -598,6 +618,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<synthesized protocol>>";
   case DAK_Specialize:
     return "_specialize";
+  case DAK_Implements:
+    return "_implements";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -872,4 +894,34 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
   void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
   return new (mem)
       SpecializeAttr(atLoc, range, requirements, exported, kind);
+}
+
+
+ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
+                               TypeLoc ProtocolType,
+                               DeclName MemberName,
+                               DeclNameLoc MemberNameLoc)
+    : DeclAttribute(DAK_Implements, atLoc, range, /*Implicit=*/false),
+      ProtocolType(ProtocolType),
+      MemberName(MemberName),
+      MemberNameLoc(MemberNameLoc) {
+}
+
+
+ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
+                                       SourceRange range,
+                                       TypeLoc ProtocolType,
+                                       DeclName MemberName,
+                                       DeclNameLoc MemberNameLoc) {
+  void *mem = Ctx.Allocate(sizeof(ImplementsAttr), alignof(ImplementsAttr));
+  return new (mem) ImplementsAttr(atLoc, range, ProtocolType,
+                                  MemberName, MemberNameLoc);
+}
+
+TypeLoc ImplementsAttr::getProtocolType() const {
+  return ProtocolType;
+}
+
+TypeLoc &ImplementsAttr::getProtocolType() {
+  return ProtocolType;
 }

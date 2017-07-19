@@ -135,6 +135,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOINIT_FINAL -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_FINAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOINIT_STRUCT -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_STRUCT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MISSING_ASSOC_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=MISSING_ASSOC_1
+
+
 @objc
 class TagPA {}
 @objc
@@ -704,3 +707,22 @@ struct RequiredS : RequiredP {
 // PROTOINIT_STRUCT: Begin completions, 1 items
 // PROTOINIT_STRUCT-DAG: init(p: Int) {|}; name=init(p: Int)
 // PROTOINIT_STRUCT: End completions
+
+protocol AssocAndMethod {
+  associatedtype T = Int
+  associatedtype U: P0
+  associatedtype V
+
+  func f1(_: T)
+  func f2(_: U)
+  func f3(_: V)
+}
+
+struct MissingAssoc: AssocAndMethod {
+  func #^MISSING_ASSOC_1^#
+}
+// MISSING_ASSOC_1: Begin completions
+// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f1(_: MissingAssoc.T) {|};
+// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f2(_: MissingAssoc.U) {|};
+// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f3(_: MissingAssoc.V) {|};
+// MISSING_ASSOC_1: End completions

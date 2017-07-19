@@ -17,18 +17,31 @@ import Foundation
 import TestsUtils
 
 // a naive O(n) implementation of byteswap.
+@inline(never)
 func byteswap_n(_ a: UInt64) -> UInt64 {
+#if swift(>=4)
+  return ((a & 0x00000000000000FF) &<< 56) |
+         ((a & 0x000000000000FF00) &<< 40) |
+         ((a & 0x0000000000FF0000) &<< 24) |
+         ((a & 0x00000000FF000000) &<<  8) |
+         ((a & 0x000000FF00000000) &>>  8) |
+         ((a & 0x0000FF0000000000) &>> 24) |
+         ((a & 0x00FF000000000000) &>> 40) |
+         ((a & 0xFF00000000000000) &>> 56)
+#else
   return ((a & 0x00000000000000FF) << 56) |
-      ((a & 0x000000000000FF00) << 40) |
-      ((a & 0x0000000000FF0000) << 24) |
-      ((a & 0x00000000FF000000) <<  8) |
-      ((a & 0x000000FF00000000) >>  8) |
-      ((a & 0x0000FF0000000000) >> 24) |
-      ((a & 0x00FF000000000000) >> 40) |
-      ((a & 0xFF00000000000000) >> 56)
+         ((a & 0x000000000000FF00) << 40) |
+         ((a & 0x0000000000FF0000) << 24) |
+         ((a & 0x00000000FF000000) <<  8) |
+         ((a & 0x000000FF00000000) >>  8) |
+         ((a & 0x0000FF0000000000) >> 24) |
+         ((a & 0x00FF000000000000) >> 40) |
+         ((a & 0xFF00000000000000) >> 56)
+#endif
 }
 
 // a O(logn) implementation of byteswap.
+@inline(never)
 func byteswap_logn(_ a: UInt64) -> UInt64 {
   var a = a
   a = (a & 0x00000000FFFFFFFF) << 32 | (a & 0xFFFFFFFF00000000) >> 32
@@ -39,10 +52,13 @@ func byteswap_logn(_ a: UInt64) -> UInt64 {
 
 @inline(never)
 public func run_ByteSwap(_ N: Int) {
-  for _ in 1...100*N {
+  var s: UInt64 = 0
+  for _ in 1...10000*N {
     // Check some results.
-    CheckResults(byteswap_logn(byteswap_n(2457)) == 2457, "Incorrect results in ByteSwap.")
-    CheckResults(byteswap_logn(byteswap_n(9129)) == 9129, "Incorrect results in ByteSwap.")
-    CheckResults(byteswap_logn(byteswap_n(3333)) == 3333, "Incorrect results in ByteSwap.")
+    let x : UInt64 = UInt64(getInt(0))
+    s = s &+ byteswap_logn(byteswap_n(x &+ 2457))
+          &+ byteswap_logn(byteswap_n(x &+ 9129))
+          &+ byteswap_logn(byteswap_n(x &+ 3333))
   }
+  CheckResults(s == (2457 &+ 9129 &+ 3333) &* 10000 &* N)
 }

@@ -1,0 +1,147 @@
+// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+
+import Builtin
+import Swift
+
+class A {
+  @sil_stored var property: Int { get set }
+  @sil_stored var exProperty: Any { get set }
+  deinit
+  init()
+}
+
+// CHECK-DAG: [[C:%T14access_markers1AC]] = type
+// CHECK-DAG: [[INT:%TSi]] = type <{ [[SIZE:i(32|64)]] }>
+
+sil_vtable A {}
+
+// CHECK-LABEL: define {{.*}}void @testPaired(
+sil @testPaired : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  // CHECK:      [[SCRATCH1:%.*]] = alloca [[BUFFER:.* x i8.]], align
+  // CHECK:      [[SCRATCH2:%.*]] = alloca [[BUFFER]], align
+
+  // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds [[C]], [[C]]* %0, i32 0, i32 1
+  %2 = ref_element_addr %0 : $A, #A.property
+
+  // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH1]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.start(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH1]], [[SIZE]] 1, i8* null)
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH1]])
+  // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH1]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.end(i64 {{.*}}, i8* [[T0]])
+  %4 = end_access %3 : $*Int
+
+  // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH2]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.start(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH2]], [[SIZE]] 0, i8* null)
+  %5 = begin_access [read] [dynamic] %2 : $*Int
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH2]])
+  // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH2]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.end(i64 {{.*}}, i8* [[T0]])
+  %6 = end_access %5 : $*Int
+
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// CHECK-LABEL: define {{.*}}void @testUnpaired(
+sil @testUnpaired : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  // CHECK:      [[SCRATCH:%.*]] = alloca [[BUFFER:.* x i8.]], align
+  %1 = alloc_stack $Builtin.UnsafeValueBuffer
+
+  // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds [[C]], [[C]]* %0, i32 0, i32 1
+  %2 = ref_element_addr %0 : $A, #A.property
+
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 1, i8* null)
+  %3 = begin_unpaired_access [modify] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
+  %4 = end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 0, i8* null)
+  %5 = begin_unpaired_access [read] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
+  %6 = end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+
+  dealloc_stack %1 : $*Builtin.UnsafeValueBuffer
+
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// CHECK-LABEL: define {{.*}}void @testUnpairedExternal(
+sil @testUnpairedExternal : $(@guaranteed A, @inout Builtin.UnsafeValueBuffer) -> () {
+bb0(%0 : $A, %1 : $*Builtin.UnsafeValueBuffer):
+  // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds [[C]], [[C]]* %0, i32 0, i32 1
+  %2 = ref_element_addr %0 : $A, #A.property
+
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: [[PC:%.*]] = call i8* @llvm.returnaddress(i32 0)
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH:%1]], [[SIZE]] 1, i8* [[PC]])
+  %3 = begin_unpaired_access [modify] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
+  %4 = end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: [[PC:%.*]] = call i8* @llvm.returnaddress(i32 0)
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 0, i8* [[PC]])
+  %5 = begin_unpaired_access [read] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
+  %6 = end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+
+  %20 = tuple ()
+  return %20 : $()
+}
+
+sil @writeEmptyTuple : $(@inout ()) -> ()
+sil @readEmptyTuple : $(@in_guaranteed ()) -> ()
+
+// rdar://32039394 - Don't apply dynamic enforcement to empty types.
+// CHECK-LABEL: define {{.*}}void @testPairedBox(
+sil @testPairedBox : $(@guaranteed { var () }) -> () {
+bb0(%0 : ${ var () }):
+  // CHECK: entry:
+  %2 = project_box %0 : ${ var () }, 0
+  //  CHECK-NEXT: call {{.*}}void @writeEmptyTuple(%swift.opaque* nocapture undef)
+  %3 = begin_access [modify] [dynamic] %2 : $*()
+  %write_fn = function_ref @writeEmptyTuple : $@convention(thin) (@inout ()) -> ()
+  apply %write_fn(%3) : $@convention(thin) (@inout ()) -> ()
+  %4 = end_access %3 : $*()
+
+  // CHECK-NEXT: call {{.*}}void @readEmptyTuple(%swift.opaque* noalias nocapture undef)
+  %5 = begin_access [read] [dynamic] %2 : $*()
+  %read_fn = function_ref @readEmptyTuple : $@convention(thin) (@in_guaranteed ()) -> ()
+  apply %read_fn(%5) : $@convention(thin) (@in_guaranteed ()) -> ()
+  %6 = end_access %5 : $*()
+
+  // CHECK-NEXT: ret void
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// rdar://31964550
+// Just check that this doesn't crash.
+sil @testCopyAddr : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = alloc_stack $Any
+  %2 = ref_element_addr %0 : $A, #A.exProperty
+  %3 = begin_access [dynamic] [read] %2 : $*Any
+  copy_addr %2 to [initialization] %1 : $*Any
+  end_access %3 : $*Any
+  destroy_addr %1 : $*Any
+  dealloc_stack %1 : $*Any
+  %20 = tuple ()
+  return %20 : $()
+}

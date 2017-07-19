@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 

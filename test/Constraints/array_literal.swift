@@ -50,7 +50,7 @@ useDoubleList([1.0,2,3])
 useDoubleList([1.0,2.0,3.0])
 
 useIntDict(["Niners" => 31, "Ravens" => 34])
-useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Int'}}
+useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{cannot convert value of type '(String, Double)' to expected element type '(String, Int)'}}
 // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
 useDoubleDict(["Niners" => 31, "Ravens" => 34.0])
 useDoubleDict(["Niners" => 31.0, "Ravens" => 34])
@@ -112,7 +112,7 @@ func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
 }
 
 func rdar25563498_ok<T : ExpressibleByArrayLiteral>(t: T) -> T
-     where T.Element : ExpressibleByIntegerLiteral {
+     where T.ArrayLiteralElement : ExpressibleByIntegerLiteral {
   let x: T = [1]
   return x
 }
@@ -129,7 +129,7 @@ func defaultToAny(i: Int, s: String) {
 
   let a2: Array = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-  let _: Int = a2  // expected-error{{value of type '[Any]'}}
+  let _: Int = a2  // expected-error{{value of type 'Array<Any>'}}
   
   let a3 = [1, "a", nil, 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
@@ -137,7 +137,7 @@ func defaultToAny(i: Int, s: String) {
   
   let a4: Array = [1, "a", nil, 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
-  let _: Int = a4 // expected-error{{value of type '[Any?]'}}
+  let _: Int = a4 // expected-error{{value of type 'Array<Any?>'}}
 
   let a5 = []
   // expected-error@-1{{empty collection literal requires an explicit type}}
@@ -153,6 +153,15 @@ func defaultToAny(i: Int, s: String) {
 
   let a6 = [B(), C()]
   let _: Int = a6 // expected-error{{value of type '[A]'}}
+}
+
+func noInferAny(iob: inout B, ioc: inout C) {
+  var b = B()
+  var c = C()
+  let _ = [b, c, iob, ioc] // do not infer [Any] when elements are lvalues or inout
+  let _: [A] = [b, c, iob, ioc] // do not infer [Any] when elements are lvalues or inout
+  b = B()
+  c = C()
 }
 
 /// Check handling of 'nil'.

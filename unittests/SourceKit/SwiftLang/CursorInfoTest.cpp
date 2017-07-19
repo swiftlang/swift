@@ -102,7 +102,7 @@ class CursorInfoTest : public ::testing::Test {
 public:
   LangSupport &getLang() { return Ctx.getSwiftLangSupport(); }
 
-  void SetUp() {
+  void SetUp() override {
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
     llvm::InitializeAllAsmPrinters();
@@ -134,7 +134,7 @@ public:
     Semaphore sema(0);
 
     TestCursorInfo TestInfo;
-    getLang().getCursorInfo(DocName, Offset, 0, false, Args,
+    getLang().getCursorInfo(DocName, Offset, 0, false, false, Args,
       [&](const CursorInfo &Info) {
         TestInfo.Name = Info.Name;
         TestInfo.Typename = Info.TypeName;

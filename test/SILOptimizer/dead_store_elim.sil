@@ -1038,7 +1038,7 @@ bb0(%0 : $*Example):
 
 /// Make sure we can coalesce the 2 live stores to the 2 fields in S4.
 ///
-/// CHECK-LABEL : partial_dead_store_struct_in_struct
+/// CHECK-LABEL: partial_dead_store_struct_in_struct
 /// CHECK: [[RET0:%.+]] = struct_extract
 /// CHECK: [[RET1:%.+]] = struct_element_addr
 /// CHECK: {{ store}} [[RET0:%.+]] to [[RET1:%.+]] : $*S4
@@ -1058,7 +1058,7 @@ bb0(%0 : $*S5):
 
 /// Make sure we do not coalesce the 2 live stores to the 2 fields in S6.
 ///
-/// CHECK-LABEL : sil hidden @discontiguous_partial_dead_store_simple_struct
+/// CHECK-LABEL: sil hidden @discontiguous_partial_dead_store_simple_struct
 /// CHECK: store
 /// CHECK: store
 sil hidden @discontiguous_partial_dead_store_simple_struct : $@convention(thin) (@inout S6) -> () {
@@ -1077,7 +1077,7 @@ bb0(%0 : $*S6):
 
 /// Make sure we generate the store to field x first.
 ///
-/// CHECK-LABEL : sil hidden @discontiguous_partial_dead_store_lives_insert_deterministically
+/// CHECK-LABEL: sil hidden @discontiguous_partial_dead_store_lives_insert_deterministically
 /// CHECK: bb0([[A:%.*]] : $*S6):
 /// CHECK: [[IN:%.*]] = apply
 /// CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S6, #S6.x
@@ -1121,7 +1121,7 @@ bb0(%0 : $*S7):
 /// i.e. too many stores generated, but make sure we track the store correctly
 /// so that we can get rid of store %56 to %57 : $*Int.
 ///
-/// CHECK-LABEL : partial_dead_store_bail_out_proper_propagation
+/// CHECK-LABEL: partial_dead_store_bail_out_proper_propagation
 /// CHECK: bb0
 /// CHECK-NOT: {{ store}}
 /// CHECK: function_ref
@@ -1416,4 +1416,20 @@ bb0(%0 : $AB):                     // Preds: bb6 bb5 bb4 bb3
   %2 = is_unique_or_pinned %1 : $*AB
   dealloc_stack %1 : $*AB
   return %2 : $Builtin.Int1
+}
+
+// CHECK-LABEL: dont_remove_store
+// CHECK: load
+// CHECK: store
+// CHECK: value_metatype
+// CHECK: return
+sil @dont_remove_store : $@convention(thin) (@in_guaranteed foo) -> () {
+bb0(%0 : $*foo):
+  %1 = alloc_stack $foo
+  %2 = load %0 : $*foo
+  store %2 to %1 : $*foo
+  %3 = value_metatype $@thick foo.Type, %1 : $*foo
+  dealloc_stack %1 : $*foo
+  %20 = tuple()
+  return %20 : $()
 }

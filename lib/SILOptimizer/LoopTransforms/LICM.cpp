@@ -127,9 +127,9 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
 /// Check if an address does not depend on other values in a basic block.
 static SILInstruction *addressIndependent(SILValue Addr) {
   Addr = stripCasts(Addr);
-  if (GlobalAddrInst *SGAI = dyn_cast<GlobalAddrInst>(Addr))
+  if (auto *SGAI = dyn_cast<GlobalAddrInst>(Addr))
     return SGAI;
-  if (StructElementAddrInst *SEAI = dyn_cast<StructElementAddrInst>(Addr))
+  if (auto *SEAI = dyn_cast<StructElementAddrInst>(Addr))
     return addressIndependent(SEAI->getOperand());
   return nullptr;
 }
@@ -269,9 +269,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
     // that dominate all exits.
     if (!std::all_of(ExitingBBs.begin(), ExitingBBs.end(),
                      [=](SILBasicBlock *ExitBB) {
-          if (DT->dominates(CurBB, ExitBB))
-            return true;
-          return false;
+          return DT->dominates(CurBB, ExitBB);
         })) {
       DEBUG(llvm::dbgs() << "  skipping conditional block " << *CurBB << "\n");
       It.skipChildren();
@@ -526,6 +524,10 @@ void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
 
 namespace {
 /// Hoist loop invariant code out of innermost loops.
+///
+/// Transforms are identified by type, not instance. Split this
+/// Into two types: "High-level Loop Invariant Code Motion"
+/// and "Loop Invariant Code Motion".
 class LICM : public SILFunctionTransform {
 
 public:
@@ -536,11 +538,6 @@ public:
   /// We only hoist semantic calls on high-level SIL because we can be sure that
   /// e.g. an Array as SILValue is really immutable (including its content).
   bool RunsOnHighLevelSil;
-  
-  StringRef getName() override {
-    return RunsOnHighLevelSil ? "High-level Loop Invariant Code Motion" :
-                                "Loop Invariant Code Motion";
-  }
 
   void run() override {
     SILFunction *F = getFunction();

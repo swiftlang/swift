@@ -743,3 +743,36 @@ bb0(%0 : $Int8):
   %ret = tuple ()
   return %ret : $()
 }
+
+//  Check that the optimization can handle even patterns like this:
+//  %cmp_result = builtin "cmp_ult_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64) : $Builtin.Int1
+//  This cond_fail formula should be registered!
+//  cond_fail %cmp_result : $Builtin.Int1
+//  At this point we know that x >= y
+//  %usub_result = builtin "usub_with_overflow_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64, %check_overfow : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+//  %usub_val = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 0
+//  We can figure out that x - y will not underflow because of x >= y
+//  %usub_underverflow = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 1
+//  cond_fail %usub_underflow : $Builtin.Int1
+
+// CHECK-LABEL: sil @cond_fail_of_cmp
+// CHECK: cond_fail
+// Second cond_fail should be removed, because it never fails.
+// CHECK-NOT: cond_fail
+// CHECK: // end sil function 'cond_fail_of_cmp' 
+sil @cond_fail_of_cmp : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%x : $Builtin.Int64, %y: $Builtin.Int64):
+  %cmp_result = builtin "cmp_ult_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64) : $Builtin.Int1
+  //  This cond_fail formula should be registered!
+  cond_fail %cmp_result : $Builtin.Int1
+  %check_overflow = integer_literal $Builtin.Int1, -1
+  //  At this point we know that x >= y
+  %usub_result = builtin "usub_with_overflow_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64, %check_overflow : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %usub_val = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 0
+  //  We can figure out that x - y will not underflow because of x >= y
+  %usub_underflow = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %usub_underflow : $Builtin.Int1
+
+  %ret = tuple ()
+  return %ret : $()
+} // end sil function 'cond_fail_of_cmp'

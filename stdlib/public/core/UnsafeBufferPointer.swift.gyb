@@ -57,8 +57,6 @@ public struct UnsafeBufferPointerIterator<Element>
 /// instances stored in the underlying memory. However, initializing another
 /// collection with an `${Self}` instance copies the instances out of the
 /// referenced memory and into the new collection.
-///
-/// - SeeAlso: `Unsafe${Mutable}Pointer`, `Unsafe${Mutable}RawBufferPointer`
 @_fixed_layout
 public struct Unsafe${Mutable}BufferPointer<Element>
   : _${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
@@ -68,8 +66,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
   public typealias Index = Int
   public typealias IndexDistance = Int
-  public typealias Iterator =
-    IndexingIterator<Unsafe${Mutable}BufferPointer<Element>>
+  public typealias Iterator = UnsafeBufferPointerIterator<Element>
 
   /// The index of the first element in a nonempty buffer.
   ///
@@ -183,6 +180,22 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return startIndex..<endIndex
   }
 
+  /// Initializes the memory at `destination.baseAddress` with elements of `self`,
+  /// stopping when either `self` or `destination` is exhausted.
+  ///
+  /// - Returns: an iterator over any remaining elements of `self` and the
+  ///   number of elements initialized.
+  public func _copyContents(
+    initializing destination: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    guard !isEmpty && !destination.isEmpty else { return (makeIterator(), 0) }
+    let s = self.baseAddress._unsafelyUnwrappedUnchecked
+    let d = destination.baseAddress._unsafelyUnwrappedUnchecked
+    let n = Swift.min(destination.count, self.count)
+    d.initialize(from: s, count: n)
+    return (Iterator(_position: s + n, _end: _end), n)
+  }
+
   /// Accesses the element at the specified position.
   ///
 %if Mutable:
@@ -276,6 +289,20 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     _end = start.map { $0 + count }
   }
 
+  /// Creates a buffer pointer starting at `start` and extending up to the last
+  /// addressable pointer to `Element` in the memory space
+  @_inlineable
+  public init(_unboundedStartingAt start: Unsafe${Mutable}Pointer<Element>) {
+    _position = start
+    _end = type(of: start)._max
+  }
+
+  @_inlineable
+  public init(_empty: ()) {
+    _position = Unsafe${Mutable}Pointer._max
+    _end = _position
+  }
+  
 %  if not Mutable:
   /// Creates a buffer over the same memory as the given buffer slice.
   ///
@@ -338,10 +365,12 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_inlineable
   public var count: Int {
-    if let pos = _position {
-      return _end! - pos
+    switch(_position, _end) {
+    case (.some(let pos), .some(let end)):
+      return (end - pos)
+    case _:
+      return 0
     }
-    return 0
   }
 
   @_versioned
@@ -372,7 +401,7 @@ extension UnsafeMutableBufferPointer {
   ///   initialized.
   @_inlineable
   public func initialize<S: Sequence>(from source: S) -> (S.Iterator, Index)
-    where S.Iterator.Element == Iterator.Element {
+    where S.Element == Element {
     return source._copyContents(initializing: self)
   }
 }

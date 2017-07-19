@@ -336,7 +336,7 @@ private:
   bool searchForURL(CharSourceRange Range);
   bool findFieldsInDocCommentLine(SyntaxNode Node);
   bool findFieldsInDocCommentBlock(SyntaxNode Node);
-  bool isVisitedBeforeInIfConfigStmt(ASTNode Node) {
+  bool isVisitedBeforeInIfConfig(ASTNode Node) {
     return VisitedNodesInsideIfConfig.count(Node) > 0;
   }
 };
@@ -438,7 +438,7 @@ void ModelASTWalker::visitSourceFile(SourceFile &SrcFile,
 }
 
 std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
-  if (isVisitedBeforeInIfConfigStmt(E))
+  if (isVisitedBeforeInIfConfig(E))
     return {false, E};
 
   if (E->isImplicit())
@@ -556,7 +556,7 @@ void ModelASTWalker::handleStmtCondition(StmtCondition cond) {
 
 
 std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
-  if (isVisitedBeforeInIfConfigStmt(S)) {
+  if (isVisitedBeforeInIfConfig(S)) {
     return {false, S};
   }
   auto addExprElem = [&](SyntaxStructureElementKind K, const Expr *Elem,
@@ -699,39 +699,6 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
       pushStructureNode(SN, SW);
     }
 
-  } else if (auto ConfigS = dyn_cast<IfConfigStmt>(S)) {
-    for (auto &Clause : ConfigS->getClauses()) {
-      unsigned TokLen;
-      if (&Clause == &*ConfigS->getClauses().begin())
-        TokLen = 3; // '#if'
-      else if (Clause.Cond == nullptr)
-        TokLen = 5; // '#else'
-      else
-        TokLen = 7; // '#elseif'
-      if (!passNonTokenNode({SyntaxNodeKind::BuildConfigKeyword,
-        CharSourceRange(Clause.Loc, TokLen) }))
-        return { false, nullptr };
-
-      if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
-        return { false, nullptr };
-
-      for (auto &Element : Clause.Elements) {
-        if (Expr *E = Element.dyn_cast<Expr*>()) {
-          E->walk(*this);
-        } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
-          S->walk(*this);
-        } else {
-          Element.get<Decl*>()->walk(*this);
-        }
-        VisitedNodesInsideIfConfig.insert(Element);
-      }
-    }
-    
-    if (!ConfigS->hadMissingEnd())
-      if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
-        CharSourceRange(ConfigS->getEndLoc(), 6/*'#endif'*/) }))
-        return { false, nullptr };
-
   } else if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
     if (auto *FD = DeferS->getTempDecl()) {
       auto *RetS = FD->getBody()->walk(*this);
@@ -752,7 +719,7 @@ Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
 }
 
 bool ModelASTWalker::walkToDeclPre(Decl *D) {
-  if (isVisitedBeforeInIfConfigStmt(D))
+  if (isVisitedBeforeInIfConfig(D))
     return false;
   if (D->isImplicit())
     return false;
@@ -761,7 +728,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     return false;
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    FuncDecl *FD = dyn_cast<FuncDecl>(AFD);
+    auto *FD = dyn_cast<FuncDecl>(AFD);
     if (FD && FD->isAccessor()) {
       // Pass context sensitive keyword token.
       SourceLoc SL = FD->getFuncLoc();
@@ -916,9 +883,16 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return false;
 
-      for (auto *D : Clause.Elements)
-        if (D->walk(*this))
-          return false;
+      for (auto &Element : Clause.Elements) {
+        if (auto *E = Element.dyn_cast<Expr*>()) {
+          E->walk(*this);
+        } else if (auto *S = Element.dyn_cast<Stmt*>()) {
+          S->walk(*this);
+        } else {
+          Element.get<Decl*>()->walk(*this);
+        }
+        VisitedNodesInsideIfConfig.insert(Element);
+      }
     }
     
     if (!ConfigD->hadMissingEnd())
@@ -1038,8 +1012,9 @@ public:
         return { true, E };
       if (DRE->getRefKind() != DeclRefKind::Ordinary)
         return { true, E };
-      if (!Fn(CharSourceRange(DRE->getSourceRange().Start,
-                              DRE->getName().getBaseName().getLength())))
+      if (!Fn(CharSourceRange(
+              DRE->getSourceRange().Start,
+              DRE->getName().getBaseName().userFacingName().size())))
         return { false, nullptr };
     }
     return { true, E };
@@ -1055,9 +1030,7 @@ bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
   };
 
   IdRefWalker<decltype(passNode)> Walker(passNode);
-  if (!Cond->walk(Walker))
-    return false;
-  return true;
+  return Cond->walk(Walker);
 }
 
 bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
@@ -1248,9 +1221,7 @@ bool ModelASTWalker::passNode(const SyntaxNode &Node) {
     }
   }
 
-  if (!Walker.walkToNodePost(Node))
-    return false;
-  return true;
+  return Walker.walkToNodePost(Node);
 }
 
 bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,

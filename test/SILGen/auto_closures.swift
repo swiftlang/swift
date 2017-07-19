@@ -15,7 +15,7 @@ func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   return x()
 }
 
-// CHECK-LABEL sil @_T013auto_closures05test_A21_closure_with_capture{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T013auto_closures05test_A21_closure_with_capture{{[_0-9a-zA-Z]*}}F
 func test_auto_closure_with_capture(_ x: Bool) -> Bool {
   // CHECK: [[CLOSURE:%.*]] = function_ref @_T013auto_closures05test_A21_closure_with_capture
   // CHECK: [[WITHCAPTURE:%.*]] = partial_apply [[CLOSURE]](

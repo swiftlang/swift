@@ -8,7 +8,9 @@ if(SWIFT_BUILD_STATIC_SDK_OVERLAY)
   list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES STATIC)
 endif()
 
-set(all_overlays "AppKit;AssetsLibrary;AVFoundation;CallKit;CloudKit;Contacts;CoreAudio;CoreData;CoreGraphics;CoreImage;CoreLocation;CoreMedia;CryptoTokenKit;Dispatch;Foundation;GameplayKit;GLKit;HomeKit;IOKit;Intents;MapKit;ObjectiveC;OpenCL;os;Photos;QuartzCore;SafariServices;SceneKit;simd;SpriteKit;UIKit;WatchKit;XCTest;XPC")
+list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "${STDLIB_SIL_SERIALIZE_WITNESS_TABLES}")
+
+set(all_overlays "Accelerate;AppKit;ARKit;AssetsLibrary;AVFoundation;CallKit;CloudKit;Contacts;CoreAudio;CoreData;CoreFoundation;CoreGraphics;CoreImage;CoreLocation;CoreMedia;CryptoTokenKit;Dispatch;Foundation;GameplayKit;GLKit;HomeKit;IOKit;Intents;MapKit;ModelIO;ObjectiveC;OpenCL;os;Photos;QuartzCore;SafariServices;SceneKit;simd;SpriteKit;UIKit;WatchKit;XCTest;XPC")
 
 if(DEFINED SWIFT_OVERLAY_TARGETS)
   set(overlays_to_build ${SWIFT_OVERLAY_TARGETS})

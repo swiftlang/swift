@@ -524,7 +524,7 @@ func test_isa_class_1(x: B) {
 }
 // CHECK: } // end sil function '_T06switch16test_isa_class_1yAA1BC1x_tF'
 
-// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_2s9AnyObject_pAA1BC1x_tF : $@convention(thin)
+// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_2yXlAA1BC1x_tF : $@convention(thin)
 func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: bb0([[X:%.*]] : $B):
   // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
@@ -639,7 +639,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   destroy_value [[X]]
   // CHECK:   return [[T0]]
 }
-// CHECK: } // end sil function '_T06switch16test_isa_class_2s9AnyObject_pAA1BC1x_tF'
+// CHECK: } // end sil function '_T06switch16test_isa_class_2yXlAA1BC1x_tF'
 
 enum MaybePair {
   case Neither
@@ -680,7 +680,9 @@ func test_union_1(u: MaybePair) {
 
   // CHECK: [[IS_BOTH]]([[TUP:%.*]] : $(Int, String)):
   case .Both:
-  // CHECK:   destroy_value [[TUP]] : $(Int, String)
+  // CHECK:   tuple_extract [[TUP]] : $(Int, String), 0
+  // CHECK:   [[TUP_STR:%.*]] = tuple_extract [[TUP]] : $(Int, String), 1
+  // CHECK:   destroy_value [[TUP_STR]] : $String
   // CHECK:   function_ref @_T06switch1dyyF
   // CHECK:   br [[CONT]]
     d()
@@ -690,43 +692,6 @@ func test_union_1(u: MaybePair) {
   // CHECK-NOT: switch_enum [[SUBJECT]]
   // CHECK:   function_ref @_T06switch1eyyF
   e()
-}
-
-// CHECK-LABEL: sil hidden @_T06switch12test_union_2yAA9MaybePairO1u_tF
-func test_union_2(u: MaybePair) {
-  switch u {
-  // CHECK: switch_enum {{%.*}} : $MaybePair,
-  // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Right!enumelt.1: [[IS_RIGHT:bb[0-9]+]],
-  // CHECK:   default [[DEFAULT:bb[0-9]+]]
-
-  // CHECK: [[IS_NEITHER]]:
-  case .Neither:
-  // CHECK:   function_ref @_T06switch1ayyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
-    a()
-
-  // CHECK: [[IS_LEFT]]({{%.*}}):
-  case .Left:
-  // CHECK:   function_ref @_T06switch1byyF
-  // CHECK:   br [[CONT]]
-    b()
-
-  // CHECK: [[IS_RIGHT]]({{%.*}}):
-  case .Right:
-  // CHECK:   function_ref @_T06switch1cyyF
-  // CHECK:   br [[CONT]]
-    c()
-
-  // -- missing .Both case
-  // CHECK: [[DEFAULT]]:
-  // CHECK:   unreachable
-  }
-
-  // CHECK: [[CONT]]:
-  // CHECK:   function_ref @_T06switch1dyyF
-  d()
 }
 
 // CHECK-LABEL: sil hidden @_T06switch12test_union_3yAA9MaybePairO1u_tF : $@convention(thin) (@owned MaybePair) -> () {
@@ -1106,8 +1071,8 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
     
   case (.some(let base), .some(let filter)):
     // CHECK: bb2(%10 : $Int):
-    // CHECK-NEXT: debug_value %10 : $Int, let, name "base"
-    // CHECK-NEXT: debug_value %8 : $Int, let, name "filter"
+    // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
+    // CHECK-NEXT: debug_value %10 : $Int, let, name "filter"
     print("both: \(base), \(filter)")
   case (.some(let base), .none), (.none, .some(let base)):
     // CHECK: bb3:
@@ -1122,5 +1087,46 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
     print("single: \(base)")
   default:
     print("default")
+  }
+}
+
+// All cases are unreachable, either structurally (tuples involving Never) or
+// nominally (empty enums).  We fold all of these to 'unreachable'.
+enum MyNever {}
+func ~= (_ : MyNever, _ : MyNever) -> Bool { return true }
+func myFatalError() -> MyNever { fatalError("asdf") }
+
+func testUninhabitedSwitchScrutinee() {
+  func test1(x : MyNever) {
+    // CHECK: bb0(%0 : $MyNever):
+    // CHECK-NEXT: debug_value %0 : $MyNever, let, name "x"
+    // CHECK-NEXT: unreachable
+    switch x {
+    case myFatalError(): break
+    case myFatalError(): break
+    case myFatalError(): break
+    }
+  }
+  func test2(x : Never) {
+    // CHECK: bb0(%0 : $Never):
+    // CHECK-NEXT: debug_value %0 : $Never, let, name "x"
+    // CHECK-NEXT: unreachable
+    switch (x, x) {}
+  }
+  func test3(x : Never) {
+    // CHECK: unreachable
+    // CHECK-NEXT: } // end sil function '_T06switch30testUninhabitedSwitchScrutineeyyF5test3L_ys5NeverO1x_tF'
+    switch (x, 5, x) {}
+  }
+  func test4(x : Never) {
+    // CHECK: unreachable
+    // CHECK-NEXT: } // end sil function '_T06switch30testUninhabitedSwitchScrutineeyyF5test4L_ys5NeverO1x_tF'
+    switch ((8, 6, 7), (5, 3, (0, x))) {}
+  }
+  func test5() {
+    // CHECK: %0 = function_ref @_T06switch12myFatalErrorAA7MyNeverOyF : $@convention(thin) () -> MyNever
+    // CHECK-NEXT: %1 = apply %0() : $@convention(thin) () -> MyNever
+    // CHECK-NEXT: unreachable
+    switch myFatalError() {}
   }
 }

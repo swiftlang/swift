@@ -63,6 +63,5 @@ public func run_Integrate(_ N: Int) {
     }
   }
 
-  CheckResults(abs(result - ref_result) < bound,
-               "Incorrect results in Integrate: abs(\(result) - \(ref_result)) > \(bound)")
+  CheckResults(abs(result - ref_result) < bound)
 }

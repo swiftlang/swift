@@ -1,4 +1,4 @@
-//===--- NSErrorShims.h - Foundation declarations for NSError overlay ------===//
+//===--- NSErrorShims.h - Foundation declarations for NSError overlay -----===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -161,7 +161,7 @@ class subject_class1 { // no-error
 class subject_class2 : Protocol_Class1, PlainProtocol { // no-error
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{1-7=}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{1-7=}}
 class subject_genericClass<T> {
   @objc
   var subject_instanceVar: Int // no-error
@@ -173,7 +173,7 @@ class subject_genericClass<T> {
   func subject_instanceFunc() {} // no_error
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{1-7=}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{1-7=}}
 class subject_genericClass2<T> : Class_ObjC1 {
   @objc
   var subject_instanceVar: Int // no-error
@@ -359,10 +359,10 @@ class ConcreteContext3 {
 }
 
 func genericContext1<T>(_: T) {
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{3-9=}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{3-9=}}
   class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' cannot be nested in generic function 'genericContext1'}}
 
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{3-9=}}
   class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{type 'subject_inGenericContext2' cannot be nested in generic function 'genericContext1'}}
 
   class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' cannot be nested in generic function 'genericContext1'}}
@@ -382,10 +382,10 @@ func genericContext1<T>(_: T) {
 }
 
 class GenericContext2<T> {
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{3-9=}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{3-9=}}
   class subject_inGenericContext {}
 
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{3-9=}}
   class subject_inGenericContext2 : Class_ObjC1 {}
 
   @objc
@@ -394,10 +394,10 @@ class GenericContext2<T> {
 
 class GenericContext3<T> {
   class MoreNested {
-    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{5-11=}}
+    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{5-11=}}
     class subject_inGenericContext {}
 
-    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{5-11=}}
+    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{5-11=}}
     class subject_inGenericContext2 : Class_ObjC1 {}
 
     @objc
@@ -405,17 +405,24 @@ class GenericContext3<T> {
   }
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{1-7=}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{1-7=}}
 class ConcreteSubclassOfGeneric : GenericContext3<Int> {}
 
 extension ConcreteSubclassOfGeneric {
   @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{1-7=}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{1-7=}}
 class ConcreteSubclassOfGeneric2 : subject_genericClass2<Int> {}
 
 extension ConcreteSubclassOfGeneric2 {
+  @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
+}
+
+@objc(CustomNameForSubclassOfGeneric) // okay
+class ConcreteSubclassOfGeneric3 : GenericContext3<Int> {}
+
+extension ConcreteSubclassOfGeneric3 {
   @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
 }
 
@@ -528,21 +535,21 @@ class subject_subscriptInvalid5 {
 class subject_subscriptInvalid6 {
   @objc
   subscript(a: PlainProtocol) -> Int { // expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
-    // expected-note@-1{{protocol 'PlainProtocol' is not '@objc'}}
+    // expected-note@-1{{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
 class subject_subscriptInvalid7 {
   @objc
   subscript(a: Protocol_Class1) -> Int { // expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
-    // expected-note@-1{{protocol 'Protocol_Class1' is not '@objc'}}
+    // expected-note@-1{{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
 class subject_subscriptInvalid8 {
   @objc
   subscript(a: Protocol_Class1 & Protocol_Class2) -> Int { // expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
-    // expected-note@-1{{protocol 'Protocol_Class1' is not '@objc'}}
+    // expected-note@-1{{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
@@ -641,7 +648,7 @@ class infer_instanceFunc1 {
 
   @objc func func12_(a: PlainProtocol) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   func func13(a: Class_ObjC1) {}
 // CHECK-LABEL: @objc func func13(a: Class_ObjC1) {
@@ -653,7 +660,7 @@ class infer_instanceFunc1 {
 
   @objc func func14_(a: Protocol_Class1) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   func func15(a: Protocol_ObjC1) {}
 // CHECK-LABEL: @objc func func15(a: Protocol_ObjC1) {
@@ -802,7 +809,7 @@ class infer_instanceVar1 {
 
   @objc var (instanceVar1_, instanceVar2_): (Int, PlainProtocol)
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var intstanceVar4: Int {
   // CHECK: @objc var intstanceVar4: Int {
@@ -860,8 +867,8 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_Float: Float
 // CHECK-LABEL: @objc var var_Double: Double
 
-  var var_Char: UnicodeScalar
-// CHECK-LABEL: @objc var var_Char: UnicodeScalar
+  var var_Char: Unicode.Scalar
+// CHECK-LABEL: @objc var var_Char: Unicode.Scalar
 
   //===--- Tuples.
 
@@ -940,7 +947,7 @@ class infer_instanceVar1 {
 
   @objc var var_PlainProtocol_: PlainProtocol
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_ClassObjC: Class_ObjC1
 // CHECK-LABEL: @objc var var_ClassObjC: Class_ObjC1
@@ -952,7 +959,7 @@ class infer_instanceVar1 {
 
   @objc var var_ProtocolClass_: Protocol_Class1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_ProtocolObjC: Protocol_ObjC1
 // CHECK-LABEL: @objc var var_ProtocolObjC: Protocol_ObjC1
@@ -1020,49 +1027,49 @@ class infer_instanceVar1 {
 
   @objc var var_Existential1_: PlainProtocol
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential2: PlainProtocol & PlainProtocol
 // CHECK-LABEL: {{^}}  var var_Existential2: PlainProtocol
 
   @objc var var_Existential2_: PlainProtocol & PlainProtocol
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential3: PlainProtocol & Protocol_Class1
 // CHECK-LABEL: {{^}}  var var_Existential3: PlainProtocol & Protocol_Class1
 
   @objc var var_Existential3_: PlainProtocol & Protocol_Class1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential4: PlainProtocol & Protocol_ObjC1
 // CHECK-LABEL: {{^}}  var var_Existential4: PlainProtocol & Protocol_ObjC1
 
   @objc var var_Existential4_: PlainProtocol & Protocol_ObjC1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential5: Protocol_Class1
   // CHECK-LABEL: {{^}}  var var_Existential5: Protocol_Class1
 
   @objc var var_Existential5_: Protocol_Class1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_Existential6: Protocol_Class1 & Protocol_Class2
 // CHECK-LABEL: {{^}}  var var_Existential6: Protocol_Class1 & Protocol_Class2
 
   @objc var var_Existential6_: Protocol_Class1 & Protocol_Class2
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_Existential7: Protocol_Class1 & Protocol_ObjC1
 // CHECK-LABEL: {{^}}  var var_Existential7: Protocol_Class1 & Protocol_ObjC1
 
   @objc var var_Existential7_: Protocol_Class1 & Protocol_ObjC1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
+  // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_Existential8: Protocol_ObjC1
 // CHECK-LABEL: @objc var var_Existential8: Protocol_ObjC1
@@ -1672,9 +1679,6 @@ class HasIBAction {
 class HasIBInspectable {
   @IBInspectable var goodProperty: AnyObject?
   // CHECK: {{^}}  @IBInspectable @objc var goodProperty: AnyObject?
-
-  @IBInspectable var badProperty: PlainStruct?
-  // expected-error@-1{{property cannot be marked @IBInspectable because its type cannot be represented in Objective-C}}
 }
 
 //===---
@@ -1685,9 +1689,6 @@ class HasIBInspectable {
 class HasGKInspectable {
   @GKInspectable var goodProperty: AnyObject?
   // CHECK: {{^}}  @GKInspectable @objc var goodProperty: AnyObject?
-
-  @GKInspectable var badProperty: PlainStruct?
-  // expected-error@-1{{property cannot be marked @GKInspectable because its type cannot be represented in Objective-C}}
 }
 
 //===---
@@ -2024,7 +2025,7 @@ class ClassThrows1 {
 
   @objc func fooWithErrorProtocolComposition1(x: Error & Protocol_ObjC1) { }
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2{{protocol composition involving 'Error' cannot be represented in Objective-C}}
+  // expected-note@-2{{protocol-constrained type containing 'Error' cannot be represented in Objective-C}}
 
   // CHECK: {{^}} func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1)
   func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1) { }
@@ -2260,4 +2261,24 @@ extension SubclassInfersFromProtocol2 {
 
 @objc class NeverReturningMethod {
   @objc func doesNotReturn() -> Never {}
+}
+
+// SR-5025
+class User: NSObject {
+}
+
+@objc extension User {
+	var name: String {
+		get {
+			return "No name"
+		}
+		set {
+			// Nothing
+		}
+	}
+
+	var other: String {
+    unsafeAddress { // expected-error{{addressors are not allowed to be marked @objc}}
+    }
+  }
 }

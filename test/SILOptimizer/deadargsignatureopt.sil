@@ -83,10 +83,10 @@ bb0:
   return %2 : $@callee_owned (Int32, Int32) -> Bool
 }
 
-// CHECK-LABEL: sil @_T012one_arg_deadTf4nnd_n
+// CHECK-LABEL: sil shared @_T012one_arg_deadTf4nnd_n
 // CHECK: builtin
 // CHECK: return
 
-// CHECK-LABEL: sil @_T013two_args_deadTf4nnd_n
+// CHECK-LABEL: sil shared @_T013two_args_deadTf4nnd_n
 // CHECK: builtin
 // CHECK: return

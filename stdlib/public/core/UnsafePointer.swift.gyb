@@ -52,8 +52,8 @@
 ///
 %if mutable:
 /// You can use methods like `initialize(to:count:)`, `initialize(from:)`, and
-/// `moveInitializeMemory(from:count)` to initialize the memory referenced by
-/// a pointer with a value or series of values.
+/// `moveInitialize(from:count:)` to initialize the memory referenced by a
+/// pointer with a value or series of values.
 ///
 % end
 /// Initialized Memory
@@ -108,7 +108,7 @@
 /// example binds the memory referenced by `uint8Pointer` to one instance of
 /// the `UInt64` type:
 ///
-///     let uint64Pointer = Unsafe${Mutable}RawPointer(uint64Pointer)
+///     let uint64Pointer = Unsafe${Mutable}RawPointer(uint8Pointer)
 ///                               .bindMemory(to: UInt64.self, capacity: 1)
 ///
 /// After rebinding the memory referenced by `uint8Pointer` to `UInt64`,
@@ -640,7 +640,7 @@ public struct ${Self}<Pointee>
   @_inlineable
   @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
   public func initialize<C : Collection>(from source: C)
-    where C.Iterator.Element == Pointee {
+    where C.Element == Pointee {
     let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
     var (remainders,writtenUpTo) = source._copyContents(initializing: buf)
     // ensure that exactly rhs.count elements were written
@@ -739,9 +739,9 @@ public struct ${Self}<Pointee>
   ///   - body: A closure that takes a ${Mutable.lower()} typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
-  ///     execution. If `body` has a return value, it is used as the return
-  ///     value for the `withMemoryRebound(to:capacity:_:)` method.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///     execution. If `body` has a return value, that value is also used as
+  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public func withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
     _ body: (${Self}<T>) throws -> Result
@@ -845,8 +845,6 @@ public struct ${Self}<Pointee>
   /// - Returns: The distance from this pointer to `end`, in strides of the
   ///   pointer's `Pointee` type. To access the stride, use
   ///   `MemoryLayout<Pointee>.stride`.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_inlineable
   public func distance(to end: ${Self}) -> Int {
     return end - self
@@ -867,8 +865,6 @@ public struct ${Self}<Pointee>
   ///   zero.
   /// - Returns: A pointer offset from this pointer by `n` instances of the
   ///   `Pointee` type.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_inlineable
   public func advanced(by n: Int) -> ${Self} {
     return self + n
@@ -950,8 +946,6 @@ extension ${Self} {
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
   /// - Returns: A pointer offset from `lhs` by `rhs` instances of the
   ///   `Pointee` type.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func + (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
     return ${Self}(Builtin.gep_Word(
@@ -971,8 +965,6 @@ extension ${Self} {
   ///   - rhs: A pointer.
   /// - Returns: A pointer offset from `rhs` by `lhs` instances of the
   ///   `Pointee` type.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func + (lhs: Int, rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
     return rhs + lhs
@@ -991,8 +983,6 @@ extension ${Self} {
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
   /// - Returns: A pointer offset backward from `lhs` by `rhs` instances of
   ///   the `Pointee` type.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func - (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
     return lhs + -rhs
@@ -1014,8 +1004,6 @@ extension ${Self} {
   /// - Returns: The distance from `lhs` to `rhs`, in strides of the pointer's
   ///   `Pointee` type. To access the stride, use
   ///   `MemoryLayout<Pointee>.stride`.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func - (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
     return
@@ -1035,8 +1023,6 @@ extension ${Self} {
   ///   - lhs: A pointer to advance in place.
   ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func += (lhs: inout ${Self}<Pointee>, rhs: Int) {
     lhs = lhs + rhs
@@ -1053,8 +1039,6 @@ extension ${Self} {
   ///   - lhs: A pointer to advance in place.
   ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func -= (lhs: inout ${Self}<Pointee>, rhs: Int) {
     lhs = lhs - rhs
@@ -1188,6 +1172,13 @@ extension ${Self} {
 }
 
 extension Int {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
   @_inlineable
   public init<U>(bitPattern: ${Self}<U>?) {
     if let bitPattern = bitPattern {
@@ -1199,6 +1190,13 @@ extension Int {
 }
 
 extension UInt {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
   @_inlineable
   public init<U>(bitPattern: ${Self}<U>?) {
     if let bitPattern = bitPattern {
@@ -1206,6 +1204,15 @@ extension UInt {
     } else {
       self = 0
     }
+  }
+}
+
+extension ${Self} {
+  @_versioned
+  static var _max : ${Self} {
+    return ${Self}(
+      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
+    )._unsafelyUnwrappedUnchecked
   }
 }
 % end # for mutable

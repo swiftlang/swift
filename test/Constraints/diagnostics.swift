@@ -84,12 +84,12 @@ for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to proto
 }
 
 // Generic as part of function/tuple types
-func f6<T:P2>(_ g: (Void) -> T) -> (c: Int, i: T) {
+func f6<T:P2>(_ g: (Void) -> T) -> (c: Int, i: T) { // expected-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} {{20-26=()}}
   return (c: 0, i: g())
 }
 
 func f7() -> (c: Int, v: A) {
-  let g: (Void) -> A = { return A() }
+  let g: (Void) -> A = { return A() } // expected-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} {{10-16=()}}
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
@@ -97,7 +97,7 @@ func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
 f8(3, f4) // expected-error {{in argument type '(Int) -> Int', 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{in argument type '(Tup) -> Tup', 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
+f8((1,2.0), f9) // expected-error {{in argument type '(Tup) -> Tup' (aka '(Int, Double) -> (Int, Double)'), 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -167,7 +167,7 @@ func rdar21080030() {
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
-func r21248136<T>() -> T { preconditionFailure() } // expected-note 2 {{in call to function 'r21248136'}}
+func r21248136<T>() -> T { preconditionFailure() } // expected-note 2 {{in call to function 'r21248136()'}}
 
 r21248136()            // expected-error {{generic parameter 'T' could not be inferred}}
 let _ = r21248136()    // expected-error {{generic parameter 'T' could not be inferred}}
@@ -237,7 +237,7 @@ String().asdf  // expected-error {{value of type 'String' has no member 'asdf'}}
 // <rdar://problem/21553065> Spurious diagnostic: '_' can only appear in a pattern or on the left side of an assignment
 protocol r21553065Protocol {}
 class r21553065Class<T : AnyObject> {}
-_ = r21553065Class<r21553065Protocol>()  // expected-error {{type 'r21553065Protocol' does not conform to protocol 'AnyObject'}}
+_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Protocol' is not convertible to 'AnyObject'}}
 
 // Type variables not getting erased with nested closures
 struct Toe {
@@ -428,7 +428,7 @@ let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argu
 let _: (Int) -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{48-48=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
 let _: Color = .Unknown // expected-error {{member 'Unknown' expects argument of type '(description: String)'}}
-let _: Color = .Unknown(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+let _: Color = .Unknown(42) // expected-error {{missing argument label 'description:' in call}}
 let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}}
 
 let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
@@ -440,10 +440,11 @@ let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member
 // expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
 let _: Color = .overload(1)  // expected-error {{ambiguous reference to member 'overload'}}
 // expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
-let _: Color = .frob(1.0, &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-let _: Color = .frob(1, i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
+let _: Color = .frob(1.0, b: &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+let _: Color = .frob(1, i)  // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
-let _: Color = .frob(1, &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
 someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
@@ -459,7 +460,7 @@ func testTypeSugar(_ a : Int) {
 // <rdar://problem/21974772> SegFault in FailureDiagnosis::visitInOutExpr
 func r21974772(_ y : Int) {
   let x = &(1.0 + y)  // expected-error {{binary operator '+' cannot be applied to operands of type 'Double' and 'Int'}}
-   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (UnsafeMutablePointer<Pointee>, Int), (UnsafePointer<Pointee>, Int)}}
+   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
 }
 
 // <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
@@ -634,7 +635,7 @@ func r23272739(_ contentType: String) {
 // <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
 func r23641896() {
   var g = "Hello World"
-  g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot invoke 'replaceSubrange' with an argument list of type '(CountableClosedRange<Int>, with: String)'}} expected-note {{overloads for 'replaceSubrange' exist}}
+  g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot convert value of type 'CountableClosedRange<Int>' to expected argument type 'Range<String.Index>'}}
 
   _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
@@ -647,7 +648,7 @@ func test17875634() {
   var row = 1
   var col = 2
   
-  match.append(row, col)  // expected-error {{extra argument in call}}
+  match.append(row, col)  // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 }
 
 // <https://github.com/apple/swift/pull/1205> Improved diagnostics for enums with associated values
@@ -663,7 +664,8 @@ if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '=
 func r24251022() {
   var a = 1
   var b: UInt32 = 2
-  a += a + // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  _ = a + b // expected-warning {{deprecated}}
+  a += a + // expected-error {{binary operator '+=' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+=' exist}}
     b
 }
 
@@ -673,10 +675,13 @@ func overloadSetResultType(_ a : Int, b : Int) -> Int {
   return a == b && 1 == 2  // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
 }
 
+postfix operator +++
+postfix func +++ <T>(_: inout T) -> T { fatalError() }
+
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
 func r21523291(_ bytes : UnsafeMutablePointer<UInt8>) {
   let i = 42   // expected-note {{change 'let' to 'var' to make it mutable}}
-  let r = bytes[i++]  // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
+  _ = bytes[i+++]  // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
 }
 
 
@@ -698,14 +703,15 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
   _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
   
-  _ = i < nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil < i  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i <= nil // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil <= i // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i > nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil > i  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i >= nil // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil >= i // expected-error {{type 'Int' is not optional, value can never be nil}}
+  // FIXME(integers): uncomment these tests once the < is no longer ambiguous
+  // _ = i < nil  // _xpected-error {{type 'Int' is not optional, value can never be nil}}
+  // _ = nil < i  // _xpected-error {{type 'Int' is not optional, value can never be nil}}
+  // _ = i <= nil // _xpected-error {{type 'Int' is not optional, value can never be nil}}
+  // _ = nil <= i // _xpected-error {{type 'Int' is not optional, value can never be nil}}
+  // _ = i > nil  // _xpected-error {{type 'Int' is not optional, value can never be nil}}
+  // _ = nil > i  // _xpected-error {{type 'Int' is not optional, value can never be nil}}
+  // _ = i >= nil // _xpected-error {{type 'Int' is not optional, value can never be nil}}
+  // _ = nil >= i // _xpected-error {{type 'Int' is not optional, value can never be nil}}
 
   _ = o === nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
   _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
@@ -745,7 +751,7 @@ func rdar27391581(_ a : Int, b : Int) -> Int {
 
 // <rdar://problem/22276040> QoI: not great error message with "withUnsafePointer" sametype constraints
 func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
-func read<T : Integer>() -> T? {
+func read<T : BinaryInteger>() -> T? {
   var buffer : T 
   let n = withUnsafePointer(to: &buffer) { (p) in
     read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
@@ -810,14 +816,14 @@ func r27212391(a: Int, x: Int, _ y: Int) {
 
 r27212391(3, 5)             // expected-error {{missing argument label 'x' in call}}
 r27212391(3, y: 5)          // expected-error {{missing argument label 'x' in call}}
-r27212391(3, x: 5)          // expected-error {{argument 'x' must precede unnamed argument #1}}
-r27212391(y: 3, x: 5)       // expected-error {{argument 'x' must precede argument 'y'}}
+r27212391(3, x: 5)          // expected-error {{argument 'x' must precede unnamed argument #1}} {{11-11=x: 5, }} {{12-18=}}
+r27212391(y: 3, x: 5)       // expected-error {{argument 'x' must precede argument 'y'}} {{11-11=x: 5, }} {{15-21=}}
 r27212391(y: 3, 5)          // expected-error {{incorrect argument label in call (have 'y:_:', expected 'x:_:')}}
 r27212391(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
 r27212391(a: 1, 3, y: 5)    // expected-error {{missing argument label 'x' in call}}
 r27212391(1, x: 3, y: 5)    // expected-error {{missing argument label 'a' in call}}
-r27212391(a: 1, y: 3, x: 5) // expected-error {{argument 'x' must precede argument 'y'}}
-r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}}
+r27212391(a: 1, y: 3, x: 5) // expected-error {{argument 'x' must precede argument 'y'}} {{17-17=x: 5, }} {{21-27=}}
+r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}} {{17-17=x: 5, }} {{18-24=}}
 
 // SR-1255
 func foo1255_1() {
@@ -918,10 +924,164 @@ let r29850459_a: Int = 0
 let r29850459_b: Int = 1
 func r29850459() -> Bool { return false }
 let _ = (r29850459_flag ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 let _ = ({ true }() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 let _ = (r29850459() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 let _ = ((r29850459_flag || r29850459()) ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+
+// Ambiguous overload inside a trailing closure
+
+func ambiguousCall() -> Int {} // expected-note {{found this candidate}}
+func ambiguousCall() -> Float {} // expected-note {{found this candidate}}
+
+func takesClosure(fn: () -> ()) {}
+
+takesClosure() { ambiguousCall() } // expected-error {{ambiguous use of 'ambiguousCall()'}}
+
+// SR-4692: Useless diagnostics calling non-static method
+
+class SR_4692_a {
+  private static func foo(x: Int, y: Bool) {
+    self.bar(x: x)
+    // expected-error@-1 {{instance member 'bar' cannot be used on type 'SR_4692_a'}}
+  }
+
+  private func bar(x: Int) {
+  }
+}
+
+class SR_4692_b {
+  static func a() {
+    self.f(x: 3, y: true)
+    // expected-error@-1 {{instance member 'f' cannot be used on type 'SR_4692_b'}}
+  }
+
+  private func f(a: Int, b: Bool, c: String) {
+    self.f(x: a, y: b)
+  }
+
+  private func f(x: Int, y: Bool) {
+  }
+}
+
+// rdar://problem/32101765 - Keypath diagnostics are not actionable/helpful
+
+struct R32101765 { let prop32101765 = 0 }
+let _: KeyPath<R32101765, Float> = \.prop32101765
+// expected-error@-1 {{KeyPath value type 'Int' cannot be converted to contextual type 'Float'}}
+let _: KeyPath<R32101765, Float> = \R32101765.prop32101765
+// expected-error@-1 {{KeyPath value type 'Int' cannot be converted to contextual type 'Float'}}
+let _: KeyPath<R32101765, Float> = \.prop32101765.unknown
+// expected-error@-1 {{type 'Int' has no member 'unknown'}}
+let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
+// expected-error@-1 {{type 'Int' has no member 'unknown'}}
+
+// rdar://problem/32390726 - Bad Diagnostic: Don't suggest `var` to `let` when binding inside for-statement
+for var i in 0..<10 { // expected-warning {{variable 'i' was never mutated; consider changing to 'let' constant}} {{5-9=}}
+  _ = i + 1
+}
+
+// rdar://problem/32726044 - shrink reduced domains too far
+
+public protocol P_32726044 {}
+
+extension Int: P_32726044 {}
+extension Float: P_32726044 {}
+
+public func *(lhs: P_32726044, rhs: P_32726044) -> Double {
+  fatalError()
+}
+
+func rdar32726044() -> Float {
+  var f: Float = 0
+  f = Float(1) * 100 // Ok
+  let _: Float = Float(42) + 0 // Ok
+  return f
+}
+
+// SR-5045 - Attempting to return result of reduce(_:_:) in a method with no return produces ambiguous error
+func sr5045() {
+  let doubles: [Double] = [1, 2, 3]
+  return doubles.reduce(0, +)
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+}
+
+// rdar://problem/32934129 - QoI: misleading diagnostic
+class L_32934129<T : Comparable> {
+  init(_ value: T) { self.value = value }
+  init(_ value: T, _ next: L_32934129<T>?) {
+    self.value = value
+    self.next = next
+  }
+
+  var value: T
+  var next: L_32934129<T>? = nil
+
+  func length() -> Int {
+    func inner(_ list: L_32934129<T>?, _ count: Int) {
+    guard let list = list else { return count } // expected-error {{unexpected non-void return value in void function}}
+      return inner(list.next, count + 1)
+    }
+
+    return inner(self, 0) // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
+  }
+}
+
+// rdar://problem/31671195 - QoI: erroneous diagnostic - cannot call value of non-function type
+
+class C_31671195 {
+  var name: Int { fatalError() }
+  func name(_: Int) { fatalError() }
+}
+C_31671195().name(UInt(0))
+// expected-error@-1 {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+
+
+// rdar://problem/28456467 - QoI: erroneous diagnostic - cannot call value of non-function type
+
+class AST_28456467 {
+  var hasStateDef: Bool { return false }
+}
+
+protocol Expr_28456467 {}
+
+class ListExpr_28456467 : AST_28456467, Expr_28456467 {
+  let elems: [Expr_28456467]
+
+  init(_ elems:[Expr_28456467] ) {
+    self.elems = elems
+  }
+
+  override var hasStateDef: Bool {
+    return elems.first(where: { $0.hasStateDef }) != nil
+    // expected-error@-1 {{value of type 'Expr_28456467' has no member 'hasStateDef'}}
+  }
+}
+
+// rdar://problem/31849281 - Let's play "bump the argument"
+
+struct rdar31849281 { var foo, a, b, c: Int }
+_ = rdar31849281(a: 101, b: 102, c: 103, foo: 104) // expected-error {{argument 'foo' must precede argument 'a'}} {{18-18=foo: 104, }} {{40-50=}}
+
+_ = rdar31849281(a: 101, c: 103, b: 102, foo: 104) // expected-error {{argument 'foo' must precede argument 'a'}} {{18-18=foo: 104, }} {{40-50=}}
+_ = rdar31849281(foo: 104, a: 101, c: 103, b: 102) // expected-error {{argument 'b' must precede argument 'c'}} {{36-36=b: 102, }} {{42-50=}}
+
+_ = rdar31849281(b: 102, c: 103, a: 101, foo: 104) // expected-error {{argument 'foo' must precede argument 'b'}} {{18-18=foo: 104, }} {{40-50=}}
+_ = rdar31849281(foo: 104, b: 102, c: 103, a: 101) // expected-error {{argument 'a' must precede argument 'b'}} {{28-28=a: 101, }} {{42-50=}}
+
+func var_31849281(_ a: Int, _ b: Int..., c: Int) {}
+var_31849281(1, c: 10, 3, 4, 5, 6, 7, 8, 9) // expected-error {{unnamed argument #3 must precede argument 'c'}} {{17-17=3, 4, 5, 6, 7, 8, 9, }} {{22-43=}}
+
+func fun_31849281(a: (Bool) -> Bool, b: (Int) -> (String), c: [Int?]) {}
+fun_31849281(c: [nil, 42], a: { !$0 }, b: { (num: Int) -> String in return "\(num)" })
+// expected-error @-1 {{argument 'a' must precede argument 'c'}} {{14-14=a: { !$0 }, }} {{26-38=}}
+fun_31849281(a: { !$0 }, c: [nil, 42], b: { (num: Int) -> String in return String(describing: num) })
+// expected-error @-1 {{argument 'b' must precede argument 'c'}} {{26-26=b: { (num: Int) -> String in return String(describing: num) }, }} {{38-101=}}
+fun_31849281(a: { !$0 }, c: [nil, 42], b: { "\($0)" })
+// expected-error @-1 {{argument 'b' must precede argument 'c'}} {{26-26=b: { "\\($0)" }, }} {{38-54=}}
+
+func f_31849281(x: Int, y: Int, z: Int) {}
+f_31849281(42, y: 10, x: 20) // expected-error {{argument 'x' must precede unnamed argument #1}} {{12-12=x: 20, }} {{21-28=}}

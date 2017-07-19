@@ -22,19 +22,19 @@ bb0(%x : $*T):
 // CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], {{(i32|i64)}} -1
 // CHECK-NEXT: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK-NEXT: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+// CHECK-NEXT: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
 // CHECK-NEXT: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
 // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
 // CHECK-NEXT: [[Y_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
 // CHECK-NEXT: call void @llvm.lifetime.start({{(i32|i64)}} -1, i8* [[Y_ALLOCA]])
 // CHECK-NEXT: [[Y_TMP:%.*]] = bitcast i8* [[Y_ALLOCA]] to %swift.opaque*
 //   Copy 'x' into 'y'.
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
 // CHECK-NEXT: [[INIT_WITH_COPY_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: [[Y:%.*]] = call [[OPAQUE]]* [[INIT_WITH_COPY_FN]]([[OPAQUE]]* [[Y_TMP]], [[OPAQUE]]* [[X:%.*]], [[TYPE]]* %T)
 //   Destroy 'y'.
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 1
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
 // CHECK-NEXT: [[DESTROY_FN:%.*]] = bitcast i8* [[T4]] to void ([[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[Y_TMP]], [[TYPE]]* %T)
@@ -61,24 +61,24 @@ bb0(%x : $*T):
 // CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], {{(i32|i64)}} -1
 // CHECK-NEXT: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK-NEXT: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+// CHECK-NEXT: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
 // CHECK-NEXT: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
 // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
 // CHECK-NEXT: [[Y_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
 // CHECK-NEXT: call void @llvm.lifetime.start({{(i32|i64)}} -1, i8* [[Y_ALLOCA]])
 // CHECK-NEXT: [[Y_TMP:%.*]] = bitcast i8* [[Y_ALLOCA]] to %swift.opaque*
 //   Copy 'x' into 'y'.
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
 // CHECK-NEXT: [[INIT_WITH_COPY_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: [[Y:%.*]] = call [[OPAQUE]]* [[INIT_WITH_COPY_FN]]([[OPAQUE]]* [[Y_TMP]], [[OPAQUE]]* [[X:%.*]], [[TYPE]]* %T)
 //   Destroy 'y'.
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 1
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
 // CHECK-NEXT: [[DESTROY_FN:%.*]] = bitcast i8* [[T4]] to void ([[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[Y_TMP]], [[TYPE]]* %T)
 //   Copy 'x' into 'y' again, this time as a take.
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align
 // CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* [[Y_TMP]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)

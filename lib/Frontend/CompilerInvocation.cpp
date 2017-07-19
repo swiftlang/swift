@@ -169,6 +169,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.GroupInfoPath = A->getValue();
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
+    Opts.IndexStorePath = A->getValue();
+  }
+  Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
+
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 
@@ -191,7 +196,20 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.StatsOutputDir = A->getValue();
   }
 
-  Opts.ValidateTBDAgainstIR |= Args.hasArg(OPT_validate_tbd_against_ir);
+  if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
+    using Mode = FrontendOptions::TBDValidationMode;
+    StringRef value = A->getValue();
+    if (value == "none") {
+      Opts.ValidateTBDAgainstIR = Mode::None;
+    } else if (value == "missing") {
+      Opts.ValidateTBDAgainstIR = Mode::MissingFromTBD;
+    } else if (value == "all") {
+      Opts.ValidateTBDAgainstIR = Mode::All;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                     A->getOption().getPrefixedName(), value);
+    }
+  }
 
   if (const Arg *A = Args.getLastArg(OPT_warn_long_function_bodies)) {
     unsigned attempt;
@@ -200,6 +218,26 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
     } else {
       Opts.WarnLongFunctionBodies = attempt;
+    }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_warn_long_expression_type_checking)) {
+    unsigned attempt;
+    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    } else {
+      Opts.WarnLongExpressionTypeChecking = attempt;
+    }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_solver_expression_time_threshold_EQ)) {
+    unsigned attempt;
+    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    } else {
+      Opts.SolverExpressionTimeThreshold = attempt;
     }
   }
 
@@ -670,6 +708,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                           OPT_emit_objc_header,
                           OPT_emit_objc_header_path,
                           "h", false);
+  determineOutputFilename(Opts.LoadedModuleTracePath,
+                          OPT_emit_loaded_module_trace,
+                          OPT_emit_loaded_module_trace_path,
+                          "trace.json", false);
 
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
     Opts.FixitsOutputPath = A->getValue();
@@ -757,6 +799,38 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
+  if (!Opts.LoadedModuleTracePath.empty()) {
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::NoneAction:
+    case FrontendOptions::Parse:
+    case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpInterfaceHash:
+    case FrontendOptions::DumpAST:
+    case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpScopeMaps:
+    case FrontendOptions::DumpTypeRefinementContexts:
+    case FrontendOptions::Immediate:
+    case FrontendOptions::REPL:
+      Diags.diagnose(SourceLoc(),
+                     diag::error_mode_cannot_emit_loaded_module_trace);
+      return true;
+    case FrontendOptions::Typecheck:
+    case FrontendOptions::EmitModuleOnly:
+    case FrontendOptions::EmitPCH:
+    case FrontendOptions::EmitSILGen:
+    case FrontendOptions::EmitSIL:
+    case FrontendOptions::EmitSIBGen:
+    case FrontendOptions::EmitSIB:
+    case FrontendOptions::EmitIR:
+    case FrontendOptions::EmitBC:
+    case FrontendOptions::EmitAssembly:
+    case FrontendOptions::EmitObject:
+    case FrontendOptions::EmitImportedModules:
+    case FrontendOptions::EmitTBD:
+      break;
+    }
+  }
+
   if (!Opts.ModuleOutputPath.empty() ||
       !Opts.ModuleDocOutputPath.empty()) {
     switch (Opts.RequestedAction) {
@@ -800,7 +874,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_serialize_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
-  Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
   Opts.EnableSerializationNestedTypeLookupTable &=
       !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 
@@ -848,6 +921,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
 
+  /// FIXME: Remove this flag when void subscripts are implemented.
+  /// This is used to guard preemptive testing for the fix-it.
+  if (Args.hasArg(OPT_fix_string_substring_conversion)) {
+    Opts.FixStringToSubstringConversions = true;
+  }
+
   if (auto A = Args.getLastArg(OPT_swift_version)) {
     auto vers = version::Version::parseVersionString(
       A->getValue(), SourceLoc(), &Diags);
@@ -866,19 +945,32 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
 
-  Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode);
+  Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode,
+                                            OPT_serialize_diagnostics_path);
 
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
+  Opts.EnableExperimentalKeyPathComponents |=
+    Args.hasArg(OPT_enable_experimental_keypath_components);
+
   Opts.EnableClassResilience |=
     Args.hasArg(OPT_enable_class_resilience);
+
+  if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
+                               OPT_disable_deserialization_recovery)) {
+    Opts.EnableDeserializationRecovery
+      = A->getOption().matches(OPT_enable_deserialization_recovery);
+  }
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
 
   Opts.DisableTsanInoutInstrumentation |=
       Args.hasArg(OPT_disable_tsan_inout_instrumentation);
+
+  Opts.ReportErrorsToDebugger |=
+      Args.hasArg(OPT_report_errors_to_debugger);
 
   if (FrontendOpts.InputKind == InputFileKind::IFK_SIL)
     Opts.DisableAvailabilityChecking = true;
@@ -889,7 +981,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_access_control);
   }
 
-  Opts.DisableTypoCorrection |= Args.hasArg(OPT_disable_typo_correction);
+  if (auto A = Args.getLastArg(OPT_disable_typo_correction,
+                               OPT_typo_correction_limit)) {
+    if (A->getOption().matches(OPT_disable_typo_correction))
+      Opts.TypoCorrectionLimit = 0;
+    else {
+      unsigned limit;
+      if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       A->getAsString(Args), A->getValue());
+        return true;
+      }
+
+      Opts.TypoCorrectionLimit = limit;
+    }
+  }
 
   Opts.CodeCompleteInitsInPostfixExpr |=
       Args.hasArg(OPT_code_complete_inits_in_postfix_expr);
@@ -901,6 +1007,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
+  Opts.EnableRecursiveConstraints |=
+    Args.hasArg(OPT_enable_recursive_constraints);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.EnableConstraintPropagation |= Args.hasArg(OPT_propagate_constraints);
   Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
@@ -951,6 +1059,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     
     Opts.SolverMemoryThreshold = threshold;
   }
+
+  if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
+    unsigned threshold;
+    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+
+    Opts.MaxCircularityDepth = threshold;
+  }
   
   for (const Arg *A : make_range(Args.filtered_begin(OPT_D),
                                  Args.filtered_end())) {
@@ -958,12 +1077,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
-  Opts.WarnSwift3ObjCInference |= Args.hasArg(OPT_warn_swift3_objc_inference);
 
   Opts.EnableSwift3ObjCInference =
     Args.hasFlag(OPT_enable_swift3_objc_inference,
                  OPT_disable_swift3_objc_inference,
                  Opts.isSwiftVersion3());
+
+  if (Opts.EnableSwift3ObjCInference) {
+    if (const Arg *A = Args.getLastArg(
+                                   OPT_warn_swift3_objc_inference_minimal,
+                                   OPT_warn_swift3_objc_inference_complete)) {
+      if (A->getOption().getID() == OPT_warn_swift3_objc_inference_minimal)
+        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Minimal;
+      else
+        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
+    }
+  }
+
+  Opts.EnableNSKeyedArchiverDiagnostics =
+      Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
+                   OPT_disable_nskeyedarchiver_diagnostics,
+                   Opts.EnableNSKeyedArchiverDiagnostics);
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
@@ -1030,6 +1164,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_target_cpu))
     Opts.TargetCPU = A->getValue();
 
+  if (const Arg *A = Args.getLastArg(OPT_index_store_path))
+    Opts.IndexStorePath = A->getValue();
+
   for (const Arg *A : make_range(Args.filtered_begin(OPT_Xcc),
                                  Args.filtered_end())) {
     Opts.ExtraArgs.push_back(A->getValue());
@@ -1059,6 +1196,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();
+    Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
   return false;
@@ -1184,6 +1322,12 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
         A->getOption().getPrefixedName(), A->getValue());
   }
+  if (Opts.Optimization > SILOptions::SILOptMode::None
+      && Opts.EnforceExclusivityDynamic) {
+    Diags.diagnose(SourceLoc(),
+                   diag::warning_argument_not_supported_with_optimization,
+                   A->getOption().getPrefixedName() + A->getValue());
+  }
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
@@ -1220,6 +1364,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
+
+  Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
+  Opts.SILSerializeWitnessTables |=
+    Args.hasArg(OPT_sil_serialize_witness_tables);
 
   // Parse the optimization level.
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
@@ -1298,6 +1446,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     |= Args.hasArg(OPT_assume_parsing_unqualified_ownership_sil);
   Opts.EnableMandatorySemanticARCOpts |=
       !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
+  Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
 
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
@@ -1311,17 +1460,22 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
-    Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
+    Opts.Sanitize = parseSanitizerArgValues(
+        A, Triple, Diags,
+        /* sanitizerRuntimeLibExists= */[](StringRef libName) {
+
+          // The driver has checked the existence of the library
+          // already.
+          return true;
+        });
     IRGenOpts.Sanitize = Opts.Sanitize;
   }
 
+  if (Opts.Optimization > SILOptions::SILOptMode::None)
+    Opts.EnforceExclusivityDynamic = false;
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);
   }
-
-  /// Should we use the copy-on-write implementation of opaque existentials.
-  /// FIXME: Use during bootstraping this feature. Remove later.
-  Opts.UseCOWExistentials |= Args.hasArg(OPT_enable_cow_existentials);
 
   return false;
 }
@@ -1391,6 +1545,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.DebugCompilationDir = cwd.str();
     }
   }
+
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_Xcc),
+                                 Args.filtered_end())) {
+    StringRef Opt = A->getValue();
+    if (Opt.startswith("-D") || Opt.startswith("-U"))
+      Opts.ClangDefines.push_back(Opt);
+  }
+
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_l, OPT_framework),
                                  Args.filtered_end())) {
@@ -1518,6 +1680,59 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
+bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
+                       StringRef ResourcePath, ArgList &Args,
+                       DiagnosticEngine &Diags) {
+  using namespace options;
+
+  Opts.KeepObjcVisibility |= Args.hasArg(OPT_migrate_keep_objc_visibility);
+  Opts.DumpUsr = Args.hasArg(OPT_dump_usr);
+
+  if (Args.hasArg(OPT_disable_migrator_fixits)) {
+    Opts.EnableMigratorFixits = false;
+  }
+
+  if (auto RemapFilePath = Args.getLastArg(OPT_emit_remap_file_path)) {
+    Opts.EmitRemapFilePath = RemapFilePath->getValue();
+  }
+
+  if (auto MigratedFilePath = Args.getLastArg(OPT_emit_migrated_file_path)) {
+    Opts.EmitMigratedFilePath = MigratedFilePath->getValue();
+  }
+
+  if (auto Dumpster = Args.getLastArg(OPT_dump_migration_states_dir)) {
+    Opts.DumpMigrationStatesDir = Dumpster->getValue();
+  }
+
+  if (auto DataPath = Args.getLastArg(OPT_api_diff_data_file)) {
+    Opts.APIDigesterDataStorePaths.push_back(DataPath->getValue());
+  } else {
+    bool Supported = true;
+    llvm::SmallString<128> dataPath(ResourcePath);
+    llvm::sys::path::append(dataPath, "migrator");
+    if (Triple.isMacOSX())
+      llvm::sys::path::append(dataPath, "macos.json");
+    else if (Triple.isiOS())
+      llvm::sys::path::append(dataPath, "ios.json");
+    else if (Triple.isTvOS())
+      llvm::sys::path::append(dataPath, "tvos.json");
+    else if (Triple.isWatchOS())
+      llvm::sys::path::append(dataPath, "watchos.json");
+    else
+      Supported = false;
+    if (Supported) {
+      llvm::SmallString<128> authoredDataPath(ResourcePath);
+      llvm::sys::path::append(authoredDataPath, "migrator");
+      llvm::sys::path::append(authoredDataPath, "overlay.json");
+      // Add authored list first to take higher priority.
+      Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
+      Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
+    }
+  }
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags,
                                    StringRef workingDirectory) {
@@ -1577,6 +1792,11 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseDiagnosticArgs(DiagnosticOpts, ParsedArgs, Diags)) {
+    return true;
+  }
+
+  if (ParseMigratorArgs(MigratorOpts, LangOpts.Target,
+                        SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }
 

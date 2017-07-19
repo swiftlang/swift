@@ -50,7 +50,6 @@
 
 PROTOCOL(Sequence)
 PROTOCOL(IteratorProtocol)
-PROTOCOL(AnyObject)
 PROTOCOL(RawRepresentable)
 PROTOCOL(Equatable)
 PROTOCOL(Hashable)
@@ -58,12 +57,17 @@ PROTOCOL(Comparable)
 PROTOCOL(Error)
 PROTOCOL_(ErrorCodeProtocol)
 PROTOCOL(OptionSet)
+
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
+PROTOCOL_(CFObject)
+PROTOCOL_(SwiftNewtypeWrapper)
+PROTOCOL(CodingKey)
+PROTOCOL(Encodable)
+PROTOCOL(Decodable)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)
-PROTOCOL_(SwiftNewtypeWrapper)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral)
@@ -81,12 +85,15 @@ EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral)
 
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinBooleanLiteral)
+BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinExtendedGraphemeClusterLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinFloatLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinIntegerLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinStringLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinUTF16StringLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinUnicodeScalarLiteral)
+BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinConstStringLiteral)
+BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinConstUTF16StringLiteral)
 
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_

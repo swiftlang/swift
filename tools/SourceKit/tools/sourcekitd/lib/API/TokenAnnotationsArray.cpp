@@ -137,7 +137,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 namespace sourcekitd {
 
@@ -221,7 +221,7 @@ VariantFunctions CompactVariantFuncs<TokenAnnotationsArray>::Funcs = {
   nullptr/*Annot_uid_get_value*/
 };
 
-}
+} // namespace sourcekitd
 
 VariantFunctions *
 sourcekitd::getVariantFunctionsForTokenAnnotationsArray() {

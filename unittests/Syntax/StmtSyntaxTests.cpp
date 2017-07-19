@@ -19,7 +19,8 @@ TEST(StmtSyntaxTests, FallthroughStmtGetAPIs) {
     .withFallthroughKeyword(FallthroughKW);
 
   /// This should be directly shared through reference-counting.
-  ASSERT_EQ(FallthroughKW, Fallthrough.getFallthroughKeyword());
+  ASSERT_EQ(FallthroughKW.getRaw(), Fallthrough.getFallthroughKeyword()
+                                               .getRaw());
 }
 
 TEST(StmtSyntaxTests, FallthroughStmtWithAPIs) {
@@ -50,9 +51,9 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
 
-    FallthroughKW = FallthroughKW->withLeadingTrivia(Trivia::spaces(2));
+    auto NewFallthroughKW = FallthroughKW.withLeadingTrivia(Trivia::spaces(2));
 
-    SyntaxFactory::makeFallthroughStmt(FallthroughKW).print(OS);
+    SyntaxFactory::makeFallthroughStmt(NewFallthroughKW).print(OS);
     ASSERT_EQ(OS.str().str(), "  fallthrough");
   }
 
@@ -60,9 +61,10 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
 
-    FallthroughKW = FallthroughKW->withTrailingTrivia(Trivia::spaces(2));
+    auto NewFallthroughKW = FallthroughKW.withLeadingTrivia(Trivia::spaces(2))
+                                         .withTrailingTrivia(Trivia::spaces(2));
 
-    SyntaxFactory::makeFallthroughStmt(FallthroughKW).print(OS);
+    SyntaxFactory::makeFallthroughStmt(NewFallthroughKW).print(OS);
     ASSERT_EQ(OS.str().str(), "  fallthrough  ");
   }
 
@@ -83,8 +85,8 @@ TEST(StmtSyntaxTests, BreakStmtGetAPIs) {
   auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label);
 
   /// These should be directly shared through reference-counting.
-  ASSERT_EQ(BreakKW, Break.getBreakKeyword());
-  ASSERT_EQ(Label, Break.getLabel());
+  ASSERT_EQ(BreakKW.getRaw(), Break.getBreakKeyword().getRaw());
+  ASSERT_EQ(Label.getRaw(), Break.getLabel().getRaw());
 }
 
 TEST(StmtSyntaxTests, BreakStmtWithAPIs) {
@@ -115,7 +117,7 @@ TEST(StmtSyntaxTests, BreakStmtWithAPIs) {
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    Break.withBreakKeyword(BreakKW->withTrailingTrivia(Trivia::spaces(1)))
+    Break.withBreakKeyword(BreakKW.withTrailingTrivia(Trivia::spaces(1)))
       .withLabel(Label)
       .print(OS);
     ASSERT_EQ(OS.str().str(), "break theRules"); // sometimes
@@ -148,8 +150,8 @@ TEST(StmtSyntaxTests, ContinueStmtGetAPIs) {
   auto Continue = SyntaxFactory::makeContinueStmt(ContinueKW, Label);
 
   /// These should be directly shared through reference-counting.
-  ASSERT_EQ(ContinueKW, Continue.getContinueKeyword());
-  ASSERT_EQ(Label, Continue.getLabel());
+  ASSERT_EQ(ContinueKW.getRaw(), Continue.getContinueKeyword().getRaw());
+  ASSERT_EQ(Label.getRaw(), Continue.getLabel().getRaw());
 }
 
 TEST(StmtSyntaxTests, ContinueStmtWithAPIs) {
@@ -180,7 +182,7 @@ TEST(StmtSyntaxTests, ContinueStmtWithAPIs) {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     Continue
-      .withContinueKeyword(ContinueKW->withTrailingTrivia(Trivia::spaces(1)))
+      .withContinueKeyword(ContinueKW.withTrailingTrivia(Trivia::spaces(1)))
       .withLabel(Label)
       .print(OS);
     ASSERT_EQ(OS.str().str(), "continue toCare"); // for each other
@@ -235,7 +237,7 @@ TEST(StmtSyntaxTests, ReturnStmtGetAPIs) {
   auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
   auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne);
 
-  ASSERT_EQ(ReturnKW, Return.getReturnKeyword());
+  ASSERT_EQ(ReturnKW.getRaw(), Return.getReturnKeyword().getRaw());
   auto GottenExpression = Return.getExpression().getValue();
   auto GottenExpression2 = Return.getExpression().getValue();
   ASSERT_TRUE(GottenExpression.hasSameIdentityAs(GottenExpression2));

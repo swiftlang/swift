@@ -1,7 +1,12 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift -swift-version 3
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+
+// FIXME: rdar://problem/31311598
+// UNSUPPORTED: OS=ios
+// UNSUPPORTED: OS=tvos
+// UNSUPPORTED: OS=watchos
 
 //
 // Tests for the NSString APIs as exposed by String
@@ -18,6 +23,9 @@ import StdlibUnittestFoundationExtras
 class NonContiguousNSString : NSString {
   required init(coder aDecoder: NSCoder) {
     fatalError("don't call this initializer")
+  }
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")    
   }
 
   override init() { 
@@ -530,8 +538,8 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
     (tag: String, tokenRange: Range<String.Index>, sentenceRange: Range<String.Index>, stop: inout Bool)
   in
     tags.append(tag)
-    tokens.append(s[tokenRange])
-    sentences.append(s[sentenceRange])
+    tokens.append(String(s[tokenRange]))
+    sentences.append(String(s[sentenceRange]))
     if tags.count == 3 {
       stop = true
     }
@@ -550,14 +558,16 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
   let endIndex = s.index(s.startIndex, offsetBy: 5)
   do {
     var substrings: [String] = []
+    // FIXME(strings): this API should probably change to accept a Substring?
+    // instead of a String? and a range.
     s.enumerateSubstrings(in: startIndex..<endIndex,
       options: String.EnumerationOptions.byComposedCharacterSequences) {
       (substring: String?, substringRange: Range<String.Index>,
        enclosingRange: Range<String.Index>, stop: inout Bool)
     in
       substrings.append(substring!)
-      expectEqual(substring, s[substringRange])
-      expectEqual(substring, s[enclosingRange])
+      expectEqual(substring, String(s[substringRange]))
+      expectEqual(substring, String(s[enclosingRange]))
     }
     expectEqual(["\u{304b}\u{3099}", "お", "☺️", "😀"], substrings)
   }
@@ -873,7 +883,7 @@ NSStringAPIs.test("linguisticTagsIn(_:scheme:options:orthography:tokenRanges:)")
     [NSLinguisticTagWord, NSLinguisticTagWhitespace, NSLinguisticTagWord],
     tags)
   expectEqual(["Глокая", " ", "куздра"],
-      tokenRanges.map { s[$0] } )
+      tokenRanges.map { String(s[$0]) } )
 }
 
 NSStringAPIs.test("localizedCaseInsensitiveCompare(_:)") {

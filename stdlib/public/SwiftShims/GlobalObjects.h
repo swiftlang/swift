@@ -89,6 +89,14 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride;
 
 #ifdef __cplusplus
+
+static_assert(std::is_pod<_SwiftEmptyArrayStorage>::value,
+              "empty array type should be POD");
+static_assert(std::is_pod<_SwiftEmptyDictionaryStorage>::value,
+              "empty dictionary type should be POD");
+static_assert(std::is_pod<_SwiftEmptySetStorage>::value,
+              "empty set type should be POD");
+
 }} // extern "C", namespace swift
 #endif
 

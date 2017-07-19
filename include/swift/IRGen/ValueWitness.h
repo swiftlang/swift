@@ -64,41 +64,15 @@ namespace irgen {
 /// This leaves us with 12 data operations, to which we add the
 /// meta-operation 'sizeAndAlign' for a total of 13.
 enum class ValueWitness : unsigned {
-  // destroyBuffer comes first because I expect it to be the most
-  // common operation (both by code size and occurrence), since it's
-  // the optimal way to destroy an individual local/temporary.
-  //
-  // Several other candidates that are likely to see use in
-  // existential code are then grouped together for cache-locality
-  // reasons.
+  // Candidates that are likely to see use in existential code are then grouped
+  // together for cache-locality reasons.
   
-  ///   void (*destroyBuffer)(B *buffer, M *self);
-  ///
-  /// Given a valid buffer which owns a valid object of this type,
-  /// destroy it.  This can be decomposed as
-  ///   self->destroy(self->projectBuffer(buffer), self);
-  ///   self->deallocateBuffer(buffer), self);
-  DestroyBuffer,
-
   ///   T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, M *self);
   /// Given an invalid buffer, initialize it as a copy of the
   /// object in the source buffer.  This can be decomposed as:
-  ///   initializeBufferWithCopy(dest, self->projectBuffer(src), self)
+  ///   initializeWithCopy(self->allocateBuffer(dest, self), self->projectBuffer(src), self)
   InitializeBufferWithCopyOfBuffer,
   
-  ///   T *(*projectBuffer)(B *buffer, M *self);
-  ///
-  /// Given an initialized fixed-size buffer, find its allocated
-  /// storage.
-  ProjectBuffer,
-
-  ///   void (*deallocateBuffer)(B *buffer, M *self);
-  ///
-  /// Given a buffer owning storage for an uninitialized object of this
-  /// type, deallocate the storage, putting the buffer in an invalid
-  /// state.
-  DeallocateBuffer, // likely along exception edges of initializers
-
   ///   void (*destroy)(T *object, witness_t *self);
   ///
   /// Given a valid object of this type, destroy it, leaving it as an
@@ -106,12 +80,6 @@ enum class ValueWitness : unsigned {
   /// an object which has been allocated in-line, such as an array,
   /// struct, or tuple element.
   Destroy,
-
-  ///   T *(*initializeBufferWithCopy)(B *dest, T *src, M *self);
-  /// Given an invalid buffer, initialize it as a copy of the
-  /// source object.  This can be decomposed as:
-  ///   initializeWithCopy(self->allocateBuffer(dest, self), src, self)
-  InitializeBufferWithCopy,
 
   ///   T *(*initializeWithCopy)(T *dest, T *src, M *self);
   ///
@@ -124,13 +92,6 @@ enum class ValueWitness : unsigned {
   /// Given a valid object of this type, change it to be a copy of the
   /// source object.  Returns the dest object.
   AssignWithCopy,
-
-  ///   T *(*initializeBufferWithTake)(B *dest, T *src, M *self);
-  ///
-  /// Given an invalid buffer, initialize it by taking the value
-  /// of the source object.  The source object becomes invalid.
-  /// Returns the dest object.  
-  InitializeBufferWithTake,
 
   ///   T *(*initializeWithTake)(T *dest, T *src, M *self);
   ///
@@ -145,18 +106,11 @@ enum class ValueWitness : unsigned {
   /// source object.  The source object becomes invalid.  Returns the
   /// dest object.
   AssignWithTake,
-
-  ///   T *(*allocateBuffer)(B *buffer, M *self);
-  /// 
-  /// Given a buffer in an invalid state, make it the owner of storage
-  /// for an uninitialized object of this type.  Return the address of
-  /// that object.
-  AllocateBuffer,
   
   ///   T *(*initializeBufferWithTakeOfBuffer)(B *dest, B *src, M *self);
   /// Given an invalid buffer, initialize it by taking the value out of
   /// the source buffer.  This can be (inefficiently) decomposed as:
-  ///   initializeBufferWithTake(dest, self->projectBuffer(src), self)
+  ///   initializeWithTake(self->allocateBuffer(dest, self), self->projectBuffer(src), self)
   ///   deallocateBuffer(src, self)
   InitializeBufferWithTakeOfBuffer,
   

@@ -145,7 +145,6 @@ extension Bool : Equatable, Hashable {
   /// - Note: The hash value is not guaranteed to be stable across different
   ///   invocations of the same program. Do not persist the hash value across
   ///   program runs.
-  /// - SeeAlso: `Hashable`
   @_transparent
   public var hashValue: Int {
     return self ? 1 : 0
@@ -160,8 +159,8 @@ extension Bool : Equatable, Hashable {
 extension Bool : LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///
-  /// If `description` is any string other than `"true"` or `"false"`, the
-  /// result is `nil`. This initializer is case sensitive.
+  /// If the `description` value is any string other than `"true"` or
+  /// `"false"`, the result is `nil`. This initializer is case sensitive.
   ///
   /// - Parameter description: A string representation of the Boolean value.
   public init?(_ description: String) {
@@ -202,9 +201,9 @@ extension Bool {
 }
 
 extension Bool {
-  /// Performs a logical AND operation on two Bool values.
+  /// Performs a logical AND operation on two Boolean values.
   ///
-  /// The logical AND operator (`&&`) combines two Bool values and returns
+  /// The logical AND operator (`&&`) combines two Boolean values and returns
   /// `true` if both of the values are `true`. If either of the values is
   /// `false`, the operator returns `false`.
   ///
@@ -241,9 +240,9 @@ extension Bool {
     return lhs ? try rhs() : false
   }
 
-  /// Performs a logical OR operation on two Bool values.
+  /// Performs a logical OR operation on two Boolean values.
   ///
-  /// The logical OR operator (`||`) combines two Bool values and returns
+  /// The logical OR operator (`||`) combines two Boolean values and returns
   /// `true` if at least one of the values is `true`. If both values are
   /// `false`, the operator returns `false`.
   ///

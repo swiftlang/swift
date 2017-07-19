@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
 sil_stage canonical
 
+import Builtin
+
 public protocol P {}
 public class C : P {}
 public class D<T : P> {}
@@ -58,6 +60,128 @@ bb0(%0 : $C):
   return %10 : $()
 }
 
+public protocol Q {
+  associatedtype Update
+}
+
+public struct BaseProducer<T> : Q {
+  public typealias Update = T
+}
+
+public class WeakBox<T> {}
+
+sil hidden_external @takingQ : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
+// CHECK: entry:
+// CHECK:   [[BPTYPE:%.*]] = call %swift.type* @_T023partial_apply_forwarder12BaseProducerVMa(%swift.type* %"\CF\84_0_1")
+// CHECK:   [[WEAKBOXTYPE:%.*]] = call %swift.type* @_T023partial_apply_forwarder7WeakBoxCMa(%swift.type* [[BPTYPE]])
+// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[WEAKBOXTYPE]]
+// CHECK:   [[WB:%.*]] = bitcast %swift.refcounted* [[OBJ]] to %T23partial_apply_forwarder7WeakBoxC*
+// CHECK:   [[REF:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %swift.refcounted*
+// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @_T07takingQTA to i8*), %swift.refcounted* undef }, %swift.refcounted* [[REF]], 1
+// CHECK:   ret { i8*, %swift.refcounted* } [[CLOSURE]]
+
+// CHECK-LABEL: define internal swiftcc void @_T07takingQTA(%swift.refcounted* swiftself)
+// CHECK: entry:
+// CHECK:   [[WB:%.*]] = bitcast %swift.refcounted* %0 to %T23partial_apply_forwarder7WeakBoxC*
+// CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* %1, i32 0, i32 0, i32 0
+// CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]]
+// CHECK:   [[GENPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
+// CHECK:   [[PARAMTYADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENPARAMSADDR]], {{(i64 10|i32 13)}}
+// CHECK:   %"BaseProducer<\CF\84_0_1>" = load %swift.type*, %swift.type** [[PARAMTYADDR]]
+// CHECK:   [[WITNESS:%.*]] = call i8** @_T023partial_apply_forwarder12BaseProducerVyxGAA1QAAlWa(%swift.type* %"BaseProducer<\CF\84_0_1>")
+// CHECK:   [[OBJ:%.*]] = bitcast %swift.refcounted* %0 to %T23partial_apply_forwarder7WeakBoxC.1*
+// CHECK:   tail call swiftcc void @takingQ(%T23partial_apply_forwarder7WeakBoxC.1* [[OBJ]], i8** [[WITNESS]])
+// CHECK: }
+
+sil public @bind_polymorphic_param_from_context : $@convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @callee_owned () -> () {
+bb0(%0 : $*τ_0_1):
+  %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
+  %8 = function_ref @takingQ : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
+  %9 = partial_apply %8<BaseProducer<τ_0_1>>(%1) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
+  return %9 : $@callee_owned () -> ()
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @bind_polymorphic_param_from_forwarder_parameter(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
+// CHECK: entry:
+// CHECK:   [[BPTY:%.*]] = call %swift.type* @_T023partial_apply_forwarder12BaseProducerVMa(%swift.type* %"\CF\84_0_1")
+// CHECK:   [[WBTY:%.*]] = call %swift.type* @_T023partial_apply_forwarder7WeakBoxCMa(%swift.type* [[BPTY]]
+// CHECK:   call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[WBTY]]
+// CHECK:   ret void
+
+// CHECK-LABEL: define internal swiftcc void @_T07takingQTA.2(%T23partial_apply_forwarder7WeakBoxC*, %swift.refcounted* swiftself)
+// CHECK: entry:
+// CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* %0
+// CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]]
+// CHECK:   [[CAST:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* %0 to %T23partial_apply_forwarder7WeakBoxC.1*
+// CHECK:   [[TYPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
+// CHECK:   [[TYPARAM:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[TYPARAMSADDR]], {{(i64 10|i32 13)}}
+// CHECK:   %"BaseProducer<\CF\84_0_1>" = load %swift.type*, %swift.type** [[TYPARAM]]
+// CHECK:   [[WITNESS:%.*]] = call i8** @_T023partial_apply_forwarder12BaseProducerVyxGAA1QAAlWa(%swift.type* %"BaseProducer<\CF\84_0_1>")
+// CHECK:   tail call swiftcc void @takingQ(%T23partial_apply_forwarder7WeakBoxC.1* [[CAST]], i8** [[WITNESS]])
+// CHECK:   ret void
+
+sil public @bind_polymorphic_param_from_forwarder_parameter : $@convention(thin) <τ_0_1>(@in τ_0_1) -> () {
+bb0(%0 : $*τ_0_1):
+  %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
+  %8 = function_ref @takingQ : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
+  %9 = partial_apply %8<BaseProducer<τ_0_1>>() : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
+  %10 = tuple ()
+  return %10 : $()
+}
+
+struct S {
+  var x : Builtin.Int64
+}
+
+sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context_with_layout(%swift.opaque* noalias nocapture, i64, %swift.type* %"\CF\84_0_1")
+// CHECK: entry:
+// CHECK:   [[BPTY:%.*]] = call %swift.type* @_T023partial_apply_forwarder12BaseProducerVMa(%swift.type* %"\CF\84_0_1")
+// CHECK:   [[WBTY:%.*]] = call %swift.type* @_T023partial_apply_forwarder7WeakBoxCMa(%swift.type* [[BPTY]]
+// CHECK:   [[WBREF:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[WBTY]]
+// CHECK:   [[WB:%.*]] = bitcast %swift.refcounted* [[WBREF]] to %T23partial_apply_forwarder7WeakBoxC*
+// CHECK:   [[CONTEXT0:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
+// CHECK:   [[CONTEXT:%.*]] = bitcast %swift.refcounted* [[CONTEXT0]] to <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>*
+// CHECK:   [[SADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>, <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>* [[CONTEXT]], i32 0, i32 {{(1|2)}}
+// CHECK:   [[XADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder1SV* [[SADDR]], i32 0, i32 0
+// CHECK:   store i64 %1, i64* [[XADDR]]
+// CHECK:   [[WBADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>, <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>* [[CONTEXT]], i32 0, i32 {{(2|3)}}
+// CHECK:   store %T23partial_apply_forwarder7WeakBoxC* [[WB]], %T23partial_apply_forwarder7WeakBoxC** [[WBADDR]]
+// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @_T011takingQAndSTA to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT0]], 1
+// CHECK:   ret { i8*, %swift.refcounted* } [[CLOSURE]]
+
+// CHECK-LABEL: define internal swiftcc void @_T011takingQAndSTA(%swift.refcounted* swiftself)
+// CHECK: entry:
+// CHECK:   [[CONTEXT:%.*]] = bitcast %swift.refcounted* %0 to <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>*
+// CHECK:   [[SADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>, <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>* [[CONTEXT]], i32 0, i32 {{(1|2)}}
+// CHECK:   [[XADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder1SV* [[SADDR]], i32 0, i32 0
+// CHECK:   [[X:%.*]] = load i64, i64* [[XADDR]]
+// CHECK:   [[WBADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>, <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>* [[CONTEXT]], i32 0, i32 {{(2|3)}}
+// CHECK:   [[WB:%.*]] = load %T23partial_apply_forwarder7WeakBoxC*, %T23partial_apply_forwarder7WeakBoxC** [[WBADDR]]
+// CHECK:   [[WBREF:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %swift.refcounted*
+// CHECK:   call void @swift_rt_swift_retain(%swift.refcounted* [[WBREF]])
+// CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* [[WB]], i32 0, i32 0, i32 0
+// CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** %7
+// CHECK:   %.asUnsubstituted = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %T23partial_apply_forwarder7WeakBoxC.1*
+// CHECK:   call void @swift_rt_swift_release(%swift.refcounted* %0)
+// CHECK:   [[GENPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
+// CHECK:   [[GENPARAMADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENPARAMSADDR]], {{(i64 10|i32 13)}}
+// CHECK:   %"BaseProducer<\CF\84_0_1>" = load %swift.type*, %swift.type** [[GENPARAMADDR]]
+// CHECK:   [[WITNESS:%.*]] = call i8** @_T023partial_apply_forwarder12BaseProducerVyxGAA1QAAlWa(%swift.type* %"BaseProducer<\CF\84_0_1>")
+// CHECK:   tail call swiftcc void @takingQAndS(i64 [[X]], %T23partial_apply_forwarder7WeakBoxC.1* %.asUnsubstituted, i8** [[WITNESS]])
+
+sil public @bind_polymorphic_param_from_context_with_layout : $@convention(thin) <τ_0_1>(@in τ_0_1, S) -> @owned @callee_owned () -> () {
+bb0(%0 : $*τ_0_1, %1: $S):
+  %2 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
+  %8 = function_ref @takingQAndS : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
+  %9 = partial_apply %8<BaseProducer<τ_0_1>>(%1, %2) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
+  return %9 : $@callee_owned () -> ()
+}
+
+sil_vtable WeakBox {}
 sil_vtable C {}
 sil_vtable D {}
 sil_vtable E {}

@@ -1,4 +1,4 @@
-//===--- TBDGenPublic.h - Public interface to TBDGen ------------*- C++ -*-===//
+//===--- TBDGen.h - Public interface to TBDGen ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,7 +17,9 @@
 namespace swift {
 class FileUnit;
 
-void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols);
+void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
+                            bool hasMultipleIRGenThreads, bool isWholeModule,
+                            bool silSerializeWitnessTables);
 } // end namespace swift
 
 #endif

@@ -20,7 +20,7 @@
         {
           key.kind: source.lang.swift.decl.typealias,
           key.name: "Index",
-          key.usr: "s:7sr_38151PP5Index",
+          key.usr: "s:7sr_38151PP5Indexa",
           key.line: 5,
           key.column: 13,
           key.entities: [
@@ -38,7 +38,8 @@
           key.name: "f()",
           key.usr: "s:7sr_38151PP1fyyF",
           key.line: 6,
-          key.column: 8
+          key.column: 8,
+          key.is_dynamic: 1
         }
       ]
     },
@@ -68,7 +69,7 @@
         {
           key.kind: source.lang.swift.decl.typealias,
           key.name: "Index",
-          key.usr: "s:7sr_38151SV5Index",
+          key.usr: "s:7sr_38151SV5Indexa",
           key.line: 10,
           key.column: 13,
           key.entities: [
@@ -94,6 +95,12 @@
               key.usr: "s:7sr_38151PP1fyyF"
             }
           ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:7sr_38151SVACycfc",
+          key.line: 9,
+          key.column: 8
         }
       ]
     }

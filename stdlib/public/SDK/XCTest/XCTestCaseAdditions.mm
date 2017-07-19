@@ -143,6 +143,7 @@ NSDictionary<NSString *, NSString *> *_XCTRunThrowableBlockBridge(void (^block)(
     @try {
         block();
     }
+    @catch (_XCTestCaseInterruptionException *interruption) { [interruption raise]; }
     @catch (NSException *exception) {
         result = @{
                    @"type": @"objc",

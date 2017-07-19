@@ -41,8 +41,6 @@ internal func _abstract(
 /// This iterator forwards its `next()` method to an arbitrary underlying
 /// iterator having the same `Element` type, hiding the specifics of the
 /// underlying `IteratorProtocol`.
-///
-/// - SeeAlso: `AnySequence`
 @_fixed_layout
 public struct AnyIterator<Element> : IteratorProtocol {
   /// Creates an iterator that wraps a base iterator but whose type depends
@@ -363,7 +361,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
-  func _customIndexOfEquatableElement(element: Iterator.Element) -> Index??
+  func _customIndexOfEquatableElement(element: Element) -> Index??
   */
 
   @_versioned
@@ -423,27 +421,24 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %     assert False, 'Unknown kind'
 %   end
 
+
+
 @_fixed_layout
 @_versioned
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
   where
   S.SubSequence : ${Kind},
-  S.SubSequence.Iterator.Element == S.Iterator.Element,
+// FIXME(ABI) (Revert Where Clauses): apply all this only to Sequence:
+%  if Kind == 'Sequence':
+  S.SubSequence.Element == S.Element,
   S.SubSequence.SubSequence == S.SubSequence
-%   if Kind != 'Sequence':
-  ,
-  S.SubSequence.Index == S.Index,
+// FIXME(ABI) (Revert Where Clauses): remove this else clause:
+%  else:
   S.SubSequence.Indices : ${Kind},
-  S.SubSequence.Indices.Iterator.Element == S.Index,
-  S.SubSequence.Indices.Index == S.Index,
-  S.SubSequence.Indices.SubSequence == S.SubSequence.Indices,
-  S.Indices : ${Kind},
-  S.Indices.Iterator.Element == S.Index,
-  S.Indices.Index == S.Index,
-  S.Indices.SubSequence == S.Indices
-%   end
+  S.Indices : ${Kind}
+%  end
 {
-  internal typealias Element = S.Iterator.Element
+  internal typealias Element = S.Element
 
   @_versioned
   @_inlineable
@@ -734,8 +729,6 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
 /// An instance of `AnySequence` forwards its operations to an underlying base
 /// sequence having the same `Element` type, hiding the specifics of the
 /// underlying sequence.
-///
-/// - SeeAlso: `AnyIterator`
 //@_versioned
 @_fixed_layout
 public struct AnySequence<Element> : Sequence {
@@ -743,9 +736,9 @@ public struct AnySequence<Element> : Sequence {
   @_inlineable
   public init<S : Sequence>(_ base: S)
     where
-    S.Iterator.Element == Element,
+    S.Element == Element,
     S.SubSequence : Sequence,
-    S.SubSequence.Iterator.Element == Element,
+    S.SubSequence.Element == Element,
     S.SubSequence.SubSequence == S.SubSequence {
     self._box = _SequenceBox(_base: base)
   }
@@ -875,7 +868,7 @@ extension Any${Kind} {
   }
 
   @_inlineable
-  public func _copyContents(initializing buf: UnsafeMutableBufferPointer<Iterator.Element>)
+  public func _copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
   -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     let (it,idx) = _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
@@ -943,8 +936,6 @@ internal final class _IndexBox<
 }
 
 /// A wrapper over an underlying index that hides the specific underlying type.
-///
-/// - SeeAlso: `AnyCollection`
 @_fixed_layout
 public struct AnyIndex {
   /// Creates a new index wrapping `base`.
@@ -1018,8 +1009,6 @@ protocol _AnyCollectionProtocol : Collection {
 /// An `${Self}` instance forwards its operations to a base collection having the
 /// same `Element` type, hiding the specifics of the underlying
 /// collection.
-///
-/// - SeeAlso: ${', '.join('`Any%sCollection`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
 @_fixed_layout
 public struct ${Self}<Element>
   : _AnyCollectionProtocol, ${SelfProtocol} {
@@ -1045,22 +1034,14 @@ public struct ${Self}<Element>
   @_inlineable
   public init<C : ${SubProtocol}>(_ base: C)
     where
-    C.Iterator.Element == Element,
-
-    // FIXME(ABI)#101 (Associated Types with where clauses): these constraints should be applied to
-    // associated types of Collection.
+    // FIXME(ABI) (Revert Where Clauses): remove next 3 lines
     C.SubSequence : ${SubProtocol},
-    C.SubSequence.Iterator.Element == Element,
-    C.SubSequence.Index == C.Index,
     C.SubSequence.Indices : ${SubProtocol},
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.Indices.Index == C.Index,
-    C.SubSequence.Indices.SubSequence == C.SubSequence.Indices,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : ${SubProtocol},
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices {
+    // FIXME(ABI)#101 (Associated Types with where clauses): these constraints
+    // should be applied to associated types of Collection.
+    C.SubSequence.Element == Element
+     {
     // Traversal: ${Traversal}
     // SubTraversal: ${SubTraversal}
     self._box = _${SubProtocol}Box<C>(
@@ -1289,7 +1270,7 @@ public typealias AnyCollectionProtocol = _AnyCollectionProtocol
 
 extension _AnyCollectionProtocol {
   @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> AnyIterator<Iterator.Element> {
+  public func generate() -> AnyIterator<Element> {
     Builtin.unreachable()
   }
 }

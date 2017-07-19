@@ -1,0 +1,163 @@
+//===--- StringWalk.swift -------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% # Ignore the following warning. This _is_ the correct file to edit.
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from .gyb template and should not
+// be directly modified. Instead, make changes to StringWalk.swift.gyb and run
+// scripts/generate_harness/generate_harness.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// Test String iteration performance over a variety of workloads, languages,
+// and symbols.
+//
+
+import TestsUtils
+
+var count: Int = 0
+
+//
+// Helper functionality
+//
+
+@inline(never) func count_unicodeScalars(_ s: String.UnicodeScalarView) {
+  for _ in s {
+    count += 1
+  }
+}
+@inline(never) func count_characters(_ s: String.CharacterView) {
+  for _ in s {
+    count += 1
+  }
+}
+@inline(never) func count_unicodeScalars_rev(
+  _ s: ReversedCollection<String.UnicodeScalarView>
+) {
+  for _ in s {
+    count += 1
+  }
+}
+@inline(never) func count_characters_rev(
+  _ s: ReversedCollection<String.CharacterView>
+) {
+  for _ in s {
+    count += 1
+  }
+}
+
+//
+// Workloads
+//
+let ascii =
+  "siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebzig"
+let emoji = "👍👩‍👩‍👧‍👧👨‍👨‍👦‍👦🇺🇸🇨🇦🇲🇽👍🏻👍🏼👍🏽👍🏾👍🏿"
+let utf16 = emoji + "the quick brown fox" + String(emoji.reversed() as Array<Character>)
+
+let japanese = "今回のアップデートでSwiftに大幅な改良が施され、安定していてしかも直感的に使うことができるAppleプラットフォーム向けプログラミング言語になりました。"
+let chinese = "Swift 是面向 Apple 平台的编程语言，功能强大且直观易用，而本次更新对其进行了全面优化。"
+let korean = "이번 업데이트에서는 강력하면서도 직관적인 Apple 플랫폼용 프로그래밍 언어인 Swift를 완벽히 개선하였습니다."
+let russian = "в чащах юга жил-был цитрус? да, но фальшивый экземпляр"
+let punctuated = "\u{201c}Hello\u{2010}world\u{2026}\u{201d}"
+let punctuatedJapanese = "\u{300c}\u{300e}今日は\u{3001}世界\u{3002}\u{300f}\u{300d}"
+
+// A workload that's mostly Latin characters, with occasional emoji
+// interspersed. Common for tweets.
+let tweet = "Worst thing about working on String is that it breaks *everything*. Asserts, debuggers, and *especially* printf-style debugging 😭"
+
+//
+// Benchmarks
+//
+
+// Pre-commit benchmark: simple scalar walk
+@inline(never)
+public func run_StringWalk(_ N: Int) {
+  return run_StringWalk_ascii_unicodeScalars(N)
+}
+
+// Extended String benchmarks:
+let baseMultiplier = 10_000
+let unicodeScalarsMultiplier = baseMultiplier
+let charactersMultiplier = baseMultiplier / 5
+
+% for Name in ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian", "punctuated", "punctuatedJapanese"]:
+%   for Kind in ["unicodeScalars", "characters"]:
+
+@inline(never)
+public func run_StringWalk_${Name}_${Kind}(_ N: Int) {
+  for _ in 1...${Kind}Multiplier*N {
+    count_${Kind}(${Name}.${Kind})
+  }
+}
+
+@inline(never)
+public func run_StringWalk_${Name}_${Kind}_Backwards(_ N: Int) {
+  for _ in 1...${Kind}Multiplier*N {
+    count_${Kind}_rev(${Name}.${Kind}.reversed())
+  }
+}
+
+
+
+%   end
+
+let ${Name}Characters = Array(${Name})
+
+@inline(never)
+public func run_CharIteration_${Name}_unicodeScalars(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    for c in ${Name}Characters {
+      for u in c.unicodeScalars {
+        count |= Int(u.value)
+      }
+    }
+  }
+}
+
+@inline(never)
+public func run_CharIteration_${Name}_unicodeScalars_Backwards(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    for c in ${Name}Characters {
+      for u in c.unicodeScalars.reversed() {
+        count |= Int(u.value)
+      }
+    }
+  }
+}
+
+@inline(never)
+public func run_CharIndexing_${Name}_unicodeScalars(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    for c in ${Name}Characters {
+      let s = c.unicodeScalars
+      for i in s.indices {
+        count |= Int(s[i].value)
+      }
+    }
+  }
+}
+
+@inline(never)
+public func run_CharIndexing_${Name}_unicodeScalars_Backwards(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    for c in ${Name}Characters {
+      let s = c.unicodeScalars
+      for i in s.indices.reversed() {
+        count |= Int(s[i].value)
+      }
+    }
+  }
+}
+
+
+
+% end

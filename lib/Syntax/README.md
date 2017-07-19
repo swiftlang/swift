@@ -72,7 +72,7 @@ points for this library:
    Swift Programming Language book as much as possible, so people know what to
    look for.
 1. Accommodate "bad syntax" - humans are imperfect and source code is constantly
-   in a state of flux in an editor. Unforunately, we still live in a
+   in a state of flux in an editor. Unfortunately, we still live in a
    character-centric world - the library shouldn't fall over on bad syntax just
    because someone is in the middle of typing `struct`.
 
@@ -236,7 +236,7 @@ tokens, represented by the `TokenSyntax` class.
 - `RawSyntax` store no parental relationships and can therefore be shared
    among syntax nodes if they have identical content.
 
-### TokenSyntax
+### RawTokenSyntax
 
 These are special cases of `RawSyntax` and represent all terminals in the
 grammar. Aside from the token kind and the text, they have two very important
@@ -245,12 +245,12 @@ pieces of information for full-fidelity source: leading and trailing source
 
 #### TokenSyntax summary
 
-- `TokenSyntax` are `RawSyntax` and represent the terminals in the Swift
+- `RawTokenSyntax` are `RawSyntax` and represent the terminals in the Swift
   grammar.
-- Like `RawSyntax`, `TokenSyntax` are immutable.
-- `TokenSyntax` do not have pointer equality, as they can be shared among syntax
+- Like `RawSyntax`, `RawTokenSyntax` are immutable.
+- `RawTokenSyntax` do have pointer equality, but they can be shared among syntax
   nodes.
-- `TokenSyntax` have *leading-* and *trailing trivia*, the purely syntactic
+- `RawTokenSyntax` have *leading-* and *trailing trivia*, the purely syntactic
   formatting information like whitespace and comments.
 
 ### Trivia
@@ -370,10 +370,10 @@ A couple of remarks about the `EOF` token:
 additional information: a pointer to a parent, the position in which the node
 occurs in its parent, and cached children.
 
-For example, if we have a `StructDeclSyntaxData`, wrapping a `RawSyntax` for a
+For example, if we have a `SyntaxData`, wrapping a `RawSyntax` for a
 struct declaration, we might ask for the generic parameter clause. At first,
 this is only represented in the raw syntax. On first ask, we thaw those out by
-creating a new `GenericParameterClauseSyntaxData`, cache it as our child, set
+creating a new `SyntaxData`, cache it as our child, set
 its parent to `this`, and send it back to the caller. These cached children
 are strong references, keeping the syntax tree alive in memory.
 
@@ -383,7 +383,7 @@ column number, etc. `RawSyntax` are more like the integer 1 - a single
 theoretical entity that exists, but manifesting everywhere it occurs identically
 in Swift source code.
 
-Beyond this, `SyntaxData` nodes have *no signficant public API*.
+Beyond this, `SyntaxData` nodes have *no significant public API*.
 
 - `SyntaxData` are immutable.
    However, they may mutate themselves in order to implement lazy instantiation
@@ -447,7 +447,7 @@ auto Block = SyntaxFactory::makeBlankCodeBlockStmt()
 
 // Returns a new ReturnStmtSyntax with the root set to the Block
 // above, and the parent set to the StmtListSyntax.
-auto MyReturn = Block.getStatement(0).castTo<ReturnStmt>;
+auto MyReturn = Block.getStatement(0).castTo<ReturnStmt>();
 ```
 
 Here's what the corresponding object diagram would look like starting with
@@ -456,7 +456,7 @@ Here's what the corresponding object diagram would look like starting with
 ![Syntax Example](.doc/SyntaxExample.png)
 
 Legend:
-- Green: `RawSyntax` types (`TokenSyntax` is a `RawSyntax`)
+- Green: `RawSyntax` types (`RawTokenSyntax` is a `RawSyntax`)
 - Red: `SyntaxData` types
 - Blue: `Syntax` types
 - Gray: `Trivia`
@@ -484,8 +484,6 @@ Here's a handy checklist when implementing a production in the grammar.
   are affected.
   - **Add the `Syntax` bug label!**
 - Add a *kind* to include/swift/Syntax/SyntaxKinds.def
-- Create the `${KIND}SyntaxData` class.  
-  - Cached children members as `RC<${CHILDKIND}SyntaxData>`
 - Create the `${KIND}Syntax` class.  
   Be sure to implement the following:
   - Define the `Cursor` enum for the syntax node. This specifies all of the
@@ -494,7 +492,7 @@ Here's a handy checklist when implementing a production in the grammar.
     `same-type-requirement -> type-identifier '==' type`
 
     That's three terms in the production, and you can see this reflected in the
-    `StructDeclSyntaxData` class:
+    `SameTypeRequirementSyntax` class:
 
     ```c++
     enum Cursor : CursorIndex {
@@ -509,7 +507,6 @@ Here's a handy checklist when implementing a production in the grammar.
         what you changed. `print` the new node and check the text.
       - Check that the new node has a different parent.
   - Getters for all layout elements (e.g. `getLeftTypeIdentifier()`)
-    - Caching mechanics in corresponding `${KIND}SyntaxData` class.
     - Add a C++ unit test.
       - After `get`ing the child, verify:
         - The child's parent and root are correct

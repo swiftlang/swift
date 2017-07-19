@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -Xllvm -sil-disable-pass="External Defs To Decls" -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false -module-name Swift > %t.sil
+// RUN: %target-swift-frontend %s -Xllvm -sil-disable-pass="External Definition To Declaration" -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false -module-name Swift > %t.sil
 // RUN: %FileCheck %s < %t.sil
 // RUN: %FileCheck -check-prefix=NEG-CHECK %s < %t.sil
 

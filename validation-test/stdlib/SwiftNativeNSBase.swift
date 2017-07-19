@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 // 
 // RUN: %target-clang %S/Inputs/SwiftNativeNSBase/SwiftNativeNSBase.m -c -o %t/SwiftNativeNSBase.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/SwiftNativeNSBase/ -Xlinker %t/SwiftNativeNSBase.o -o %t/SwiftNativeNSBase

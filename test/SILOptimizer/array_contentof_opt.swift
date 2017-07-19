@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // This is an end-to-end test of the array(contentsOf) -> array(Element) optimization
@@ -16,6 +16,9 @@ public func testInt(_ a: inout [Int]) {
 
 // CHECK-LABEL: sil @{{.*}}testThreeInt
 // CHECK-NOT: apply
+// CHECK:        [[FR:%[0-9]+]] = function_ref @_T0Sa15reserveCapacityySiFSi_Tg5
+// CHECK-NEXT:   apply [[FR]]
+// CHECK-NOT: apply
 // CHECK:        [[F:%[0-9]+]] = function_ref @_T0Sa6appendyxFSi_Tg
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
@@ -29,7 +32,7 @@ public func testThreeInts(_ a: inout [Int]) {
 
 // CHECK-LABEL: sil @{{.*}}testTooManyInts
 // CHECK-NOT: apply
-// CHECK:        [[F:%[0-9]+]] = function_ref @_T0Sa6appendyqd__10contentsOf_t8Iterator_7ElementQYd__Rszs8SequenceRd__lF
+// CHECK:        [[F:%[0-9]+]] = function_ref  @_T0Sa6appendyqd__10contentsOf_t7ElementQyd__Rszs8SequenceRd__lFSi_SaySiGTg5
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
 // CHECK-NOT: apply
@@ -50,3 +53,7 @@ public func testString(_ a: inout [String], s: String) {
   a += [s]
 }
 
+// This is not supported yet. Just check that we don't crash on this.`
+public func dontPropagateContiguousArray(_ a: inout ContiguousArray<UInt8>) {
+  a += [4]
+}

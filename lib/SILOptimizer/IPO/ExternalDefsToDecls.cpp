@@ -33,7 +33,6 @@ class ExternalDefsToDecls : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "External Defs To Decls"; }
 };
 
 } // end anonymous namespace

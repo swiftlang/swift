@@ -23,10 +23,12 @@
 #define ANALYSIS(NAME)
 #endif
 
+ANALYSIS(AccessSummary)
 ANALYSIS(Alias)
 ANALYSIS(BasicCallee)
 ANALYSIS(Caller)
 ANALYSIS(ClassHierarchy)
+ANALYSIS(ClosureScope)
 ANALYSIS(Destructor)
 ANALYSIS(Dominance)
 ANALYSIS(EpilogueARC)

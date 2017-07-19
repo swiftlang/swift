@@ -32,11 +32,12 @@
 
 PASSPIPELINE_WITH_OPTIONS(Diagnostic, "Guaranteed Passes")
 PASSPIPELINE(OwnershipEliminator, "Utility pass to just run the ownership eliminator pass")
+PASSPIPELINE_WITH_OPTIONS(SILOptPrepare, "Passes that prepare SIL for -O")
 PASSPIPELINE_WITH_OPTIONS(Performance, "Passes run at -O")
 PASSPIPELINE(Onone, "Passes run at -Onone")
 PASSPIPELINE(InstCount, "Utility pipeline to just run the inst count pass")
 PASSPIPELINE(Lowering, "SIL Address Lowering")
-PASSPIPELINE(IRGenPrepare, "Pipeline to run during IRGen")
+PASSPIPELINE_WITH_OPTIONS(IRGenPrepare, "Pipeline to run during IRGen")
 
 #undef PASSPIPELINE_WITH_OPTIONS
 #undef PASSPIPELINE

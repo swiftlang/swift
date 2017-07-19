@@ -151,9 +151,9 @@ func resyncParser1() {}
 
 fooObject#^TYPE_CHECKED_EXPR_1^#
 // TYPE_CHECKED_EXPR_1: Begin completions
-// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_1-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#];
+// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceVar]/CurrNominal:      .instanceVar[#Int#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_1-NEXT:BuiltinOperator/None:                = {#FooStruct#}[#Void#]; name== FooStruct
 // TYPE_CHECKED_EXPR_1-NEXT: End completions
 
 func resyncParser2() {}
@@ -165,7 +165,7 @@ fooObject#^TYPE_CHECKED_EXPR_2^#
 // TYPE_CHECKED_EXPR_2: Begin completions
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_2-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#];
+// TYPE_CHECKED_EXPR_2-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#]; name== FooStruct
 // TYPE_CHECKED_EXPR_2-NEXT: End completions
 
 func resyncParser3() {}
@@ -174,7 +174,7 @@ fooObject#^TYPE_CHECKED_EXPR_3^#.bar
 // TYPE_CHECKED_EXPR_3: Begin completions
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_3-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#];
+// TYPE_CHECKED_EXPR_3-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#]; name== FooStruct
 // TYPE_CHECKED_EXPR_3-NEXT: End completions
 
 func resyncParser4() {}
@@ -397,8 +397,8 @@ func resyncParserB11() {}
 func optStr() -> String? { return nil }
 let x = (optStr() ?? "autoclosure").#^TOP_LEVEL_AUTOCLOSURE_1^#
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      unicodeScalars[#String.UnicodeScalarView#]
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf8[#String.UTF8View#]
 
 func resyncParserB12() {}
 

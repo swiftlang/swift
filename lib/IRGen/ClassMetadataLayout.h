@@ -83,7 +83,7 @@ private:
     // NB: We don't apply superclass substitutions to members because we want
     // consistent metadata layout between generic superclasses and concrete
     // subclasses.
-    if (Type superclass = type->getSuperclass(nullptr)) {
+    if (Type superclass = type->getSuperclass()) {
       ClassDecl *superclassDecl = superclass->getClassOrBoundGenericClass();
       // Skip superclass fields if superclass is resilient.
       // FIXME: Needs runtime support to ensure the field offset vector is
@@ -180,6 +180,12 @@ public:
   void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf,
                               ClassDecl *forClass) {
     addPointer();
+  }
+  void addPlaceholder(MissingMemberDecl *MMD) {
+    for (auto i : range(MMD->getNumberOfVTableEntries())) {
+      (void)i;
+      addPointer();
+    }
   }
 
 private:

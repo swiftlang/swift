@@ -423,7 +423,7 @@ protected:
 /// store to the local's address. checkSafeArrayAddressUses will check that the
 /// store is a simple initialization outside the loop.
 bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
-  if (SILArgument *Arg = dyn_cast<SILArgument>(ArrayContainer)) {
+  if (auto *Arg = dyn_cast<SILArgument>(ArrayContainer)) {
     // Check that the argument is passed as an inout type. This means there are
     // no aliases accessible within this function scope.
     auto Params = Function->getLoweredFunctionType()->getParameters();
@@ -486,6 +486,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
     return true;
   case ArrayCallKind::kMakeMutable:
   case ArrayCallKind::kMutateUnknown:
+  case ArrayCallKind::kReserveCapacityForAppend:
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
@@ -824,6 +825,7 @@ static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
 
   case ArrayCallKind::kNone:
   case ArrayCallKind::kMutateUnknown:
+  case ArrayCallKind::kReserveCapacityForAppend:
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
@@ -1260,7 +1262,7 @@ bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
       }
       // A store is only safe if it is to an array element and the element type
       // is trivial.
-      if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
+      if (auto *SI = dyn_cast<StoreInst>(Inst)) {
         if (!isArrayEltStore(SI) ||
             !SI->getSrc()->getType().isTrivial(Module)) {
           DEBUG(llvm::dbgs()
@@ -1602,7 +1604,6 @@ class COWArrayOptPass : public SILFunctionTransform {
       }
   }
 
-  StringRef getName() override { return "SIL COW Array Optimization"; }
 };
 } // end anonymous namespace
 
@@ -2346,7 +2347,6 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "SIL Swift Array Optimization"; }
 };
 } // end anonymous namespace
 

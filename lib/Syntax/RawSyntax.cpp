@@ -33,10 +33,10 @@ void dumpSyntaxKind(llvm::raw_ostream &OS, const SyntaxKind Kind) {
   case SyntaxKind::Token: OS << "Token"; break;
   }
 }
-}
+} // end anonymous namespace
 
 void RawSyntax::print(llvm::raw_ostream &OS) const {
-  if (const auto Tok = dyn_cast<TokenSyntax>(this)) {
+  if (const auto Tok = dyn_cast<RawTokenSyntax>(this)) {
     Tok->print(OS);
   }
 
@@ -71,7 +71,7 @@ void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
     }
     switch ((*LE)->Kind) {
     case SyntaxKind::Token:
-      llvm::cast<TokenSyntax>(*LE)->dump(OS, Indent + 1);
+      llvm::cast<RawTokenSyntax>(*LE)->dump(OS, Indent + 1);
       break;
     default:
       (*LE)->dump(OS, Indent + 1);
@@ -87,7 +87,7 @@ bool RawSyntax::accumulateAbsolutePosition(
   for (auto LE : Layout) {
     switch (LE->Kind) {
     case SyntaxKind::Token: {
-      auto Tok = llvm::cast<TokenSyntax>(LE);
+      auto Tok = llvm::cast<RawTokenSyntax>(LE);
       for (auto Leader : Tok->LeadingTrivia) {
         Leader.accumulateAbsolutePosition(Pos);
       }
@@ -131,7 +131,7 @@ void AbsolutePosition::dump(llvm::raw_ostream &OS) const {
   OS << ')';
 }
 
-RC<RawSyntax>
+swift::RC<RawSyntax>
 RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {
   auto NewLayout = Layout;
   NewLayout.push_back(NewLayoutElement);

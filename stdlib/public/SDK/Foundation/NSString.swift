@@ -30,17 +30,6 @@ func _convertStringToNSString(_ string: String) -> NSString {
 
 extension NSString : ExpressibleByStringLiteral {
   /// Create an instance initialized to `value`.
-  public required convenience init(unicodeScalarLiteral value: StaticString) {
-    self.init(stringLiteral: value)
-  }
-
-  public required convenience init(
-    extendedGraphemeClusterLiteral value: StaticString
-  ) {
-    self.init(stringLiteral: value)
-  }
-
-  /// Create an instance initialized to `value`.
   public required convenience init(stringLiteral value: StaticString) {
     var immutableResult: NSString
     if value.hasPointerRepresentation {

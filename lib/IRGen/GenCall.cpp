@@ -382,7 +382,9 @@ NativeConventionSchema::getCoercionTypes(
           packed = true;
         elts.push_back(type);
         expandedTyIndicesMap.push_back(idx - 1);
-        lastEnd = end;
+        lastEnd = begin + clang::CharUnits::fromQuantity(
+                              IGM.DataLayout.getTypeAllocSize(type));
+        assert(end <= lastEnd);
       });
 
   auto *coercionType = llvm::StructType::get(ctx, elts, packed);
@@ -419,7 +421,9 @@ NativeConventionSchema::getCoercionTypes(
           packed = true;
         elts.push_back(type);
         expandedTyIndicesMap.push_back(idx - 1);
-        lastEnd = end;
+        lastEnd = begin + clang::CharUnits::fromQuantity(
+                              IGM.DataLayout.getTypeAllocSize(type));
+        assert(end <= lastEnd);
       });
   auto *overlappedCoercionType = llvm::StructType::get(ctx, elts, packed);
   return {coercionType, overlappedCoercionType};
@@ -972,8 +976,9 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
       auto paramTy = getSILFuncConventions().getSILType(param);
       auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(paramTy));
       if (AI.getIndirectByVal())
-        addByvalArgumentAttributes(IGM, Attrs, getCurParamIndex(),
-                                   paramTI.getFixedAlignment());
+        addByvalArgumentAttributes(
+            IGM, Attrs, getCurParamIndex(),
+            Alignment(AI.getIndirectAlign().getQuantity()));
       addPointerParameter(paramTI.getStorageType());
       break;
     }
@@ -1011,6 +1016,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
   auto &ti = IGM.getTypeInfo(paramSILType);
   switch (auto conv = param.getConvention()) {
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
     addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size());
     addPointerParameter(
@@ -1229,7 +1235,7 @@ void irgen::extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
   if (bodyType != callType)
     returned = IGF.coerceValue(returned, bodyType, IGF.IGM.DataLayout);
 
-  if (llvm::StructType *structType = dyn_cast<llvm::StructType>(bodyType))
+  if (auto *structType = dyn_cast<llvm::StructType>(bodyType))
     for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
       out.add(IGF.Builder.CreateExtractValue(returned, i));
   else
@@ -1846,6 +1852,16 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
       Address addr = ti.allocateStack(IGF, paramType, false,
                                       "indirect-temporary").getAddress();
+      // Set at least the alignment the ABI expects.
+      if (AI.getIndirectByVal()) {
+        auto ABIAlign = AI.getIndirectAlign();
+        if (ABIAlign > addr.getAlignment()) {
+          auto *AS = cast<llvm::AllocaInst>(addr.getAddress());
+          AS->setAlignment(ABIAlign.getQuantity());
+          addr = Address(addr.getAddress(), Alignment(ABIAlign.getQuantity()));
+        }
+      }
+
       ti.initialize(IGF, in, addr);
 
       out.add(addr.getAddress());

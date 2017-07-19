@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -primary-file %S/Inputs/MoreSwiftNewtypes_conformances.swift %S/Inputs/MoreSwiftNewtypes_tests.swift -module-name MoreSwiftNewtypes
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %S/Inputs/MoreSwiftNewtypes_conformances.swift -primary-file %S/Inputs/MoreSwiftNewtypes_tests.swift -module-name MoreSwiftNewtypes
@@ -15,18 +15,14 @@ func acceptEquatable<T: Equatable>(_: T) {}
 func acceptHashable<T: Hashable>(_: T) {}
 func acceptComparable<T: Comparable>(_: T) {}
 
-func testNewTypeWrapperComparable(x: NSNotification.Name, y: NSNotification.Name) {
+func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name) {
   acceptEquatable(x)
   acceptHashable(x)
-  acceptComparable(x)
+  acceptComparable(x) // expected-error {{does not conform to expected type 'Comparable'}}
 
   _ = x == y
   _ = x != y
   _ = x.hashValue
-  _ = x < y
-  _ = x > y
-  _ = x <= y
-  _ = x >= y
   _ = x as NSString
 }
 

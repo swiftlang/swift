@@ -61,6 +61,9 @@ namespace swift {
     FUNC(Expr)
     FUNC(Decl)
 #undef FUNC
+
+    /// Whether the AST node is implicit.
+    bool isImplicit() const;
   };
 } // namespace swift
 

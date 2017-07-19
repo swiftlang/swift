@@ -178,6 +178,13 @@ public:
 
   ASTPrinter &operator<<(DeclName name);
 
+  // Special case for 'char', but not arbitrary things that convert to 'char'.
+  template <typename T>
+  typename std::enable_if<std::is_same<T, char>::value, ASTPrinter &>::type
+  operator<<(T c) {
+    return *this << StringRef(&c, 1);
+  }
+
   void printKeyword(StringRef name) {
     callPrintNamePre(PrintNameContext::Keyword);
     *this << name;
@@ -298,9 +305,6 @@ public:
   }
 };
 
-bool shouldPrint(const Decl *D, PrintOptions &Options);
-bool shouldPrintPattern(const Pattern *P, PrintOptions &Options);
-
 void printContext(raw_ostream &os, DeclContext *dc);
 
 bool printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
@@ -314,11 +318,6 @@ uint8_t getKeywordLen(tok keyword);
 
 /// Get <#code#>;
 StringRef getCodePlaceholder();
-
-/// Given an array of enum element decls, print them as case statements with
-/// placeholders as contents.
-void printEnumElmentsAsCases(llvm::DenseSet<EnumElementDecl*> &UnhandledElements,
-                             llvm::raw_ostream &OS);
 
 } // namespace swift
 

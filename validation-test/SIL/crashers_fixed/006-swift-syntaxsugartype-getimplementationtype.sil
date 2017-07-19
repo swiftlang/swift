@@ -1,0 +1,3 @@
+// RUN: not %target-sil-opt %s
+class C
+struct e{weak var x:C

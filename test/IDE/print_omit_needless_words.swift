@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // REQUIRES: objc_interop
 // FIXME: this is failing on simulators
@@ -144,7 +143,7 @@
 // CHECK-FOUNDATION: func doSomethingElse(with: NSCopying & NSObjectProtocol)
 
 // Note: Function type -> "Function".
-// CHECK-FOUNDATION: func sort(_: @escaping @convention(c) (Any, Any) -> Int)
+// CHECK-FOUNDATION: func sort(_: @escaping @convention(c) (AnyObject, AnyObject) -> Int)
 
 // Note: Plural: NSArray without type arguments -> "Objects".
 // CHECK-FOUNDATION: func remove(_: [Any])
@@ -261,25 +260,37 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func addDoodle(_: ABCDoodle)
 
 // Protocols as contexts
-// CHECK-OMIT-NEEDLESS-WORDS: protocol OMWLanding {
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: protocol OMWLanding {
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func flip()
 
 // Verify that we get the Swift name from the original declaration.
-// CHECK-OMIT-NEEDLESS-WORDS: protocol OMWWiggle
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: protocol OMWWiggle
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func joinSub()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func wiggle1()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "wiggle1()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func conflicting1()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var wiggleProp1: Int { get }
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "wiggleProp1")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: var conflictingProp1: Int { get }
 
-// CHECK-OMIT-NEEDLESS-WORDS: protocol OMWWaggle
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: protocol OMWWaggle
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func waggle1()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "waggle1()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func conflicting1()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var waggleProp1: Int { get }
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "waggleProp1")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: var conflictingProp1: Int { get }
 
-// CHECK-OMIT-NEEDLESS-WORDS: class OMWSuper
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: class OMWSuper
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jump()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "jump()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jumpSuper()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var wiggleProp1: Int { get }
 
-// CHECK-OMIT-NEEDLESS-WORDS: class OMWSub
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: class OMWSub
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jump()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "jump()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jumpSuper()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func joinSub()
 
 // CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C method 'conflicting1' in 'OMWSub' ('waggle1()' in 'OMWWaggle' vs. 'wiggle1()' in 'OMWWiggle')

@@ -18,9 +18,10 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
-#include "swift/Basic/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticConsumer.h"
 
 namespace swift {
   class Decl;
@@ -122,10 +123,12 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
     }
 
-    DiagnosticArgument(DeclName I)
-      : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
-    }
-    
+    DiagnosticArgument(DeclName D)
+        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(D) {}
+
+    DiagnosticArgument(DeclBaseName D)
+        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(D) {}
+
     DiagnosticArgument(Identifier I)
       : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
     }
@@ -258,6 +261,23 @@ namespace swift {
       assert(Kind == DiagnosticArgumentKind::LayoutConstraint);
       return LayoutConstraintVal;
     }
+  };
+  
+  struct DiagnosticFormatOptions {
+    const std::string OpeningQuotationMark;
+    const std::string ClosingQuotationMark;
+    const std::string AKAFormatString;
+
+    DiagnosticFormatOptions(std::string OpeningQuotationMark,
+                            std::string ClosingQuotationMark,
+                            std::string AKAFormatString)
+        : OpeningQuotationMark(OpeningQuotationMark),
+          ClosingQuotationMark(ClosingQuotationMark),
+          AKAFormatString(AKAFormatString) {}
+
+    DiagnosticFormatOptions()
+        : OpeningQuotationMark("'"), ClosingQuotationMark("'"),
+          AKAFormatString("'%1$s' (aka '%2$s')") {}
   };
   
   /// Diagnostic - This is a specific instance of a diagnostic along with all of
@@ -723,6 +743,17 @@ namespace swift {
     /// \returns true if diagnostic is marked with PointsToFirstBadToken
     /// option.
     bool isDiagnosticPointsToFirstBadToken(DiagID id) const;
+
+    /// \returns true if any diagnostic consumer gave an error while invoking
+    //// \c finishProcessing.
+    bool finishProcessing();
+    
+    /// \brief Format the given diagnostic text and place the result in the given
+    /// buffer.
+    static void formatDiagnosticText(
+        llvm::raw_ostream &Out, StringRef InText,
+        ArrayRef<DiagnosticArgument> FormatArgs,
+        DiagnosticFormatOptions FormatOpts = DiagnosticFormatOptions());
 
   private:
     /// \brief Flush the active diagnostic.

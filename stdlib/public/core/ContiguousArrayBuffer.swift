@@ -563,7 +563,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 @_versioned
 internal func += <Element, C : Collection>(
   lhs: inout _ContiguousArrayBuffer<Element>, rhs: C
-) where C.Iterator.Element == Element {
+) where C.Element == Element {
 
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(rhs.count)
@@ -582,7 +582,7 @@ internal func += <Element, C : Collection>(
     newLHS.firstElementAddress.moveInitialize(
       from: lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
-    swap(&lhs, &newLHS)
+    (lhs, newLHS) = (newLHS, lhs)
     buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
   }
 
@@ -618,7 +618,7 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
 
 extension Sequence {
   @_inlineable
-  public func _copyToContiguousArray() -> ContiguousArray<Iterator.Element> {
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
     return _copySequenceToContiguousArray(self)
   }
 }
@@ -627,10 +627,10 @@ extension Sequence {
 @_versioned
 internal func _copySequenceToContiguousArray<
   S : Sequence
->(_ source: S) -> ContiguousArray<S.Iterator.Element> {
+>(_ source: S) -> ContiguousArray<S.Element> {
   let initialCapacity = source.underestimatedCount
   var builder =
-    _UnsafePartiallyInitializedContiguousArrayBuffer<S.Iterator.Element>(
+    _UnsafePartiallyInitializedContiguousArrayBuffer<S.Element>(
       initialCapacity: initialCapacity)
 
   var iterator = source.makeIterator()
@@ -652,7 +652,7 @@ internal func _copySequenceToContiguousArray<
 
 extension Collection {
   @_inlineable
-  public func _copyToContiguousArray() -> ContiguousArray<Iterator.Element> {
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
     return _copyCollectionToContiguousArray(self)
   }
 }
@@ -677,14 +677,14 @@ extension _ContiguousArrayBuffer {
 @_versioned
 internal func _copyCollectionToContiguousArray<
   C : Collection
->(_ source: C) -> ContiguousArray<C.Iterator.Element>
+>(_ source: C) -> ContiguousArray<C.Element>
 {
   let count: Int = numericCast(source.count)
   if count == 0 {
     return ContiguousArray()
   }
 
-  let result = _ContiguousArrayBuffer<C.Iterator.Element>(
+  let result = _ContiguousArrayBuffer<C.Element>(
     _uninitializedCount: count,
     minimumCapacity: 0)
 
@@ -746,7 +746,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       newResult.firstElementAddress.moveInitialize(
         from: result.firstElementAddress, count: result.capacity)
       result.count = 0
-      swap(&result, &newResult)
+      (result, newResult) = (newResult, result)
     }
     addWithExistingCapacity(element)
   }
@@ -789,7 +789,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     _sanityCheck(remainingCapacity == result.capacity - result.count,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has incorrect count")
     var finalResult = _ContiguousArrayBuffer<Element>()
-    swap(&finalResult, &result)
+    (finalResult, result) = (result, finalResult)
     remainingCapacity = 0
     return ContiguousArray(_buffer: finalResult)
   }

@@ -2,7 +2,12 @@
 
 sil @test : $@convention(thin) () -> () {
 bb0:
+// CHECK: string_literal utf8 "\u{0B}"
   %1 = string_literal utf8 "\u{0B}"
+// CHECK: const_string_literal utf8 "\u{0B}"
+  %2 = const_string_literal utf8 "\u{0B}"
+// CHECK: const_string_literal utf16 "\u{0B}"
+  %3 = const_string_literal utf16 "\u{0B}"
   %6 = tuple ()                                   // user: %7
   return %6 : $()
 }

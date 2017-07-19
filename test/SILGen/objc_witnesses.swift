@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sil-serialize-witness-tables -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -109,7 +109,7 @@ extension NSObject : Atom {
   var valence: Int { get { return 1 } set { } }
 }
 
-// CHECK-LABEL: sil hidden @_T0So8NSObjectC14objc_witnessesE7valenceSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout NSObject, @thick NSObject.Type) -> () {
+// CHECK-LABEL: sil private @_T0So8NSObjectC14objc_witnessesE7valenceSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout NSObject, @thick NSObject.Type) -> () {
 // CHECK: class_method [volatile] %4 : $NSObject, #NSObject.valence!setter.1.foreign
 // CHECK: }
 

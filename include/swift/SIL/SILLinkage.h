@@ -97,6 +97,18 @@ enum IsSerialized_t : unsigned char {
   IsSerialized
 };
 
+/// The scope in which a subclassable class can be subclassed.
+enum class SubclassScope : unsigned char {
+  /// This class can be subclassed in other modules.
+  External,
+
+  /// This class can only be subclassed in this module.
+  Internal,
+
+  /// There is no class to subclass, or it is final.
+  NotApplicable,
+};
+
 /// Strip external from public_external, hidden_external. Otherwise just return
 /// the linkage.
 inline SILLinkage stripExternalFromLinkage(SILLinkage linkage) {
@@ -216,6 +228,42 @@ inline bool isLessVisibleThan(SILLinkage l1, SILLinkage l2) {
     l2 = SILLinkage::Private;
 
   return unsigned(l1) > unsigned(l2);
+}
+
+inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
+                                                 SubclassScope scope) {
+  switch (scope) {
+  case SubclassScope::External:
+    if (linkage == SILLinkage::Private || linkage == SILLinkage::Hidden)
+      return SILLinkage::Public;
+    if (linkage == SILLinkage::PrivateExternal ||
+        linkage == SILLinkage::HiddenExternal)
+      return SILLinkage::PublicExternal;
+    break;
+
+  case SubclassScope::Internal:
+    if (linkage == SILLinkage::Private)
+      return SILLinkage::Hidden;
+    break;
+
+  case SubclassScope::NotApplicable:
+    break;
+  }
+  return linkage;
+}
+
+// FIXME: This should not be necessary, but it looks like visibility rules for
+// extension members are slightly bogus, and so some protocol witness thunks
+// need to be public.
+//
+// We allow a 'public' member of an extension to witness a public
+// protocol requirement, even if the extended type is not public;
+// then SILGen gives the member private linkage, ignoring the more
+// visible accessibility it was given in the AST.
+inline bool
+fixmeWitnessHasLinkageThatNeedsToBePublic(SILLinkage witnessLinkage) {
+  return !hasPublicVisibility(witnessLinkage) &&
+         !hasSharedVisibility(witnessLinkage);
 }
 
 } // end swift namespace

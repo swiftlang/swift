@@ -748,7 +748,7 @@ bool swift::isLetPointer(SILValue V) {
 
 
   // Check if a parent of a tuple is a "let"
-  if (TupleElementAddrInst *TEA = dyn_cast<TupleElementAddrInst>(V))
+  if (auto *TEA = dyn_cast<TupleElementAddrInst>(V))
     return isLetPointer(TEA->getOperand());
 
   return false;

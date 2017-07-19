@@ -99,6 +99,6 @@ public func run_RC4(_ N: Int) {
       Enc.encrypt(&LongData)
     }
 
-    CheckResults(LongData == RefResults, "Incorrect result in RC4")
+    CheckResults(LongData == RefResults)
   }
 }

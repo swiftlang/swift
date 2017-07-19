@@ -48,7 +48,7 @@ protected:
   // Cache block and value identifiers for this function. This is useful in
   // general for identifying entities, not just emitting textual SIL.
   //
-  // TODO: It would be more discplined for the caller to provide a function
+  // TODO: It would be more disciplined for the caller to provide a function
   // context. That way it would be impossible for IDs to change meaning within
   // the caller's scope.
   struct SILPrintFunctionContext {
@@ -69,10 +69,18 @@ protected:
   /// Sort all kind of tables to ease diffing.
   bool SortedSIL;
 
+  /// Print debug locations and scopes.
+  bool DebugInfo;
+
 public:
+  /// Constructor with default values for options.
+  ///
+  /// DebugInfo will be set according to the -sil-print-debuginfo option.
   SILPrintContext(llvm::raw_ostream &OS, bool Verbose = false,
-                  bool SortedSIL = false) :
-        OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL) { }
+                  bool SortedSIL = false);
+
+  SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
+                  bool SortedSIL, bool DebugInfo);
 
   virtual ~SILPrintContext();
 
@@ -89,6 +97,9 @@ public:
   
   /// Returns true if verbose SIL should be printed.
   bool printVerbose() const { return Verbose; }
+
+  /// Returns true if debug locations and scopes should be printed.
+  bool printDebugInfo() const { return DebugInfo; }
 
   SILPrintContext::ID getID(const SILBasicBlock *Block);
 

@@ -1,16 +1,17 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype -skip-unavailable > %t.printed.A.txt
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t
 // REQUIRES: objc_interop
 
-// PRINT-LABEL: struct ErrorDomain : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-LABEL: struct ErrorDomain : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ErrorDomain {
 // PRINT-NEXT:    func process()
@@ -26,26 +27,31 @@
 // PRINT-NEXT:  extension Food {
 // PRINT-NEXT:    static let err: ErrorDomain
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct ClosedEnum : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:  struct ClosedEnum : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ClosedEnum {
 // PRINT-NEXT:    static let firstClosedEntryEnum: ClosedEnum
 // PRINT-NEXT:    static let secondEntry: ClosedEnum
 // PRINT-NEXT:    static let thirdEntry: ClosedEnum
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct IUONewtype : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:  struct IUONewtype : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct MyFloat : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
+// PRINT-NEXT:  struct MyFloat : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
 // PRINT-NEXT:    init(_ rawValue: Float)
 // PRINT-NEXT:    init(rawValue: Float)
 // PRINT-NEXT:    let rawValue: Float
+// PRINT-NEXT:    typealias RawValue = Float
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyFloat {
 // PRINT-NEXT:    static let globalFloat: MyFloat{{$}}
@@ -53,10 +59,11 @@
 // PRINT-NEXT:    static let version: MyFloat{{$}}
 // PRINT-NEXT:  }
 //
-// PRINT-LABEL: struct MyInt : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
+// PRINT-LABEL: struct MyInt : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
 // PRINT-NEXT:    init(_ rawValue: Int32)
 // PRINT-NEXT:    init(rawValue: Int32)
 // PRINT-NEXT:    let rawValue: Int32
+// PRINT-NEXT:    typealias RawValue = Int32
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyInt {
 // PRINT-NEXT:    static let zero: MyInt{{$}}
@@ -79,10 +86,11 @@
 // PRINT-NEXT:  let Notification: String
 // PRINT-NEXT:  let swiftNamedNotification: String
 //
-// PRINT-LABEL: struct CFNewType : RawRepresentable, _SwiftNewtypeWrapper {
+// PRINT-LABEL: struct CFNewType : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
+// PRINT-NEXT:    typealias RawValue = CFString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension CFNewType {
 // PRINT-NEXT:    static let MyCFNewTypeValue: CFNewType
@@ -92,10 +100,11 @@
 // PRINT-NEXT:  func FooAudited() -> CFNewType
 // PRINT-NEXT:  func FooUnaudited() -> Unmanaged<CFString>
 //
-// PRINT-NEXT:  struct MyABINewType : RawRepresentable, _SwiftNewtypeWrapper {
+// PRINT-LABEL: struct MyABINewType : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
+// PRINT-NEXT:    typealias RawValue = CFString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  typealias MyABIOldType = CFString
 // PRINT-NEXT:  extension MyABINewType {
@@ -108,11 +117,13 @@
 // PRINT-NEXT:  func takeMyABIOldType(_: MyABIOldType!)
 // PRINT-NEXT:  func takeMyABINewTypeNonNull(_: MyABINewType)
 // PRINT-NEXT:  func takeMyABIOldTypeNonNull(_: MyABIOldType)
-// PRINT-NEXT:  struct MyABINewTypeNS : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-LABEL: struct MyABINewTypeNS : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  typealias MyABIOldTypeNS = NSString
 // PRINT-NEXT:  func getMyABINewTypeNS() -> MyABINewTypeNS!
@@ -126,16 +137,66 @@
 // PRINT-NEXT:    init(i: Int32)
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSSomeContext {
-// PRINT-NEXT:    struct Name : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:    struct Name : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:      init(_ rawValue: String)
 // PRINT-NEXT:      init(rawValue: String)
 // PRINT-NEXT:      var _rawValue: NSString
 // PRINT-NEXT:      var rawValue: String { get }
+// PRINT-NEXT:      typealias RawValue = String
+// PRINT-NEXT:      typealias _ObjectiveCType = NSString
 // PRINT-NEXT:    }
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSSomeContext.Name {
 // PRINT-NEXT:    static let myContextName: NSSomeContext.Name
 // PRINT-NEXT:  }
+//
+// PRINT-NEXT: struct TRef : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
+// PRINT-NEXT:   init(_ rawValue: OpaquePointer)
+// PRINT-NEXT:   init(rawValue: OpaquePointer)
+// PRINT-NEXT:   let rawValue: OpaquePointer
+// PRINT-NEXT:   typealias RawValue = OpaquePointer
+// PRINT-NEXT: }
+// PRINT-NEXT: struct ConstTRef : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
+// PRINT-NEXT:   init(_ rawValue: OpaquePointer)
+// PRINT-NEXT:   init(rawValue: OpaquePointer)
+// PRINT-NEXT:   let rawValue: OpaquePointer
+// PRINT-NEXT:   typealias RawValue = OpaquePointer
+// PRINT-NEXT: }
+// PRINT-NEXT: func create_T() -> TRef
+// PRINT-NEXT: func create_ConstT() -> ConstTRef
+// PRINT-NEXT: func destroy_T(_: TRef!)
+// PRINT-NEXT: func destroy_ConstT(_: ConstTRef!)
+// PRINT-NEXT: extension TRef {
+// PRINT-NEXT:   func mutatePointee()
+// PRINT-NEXT:   mutating func mutate()
+// PRINT-NEXT: }
+// PRINT-NEXT: extension ConstTRef {
+// PRINT-NEXT:   func use()
+// PRINT-NEXT: }
+//
+// PRINT-NEXT: struct TRefRef : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
+// PRINT-NEXT:   init(_ rawValue: UnsafeMutablePointer<OpaquePointer>)
+// PRINT-NEXT:   init(rawValue: UnsafeMutablePointer<OpaquePointer>)
+// PRINT-NEXT:   let rawValue: UnsafeMutablePointer<OpaquePointer>
+// PRINT-NEXT:   typealias RawValue = UnsafeMutablePointer<OpaquePointer>
+// PRINT-NEXT: }
+// PRINT-NEXT: struct ConstTRefRef : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
+// PRINT-NEXT:   init(_ rawValue: UnsafePointer<OpaquePointer>)
+// PRINT-NEXT:   init(rawValue: UnsafePointer<OpaquePointer>)
+// PRINT-NEXT:   let rawValue: UnsafePointer<OpaquePointer>
+// PRINT-NEXT:   typealias RawValue = UnsafePointer<OpaquePointer>
+// PRINT-NEXT: }
+// PRINT-NEXT: func create_TRef() -> TRefRef
+// PRINT-NEXT: func create_ConstTRef() -> ConstTRefRef
+// PRINT-NEXT: func destroy_TRef(_: TRefRef!)
+// PRINT-NEXT: func destroy_ConstTRef(_: ConstTRefRef!)
+// PRINT-NEXT: extension TRefRef {
+// PRINT-NEXT:   func mutatePointee()
+// PRINT-NEXT:   mutating func mutate()
+// PRINT-NEXT: }
+// PRINT-NEXT: extension ConstTRefRef {
+// PRINT-NEXT:   func use()
+// PRINT-NEXT: }
 
 import Newtype
 
@@ -165,14 +226,12 @@ func tests() {
 func acceptSwiftNewtypeWrapper<T : _SwiftNewtypeWrapper>(_ t: T) { }
 func acceptEquatable<T : Equatable>(_ t: T) { }
 func acceptHashable<T : Hashable>(_ t: T) { }
-func acceptComparable<T : Hashable>(_ t: T) { }
 func acceptObjectiveCBridgeable<T : _ObjectiveCBridgeable>(_ t: T) { }
 
 func testConformances(ed: ErrorDomain) {
   acceptSwiftNewtypeWrapper(ed)
   acceptEquatable(ed)
   acceptHashable(ed)
-  acceptComparable(ed)
   acceptObjectiveCBridgeable(ed)
 }
 

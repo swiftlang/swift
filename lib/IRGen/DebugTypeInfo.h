@@ -52,12 +52,13 @@ public:
   /// the storage type for undefined variables.
   llvm::Type *StorageType = nullptr;
   Size size = Size(0);
-  Alignment align = Alignment(1);
+  Alignment align = Alignment(0);
+  bool DefaultAlignment = true;
 
   DebugTypeInfo() {}
   DebugTypeInfo(DeclContext *DC, GenericEnvironment *GE, swift::Type Ty,
-                llvm::Type *StorageTy, Size SizeInBytes,
-                Alignment AlignInBytes);
+                llvm::Type *StorageTy, Size SizeInBytes, Alignment AlignInBytes,
+                bool HasDefaultAlignment);
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(DeclContext *DeclCtx,
                                         GenericEnvironment *GE, VarDecl *Decl,
@@ -84,12 +85,12 @@ public:
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
 
   void unwrapLValueOrInOutType() {
-    Type = Type->getLValueOrInOutObjectType().getPointer();
+    Type = Type->getWithoutSpecifierType().getPointer();
   }
 
   // Determine whether this type is an Archetype itself.
   bool isArchetype() const {
-    return Type->getLValueOrInOutObjectType()->is<ArchetypeType>();
+    return Type->getWithoutSpecifierType()->is<ArchetypeType>();
   }
 
   /// LValues, inout args, and Archetypes are implicitly indirect by
@@ -99,8 +100,7 @@ public:
   // instead? Otherwise optionals of archetypes etc will still have
   // 'isImplicitlyIndirect()' return false.
   bool isImplicitlyIndirect() const {
-    return Type->isLValueType() || isArchetype() ||
-      Type->is<InOutType>();
+    return Type->hasLValueType() || isArchetype() || Type->is<InOutType>();
   }
 
   bool isNull() const { return Type == nullptr; }
@@ -123,7 +123,7 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
     return swift::irgen::DebugTypeInfo(
         nullptr, nullptr,
         llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr,
-        swift::irgen::Size(0), swift::irgen::Alignment(0));
+        swift::irgen::Size(0), swift::irgen::Alignment(0), false);
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

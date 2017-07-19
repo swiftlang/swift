@@ -37,12 +37,18 @@ public:
   /// Equivalent to Clang's -mcpu=.
   std::string TargetCPU;
 
+  /// The path to which we should store indexing data, if any.
+  std::string IndexStorePath;
+
   /// The bridging header or PCH that will be imported.
   std::string BridgingHeader;
 
   /// When automatically generating a precompiled header from the bridging
   /// header, place it in this directory.
   std::string PrecompiledHeaderOutputDir;
+
+  /// Disable validating the persistent PCH.
+  bool PCHDisableValidation = false;
 
   /// \see Mode
   enum class Modes : uint8_t {

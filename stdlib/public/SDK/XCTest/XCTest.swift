@@ -15,6 +15,31 @@
 import CoreGraphics
 import _SwiftXCTestOverlayShims
 
+// --- XCTest API Swiftification ---
+
+public extension XCTContext {
+
+  /// Create and run a new activity with provided name and block.
+  public class func runActivity(named name: String, block: (XCTActivity) throws -> ()) rethrows {
+    let context = _XCTContextCurrent()
+
+    if _XCTContextShouldStartActivity(context, XCTActivityTypeUserCreated) {
+      try autoreleasepool {
+        let activity = _XCTContextWillStartActivity(context, name, XCTActivityTypeUserCreated)
+        do {
+          try block(activity)
+          _XCTContextDidFinishActivity(context, activity)
+        } catch {
+          _XCTContextDidFinishActivity(context, activity)
+          throw error
+        }
+      }
+    } else {
+      XCTFail("XCTContext.runActivity(named:block:) failed because activities are disallowed in the current configuration.")
+    }
+  }
+}
+
 // --- Failure Formatting ---
 
 /// Register the failure, expected or unexpected, of the current test case.
@@ -717,7 +742,7 @@ func _XCTCheckEqualWithAccuracy_CGFloat(_ value1: CGFloat, _ value2: CGFloat, _ 
     && (abs(value1 - value2) <= accuracy)
 }
 
-public func XCTAssertEqualWithAccuracy<T : FloatingPoint>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, accuracy: T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
+public func XCTAssertEqual<T : FloatingPoint>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, accuracy: T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
   let assertionType = _XCTAssertionType.equalWithAccuracy
   
   // evaluate each expression exactly once
@@ -748,7 +773,7 @@ public func XCTAssertEqualWithAccuracy<T : FloatingPoint>(_ expression1: @autocl
       
     default:
       // unknown type, fail with prejudice
-      _preconditionFailure("unsupported floating-point type passed to XCTAssertEqualWithAccuracy")
+      _preconditionFailure("unsupported floating-point type passed to XCTAssertEqual")
     }
     
     if !equalWithAccuracy {
@@ -763,7 +788,7 @@ public func XCTAssertEqualWithAccuracy<T : FloatingPoint>(_ expression1: @autocl
     }
     
   case .failedWithError(let error):
-    _XCTRegisterFailure(false, "XCTAssertEqualWithAccuracy failed: threw error \"\(error)\"", message, file, line)
+    _XCTRegisterFailure(false, "XCTAssertEqual failed: threw error \"\(error)\"", message, file, line)
     
   case .failedWithException(_, _, let reason):
     _XCTRegisterFailure(false, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
@@ -771,6 +796,11 @@ public func XCTAssertEqualWithAccuracy<T : FloatingPoint>(_ expression1: @autocl
   case .failedWithUnknownException:
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 2), message, file, line)
   }
+}
+
+@available(*, deprecated, renamed: "XCTAssertEqual(_:_:accuracy:file:line:)")
+public func XCTAssertEqualWithAccuracy<T : FloatingPoint>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, accuracy: T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
+  XCTAssertEqual(expression1, expression2, accuracy: accuracy, message, file: file, line: line)
 }
 
 func _XCTCheckNotEqualWithAccuracy_Double(_ value1: Double, _ value2: Double, _ accuracy: Double) -> Bool {
@@ -788,7 +818,7 @@ func _XCTCheckNotEqualWithAccuracy_CGFloat(_ value1: CGFloat, _ value2: CGFloat,
     || (abs(value1 - value2) > accuracy)
 }
 
-public func XCTAssertNotEqualWithAccuracy<T : FloatingPoint>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, _ accuracy: T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
+public func XCTAssertNotEqual<T : FloatingPoint>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, accuracy: T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
   let assertionType = _XCTAssertionType.notEqualWithAccuracy
   
   // evaluate each expression exactly once
@@ -819,7 +849,7 @@ public func XCTAssertNotEqualWithAccuracy<T : FloatingPoint>(_ expression1: @aut
       
     default:
       // unknown type, fail with prejudice
-      _preconditionFailure("unsupported floating-point type passed to XCTAssertNotEqualWithAccuracy")
+      _preconditionFailure("unsupported floating-point type passed to XCTAssertNotEqual")
     }
     
     if !notEqualWithAccuracy {
@@ -834,7 +864,7 @@ public func XCTAssertNotEqualWithAccuracy<T : FloatingPoint>(_ expression1: @aut
     }
     
   case .failedWithError(let error):
-    _XCTRegisterFailure(false, "XCTAssertNotEqualWithAccuracy failed: threw error \"\(error)\"", message, file, line)
+    _XCTRegisterFailure(false, "XCTAssertNotEqual failed: threw error \"\(error)\"", message, file, line)
     
   case .failedWithException(_, _, let reason):
     _XCTRegisterFailure(false, _XCTFailureDescription(assertionType, 1, reason as NSString), message, file, line)
@@ -842,6 +872,11 @@ public func XCTAssertNotEqualWithAccuracy<T : FloatingPoint>(_ expression1: @aut
   case .failedWithUnknownException:
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 2), message, file, line)
   }
+}
+
+@available(*, deprecated, renamed: "XCTAssertNotEqual(_:_:accuracy:file:line:)")
+public func XCTAssertNotEqualWithAccuracy<T : FloatingPoint>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, _ accuracy: T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
+    XCTAssertNotEqual(expression1, expression2, accuracy: accuracy, message, file: file, line: line)
 }
 
 public func XCTAssertGreaterThan<T : Comparable>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {

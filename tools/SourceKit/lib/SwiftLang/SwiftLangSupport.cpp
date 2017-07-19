@@ -52,126 +52,8 @@ using swift::index::SymbolInfo;
 using swift::index::SymbolRole;
 using swift::index::SymbolRoleSet;
 
-static UIdent KindDeclFunctionFree("source.lang.swift.decl.function.free");
-static UIdent KindRefFunctionFree("source.lang.swift.ref.function.free");
-static UIdent KindDeclMethodInstance(
-      "source.lang.swift.decl.function.method.instance");
-static UIdent KindRefMethodInstance(
-      "source.lang.swift.ref.function.method.instance");
-static UIdent KindDeclMethodStatic(
-      "source.lang.swift.decl.function.method.static");
-static UIdent KindRefMethodStatic(
-      "source.lang.swift.ref.function.method.static");
-static UIdent KindDeclMethodClass(
-      "source.lang.swift.decl.function.method.class");
-static UIdent KindRefMethodClass(
-      "source.lang.swift.ref.function.method.class");
-static UIdent KindDeclAccessorGetter(
-      "source.lang.swift.decl.function.accessor.getter");
-static UIdent KindRefAccessorGetter(
-      "source.lang.swift.ref.function.accessor.getter");
-static UIdent KindDeclAccessorSetter(
-      "source.lang.swift.decl.function.accessor.setter");
-static UIdent KindRefAccessorSetter(
-      "source.lang.swift.ref.function.accessor.setter");
-static UIdent KindDeclAccessorWillSet(
-      "source.lang.swift.decl.function.accessor.willset");
-static UIdent KindRefAccessorWillSet(
-      "source.lang.swift.ref.function.accessor.willset");
-static UIdent KindDeclAccessorDidSet(
-      "source.lang.swift.decl.function.accessor.didset");
-static UIdent KindRefAccessorDidSet(
-      "source.lang.swift.ref.function.accessor.didset");
-static UIdent KindDeclAccessorAddress(
-      "source.lang.swift.decl.function.accessor.address");
-static UIdent KindRefAccessorAddress(
-      "source.lang.swift.ref.function.accessor.address");
-static UIdent KindDeclAccessorMutableAddress(
-      "source.lang.swift.decl.function.accessor.mutableaddress");
-static UIdent KindRefAccessorMutableAddress(
-      "source.lang.swift.ref.function.accessor.mutableaddress");
-static UIdent KindDeclConstructor("source.lang.swift.decl.function.constructor");
-static UIdent KindRefConstructor("source.lang.swift.ref.function.constructor");
-static UIdent KindDeclDestructor("source.lang.swift.decl.function.destructor");
-static UIdent KindRefDestructor("source.lang.swift.ref.function.destructor");
-static UIdent KindDeclFunctionPrefixOperator("source.lang.swift.decl.function.operator.prefix");
-static UIdent KindDeclFunctionPostfixOperator("source.lang.swift.decl.function.operator.postfix");
-static UIdent KindDeclFunctionInfixOperator("source.lang.swift.decl.function.operator.infix");
-static UIdent KindRefFunctionPrefixOperator("source.lang.swift.ref.function.operator.prefix");
-static UIdent KindRefFunctionPostfixOperator("source.lang.swift.ref.function.operator.postfix");
-static UIdent KindRefFunctionInfixOperator("source.lang.swift.ref.function.operator.infix");
-static UIdent KindDeclPrecedenceGroup("source.lang.swift.decl.precedencegroup");
-static UIdent KindRefPrecedenceGroup("source.lang.swift.ref.precedencegroup");
-static UIdent KindDeclSubscript("source.lang.swift.decl.function.subscript");
-static UIdent KindRefSubscript("source.lang.swift.ref.function.subscript");
-static UIdent KindDeclVarGlobal("source.lang.swift.decl.var.global");
-static UIdent KindRefVarGlobal("source.lang.swift.ref.var.global");
-static UIdent KindDeclVarInstance("source.lang.swift.decl.var.instance");
-static UIdent KindRefVarInstance("source.lang.swift.ref.var.instance");
-static UIdent KindDeclVarStatic("source.lang.swift.decl.var.static");
-static UIdent KindRefVarStatic("source.lang.swift.ref.var.static");
-static UIdent KindDeclVarClass("source.lang.swift.decl.var.class");
-static UIdent KindRefVarClass("source.lang.swift.ref.var.class");
-static UIdent KindDeclVarLocal("source.lang.swift.decl.var.local");
-static UIdent KindRefVarLocal("source.lang.swift.ref.var.local");
-static UIdent KindDeclVarParam("source.lang.swift.decl.var.parameter");
-static UIdent KindDeclModule("source.lang.swift.decl.module");
-static UIdent KindDeclClass("source.lang.swift.decl.class");
-static UIdent KindRefClass("source.lang.swift.ref.class");
-static UIdent KindDeclStruct("source.lang.swift.decl.struct");
-static UIdent KindRefStruct("source.lang.swift.ref.struct");
-static UIdent KindDeclEnum("source.lang.swift.decl.enum");
-static UIdent KindRefEnum("source.lang.swift.ref.enum");
-static UIdent KindDeclEnumCase("source.lang.swift.decl.enumcase");
-static UIdent KindDeclEnumElement("source.lang.swift.decl.enumelement");
-static UIdent KindRefEnumElement("source.lang.swift.ref.enumelement");
-static UIdent KindDeclProtocol("source.lang.swift.decl.protocol");
-static UIdent KindRefProtocol("source.lang.swift.ref.protocol");
-static UIdent KindDeclExtension("source.lang.swift.decl.extension");
-static UIdent KindDeclExtensionStruct("source.lang.swift.decl.extension.struct");
-static UIdent KindDeclExtensionClass("source.lang.swift.decl.extension.class");
-static UIdent KindDeclExtensionEnum("source.lang.swift.decl.extension.enum");
-static UIdent KindDeclExtensionProtocol("source.lang.swift.decl.extension.protocol");
-static UIdent KindDeclAssociatedType("source.lang.swift.decl.associatedtype");
-static UIdent KindRefAssociatedType("source.lang.swift.ref.associatedtype");
-static UIdent KindDeclTypeAlias("source.lang.swift.decl.typealias");
-static UIdent KindRefTypeAlias("source.lang.swift.ref.typealias");
-static UIdent KindDeclGenericTypeParam("source.lang.swift.decl.generic_type_param");
-static UIdent KindRefGenericTypeParam("source.lang.swift.ref.generic_type_param");
-static UIdent KindRefModule("source.lang.swift.ref.module");
-static UIdent KindStmtForEach("source.lang.swift.stmt.foreach");
-static UIdent KindStmtFor("source.lang.swift.stmt.for");
-static UIdent KindStmtWhile("source.lang.swift.stmt.while");
-static UIdent KindStmtRepeatWhile("source.lang.swift.stmt.repeatwhile");
-static UIdent KindStmtIf("source.lang.swift.stmt.if");
-static UIdent KindStmtGuard("source.lang.swift.stmt.guard");
-static UIdent KindStmtSwitch("source.lang.swift.stmt.switch");
-static UIdent KindStmtCase("source.lang.swift.stmt.case");
-static UIdent KindStmtBrace("source.lang.swift.stmt.brace");
-static UIdent KindExprCall("source.lang.swift.expr.call");
-static UIdent KindExprArg("source.lang.swift.expr.argument");
-static UIdent KindExprArray("source.lang.swift.expr.array");
-static UIdent KindExprDictionary("source.lang.swift.expr.dictionary");
-static UIdent KindExprObjectLiteral("source.lang.swift.expr.object_literal");
-
-static UIdent KindStructureElemId("source.lang.swift.structure.elem.id");
-static UIdent KindStructureElemExpr("source.lang.swift.structure.elem.expr");
-static UIdent KindStructureElemInitExpr("source.lang.swift.structure.elem.init_expr");
-static UIdent KindStructureElemCondExpr("source.lang.swift.structure.elem.condition_expr");
-static UIdent KindStructureElemPattern("source.lang.swift.structure.elem.pattern");
-static UIdent KindStructureElemTypeRef("source.lang.swift.structure.elem.typeref");
-
-static UIdent KindRangeSingleStatement("source.lang.swift.range.singlestatement");
-static UIdent KindRangeSingleExpression("source.lang.swift.range.singleexpression");
-static UIdent KindRangeSingleDeclaration("source.lang.swift.range.singledeclaration");
-
-static UIdent KindRangeMultiStatement("source.lang.swift.range.multistatement");
-
-static UIdent KindRangeInvalid("source.lang.swift.range.invalid");
-
-static UIdent KindNameObjc("source.lang.name.kind.objc");
-static UIdent KindNameSwift("source.lang.name.kind.swift");
-
+#define KIND(NAME, CONTENT) static UIdent Kind##NAME(CONTENT);
+#include "SourceKit/Core/ProtocolUIDs.def"
 
 std::unique_ptr<LangSupport>
 SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
@@ -416,24 +298,6 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
 }
 
 UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
-  static UIdent KindKeyword("source.lang.swift.syntaxtype.keyword");
-  static UIdent KindIdentifier("source.lang.swift.syntaxtype.identifier");
-  static UIdent KindTypeIdentifier("source.lang.swift.syntaxtype.typeidentifier");
-  static UIdent KindBuildConfigKeyword("source.lang.swift.syntaxtype.buildconfig.keyword");
-  static UIdent KindBuildConfigId("source.lang.swift.syntaxtype.buildconfig.id");
-  static UIdent KindAttributeId("source.lang.swift.syntaxtype.attribute.id");
-  static UIdent KindAttributeBuiltin("source.lang.swift.syntaxtype.attribute.builtin");
-  static UIdent KindNumber("source.lang.swift.syntaxtype.number");
-  static UIdent KindString("source.lang.swift.syntaxtype.string");
-  static UIdent KindStringInterpolation("source.lang.swift.syntaxtype.string_interpolation_anchor");
-  static UIdent KindComment("source.lang.swift.syntaxtype.comment");
-  static UIdent KindDocComment("source.lang.swift.syntaxtype.doccomment");
-  static UIdent KindDocCommentField("source.lang.swift.syntaxtype.doccomment.field");
-  static UIdent KindCommentMarker("source.lang.swift.syntaxtype.comment.mark");
-  static UIdent KindCommentURL("source.lang.swift.syntaxtype.comment.url");
-  static UIdent KindPlaceholder("source.lang.swift.syntaxtype.placeholder");
-  static UIdent KindObjectLiteral("source.lang.swift.syntaxtype.objectliteral");
-
   switch (SC) {
   case SyntaxNodeKind::Keyword:
     return KindKeyword;
@@ -567,6 +431,7 @@ getUIDForRangeKind(swift::ide::RangeKind Kind) {
     case swift::ide::RangeKind::SingleStatement: return KindRangeSingleStatement;
     case swift::ide::RangeKind::SingleDecl: return KindRangeSingleDeclaration;
     case swift::ide::RangeKind::MultiStatement: return KindRangeMultiStatement;
+    case swift::ide::RangeKind::PartOfExpression: return KindRangeInvalid;
     case swift::ide::RangeKind::Invalid: return KindRangeInvalid;
   }
 
@@ -728,6 +593,7 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
     // Ignore these.
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
+    case DAK_DowngradeExhaustivityCheck:
       continue;
     default:
       break;

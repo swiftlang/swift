@@ -1,8 +1,7 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %s
 // RUN: llvm-bcanalyzer %t/global_init.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -enable-sil-verify-all %t/global_init.swiftmodule | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -disable-sil-linking %t/global_init.swiftmodule | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 

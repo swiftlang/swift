@@ -13,6 +13,8 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 #define SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 
+#include "llvm/ADT/Hashing.h"
+
 namespace swift {
 
 /// Options for controlling diagnostics.

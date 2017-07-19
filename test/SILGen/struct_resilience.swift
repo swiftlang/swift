@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -I %t -emit-silgen -enable-resilience %s | %FileCheck %s
 
@@ -16,11 +16,12 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%[0-9]*]] : $*Size
   var s2 = s
 
+// CHECK:         [[SETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifs : $@convention(method) (Int, @inout Size) -> ()
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
-// CHECK:         [[FN:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifg : $@convention(method) (@in_guaranteed Size) -> Int
-// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
-// CHECK:         [[FN:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifs : $@convention(method) (Int, @inout Size) -> ()
-// CHECK:         apply [[FN]]([[RESULT]], [[OTHER_SIZE_BOX]])
+// CHECK:         [[GETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSifg : $@convention(method) (@in_guaranteed Size) -> Int
+// CHECK:         [[RESULT:%.*]] = apply [[GETTER]]([[SIZE_BOX]])
+// CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] [[OTHER_SIZE_BOX]] : $*Size
+// CHECK:         apply [[SETTER]]([[RESULT]], [[WRITE]])
   s2.w = s.w
 
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
@@ -139,7 +140,8 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 
 // CHECK:         [[SRC_ADDR:%.*]] = struct_element_addr %1 : $*MySize, #MySize.w
 // CHECK:         [[SRC:%.*]] = load [trivial] [[SRC_ADDR]] : $*Int
-// CHECK:         [[DEST_ADDR:%.*]] = struct_element_addr [[SIZE_BOX]] : $*MySize, #MySize.w
+// CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] [[SIZE_BOX]] : $*MySize
+// CHECK:         [[DEST_ADDR:%.*]] = struct_element_addr [[WRITE]] : $*MySize, #MySize.w
 // CHECK:         assign [[SRC]] to [[DEST_ADDR]] : $*Int
   s2.w = s.w
 

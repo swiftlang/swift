@@ -473,14 +473,14 @@ sil @f101_passAny : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $T):
   %2 = function_ref @f100_any : $@convention(thin) (@in Any) -> ()
   %3 = copy_value %0 : $T
-  %4 = init_existential_opaque %3 : $T, $T, $Any
+  %4 = init_existential_value %3 : $T, $T, $Any
   %5 = apply %2(%4) : $@convention(thin) (@in Any) -> ()
   destroy_value %0 : $T
   %7 = tuple ()
   return %7 : $()
 }
 
-// Test convertIndirectFunctionArgs and init_existential_opaque on concrete
+// Test convertIndirectFunctionArgs and init_existential_value on concrete
 // types.
 // CHECK-LABEL: sil @f102_passAnyObjectAsAny : $@convention(thin) (@in AnyObject) -> () {
 // CHECK: bb0(%0 : $*AnyObject):
@@ -500,7 +500,7 @@ sil @f102_passAnyObjectAsAny : $@convention(thin) (@in AnyObject) -> () {
 bb0(%0 : $AnyObject):
   %2 = function_ref @f100_any : $@convention(thin) (@in Any) -> ()
   strong_retain %0 : $AnyObject
-  %4 = init_existential_opaque %0 : $AnyObject, $AnyObject, $Any
+  %4 = init_existential_value %0 : $AnyObject, $AnyObject, $Any
   %5 = apply %2(%4) : $@convention(thin) (@in Any) -> ()
   strong_release %0 : $AnyObject
   %7 = tuple ()

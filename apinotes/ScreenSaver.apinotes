@@ -1,0 +1,13 @@
+---
+Name: ScreenSaver
+SwiftVersions:
+- Version: 3
+  Classes:
+  - Name: ScreenSaverView
+    Properties:
+    - Name: hasConfigureSheet
+      PropertyKind: Instance
+      SwiftImportAsAccessors: true
+    - Name: configureSheet
+      PropertyKind: Instance
+      SwiftImportAsAccessors: true

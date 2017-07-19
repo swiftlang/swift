@@ -17,10 +17,21 @@
 #include "ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace constraints;
+
+bool isBindOverloadDisjunction(Constraint *disjunction) {
+  assert(disjunction->getKind() == ConstraintKind::Disjunction &&
+         "Expected disjunction constraint!");
+
+  assert(!disjunction->getNestedConstraints().empty() &&
+         "Unexpected empty disjunction!");
+
+  auto *nested = disjunction->getNestedConstraints().front();
+  return nested->getKind() == ConstraintKind::BindOverload;
+}
 
 // Find the disjunction of bind overload constraints related to this
 // applicable function constraint, if it exists.
@@ -53,15 +64,40 @@ getBindOverloadDisjunction(ConstraintSystem &CS, Constraint *applicableFn) {
 #endif
 
   // Verify the disjunction consists of BindOverload constraints.
-  assert(found->getNestedConstraints().front()->getKind() ==
-         ConstraintKind::BindOverload);
+  assert(isBindOverloadDisjunction(found));
 
   return found;
 }
 
-// Simplify the active constraints, collecting any new applicable
-// function constraints we find along the way, and bailing if we fail
-// to simplify a constraint successfully.
+void ConstraintSystem::collectNeighboringBindOverloadDisjunctions(
+    llvm::SetVector<Constraint *> &neighbors) {
+
+  while (!ActiveConstraints.empty()) {
+    auto *constraint = &ActiveConstraints.front();
+    ActiveConstraints.pop_front();
+
+    assert(constraint->isActive() && "Expected constraints to be active?");
+    assert(!constraint->isDisabled() && "Unexpected disabled constraint!");
+
+    if (constraint->getKind() == ConstraintKind::Disjunction) {
+      if (isBindOverloadDisjunction(constraint)) {
+        neighbors.insert(constraint);
+      }
+    } else if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
+      if (auto *bindDisjunction =
+              getBindOverloadDisjunction(*this, constraint)) {
+        neighbors.insert(bindDisjunction);
+      }
+    }
+
+    solverState->retireConstraint(constraint);
+    CG.removeConstraint(constraint);
+    constraint->setActive(false);
+  }
+}
+
+// Simplify any active constraints, returning true on success, false
+// on failure.
 bool ConstraintSystem::simplifyForConstraintPropagation() {
   while (!ActiveConstraints.empty()) {
     auto *constraint = &ActiveConstraints.front();
@@ -92,107 +128,146 @@ bool ConstraintSystem::simplifyForConstraintPropagation() {
     constraint->setActive(false);
 
     if (failed)
-      return true;
+      return false;
   }
 
-  return false;
+  return true;
 }
 
-// Gather the applicable function constraints associated with a
-// particular typevar, but do not include the one that is passed in
-// since that is the constraint that we're starting from.
-void ConstraintSystem::gatherNeighboringApplicableFunctionConstraints(
-    Constraint *applicableFn,
-    SmallVectorImpl<Constraint *> &otherApplicableFn) {
+bool ConstraintSystem::areBindPairConsistent(Constraint *first,
+                                             Constraint *second) {
+  // Set up a scope that will be torn down when we're done testing
+  // this constraint.
+  ConstraintSystem::SolverScope scope(*this);
 
-  auto *tyvar = applicableFn->getSecondType()->getAs<TypeVariableType>();
-  assert(tyvar && "Expected type variable!");
-
-  SmallVector<Constraint *, 8> neighbors;
-  CG.gatherConstraints(tyvar, neighbors,
-                       ConstraintGraph::GatheringKind::AllMentions);
-
-  for (auto *constraint : neighbors) {
-    if (constraint->getKind() != ConstraintKind::ApplicableFunction ||
-        constraint == applicableFn)
-      continue;
-
-    otherApplicableFn.push_back(constraint);
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    log << "Testing constraints for consistency: ";
+    first->print(log, &TC.Context.SourceMgr);
+    log << "\nversus: ";
+    second->print(log, &TC.Context.SourceMgr);
   }
+
+  auto result = simplifyConstraint(*first);
+  assert(result == ConstraintSystem::SolutionKind::Solved &&
+         "Expected the first bind constraint to work!");
+
+  solverState->retireConstraint(first);
+  solverState->addGeneratedConstraint(first);
+
+  result = simplifyConstraint(*second);
+  assert(result == ConstraintSystem::SolutionKind::Solved &&
+         "Expected the second bind constraint to work!");
+
+  solverState->retireConstraint(second);
+  solverState->addGeneratedConstraint(second);
+
+  auto success = simplifyForConstraintPropagation();
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    if (success)
+      log << "Consistent!\n";
+    else
+      log << "Not consistent!\n";
+  }
+
+  return success;
 }
 
 // Test a bind overload constraint to see if it is consistent with the
 // rest of the constraint system.
 bool ConstraintSystem::isBindOverloadConsistent(
-    Constraint *bindConstraint, Constraint *applicableFn,
-    llvm::SetVector<Constraint *> &workList, bool topLevel) {
+    Constraint *bindConstraint, llvm::SetVector<Constraint *> &workList) {
 
-  // Set up a scope that will be torn down when we're done testing
-  // this constraint.
-  ConstraintSystem::SolverScope scope(*this);
+  llvm::SetVector<Constraint *> otherDisjunctions;
 
-  assert(applicableFn->getKind() == ConstraintKind::ApplicableFunction
-         && "Expected an ApplicableFunction constraint!");
-  assert(bindConstraint->getKind() == ConstraintKind::BindOverload
-         && "Expected a BindOverload constraint!");
+  {
+    // Set up a scope that will be torn down when we're done testing
+    // this constraint.
+    ConstraintSystem::SolverScope scope(*this);
 
-  switch (simplifyConstraint(*bindConstraint)) {
-  case ConstraintSystem::SolutionKind::Error:
+    assert(bindConstraint->getKind() == ConstraintKind::BindOverload &&
+           "Expected a BindOverload constraint!");
+
+    // Test this bind overload constraint, activating neighboring
+    // constraints.
+    auto result = simplifyConstraint(*bindConstraint);
+    assert(result == ConstraintSystem::SolutionKind::Solved &&
+           "Expected the bind constraint to work!");
+    (void)result;
+
     solverState->retireConstraint(bindConstraint);
     solverState->addGeneratedConstraint(bindConstraint);
-    return false;
-  case ConstraintSystem::SolutionKind::Solved: {
-    solverState->retireConstraint(bindConstraint);
-    solverState->addGeneratedConstraint(bindConstraint);
 
-    if (simplifyForConstraintPropagation())
+    collectNeighboringBindOverloadDisjunctions(otherDisjunctions);
+  }
+
+  // Test the our primary constraint against all of the members of
+  // neighboring disjunctions. If this constraint fails with all
+  // members of a neighboring disjunction, we'll disable it and queue
+  // up these neighbors for further processing. If this constraint
+  // works with any member of each of the disjunctions, we do not need
+  // to test the remaining members.
+  for (auto *disjunction : otherDisjunctions) {
+    auto insertPt = InactiveConstraints.erase(disjunction);
+    CG.removeConstraint(disjunction);
+
+    bool foundConsistent = false;
+    for (auto *nested : disjunction->getNestedConstraints()) {
+      assert(nested->getKind() == ConstraintKind::BindOverload &&
+             "Expected a BindOverload constraint");
+
+      if (nested->isDisabled())
+        continue;
+
+      if (areBindPairConsistent(bindConstraint, nested)) {
+        foundConsistent = true;
+        break;
+      }
+    }
+
+    CG.addConstraint(disjunction);
+    InactiveConstraints.insert(insertPt, disjunction);
+
+    // We failed to find a working pair between the bind overload
+    // constraint we started with and the members of this
+    // disjunction. We'll mark this bind overload as disabled and
+    // queue up the neighboring disjunctions for re-processing.
+    if (!foundConsistent) {
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        log << "Disabling bind constraint: ";
+        bindConstraint->print(log, &TC.Context.SourceMgr);
+        log << "\n";
+      }
+
+      bindConstraint->setDisabled();
+      for (auto *disjunction : otherDisjunctions)
+        workList.insert(disjunction);
+
       return false;
-
-    if (!topLevel)
-      return true;
-
-    // Test the applicable function constraints that neighbor the bind
-    // overload constraint.
-    SmallVector<Constraint *, 8> otherApplicableFn;
-    gatherNeighboringApplicableFunctionConstraints(applicableFn,
-                                                   otherApplicableFn);
-
-    for (auto *constraint : otherApplicableFn)
-      if (!isApplicableFunctionConsistent(constraint, workList,
-                                          /* topLevel = */ false))
-        return false;
-
-    return true;
+    }
   }
 
-  case ConstraintSystem::SolutionKind::Unsolved:
-    InactiveConstraints.push_back(bindConstraint);
-    CG.addConstraint(bindConstraint);
-    solverState->addGeneratedConstraint(bindConstraint);
-    return true;
-  }
+  return true;
 }
 
-// Test an applicable function constraint by testing all of the bind
-// overload constraints in the related disjunction. If we cannot find
-// a related disjunction, or if all the constraints in that
-// disjunction are inconsistent with the system, we'll return false.
-bool ConstraintSystem::isApplicableFunctionConsistent(
-    Constraint *applicableFn, llvm::SetVector<Constraint *> &workList,
-    bool topLevel) {
+void ConstraintSystem::reviseBindOverloadDisjunction(
+    Constraint *disjunction, llvm::SetVector<Constraint *> &workList,
+    bool *foundConsistent) {
+  assert(disjunction->getKind() == ConstraintKind::Disjunction &&
+         "Expected disjunction constraint on work list!");
 
   // Set up a scope that will be torn down when we're done testing
   // this constraint.
   ConstraintSystem::SolverScope scope(*this);
 
-  auto *disjunction = getBindOverloadDisjunction(*this, applicableFn);
-  if (!disjunction)
-    return true;
-
+  // Temporarily remove the disjunction from the constraint system and
+  // constraint graph.
   auto insertPt = InactiveConstraints.erase(disjunction);
   CG.removeConstraint(disjunction);
 
-  bool foundConsistent = false;
+  *foundConsistent = false;
   for (auto *bindConstraint : disjunction->getNestedConstraints()) {
     assert(bindConstraint->getKind() == ConstraintKind::BindOverload
            && "Expected a BindOverload constraint!");
@@ -200,37 +275,12 @@ bool ConstraintSystem::isApplicableFunctionConsistent(
     if (bindConstraint->isDisabled())
       continue;
 
-    if (!isBindOverloadConsistent(bindConstraint, applicableFn, workList,
-                                  topLevel)) {
-      if (topLevel) {
-        bindConstraint->setDisabled();
-
-        // Queue up other constraints that may be affected by disabling
-        // this one.
-        SmallVector<Constraint *, 8> otherApplicableFn;
-        gatherNeighboringApplicableFunctionConstraints(applicableFn,
-                                                       otherApplicableFn);
-
-        for (auto *constraint : otherApplicableFn)
-          workList.insert(constraint);
-      }
-    } else {
-      foundConsistent = true;
-
-      // If we find any bind overload that works when we're testing
-      // the "other" applicable function constraints, we know there is
-      // some working solution and can stop.
-      if (!topLevel)
-        break;
-    }
+    if (isBindOverloadConsistent(bindConstraint, workList))
+      *foundConsistent = true;
   }
 
   CG.addConstraint(disjunction);
   InactiveConstraints.insert(insertPt, disjunction);
-
-  // If none of the nested constraints works, we know there is no
-  // solution to this constraint system, otherwise, there may be.
-  return foundConsistent;
 }
 
 // Do a form of constraint propagation consisting of examining
@@ -243,25 +293,29 @@ bool ConstraintSystem::propagateConstraints() {
   assert(!failedConstraint && "Unexpected failed constraint!");
   assert(getActiveConstraints().empty() && "Expected no active constraints!");
 
-  // Queue an initial set of ApplicableFunction constraints to process.
-  llvm::SetVector<Constraint *> workList;
-  for (auto &constraint : getConstraints()) {
-    if (constraint.getKind() != ConstraintKind::ApplicableFunction)
-      continue;
-
-    workList.insert(&constraint);
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    log << "---Propagating constraints---\n";
   }
 
-  // Process all constraints in the work list, adding new elements as
-  // we process them.
+  // Queue an initial list of bind overload disjunction constraints to
+  // process.
+  llvm::SetVector<Constraint *> workList;
+  for (auto &constraint : getConstraints())
+    if (constraint.getKind() == ConstraintKind::Disjunction)
+      if (isBindOverloadDisjunction(&constraint))
+        workList.insert(&constraint);
+
+  // Process each disjunction in the work list. If we modify the
+  // active constraints in the disjunction as a result of processing
+  // it, we'll add it's neighbors back to the worklist for
+  // reprocessing.
   while (!workList.empty()) {
-    auto *constraint = workList.pop_back_val();
+    auto *disjunction = workList.pop_back_val();
 
-    assert(constraint->getKind() == ConstraintKind::ApplicableFunction
-           && "Expected ApplicableFunction constraint on work list!");
-
-    if (!isApplicableFunctionConsistent(constraint, workList,
-                                        /* topLevel = */ true))
+    bool foundConsistent;
+    reviseBindOverloadDisjunction(disjunction, workList, &foundConsistent);
+    if (!foundConsistent)
       return true;
   }
 

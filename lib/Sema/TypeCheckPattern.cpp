@@ -78,14 +78,15 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
 
-  for (LookupResult::Result result : foundElements) {
-    ValueDecl *e = result.Decl;
+  for (LookupResultEntry result : foundElements) {
+    ValueDecl *e = result.getValueDecl();
     assert(e);
     if (e->isInvalid()) {
       continue;
     }
     // Skip if the enum element was referenced as an instance member
-    if (!result.Base || !result.Base->getInterfaceType()->is<MetatypeType>()) {
+    if (!result.getBaseDecl() ||
+        !result.getBaseDecl()->getInterfaceType()->is<MetatypeType>()) {
       continue;
     }
 
@@ -160,8 +161,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     // Get the declared type.
     if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
       components.push_back(
-        new (C) SimpleIdentTypeRepr(dre->getLoc(), dre->getDecl()->getName()));
-      components.back()->setValue(td);
+        new (C) SimpleIdentTypeRepr(dre->getLoc(), td->getName()));
+      components.back()->setValue(td, nullptr);
       return true;
     }
     return false;
@@ -172,7 +173,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     // Track the AST location of the component.
     components.push_back(
       new (C) SimpleIdentTypeRepr(udre->getLoc(),
-                                  udre->getName().getBaseName()));
+                                  udre->getName().getBaseIdentifier()));
     return true;
   }
   
@@ -184,7 +185,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
 
     // Track the AST location of the new component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(ude->getLoc(), ude->getName().getBaseName()));
+      new (C) SimpleIdentTypeRepr(ude->getLoc(),
+                                  ude->getName().getBaseIdentifier()));
     return true;
   }
   
@@ -405,7 +407,7 @@ public:
     return new (TC.Context) EnumElementPattern(
                               ume->getDotLoc(),
                               ume->getNameLoc().getBaseNameLoc(),
-                              ume->getName().getBaseName(),
+                              ume->getName().getBaseIdentifier(),
                               subPattern,
                               ume);
   }
@@ -432,7 +434,7 @@ public:
 
     // FIXME: Argument labels?
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseName(),
+      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseIdentifier(),
                                 ude->getLoc());
     if (!referencedElement)
       return nullptr;
@@ -445,7 +447,8 @@ public:
                                                ude->getDotLoc(),
                                                ude->getNameLoc()
                                                  .getBaseNameLoc(),
-                                               ude->getName().getBaseName(),
+                                               ude->getName()
+                                                 .getBaseIdentifier(),
                                                referencedElement,
                                                nullptr);
   }
@@ -473,7 +476,7 @@ public:
     // Try looking up an enum element in context.
     if (EnumElementDecl *referencedElement
         = lookupUnqualifiedEnumMemberElement(TC, DC,
-                                             ude->getName().getBaseName(),
+                                             ude->getName().getBaseIdentifier(),
                                              ude->getLoc())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
@@ -481,7 +484,8 @@ public:
       
       return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
                                                  ude->getLoc(),
-                                                 ude->getName().getBaseName(),
+                                                 ude->getName()
+                                                   .getBaseIdentifier(),
                                                  referencedElement,
                                                  nullptr);
     }
@@ -668,74 +672,6 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
   return hadError;
 }
 
-static void diagnoseAndMigrateVarParameterToBody(ParamDecl *decl,
-                                                 AbstractFunctionDecl *func,
-                                                 TypeChecker &TC) {
-  if (!func || !func->hasBody()) {
-    // If there is no function body, just suggest removal.
-    TC.diagnose(decl->getLetVarInOutLoc(),
-                diag::var_parameter_not_allowed)
-      .fixItRemove(decl->getLetVarInOutLoc());
-    return;
-  }
-  // Insert the shadow copy. The computations that follow attempt to
-  // 'best guess' the indentation and new lines so that the user
-  // doesn't have to add any whitespace.
-  auto declBody = func->getBody();
-  
-  auto &SM = TC.Context.SourceMgr;
-  
-  SourceLoc insertionStartLoc;
-  std::string start;
-  std::string end;
-  
-  auto lBraceLine = SM.getLineNumber(declBody->getLBraceLoc());
-  auto rBraceLine = SM.getLineNumber(declBody->getRBraceLoc());
-
-  if (!declBody->getNumElements()) {
-    
-    // Empty function body.
-    insertionStartLoc = declBody->getRBraceLoc();
-    
-    if (lBraceLine == rBraceLine) {
-      // Same line braces, means we probably have something
-      // like {} as the func body. Insert directly into body with spaces.
-      start = " ";
-      end = " ";
-    } else {
-      // Different line braces, so use RBrace's indentation.
-      end = "\n" + Lexer::getIndentationForLine(SM, declBody->
-                                                getRBraceLoc()).str();
-      start = "    "; // Guess 4 spaces as extra indentation.
-    }
-  } else {
-    auto firstLine = declBody->getElement(0);
-    insertionStartLoc = firstLine.getStartLoc();
-    if (lBraceLine == SM.getLineNumber(firstLine.getStartLoc())) {
-      // Function on same line, insert with semi-colon. Not ideal but
-      // better than weird space alignment.
-      start = "";
-      end = "; ";
-    } else {
-      start = "";
-      end = "\n" + Lexer::getIndentationForLine(SM, firstLine.
-                                                getStartLoc()).str();
-    }
-  }
-  if (insertionStartLoc.isInvalid()) {
-    TC.diagnose(decl->getLetVarInOutLoc(),
-                diag::var_parameter_not_allowed)
-    .fixItRemove(decl->getLetVarInOutLoc());
-    return;
-  }
-  auto parameterName = decl->getNameStr().str();
-  TC.diagnose(decl->getLetVarInOutLoc(),
-              diag::var_parameter_not_allowed)
-  .fixItRemove(decl->getLetVarInOutLoc())
-  .fixItInsert(insertionStartLoc, start + "var " + parameterName + " = " +
-               parameterName + end);
-}
-
 static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
                                   TypeResolutionOptions options,
                                   GenericTypeResolver &resolver,
@@ -766,17 +702,20 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     }
     decl->getTypeLoc().setType(Ty);
   }
-  // If the param is not a 'let' and it is not an 'inout'.
-  // It must be a 'var'. Provide helpful diagnostics like a shadow copy
-  // in the function body to fix the 'var' attribute.
-  if (!decl->isLet() &&
-      !decl->isImplicit() &&
-      (Ty.isNull() || !Ty->is<InOutType>()) &&
-      !hadError) {
-    auto func = dyn_cast_or_null<AbstractFunctionDecl>(DC);
-    diagnoseAndMigrateVarParameterToBody(decl, func, TC);
-    decl->setInvalid();
-    hadError = true;
+
+  // If the user did not explicitly write 'let', 'var', or 'inout', we'll let
+  // type inference figure out what went wrong in detail.
+  if (decl->getSpecifierLoc().isValid()) {
+    // If the param is not a 'let' and it is not an 'inout'.
+    // It must be a 'var'. Provide helpful diagnostics like a shadow copy
+    // in the function body to fix the 'var' attribute.
+    if (!decl->isLet() &&
+        !decl->isImplicit() &&
+        (Ty.isNull() || !Ty->is<InOutType>()) &&
+        !hadError) {
+      decl->setInvalid();
+      hadError = true;
+    }
   }
 
   if (hadError)
@@ -821,7 +760,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     
     checkTypeModifyingDeclAttributes(param);
     if (!hadError && type->is<InOutType>()) {
-      param->setLet(false);
+      param->setSpecifier(VarDecl::Specifier::InOut);
     }
   }
   
@@ -861,6 +800,12 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = validateTypedPattern(*this, dc, TP, options, &resolver);
+
+    // If we have unbound generic types, don't apply them below; instead,
+    // the caller will call typeCheckBinding() later.
+    if (P->getType()->hasUnboundGenericType())
+      return hadError;
+
     Pattern *subPattern = TP->getSubPattern();
     if (coercePatternToType(subPattern, dc, P->getType(),
                             options|TR_FromNonInferredPattern, &resolver,
@@ -970,7 +915,8 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
   }
 
   // Create a new match variable $match.
-  auto *matchVar = new (tc.Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+  auto *matchVar = new (tc.Context) VarDecl(/*IsStatic*/false,
+                                            VarDecl::Specifier::Let,
                                             /*IsCaptureList*/false,
                                             pattern->getLoc(),
                                             tc.Context.getIdentifier("$match"),
@@ -1100,10 +1046,10 @@ recur:
 
     checkTypeModifyingDeclAttributes(var);
     if (type->is<InOutType>()) {
-      NP->getDecl()->setLet(false);
+      NP->getDecl()->setSpecifier(VarDecl::Specifier::InOut);
     }
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
-      type = getTypeOfRValue(var, false);
+      type = var->getType()->getReferenceStorageReferent();
     else if (!var->isInvalid())
       type = var->getType();
     P->setType(type);
@@ -1126,10 +1072,8 @@ recur:
     } else if (diagTy->isEqual(Context.TheEmptyTupleType)) {
       shouldRequireType = true;
     } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
-      if (auto protoTy = MTT->getInstanceType()->getAs<ProtocolType>()) {
-        shouldRequireType =
-          protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-      }
+      if (MTT->getInstanceType()->isAnyObject())
+        shouldRequireType = true;
     }
     
     if (shouldRequireType && 
@@ -1390,8 +1334,17 @@ recur:
             goto recur;
           }
 
-          diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
-                   EEP->getName().str(), type);
+          auto diag = diagnose(EEP->getLoc(),
+                               diag::enum_element_pattern_member_not_found,
+                               EEP->getName().str(), type);
+
+          // If we have an optional type let's try to see if the case
+          // exists in its base type, if so we can suggest a fix-it for that.
+          if (auto baseType = type->getOptionalObjectType()) {
+            if (lookupEnumMemberElement(*this, dc, baseType, EEP->getName(),
+                                        EEP->getLoc()))
+              diag.fixItInsertAfter(EEP->getEndLoc(), "?");
+          }
         }
         return true;
       }
@@ -1444,16 +1397,54 @@ recur:
 
     // If there is a subpattern, push the enum element type down onto it.
     if (EEP->hasSubPattern()) {
+      Pattern *sub = EEP->getSubPattern();
+      if (!Context.isSwiftVersion3() && !elt->hasAssociatedValues()) {
+        diagnose(EEP->getLoc(),
+                 diag::enum_element_pattern_assoc_values_mismatch,
+                 EEP->getName());
+        diagnose(EEP->getLoc(), diag::enum_element_pattern_assoc_values_remove)
+          .fixItRemove(sub->getSourceRange());
+        return true;
+      }
+      
       Type elementType;
       if (auto argType = elt->getArgumentInterfaceType())
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
                                               elt, argType);
       else
         elementType = TupleType::getEmpty(Context);
-      Pattern *sub = EEP->getSubPattern();
       if (coercePatternToType(sub, dc, elementType,
-                     subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
-                     resolver))
+                              subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
+                              resolver))
+        return true;
+      EEP->setSubPattern(sub);
+    } else if (auto argType = elt->getArgumentInterfaceType()) {
+      // Else if the element pattern has no sub-pattern but the element type has
+      // associated values, expand it to be semantically equivalent to an
+      // element pattern of wildcards.
+      Type elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
+                                                 elt, argType);
+      SmallVector<TuplePatternElt, 8> elements;
+      if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
+        for (auto &elt : TTy->getElements()) {
+          auto *subPattern = new (Context) AnyPattern(SourceLoc());
+          elements.push_back(TuplePatternElt(elt.getName(), SourceLoc(),
+                                             subPattern));
+        }
+      } else {
+        auto parenTy = dyn_cast<ParenType>(elementType.getPointer());
+        assert(parenTy && "Associated value type is neither paren nor tuple?");
+        
+        auto *subPattern = new (Context) AnyPattern(SourceLoc());
+        elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),
+                                           subPattern));
+      }
+      Pattern *sub = TuplePattern::createSimple(Context, SourceLoc(),
+                                                elements, SourceLoc(),
+                                                /*implicit*/true);
+      if (coercePatternToType(sub, dc, elementType,
+                              subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
+                              resolver))
         return true;
       EEP->setSubPattern(sub);
     }
@@ -1572,11 +1563,12 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
         param->setInterfaceType(CE->mapTypeOutOfContext(ty));
       }
     }
-
-    if (!ty->isMaterializable()) {
-      if (ty->is<InOutType>()) {
-        param->setLet(false);
-      } else if (param->hasName()) {
+    
+    assert(!ty->hasLValueType() && "Bound param type to @lvalue?");
+    if (ty->is<InOutType>()) {
+      param->setSpecifier(VarDecl::Specifier::InOut);
+    } else if (auto *TTy = ty->getAs<TupleType>()) {
+      if (param->hasName() && TTy->hasInOutElement()) {
         diagnose(param->getStartLoc(),
                  diag::param_type_non_materializable_tuple, ty);
       }

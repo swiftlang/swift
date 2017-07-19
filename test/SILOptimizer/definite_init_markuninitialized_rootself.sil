@@ -1,0 +1,110 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
+
+// This file tests mark_uninitialized [rootself]
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class RootClassWithIVars {
+  var x: Int          // expected-note {{'self.x' not initialized}}
+  var y: Int
+  var z: (Int, Int)   // expected-note 2 {{'self.z.1' not initialized}} expected-note {{'self.z.0' not initialized}}
+  init()
+}
+
+class RootClassWithNontrivialStoredProperties {
+  var x, y: SomeClass
+
+  init()
+}
+
+class SomeClass {}
+sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
+sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
+
+// CHECK-LABEL: sil @rootclass_test1
+sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+bb0(%0 : $RootClassWithIVars, %1 : $Int):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
+
+  %10 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.x
+  assign %1 to %10 : $*Int
+
+  %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
+  assign %1 to %11 : $*Int
+
+  %12 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.z
+  %13 = tuple_element_addr %12 : $*(Int, Int), 0
+  assign %1 to %13 : $*Int
+  %14 = tuple_element_addr %12 : $*(Int, Int), 1
+  assign %1 to %14 : $*Int
+
+  return %3 : $RootClassWithIVars
+}
+
+// CHECK-LABEL: sil @rootclass_test2
+sil @rootclass_test2 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+bb0(%0 : $RootClassWithIVars, %1 : $Int):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
+
+  %10 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.x
+  assign %1 to %10 : $*Int
+
+  %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
+  assign %1 to %11 : $*Int
+
+  %12 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.z
+  %13 = tuple_element_addr %12 : $*(Int, Int), 0
+  assign %1 to %13 : $*Int
+
+  return %3 : $RootClassWithIVars  // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+// CHECK-LABEL: sil @rootclass_test3
+sil @rootclass_test3 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+bb0(%0 : $RootClassWithIVars, %1 : $Int):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
+
+  %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
+  assign %1 to %11 : $*Int
+
+  return %3 : $RootClassWithIVars    // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+// CHECK-LABEL: sil @test_root_release
+// CHECK: bb0(%0 : $RootClassWithNontrivialStoredProperties):
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thick RootClassWithNontrivialStoredProperties.Type
+// CHECK-NEXT: dealloc_partial_ref %0 : $RootClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick RootClassWithNontrivialStoredProperties.Type
+sil @test_root_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : $RootClassWithNontrivialStoredProperties):
+  %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
+  strong_release %4 : $RootClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil @test_root_partial_release
+// CHECK: bb0(%0 : $RootClassWithNontrivialStoredProperties):
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thick RootClassWithNontrivialStoredProperties.Type
+// CHECK-NEXT: dealloc_partial_ref %0 : $RootClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick RootClassWithNontrivialStoredProperties.Type
+sil @test_root_partial_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : $RootClassWithNontrivialStoredProperties):
+  %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
+
+  %1 = alloc_ref $SomeClass
+  %2 = ref_element_addr %4 : $RootClassWithNontrivialStoredProperties, #RootClassWithNontrivialStoredProperties.x
+  assign %1 to %2 : $*SomeClass
+
+  strong_release %4 : $RootClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}

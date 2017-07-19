@@ -116,6 +116,18 @@ __attribute__((availability(ios,introduced=8.0)))
 @property NSDictionary *dictProperty;
 @property NSSet *setProperty;
 
+- (nonnull NSString*) fetchNonnullString;
+- (nullable NSString*) fetchNullableString;
+- (null_unspecified NSString*) fetchNullproneString;
+
+- (void) takeNonnullString: (nonnull NSString*) string;
+- (void) takeNullableString: (nullable NSString*) string;
+- (void) takeNullproneString: (null_unspecified NSString*) string;
+
+@property (readwrite) __nonnull NSString *nonnullStringProperty;
+@property (readwrite) __nullable NSString *nullableStringProperty;
+@property (readwrite) __null_unspecified NSString *nullproneStringProperty;
+
 @end
 
 @interface DummyClass (Extras)
@@ -1086,3 +1098,30 @@ typedef enum __attribute__((ns_error_domain(FictionalServerErrorDomain))) Fictio
   FictionalServerErrorMeltedDown = 1
 } FictionalServerErrorCode;
 
+@protocol Garment
+@end
+
+@protocol Cotton
+@end
+
+@interface Coat
+@end
+
+@protocol NSLaundry
+- (void)wash:(Coat <Garment> * _Nonnull)garment;
+- (void)bleach:(Coat <Garment, Cotton> * _Nonnull)garment;
+- (Coat <Garment> * _Nonnull)dry;
+@end
+
+@interface NSLaundromat : NSObject
+@end
+
+extern NSString * const NSLaundryErrorDomain;
+
+typedef enum __attribute__((ns_error_domain(NSLaundryErrorDomain))) __attribute__((swift_name("NSLaundromat.Error"))) NSLaundryErrorCode {
+    NSLaundryErrorTooMuchSoap = 1,
+    NSLaundryErrorCatInWasher = 2
+};
+
+typedef void (*event_handler)(__nonnull id);
+void install_global_event_handler(__nullable event_handler handler);

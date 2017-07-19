@@ -207,20 +207,15 @@ public:
 
       TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use
                               : diag::closure_noescape_use,
-                  VD->getName());
+                  VD->getBaseName().getIdentifier());
 
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(VD);
-      bool isAutoClosure =
-          VD->getInterfaceType()->castTo<AnyFunctionType>()->isAutoClosure();
-      if (paramDecl && !isAutoClosure) {
+      if (paramDecl) {
         TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
                     paramDecl->getName())
             .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
                          "@escaping ");
-      } else if (isAutoClosure) {
-        // TODO: add in a fixit for autoclosure
-        TC.diagnose(VD->getLoc(), diag::noescape_autoclosure, VD->getName());
       }
     }
   }
@@ -228,10 +223,14 @@ public:
   std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
-    // Capture the generic parameters of the decl.
-    if (!AFR.isObjC() || !D->isObjC() || isa<ConstructorDecl>(D)) {
-      for (auto sub : DRE->getDeclRef().getSubstitutions()) {
-        checkType(sub.getReplacement(), DRE->getLoc());
+    // Capture the generic parameters of the decl, unless it's a
+    // local declaration in which case we will pick up generic
+    // parameter references transitively.
+    if (!D->getDeclContext()->isLocalContext()) {
+      if (!AFR.isObjC() || !D->isObjC() || isa<ConstructorDecl>(D)) {
+        for (auto sub : DRE->getDeclRef().getSubstitutions()) {
+          checkType(sub.getReplacement(), DRE->getLoc());
+        }
       }
     }
 
@@ -258,7 +257,7 @@ public:
           if (DC->isLocalContext()) {
             TC.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
                         NTD->getDescriptiveKind(),
-                        D->getName());
+                        D->getBaseName().getIdentifier());
 
             TC.diagnose(NTD->getLoc(), diag::type_declared_here);
 
@@ -325,18 +324,18 @@ public:
       if (Diagnosed.insert(capturedDecl).second) {
         if (capturedDecl == DRE->getDecl()) {
           TC.diagnose(DRE->getLoc(), diag::capture_before_declaration,
-                      capturedDecl->getName());
+                      capturedDecl->getBaseName().getIdentifier());
         } else {
           TC.diagnose(DRE->getLoc(),
                       diag::transitive_capture_before_declaration,
-                      DRE->getDecl()->getName(),
-                      capturedDecl->getName());
+                      DRE->getDecl()->getBaseName().getIdentifier(),
+                      capturedDecl->getBaseName().getIdentifier());
           ValueDecl *prevDecl = capturedDecl;
           for (auto path : reversed(capturePath)) {
             TC.diagnose(path->getLoc(),
                         diag::transitive_capture_through_here,
                         path->getName(),
-                        prevDecl->getName());
+                        prevDecl->getBaseName().getIdentifier());
             prevDecl = path;
           }
         }
@@ -357,7 +356,7 @@ public:
       isNested = f->getDeclContext()->isLocalContext();
 
     if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
-      if (D->getNameStr() == "self") {
+      if (D->getBaseName() == D->getASTContext().Id_self) {
         TC.diagnose(DRE->getLoc(),
           diag::closure_implicit_capture_mutating_self);
       } else {
@@ -457,9 +456,9 @@ public:
     // doesn't require its type metadata.
     if (auto declRef = dyn_cast<DeclRefExpr>(E))
       return (!declRef->getDecl()->isObjC()
-              && !E->getType()->getLValueOrInOutObjectType()
+              && !E->getType()->getWithoutSpecifierType()
                               ->hasRetainablePointerRepresentation()
-              && !E->getType()->getLValueOrInOutObjectType()
+              && !E->getType()->getWithoutSpecifierType()
                               ->is<AnyMetatypeType>());
 
     // Loading classes or metatypes doesn't require their metadata.
@@ -583,8 +582,9 @@ public:
     
     // Assigning an object doesn't require type metadata.
     if (auto assignment = dyn_cast<AssignExpr>(E))
-      return !assignment->getSrc()->getType()
-        ->hasRetainablePointerRepresentation();
+      return assignment->getSrc()->getType() &&
+        !assignment->getSrc()->getType()
+            ->hasRetainablePointerRepresentation();
 
     return true;
   }

@@ -22,13 +22,6 @@ namespace swift {
 namespace sys {
 
 template <typename T>
-struct CacheTypeMgmtInfo {
-  static void *enterCache(const T &Val) { return new T(Val); }
-  static void exitCache(void *Ptr) { delete static_cast<T*>(Ptr); }
-  static const T &getFromCache(void *Ptr) { return *static_cast<T*>(Ptr); }
-};
-
-template <typename T>
 struct CacheKeyHashInfo {
   static uintptr_t getHashValue(const T &Val) {
     return llvm::DenseMapInfo<T>::getHashValue(Val);
@@ -40,19 +33,24 @@ struct CacheKeyHashInfo {
 };
 
 template <typename T>
+struct CacheKeyInfo : public CacheKeyHashInfo<T> {
+  static void *enterCache(const T &Val) { return new T(Val); }
+  static void exitCache(void *Ptr) { delete static_cast<T*>(Ptr); }
+  static const void *getLookupKey(const T *Val) { return Val; }
+  static const T &getFromCache(void *Ptr) { return *static_cast<T*>(Ptr); }
+};
+
+template <typename T>
 struct CacheValueCostInfo {
   static size_t getCost(const T &Val) { return sizeof(Val); }
 };
 
 template <typename T>
-struct CacheKeyInfo : public CacheKeyHashInfo<T>,
-                      public CacheTypeMgmtInfo<T> {
-  static const void *getLookupKey(const T *Val) { return Val; }
-};
-
-template <typename T>
-struct CacheValueInfo : public CacheValueCostInfo<T>,
-                        public CacheTypeMgmtInfo<T> {
+struct CacheValueInfo : public CacheValueCostInfo<T> {
+  static void *enterCache(const T &Val) { return new T(Val); }
+  static void retain(void *Ptr) {}
+  static void release(void *Ptr) { delete static_cast<T *>(Ptr); }
+  static const T &getFromCache(void *Ptr) { return *static_cast<T *>(Ptr); }
 };
 
 /// The underlying implementation of the caching mechanism.
@@ -68,7 +66,8 @@ public:
     bool (*keyIsEqualCB)(void *Key1, void *Key2, void *UserData);
 
     void (*keyDestroyCB)(void *Key, void *UserData);
-    void (*valueDestroyCB)(void *Value, void *UserData);
+    void (*valueRetainCB)(void *Value, void *UserData);
+    void (*valueReleaseCB)(void *Value, void *UserData);
   };
 
 protected:
@@ -154,7 +153,8 @@ public:
       keyHash,
       keyIsEqual,
       keyDestroy,
-      valueDestroy
+      valueRetain,
+      valueRelease,
     };
     Impl = create(Name, CBs);
   }
@@ -203,19 +203,23 @@ private:
   static void keyDestroy(void *Key, void *UserData) {
     KeyInfoT::exitCache(Key);
   }
-  static void valueDestroy(void *Value, void *UserData) {
-    ValueInfoT::exitCache(Value);
+  static void valueRetain(void *Value, void *UserData) {
+    ValueInfoT::retain(Value);
+  }
+  static void valueRelease(void *Value, void *UserData) {
+    ValueInfoT::release(Value);
   }
 };
 
 template <typename T>
 struct CacheValueInfo<llvm::IntrusiveRefCntPtr<T>>{
   static void *enterCache(const llvm::IntrusiveRefCntPtr<T> &Val) {
-    T *Ptr = Val.get();
-    Ptr->Retain();
-    return Ptr;
+    return const_cast<T *>(Val.get());
   }
-  static void exitCache(void *Ptr) {
+  static void retain(void *Ptr) {
+    static_cast<T*>(Ptr)->Retain();
+  }
+  static void release(void *Ptr) {
     static_cast<T*>(Ptr)->Release();
   }
   static llvm::IntrusiveRefCntPtr<T> getFromCache(void *Ptr) {

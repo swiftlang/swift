@@ -15,23 +15,23 @@ import _SwiftFoundationOverlayShims
 
 extension IndexSet.Index {
     public static func ==(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value == rhs.value && rhs.rangeIndex == rhs.rangeIndex
+        return lhs.value == rhs.value
     }
 
     public static func <(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value < rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+        return lhs.value < rhs.value
     }
 
     public static func <=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value <= rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+        return lhs.value <= rhs.value
     }
 
     public static func >(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value > rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+        return lhs.value > rhs.value
     }
 
     public static func >=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value >= rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+        return lhs.value >= rhs.value
     }
 }
 
@@ -237,9 +237,14 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     }
     
     public var startIndex: Index {
-        // If this winds up being NSNotFound, that's ok because then endIndex is also NSNotFound, and empty collections have startIndex == endIndex
-        let extent = _range(at: 0)
-        return Index(value: extent.lowerBound, extent: extent, rangeIndex: 0, rangeCount: _rangeCount)
+        let rangeCount = _rangeCount
+        if rangeCount > 0 {
+            // If this winds up being NSNotFound, that's ok because then endIndex is also NSNotFound, and empty collections have startIndex == endIndex
+            let extent = _range(at: 0)
+            return Index(value: extent.lowerBound, extent: extent, rangeIndex: 0, rangeCount: _rangeCount)
+        } else {
+            return Index(value: 0, extent: 0..<0, rangeIndex: -1, rangeCount: rangeCount)
+        }
     }
 
     public var endIndex: Index {
@@ -839,7 +844,8 @@ extension IndexSet : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSIndexSet?) -> IndexSet {
-        return IndexSet(reference: source!)
+        guard let src = source else { return IndexSet() }
+        return IndexSet(reference: src)
     }    
     
 }
@@ -913,6 +919,41 @@ private final class _MutablePairHandle<ImmutableType : NSObject, MutableType : N
         case .Mutable(let m):
             // TODO: It should be possible to reflect the constraint that MutableType is a subtype of ImmutableType in the generics for the class, but I haven't figured out how yet. For now, cheat and unsafe bit cast.
             return unsafeDowncast(m, to: ImmutableType.self)
+        }
+    }
+}
+
+extension IndexSet : Codable {
+    private enum CodingKeys : Int, CodingKey {
+        case indexes
+    }
+
+    private enum RangeCodingKeys : Int, CodingKey {
+        case location
+        case length
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        var indexesContainer = try container.nestedUnkeyedContainer(forKey: .indexes)
+        self.init()
+
+        while !indexesContainer.isAtEnd {
+            let rangeContainer = try indexesContainer.nestedContainer(keyedBy: RangeCodingKeys.self)
+            let startIndex = try rangeContainer.decode(Int.self, forKey: .location)
+            let count = try rangeContainer.decode(Int.self, forKey: .length)
+            self.insert(integersIn: startIndex ..< (startIndex + count))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        var indexesContainer = container.nestedUnkeyedContainer(forKey: .indexes)
+
+        for range in self.rangeView {
+            var rangeContainer = indexesContainer.nestedContainer(keyedBy: RangeCodingKeys.self)
+            try rangeContainer.encode(range.startIndex, forKey: .location)
+            try rangeContainer.encode(range.count, forKey: .length)
         }
     }
 }

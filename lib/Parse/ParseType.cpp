@@ -196,7 +196,13 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     }
     LLVM_FALLTHROUGH;
   default:
-    diagnose(Tok, MessageID);
+    {
+      auto diag = diagnose(Tok, MessageID);
+      // If the next token is closing or separating, the type was likely forgotten
+      if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
+                    tok::equal, tok::comma, tok::semi))
+        diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
+    }
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
       ty = makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
       consumeToken();
@@ -407,8 +413,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       bool walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
-            if (isa<GenericTypeParamDecl>(decl))
-              ident->overwriteIdentifier(decl->getName());
+            if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
+              ident->overwriteIdentifier(genericParam->getName());
           }
         }
         return true;
@@ -581,8 +587,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
     // Lookup element #0 through our current scope chains in case it is some
     // thing local (this returns null if nothing is found).
     if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
-      if (isa<TypeDecl>(Entry))
-        ComponentsR[0]->setValue(Entry);
+      if (auto *TD = dyn_cast<TypeDecl>(Entry))
+        ComponentsR[0]->setValue(TD, nullptr);
 
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
@@ -747,13 +753,16 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
       replacement += TrailingContent;
     }
 
+    auto isThree = Context.isSwiftVersion3();
+#define THREEIFY(MESSAGE) (isThree ? diag::swift3_##MESSAGE : diag::MESSAGE)
     // Replace 'protocol<T1, T2>' with 'T1 & T2'
     diagnose(ProtocolLoc,
-      IsEmpty              ? diag::deprecated_any_composition :
-      Protocols.size() > 1 ? diag::deprecated_protocol_composition :
-                             diag::deprecated_protocol_composition_single)
+      IsEmpty              ? THREEIFY(deprecated_any_composition) :
+      Protocols.size() > 1 ? THREEIFY(deprecated_protocol_composition) :
+                             THREEIFY(deprecated_protocol_composition_single))
       .highlight(composition->getSourceRange())
       .fixItReplace(composition->getSourceRange(), replacement);
+#undef THREEIFY
   }
 
   return makeParserResult(Status, composition);
@@ -772,17 +781,13 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   unsigned EllipsisIdx;
-  SmallVector<TypeRepr *, 8> ElementsR;
-
-  // We keep track of the labels separately, and apply them at the end.
-  SmallVector<std::tuple<Identifier, SourceLoc, Identifier, SourceLoc>, 4>
-    Labels;
+  SmallVector<TupleTypeReprElement, 8> ElementsR;
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
-    TypeRepr *tyR;
+    TupleTypeReprElement element;
 
     // If this is a deprecated use of the inout marker in an argument list,
     // consume the inout.
@@ -795,23 +800,24 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     if (Tok.canBeArgumentLabel() &&
         (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
       // Consume the name
-      Identifier name;
       if (!Tok.is(tok::kw__))
-        name = Context.getIdentifier(Tok.getText());
-      SourceLoc nameLoc = consumeToken();
+        element.Name = Context.getIdentifier(Tok.getText());
+      element.NameLoc = consumeToken();
 
       // If there is a second name, consume it as well.
-      Identifier secondName;
-      SourceLoc secondNameLoc;
       if (Tok.canBeArgumentLabel()) {
         if (!Tok.is(tok::kw__))
-          secondName = Context.getIdentifier(Tok.getText());
-        secondNameLoc = consumeToken();
+          element.SecondName = Context.getIdentifier(Tok.getText());
+        element.SecondNameLoc = consumeToken();
       }
 
       // Consume the ':'.
-      if (!consumeIf(tok::colon))
+      SourceLoc colonLoc;
+      if (Tok.is(tok::colon)) {
+        colonLoc = consumeToken();
+      } else {
         diagnose(Tok, diag::expected_parameter_colon);
+      }
 
       SourceLoc postColonLoc = Tok.getLoc();
 
@@ -821,18 +827,13 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         return makeParserCodeCompletionStatus();
       if (type.isNull())
         return makeParserError();
-      tyR = type.get();
+      element.Type = type.get();
 
       // Complain obsoleted 'inout' position; (inout name: Ty)
-      if (InOutLoc.isValid() && !isa<InOutTypeRepr>(tyR))
+      if (InOutLoc.isValid() && !isa<InOutTypeRepr>(element.Type))
         diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed)
           .fixItRemove(InOutLoc)
           .fixItInsert(postColonLoc, "inout ");
-
-      // Record the label. We will look at these at the end.
-      if (Labels.empty())
-        Labels.resize(ElementsR.size());
-      Labels.emplace_back(name, nameLoc, secondName, secondNameLoc);
     } else {
       // Otherwise, this has to be a type.
       auto type = parseType();
@@ -840,24 +841,21 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         return makeParserCodeCompletionStatus();
       if (type.isNull())
         return makeParserError();
-      tyR = type.get();
-
-      if (!Labels.empty())
-        Labels.emplace_back();
+      element.Type = type.get();
     }
 
     // If an 'inout' marker was specified, build inout type.
     // Note that we bury the inout locator within the named locator.
     // This is weird but required by Sema apparently.
     if (InOutLoc.isValid()) {
-      if (isa<InOutTypeRepr>(tyR))
+      if (isa<InOutTypeRepr>(element.Type))
         diagnose(Tok, diag::parameter_inout_var_let_repeated)
           .fixItRemove(InOutLoc);
       else
-        tyR = new (Context) InOutTypeRepr(tyR, InOutLoc);
+        element.Type = new (Context) InOutTypeRepr(element.Type, InOutLoc);
     }
 
-    ElementsR.push_back(tyR);
+    ElementsR.push_back(element);
 
     // Parse '= expr' here so we can complain about it directly, rather
     // than dying when we see it.
@@ -880,6 +878,9 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         EllipsisIdx = ElementsR.size() - 1;
       }
     }
+    if (Tok.is(tok::comma)) {
+      element.TrailingCommaLoc = Tok.getLoc();
+    }
     return makeParserSuccess();
   });
 
@@ -890,76 +891,55 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
 
-  SmallVector<Identifier, 4> ElementNames;
-  SmallVector<SourceLoc, 4> ElementNameLocs;
-  SmallVector<SourceLoc, 4> UnderscoreLocs;
   // If there were any labels, figure out which labels should go into the type
   // representation.
-  if (!Labels.empty()) {
-    assert(Labels.size() == ElementsR.size());
 
-    bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
-                                    tok::kw_rethrows);
-    ElementNames.resize(ElementsR.size());
-    ElementNameLocs.resize(ElementsR.size());
-    if (isFunctionType)
-      UnderscoreLocs.resize(ElementsR.size());
+  bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
+                                  tok::kw_rethrows);
 
-    for (unsigned i : indices(ElementsR)) {
-      auto &currentLabel = Labels[i];
-
-      Identifier firstName = std::get<0>(currentLabel);
-      SourceLoc firstNameLoc = std::get<1>(currentLabel);
-      Identifier secondName = std::get<2>(currentLabel);
-      SourceLoc secondNameLoc = std::get<3>(currentLabel);
-
-      // True tuples have labels.
-      if (!isFunctionType) {
-        // If there were two names, complain.
-        if (firstNameLoc.isValid() && secondNameLoc.isValid()) {
-          auto diag = diagnose(firstNameLoc, diag::tuple_type_multiple_labels);
-          if (firstName.empty()) {
-            diag.fixItRemoveChars(firstNameLoc, ElementsR[i]->getStartLoc());
-          } else {
-            diag.fixItRemove(
-              SourceRange(Lexer::getLocForEndOfToken(SourceMgr,firstNameLoc),
-                          secondNameLoc));
-          }
+  for (auto &element : ElementsR) {
+    // True tuples have labels.
+    if (!isFunctionType) {
+      // If there were two names, complain.
+      if (element.NameLoc.isValid() && element.SecondNameLoc.isValid()) {
+        auto diag = diagnose(element.NameLoc, diag::tuple_type_multiple_labels);
+        if (element.Name.empty()) {
+          diag.fixItRemoveChars(element.NameLoc,
+                                element.Type->getStartLoc());
+        } else {
+          diag.fixItRemove(
+            SourceRange(Lexer::getLocForEndOfToken(SourceMgr, element.NameLoc),
+                        element.SecondNameLoc));
         }
-
-        // Form the named type representation.
-        ElementNames[i] = firstName;
-        ElementNameLocs[i] = firstNameLoc;
-        continue;
       }
+      continue;
+    }
 
-      // If there was a first name, complain; arguments in function types are
-      // always unlabeled.
-      if (firstNameLoc.isValid() && !firstName.empty()) {
-        auto diag = diagnose(firstNameLoc, diag::function_type_argument_label,
-                             firstName);
-        if (secondNameLoc.isInvalid())
-          diag.fixItInsert(firstNameLoc, "_ ");
-        else if (secondName.empty())
-          diag.fixItRemoveChars(firstNameLoc, ElementsR[i]->getStartLoc());
-        else
-          diag.fixItReplace(SourceRange(firstNameLoc), "_");
-      }
+    // If there was a first name, complain; arguments in function types are
+    // always unlabeled.
+    if (element.NameLoc.isValid() && !element.Name.empty()) {
+      auto diag = diagnose(element.NameLoc, diag::function_type_argument_label,
+                           element.Name);
+      if (element.SecondNameLoc.isInvalid())
+        diag.fixItInsert(element.NameLoc, "_ ");
+      else if (element.SecondName.empty())
+        diag.fixItRemoveChars(element.NameLoc,
+                              element.Type->getStartLoc());
+      else
+        diag.fixItReplace(SourceRange(element.NameLoc), "_");
+    }
 
-      if (firstNameLoc.isValid() || secondNameLoc.isValid()) {
-        // Form the named parameter type representation.
-        ElementNames[i] = secondName;
-        ElementNameLocs[i] = secondNameLoc;
-        UnderscoreLocs[i]  = firstNameLoc;
-      }
+    if (element.NameLoc.isValid() || element.SecondNameLoc.isValid()) {
+      // Form the named parameter type representation.
+      element.Name = element.SecondName;
+      element.NameLoc = element.SecondNameLoc;
+      element.UnderscoreLoc = element.NameLoc;
     }
   }
 
   return makeParserResult(Status,
                           TupleTypeRepr::create(Context, ElementsR,
                                                 SourceRange(LPLoc, RPLoc),
-                                                ElementNames, ElementNameLocs,
-                                                UnderscoreLocs,
                                                 EllipsisLoc, EllipsisIdx));
 }
 
@@ -1136,9 +1116,13 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   case tok::exclaim_postfix:
   case tok::question_postfix:
     return true;
-  
-  case tok::oper_binary_unspaced:
+
   case tok::oper_binary_spaced:
+    if (tok.getText() == "&")
+      return true;
+
+    LLVM_FALLTHROUGH;
+  case tok::oper_binary_unspaced:
   case tok::oper_postfix:
     // These might be '?' or '!' type modifiers.
     return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);

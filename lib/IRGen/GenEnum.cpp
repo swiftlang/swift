@@ -1314,16 +1314,7 @@ namespace {
     /// Do a primitive copy of the enum from one address to another.
     void emitPrimitiveCopy(IRGenFunction &IGF, Address dest, Address src,
                            SILType T) const {
-      // If the layout is fixed, load and store the fixed-size payload and tag.
-      if (TIK >= Fixed) {
-        EnumPayload payload;
-        llvm::Value *extraTag;
-        std::tie(payload, extraTag)
-          = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
-        emitPrimitiveStorePayloadAndExtraTag(IGF, dest, payload, extraTag);
-        return;
-      }
-
+      // If the layout is fixed, the size will be a constant.
       // Otherwise, do a memcpy of the dynamic size of the type.
       IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
                                TI->getSize(IGF, T),
@@ -1485,7 +1476,8 @@ namespace {
 
     llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, EnumDecl *theEnum) {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedCopyFunction(theEnum);
+      std::string name = Mangler.mangleOutlinedCopyFunction(
+          theEnum->getAsNominalTypeOrNominalTypeExtensionContext());
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
@@ -2929,7 +2921,7 @@ namespace {
     llvm::Function *emitConsumeEnumFunction(IRGenModule &IGM,
                                             EnumDecl *theEnum) {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedCopyFunction(theEnum);
+      std::string name = Mangler.mangleOutlinedConsumeFunction(theEnum);
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);

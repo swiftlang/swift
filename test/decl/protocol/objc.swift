@@ -246,3 +246,15 @@ class C8SubB: C8Base {
 
   @objc(getTheProp) func collision() {} // okay
 }
+
+// These used to crash because the requirement is get-only.
+class C8SubRW: C8Base {
+  var prop: Int {
+    get { return 0 }
+    set {}
+  }
+}
+
+class C8SubRW2: C8Base {
+  var prop: Int = 0
+}

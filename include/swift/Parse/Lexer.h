@@ -26,6 +26,11 @@
 #include "llvm/Support/SaveAndRestore.h"
 
 namespace swift {
+  /// Given a pointer to the starting byte of a UTF8 character, validate it and
+  /// advance the lexer past it.  This returns the encoded character or ~0U if
+  /// the encoding is invalid.
+  uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr, const char *End);
+
   class DiagnosticEngine;
   class InFlightDiagnostic;
   class LangOptions;
@@ -234,7 +239,7 @@ public:
   }
 
   /// Lex a full token including leading and trailing trivia.
-  syntax::RC<syntax::TokenSyntax> fullLex();
+  RC<syntax::RawTokenSyntax> fullLex();
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;
@@ -374,13 +379,19 @@ public:
     enum : char { Literal, Expr } Kind;
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
-    unsigned Length;
-    
-    static StringSegment getLiteral(SourceLoc Loc, unsigned Length) {
+    unsigned Length, IndentToStrip;
+    bool IsFirstSegment, IsLastSegment;
+
+    static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
+                                    bool IsFirstSegment, bool IsLastSegment,
+                                    unsigned IndentToStrip) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
       Result.Length = Length;
+      Result.IsFirstSegment = IsFirstSegment;
+      Result.IsLastSegment = IsLastSegment;
+      Result.IndentToStrip = IndentToStrip;
       return Result;
     }
     
@@ -389,6 +400,9 @@ public:
       Result.Kind = Expr;
       Result.Loc = Loc;
       Result.Length = Length;
+      Result.IsFirstSegment = false;
+      Result.IsLastSegment = false;
+      Result.IndentToStrip = 0;
       return Result;
     }
   };
@@ -397,12 +411,16 @@ public:
   /// If a copy needs to be made, it will be allocated out of the provided
   /// Buffer.
   static StringRef getEncodedStringSegment(StringRef Str,
-                                           SmallVectorImpl<char> &Buffer);
+                                           SmallVectorImpl<char> &Buffer,
+                                           bool IsFirstSegment = false,
+                                           bool IsLastSegment = false,
+                                           unsigned IndentToStrip = 0);
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
-        Buffer);
+        Buffer, Segment.IsFirstSegment, Segment.IsLastSegment,
+        Segment.IndentToStrip);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
@@ -464,7 +482,7 @@ private:
     return diagnose(Loc, Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
 
-  void formToken(tok Kind, const char *TokStart);
+  void formToken(tok Kind, const char *TokStart, bool MultilineString = false);
 
   /// Advance to the end of the line but leave the current buffer pointer
   /// at that newline character.
@@ -495,7 +513,8 @@ private:
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
-                        char StopQuote, bool EmitDiagnostics);
+                        char StopQuote, bool EmitDiagnostics,
+                        bool MultilineString = false);
   void lexStringLiteral();
   void lexEscapedIdentifier();
 

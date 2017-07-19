@@ -76,7 +76,9 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
       isa<RetainValueInst>(Inst) || isa<UnownedRetainInst>(Inst) ||
       isa<UnownedReleaseInst>(Inst) || isa<StrongRetainUnownedInst>(Inst) ||
       isa<StoreWeakInst>(Inst) || isa<StrongRetainInst>(Inst) ||
-      isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst))
+      isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst) ||
+      isa<BeginAccessInst>(Inst) || isa<EndAccessInst>(Inst) ||
+      isa<BeginUnpairedAccessInst>(Inst) || isa<EndUnpairedAccessInst>(Inst))
     return false;
 
   // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'
@@ -221,8 +223,6 @@ struct GuaranteedARCOpts : SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
-
-  StringRef getName() override { return "Guaranteed ARC Opts"; }
 };
 
 } // end anonymous namespace

@@ -117,15 +117,19 @@ namespace irgen {
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
                                 CanSILFunctionType origType,
-                                CanSILFunctionType substType,
                                 const SubstitutionMap &subs,
                                 WitnessMetadata *witnessMetadata,
                                 Explosion &args);
 
+  /// Bind the polymorphic parameter inside of a partial apply forwarding thunk.
+  void bindPolymorphicParameter(IRGenFunction &IGF,
+                                CanSILFunctionType &OrigFnType,
+                                CanSILFunctionType &SubstFnType,
+                                Explosion &nativeParam, unsigned paramIndex);
+
   /// Emit references to the witness tables for the substituted type
   /// in the given substitution.
-  void emitWitnessTableRefs(IRGenFunction &IGF,
-                            const Substitution &sub,
+  void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
                             llvm::Value **metadataCache,
                             SmallVectorImpl<llvm::Value *> &out);
 

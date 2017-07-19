@@ -92,6 +92,8 @@ class CMake(object):
             sanitizers.append('Undefined')
         if args.enable_tsan:
             sanitizers.append('Thread')
+        if args.enable_lsan:
+            sanitizers.append('Leaks')
         if sanitizers:
             define("LLVM_USE_SANITIZER", ";".join(sanitizers))
 

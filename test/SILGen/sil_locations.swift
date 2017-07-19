@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -Xllvm -sil-print-debuginfo -emit-verbose-sil %s | %FileCheck %s
 
 // FIXME: Not sure if this an ideal source info for the branch - 
 // it points to if, not the last instruction in the block.
@@ -140,6 +140,8 @@ func testSwitch() {
   // CHECK:  destroy_value [[VAR_Z]]{{.*}}, loc "{{.*}}":[[@LINE-1]]:9, {{.*}}:cleanup
   case (3, let y):
     x += 1
+  default:
+    ()
   }
 }
 

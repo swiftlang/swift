@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
 // RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o %s -o %t/a.out
@@ -249,3 +248,53 @@ let c = PandorasBox(30)
 // CHECK: 30
 // Uses ConstantDirect access pattern
 print(c.value)
+
+// Super method calls from a generic subclass of an @objc class
+class HasDynamicMethod : NSObject {
+  @objc dynamic class func funkyTown() {
+    print("Here we are with \(self)")
+  }
+}
+
+class GenericOverrideOfDynamicMethod<T> : HasDynamicMethod {
+  override class func funkyTown() {
+    print("Hello from \(self) with T = \(T.self)")
+    super.funkyTown()
+    print("Goodbye from \(self) with T = \(T.self)")
+  }
+}
+
+class ConcreteOverrideOfDynamicMethod : GenericOverrideOfDynamicMethod<Int> {
+  override class func funkyTown() {
+    print("Hello from \(self)")
+    super.funkyTown()
+    print("Goodbye from \(self)")
+  }
+}
+
+// CHECK: Hello from ConcreteOverrideOfDynamicMethod
+// CHECK: Hello from ConcreteOverrideOfDynamicMethod with T = Int
+// CHECK: Here we are with ConcreteOverrideOfDynamicMethod
+// CHECK: Goodbye from ConcreteOverrideOfDynamicMethod with T = Int
+// CHECK: Goodbye from ConcreteOverrideOfDynamicMethod
+ConcreteOverrideOfDynamicMethod.funkyTown()
+
+class Foo {}
+class Bar {}
+class DependOnAlignOf<T> : HasHiddenIvars2 {
+  var first = Foo()
+  var second = Bar()
+  var third: T?
+}
+
+let ad = DependOnAlignOf<Double>()
+let ai = DependOnAlignOf<Int>()
+
+let fd = { (ad.x, ad.first, ad.second, ad.third) }
+let fi = { (ai.x, ai.first, ai.second, ai.third) }
+
+// CHECK: (nil, a.Foo, a.Bar, nil)
+print(fd())
+
+// CHECK: (nil, a.Foo, a.Bar, nil)
+print(fi())

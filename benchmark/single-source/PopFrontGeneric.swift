@@ -19,8 +19,6 @@ let arrayCount = 1024
 // being really slow).
 @_versioned
 protocol MyArrayBufferProtocol : MutableCollection, RandomAccessCollection {
-  associatedtype Element
-
   mutating func myReplace<C>(
     _ subRange: Range<Int>,
     with newValues: C
@@ -56,7 +54,7 @@ public func run_PopFrontArrayGeneric(_ N: Int) {
         result += a[0]
         myArrayReplace(&a, 0..<1, EmptyCollection())
       }
-      CheckResults(result == arrayCount, "IncorrectResults in StringInterpolation: \(result) != \(arrayCount)")
+      CheckResults(result == arrayCount)
     }
   }
 }

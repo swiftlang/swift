@@ -14,6 +14,7 @@
 #include "sourcekitd/sourcekitd.h"
 #include "sourcekitd/Internal.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
+#include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/Logging.h"
@@ -249,6 +250,10 @@ public:
       case CustomBufferKind::TokenAnnotationsArray:
       case CustomBufferKind::DocSupportAnnotationArray:
       case CustomBufferKind::CodeCompletionResultsArray:
+      case CustomBufferKind::DocStructureArray:
+      case CustomBufferKind::InheritedTypesArray:
+      case CustomBufferKind::DocStructureElementArray:
+      case CustomBufferKind::AttributesArray:
         return SOURCEKITD_VARIANT_TYPE_ARRAY;
     }
     llvm::report_fatal_error("sourcekitd object did not resolve to a known type");
@@ -755,6 +760,13 @@ bool RequestDict::getInt64(SourceKit::UIdent Key, int64_t &Val,
   return false;
 }
 
+Optional<int64_t> RequestDict::getOptionalInt64(SourceKit::UIdent Key) {
+  auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key));
+  if (!Object)
+    return None;
+  return Object->getInt64().getValueOr(0);
+}
+
 sourcekitd_response_t
 sourcekitd::createErrorRequestInvalid(const char *Description) {
   return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_INVALID, 
@@ -926,6 +938,18 @@ static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
           (uintptr_t)DataObject->getDataPtr(), 0 }};
       case CustomBufferKind::CodeCompletionResultsArray:
         return {{ (uintptr_t)getVariantFunctionsForCodeCompletionResultsArray(),
+          (uintptr_t)DataObject->getDataPtr(), 0 }};
+      case CustomBufferKind::DocStructureArray:
+        return {{ (uintptr_t)getVariantFunctionsForDocStructureArray(),
+          (uintptr_t)DataObject->getDataPtr(), ~size_t(0) }};
+      case CustomBufferKind::InheritedTypesArray:
+        return {{ (uintptr_t)getVariantFunctionsForInheritedTypesArray(),
+          (uintptr_t)DataObject->getDataPtr(), 0 }};
+      case CustomBufferKind::DocStructureElementArray:
+        return {{ (uintptr_t)getVariantFunctionsForDocStructureElementArray(),
+          (uintptr_t)DataObject->getDataPtr(), 0 }};
+      case CustomBufferKind::AttributesArray:
+        return {{ (uintptr_t)getVariantFunctionsForAttributesArray(),
           (uintptr_t)DataObject->getDataPtr(), 0 }};
     }
   }

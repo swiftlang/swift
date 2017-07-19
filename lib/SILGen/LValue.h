@@ -28,6 +28,7 @@
 namespace swift {
 namespace Lowering {
 
+class ArgumentSource;
 class LogicalPathComponent;
 class ManagedValue;
 class PhysicalPathComponent;
@@ -97,15 +98,17 @@ public:
     TupleElementKind,           // tuple_element_addr
     StructElementKind,          // struct_element_addr
     OptionalObjectKind,         // optional projection
-    OpenedExistentialKind,      // opened opaque existential
+    OpenOpaqueExistentialKind,  // opened opaque existential
     AddressorKind,              // var/subscript addressor
     ValueKind,                  // random base pointer as an lvalue
+    KeyPathApplicationKind,     // applying a key path
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
     OwnershipKind,              // weak pointer remapping
     AutoreleasingWritebackKind, // autorelease pointer on set
     WritebackPseudoKind,        // a fake component to customize writeback
+    OpenNonOpaqueExistentialKind,  // opened class or metatype existential
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution
@@ -152,6 +155,12 @@ public:
   TranslationPathComponent &asTranslation();
   const TranslationPathComponent &asTranslation() const;
 
+  /// Is this some form of open-existential component?
+  bool isOpenExistential() const {
+    return getKind() == OpenOpaqueExistentialKind ||
+           getKind() == OpenNonOpaqueExistentialKind;
+  }
+
   /// Return the appropriate access kind to use when producing the
   /// base value.
   virtual AccessKind getBaseAccessKind(SILGenFunction &SGF,
@@ -172,7 +181,7 @@ public:
   KindTy getKind() const { return Kind; }
 
   void dump() const;
-  virtual void print(raw_ostream &OS) const = 0;
+  virtual void dump(raw_ostream &OS, unsigned indent = 0) const = 0;
 };
 
 /// An abstract class for "physical" path components, i.e. path
@@ -232,7 +241,7 @@ public:
   ///
   /// \param base - always an address, but possibly an r-value
   virtual void set(SILGenFunction &SGF, SILLocation loc,
-                   RValue &&value, ManagedValue base) && = 0;
+                   ArgumentSource &&value, ManagedValue base) && = 0;
 
   /// Get the property.
   ///
@@ -302,7 +311,7 @@ public:
              ManagedValue base, SGFContext c) && override;
 
   void set(SILGenFunction &SGF, SILLocation loc,
-           RValue &&value, ManagedValue base) && override;
+           ArgumentSource &&value, ManagedValue base) && override;
 
   /// Transform from the original pattern.
   virtual RValue translate(SILGenFunction &SGF, SILLocation loc,
@@ -383,6 +392,13 @@ public:
     assert(isLastComponentTranslation());
     Path.pop_back();
   }
+
+  /// Assert that the given component is the last component in the
+  /// l-value, drop it.
+  void dropLastComponent(PathComponent &component) & {
+    assert(&component == Path.back().get());
+    Path.pop_back();
+  }
   
   /// Add a new component at the end of the access path of this lvalue.
   template <class T, class... As>
@@ -456,8 +472,15 @@ public:
     return getTypeData().OrigFormalType;
   }
 
+  /// Returns true when the other access definitely does not begin a formal
+  /// access that would conflict with this the accesses begun by this
+  /// LValue. This is a best-effort attempt; it may return false in cases
+  /// where the two LValues do not conflict.
+  bool isObviouslyNonConflicting(const LValue &other, AccessKind selfAccess,
+                                 AccessKind otherAccess);
+
   void dump() const;
-  void print(raw_ostream &OS) const;
+  void dump(raw_ostream &os, unsigned indent = 0) const;
 };
   
 /// RAII object used to enter an inout conversion scope. Writeback scopes formed
@@ -489,22 +512,7 @@ struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
         component(std::move(comp)), base(base), materialized(materialized) {}
 
   void diagnoseConflict(const ExclusiveBorrowFormalAccess &rhs,
-                        SILGenFunction &SGF) const {
-    // If the two writebacks we're comparing are of different kinds (e.g.
-    // ownership conversion vs a computed property) then they aren't the
-    // same and thus cannot conflict.
-    if (component->getKind() != rhs.component->getKind())
-      return;
-
-    // If the lvalues don't have the same base value, then they aren't the same.
-    // Note that this is the primary source of false negative for this
-    // diagnostic.
-    if (base.getValue() != rhs.base.getValue())
-      return;
-
-    component->diagnoseWritebackConflict(rhs.component.get(), loc, rhs.loc,
-                                         SGF);
-  }
+                        SILGenFunction &SGF) const;
 
   void performWriteback(SILGenFunction &SGF, bool isFinal) {
     Scope S(SGF.Cleanups, CleanupLocation::get(loc));
@@ -513,6 +521,7 @@ struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
 
   void finishImpl(SILGenFunction &SGF) override {
     performWriteback(SGF, /*isFinal*/ true);
+    component.reset();
   }
 };
 

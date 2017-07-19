@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/ -module-name Mixed -import-underlying-module -parse-as-library %s -typecheck -emit-objc-header-path %t/mixed.h
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=FRAMEWORK %s < %t/mixed.h
 // RUN: %check-in-clang -F %S/Inputs/ %t/mixed.h
@@ -9,7 +9,7 @@
 
 // REQUIRES: objc_interop
 
-// CHECK-LABEL: #if defined(__has_feature) && __has_feature(modules)
+// CHECK-LABEL: #if __has_feature(modules)
 // CHECK-NEXT: @import Foundation;
 // CHECK-NEXT: #endif
 

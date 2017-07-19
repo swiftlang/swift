@@ -353,7 +353,7 @@ public func ExistentialToArchetype<T>(o o : AnyObject, t : T) -> T {
 // CHECK: return
 
 // AnyObject -> AnyObject
-// CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast22ExistentialToArchetype{{[_0-9a-zA-Z]*}}AnyObject{{.*}}Tg5 : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned AnyObject {
+// CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast22ExistentialToArchetype{{[_0-9a-zA-Z]*}}yXl{{.*}}Tg5 : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned AnyObject {
 // CHECK: bb0(%0 : $AnyObject, %1 : $AnyObject):
 // CHECK: strong_release %1
 // CHECK: return %0

@@ -118,15 +118,34 @@
                 "clang": "swift-4.0-branch",
                 "swift": "swift-4.0-branch",
                 "lldb": "swift-4.0-branch",
-                "cmark": "master",
-                "llbuild": "master",
-                "swiftpm": "master",
+                "cmark": "swift-4.0-branch",
+                "llbuild": "swift-4.0-branch",
+                "swiftpm": "swift-4.0-branch",
                 "compiler-rt": "swift-4.0-branch",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master",
+                "swift-corelibs-xctest": "swift-4.0-branch",
+                "swift-corelibs-foundation": "swift-4.0-branch",
+                "swift-corelibs-libdispatch": "swift-4.0-branch",
+                "swift-integration-tests": "swift-4.0-branch",
+                "swift-xcode-playground-support": "swift-4.0-branch",
+                "ninja": "release"
+            }
+        },
+         "swift-4.0-branch-07-11-2017" : {
+            "aliases": ["swift-4.0-branch-07-11-2017"],
+            "repos": {
+                "llvm": "swift-4.0-branch-07-11-2017",
+                "clang": "swift-4.0-branch-07-11-2017",
+                "swift": "swift-4.0-branch-07-11-2017",
+                "lldb": "swift-4.0-branch-07-11-2017",
+                "cmark": "swift-4.0-branch",
+                "llbuild": "swift-4.0-branch",
+                "swiftpm": "swift-4.0-branch",
+                "compiler-rt": "swift-4.0-branch-07-11-2017",
+                "swift-corelibs-xctest": "swift-4.0-branch",
+                "swift-corelibs-foundation": "swift-4.0-branch",
+                "swift-corelibs-libdispatch": "swift-4.0-branch",
+                "swift-integration-tests": "swift-4.0-branch",
+                "swift-xcode-playground-support": "swift-4.0-branch",
                 "ninja": "release"
             }
         }

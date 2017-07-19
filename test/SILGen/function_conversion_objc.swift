@@ -8,12 +8,12 @@ import Foundation
 
 // CHECK-LABEL: sil hidden @_T024function_conversion_objc20convMetatypeToObjectySo8NSObjectCmADcF
 func convMetatypeToObject(_ f: @escaping (NSObject) -> NSObject.Type) {
-// CHECK:         function_ref @_T0So8NSObjectCABXMTIxxd_ABs9AnyObject_pIxxo_TR
+// CHECK:         function_ref @_T0So8NSObjectCABXMTIxxd_AByXlIxxo_TR
 // CHECK:         partial_apply
   let _: (NSObject) -> AnyObject = f
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0So8NSObjectCABXMTIxxd_ABs9AnyObject_pIxxo_TR : $@convention(thin) (@owned NSObject, @owned @callee_owned (@owned NSObject) -> @thick NSObject.Type) -> @owned AnyObject {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0So8NSObjectCABXMTIxxd_AByXlIxxo_TR : $@convention(thin) (@owned NSObject, @owned @callee_owned (@owned NSObject) -> @thick NSObject.Type) -> @owned AnyObject {
 // CHECK:         apply %1(%0)
 // CHECK:         thick_to_objc_metatype {{.*}} : $@thick NSObject.Type to $@objc_metatype NSObject.Type
 // CHECK:         objc_metatype_to_object {{.*}} : $@objc_metatype NSObject.Type to $AnyObject
@@ -23,12 +23,12 @@ func convMetatypeToObject(_ f: @escaping (NSObject) -> NSObject.Type) {
 
 // CHECK-LABEL: sil hidden @_T024function_conversion_objc31convExistentialMetatypeToObjectyAA9NSBurrito_pXpAaC_pcF
 func convExistentialMetatypeToObject(_ f: @escaping (NSBurrito) -> NSBurrito.Type) {
-// CHECK:         function_ref @_T024function_conversion_objc9NSBurrito_pAaB_pXmTIxxd_AaB_ps9AnyObject_pIxxo_TR
+// CHECK:         function_ref @_T024function_conversion_objc9NSBurrito_pAaB_pXmTIxxd_AaB_pyXlIxxo_TR
 // CHECK:         partial_apply
   let _: (NSBurrito) -> AnyObject = f
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T024function_conversion_objc9NSBurrito_pAaB_pXmTIxxd_AaB_ps9AnyObject_pIxxo_TR : $@convention(thin) (@owned NSBurrito, @owned @callee_owned (@owned NSBurrito) -> @thick NSBurrito.Type) -> @owned AnyObject
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T024function_conversion_objc9NSBurrito_pAaB_pXmTIxxd_AaB_pyXlIxxo_TR : $@convention(thin) (@owned NSBurrito, @owned @callee_owned (@owned NSBurrito) -> @thick NSBurrito.Type) -> @owned AnyObject
 // CHECK:         apply %1(%0)
 // CHECK:         thick_to_objc_metatype {{.*}} : $@thick NSBurrito.Type to $@objc_metatype NSBurrito.Type
 // CHECK:         objc_existential_metatype_to_object {{.*}} : $@objc_metatype NSBurrito.Type to $AnyObject

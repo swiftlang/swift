@@ -443,3 +443,91 @@ bb3:
   %5 = tuple()
   return %5 : $()
 }
+
+// CHECK-LABEL: sil @move_retain_over_loop
+// CHECK:      bb0({{.*}}):
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   cond_br
+// CHECK:      bb2:
+// CHECK:        strong_retain
+// CHECK:        apply
+// CHECK:        strong_release
+// CHECK:        return
+sil @move_retain_over_loop : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  cond_br undef, bb1, bb2
+
+bb2:
+  %2 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @move_release_over_loop
+// CHECK:      bb0{{.*}}:
+// CHECK:        strong_retain
+// CHECK:        apply
+// CHECK:        strong_release
+// CHECK:        br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   cond_br
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb1
+// CHECK:      bb3:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @move_release_over_loop : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  br bb1
+
+bb1:
+  cond_br undef, bb1, bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @handle_infinite_loop
+// CHECK:      bb0{{.*}}:
+// CHECK-NEXT:   cond_br
+// CHECK:      bb1:
+// CHECK-NOT:    {{(retain|release)}}
+// CHECK:        apply
+// CHECK-NEXT:   br bb2
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb2
+// CHECK:      bb3:
+// CHECK:        strong_retain
+// CHECK:        strong_release
+// CHECK:        return
+sil @handle_infinite_loop : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%a : $*Builtin.NativeObject):
+  cond_br undef, bb1, bb3
+
+bb1:
+  %2 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  br bb2
+
+bb2:
+  br bb2
+
+bb3:
+  %0 = load %a : $*Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}

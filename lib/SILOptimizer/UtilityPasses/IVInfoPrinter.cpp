@@ -20,8 +20,6 @@ namespace {
 
 class IVInfoPrinter : public SILModuleTransform {
 
-  StringRef getName() override { return "SIL IV Information Printer"; }
-
   void dumpIV(ValueBase *Header, ValueBase *IV) {
     if (IV == Header) {
       llvm::errs() << "IV Header: ";

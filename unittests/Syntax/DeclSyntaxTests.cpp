@@ -43,10 +43,10 @@ TEST(DeclSyntaxTests, DeclModifierGetAPIs) {
   auto RParen = SyntaxFactory::makeRightParenToken({}, {});
   auto Mod = SyntaxFactory::makeDeclModifier(Private, LParen, Set, RParen);
 
-  ASSERT_EQ(Private, Mod.getName());
-  ASSERT_EQ(LParen, Mod.getLeftParenToken());
-  ASSERT_EQ(Set, Mod.getArgument());
-  ASSERT_EQ(RParen, Mod.getRightParenToken());
+  ASSERT_EQ(Private.getRaw(), Mod.getName().getRaw());
+  ASSERT_EQ(LParen.getRaw(), Mod.getLeftParenToken().getRaw());
+  ASSERT_EQ(Set.getRaw(), Mod.getArgument().getRaw());
+  ASSERT_EQ(RParen.getRaw(), Mod.getRightParenToken().getRaw());
 }
 
 TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
@@ -252,21 +252,21 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
                                                     Colon, Int, NoEllipsis,
                                                     Equal, One, Comma);
 
-  ASSERT_EQ(ExternalName, Param.getExternalName());
-  ASSERT_EQ(LocalName, Param.getLocalName());
-  ASSERT_EQ(Colon, Param.getColonToken());
+  ASSERT_EQ(ExternalName.getRaw(), Param.getExternalName().getRaw());
+  ASSERT_EQ(LocalName.getRaw(), Param.getLocalName().getRaw());
+  ASSERT_EQ(Colon.getRaw(), Param.getColonToken().getRaw());
 
   auto GottenType = Param.getTypeSyntax().getValue();
   auto GottenType2 = Param.getTypeSyntax().getValue();
   ASSERT_TRUE(GottenType.hasSameIdentityAs(GottenType2));
 
-  ASSERT_EQ(Equal, Param.getEqualToken());
+  ASSERT_EQ(Equal.getRaw(), Param.getEqualToken().getRaw());
 
   auto GottenDefaultValue = Param.getDefaultValue().getValue();
   auto GottenDefaultValue2 = Param.getDefaultValue().getValue();
   ASSERT_TRUE(GottenDefaultValue.hasSameIdentityAs(GottenDefaultValue2));
 
-  ASSERT_EQ(Comma, Param.getTrailingComma());
+  ASSERT_EQ(Comma.getRaw(), Param.getTrailingComma().getRaw());
 
   // Test that llvm::None is returned for non-token missing children:
   auto Decimated = Param
@@ -392,7 +392,7 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
   auto Sig = SyntaxFactory::makeFunctionSignature(LParen, List, RParen, Throws,
                                                   Arrow, NoAttributes, Int);
 
-  ASSERT_EQ(LParen, Sig.getLeftParenToken());
+  ASSERT_EQ(LParen.getRaw(), Sig.getLeftParenToken().getRaw());
 
   {
     SmallString<48> Scratch;
@@ -407,10 +407,10 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
               "with radius: Int = -1, ");
   }
 
-  ASSERT_EQ(RParen, Sig.getRightParenToken());
-  ASSERT_EQ(Throws, Sig.getThrowsToken());
-  ASSERT_TRUE(Sig.getRethrowsToken()->isMissing());
-  ASSERT_EQ(Arrow, Sig.getArrowToken());
+  ASSERT_EQ(RParen.getRaw(), Sig.getRightParenToken().getRaw());
+  ASSERT_EQ(Throws.getRaw(), Sig.getThrowsToken().getRaw());
+  ASSERT_TRUE(Sig.getRethrowsToken().isMissing());
+  ASSERT_EQ(Arrow.getRaw(), Sig.getArrowToken().getRaw());
 
   {
     SmallString<48> Scratch;

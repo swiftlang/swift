@@ -105,8 +105,11 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
     STRINGS FALSE "NOT-MERGED" "MERGED")
 
-set(SWIFT_VERSION "3.1" CACHE STRING
-    "The user-visible version of the Swift compiler")
+# SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
+# can be reused when a new version of Swift comes out (assuming the user hasn't
+# manually set it as part of their own CMake configuration).
+set(SWIFT_VERSION "4.0")
+
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
 set(SWIFT_COMPILER_VERSION "" CACHE STRING
@@ -249,6 +252,10 @@ option(SWIFT_CHECK_INCREMENTAL_COMPILATION
     "Check if incremental compilation works when compiling the Swift libraries"
     FALSE)
 
+option(SWIFT_REPORT_STATISTICS
+    "Create json files which contain internal compilation statistics"
+    FALSE)
+
 #
 # User-configurable experimental options.  Do not use in production builds.
 #
@@ -269,10 +276,6 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
-
-option(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
-    "Build the runtime with a copy-on-write implementation for opaque existentials"
-    TRUE)
 
 option(SWIFT_STDLIB_USE_NONATOMIC_RC
     "Build the standard libraries and overlays with nonatomic reference count operations enabled"
@@ -380,6 +383,9 @@ else()
 endif()
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
+    ${SWIFT_BUILD_SOURCEKIT_default})
+option(SWIFT_ENABLE_SOURCEKIT_TESTS
+    "Enable running SourceKit tests"
     ${SWIFT_BUILD_SOURCEKIT_default})
 
 #
@@ -491,6 +497,7 @@ include_directories(BEFORE
 #     ...
 #  endif()
 set(SWIFT_DARWIN_VARIANTS "^(macosx|iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
+set(SWIFT_DARWIN_EMBEDDED_VARIANTS "^(iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
 
 # A convenient list to match Darwin SDKs. Example:
 #  if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)

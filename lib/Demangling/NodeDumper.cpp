@@ -62,8 +62,8 @@ void swift::Demangle::Node::dump() {
 
 void Demangler::dump() {
   for (unsigned Idx = 0; Idx < NodeStack.size(); ++Idx) {
-    fprintf(stderr, "NodeStack[%u] at position %zd:\n", Idx, NodeStack[Idx].Pos);
-    NodeStack[Idx].Node->dump();
+    fprintf(stderr, "NodeStack[%u]:\n", Idx);
+    NodeStack[Idx]->dump();
     fprintf(stderr, "\n");
   }
   fprintf(stderr, "Position = %zd:\n%.*s\n%*s\n", Pos,

@@ -13,13 +13,13 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
 import Glibc
 #elseif os(Windows)
 import ucrt
 #endif
 
-#if !os(Windows) || CYGWIN
+#if !os(Windows)
 public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {
 #if os(Android)
   preconditionFailure("mkstemps doesn't work on Android")
@@ -85,7 +85,7 @@ public struct _stdlib_fd_set {
   }
 }
 
-#if !os(Windows) || CYGWIN
+#if !os(Windows)
 public func _stdlib_select(
   _ readfds: inout _stdlib_fd_set, _ writefds: inout _stdlib_fd_set,
   _ errorfds: inout _stdlib_fd_set, _ timeout: UnsafeMutablePointer<timeval>?
@@ -99,7 +99,7 @@ public func _stdlib_select(
         let readAddr = readfds.baseAddress
         let writeAddr = writefds.baseAddress
         let errorAddr = errorfds.baseAddress
-#if CYGWIN
+#if os(Cygwin)
         typealias fd_set = _types_fd_set
 #endif
         func asFdSetPtr(
@@ -125,10 +125,10 @@ public func _stdlib_select(
 public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
   var fds: [CInt] = [0, 0]
   let ret = fds.withUnsafeMutableBufferPointer { unsafeFds -> CInt in
-#if !os(Windows) || CYGWIN
-    return pipe(unsafeFds.baseAddress)
-#else
+#if os(Windows)
     return _pipe(unsafeFds.baseAddress, 0, 0)
+#else
+    return pipe(unsafeFds.baseAddress)
 #endif
   }
   return (readEnd: fds[0], writeEnd: fds[1], error: ret)

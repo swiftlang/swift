@@ -70,6 +70,10 @@ static SILValue getAccessPathRoot(SILValue Pointer) {
       Pointer = TEAI->getOperand();
     else if (auto SEAI = dyn_cast<StructElementAddrInst>(Pointer))
       Pointer = SEAI->getOperand();
+    else if (auto BAI = dyn_cast<BeginAccessInst>(Pointer))
+      Pointer = BAI->getSource();
+    else if (auto BUAI = dyn_cast<BeginUnpairedAccessInst>(Pointer))
+      Pointer = BUAI->getSource();
     else
       return Pointer;
   }
@@ -100,6 +104,15 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
     auto *Inst = cast<SILInstruction>(Pointer);
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Inst)) {
       Pointer = PBI->getOperand();
+      continue;
+    }
+
+    if (auto *BAI = dyn_cast<BeginAccessInst>(Inst)) {
+      Pointer = BAI->getSource();
+      continue;
+    }
+    if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(Inst)) {
+      Pointer = BUAI->getSource();
       continue;
     }
 
@@ -1018,7 +1031,6 @@ class PredictableMemoryOptimizations : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
-  StringRef getName() override { return "Predictable Memory Opts"; }
 };
 } // end anonymous namespace
 

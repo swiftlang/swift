@@ -147,6 +147,11 @@ class HostSpecificConfiguration(object):
                     test = False
 
             name = deployment_target.name
+
+            for skip_test_arch in invocation.platforms_archs_to_skip_test:
+                if deployment_target.name == skip_test_arch.name:
+                    test = False
+
             if build:
                 # Validation and long tests require building the full standard
                 # library, whereas the other targets can build a slightly
@@ -499,6 +504,7 @@ class BuildScriptInvocation(object):
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
 
         self.platforms_to_skip_test = set()
+        self.platforms_archs_to_skip_test = set()
         if args.skip_test_linux:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
         if args.skip_test_freebsd:
@@ -515,6 +521,9 @@ class BuildScriptInvocation(object):
         if args.skip_test_ios_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator)
+        if args.skip_test_ios_32bit_simulator:
+            self.platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.iOSSimulator.i386)
         if args.skip_test_tvos_host:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
         else:
@@ -682,6 +691,14 @@ class BuildScriptInvocation(object):
         # NOT pass them to build-script-impl.
         if args.enable_asan:
             impl_args += ["--enable-asan"]
+        # If we have lsan, we need to export our suppression list. The actual
+        # passing in of the LSAN flag is done via the normal cmake method. We
+        # do not pass the flag to build-script-impl.
+        if args.enable_lsan:
+            supp_file = os.path.join(SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME,
+                                     "utils",
+                                     "lsan_leaks_suppression_list.txt")
+            os.environ['LSAN_OPTIONS'] = 'suppressions={}'.format(supp_file)
         if args.verbose_build:
             impl_args += ["--verbose-build"]
         if args.install_symroot:
@@ -772,6 +789,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-ios-host"]
         if args.skip_test_ios_simulator:
             impl_args += ["--skip-test-ios-simulator"]
+        if args.skip_test_ios_32bit_simulator:
+            impl_args += ["--skip-test-ios-32bit-simulator"]
         if args.skip_test_tvos_host:
             impl_args += ["--skip-test-tvos-host"]
         if args.skip_test_tvos_simulator:
@@ -1781,6 +1800,11 @@ iterations with -O",
         help="skip testing iOS simulator targets",
         action=arguments.action.optional_bool)
     skip_test_group.add_argument(
+        "--skip-test-ios-32bit-simulator",
+        help="skip testing iOS 32 bit simulator targets",
+        action=arguments.action.optional_bool,
+        default=True)
+    skip_test_group.add_argument(
         "--skip-test-ios-host",
         help="skip testing iOS device targets on the host machine (the phone "
              "itself)",
@@ -2018,6 +2042,10 @@ iterations with -O",
     parser.add_argument(
         "--enable-tsan-runtime",
         help="enable Thread Sanitizer on the swift runtime")
+    parser.add_argument(
+        "--enable-lsan",
+        help="enable Leak Sanitizer for swift tools",
+        action=arguments.action.optional_bool)
 
     parser.add_argument(
         "--compiler-vendor",
@@ -2044,7 +2072,7 @@ iterations with -O",
         "--swift-user-visible-version",
         help="User-visible version of the embedded Swift compiler",
         type=arguments.type.swift_compiler_version,
-        default="3.1",
+        default="4.0",
         metavar="MAJOR.MINOR")
 
     parser.add_argument(
@@ -2254,4 +2282,7 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(1)

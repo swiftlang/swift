@@ -115,7 +115,6 @@ private:
     }
   }
 
-  StringRef getName() override { return "ConditionForwarding"; }
 };
 
 /// Returns true if all instructions of block \p BB are safe to be moved
@@ -150,7 +149,7 @@ static bool hasNoRelevantSideEffects(SILBasicBlock *BB) {
 bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   // The switch_enum argument (an Enum) must be a block argument at the merging
   // point of the condition's destinations.
-  SILArgument *Arg = dyn_cast<SILArgument>(SEI->getOperand());
+  auto *Arg = dyn_cast<SILArgument>(SEI->getOperand());
   if (!Arg)
     return false;
 

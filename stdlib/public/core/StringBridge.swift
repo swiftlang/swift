@@ -25,7 +25,6 @@ func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString
 ) -> _CocoaString {
   let result = _swift_stdlib_CFStringCreateCopy(nil, source) as AnyObject
-  Builtin.release(result)
   return result
 }
 

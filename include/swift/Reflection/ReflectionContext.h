@@ -244,16 +244,12 @@ public:
         if (!getReader().readInteger(ExistentialAddress, &BoxAddress))
           return false;
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
         // Address = BoxAddress + (sizeof(HeapObject) + alignMask) & ~alignMask)
         auto Alignment = InstanceTI->getAlignment();
         auto StartOfValue = BoxAddress + getSizeOfHeapObject();
         // Align.
         StartOfValue += Alignment - StartOfValue % Alignment;
         *OutInstanceAddress = RemoteAddress(StartOfValue);
-#else
-        *OutInstanceAddress = RemoteAddress(BoxAddress);
-#endif
       }
       return true;
     }
@@ -376,6 +372,11 @@ private:
     // solve the problem.
     while (!CaptureTypes.empty()) {
       const TypeRef *OrigCaptureTR = CaptureTypes[0];
+
+      // If we failed to demangle the capture type, we cannot proceed.
+      if (OrigCaptureTR == nullptr)
+        return nullptr;
+
       const TypeRef *SubstCaptureTR = nullptr;
 
       // If we have enough substitutions to make this captured value's

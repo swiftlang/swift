@@ -442,6 +442,5 @@ sil [transparent] [serialized] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@conve
 
 sil [serialized] @_TZFsoi3eeeFTGSqPs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
 
-sil_witness_table C: AnyObject module main
 
 

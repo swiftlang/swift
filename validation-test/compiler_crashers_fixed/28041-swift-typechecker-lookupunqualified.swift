@@ -6,7 +6,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // Test is no longer valid as there is no longer `map` as a free function in Swift 3
-// XFAIL: *
 // DUPLICATE-OF: 26813-generic-enum-tuple-optional-payload.swift
-// RUN: not --crash %target-swift-frontend %s -typecheck
+// RUN: not %target-swift-frontend %s -typecheck
 let a{{map($0

@@ -131,13 +131,13 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
 
 SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
   // tuple_extract(tuple(x, y), 0) -> x
-  if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
+  if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
     return TheTuple->getElement(TEI->getFieldNo());
 
   // tuple_extract(apply([add|sub|...]overflow(x,y)),  0) -> x
   // tuple_extract(apply(checked_trunc(ext(x))), 0) -> x
   if (TEI->getFieldNo() == 0)
-    if (BuiltinInst *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
+    if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
       return simplifyOverflowBuiltin(BI);
 
   return SILValue();
@@ -145,7 +145,7 @@ SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
 
 SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
   // struct_extract(struct(x, y), x) -> x
-  if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand()))
+  if (auto *Struct = dyn_cast<StructInst>(SEI->getOperand()))
     return Struct->getFieldValue(SEI->getField());
 
   return SILValue();
@@ -155,7 +155,7 @@ SILValue
 InstSimplifier::
 visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
   // (unchecked_enum_data (enum payload)) -> payload
-  if (EnumInst *EI = dyn_cast<EnumInst>(UEDI->getOperand())) {
+  if (auto *EI = dyn_cast<EnumInst>(UEDI->getOperand())) {
     if (EI->getElement() != UEDI->getElement())
       return SILValue();
 
@@ -570,8 +570,8 @@ static SILValue simplifyBinaryWithOverflow(BuiltinInst *BI,
   const SILValue &Op1 = Args[0];
   const SILValue &Op2 = Args[1];
 
-  IntegerLiteralInst *IntOp1 = dyn_cast<IntegerLiteralInst>(Op1);
-  IntegerLiteralInst *IntOp2 = dyn_cast<IntegerLiteralInst>(Op2);
+  auto *IntOp1 = dyn_cast<IntegerLiteralInst>(Op1);
+  auto *IntOp2 = dyn_cast<IntegerLiteralInst>(Op2);
 
   // If both ops are not constants, we cannot do anything.
   // FIXME: Add cases where we can do something, eg, (x - x) -> 0

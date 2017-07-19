@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
 
+import Swift
 import Builtin
 
 struct UInt {
@@ -225,16 +226,27 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-NEXT: return
 }
 
-sil @testFoldingIntBinaryPredicates : $@convention(thin) () -> () {
-bb0:
+sil @testFoldingIntBinaryPredicates : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
   %1 = integer_literal $Builtin.Int1, 1
   %2 = integer_literal $Builtin.Int1, 0
+  // This is Int32.Max
+  %3 = integer_literal $Builtin.Int32, 2147483647 
   %4 = builtin "cmp_eq_Int1"(%1 : $Builtin.Int1, %2 : $Builtin.Int1) : $Builtin.Int1
   %11 = integer_literal $Builtin.Int32, 21
   %12 = integer_literal $Builtin.Int32, 12
   %14 = builtin "cmp_ne_Int32"(%11 : $Builtin.Int32, %12 : $Builtin.Int32) : $Builtin.Int1
   %16 = builtin "cmp_sgt_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
   %17 = builtin "cmp_ult_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
+  // Int32.Max < x
+  %18 = builtin "cmp_slt_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  // x > Int32.Max
+  %19 = builtin "cmp_sgt_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  // Int32.Max >= x
+  %20 = builtin "cmp_sge_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  // x <= Int32.Max
+  %21 = builtin "cmp_sle_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+
   %5 = tuple ()
   return %5 : $()
 // CHECK-LABEL: sil @testFoldingIntBinaryPredicates
@@ -242,6 +254,10 @@ bb0:
 // CHECK-NEXT: integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
@@ -290,6 +306,115 @@ bb0:
 // CHECK_NEXT: return %2 : $Builtin.Int64
 }
 
+// For any x of the same size as Int.max and n>=1 , (x>>n) is always <= Int.max,
+// that is (x>>n) <= Int.max and Int.max >= (x>>n) are true.
+// At the same time (x>>n) > Int.max and Int.max < (x>>n) is always false.
+sil @fold_cmp_lshr_with_IntMax : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 9223372036854775807 
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = integer_literal $Builtin.Int64, -2
+
+  // x >> 1
+  %9 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+
+  %10 = builtin "cmp_sge_Int64"(%1 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int1
+  %11 = builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int1
+  %12 = builtin "cmp_sle_Int64"(%9 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %13 = builtin "cmp_ule_Int64"(%9 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  %20 = builtin "cmp_slt_Int64"(%1 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int1
+  %21 = builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int1
+  %22 = builtin "cmp_sgt_Int64"(%9 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %23 = builtin "cmp_ugt_Int64"(%9 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  // x >> 3
+  %29 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int64
+
+  %30 = builtin "cmp_sge_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %31 = builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %32 = builtin "cmp_sle_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %33 = builtin "cmp_ule_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  %40 = builtin "cmp_slt_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %41 = builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %42 = builtin "cmp_sgt_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %43 = builtin "cmp_ugt_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  // Check that this peephole does not happen if the shift amount is < 1
+
+  // x >> 0 (i.e. x shifted by something < 1)
+  %59 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int64
+
+  %60 = builtin "cmp_sge_Int64"(%1 : $Builtin.Int64, %59 : $Builtin.Int64) : $Builtin.Int1
+  %61 = builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %59 : $Builtin.Int64) : $Builtin.Int1
+  %62 = builtin "cmp_sle_Int64"(%59 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %63 = builtin "cmp_ule_Int64"(%59 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  %70 = builtin "cmp_slt_Int64"(%1 : $Builtin.Int64, %59 : $Builtin.Int64) : $Builtin.Int1
+  %71 = builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %59 : $Builtin.Int64) : $Builtin.Int1
+  %72 = builtin "cmp_sgt_Int64"(%59 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %73 = builtin "cmp_ugt_Int64"(%59 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  // x >> -2 (i.e. x shifted by something < 1)
+  %79 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64
+
+  %80 = builtin "cmp_sge_Int64"(%1 : $Builtin.Int64, %79 : $Builtin.Int64) : $Builtin.Int1
+  %81 = builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %79 : $Builtin.Int64) : $Builtin.Int1
+  %82 = builtin "cmp_sle_Int64"(%79 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %83 = builtin "cmp_ule_Int64"(%79 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  %90 = builtin "cmp_slt_Int64"(%1 : $Builtin.Int64, %79 : $Builtin.Int64) : $Builtin.Int1
+  %91 = builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %79 : $Builtin.Int64) : $Builtin.Int1
+  %92 = builtin "cmp_sgt_Int64"(%79 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %93 = builtin "cmp_ugt_Int64"(%79 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  return %4 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_cmp_lshr_with_IntMax
+// CHECK: bb0
+// CHECK-NEXT: integer_literal $Builtin.Int64, 9223372036854775807 
+// CHECK-NEXT: integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: integer_literal $Builtin.Int64, -2
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "lshr_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %20 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: builtin "cmp_ule_Int64"(%20 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %20 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "cmp_ugt_Int64"(%20 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: builtin "lshr_Int64"(%0 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int64
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: builtin "cmp_ule_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "cmp_ugt_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: return %2 : $Builtin.Int64
+}
+
 // fold_shifts
 sil @fold_shifts : $@convention(thin) () -> Builtin.Int64 {
 bb0:
@@ -314,6 +439,53 @@ bb0:
 // CHECK-NEXT: %4 = integer_literal $Builtin.Int64, 32
 // CHECK-NEXT: return %4 : $Builtin.Int64
 }
+
+// Fold x < 0 into false, if x is known to be a result of an unsigned
+// operation with overflow checks enabled.
+// At the same time x >= 0 is always true under the same conditions.
+sil @fold_unsigned_op_with_overflow_lt_zero : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+ %zero  = integer_literal $Builtin.Int64, 0
+ %2 = integer_literal $Builtin.Int1, -1
+
+ %uadd_result = builtin "uadd_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2: $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+ %uadd_with_overflow_result = tuple_extract %uadd_result : $(Builtin.Int64, Builtin.Int1), 0
+ %uadd_overflow = tuple_extract %uadd_result : $(Builtin.Int64, Builtin.Int1), 1
+ cond_fail %uadd_overflow : $Builtin.Int1
+ %compare_slt_uadd_result = builtin "cmp_slt_Int64"(%uadd_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+ %compare_sge_uadd_result = builtin "cmp_sge_Int64"(%uadd_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+
+
+ %usub_result = builtin "usub_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2: $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+ %usub_with_overflow_result = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 0
+ %usub_overflow = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 1
+ cond_fail %uadd_overflow : $Builtin.Int1
+ %compare_slt_usub_result = builtin "cmp_slt_Int64"(%usub_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+ %compare_sge_usub_result = builtin "cmp_sge_Int64"(%usub_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+
+
+ %umul_result = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2: $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+ %umul_with_overflow_result = tuple_extract %umul_result : $(Builtin.Int64, Builtin.Int1), 0
+ %umul_overflow = tuple_extract %umul_result : $(Builtin.Int64, Builtin.Int1), 1
+ cond_fail %umul_overflow : $Builtin.Int1
+ %compare_slt_umul_result = builtin "cmp_slt_Int64"(%umul_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+ %compare_sge_umul_result = builtin "cmp_sge_Int64"(%umul_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+
+ return %uadd_with_overflow_result : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_unsigned_op_with_overflow_lt_zero
+// CHECK: builtin "uadd_with_overflow_Int64"
+// CHECK: integer_literal $Builtin.Int1, 0 
+// CHECK: integer_literal $Builtin.Int1, -1 
+// CHECK: builtin "usub_with_overflow_Int64"
+// CHECK: integer_literal $Builtin.Int1, 0 
+// CHECK: integer_literal $Builtin.Int1, -1 
+// CHECK: builtin "umul_with_overflow_Int64"
+// CHECK: integer_literal $Builtin.Int1, 0 
+// CHECK: integer_literal $Builtin.Int1, -1 
+// CHECK-NEXT: return {{.*}}$Builtin.Int64
+}
+
 
 // fold_float_operations
 sil @fold_float_operations : $@convention(thin) () -> Builtin.FPIEEE64 {
@@ -520,4 +692,255 @@ bb2:
   dealloc_stack %32: $*AnObject
   dealloc_stack %31 : $*AnObject
   br bb1
+}
+
+public protocol P {
+}
+
+public protocol PP {
+}
+
+struct X : P {
+}
+
+struct Y<T>: P {
+  var x : T
+}
+
+class Z: P {
+  init()
+}
+
+// Do not optimize casts to unrelated protocols.
+// CHECK-LABEL: sil @dont_replace_unconditional_check_cast_addr_for_type_to_unrelated_existential
+// CHECK: unconditional_checked_cast_addr
+// CHECK: end sil function 'dont_replace_unconditional_check_cast_addr_for_type_to_unrelated_existential'
+sil @dont_replace_unconditional_check_cast_addr_for_type_to_unrelated_existential : $@convention(thin) (@in X) -> (@out PP) {
+bb0(%0 : $*PP, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to PP in %0 : $*PP
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Do not optimize casts between existentials.
+// CHECK-LABEL: sil @dont_replace_unconditional_check_cast_addr_for_existential_to_existential
+// CHECK: unconditional_checked_cast_addr
+// CHECK: end sil function 'dont_replace_unconditional_check_cast_addr_for_existential_to_existential'
+sil @dont_replace_unconditional_check_cast_addr_for_existential_to_existential : $@convention(thin) (@in PP) -> (@out P) {
+bb0(%0 : $*P, %1 : $*PP):
+  unconditional_checked_cast_addr take_always PP in %1 : $*PP to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Check that an unconditional_checked_cast_addr from a non-existential loadable type to a protocol
+// can be replaced by a more efficient code sequence if it is statitcally known that this
+// type conforms to this protocol.
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential
+// CHECK-NOT: store
+// CHECK: copy_addr
+// CHECK-NOT: destroy_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil @replace_unconditional_check_cast_addr_for_type_to_existential : $@convention(thin) (@in X) -> (@out P) {
+bb0(%0 : $*P, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_class_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil @replace_unconditional_check_cast_addr_for_class_to_existential : $@convention(thin) (@in Z) -> (@out P) {
+bb0(%0 : $*P, %1 : $*Z):
+  unconditional_checked_cast_addr take_always Z in %1 : $*Z to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_archetype_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil @replace_unconditional_check_cast_addr_for_archetype_to_existential : $@convention(thin) <X:P> (@in X) -> (@out P) {
+bb0(%0 : $*P, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_generic_type_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil @replace_unconditional_check_cast_addr_for_generic_type_to_existential : $@convention(thin) <X:P> (@in Y<X>) -> (@out P) {
+bb0(%0 : $*P, %1 : $*Y<X>):
+  unconditional_checked_cast_addr take_always Y<X> in %1 : $*Y<X> to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+protocol Q : class {
+}
+
+class V : Q {
+  init()
+}
+
+class W<T>: Q {
+  var x : T
+  init()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_class_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_class_existential : $@convention(thin) (@in V) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*V):
+  unconditional_checked_cast_addr take_always V in %1 : $*V to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_class_existential_copy_on_success
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_class_existential_copy_on_success : $@convention(thin) (@in V) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*V):
+  unconditional_checked_cast_addr copy_on_success V in %1 : $*V to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_archetype_to_class_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_archetype_to_class_existential : $@convention(thin) <X:Q> (@in X) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_to_class_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_to_class_existential : $@convention(thin) <X:Q> (@in W<X>) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*W<X>):
+  unconditional_checked_cast_addr take_always W<X> in %1 : $*W<X> to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+public protocol MyError : Error {
+}
+
+public class E1 : MyError {
+  init()
+}
+
+public class E2<T> : MyError {
+  init()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_myerror_existential 
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_myerror_existential : $@convention(thin) (@in E1) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*E1):
+  unconditional_checked_cast_addr take_always E1 in %1 : $*E1 to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_myerror_existential_copy_on_success
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// There should be no [take] in copy_addr! 
+// CHECK: copy_addr %{{.}} to [initialization]
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_myerror_existential_copy_on_success : $@convention(thin) (@in E1) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*E1):
+  unconditional_checked_cast_addr copy_on_success E1 in %1 : $*E1 to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_archetype_to_myerror_existentia
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_archetype_to_myerror_existential : $@convention(thin) <X:MyError> (@in X) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_to_myerror_existential 
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_to_myerror_existential : $@convention(thin) <X:MyError> (@in E2<X>) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*E2<X>):
+  unconditional_checked_cast_addr take_always E2<X> in %1 : $*E2<X> to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Check casts to Error.
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_error_existential 
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: [[ALLOC_BOX:%.*]] = alloc_existential_box $Error, $E1
+// CHECK: [[PROJ:%.*]] = project_existential_box $E1 in [[ALLOC_BOX]] : $Error
+// CHECK: [[VAL:%.*]] = load %1 : $*E1
+// CHECK: store [[VAL]] to [[PROJ]]
+// CHECK: store [[ALLOC_BOX]] to %0 : $*Error
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_error_existential : $@convention(thin) (@in E1) -> (@out Error) {
+bb0(%0 : $*Error, %1 : $*E1):
+  unconditional_checked_cast_addr take_always E1 in %1 : $*E1 to Error in %0 : $*Error
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Check casts to Error.
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_error_existential_copy_on_success 
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: [[ALLOC_BOX:%.*]] = alloc_existential_box $Error, $E1
+// CHECK: [[PROJ:%.*]] = project_existential_box $E1 in [[ALLOC_BOX]] : $Error
+// CHECK: [[VAL:%.*]] = load %1 : $*E1
+// CHECK: retain_value [[VAL]]
+// CHECK: store [[VAL]] to [[PROJ]]
+// CHECK: store [[ALLOC_BOX]] to %0 : $*Error
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_error_existential_copy_on_success : $@convention(thin) (@in E1) -> (@out Error) {
+bb0(%0 : $*Error, %1 : $*E1):
+  unconditional_checked_cast_addr copy_on_success E1 in %1 : $*E1 to Error in %0 : $*Error
+  %2 = tuple ()
+  return %2 : $()
 }

@@ -58,6 +58,10 @@ llvm::cl::opt<bool>
 SILFullDemangle("sil-full-demangle", llvm::cl::init(false),
                 llvm::cl::desc("Fully demangle symbol names in SIL output"));
 
+llvm::cl::opt<bool>
+SILPrintDebugInfo("sil-print-debuginfo", llvm::cl::init(false),
+                llvm::cl::desc("Include debug info in SIL output"));
+
 static std::string demangleSymbol(StringRef Name) {
   if (SILFullDemangle)
     return Demangle::demangleSymbolAsString(Name);
@@ -127,7 +131,7 @@ raw_ostream &operator<<(raw_ostream &OS, SILPrintContext::ID i) {
   i.print(OS);
   return OS;
 }
-}
+} // namespace swift
 
 /// IDAndType - Used when a client wants to print something like "%0 : $Int".
 struct SILValuePrinterInfo {
@@ -233,10 +237,13 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
   printFullContext(Decl->getDeclContext(), OS);
   assert(Decl->hasName());
 
-  if (Decl->isOperator())
-    OS << '"' << Decl->getName() << '"';
-  else
-    OS << Decl->getName();
+  if (Decl->isOperator()) {
+    OS << '"' << Decl->getBaseName() << '"';
+  } else if (Decl->getBaseName() == "subscript") {
+    OS << '`' << Decl->getBaseName() << '`';
+  } else {
+    OS << Decl->getBaseName();
+  }
 }
 
 /// SILDeclRef uses sigil "#" and prints the fully qualified dotted path.
@@ -326,6 +333,8 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << "!propertyinit";
     break;
   }
+
+  auto uncurryLevel = getUncurryLevel();
   if (uncurryLevel != 0)
     OS << (isDot ? '.' : '!')  << uncurryLevel;
 
@@ -763,14 +772,7 @@ public:
     }
   }
 
-  void print(SILValue V, bool PrintScopes = false) {
-    // Lazily print any debug locations used in this value.
-    if (PrintScopes)
-      if (auto *I = dyn_cast<SILInstruction>(V)) {
-        auto &SM = I->getModule().getASTContext().SourceMgr;
-        printDebugScope(I->getDebugScope(), SM);
-      }
-
+  void print(SILValue V) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(V))
       *this << "  // function_ref "
             << demangleSymbol(FRI->getReferencedFunction()->getName())
@@ -793,9 +795,11 @@ public:
 
     bool printedSlashes = false;
     if (auto *I = dyn_cast<SILInstruction>(V)) {
-      auto &SM = I->getModule().getASTContext().SourceMgr;
-      printDebugLocRef(I->getLoc(), SM);
-      printDebugScopeRef(I->getDebugScope(), SM);
+      if (Ctx.printDebugInfo()) {
+        auto &SM = I->getModule().getASTContext().SourceMgr;
+        printDebugLocRef(I->getLoc(), SM);
+        printDebugScopeRef(I->getDebugScope(), SM);
+      }
       printedSlashes = printTypeDependentOperands(I);
     }
 
@@ -954,6 +958,7 @@ public:
     // Should not apply to callees.
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
@@ -1027,6 +1032,22 @@ public:
   }
 
   void visitStringLiteralInst(StringLiteralInst *SLI) {
+    *this << getStringEncodingName(SLI->getEncoding())
+          << QuotedString(SLI->getValue());
+  }
+
+  static StringRef
+  getStringEncodingName(ConstStringLiteralInst::Encoding kind) {
+    switch (kind) {
+    case ConstStringLiteralInst::Encoding::UTF8:
+      return "utf8 ";
+    case ConstStringLiteralInst::Encoding::UTF16:
+      return "utf16 ";
+    }
+    llvm_unreachable("bad string literal encoding");
+  }
+
+  void visitConstStringLiteralInst(ConstStringLiteralInst *SLI) {
     *this << getStringEncodingName(SLI->getEncoding())
           << QuotedString(SLI->getValue());
   }
@@ -1341,6 +1362,14 @@ public:
 
   void visitReleaseValueInst(ReleaseValueInst *I) { visitRefCountingInst(I); }
 
+  void visitRetainValueAddrInst(RetainValueAddrInst *I) {
+    visitRefCountingInst(I);
+  }
+
+  void visitReleaseValueAddrInst(ReleaseValueAddrInst *I) {
+    visitRefCountingInst(I);
+  }
+
   void visitAutoreleaseValueInst(AutoreleaseValueInst *I) {
     visitRefCountingInst(I);
   }
@@ -1496,14 +1525,17 @@ public:
   void visitOpenExistentialBoxInst(OpenExistentialBoxInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
-  void visitOpenExistentialOpaqueInst(OpenExistentialOpaqueInst *OI) {
+  void visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *OI) {
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+  }
+  void visitOpenExistentialValueInst(OpenExistentialValueInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType();
   }
-  void visitInitExistentialOpaqueInst(InitExistentialOpaqueInst *AEI) {
+  void visitInitExistentialValueInst(InitExistentialValueInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
   }
@@ -1521,7 +1553,7 @@ public:
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
     *this << getIDAndType(DEI->getOperand());
   }
-  void visitDeinitExistentialOpaqueInst(DeinitExistentialOpaqueInst *DEI) {
+  void visitDeinitExistentialValueInst(DeinitExistentialValueInst *DEI) {
     *this << getIDAndType(DEI->getOperand());
   }
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEI) {
@@ -1625,6 +1657,17 @@ public:
   }
   void visitEndAccessInst(EndAccessInst *EAI) {
     *this << (EAI->isAborting() ? "[abort] " : "")
+          << getIDAndType(EAI->getOperand());
+  }
+  void visitBeginUnpairedAccessInst(BeginUnpairedAccessInst *BAI) {
+    *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
+          << getSILAccessEnforcementName(BAI->getEnforcement())
+          << "] " << getIDAndType(BAI->getSource()) << ", "
+          << getIDAndType(BAI->getBuffer());
+  }
+  void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {
+    *this << (EAI->isAborting() ? "[abort] " : "")
+          << '[' << getSILAccessEnforcementName(EAI->getEnforcement()) << "] "
           << getIDAndType(EAI->getOperand());
   }
 
@@ -1755,6 +1798,102 @@ public:
     *this << ", " << Ctx.getID(CBI->getFalseBB());
     printBranchArgs(CBI->getFalseArgs());
   }
+  
+  void visitKeyPathInst(KeyPathInst *KPI) {
+    *this << KPI->getType() << ", ";
+    
+    auto pattern = KPI->getPattern();
+    
+    if (pattern->getGenericSignature()) {
+      pattern->getGenericSignature()->print(PrintState.OS);
+      *this << ' ';
+    }
+    
+    *this << "(";
+    
+    if (!pattern->getObjCString().empty())
+      *this << "objc \"" << pattern->getObjCString() << "\"; ";
+    
+    *this << "root $" << KPI->getPattern()->getRootType();
+    
+    for (auto &component : pattern->getComponents()) {
+      *this << "; ";
+      
+      switch (auto kind = component.getKind()) {
+      case KeyPathPatternComponent::Kind::StoredProperty: {
+        auto prop = component.getStoredPropertyDecl();
+        *this << "stored_property #";
+        printValueDecl(prop, PrintState.OS);
+        *this << " : $" << component.getComponentType();
+        break;
+      }
+      case KeyPathPatternComponent::Kind::GettableProperty:
+      case KeyPathPatternComponent::Kind::SettableProperty: {
+        *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
+                    ? "gettable_property $" : "settable_property $")
+              << component.getComponentType() << ", "
+              << " id ";
+        auto id = component.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto declRef = id.getDeclRef();
+          *this << declRef << " : "
+                << declRef.getDecl()->getInterfaceType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Function: {
+          id.getFunction()->printName(PrintState.OS);
+          *this << " : " << id.getFunction()->getLoweredType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Property: {
+          *this << "##";
+          printValueDecl(id.getProperty(), PrintState.OS);
+          break;
+        }
+        }
+        *this << ", getter ";
+        component.getComputedPropertyGetter()->printName(PrintState.OS);
+        *this << " : "
+              << component.getComputedPropertyGetter()->getLoweredType();
+        if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
+          *this << ", setter ";
+          component.getComputedPropertySetter()->printName(PrintState.OS);
+          *this << " : "
+                << component.getComputedPropertySetter()->getLoweredType();
+        }
+        assert(component.getComputedPropertyIndices().empty()
+               && "todo");
+        break;
+      }
+      case KeyPathPatternComponent::Kind::OptionalWrap:
+      case KeyPathPatternComponent::Kind::OptionalChain:
+      case KeyPathPatternComponent::Kind::OptionalForce: {
+        switch (kind) {
+        case KeyPathPatternComponent::Kind::OptionalWrap:
+          *this << "optional_wrap : $";
+          break;
+        case KeyPathPatternComponent::Kind::OptionalChain:
+          *this << "optional_chain : $";
+          break;
+        case KeyPathPatternComponent::Kind::OptionalForce:
+          *this << "optional_force : $";
+          break;
+        default:
+          llvm_unreachable("out of sync");
+        }
+        *this << component.getComponentType();
+        break;
+      }
+      }
+    }
+    
+    *this << ')';
+    if (!KPI->getSubstitutions().empty()) {
+      *this << ' ';
+      printSubstitutions(KPI->getSubstitutions());
+    }
+  }
 };
 } // end anonymous namespace
 
@@ -1837,14 +1976,16 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
 
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(SILPrintContext &PrintCtx) const {
-  auto &SM = getModule().getASTContext().SourceMgr;
   llvm::raw_ostream &OS = PrintCtx.OS();
-  for (auto &BB : *this)
-    for (auto &I : BB) {
-      SILPrinter P(PrintCtx);
-      P.printDebugScope(I.getDebugScope(), SM);
-    }
-  OS << "\n";
+  if (PrintCtx.printDebugInfo()) {
+    auto &SM = getModule().getASTContext().SourceMgr;
+    for (auto &BB : *this)
+      for (auto &I : BB) {
+        SILPrinter P(PrintCtx);
+        P.printDebugScope(I.getDebugScope(), SM);
+      }
+    OS << "\n";
+  }
 
   OS << "// " << demangleSymbol(getName()) << '\n';
   OS << "sil ";
@@ -1987,6 +2128,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
 void SILGlobalVariable::dump(bool Verbose) const {
   print(llvm::errs(), Verbose);
+}
+void SILGlobalVariable::dump() const {
+   dump(false);
 }
 
 void SILGlobalVariable::printName(raw_ostream &OS) const {
@@ -2333,7 +2477,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     case MissingOptional: {
       // optional requirement 'declref': <<not present>>
       OS << "optional requirement '"
-         << witness.getMissingOptionalWitness().Witness->getName()
+         << witness.getMissingOptionalWitness().Witness->getBaseName()
          << "': <<not present>>";
       break;
     }
@@ -2476,6 +2620,16 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 //===----------------------------------------------------------------------===//
 // SILPrintContext members
 //===----------------------------------------------------------------------===//
+
+SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
+                bool SortedSIL) :
+  OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
+  DebugInfo(SILPrintDebugInfo) { }
+
+SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
+                                 bool SortedSIL, bool DebugInfo) :
+  OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
+  DebugInfo(DebugInfo) { }
 
 SILPrintContext::SILPrintFunctionContext &
 SILPrintContext::getFuncContext(const SILFunction *F) {

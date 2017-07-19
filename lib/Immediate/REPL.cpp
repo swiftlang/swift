@@ -224,7 +224,7 @@ public:
   
   void print(llvm::raw_ostream &out) const override;
 };
-}
+} // end anonymous namespace
 
 /// EditLine wrapper that implements the user interface behavior for reading
 /// user input to the REPL. All of its methods must be usable from a separate
@@ -953,8 +953,9 @@ public:
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
     std::string CPU;
+    std::string Triple;
     std::vector<std::string> Features;
-    std::tie(TargetOpt, CPU, Features)
+    std::tie(TargetOpt, CPU, Features, Triple)
       = getIRTargetOptions(IRGenOpts, CI.getASTContext());
     
     builder.setRelocationModel(llvm::Reloc::PIC_);

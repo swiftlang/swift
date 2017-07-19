@@ -169,7 +169,7 @@ class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
 // <rdar://problem/22459135> error: 'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'
 func r22459135() {
   func h<S : Sequence>(_ sequence: S) -> S.Iterator.Element
-    where S.Iterator.Element : Integer {
+    where S.Iterator.Element : FixedWidthInteger {
     return 0
   }
 
@@ -205,7 +205,7 @@ var _ : Int = R24267414.foo() // expected-error {{generic parameter 'T' could no
 
 
 // https://bugs.swift.org/browse/SR-599
-func SR599<T: Integer>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599'}}
+func SR599<T: FixedWidthInteger>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599()'}}
 _ = SR599()         // expected-error {{generic parameter 'T' could not be inferred}}
 
 
@@ -225,16 +225,16 @@ func test9215114<T: P19215114, U: Q19215114>(_ t: T) -> (U) -> () {
 }
 
 // <rdar://problem/21718970> QoI: [uninferred generic param] cannot invoke 'foo' with an argument list of type '(Int)'
-class Whatever<A: IntegerArithmetic, B: IntegerArithmetic> {  // expected-note 2 {{'A' declared as parameter to type 'Whatever'}}
+class Whatever<A: Numeric, B: Numeric> {  // expected-note 2 {{'A' declared as parameter to type 'Whatever'}}
   static func foo(a: B) {}
   
   static func bar() {}
 
 }
-Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: IntegerArithmetic#>, <#B: IntegerArithmetic#>>}}
+Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
 
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
-Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: IntegerArithmetic#>, <#B: IntegerArithmetic#>>}}
+Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
 
 // <rdar://problem/27515965> Type checker doesn't enforce same-type constraint if associated type is Any
 protocol P27515965 {
@@ -260,7 +260,7 @@ protocol SubProto: BaseProto {}
   func copy() -> Any
 }
 
-struct FullyGeneric<Foo> {} // expected-note 6 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 6 {{generic type 'FullyGeneric' declared here}}
+struct FullyGeneric<Foo> {} // expected-note 11 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic type 'FullyGeneric' declared here}}
 
 struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic type 'AnyClassBound' declared here}}
 struct AnyClassBound2<Foo> where Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound2'}}
@@ -299,11 +299,11 @@ func testFixIts() {
   _ = FullyGeneric<Any>()
 
   _ = AnyClassBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<AnyObject>}}
-  _ = AnyClassBound<Any>() // expected-error {{type 'Any' does not conform to protocol 'AnyObject'}}
+  _ = AnyClassBound<Any>() // expected-error {{'Any' is not convertible to 'AnyObject'}}
   _ = AnyClassBound<AnyObject>()
 
   _ = AnyClassBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{21-21=<AnyObject>}}
-  _ = AnyClassBound2<Any>() // expected-error {{type 'Any' does not conform to protocol 'AnyObject'}}
+  _ = AnyClassBound2<Any>() // expected-error {{'Any' is not convertible to 'AnyObject'}}
   _ = AnyClassBound2<AnyObject>()
 
   _ = ProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{17-17=<<#Foo: SubProto#>>}}
@@ -324,8 +324,8 @@ func testFixIts() {
   _ = ProtosBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{19-19=<<#Foo: NSCopyish & SubProto#>>}}
   _ = ProtosBound3() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{19-19=<<#Foo: NSCopyish & SubProto#>>}}
 
-  _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: AnyObject & SubProto#>>}}
-  _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: AnyObject & SubProto#>>}}
+  _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: SubProto & AnyObject#>>}}
+  _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: SubProto & AnyObject#>>}}
 
   _ = ClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{25-25=<<#Foo: X & SubProto#>>}}
 
@@ -369,21 +369,24 @@ func testFixItTypePosition() {
 }
 
 func testFixItNested() {
-  _ = Array<FullyGeneric>() // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{25-25=<Any>}}
+  _ = Array<FullyGeneric>() // expected-error {{generic parameter 'Foo' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{25-25=<Any>}}
   _ = [FullyGeneric]() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any>}}
 
-  _ = FullyGeneric<FullyGeneric>() // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{32-32=<Any>}}
+  _ = FullyGeneric<FullyGeneric>() // expected-error {{generic parameter 'Foo' could not be inferred}}
 
-  _ = Pair<
-    FullyGeneric, // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{17-17=<Any>}}
+  _ = Pair< // expected-error {{generic parameter 'Foo' could not be inferred}}
+    FullyGeneric,
+    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
     FullyGeneric // FIXME: We could diagnose both of these, but we don't.
   >()
-  _ = Pair<
+  _ = Pair< // expected-error {{generic parameter 'Foo' could not be inferred}}
     FullyGeneric<Any>,
-    FullyGeneric // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{17-17=<Any>}}
+    FullyGeneric
   >()
-  _ = Pair<
-    FullyGeneric, // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{17-17=<Any>}}
+  _ = Pair< // expected-error {{generic parameter 'Foo' could not be inferred}}
+    FullyGeneric,
+    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
     FullyGeneric<Any>
   >()
 
@@ -442,4 +445,36 @@ func sr3525_3<T>(t: SR_3525<T>) {
 
 class testStdlibType {
   let _: Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+}
+
+// rdar://problem/32697033
+protocol P3 {
+    associatedtype InnerAssoc
+}
+
+protocol P4 {
+    associatedtype OuterAssoc: P3
+}
+
+struct S3 : P3 {
+  typealias InnerAssoc = S4
+}
+
+struct S4: P4 {
+  typealias OuterAssoc = S3
+}
+
+public struct S5 {
+    func f<Model: P4, MO> (models: [Model])
+        where Model.OuterAssoc == MO, MO.InnerAssoc == Model {
+    }
+
+    func g<MO, Model: P4> (models: [Model])
+        where Model.OuterAssoc == MO, MO.InnerAssoc == Model {
+    }
+
+    func f(arr: [S4]) {
+        f(models: arr)
+        g(models: arr)
+    }
 }

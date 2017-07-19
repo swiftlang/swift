@@ -33,7 +33,7 @@ namespace swift {
   class DeclContext;
   class GenericEnvironment;
   class IdentTypeRepr;
-  class ValueDecl;
+  class TypeDecl;
 
 enum class TypeReprKind : uint8_t {
 #define TYPEREPR(ID, PARENT) ID,
@@ -63,9 +63,11 @@ class alignas(8) TypeRepr {
   class TupleTypeReprBitfields {
     friend class TupleTypeRepr;
     unsigned : NumTypeReprBits;
-    // HasNames, HasLabels?
-    unsigned NameStatus : 2;
-    // Whether this tuple has '...' and its position.
+
+    /// The number of elements contained.
+    unsigned NumElements : 16;
+
+    /// Whether this tuple has '...' and its position.
     unsigned HasEllipsis : 1;
   };
 
@@ -243,11 +245,15 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
   ///
   /// The initial parsed representation is always an identifier, and
   /// name binding will resolve this to a specific declaration.
-  llvm::PointerUnion<Identifier, ValueDecl *> IdOrDecl;
+  llvm::PointerUnion<Identifier, TypeDecl *> IdOrDecl;
+
+  /// The declaration context from which the bound declaration was
+  /// found. only valid if IdOrDecl is a TypeDecl.
+  DeclContext *DC;
 
 protected:
   ComponentIdentTypeRepr(TypeReprKind K, SourceLoc Loc, Identifier Id)
-    : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id) {}
+    : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
 
 public:
   SourceLoc getIdLoc() const { return Loc; }
@@ -258,11 +264,19 @@ public:
   void overwriteIdentifier(Identifier newId) { IdOrDecl = newId; }
 
   /// Return true if this has been name-bound already.
-  bool isBound() const { return IdOrDecl.is<ValueDecl *>(); }
+  bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
 
-  ValueDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<ValueDecl*>(); }
+  TypeDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<TypeDecl*>(); }
 
-  void setValue(ValueDecl *VD) { IdOrDecl = VD; }
+  DeclContext *getDeclContext() const {
+    assert(isBound());
+    return DC;
+  }
+
+  void setValue(TypeDecl *TD, DeclContext *DC) {
+    IdOrDecl = TD;
+    this->DC = DC;
+  }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent ||
@@ -572,6 +586,22 @@ private:
   friend class TypeRepr;
 };
 
+/// \brief A parsed element within a tuple type.
+struct TupleTypeReprElement {
+  Identifier Name;
+  SourceLoc NameLoc;
+  Identifier SecondName;
+  SourceLoc SecondNameLoc;
+  SourceLoc UnderscoreLoc;
+  SourceLoc ColonLoc;
+  SourceLoc InOutLoc;
+  TypeRepr *Type;
+  SourceLoc TrailingCommaLoc;
+
+  TupleTypeReprElement() {}
+  TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
+};
+
 /// \brief A tuple type.
 /// \code
 ///   (Foo, Bar)
@@ -579,121 +609,113 @@ private:
 ///   (_ x: Foo)
 /// \endcode
 class TupleTypeRepr final : public TypeRepr,
-    private llvm::TrailingObjects<TupleTypeRepr, TypeRepr*, Identifier,
-                                  SourceLoc, std::pair<SourceLoc, unsigned>> {
+    private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement,
+                                  std::pair<SourceLoc, unsigned>> {
   friend TrailingObjects;
   typedef std::pair<SourceLoc, unsigned> SourceLocAndIdx;
 
-  unsigned NumElements;
   SourceRange Parens;
-
-  enum {
-    NotNamed = 0,
-    HasNames = 1,
-    HasLabels = 2
-  };
   
-  size_t numTrailingObjects(OverloadToken<TypeRepr *>) const {
-    return NumElements;
-  }
-  size_t numTrailingObjects(OverloadToken<Identifier>) const {
-    return TupleTypeReprBits.NameStatus >= HasNames ? NumElements : 0;
-  }
-  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
-    switch (TupleTypeReprBits.NameStatus) {
-    case NotNamed: return 0;
-    case HasNames: return NumElements;
-    case HasLabels: return NumElements + NumElements;
-    }
-    llvm_unreachable("all cases should have been handled");
+  size_t numTrailingObjects(OverloadToken<TupleTypeReprElement>) const {
+    return TupleTypeReprBits.NumElements;
   }
 
-  TupleTypeRepr(ArrayRef<TypeRepr *> Elements, SourceRange Parens,
-                ArrayRef<Identifier> ElementNames,
-                ArrayRef<SourceLoc> ElementNameLocs,
-                ArrayRef<SourceLoc> underscoreLocs,
-                SourceLoc Ellipsis, unsigned EllipsisIdx);
+  TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
+                SourceRange Parens, SourceLoc Ellipsis, unsigned EllipsisIdx);
+
 public:
-
-  unsigned getNumElements() const { return NumElements; }
+  unsigned getNumElements() const { return TupleTypeReprBits.NumElements; }
   bool hasElementNames() const {
-    return TupleTypeReprBits.NameStatus >= HasNames;
-  }
-  bool hasUnderscoreLocs() const {
-    return TupleTypeReprBits.NameStatus == HasLabels;
-  }
-
-  ArrayRef<TypeRepr *> getElements() const {
-    return { getTrailingObjects<TypeRepr *>(), NumElements };
+    for (auto &Element : getElements()) {
+      if (Element.NameLoc.isValid()) {
+        return true;
+      }
+    }
+    return false;
   }
 
-  ArrayRef<Identifier> getElementNames() const {
-    if (!hasElementNames()) return {};
-    return { getTrailingObjects<Identifier>(), NumElements };
+  ArrayRef<TupleTypeReprElement> getElements() const {
+    return { getTrailingObjects<TupleTypeReprElement>(),
+             TupleTypeReprBits.NumElements };
   }
 
-  ArrayRef<SourceLoc> getElementNameLocs() const {
-    if (!hasElementNames()) return {};
-    return { getTrailingObjects<SourceLoc>(), NumElements };
+  void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
+    for (auto &Element : getElements()) {
+      Types.push_back(Element.Type);
+    }
   }
 
-  ArrayRef<SourceLoc> getUnderscoreLocs() const {
-    if (!hasUnderscoreLocs()) return {};
-    return { getTrailingObjects<SourceLoc>() + NumElements, NumElements };
+  TypeRepr *getElementType(unsigned i) const {
+    return getElement(i).Type;
   }
 
-  TypeRepr *getElement(unsigned i) const { return getElements()[i]; }
+  TupleTypeReprElement getElement(unsigned i) const {
+    return getElements()[i];
+  }
+
+  void getElementNames(SmallVectorImpl<Identifier> &Names) {
+    for (auto &Element : getElements()) {
+      Names.push_back(Element.Name);
+    }
+  }
 
   Identifier getElementName(unsigned i) const {
-    return hasElementNames() ? getElementNames()[i] : Identifier();
+    return getElement(i).Name;
   }
 
   SourceLoc getElementNameLoc(unsigned i) const {
-    return hasElementNames() ? getElementNameLocs()[i] : SourceLoc();
+    return getElement(i).NameLoc;
   }
 
   SourceLoc getUnderscoreLoc(unsigned i) const {
-    return hasElementNames() ? getElementNameLocs()[i] : SourceLoc();
+    return getElement(i).UnderscoreLoc;
   }
 
   bool isNamedParameter(unsigned i) const {
-    return hasUnderscoreLocs() ? getUnderscoreLocs()[i].isValid() : false;
+    return getUnderscoreLoc(i).isValid();
   }
 
   SourceRange getParens() const { return Parens; }
 
-  bool hasEllipsis() const { return TupleTypeReprBits.HasEllipsis; }
+  bool hasEllipsis() const {
+    return TupleTypeReprBits.HasEllipsis;
+  }
+
   SourceLoc getEllipsisLoc() const {
     return hasEllipsis() ?
       getTrailingObjects<SourceLocAndIdx>()[0].first : SourceLoc();
   }
+
   unsigned getEllipsisIndex() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].second : NumElements;
+      getTrailingObjects<SourceLocAndIdx>()[0].second :
+        TupleTypeReprBits.NumElements;
   }
+
   void removeEllipsis() {
     if (hasEllipsis()) {
       TupleTypeReprBits.HasEllipsis = false;
-      getTrailingObjects<SourceLocAndIdx>()[0] = {SourceLoc(), NumElements};
+      getTrailingObjects<SourceLocAndIdx>()[0] = {
+        SourceLoc(),
+        getNumElements()
+      };
     }
   }
 
   bool isParenType() const {
-    return NumElements == 1 && getElementNameLoc(0).isInvalid() &&
+    return TupleTypeReprBits.NumElements == 1 &&
+           getElementNameLoc(0).isInvalid() &&
            !hasEllipsis();
   }
 
   static TupleTypeRepr *create(const ASTContext &C,
-                               ArrayRef<TypeRepr *> Elements,
+                               ArrayRef<TupleTypeReprElement> Elements,
                                SourceRange Parens,
-                               ArrayRef<Identifier> ElementNames,
-                               ArrayRef<SourceLoc> ElementNameLocs,
-                               ArrayRef<SourceLoc> underscoreLocs,
                                SourceLoc Ellipsis, unsigned EllipsisIdx);
   static TupleTypeRepr *create(const ASTContext &C,
-                               ArrayRef<TypeRepr *> Elements,
+                               ArrayRef<TupleTypeReprElement> Elements,
                                SourceRange Parens) {
-    return create(C, Elements, Parens, {}, {}, {},
+    return create(C, Elements, Parens,
                   SourceLoc(), Elements.size());
   }
   static TupleTypeRepr *createEmpty(const ASTContext &C, SourceRange Parens);

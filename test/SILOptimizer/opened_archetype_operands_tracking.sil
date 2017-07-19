@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -O | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-inline-generics -enable-sil-verify-all %s -O | %FileCheck %s
 
 // Check some corner cases related to tracking of opened archetypes.
 // For example, the compiler used to crash compiling the "process" function (rdar://28024272)
@@ -61,4 +61,171 @@ bb2(%12 : $Error):
 
 sil_default_witness_table P {
 }
+
+public protocol View {
+}
+
+class DynamicStorage {
+  deinit
+  init()
+}
+
+final class ItemStorage<V> : DynamicStorage where V : View {
+  @sil_stored final let content: V
+  init(content: V)
+  deinit
+  override init()
+}
+
+extension View {
+  func dynamicStorage() -> DynamicStorage
+}
+
+public struct DynamicItem {
+  @sil_stored private var storage: DynamicStorage { get set }
+  public init(view: View)
+}
+
+sil @ItemStorage_alloc_init : $@convention(method) <V where V : View> (@in V, @thick ItemStorage<V>.Type) -> @owned ItemStorage<V> {
+
+bb0(%0 : $*V, %1 : $@thick ItemStorage<V>.Type):
+  %2 = alloc_ref $ItemStorage<V>
+
+  %3 = function_ref @ItemStorage_init : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @owned ItemStorage<τ_0_0>) -> @owned ItemStorage<τ_0_0>
+  %4 = apply %3<V>(%0, %2) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @owned ItemStorage<τ_0_0>) -> @owned ItemStorage<τ_0_0>
+  return %4 : $ItemStorage<V>
+}
+
+sil @ItemStorage_init : $@convention(method) <V where V : View> (@in V, @owned ItemStorage<V>) -> @owned ItemStorage<V>
+
+sil @function_with_generic_alloc_ref : $@convention(method) <Self where Self : View> (@in_guaranteed Self) -> @owned DynamicStorage {
+bb0(%0 : $*Self):
+  %2 = function_ref @ItemStorage_alloc_init : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @thick ItemStorage<τ_0_0>.Type) -> @owned ItemStorage<τ_0_0>
+  %3 = metatype $@thick ItemStorage<Self>.Type
+  %4 = alloc_stack $Self
+  copy_addr %0 to [initialization] %4 : $*Self
+  %6 = apply %2<Self>(%4, %3) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @thick ItemStorage<τ_0_0>.Type) -> @owned ItemStorage<τ_0_0>
+  dealloc_stack %4 : $*Self
+  %8 = upcast %6 : $ItemStorage<Self> to $DynamicStorage
+  return %8 : $DynamicStorage
+}
+
+// Check that function calls with inlined properly and an alloc_ref
+// with an opened archetype was created.
+// CHECK-LABEL: sil @testAllocRefWithOpenArchetype
+// CHECK: alloc_ref{{.*}}ItemStorage{{.*}}opened
+sil @testAllocRefWithOpenArchetype: $@convention(method) (@in View, @thin DynamicItem.Type) -> @owned DynamicItem {
+bb0(%0 : $*View, %1 : $@thin DynamicItem.Type):
+  %2 = alloc_stack $DynamicItem, var, name "self"
+  %4 = open_existential_addr immutable_access %0 : $*View to $*@opened("50960F66-26E4-11E7-BC37-A45E60E99281") View
+  %5 = function_ref @function_with_generic_alloc_ref : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @owned DynamicStorage
+  %6 = apply %5<@opened("50960F66-26E4-11E7-BC37-A45E60E99281") View>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @owned DynamicStorage
+  %7 = struct_element_addr %2 : $*DynamicItem, #DynamicItem.storage
+  store %6 to %7 : $*DynamicStorage
+  %9 = struct $DynamicItem (%6 : $DynamicStorage)
+  retain_value %9 : $DynamicItem
+  destroy_addr %0 : $*View
+  %12 = struct $DynamicItem (%6 : $DynamicStorage)
+  release_value %12 : $DynamicItem
+  dealloc_stack %2 : $*DynamicItem
+  return %9 : $DynamicItem
+}
+
+func use<T>(_ t: T)
+
+final class Foo<T> where T : P {
+  init(_ x: T)
+  @sil_stored final var x: T { get set }
+  @sil_stored final var y: T { get set }
+  deinit
+}
+
+extension P {
+  @inline(__always) func foo()
+}
+
+public func bar(_ p: P)
+
+// Foo.__allocating_init(_:)
+sil @Foo_alloc_init : $@convention(method) <T where T : P> (@in T, @thick Foo<T>.Type) -> @owned Foo<T> {
+bb0(%0 : $*T, %1 : $@thick Foo<T>.Type):
+  %2 = alloc_ref $Foo<T>
+  // function_ref Foo.init(_:)
+  %3 = function_ref @Foo_init : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @owned Foo<τ_0_0>) -> @owned Foo<τ_0_0> 
+  %4 = apply %3<T>(%0, %2) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @owned Foo<τ_0_0>) -> @owned Foo<τ_0_0> 
+  return %4 : $Foo<T>
+} // end sil function 'Foo_alloc_init'
+
+// Foo.init(_:)
+sil @Foo_init : $@convention(method) <T where T : P> (@in T, @owned Foo<T>) -> @owned Foo<T> {
+bb0(%0 : $*T, %1 : $Foo<T>):
+  %4 = alloc_stack $T
+  copy_addr %0 to [initialization] %4 : $*T
+  %6 = ref_element_addr %1 : $Foo<T>, #Foo.x
+  copy_addr [take] %4 to [initialization] %6 : $*T
+  dealloc_stack %4 : $*T
+  %9 = alloc_stack $T
+  copy_addr %0 to [initialization] %9 : $*T
+  %11 = ref_element_addr %1 : $Foo<T>, #Foo.y
+  copy_addr [take] %9 to [initialization] %11 : $*T
+  dealloc_stack %9 : $*T
+  destroy_addr %0 : $*T
+  return %1 : $Foo<T>
+} // end sil function 'Foo_init'
+
+// P.foo()
+sil [always_inline] @P_foo : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  // function_ref Foo.__allocating_init(_:)
+  %2 = function_ref @Foo_alloc_init : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @thick Foo<τ_0_0>.Type) -> @owned Foo<τ_0_0>
+  %3 = metatype $@thick Foo<Self>.Type
+  %4 = alloc_stack $Self 
+  copy_addr %0 to [initialization] %4 : $*Self
+  %6 = apply %2<Self>(%4, %3) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @thick Foo<τ_0_0>.Type) -> @owned Foo<τ_0_0>
+  dealloc_stack %4 : $*Self 
+  // function_ref use
+  %9 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () 
+  %10 = ref_element_addr %6 : $Foo<Self>, #Foo.x 
+  %11 = alloc_stack $Self
+  copy_addr %10 to [initialization] %11 : $*Self
+  %13 = apply %9<Self>(%11) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %11 : $*Self
+  // function_ref use
+  %15 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () 
+  %16 = ref_element_addr %6 : $Foo<Self>, #Foo.y
+  %17 = alloc_stack $Self
+  copy_addr %16 to [initialization] %17 : $*Self
+  %19 = apply %15<Self>(%17) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %17 : $*Self
+  strong_release %6 : $Foo<Self> 
+  %22 = tuple ()
+  return %22 : $()
+} // end sil function 'P_foo'
+
+// use
+sil hidden_external @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+
+// Check that everything besides the external function use is inlined into bar.
+// It should contain alloc_ref and alloc_stack instructions using opened archetypes.
+// CHECK-LABEL: sil @bar
+// CHECK: open_existential{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK: alloc_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK: alloc_stack{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK-NOT: function_ref @use
+// CHECK: function_ref @use 
+// CHECK-NOT: function_ref
+// CHECK: dealloc_stack{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK: strong_release{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK: dealloc_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK: end sil function 'bar' 
+sil @bar : $@convention(thin) (@in P) -> () {
+bb0(%0 : $*P):
+  %2 = open_existential_addr immutable_access %0 : $*P to $*@opened("C08045E0-2779-11E7-970E-A45E60E99281") P
+  // function_ref P.foo()
+  %3 = function_ref @P_foo : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %4 = apply %3<@opened("C08045E0-2779-11E7-970E-A45E60E99281") P>(%2) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0 : $*P
+  %6 = tuple ()
+  return %6 : $()
+} // end sil function 'bar'
 

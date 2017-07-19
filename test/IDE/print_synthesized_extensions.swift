@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/print_synthesized_extensions.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_synthesized_extensions.swiftdoc %s
 // RUN: %target-swift-ide-test -print-module -annotate-print -synthesize-extension -print-interface -no-empty-line-between-members -module-to-print=print_synthesized_extensions -I %t -source-filename=%s > %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK1 < %t.syn.txt
@@ -14,6 +14,7 @@
 // RUN: %FileCheck %s -check-prefix=CHECK11 < %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK12 < %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK13 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK14 < %t.syn.txt
 
 public protocol P1 {
   associatedtype T1
@@ -223,6 +224,13 @@ public extension P7 {
   public func f1(t: T1) -> T1 { return t }
 }
 
+public struct S13 {}
+
+extension S13 : P5 {
+  public typealias T1 = Int
+  public func foo1() {}
+}
+
 // CHECK1: <synthesized>extension <ref:Struct>S1</ref> where T : <ref:Protocol>P2</ref> {
 // CHECK1-NEXT:     <decl:Func>public func <loc>p2member()</loc></decl>
 // CHECK1-NEXT:     <decl:Func>public func <loc>ef1(<decl:Param>t: T</decl>)</loc></decl>
@@ -311,3 +319,12 @@ public extension P7 {
 // CHECK13-NEXT:   <decl:Func>public func <loc>nomergeFunc(<decl:Param>t: <ref:GenericTypeParam>Self</ref>.T1</decl>)</loc> -> <ref:GenericTypeParam>Self</ref>.T1</decl>
 // CHECK13-NEXT:   <decl:Func>public func <loc>f1(<decl:Param>t: <ref:GenericTypeParam>Self</ref>.T1</decl>)</loc> -> <ref:GenericTypeParam>Self</ref>.T1</decl>
 // CHECK13-NEXT:  }</decl>
+
+// CHECK14: <decl:Struct>public struct <loc>S13</loc> {</decl>
+// CHECK14-NEXT: <decl:Func>/// This is picked
+// CHECK14-NEXT:     public func <loc>foo2()</loc></decl>
+// CHECK14-NEXT: <decl:Func>/// This is picked
+// CHECK14-NEXT:     public func <loc>foo3()</loc></decl>
+// CHECK14-NEXT: <decl:Func>/// This is picked
+// CHECK14-NEXT:     public func <loc>foo4()</loc></decl>
+// CHECK14-NEXT: }</synthesized>

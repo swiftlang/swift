@@ -42,7 +42,15 @@ class RValue {
   
   /// Flag value used to mark an rvalue as invalid, because it was
   /// consumed or it was default-initialized.
-  enum : unsigned { Used = ~0U };
+  enum : unsigned {
+    Null = ~0U,
+    Used = Null - 1,
+    InContext = Used - 1,
+  };
+
+  bool isInSpecialState() const {
+    return elementsToBeAdded >= InContext;
+  }
   
   // Don't copy.
   RValue(const RValue &) = delete;
@@ -60,23 +68,26 @@ class RValue {
   /// ManagedValues. Used to implement the extractElement* methods.
   RValue(ArrayRef<ManagedValue> values, CanType type);
 
+  RValue(unsigned state) : elementsToBeAdded(state) {
+    assert(isInSpecialState());
+  }
+
 public:
-  /// Creates an invalid RValue object, in a "used" state.
-  RValue() : elementsToBeAdded(Used) {}
+  RValue() : elementsToBeAdded(Null) {}
   
   RValue(RValue &&rv)
     : values(std::move(rv.values)),
       type(rv.type),
       elementsToBeAdded(rv.elementsToBeAdded)
   {
-    assert((rv.isComplete() || rv.isUsed())
+    assert((rv.isComplete() || rv.isInSpecialState())
            && "moving rvalue that wasn't complete?!");
     rv.elementsToBeAdded = Used;
   }
   RValue &operator=(RValue &&rv) {
-    assert(isUsed() && "reassigning an unused rvalue?!");
+    assert((isNull() || isUsed()) && "reassigning an valid rvalue?!");
     
-    assert((rv.isComplete() || rv.isUsed())
+    assert((rv.isComplete() || rv.isInSpecialState())
            && "moving rvalue that wasn't complete?!");
     values = std::move(rv.values);
     type = rv.type;
@@ -100,6 +111,11 @@ public:
   /// ManagedValues. Used to implement the extractElement* methods.
   static RValue withPreExplodedElements(ArrayRef<ManagedValue> values,
                                         CanType type);
+
+  /// Creates an invalid RValue object, in an "in-context" state.
+  static RValue forInContext() {
+    return RValue(InContext);
+  }
   
   /// Create an RValue to which values will be subsequently added using
   /// addElement(), with the level of tuple expansion in the input specified
@@ -111,17 +127,19 @@ public:
   /// addElement(). The RValue will not be complete until all the elements have
   /// been added.
   explicit RValue(CanType type);
-  
+
   /// True if the rvalue has been completely initialized by adding all its
   /// elements.
   bool isComplete() const & { return elementsToBeAdded == 0; }
+
+  /// True if the rvalue was null-initialized.
+  bool isNull() const & { return elementsToBeAdded == Null; }
   
   /// True if this rvalue has been used.
   bool isUsed() const & { return elementsToBeAdded == Used; }
-  explicit operator bool() const & { return !isUsed(); }
 
   /// True if this rvalue was emitted into context.
-  bool isInContext() const & { return isUsed(); }
+  bool isInContext() const & { return elementsToBeAdded == InContext; }
   
   /// True if this represents an lvalue.
   bool isLValue() const & {
@@ -209,11 +227,35 @@ public:
 
   /// Rewrite the type of this r-value.
   void rewriteType(CanType newType) & {
+#ifndef NDEBUG
+    static const auto areSimilarTypes = [](CanType l, CanType r) {
+      if (l == r) return true;
+
+      // Allow function types to disagree about 'noescape'.
+      if (auto lf = dyn_cast<FunctionType>(l)) {
+        if (auto rf = dyn_cast<FunctionType>(r)) {
+          return lf.getInput() == rf.getInput()
+              && lf.getResult() == rf.getResult()
+              && lf->getExtInfo().withNoEscape(false) ==
+                 lf->getExtInfo().withNoEscape(false);
+        }
+      }
+      return false;
+    };
+
+    static const auto isSingleElementTuple = [](CanType type, CanType eltType) {
+      if (auto tupleType = dyn_cast<TupleType>(type)) {
+        return tupleType->getNumElements() == 1 &&
+               areSimilarTypes(tupleType.getElementType(0), eltType);
+      }
+      return false;
+    };
+
     // We only allow a very modest set of changes to a type.
-    assert(newType == type ||
-           (isa<TupleType>(newType) &&
-            cast<TupleType>(newType)->getNumElements() == 1 &&
-            cast<TupleType>(newType).getElementType(0) == type));
+    assert(areSimilarTypes(newType, type) ||
+           isSingleElementTuple(newType, type) ||
+           isSingleElementTuple(type, newType));
+#endif
     type = newType;
   }
   
@@ -222,19 +264,11 @@ public:
     return RValue(*this, SGF, l);
   }
 
-  bool isObviouslyEqual(const RValue &rhs) const {
-    assert(isComplete() && rhs.isComplete() && "Comparing incomplete rvalues");
+  static bool areObviouslySameValue(SILValue lhs, SILValue rhs);
+  bool isObviouslyEqual(const RValue &rhs) const;
 
-    // Compare the count of elements instead of the type.
-    if (values.size() != rhs.values.size())
-      return false;
-
-    return std::equal(values.begin(), values.end(), rhs.values.begin(),
-                  [](const ManagedValue &lhs, const ManagedValue &rhs) -> bool {
-                    return lhs.getValue() == rhs.getValue() &&
-                    lhs.getCleanup() == rhs.getCleanup();
-                  });
-  }
+  void dump() const;
+  void dump(raw_ostream &OS, unsigned indent = 0) const;
 };
 
 } // end namespace Lowering

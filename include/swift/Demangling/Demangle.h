@@ -34,7 +34,6 @@ namespace Demangle {
 
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
-  bool DisplayTypeOfIVarFieldOffset = true;
   bool DisplayDebuggerGeneratedModule = true;
   bool QualifyEntities = true;
   bool DisplayExtensionContexts = true;
@@ -49,6 +48,7 @@ struct DemangleOptions {
   bool ShortenValueWitness = false;
   bool ShortenArchetype = false;
   bool ShowPrivateDiscriminators = true;
+  bool ShowFunctionArgumentTypes = true;
 
   DemangleOptions() {}
 
@@ -68,6 +68,7 @@ struct DemangleOptions {
     Opt.ShortenValueWitness = true;
     Opt.ShortenArchetype = true;
     Opt.ShowPrivateDiscriminators = false;
+    Opt.ShowFunctionArgumentTypes = false;
     return Opt;
   };
 };
@@ -215,8 +216,21 @@ public:
   void dump();
 };
 
+/// Returns the length of the swift mangling prefix of the \p SymbolName.
+///
+/// Returns 0 if \p SymbolName is not a mangled swift (>= swift 4.x) name.
+int getManglingPrefixLength(const char *mangledName);
+
+/// Returns true if \p SymbolName is a mangled swift name.
+///
+/// This does not include the old (<= swift 3.x) mangling prefix "_T".
+inline bool isMangledName(llvm::StringRef MangledName) {
+  return getManglingPrefixLength(MangledName.data()) != 0;
+}
+
 /// Returns true if the mangledName starts with the swift mangling prefix.
 ///
+/// This includes the old (<= swift 3.x) mangling prefix "_T".
 /// \param mangledName A null-terminated string containing a mangled name.
 bool isSwiftSymbol(const char *mangledName);
 
@@ -251,8 +265,8 @@ public:
 
   /// Demangle the given symbol and return the parse tree.
   ///
-  /// \param MangledName The mangled symbol string, which start with the
-  /// mangling prefix _T.
+  /// \param MangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
@@ -262,8 +276,8 @@ public:
 
   /// Demangle the given type and return the parse tree.
   ///
-  /// \param MangledName The mangled type string, which does _not_ start with
-  /// the mangling prefix _T.
+  /// \param MangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
@@ -273,8 +287,8 @@ public:
   
   /// Demangle the given symbol and return the readable name.
   ///
-  /// \param MangledName The mangled symbol string, which start with the
-  /// mangling prefix _T.
+  /// \param MangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns The demangled string.
   std::string demangleSymbolAsString(llvm::StringRef MangledName,
@@ -283,7 +297,7 @@ public:
   /// Demangle the given type and return the readable name.
   ///
   /// \param MangledName The mangled type string, which does _not_ start with
-  /// the mangling prefix _T.
+  /// a mangling prefix.
   ///
   /// \returns The demangled string.
   std::string demangleTypeAsString(llvm::StringRef MangledName,
@@ -298,8 +312,9 @@ public:
   /// Returns the mangled name of the target of a thunk.
   ///
   /// \returns Returns the remaining name after removing the thunk mangling
-  /// characters from \p MangledName. If \p MangledName is not a thunk symbol,
-  /// an empty string is returned.
+  /// characters from \p MangledName. If \p MangledName is not a thunk symbol
+  /// or the thunk target cannot be derived from the mangling, an empty string
+  /// is returned.
   std::string getThunkTarget(llvm::StringRef MangledName);
 
   /// Returns true if the \p mangledName refers to a function which conforms to
@@ -316,7 +331,7 @@ public:
   void clear();
 };
 
-/// Standalong utility function to demangle the given symbol as string.
+/// Standalone utility function to demangle the given symbol as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
 /// Context::demangleSymbolAsString should be used instead.
@@ -327,7 +342,7 @@ std::string
 demangleSymbolAsString(const char *mangledName, size_t mangledNameLength,
                        const DemangleOptions &options = DemangleOptions());
 
-/// Standalong utility function to demangle the given symbol as string.
+/// Standalone utility function to demangle the given symbol as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
 /// Context::demangleSymbolAsString should be used instead.
@@ -340,7 +355,7 @@ demangleSymbolAsString(const std::string &mangledName,
                                 options);
 }
   
-/// Standalong utility function to demangle the given symbol as string.
+/// Standalone utility function to demangle the given symbol as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
 /// Context::demangleSymbolAsString should be used instead.
@@ -353,7 +368,7 @@ demangleSymbolAsString(llvm::StringRef MangledName,
                                 MangledName.size(), Options);
 }
 
-/// Standalong utility function to demangle the given type as string.
+/// Standalone utility function to demangle the given type as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
 /// Context::demangleTypeAsString should be used instead.
@@ -364,7 +379,7 @@ std::string
 demangleTypeAsString(const char *mangledName, size_t mangledNameLength,
                      const DemangleOptions &options = DemangleOptions());
 
-/// Standalong utility function to demangle the given type as string.
+/// Standalone utility function to demangle the given type as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
 /// Context::demangleTypeAsString should be used instead.
@@ -376,7 +391,7 @@ demangleTypeAsString(const std::string &mangledName,
   return demangleTypeAsString(mangledName.data(), mangledName.size(), options);
 }
 
-/// Standalong utility function to demangle the given type as string.
+/// Standalone utility function to demangle the given type as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
 /// Context::demangleTypeAsString should be used instead.
@@ -406,6 +421,12 @@ void mangleIdentifier(const char *data, size_t length,
 ///
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
+
+/// Remangle in the old mangling scheme.
+///
+/// This is only used for objc-runtime names and should be removed as soon as
+/// we switch to the new mangling for those names as well.
+std::string mangleNodeOld(const NodePointer &root);
 
 /// \brief Transform the node structure to a string.
 ///

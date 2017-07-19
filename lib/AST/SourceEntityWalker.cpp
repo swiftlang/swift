@@ -18,6 +18,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -71,7 +72,7 @@ private:
   bool shouldIgnore(Decl *D, bool &ShouldVisitChildren);
 
   ValueDecl *extractDecl(Expr *Fn) const {
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Fn))
+    if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
       return DRE->getDecl();
     if (auto ApplyE = dyn_cast<ApplyExpr>(Fn))
       return extractDecl(ApplyE->getFn());
@@ -93,11 +94,34 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   unsigned NameLen = 0;
   bool IsExtension = false;
 
-  if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->hasName())
-      NameLen = VD->getName().getLength();
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (VD->hasName() && !VD->isImplicit())
+      NameLen = VD->getBaseName().userFacingName().size();
 
-  } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+    auto ReportParamList = [&](ParameterList *PL) {
+      for (auto *PD : *PL) {
+        auto Loc = PD->getArgumentNameLoc();
+        if (Loc.isInvalid())
+          continue;
+        if (!SEWalker.visitDeclarationArgumentName(PD->getArgumentName(), Loc,
+                                                   VD)) {
+          Cancelled = true;
+          return true;
+        }
+      }
+      return false;
+    };
+
+    if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
+      for (auto *PL : AF->getParameterLists())
+        if (ReportParamList(PL))
+          return false;
+    }
+    if (auto SD = dyn_cast<SubscriptDecl>(VD)) {
+      if (ReportParamList(SD->getIndices()))
+        return false;
+    }
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
     Loc = SR.Start;
     if (Loc.isValid())
@@ -117,6 +141,15 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     if (Loc.isValid())
       NameLen = PrecD->getName().getLength();
 
+  } else if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+    if (SEWalker.shouldWalkInactiveConfigRegion()) {
+      for (auto Clause : ICD->getClauses()) {
+        for (auto Member : Clause.Elements) {
+          Member.walk(*this);
+        }
+      }
+      return false;
+    }
   } else {
     return true;
   }
@@ -174,17 +207,6 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
 std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
   if (TraverseChildren) {
-    if (SEWalker.shouldWalkInactiveConfigRegion()) {
-      if (auto *ICS = dyn_cast<IfConfigStmt>(S)) {
-        TraverseChildren = false;
-        for (auto Clause : ICS->getClauses()) {
-          for (auto Member : Clause.Elements) {
-            Member.walk(*this);
-          }
-        }
-      }
-    }
-
     if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
       if (auto *FD = DeferS->getTempDecl()) {
         auto *RetS = FD->getBody()->walk(*this);
@@ -224,7 +246,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (!SEWalker.walkToExprPre(E))
     return { false, E };
 
-  if (ConstructorRefCallExpr *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
+  if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
 
   if (E->isImplicit())
@@ -232,7 +254,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
   Optional<AccessKind> OpAccess = getAccessKind(E);
 
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
                          std::make_pair(module->getName(), E->getLoc())))
@@ -243,7 +265,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
                                         OpAccess))) {
       return { false, nullptr };
     }
-  } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E)) {
+  } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     // Visit in source order.
     if (!MRE->getBase()->walk(*this))
       return { false, nullptr };
@@ -265,7 +287,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
                                          OpAccess)))
       return { false, nullptr };
 
-  } else if (SubscriptExpr *SE = dyn_cast<SubscriptExpr>(E)) {
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
     // Visit in source order.
     if (!SE->getBase()->walk(*this))
       return { false, nullptr };
@@ -292,7 +314,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
     return { false, E };
 
-  } else if (BinaryExpr *BinE = dyn_cast<BinaryExpr>(E)) {
+  } else if (auto *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
     if (!BinE->getArg()->getElement(0)->walk(*this))
       return { false, nullptr };
@@ -322,7 +344,7 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
-      if (ModuleDecl *ModD = dyn_cast<ModuleDecl>(VD))
+      if (auto *ModD = dyn_cast<ModuleDecl>(VD))
         return passReference(ModD, std::make_pair(IdT->getIdentifier(),
                                                   IdT->getIdLoc()));
 
@@ -346,9 +368,7 @@ Expr *SemaAnnotator::walkToExprPost(Expr *E) {
 }
 
 bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
-  if (isDone())
-    return false;
-  return true;
+  return !isDone();
 }
 
 std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
@@ -430,7 +450,7 @@ passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtDecl = nullptr;
 
-  if (TypeDecl *TD = dyn_cast<TypeDecl>(D)) {
+  if (auto *TD = dyn_cast<TypeDecl>(D)) {
     if (!CtorRefs.empty() && Loc.isValid()) {
       Expr *Fn = CtorRefs.back()->getFn();
       if (Fn->getLoc() == Loc.getBaseNameLoc()) {
@@ -497,7 +517,9 @@ bool SemaAnnotator::passCallArgNames(Expr *Fn, TupleExpr *TupleE) {
 }
 
 bool SemaAnnotator::shouldIgnore(Decl *D, bool &ShouldVisitChildren) {
-  if (D->isImplicit() && !isa<PatternBindingDecl>(D)) {
+  if (D->isImplicit() &&
+      !isa<PatternBindingDecl>(D) &&
+      !isa<ConstructorDecl>(D)) {
     ShouldVisitChildren = false;
     return true;
   }
@@ -554,6 +576,11 @@ bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
 bool SourceEntityWalker::visitCallArgName(Identifier Name,
                                           CharSourceRange Range,
                                           ValueDecl *D) {
+  return true;
+}
+
+bool SourceEntityWalker::
+visitDeclarationArgumentName(Identifier Name, SourceLoc Start, ValueDecl *D) {
   return true;
 }
 

@@ -232,11 +232,13 @@ public extension DispatchQueue {
 	{
 		var result: T?
 		var error: Error?
-		fn {
-			do {
-				result = try work()
-			} catch let e {
-				error = e
+		withoutActuallyEscaping(work) { _work in
+			fn {
+				do {
+					result = try _work()
+				} catch let e {
+					error = e
+				}
 			}
 		}
 		if let e = error {

@@ -2,6 +2,7 @@
 // RUN: %swift -target i386-apple-ios7.1 %s -module-name main -emit-ir -o - | %FileCheck %s
 // RUN: %swift -target x86_64-apple-ios7.1 %s -module-name main -emit-ir -o - | %FileCheck %s
 // RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name main -emit-ir -o - | %FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-name main %s -emit-ir -o - | %FileCheck %s --check-prefix=X86_64
 
 // REQUIRES: CODEGENERATOR=X86
 
@@ -34,3 +35,10 @@ bb0:
 // CHECK: define{{( protected)?}} swiftcc void @foo
 // CHECK: define{{( protected)?}} swiftcc void @bar
 // CHECK: define{{( protected)?}} swiftcc void @baz
+
+// Make sure that the target features are ordered. We care because function
+// merging does not identify two otherwise identical functions as the same if
+// the order of features differs.
+
+// X86_64: define{{( protected)?}} swiftcc void @baz{{.*}}#0
+// X86_64: #0 = {{.*}}"target-features"="+cx16,+fxsr,+mmx,+sse,+sse2,+sse3,+ssse3,+x87"

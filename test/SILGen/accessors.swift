@@ -30,12 +30,12 @@ func test0(_ ref: A) {
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.index0() -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index0SiyF
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
 // CHECK-NEXT: [[BORROWED_ARG_RHS:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.index1() -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
@@ -50,6 +50,8 @@ func test0(_ ref: A) {
 // CHECK-NEXT: end_borrow [[T0]] from [[TEMP]]
 // CHECK-NEXT: destroy_addr [[TEMP]]
 //   Formal access to LHS.
+// CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
+// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_T09accessors11OrdinarySubV9subscriptS2icfs
 // CHECK-NEXT: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $OrdinarySub
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
@@ -59,9 +61,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on [[BORROWED_ARG_LHS]] : $A
-// CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11OrdinarySubV9subscriptS2icfs
-// CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
+// CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
@@ -104,12 +104,12 @@ func test1(_ ref: B) {
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.index0() -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index0SiyF
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
 // CHECK-NEXT: [[BORROWED_ARG_RHS:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.index1() -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
@@ -139,6 +139,8 @@ func test1(_ ref: B) {
 //
 // CHECK:    [[CONT]]:
 //   Formal access to LHS.
+// CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
+// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_T09accessors11MutatingSubV9subscriptS2icfs : $@convention(method) (Int, Int, @inout MutatingSub) -> () 
 // CHECK-NEXT: [[STORAGE2:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER2:%.*]] = alloc_stack $MutatingSub
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER2]]
@@ -148,9 +150,7 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on [[BORROWED_ARG_LHS]] : $B
-// CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
-// CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11MutatingSubV9subscriptS2icfs : $@convention(method) (Int, Int, @inout MutatingSub) -> () 
-// CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
+// CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 //
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):

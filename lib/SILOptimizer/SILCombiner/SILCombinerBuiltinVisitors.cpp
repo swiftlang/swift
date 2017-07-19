@@ -55,8 +55,19 @@ SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
   IsZeroKind RHS = isZeroValue(BI->getArguments()[1]);
 
   // Can't handle unknown values.
-  if (LHS == IsZeroKind::Unknown || RHS == IsZeroKind::Unknown)
+  if (LHS == IsZeroKind::Unknown) {
     return nullptr;
+  }
+
+  // Canonicalize i1_const == X to X == i1_const.
+  // Canonicalize i1_const != X to X != i1_const.
+  if (RHS == IsZeroKind::Unknown) {
+    auto *CanonI =
+        Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(), {},
+                              {BI->getArguments()[1], BI->getArguments()[0]});
+    replaceInstUsesWith(*BI, CanonI);
+    return eraseInstFromFunction(*BI);
+  }
 
   // Can't handle non-zero ptr values.
   if (LHS == IsZeroKind::NotZero && RHS == IsZeroKind::NotZero)
@@ -234,7 +245,7 @@ static IndexRawPointerInst *
 matchSizeOfMultiplication(SILValue I, MetatypeInst *RequiredType,
                           BuiltinInst *&TruncOrBitCast, SILValue &Ptr,
                           SILValue &Distance) {
-  IndexRawPointerInst *Res = dyn_cast<IndexRawPointerInst>(I);
+  auto *Res = dyn_cast<IndexRawPointerInst>(I);
   if (!Res)
     return nullptr;
 

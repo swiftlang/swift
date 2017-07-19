@@ -373,6 +373,23 @@ ${Suite}.test(
 // Special cases and one-off tests.
 //===----------------------------------------------------------------------===//
 
+${Suite}.test(
+  "${ArrayType}/subscriptSelfAssignDifferentRanges") {
+  var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
+  arr[0..<0] = arr[...]
+  expectEqual([ 1010, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[1..<1] = arr[1..<2]
+  expectEqual([ 1010, 1020, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[1..<1] = arr[1..<2]
+  expectEqual([ 1010, 1020, 1020, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[1..<2] = arr[0..<1]
+  expectEqual([ 1010, 1010, 1020, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[0..<5] = arr.dropFirst(5)
+  expectEqual([ 1010, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[...] = arr[0..<0]
+  expectEqual([  ], arr)
+}
+
 ${Suite}.test("${ArrayType}<Void>/map") {
   // This code used to crash because it generated an array of Void with
   // stride == 0.

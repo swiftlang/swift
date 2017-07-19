@@ -558,13 +558,15 @@ func testExistentialSetters(_ p1: P1, b: Bool) {
   // CHECK: [[PBOX:%[0-9]+]] = alloc_box ${ var P1 }
   // CHECK: [[PBP:%[0-9]+]] = project_box [[PBOX]]
   // CHECK-NEXT: copy_addr [[P]] to [initialization] [[PBP]] : $*P1
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[PBP]] : $*P1 to $*@opened([[UUID:".*"]]) P1
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBP]]
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[WRITE]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE5prop2Sbfs
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr
   p1.prop2 = b
 
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[PBP]] : $*P1 to $*@opened([[UUID:".*"]]) P1
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBP]]
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[WRITE]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE9subscriptS2bcfs
   // CHECK: apply [[SUBSETTER]]<@opened([[UUID]]) P1>([[B]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr [[PB]] : $*P1
@@ -589,16 +591,17 @@ func testLogicalExistentialSetters(_ hasAP1: HasAP1, _ b: Bool) {
   // CHECK: [[HASP1_BOX:%[0-9]+]] = alloc_box ${ var HasAP1 }
   // CHECK: [[PBHASP1:%[0-9]+]] = project_box [[HASP1_BOX]]
   // CHECK-NEXT: copy_addr [[HASP1]] to [initialization] [[PBHASP1]] : $*HasAP1
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBHASP1]]
   // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $P1
   // CHECK-NEXT: [[HASP1_COPY:%[0-9]+]] = alloc_stack $HasAP1
-  // CHECK-NEXT: copy_addr [[PBHASP1]] to [initialization] [[HASP1_COPY]] : $*HasAP1
+  // CHECK-NEXT: copy_addr [[WRITE]] to [initialization] [[HASP1_COPY]] : $*HasAP1
   // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions6HasAP1V6someP1AA0F0_pfg : $@convention(method) (@in_guaranteed HasAP1) -> @out P1
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]], %8) : $@convention(method) (@in_guaranteed HasAP1) -> @out P1
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]], [[HASP1_COPY]]) : $@convention(method) (@in_guaranteed HasAP1) -> @out P1
   // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr mutable_access [[P1_COPY]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE5prop2Sbfs : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: apply [[PROP2_SETTER]]<@opened([[UUID]]) P1>([[B]], [[P1_OPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: [[SOMEP1_SETTER:%[0-9]+]] = function_ref @_T019protocol_extensions6HasAP1V6someP1AA0F0_pfs : $@convention(method) (@in P1, @inout HasAP1) -> ()
-  // CHECK: apply [[SOMEP1_SETTER]]([[P1_COPY]], [[PBHASP1]]) : $@convention(method) (@in P1, @inout HasAP1) -> ()
+  // CHECK: apply [[SOMEP1_SETTER]]([[P1_COPY]], [[WRITE]]) : $@convention(method) (@in P1, @inout HasAP1) -> ()
   // CHECK-NOT: deinit_existential_addr
   hasAP1.someP1.prop2 = b
   // CHECK: return
@@ -619,7 +622,8 @@ func test_open_existential_semantics_opaque(_ guaranteed: P1,
   guaranteed.f1()
   
   // -- Need a guaranteed copy because it's immutable
-  // CHECK: copy_addr [[PB]] to [initialization] [[IMMEDIATE:%.*]] :
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
+  // CHECK: copy_addr [[READ]] to [initialization] [[IMMEDIATE:%.*]] :
   // CHECK: [[VALUE:%.*]] = open_existential_addr immutable_access [[IMMEDIATE]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // -- Can consume the value from our own copy
@@ -664,7 +668,8 @@ func test_open_existential_semantics_class(_ guaranteed: CP1,
   // CHECK-NOT: destroy_value [[ARG0]]
   guaranteed.f1()
 
-  // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[PB]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
+  // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[READ]]
   // CHECK: [[VALUE:%.*]] = open_existential_ref [[IMMEDIATE]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
@@ -773,15 +778,15 @@ extension ProtoDelegatesToObjC where Self : ObjCInitClass {
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : ObjCInitClass, τ_0_0 : ProtoDelegatesToObjC> { var τ_0_0 } <Self>
-    // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
-    // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*Self
+    // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+    // CHECK:   [[PB_SELF_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
     // CHECK:   [[SELF_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[SELF_META]] : $@thick Self.Type to $@objc_metatype Self.Type
     // CHECK:   [[SELF_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[SELF_META_OBJC]] : $@objc_metatype Self.Type, $Self
     // CHECK:   [[SELF_ALLOC_C:%[0-9]+]] = upcast [[SELF_ALLOC]] : $Self to $ObjCInitClass
     // CHECK:   [[OBJC_INIT:%[0-9]+]] = class_method [[SELF_ALLOC_C]] : $ObjCInitClass, #ObjCInitClass.init!initializer.1 : (ObjCInitClass.Type) -> () -> ObjCInitClass, $@convention(method) (@owned ObjCInitClass) -> @owned ObjCInitClass
     // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[OBJC_INIT]]([[SELF_ALLOC_C]]) : $@convention(method) (@owned ObjCInitClass) -> @owned ObjCInitClass
     // CHECK:   [[SELF_RESULT_AS_SELF:%[0-9]+]] = unchecked_ref_cast [[SELF_RESULT]] : $ObjCInitClass to $Self
-    // CHECK:   assign [[SELF_RESULT_AS_SELF]] to [[SELF]] : $*Self
+    // CHECK:   assign [[SELF_RESULT_AS_SELF]] to [[PB_SELF_BOX]] : $*Self
     self.init()
   }
 }
@@ -799,13 +804,13 @@ extension ProtoDelegatesToRequired where Self : RequiredInitClass {
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
   // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : RequiredInitClass, τ_0_0 : ProtoDelegatesToRequired> { var τ_0_0 } <Self>
-  // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
-  // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*Self
+  // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+  // CHECK:   [[PB_SELF_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
   // CHECK:   [[SELF_META_AS_CLASS_META:%[0-9]+]] = upcast [[SELF_META]] : $@thick Self.Type to $@thick RequiredInitClass.Type
   // CHECK:   [[INIT:%[0-9]+]] = class_method [[SELF_META_AS_CLASS_META]] : $@thick RequiredInitClass.Type, #RequiredInitClass.init!allocator.1 : (RequiredInitClass.Type) -> () -> RequiredInitClass, $@convention(method) (@thick RequiredInitClass.Type) -> @owned RequiredInitClass
   // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[INIT]]([[SELF_META_AS_CLASS_META]]) : $@convention(method) (@thick RequiredInitClass.Type) -> @owned RequiredInitClass
   // CHECK:   [[SELF_RESULT_AS_SELF:%[0-9]+]] = unchecked_ref_cast [[SELF_RESULT]] : $RequiredInitClass to $Self
-  // CHECK:   assign [[SELF_RESULT_AS_SELF]] to [[SELF]] : $*Self
+  // CHECK:   assign [[SELF_RESULT_AS_SELF]] to [[PB_SELF_BOX]] : $*Self
     self.init()
   }
 }

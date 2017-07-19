@@ -58,26 +58,6 @@ extension Decimal {
     @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
     public mutating func formTruncatingRemainder(dividingBy other: Decimal) { fatalError("Decimal does not yet fully adopt FloatingPoint") }
 
-    public mutating func add(_ other: Decimal) {
-        var rhs = other
-        NSDecimalAdd(&self, &self, &rhs, .plain)
-    }
-
-    public mutating func subtract(_ other: Decimal) {
-        var rhs = other
-        NSDecimalSubtract(&self, &self, &rhs, .plain)
-    }
-
-    public mutating func multiply(by other: Decimal) {
-        var rhs = other
-        NSDecimalMultiply(&self, &self, &rhs, .plain)
-    }
-
-    public mutating func divide(by other: Decimal) {
-        var rhs = other
-        NSDecimalDivide(&self, &self, &rhs, .plain)
-    }
-
     public mutating func negate() {
         _isNegative = _isNegative == 0 ? 1 : 0
     }
@@ -157,7 +137,6 @@ extension Decimal {
         NSDecimalMultiply(&res, &leftOp, &rightOp, .plain)
         return res
     }
-
 }
 
 public func pow(_ x: Decimal, _ y: Int) -> Decimal {
@@ -174,30 +153,15 @@ extension Decimal : Hashable, Comparable {
             return Double.nan
         }
         
-        for i in 0..<8 {
-            let index = 8 - i - 1
-            switch index {
-            case 0:
-                d = d * 65536 + Double(_mantissa.0)
-            case 1:
-                d = d * 65536 + Double(_mantissa.1)
-            case 2:
-                d = d * 65536 + Double(_mantissa.2)
-            case 3:
-                d = d * 65536 + Double(_mantissa.3)
-            case 4:
-                d = d * 65536 + Double(_mantissa.4)
-            case 5:
-                d = d * 65536 + Double(_mantissa.5)
-            case 6:
-                d = d * 65536 + Double(_mantissa.6)
-            case 7:
-                d = d * 65536 + Double(_mantissa.7)
-            default:
-                fatalError("conversion overflow")
-            }
-        }
-
+        d = d * 65536 + Double(_mantissa.7)
+        d = d * 65536 + Double(_mantissa.6)
+        d = d * 65536 + Double(_mantissa.5)
+        d = d * 65536 + Double(_mantissa.4)
+        d = d * 65536 + Double(_mantissa.3)
+        d = d * 65536 + Double(_mantissa.2)
+        d = d * 65536 + Double(_mantissa.1)
+        d = d * 65536 + Double(_mantissa.0)
+        
         if _exponent < 0 {
             for _ in _exponent..<0 {
                 d /= 10.0
@@ -239,7 +203,73 @@ extension Decimal : ExpressibleByIntegerLiteral {
     }
 }
 
-extension Decimal : SignedNumber { }
+extension Decimal : SignedNumeric {
+  public var magnitude: Decimal {
+      return Decimal(
+          _exponent: self._exponent, _length: self._length,
+          _isNegative: 0, _isCompact: self._isCompact,
+          _reserved: 0, _mantissa: self._mantissa)
+  }
+
+  // FIXME(integers): implement properly
+  public init?<T : BinaryInteger>(exactly source: T) {
+      fatalError()
+  }
+
+  public static func +=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      _ = withUnsafeMutablePointer(to: &lhs) {
+          NSDecimalAdd($0, $0, &rhs, .plain)
+      }
+  }
+
+  public static func -=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      _ = withUnsafeMutablePointer(to: &lhs) {
+          NSDecimalSubtract($0, $0, &rhs, .plain)
+      }
+  }
+
+  public static func *=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      _ = withUnsafeMutablePointer(to: &lhs) {
+          NSDecimalMultiply($0, $0, &rhs, .plain)
+      }
+  }
+
+  public static func /=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      _ = withUnsafeMutablePointer(to: &lhs) {
+          NSDecimalDivide($0, $0, &rhs, .plain)
+      }
+  }
+}
+
+extension Decimal {
+  @available(swift, obsoleted: 4, message: "Please use arithmetic operators instead")
+  @_transparent
+  public mutating func add(_ other: Decimal) {
+      self += other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use arithmetic operators instead")
+  @_transparent
+  public mutating func subtract(_ other: Decimal) {
+      self -= other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use arithmetic operators instead")
+  @_transparent
+  public mutating func multiply(by other: Decimal) {
+      self *= other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use arithmetic operators instead")
+  @_transparent
+  public mutating func divide(by other: Decimal) {
+      self /= other
+  }
+}
 
 extension Decimal : Strideable {
     public func distance(to other: Decimal) -> Decimal {
@@ -248,12 +278,6 @@ extension Decimal : Strideable {
 
     public func advanced(by n: Decimal) -> Decimal {
         return self + n
-    }
-}
-
-extension Decimal : AbsoluteValuable {
-    public static func abs(_ x: Decimal) -> Decimal {
-        return Decimal(_exponent: x._exponent, _length: x._length, _isNegative: 0, _isCompact: x._isCompact, _reserved: 0, _mantissa: x._mantissa)
     }
 }
 
@@ -439,8 +463,82 @@ extension Decimal : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDecimalNumber?) -> Decimal {
-        var result: Decimal?
-        _forceBridgeFromObjectiveC(source!, result: &result)
-        return result!
+        guard let src = source else { return Decimal(_exponent: 0, _length: 0, _isNegative: 0, _isCompact: 0, _reserved: 0, _mantissa: (0, 0, 0, 0, 0, 0, 0, 0)) }
+        return src.decimalValue
+    }
+}
+
+extension Decimal : Codable {
+    private enum CodingKeys : Int, CodingKey {
+        case exponent
+        case length
+        case isNegative
+        case isCompact
+        case mantissa
+    }
+
+    public init(from decoder: Decoder) throws {
+        // FIXME: This is a hook for bypassing a conditional conformance implementation to apply a strategy (see SR-5206). Remove this once conditional conformance is available.
+        do {
+            // We are allowed to request this container as long as we don't decode anything through it when we need the keyed container below.
+            let singleValueContainer = try decoder.singleValueContainer()
+            if singleValueContainer is _JSONDecoder {
+                // _JSONDecoder has a hook for Decimals; this won't recurse since we're not going to defer to Decimal in _JSONDecoder.
+                self  = try singleValueContainer.decode(Decimal.self)
+                return
+            }
+        } catch { /* Fall back to default implementation below. */ }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let exponent = try container.decode(CInt.self, forKey: .exponent)
+        let length = try container.decode(CUnsignedInt.self, forKey: .length)
+        let isNegative = try container.decode(Bool.self, forKey: .isNegative)
+        let isCompact = try container.decode(Bool.self, forKey: .isCompact)
+
+        var mantissaContainer = try container.nestedUnkeyedContainer(forKey: .mantissa)
+        var mantissa: (CUnsignedShort, CUnsignedShort, CUnsignedShort, CUnsignedShort,
+                       CUnsignedShort, CUnsignedShort, CUnsignedShort, CUnsignedShort) = (0,0,0,0,0,0,0,0)
+        mantissa.0 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.1 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.2 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.3 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.4 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.5 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.6 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.7 = try mantissaContainer.decode(CUnsignedShort.self)
+
+        self = Decimal(_exponent: exponent,
+                       _length: length,
+                       _isNegative: CUnsignedInt(isNegative ? 1 : 0),
+                       _isCompact: CUnsignedInt(isCompact ? 1 : 0),
+                       _reserved: 0,
+                       _mantissa: mantissa)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        // FIXME: This is a hook for bypassing a conditional conformance implementation to apply a strategy (see SR-5206). Remove this once conditional conformance is available.
+        // We are allowed to request this container as long as we don't encode anything through it when we need the keyed container below.
+        var singleValueContainer = encoder.singleValueContainer()
+        if singleValueContainer is _JSONEncoder {
+            // _JSONEncoder has a hook for Decimals; this won't recurse since we're not going to defer to Decimal in _JSONEncoder.
+            try singleValueContainer.encode(self)
+            return
+        }
+
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(_exponent, forKey: .exponent)
+        try container.encode(_length, forKey: .length)
+        try container.encode(_isNegative == 0 ? false : true, forKey: .isNegative)
+        try container.encode(_isCompact == 0 ? false : true, forKey: .isCompact)
+
+        var mantissaContainer = container.nestedUnkeyedContainer(forKey: .mantissa)
+        try mantissaContainer.encode(_mantissa.0)
+        try mantissaContainer.encode(_mantissa.1)
+        try mantissaContainer.encode(_mantissa.2)
+        try mantissaContainer.encode(_mantissa.3)
+        try mantissaContainer.encode(_mantissa.4)
+        try mantissaContainer.encode(_mantissa.5)
+        try mantissaContainer.encode(_mantissa.6)
+        try mantissaContainer.encode(_mantissa.7)
     }
 }

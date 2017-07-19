@@ -790,10 +790,14 @@ public let mapTests = [
     [], [],
     { _ -> Int32 in expectUnreachable(); return 0xffff }),
 
-  MapTest([ 101 ], [ 1 ], { (x: Int) -> Int32 in Int32(x + 100) }),
-  MapTest([ 101, 102 ], [ 1, 2 ], { (x: Int) -> Int32 in Int32(x + 100) }),
-  MapTest([ 101, 102, 103 ], [ 1, 2, 3 ], { (x: Int) -> Int32 in Int32(x + 100) }),
-  MapTest(Array(101..<200), Array(1..<100), { (x: Int) -> Int32 in Int32(x + 100) }),
+  MapTest([ 101 ], [ 1 ],
+    { (x: Int) -> Int32 in Int32(x + 100) }),
+  MapTest([ 101, 102 ], [ 1, 2 ],
+    { (x: Int) -> Int32 in Int32(x + 100) }),
+  MapTest([ 101, 102, 103 ], [ 1, 2, 3 ],
+    { (x: Int) -> Int32 in Int32(x + 100) }),
+  MapTest(Array(101..<200), Array(1..<100),
+    { (x: Int) -> Int32 in Int32(x + 100) }),
 ]
 
 public let minMaxTests = [

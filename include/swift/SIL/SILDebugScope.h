@@ -70,10 +70,8 @@ public:
 #endif
 };
 
-#ifndef NDEBUG
 /// Determine whether an instruction may not have a SILDebugScope.
 bool maybeScopeless(SILInstruction &I);
-#endif
 
 /// Knows how to make a deep copy of a debug scope.
 class ScopeCloner {

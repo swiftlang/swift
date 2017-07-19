@@ -61,7 +61,7 @@ FUNCTION(MakeBoxUnique,
          DefaultCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
-         ATTRS(NoUnwind, ZExt))
+         ATTRS(NoUnwind))
 
 FUNCTION(DeallocBox, swift_deallocBox, DefaultCC,
          RETURNS(VoidTy),
@@ -72,6 +72,11 @@ FUNCTION(ProjectBox, swift_projectBox, DefaultCC,
          RETURNS(OpaquePtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ReadNone))
+
+FUNCTION(AllocEmptyBox, swift_allocEmptyBox, DefaultCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(),
+         ATTRS(NoUnwind))
 
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocObject, swift_allocObject,
@@ -791,12 +796,17 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, DefaultCC,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_getExistentialTypeMetadata(size_t numProtocols,
+// Metadata *swift_getExistentialTypeMetadata(
+//                              ProtocolClassConstraint classConstraint,
+//                              const Metadata *superclassConstraint,
+//                              size_t numProtocols,
 //                              const protocol_descriptor_t * const *protocols);
+//
+// Note: ProtocolClassConstraint::Class is 0, ::Any is 1.
 FUNCTION(GetExistentialMetadata,
          swift_getExistentialTypeMetadata, RegisterPreservingCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy,
+         ARGS(Int1Ty, TypeMetadataPtrTy, SizeTy,
               ProtocolDescriptorPtrTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
@@ -1064,10 +1074,11 @@ FUNCTION(IsOptionalType,
          ATTRS(NoUnwind, ReadNone))
 
 // void swift_once(swift_once_t *predicate,
-//                 void (*function_code)(RefCounted*));
+//                 void (*function_code)(RefCounted*),
+//                 void *context);
 FUNCTION(Once, swift_once, DefaultCC,
          RETURNS(VoidTy),
-         ARGS(OnceTy->getPointerTo(), Int8PtrTy),
+         ARGS(OnceTy->getPointerTo(), Int8PtrTy, Int8PtrTy),
          ATTRS())
 
 // void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
@@ -1081,6 +1092,18 @@ FUNCTION(RegisterTypeMetadataRecords,
          swift_registerTypeMetadataRecords, DefaultCC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataRecordPtrTy, TypeMetadataRecordPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_beginAccess(void *pointer, ValueBuffer *scratch, size_t flags);
+FUNCTION(BeginAccess, swift_beginAccess, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, getFixedBufferTy()->getPointerTo(), SizeTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_endAccess(ValueBuffer *scratch);
+FUNCTION(EndAccess, swift_endAccess, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(getFixedBufferTy()->getPointerTo()),
          ATTRS(NoUnwind))
 
 FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, DefaultCC,
@@ -1194,6 +1217,11 @@ FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(GetKeyPath, swift_getKeyPath, C_CC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
 
 // Put here all definitions of runtime functions which are:
@@ -1211,7 +1239,7 @@ FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RegisterPreserv
 FUNCTION(Swift3ImplicitObjCEntrypoint, swift_objc_swift3ImplicitObjCEntrypoint,
          DefaultCC,
          RETURNS(VoidTy),
-         ARGS(ObjCPtrTy, ObjCSELTy),
+         ARGS(ObjCPtrTy, ObjCSELTy, Int8PtrTy, SizeTy, SizeTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 #endif

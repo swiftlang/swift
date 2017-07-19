@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_versioned
 internal protocol _ArrayProtocol
   : RangeReplaceableCollection,
     ExpressibleByArrayLiteral
@@ -31,7 +32,7 @@ internal protocol _ArrayProtocol
   /// element. Otherwise, `nil`.
   var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? { get }
 
-  subscript(index: Int) -> Iterator.Element { get set }
+  subscript(index: Int) -> Element { get set }
 
   //===--- basic mutations ------------------------------------------------===//
 
@@ -50,7 +51,7 @@ internal protocol _ArrayProtocol
   /// - Complexity: O(`self.count`).
   ///
   /// - Precondition: `startIndex <= i`, `i <= endIndex`.
-  mutating func insert(_ newElement: Iterator.Element, at i: Int)
+  mutating func insert(_ newElement: Element, at i: Int)
 
   /// Remove and return the element at the given index.
   ///
@@ -60,7 +61,7 @@ internal protocol _ArrayProtocol
   ///
   /// - Precondition: `count > index`.
   @discardableResult
-  mutating func remove(at index: Int) -> Iterator.Element
+  mutating func remove(at index: Int) -> Element
 
   //===--- implementation detail  -----------------------------------------===//
 
@@ -69,4 +70,16 @@ internal protocol _ArrayProtocol
 
   // For testing.
   var _buffer: _Buffer { get }
+}
+
+extension _ArrayProtocol {
+  // Since RangeReplaceableCollection now has a version of filter that is less
+  // efficient, we should make the default implementation coming from Sequence
+  // preferred.
+  @_inlineable
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    return try _filter(isIncluded)
+  }
 }

@@ -12,6 +12,13 @@
 
 import SwiftShims
 
+@_silgen_name("swift_bufferAllocate")
+internal func _swift_bufferAllocate(
+  bufferType type: AnyClass,
+  size: Int,
+  alignmentMask: Int
+) -> AnyObject
+
 /// A class whose instances contain a property of type `Header` and raw
 /// storage for an array of `Element`, whose size is determined at
 /// instance creation.
@@ -337,6 +344,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///
   /// - Note: It is an error to use the `header` property of the resulting
   ///   instance unless it has been initialized.
+  @_versioned
   internal init(_ buffer: ManagedBuffer<Header, Element>) {
     _nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
@@ -427,15 +435,14 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
       _headerOffset + MemoryLayout<Header>.size,
       toAlignment: MemoryLayout<Element>.alignment)
   }
+  
+  public static func == (
+    lhs: ManagedBufferPointer, rhs: ManagedBufferPointer
+  ) -> Bool {
+    return lhs._address == rhs._address
+  }
 
   internal var _nativeBuffer: Builtin.NativeObject
-}
-
-public func == <Header, Element>(
-  lhs: ManagedBufferPointer<Header, Element>,
-  rhs: ManagedBufferPointer<Header, Element>
-) -> Bool {
-  return lhs._address == rhs._address
 }
 
 // FIXME: when our calling convention changes to pass self at +0,

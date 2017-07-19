@@ -60,3 +60,5 @@ public var computedGlobalInUninstrumentedModule2: Int {
   get { return 0 }
   set { }
 }
+
+public func uninstrumentedBlackHole<T>(_ p: T) { }

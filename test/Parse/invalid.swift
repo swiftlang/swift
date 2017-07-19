@@ -1,12 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-func foo(_ a: Int) {
-  // expected-error @+1 {{invalid character in source file}} {{8-9= }}
-  foo(<\a\>) // expected-error {{invalid character in source file}} {{10-11= }}
-  // expected-error @-1 {{'<' is not a prefix unary operator}}
-  // expected-error @-2 {{'>' is not a postfix unary operator}}
-}
-
 // rdar://15946844
 func test1(inout var x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{18-22=}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{12-17=}} {{26-26=inout }}
@@ -50,17 +43,6 @@ func testNotCoveredCase(x: Int) {
   default:
     break
   }
-
-  switch x { // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
-#if true // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
-  case 1:
-    break
-  case "foobar": // ignored
-    break
-  default:
-    break
-#endif
-  }
 }
 
 // rdar://18926814
@@ -100,18 +82,18 @@ func SR979d(let let a: Int) {}  // expected-error {{'let' as a parameter attribu
 // expected-error @-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-21=}}
 func SR979e(inout x: inout String) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-18=}}
 func SR979f(var inout x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-23=}}
-// expected-error @-1 {{parameters may not have the 'var' specifier}} {{13-16=}}{{3-3=var x = x\n  }} 
-  x += 10
+// expected-error @-1 {{'var' as a parameter attribute is not allowed}}
+  x += 10     // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
 }
 func SR979g(inout i: inout Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-18=}}
 func SR979h(let inout x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-23=}}
 // expected-error @-1 {{'let' as a parameter attribute is not allowed}}
 class VarTester {
-  init(var a: Int, var b: Int) {} // expected-error {{parameters may not have the 'var' specifier}} {{8-11=}} {{33-33= var a = a }}
-  // expected-error @-1 {{parameters may not have the 'var' specifier}} {{20-24=}} {{33-33= var b = b }}
-    func x(var b: Int) { //expected-error {{parameters may not have the 'var' specifier}} {{12-15=}} {{9-9=var b = b\n        }}
-        b += 10
-    }
+  init(var a: Int, var b: Int) {} // expected-error {{'var' as a parameter attribute is not allowed}}
+  // expected-error @-1 {{'var' as a parameter attribute is not allowed}}
+  func x(var b: Int) { //expected-error {{'var' as a parameter attribute is not allowed}}
+    b += 10 // expected-error {{left side of mutating operator isn't mutable: 'b' is a 'let' constant}}
+  }
 }
 
 func repeat() {}

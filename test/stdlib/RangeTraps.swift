@@ -9,14 +9,16 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out_Debug
 // RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
+// CountablePartialRangeFrom fails in resilient mode. <rdar://problem/31909976>
+// XFAIL: resilient_stdlib
+
 
 import StdlibUnittest
 
@@ -58,6 +60,21 @@ RangeTraps.test("OutOfRange")
   // This works for Ranges now!
   expectTrue((0...Int.max).contains(Int.max))
 }
+
+RangeTraps.test("CountablePartialRangeFrom")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+    
+    let range = (Int.max - 1)...
+    var it = range.makeIterator()
+    _ = it.next()
+    expectCrashLater()
+    _ = it.next()
+}
+
+
 
 runAllTests()
 

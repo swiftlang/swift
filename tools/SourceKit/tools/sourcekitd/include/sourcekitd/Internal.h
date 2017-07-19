@@ -142,6 +142,7 @@ public:
                             llvm::function_ref<bool(RequestDict)> applier);
 
   bool getInt64(SourceKit::UIdent Key, int64_t &Val, bool isOptional);
+  Optional<int64_t> getOptionalInt64(SourceKit::UIdent Key);
 };
 
 void initialize();

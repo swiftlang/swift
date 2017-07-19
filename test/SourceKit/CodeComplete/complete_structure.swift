@@ -117,8 +117,6 @@ func test9(_ x: inout Int) {
 // INT_INNER_0: {name:x==}
 // INT_INNER_0: {name:x<}
 // INT_INNER_0: {name:x+}
-// INT_INNER_0: {name:x++}
-// INT_INNER_0: {name:x>>}
 // INT_INNER_0: {name:x..<}
 
 protocol P1 {

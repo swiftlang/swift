@@ -131,13 +131,21 @@ For details see the SILDebugInfoGenerator pass.
 To enable SIL debugging and profiling for the Swift standard library, use
 the build-script-impl option ``--build-sil-debugging-stdlib``.
 
-Other Utilities
-```````````````
+ViewCFG: Regex based CFG Printer
+````````````````````````````````
 
-To view the CFG of a function (or code region) in a SIL file, you can use the
-script ``swift/utils/viewcfg``. It also works for LLVM IR files.
-The script reads the SIL (or LLVM IR) code from stdin and displays the dot
-graph file. Note: .dot files should be associated with the Graphviz app.
+ViewCFG (``./utils/viewcfg``) is a script that parses a textual CFG (e.g. a llvm
+or sil function) and displays a .dot file of the CFG. Since the parsing is done
+using regular expressions (i.e. ignoring language semantics), ViewCFG can:
+
+1. Parse both SIL and LLVM IR
+2. Parse blocks and functions without needing to know contextual
+   information. Ex: types and declarations.
+
+The script assumes that the relevant text is passed in via stdin and uses open
+to display the .dot file.
+
+**NOTE** Since we use open, .dot files should be associated with the Graphviz app for this to work.
 
 Using Breakpoints
 `````````````````

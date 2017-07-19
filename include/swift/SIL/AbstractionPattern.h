@@ -177,16 +177,22 @@ class AbstractionPattern {
     /// function type.  ObjCMethod is valid.  OtherData is an encoded
     /// foreign error index.
     PartialCurriedObjCMethodType,
+    /// The uncurried imported type of a C function imported as a method.
+    /// OrigType is valid and is a function type. ClangType is valid and is
+    /// a function type. OtherData is an encoded ImportAsMemberStatus.
+    CFunctionAsMethodType,
+    /// The uncurried parameter tuple type of a C function imported as a method.
+    /// OrigType is valid and is a function type. ClangType is valid and is
+    /// a tuple type. OtherData is an encoded ImportAsMemberStatus.
+    CFunctionAsMethodParamTupleType,
     /// The curried imported type of a C function imported as a method.
     /// OrigType is valid and is a function type. ClangType is valid and is
-    /// a function type. OtherData is the offset of the parameter imported as
-    /// `self`, or -1 if the function was imported as a static method.
+    /// a function type. OtherData is an encoded ImportAsMemberStatus.
     CurriedCFunctionAsMethodType,
     /// The partially-applied curried imported type of a C function imported as
     /// a method.
     /// OrigType is valid and is a function type. ClangType is valid and is
-    /// a function type. OtherData is the offset of the parameter imported as
-    /// `self`, or ~0 if the function was imported as a static method.
+    /// a function type. OtherData is an encoded ImportAsMemberStatus.
     PartialCurriedCFunctionAsMethodType,
     /// The uncurried imported type of an Objective-C method (that is,
     /// '(Input, Self) -> Result').  OrigType is valid and is a function
@@ -208,8 +214,7 @@ class AbstractionPattern {
     /// A reference to the formal method parameters of a C function that was
     /// imported as a method.
     /// OrigType is valid and is a tuple type. ClangType is valid and is
-    /// a function type. OtherData is the offset of the parameter imported as
-    /// `self`, or ~0 if the function was imported as a static method.
+    /// a function type. OtherData is an encoded ImportAsMemberStatus.
     CFunctionAsMethodFormalParamTupleType,
   };
 
@@ -287,19 +292,33 @@ class AbstractionPattern {
   }
 
   bool hasStoredClangType() const {
-    return (getKind() == Kind::ClangType ||
-            getKind() == Kind::ClangFunctionParamTupleType ||
-            getKind() == Kind::CurriedCFunctionAsMethodType ||
-            getKind() == Kind::PartialCurriedCFunctionAsMethodType ||
-            getKind() == Kind::CFunctionAsMethodFormalParamTupleType);
+    switch (getKind()) {
+    case Kind::ClangType:
+    case Kind::ClangFunctionParamTupleType:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CFunctionAsMethodParamTupleType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
+      return true;
+
+    default:
+      return false;
+    }
   }
 
   bool hasStoredObjCMethod() const {
-    return (getKind() == Kind::CurriedObjCMethodType ||
-            getKind() == Kind::PartialCurriedObjCMethodType ||
-            getKind() == Kind::ObjCMethodType ||
-            getKind() == Kind::ObjCMethodParamTupleType ||
-            getKind() == Kind::ObjCMethodFormalParamTupleType);
+    switch (getKind()) {
+    case Kind::CurriedObjCMethodType:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::ObjCMethodType:
+    case Kind::ObjCMethodParamTupleType:
+    case Kind::ObjCMethodFormalParamTupleType:
+      return true;
+
+    default:
+      return false;
+    }
   }
 
   bool hasStoredForeignErrorInfo() const {
@@ -307,9 +326,17 @@ class AbstractionPattern {
   }
 
   bool hasImportAsMemberStatus() const {
-    return getKind() == Kind::CurriedCFunctionAsMethodType ||
-           getKind() == Kind::PartialCurriedCFunctionAsMethodType ||
-           getKind() == Kind::CFunctionAsMethodFormalParamTupleType;
+    switch (getKind()) {
+    case Kind::CFunctionAsMethodType:
+    case Kind::CFunctionAsMethodParamTupleType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
+      return true;
+
+    default:
+      return false;
+    }
   }
   
   void initSwiftType(CanGenericSignature signature, CanType origType,
@@ -416,8 +443,35 @@ public:
   getCurriedObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
                        const Optional<ForeignErrorConvention> &foreignError);
 
+  /// Return an abstraction pattern for the uncurried type of a C function
+  /// imported as a method.
+  ///
+  /// For example, if the original function is:
+  ///   void CCRefrigatorSetTemperature(CCRefrigeratorRef fridge,
+  ///                                   CCRefrigeratorCompartment compartment,
+  ///                                   CCTemperature temperature);
+  /// then the uncurried type is:
+  ///   ((CCRefrigeratorComponent, CCTemperature), CCRefrigerator) -> ()
+  static AbstractionPattern
+  getCFunctionAsMethod(CanType origType, const clang::Type *clangType,
+                       ImportAsMemberStatus memberStatus) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCFunctionAsMethod(nullptr, origType, clangType,
+                                  Kind::CFunctionAsMethodType,
+                                  memberStatus);
+    return pattern;
+  }
+
   /// Return an abstraction pattern for the curried type of a
   /// C function imported as a method.
+  ///
+  /// For example, if the original function is:
+  ///   void CCRefrigatorSetTemperature(CCRefrigeratorRef fridge,
+  ///                                   CCRefrigeratorCompartment compartment,
+  ///                                   CCTemperature temperature);
+  /// then the curried type is:
+  ///   (CCRefrigerator) -> (CCRefrigeratorCompartment, CCTemperature) -> ()
   static AbstractionPattern
   getCurriedCFunctionAsMethod(CanType origType,
                               const AbstractFunctionDecl *function);
@@ -481,6 +535,15 @@ private:
     return pattern;
   }
 
+  /// Return an abstraction pattern for the partially-applied curried
+  /// type of a C function imported as a method.
+  ///
+  /// For example, if the original function is:
+  ///   CCRefrigatorSetTemperature(CCRefrigeratorRef, CCTemperature)
+  /// then the curried type is:
+  ///   (CCRefrigerator) -> (CCTemperature) -> ()
+  /// and the partially-applied curried type is:
+  ///   (CCTemperature) -> ()
   static AbstractionPattern
   getPartialCurriedCFunctionAsMethod(CanGenericSignature signature,
                                      CanType origType,
@@ -524,6 +587,29 @@ private:
     AbstractionPattern pattern;
     pattern.initObjCMethod(signature, origType, method,
                            Kind::ObjCMethodParamTupleType, errorInfo);
+    return pattern;
+  }
+
+  /// Return an abstraction pattern for a tuple representing the
+  /// uncurried parameter clauses of a C function imported as a method.
+  ///
+  /// For example, if the original function is:
+  ///   void CCRefrigatorSetTemperature(CCRefrigeratorRef fridge,
+  ///                                   CCRefrigeratorCompartment compartment,
+  ///                                   CCTemperature temperature);
+  /// then the parameter tuple type is:
+  ///   ((CCRefrigeratorComponent, CCTemperature), CCRefrigerator)
+  static AbstractionPattern
+  getCFunctionAsMethodParamTuple(CanGenericSignature signature,
+                                 CanType origType,
+                                 const clang::Type *type,
+                                 ImportAsMemberStatus memberStatus) {
+    assert(isa<TupleType>(origType));
+    assert(cast<TupleType>(origType)->getNumElements() == 2);
+    AbstractionPattern pattern;
+    pattern.initCFunctionAsMethod(signature, origType, type,
+                                  Kind::CFunctionAsMethodParamTupleType,
+                                  memberStatus);
     return pattern;
   }
 
@@ -669,12 +755,54 @@ public:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CFunctionAsMethodParamTupleType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::CFunctionAsMethodFormalParamTupleType:
     case Kind::Type:
     case Kind::Discard:
       return OrigType;
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  /// Do the two given types have the same basic type structure as
+  /// far as abstraction patterns are concerned?
+  ///
+  /// Type structure means tuples, functions, and optionals should
+  /// appear in the same positions.
+  static bool hasSameBasicTypeStructure(CanType l, CanType r);
+
+  /// Rewrite the type of this abstraction pattern without otherwise
+  /// changing its structure.  It is only valid to do this on a pattern
+  /// that already stores a type, and the new type must have the same
+  /// basic type structure as the old one.
+  void rewriteType(CanGenericSignature signature, CanType type) {
+    switch (getKind()) {
+    case Kind::Invalid:
+    case Kind::Opaque:
+    case Kind::Tuple:
+      llvm_unreachable("type cannot be replaced on pattern without type");
+    case Kind::ClangType:
+    case Kind::ClangFunctionParamTupleType:
+    case Kind::CurriedObjCMethodType:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::ObjCMethodType:
+    case Kind::ObjCMethodParamTupleType:
+    case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CFunctionAsMethodParamTupleType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
+    case Kind::Type:
+    case Kind::Discard:
+      assert(signature || !type->hasTypeParameter());
+      assert(hasSameBasicTypeStructure(OrigType, type));
+      GenericSig = (type->hasTypeParameter() ? signature : nullptr);
+      OrigType = type;
+      return;
     }
     llvm_unreachable("bad kind");
   }
@@ -700,6 +828,8 @@ public:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CFunctionAsMethodParamTupleType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::CFunctionAsMethodFormalParamTupleType:
@@ -755,6 +885,8 @@ public:
     case Kind::ClangType:
     case Kind::Type:
     case Kind::Discard:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CFunctionAsMethodParamTupleType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::CFunctionAsMethodFormalParamTupleType:
@@ -786,6 +918,8 @@ public:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CFunctionAsMethodParamTupleType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::CFunctionAsMethodFormalParamTupleType:
@@ -814,6 +948,8 @@ public:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CFunctionAsMethodParamTupleType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::CFunctionAsMethodFormalParamTupleType:
@@ -839,11 +975,13 @@ public:
     case Kind::Opaque:
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
+    case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::ObjCMethodType:
       return false;
     case Kind::Tuple:
+    case Kind::CFunctionAsMethodParamTupleType:
     case Kind::ClangFunctionParamTupleType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
@@ -864,6 +1002,7 @@ public:
     case Kind::Opaque:
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
+    case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::ObjCMethodType:
@@ -874,6 +1013,7 @@ public:
     case Kind::Discard:
     case Kind::ClangType:
     case Kind::ClangFunctionParamTupleType:
+    case Kind::CFunctionAsMethodParamTupleType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
     case Kind::CFunctionAsMethodFormalParamTupleType:
@@ -895,7 +1035,7 @@ public:
 
   /// Given that the value being abstracted is an l-value or inout type,
   /// return the abstraction pattern for its object type.
-  AbstractionPattern getLValueOrInOutObjectType() const;
+  AbstractionPattern getWithoutSpecifierType() const;
 
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.

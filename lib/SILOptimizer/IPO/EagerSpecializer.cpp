@@ -102,8 +102,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       // expects.
       auto *TupleI = cast<SILInstruction>(RetInst->getOperand(0));
       if (TupleI->hasOneUse()) {
-        TupleI->removeFromParent();
-        RetBB->insert(RetInst, TupleI);
+        TupleI->moveBefore(RetInst);
       } else {
         TupleI = TupleI->clone(RetInst);
         RetInst->setOperand(0, TupleI);
@@ -163,13 +162,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
   SILBasicBlock *ErrorBB = F.createBasicBlock();
   SILBasicBlock *NormalBB = F.createBasicBlock();
 
-  Builder.createTryApply(Loc,
-                         FuncRef,
-                         SILType::getPrimitiveObjectType(CanSILFuncTy),
-                         Subs,
-                         CallArgs,
-                         NormalBB,
-                         ErrorBB);
+  Builder.createTryApply(Loc, FuncRef, Subs, CallArgs, NormalBB, ErrorBB);
 
   {
     // Emit the rethrow logic.
@@ -248,11 +241,22 @@ emitInvocation(SILBuilder &Builder,
   SILFunctionConventions fnConv(CalleeSILSubstFnTy.castTo<SILFunctionType>(),
                                 Builder.getModule());
 
-  if (!CanSILFuncTy->hasErrorResult()) {
-    return Builder.createApply(
-        CalleeFunc->getLocation(), FuncRefInst, CalleeSILSubstFnTy,
-        fnConv.getSILResultType(), Subs, CallArgs, false);
+  bool isNonThrowing = false;
+  // It is a function whose type claims it is throwing, but
+  // it actually never throws inside its body?
+  if (CanSILFuncTy->hasErrorResult() &&
+      CalleeFunc->findThrowBB() == CalleeFunc->end()) {
+    isNonThrowing = true;
   }
+
+  // Is callee a non-throwing function according to its type
+  // or de-facto?
+  if (!CanSILFuncTy->hasErrorResult() ||
+      CalleeFunc->findThrowBB() == CalleeFunc->end()) {
+    return Builder.createApply(CalleeFunc->getLocation(), FuncRefInst,
+                               Subs, CallArgs, isNonThrowing);
+  }
+
   return emitApplyWithRethrow(Builder, CalleeFunc->getLocation(),
                               FuncRefInst, CalleeSubstFnTy, Subs,
                               CallArgs,
@@ -324,7 +328,10 @@ protected:
 /// given specialized function. Converts call arguments. Emits an invocation of
 /// the specialized function. Handle the return value.
 void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
-  SILBasicBlock *OldReturnBB = &*GenericFunc->findReturnBB();
+  SILBasicBlock *OldReturnBB = nullptr;
+  auto ReturnBB = GenericFunc->findReturnBB();
+  if (ReturnBB != GenericFunc->end())
+      OldReturnBB = &*ReturnBB;
   // 1. Emit a cascading sequence of type checks blocks.
 
   // First split the entry BB, moving all instructions to the FailedTypeCheckBB.
@@ -346,10 +353,10 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     if (!Replacement->hasArchetype()) {
       // Dispatch on concrete type.
       emitTypeCheck(FailedTypeCheckBB, ParamTy, Replacement);
-    } else {
+    } else if (auto Archetype = Replacement->getAs<ArchetypeType>()) {
       // If Replacement has a layout constraint, then dispatch based
       // on its size and the fact that it is trivial.
-      auto LayoutInfo = Replacement->getLayoutConstraint();
+      auto LayoutInfo = Archetype->getLayoutConstraint();
       if (LayoutInfo && LayoutInfo->isTrivial()) {
         // Emit a check that it is a trivial type of a certain size.
         emitTrivialAndSizeCheck(FailedTypeCheckBB, ParamTy,
@@ -395,7 +402,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     Result = Builder.createTuple(Loc, VoidTy, { });
 
   // Function marked as @NoReturn must be followed by 'unreachable'.
-  if (NewFunc->isNoReturnFunction())
+  if (NewFunc->isNoReturnFunction() || !OldReturnBB)
     Builder.createUnreachable(Loc);
   else {
     auto resultTy = GenericFunc->getConventions().getSILResultType();
@@ -535,11 +542,11 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                         {CanBeClass, ClassConst});
 
   auto *SuccessBB = Builder.getFunction().createBasicBlock();
-  auto *MayBeCalssCheckBB = Builder.getFunction().createBasicBlock();
+  auto *MayBeCallsCheckBB = Builder.getFunction().createBasicBlock();
   Builder.createCondBranch(Loc, Cmp1, SuccessBB,
-                           MayBeCalssCheckBB);
+                           MayBeCallsCheckBB);
 
-  Builder.emitBlock(MayBeCalssCheckBB);
+  Builder.emitBlock(MayBeCallsCheckBB);
 
   auto MayBeClassConst =
       Builder.createIntegerLiteral(Loc, Int8Ty, 2);
@@ -555,14 +562,8 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
   Builder.emitBlock(IsClassCheckBB);
 
   auto *FRI = Builder.createFunctionRef(Loc, IsClassF);
-  auto CanFnTy = IsClassF->getLoweredFunctionType()->substGenericArgs(
-      Builder.getModule(), {Sub});
-  auto SILFnTy = SILType::getPrimitiveObjectType(CanFnTy);
-  SILFunctionConventions fnConv(CanFnTy, Builder.getModule());
-  auto SILResultTy = fnConv.getSILResultType();
-  auto IsClassRuntimeCheck =
-      Builder.createApply(Loc, FRI, SILFnTy, SILResultTy, {Sub}, {GenericMT},
-                          /* isNonThrowing */ false);
+  auto IsClassRuntimeCheck = Builder.createApply(Loc, FRI, {Sub}, {GenericMT},
+                                                 /* isNonThrowing */ false);
   // Extract the i1 from the Bool struct.
   StructDecl *BoolStruct = cast<StructDecl>(Ctx.getBoolDecl());
   auto Members = BoolStruct->lookupDirect(Ctx.Id_value_);
@@ -685,7 +686,6 @@ public:
 
   void run() override;
 
-  StringRef getName() override { return "Eager Specializer"; }
 };
 } // end anonymous namespace
 
@@ -703,9 +703,13 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
         dbgs() << "  Specialize Attr:";
         SA.print(dbgs()); dbgs() << "\n");
 
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (GenericFunc->isSerialized())
+    Serialized = IsSerializable;
+
   GenericFuncSpecializer
         FuncSpecializer(GenericFunc, ReInfo.getClonerParamSubstitutions(),
-                        GenericFunc->isSerialized(), ReInfo);
+                        Serialized, ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)

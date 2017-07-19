@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/main.swift
 // RUN: if [ %target-runtime == "objc" ]; then \
@@ -203,7 +202,10 @@ func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by native storage
 func getNativeBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
   Set<NSObject> {
-  let result: Set<NSObject> = Set(members.map({ TestObjCKeyTy($0) }))
+  // SR-4724: Should not need to be split out but if it is not it
+  // is considered ambiguous.
+  let temp = members.map({ TestObjCKeyTy($0) })
+  let result: Set<NSObject> = Set(temp)
   expectTrue(isNativeSet(result))
   return result
 }
@@ -3486,6 +3488,28 @@ SetTestSuite.test("first") {
 
   expectTrue(s1.contains(s1.first!))
   expectNil(emptySet.first)
+}
+
+SetTestSuite.test("capacity/reserveCapacity(_:)") {
+  var s1: Set = [10, 20, 30]
+  expectEqual(3, s1.capacity)
+  s1.insert(40)
+  expectEqual(6, s1.capacity)
+
+  // Reserving new capacity jumps up to next limit.
+  s1.reserveCapacity(7)
+  expectEqual(12, s1.capacity)
+
+  // Can reserve right up to a limit.
+  s1.reserveCapacity(24)
+  expectEqual(24, s1.capacity)
+
+  // Fill up to the limit, no reallocation.
+  s1.formUnion(stride(from: 50, through: 240, by: 10))
+  expectEqual(24, s1.count)
+  expectEqual(24, s1.capacity)
+  s1.insert(250)
+  expectEqual(48, s1.capacity)
 }
 
 SetTestSuite.test("isEmpty") {

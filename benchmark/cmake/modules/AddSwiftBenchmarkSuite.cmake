@@ -42,12 +42,12 @@ function (swift_benchmark_compile_archopts)
   set(bench_flags "${${benchvar}}")
 
   set(common_options
+      "-swift-version" "3" # FIXME: Force Swift 3 version compatibility.
       "-c"
       "-sdk" "${sdk}"
       "-target" "${target}"
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-${BENCH_COMPILE_ARCHOPTS_OPT}"
-      "-D" "INTERNAL_CHECKS_ENABLED"
       "-no-link-objc-runtime"
       "-I" "${srcdir}/utils/ObjectiveCTests")
 
@@ -62,7 +62,6 @@ function (swift_benchmark_compile_archopts)
       "-target" "${target}"
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-${driver_opt}"
-      "-D" "INTERNAL_CHECKS_ENABLED"
       "-no-link-objc-runtime")
 
   set(bench_library_objects)

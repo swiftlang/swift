@@ -17,6 +17,8 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -65,11 +67,10 @@ llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
   return loc.Value;
 }
 
-void
-PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                             DiagnosticKind Kind, 
-                                             StringRef Text,
-                                             const DiagnosticInfo &Info) {
+void PrintingDiagnosticConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info) {
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
   switch (Kind) {
@@ -103,6 +104,14 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
   ColoredStream coloredErrs{Stream};
   raw_ostream &out = ForceColors ? coloredErrs : Stream;
   const llvm::SourceMgr &rawSM = SM.getLLVMSourceMgr();
+  
+  // Actually substitute the diagnostic arguments into the diagnostic text.
+  llvm::SmallString<256> Text;
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+  }
+  
   auto Msg = SM.GetMessage(Loc, SMKind, Text, Ranges, FixIts);
   rawSM.PrintMessage(out, Msg);
 }

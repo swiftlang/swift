@@ -27,7 +27,7 @@
 // Helper class designed to consolidate reporting of LLVM statistics and timers
 // across swift compilations that typically invoke many drivers, each running
 // many frontends. Additionally collects some cheap "always-on" statistics,
-// beyond those that are (compile-time) parametrized by -DLLVM_ENABLE_STATS
+// beyond those that are (compile-time) parameterized by -DLLVM_ENABLE_STATS
 // (LLVM's stats are global and involve some amount of locking and mfences).
 //
 // Assumes it's given a process name and target name (the latter used as
@@ -67,10 +67,44 @@ public:
     size_t DriverDepNominal;
     size_t DriverDepMember;
     size_t DriverDepExternal;
+
+    size_t ChildrenMaxRSS;
   };
 
   struct AlwaysOnFrontendCounters
   {
+    size_t NumSourceBuffers;
+    size_t NumLinkLibraries;
+    size_t NumLoadedModules;
+    size_t NumImportedExternalDefinitions;
+    size_t NumTotalClangImportedEntities;
+    size_t NumASTBytesAllocated;
+    size_t NumDependencies;
+    size_t NumReferencedTopLevelNames;
+    size_t NumReferencedDynamicNames;
+    size_t NumReferencedMemberNames;
+    size_t NumDecls;
+    size_t NumLocalTypeDecls;
+    size_t NumObjCMethods;
+    size_t NumInfixOperators;
+    size_t NumPostfixOperators;
+    size_t NumPrefixOperators;
+    size_t NumPrecedenceGroups;
+    size_t NumUsedConformances;
+
+    size_t NumConformancesDeserialized;
+    size_t NumConstraintScopes;
+    size_t NumDeclsDeserialized;
+    size_t NumDeclsValidated;
+    size_t NumFunctionsTypechecked;
+    size_t NumGenericSignatureBuilders;
+    size_t NumLazyGenericEnvironments;
+    size_t NumLazyGenericEnvironmentsLoaded;
+    size_t NumLazyIterableDeclContexts;
+    size_t NumTypesDeserialized;
+    size_t NumTypesValidated;
+    size_t NumUnloadedLazyIterableDeclContexts;
+
     size_t NumSILGenFunctions;
     size_t NumSILGenVtables;
     size_t NumSILGenWitnessTables;
@@ -82,6 +116,18 @@ public:
     size_t NumSILOptWitnessTables;
     size_t NumSILOptDefaultWitnessTables;
     size_t NumSILOptGlobalVariables;
+
+    size_t NumIRGlobals;
+    size_t NumIRFunctions;
+    size_t NumIRAliases;
+    size_t NumIRIFuncs;
+    size_t NumIRNamedMetaData;
+    size_t NumIRValueSymbols;
+    size_t NumIRComdatSymbols;
+    size_t NumIRBasicBlocks;
+    size_t NumIRInsts;
+
+    size_t NumLLVMBytesOutput;
   };
 
 private:
@@ -94,9 +140,16 @@ private:
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(llvm::raw_ostream &OS);
 
+  UnifiedStatsReporter(StringRef ProgramName,
+                       StringRef AuxName,
+                       StringRef Directory);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
-                       StringRef TargetName,
+                       StringRef ModuleName,
+                       StringRef InputName,
+                       StringRef TripleName,
+                       StringRef OutputType,
+                       StringRef OptType,
                        StringRef Directory);
   ~UnifiedStatsReporter();
 

@@ -145,8 +145,8 @@ class SubVariadic : SuperVariadic { } // expected-warning 4{{synthesizing a vari
 // Don't crash with invalid nesting of class in generic function
 
 func testClassInGenericFunc<T>(t: T) {
-  class A { init(t: T) {} } // expected-error {{type 'A' cannot be nested in generic function 'testClassInGenericFunc'}}
-  class B : A {} // expected-error {{type 'B' cannot be nested in generic function 'testClassInGenericFunc'}}
+  class A { init(t: T) {} } // expected-error {{type 'A' cannot be nested in generic function 'testClassInGenericFunc(t:)'}}
+  class B : A {} // expected-error {{type 'B' cannot be nested in generic function 'testClassInGenericFunc(t:)'}}
 
   _ = B(t: t)
 }

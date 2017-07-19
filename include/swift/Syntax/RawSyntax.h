@@ -18,10 +18,10 @@
 // They are reference-counted and strictly immutable, so can be shared freely
 // among Syntax nodes and have no specific identity. They could even in theory
 // be shared for expressions like 1 + 1 + 1 + 1 - you don't need 7 syntax nodes
-// to expressSwiftTypeConverter that at this layer.
+// to express that at this layer.
 //
 // These are internal implementation ONLY - do not expose anything involving
-// RawSyntax publically. Clients of lib/Syntax should not be aware that they
+// RawSyntax publicly. Clients of lib/Syntax should not be aware that they
 // exist.
 //
 //===----------------------------------------------------------------------===//
@@ -50,26 +50,29 @@ using llvm::StringRef;
 
 #ifndef NDEBUG
 #define syntax_assert_child_token(Raw, Cursor, TokenKind)                      \
-  (assert(cast<TokenSyntax>(Raw->getChild(Cursor))->getTokenKind() == TokenKind));
+  (assert(cast<RawTokenSyntax>(Raw->getChild(Cursor))->getTokenKind() ==       \
+          TokenKind));
 #else
 #define syntax_assert_child_token(Raw, Cursor, TokenKind) ((void)0);
 #endif
 
 #ifndef NDEBUG
 #define syntax_assert_child_token_text(Raw, Cursor, TokenKind, Text)           \
-  (assert(cast<TokenSyntax>(Raw->getChild(Cursor))->getTokenKind() ==          \
-          TokenKind));                                                         \
-  (assert(cast<TokenSyntax>(Raw->getChild(Cursor))->getText() == Text));
+  ({                                                                           \
+    auto __Child = cast<RawTokenSyntax>(Raw->getChild(Cursor));                \
+    assert(__Child->getTokenKind() == TokenKind);                              \
+    assert(__Child->getText() == Text);                                        \
+  })
 #else
 #define syntax_assert_child_token_text(Raw, Cursor, TokenKind, Text) ((void)0);
 #endif
 
 #ifndef NDEBUG
 #define syntax_assert_token_is(Tok, Kind, Text)                                \
-  {                                                                            \
-    assert(Tok->getTokenKind() == Kind);                                       \
-    assert(Tok->getText() == Text);                                            \
-  }
+  ({                                                                           \
+    assert(Tok.getTokenKind() == Kind);                                        \
+    assert(Tok.getText() == Text);                                             \
+  })
 #else
 #define syntax_assert_token_is(Tok, Kind, Text) ((void)0);
 #endif
