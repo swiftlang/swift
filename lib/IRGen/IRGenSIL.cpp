@@ -29,6 +29,7 @@
 #include "llvm/Support/Debug.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
+#include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/ASTContext.h"
@@ -134,231 +135,216 @@ public:
     /// If the stackrestore point is set (currently, this might happen for
     /// opaque types: generic and resilient) the deallocation of the stack must
     /// reset the stack pointer to this point.
-    Address,
+    StackAddress,
+
+    /// A @box together with the address of the box value.
+    OwnedAddress,
 
     /// The lowered value of a begin_access instruction using dynamic
     /// enforcement.
     DynamicallyEnforcedAddress,
 
-    /// The following kinds correspond to SIL non-address values.
-    Value_First,
-      /// A normal value, represented as an exploded array of llvm Values.
-      Explosion = Value_First,
+    /// A normal value, represented as an exploded array of llvm Values.
+    ExplosionVector,
 
-      /// A @box together with the address of the box value.
-      BoxWithAddress,
+    /// The special case of a single explosion.
+    SingletonExplosion,
 
-      /// A value that represents a statically-known function symbol that
-      /// can be called directly, represented as a StaticFunction.
-      StaticFunction,
-    
-      /// A value that represents an Objective-C method that must be called with
-      /// a form of objc_msgSend.
-      ObjCMethod,
-    Value_Last = ObjCMethod,
+    /// A value that represents a statically-known function symbol that
+    /// can be called directly, represented as a StaticFunction.
+    StaticFunction,
+
+    /// A value that represents an Objective-C method that must be called with
+    /// a form of objc_msgSend.
+    ObjCMethod,
+
+    /// The special case of an empty explosion.
+    EmptyExplosion,
   };
   
   Kind kind;
   
 private:
   using ExplosionVector = SmallVector<llvm::Value *, 4>;
+  using SingletonExplosion = llvm::Value*;
   
-  union {
-    ContainedAddress containedAddress;
-    StackAddress address;
-    OwnedAddress boxWithAddress;
-    DynamicallyEnforcedAddress dynamicallyEnforcedAddress;
-    struct {
-      ExplosionVector values;
-    } explosion;
-    StaticFunction staticFunction;
-    ObjCMethod objcMethod;
-  };
+  static int getStorageTypeForKind(Kind kind) {
+    switch (kind) {
+    case Kind::ContainedAddress: return 0;
+    case Kind::StackAddress: return 1;
+    case Kind::OwnedAddress: return 2;
+    case Kind::DynamicallyEnforcedAddress: return 3;
+    case Kind::ExplosionVector: return 4;
+    case Kind::SingletonExplosion: return 5;
+    case Kind::StaticFunction: return 6;
+    case Kind::ObjCMethod: return 7;
+    case Kind::EmptyExplosion: return -1;
+    }
+    llvm_unreachable("bad kind");
+  }
+  ExternalUnion<Kind, getStorageTypeForKind,
+                ContainedAddress,
+                StackAddress,
+                OwnedAddress,
+                DynamicallyEnforcedAddress,
+                ExplosionVector,
+                SingletonExplosion,
+                StaticFunction,
+                ObjCMethod> Storage;
 
 public:
 
   /// Create an address value without a stack restore point.
   LoweredValue(const Address &address)
-    : kind(Kind::Address), address(address)
-  {}
+      : kind(Kind::StackAddress) {
+    Storage.emplace<StackAddress>(kind, address);
+  }
 
   /// Create an address value with an optional stack restore point.
   LoweredValue(const StackAddress &address)
-    : kind(Kind::Address), address(address)
-  {}
+      : kind(Kind::StackAddress) {
+    Storage.emplace<StackAddress>(kind, address);
+  }
 
   /// Create an address value using dynamic enforcement.
   LoweredValue(const DynamicallyEnforcedAddress &address)
-    : kind(Kind::DynamicallyEnforcedAddress),
-      dynamicallyEnforcedAddress(address)
-  {}
+      : kind(Kind::DynamicallyEnforcedAddress) {
+    Storage.emplace<DynamicallyEnforcedAddress>(kind, address);
+  }
   
   enum ContainerForUnallocatedAddress_t { ContainerForUnallocatedAddress };
 
   /// Create an address value for an alloc_stack, consisting of a container and
   /// a not yet allocated buffer.
   LoweredValue(const Address &container, ContainerForUnallocatedAddress_t)
-    : kind(Kind::ContainedAddress), containedAddress(container, Address())
-  {}
+      : kind(Kind::ContainedAddress) {
+    Storage.emplace<ContainedAddress>(kind, container, Address());
+  }
   
   /// Create an address value for an alloc_stack, consisting of a container and
   /// the address of the allocated buffer.
   LoweredValue(const ContainedAddress &address)
-    : kind(Kind::ContainedAddress), containedAddress(address)
-  {}
+      : kind(Kind::ContainedAddress) {
+    Storage.emplace<ContainedAddress>(kind, address);
+  }
   
   LoweredValue(StaticFunction &&staticFunction)
-    : kind(Kind::StaticFunction), staticFunction(std::move(staticFunction))
-  {}
-
-  LoweredValue(ObjCMethod &&objcMethod)
-    : kind(Kind::ObjCMethod), objcMethod(std::move(objcMethod))
-  {}
-  
-  LoweredValue(Explosion &e)
-    : kind(Kind::Explosion), explosion{{}} {
-    auto Elts = e.claimAll();
-    explosion.values.append(Elts.begin(), Elts.end());
+      : kind(Kind::StaticFunction) {
+    Storage.emplace<StaticFunction>(kind, std::move(staticFunction));
   }
 
-  LoweredValue(const OwnedAddress &boxWithAddress)
-  : kind(Kind::BoxWithAddress), boxWithAddress(boxWithAddress)
-  {}
-
-  LoweredValue(LoweredValue &&lv)
-    : kind(lv.kind)
-  {    
-    switch (kind) {
-    case Kind::ContainedAddress:
-      ::new (&containedAddress) ContainedAddress(std::move(lv.containedAddress));
-      break;
-    case Kind::Address:
-      ::new (&address) StackAddress(std::move(lv.address));
-      break;
-    case Kind::DynamicallyEnforcedAddress:
-      ::new (&dynamicallyEnforcedAddress) DynamicallyEnforcedAddress(
-                 std::move(lv.dynamicallyEnforcedAddress));
-      break;
-    case Kind::Explosion:
-      ::new (&explosion.values) ExplosionVector(std::move(lv.explosion.values));
-      break;
-    case Kind::BoxWithAddress:
-      ::new (&boxWithAddress) OwnedAddress(std::move(lv.boxWithAddress));
-      break;
-    case Kind::StaticFunction:
-      ::new (&staticFunction) StaticFunction(std::move(lv.staticFunction));
-      break;
-    case Kind::ObjCMethod:
-      ::new (&objcMethod) ObjCMethod(std::move(lv.objcMethod));
-      break;
+  LoweredValue(ObjCMethod &&objcMethod)
+      : kind(Kind::ObjCMethod) {
+    Storage.emplace<ObjCMethod>(kind, std::move(objcMethod));
+  }
+  
+  LoweredValue(Explosion &e) {
+    auto elts = e.claimAll();
+    if (elts.empty()) {
+      kind = Kind::EmptyExplosion;
+    } else if (elts.size() == 1) {
+      kind = Kind::SingletonExplosion;
+      Storage.emplace<SingletonExplosion>(kind, elts.front());
+    } else {
+      kind = Kind::ExplosionVector;
+      auto &explosion = Storage.emplace<ExplosionVector>(kind);
+      explosion.append(elts.begin(), elts.end());
     }
   }
 
+  LoweredValue(const OwnedAddress &boxWithAddress)
+      : kind(Kind::OwnedAddress) {
+    Storage.emplace<OwnedAddress>(kind, boxWithAddress);
+  }
+
+  LoweredValue(LoweredValue &&lv)
+      : kind(lv.kind) {
+    Storage.moveConstruct(kind, std::move(lv.Storage));
+  }
+
   LoweredValue &operator=(LoweredValue &&lv) {
-    assert(this != &lv);
-    this->~LoweredValue();
-    ::new (this) LoweredValue(std::move(lv));
+    Storage.moveAssign(kind, lv.kind, std::move(lv.Storage));
+    kind = lv.kind;
     return *this;
+  }
+
+  ~LoweredValue() {
+    Storage.destruct(kind);
   }
   
   bool isAddress() const {
-    return (kind == Kind::Address || kind == Kind::DynamicallyEnforcedAddress);
+    return (kind == Kind::StackAddress ||
+            kind == Kind::DynamicallyEnforcedAddress);
   }
   bool isUnallocatedAddressInBuffer() const {
     return kind == Kind::ContainedAddress &&
-           !containedAddress.getAddress().isValid();
-  }
-  bool isValue() const {
-    return kind >= Kind::Value_First && kind <= Kind::Value_Last;
+           !Storage.get<ContainedAddress>(kind).getAddress().isValid();
   }
   bool isBoxWithAddress() const {
-    return kind == Kind::BoxWithAddress;
+    return kind == Kind::OwnedAddress;
   }
   
-  StackAddress getStackAddress() const {
-    assert(kind == Kind::Address && "not an allocated address");
-    return address;
+  const StackAddress &getStackAddress() const {
+    return Storage.get<StackAddress>(kind);
   }
   
   Address getContainerOfAddress() const {
-    assert(kind == Kind::ContainedAddress);
+    const auto &containedAddress = Storage.get<ContainedAddress>(kind);
     assert(containedAddress.getContainer().isValid() && "address has no container");
     return containedAddress.getContainer();
   }
 
   Address getAddressInContainer() const {
-    assert(kind == Kind::ContainedAddress);
+    const auto &containedAddress = Storage.get<ContainedAddress>(kind);
     assert(containedAddress.getContainer().isValid() &&
            "address has no container");
     return containedAddress.getAddress();
   }
 
   const DynamicallyEnforcedAddress &getDynamicallyEnforcedAddress() const {
-    assert(kind == Kind::DynamicallyEnforcedAddress);
-    return dynamicallyEnforcedAddress;
+    return Storage.get<DynamicallyEnforcedAddress>(kind);
   }
 
   Address getAnyAddress() const {
-    if (kind == LoweredValue::Kind::Address) {
-      return address.getAddress();
+    if (kind == LoweredValue::Kind::StackAddress) {
+      return Storage.get<StackAddress>(kind).getAddress();
     } else if (kind == LoweredValue::Kind::ContainedAddress) {
       return getAddressInContainer();
     } else {
-      assert(kind == LoweredValue::Kind::DynamicallyEnforcedAddress);
       return getDynamicallyEnforcedAddress().Addr;
     }
   }
+ 
+  Address getAddressOfBox() const {
+    return Storage.get<OwnedAddress>(kind).getAddress();
+  }
+
+  ArrayRef<llvm::Value *> getKnownExplosionVector() const {
+    return Storage.get<ExplosionVector>(kind);
+  }
+
+  llvm::Value *getKnownSingletonExplosion() const {
+    return Storage.get<SingletonExplosion>(kind);
+  }
   
-  void getExplosion(IRGenFunction &IGF, Explosion &ex) const;
+  const StaticFunction &getStaticFunction() const {
+    return Storage.get<StaticFunction>(kind);
+  }
   
+  const ObjCMethod &getObjCMethod() const {
+    return Storage.get<ObjCMethod>(kind);
+  }
+
+  /// Produce an explosion for this lowered value.  Note that many
+  /// different storage kinds can be turned into an explosion.
   Explosion getExplosion(IRGenFunction &IGF) const {
     Explosion e;
     getExplosion(IGF, e);
     return e;
   }
-
-  Address getAddressOfBox() const {
-    assert(kind == Kind::BoxWithAddress);
-    return boxWithAddress.getAddress();
-  }
+  void getExplosion(IRGenFunction &IGF, Explosion &ex) const;
 
   llvm::Value *getSingletonExplosion(IRGenFunction &IGF) const;
-  
-  const StaticFunction &getStaticFunction() const {
-    assert(kind == Kind::StaticFunction && "not a static function");
-    return staticFunction;
-  }
-  
-  const ObjCMethod &getObjCMethod() const {
-    assert(kind == Kind::ObjCMethod && "not an objc method");
-    return objcMethod;
-  }
-  
-  ~LoweredValue() {
-    switch (kind) {
-    case Kind::Address:
-      address.~StackAddress();
-      break;
-    case Kind::ContainedAddress:
-      containedAddress.~ContainedAddress();
-      break;
-    case Kind::DynamicallyEnforcedAddress:
-      dynamicallyEnforcedAddress.~DynamicallyEnforcedAddress();
-      break;
-    case Kind::Explosion:
-      explosion.values.~ExplosionVector();
-      break;
-    case Kind::BoxWithAddress:
-      boxWithAddress.~OwnedAddress();
-      break;
-    case Kind::StaticFunction:
-      staticFunction.~StaticFunction();
-      break;
-    case Kind::ObjCMethod:
-      objcMethod.~ObjCMethod();
-      break;
-    }
-  }
 };
 
 using PHINodeVector = llvm::TinyPtrVector<llvm::PHINode*>;
@@ -1068,51 +1054,61 @@ llvm::Value *StaticFunction::getExplosionValue(IRGenFunction &IGF) const {
 
 void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   switch (kind) {
-  case Kind::Address:
+  case Kind::StackAddress:
   case Kind::ContainedAddress:
   case Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("not a value");
       
-  case Kind::Explosion:
-    for (auto *value : explosion.values)
-      ex.add(value);
-    break;
+  case Kind::ExplosionVector:
+    ex.add(Storage.get<ExplosionVector>(kind));
+    return;
 
-  case Kind::BoxWithAddress:
-    ex.add(boxWithAddress.getOwner());
-    break;
+  case Kind::SingletonExplosion:
+    ex.add(Storage.get<SingletonExplosion>(kind));
+    return;
+
+  case Kind::EmptyExplosion:
+    return;
+
+  case Kind::OwnedAddress:
+    ex.add(Storage.get<OwnedAddress>(kind).getOwner());
+    return;
 
   case Kind::StaticFunction:
-    ex.add(staticFunction.getExplosionValue(IGF));
-    break;
+    ex.add(Storage.get<StaticFunction>(kind).getExplosionValue(IGF));
+    return;
       
   case Kind::ObjCMethod:
-    ex.add(objcMethod.getExplosionValue(IGF));
-    break;
+    ex.add(Storage.get<ObjCMethod>(kind).getExplosionValue(IGF));
+    return;
   }
+  llvm_unreachable("bad kind");
 }
 
 llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF) const {
   switch (kind) {
-  case Kind::Address:
+  case Kind::StackAddress:
   case Kind::ContainedAddress:
   case Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("not a value");
 
-  case Kind::Explosion:
-    assert(explosion.values.size() == 1);
-    return explosion.values[0];
+  case Kind::EmptyExplosion:
+  case Kind::ExplosionVector:
+    llvm_unreachable("not a singleton explosion");
 
-  case Kind::BoxWithAddress:
-    return boxWithAddress.getOwner();
+  case Kind::SingletonExplosion:
+    return Storage.get<SingletonExplosion>(kind);
+
+  case Kind::OwnedAddress:
+    return Storage.get<OwnedAddress>(kind).getOwner();
       
   case Kind::StaticFunction:
-    return staticFunction.getExplosionValue(IGF);
+    return Storage.get<StaticFunction>(kind).getExplosionValue(IGF);
 
   case Kind::ObjCMethod:
-    return objcMethod.getExplosionValue(IGF);
+    return Storage.get<ObjCMethod>(kind).getExplosionValue(IGF);
   }
-  llvm_unreachable("bad lowered value kind!");
+  llvm_unreachable("bad kind");
 }
 
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
@@ -2024,52 +2020,52 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                        objcMethod.getSearchType());
     return emission;
   }
-      
-  case LoweredValue::Kind::Explosion: {    
+
+  case LoweredValue::Kind::SingletonExplosion:
+  case LoweredValue::Kind::ExplosionVector: {
     switch (origCalleeType->getRepresentation()) {
     case SILFunctionType::Representation::Block: {
       assert(!selfValue && "block function with self?");
 
       // Grab the block pointer and make it the first physical argument.
+      llvm::PointerType *blockPtrTy = IGF.IGM.ObjCBlockPtrTy;
       llvm::Value *blockPtr = lv.getSingletonExplosion(IGF);
-      blockPtr = IGF.Builder.CreateBitCast(blockPtr, IGF.IGM.ObjCBlockPtrTy);
+      blockPtr = IGF.Builder.CreateBitCast(blockPtr, blockPtrTy);
       args.add(blockPtr);
 
       // Extract the invocation pointer for blocks.
-      llvm::Value *invokeAddr = IGF.Builder.CreateStructGEP(
-          /*Ty=*/nullptr, blockPtr, 3);
-      calleeFn = IGF.Builder.CreateLoad(invokeAddr, IGF.IGM.getPointerAlignment());
+      llvm::Value *invokeFnPtrPtr =
+        IGF.Builder.CreateStructGEP(blockPtrTy->getElementType(), blockPtr, 3);
+      Address invokePtrAddr(invokeFnPtrPtr, IGF.IGM.getPointerAlignment());
+      calleeFn = IGF.Builder.CreateLoad(invokePtrAddr);
       calleeData = nullptr;
       break;
     }
-    
+
+    case SILFunctionType::Representation::Thick: {
+      // @convention(thick) callees are exploded as a pair
+      // consisting of the function and the self value.
+      assert(!selfValue);
+
+      Explosion calleeValues = lv.getExplosion(IGF);
+      calleeFn = calleeValues.claimNext();
+      calleeData = calleeValues.claimNext();
+      break;
+    }
+
+    case SILFunctionType::Representation::WitnessMethod:
+      witnessMetadata->SelfWitnessTable = emitWitnessTableForLoweredCallee(
+        IGF, origCalleeType, substitutions);
+      LLVM_FALLTHROUGH;
+
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::CFunctionPointer:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
-    case SILFunctionType::Representation::WitnessMethod:
-    case SILFunctionType::Representation::Thick: {
-      Explosion calleeValues = lv.getExplosion(IGF);
-      calleeFn = calleeValues.claimNext();
-
-      if (origCalleeType->getRepresentation()
-            == SILFunctionType::Representation::WitnessMethod) {
-        witnessMetadata->SelfWitnessTable = emitWitnessTableForLoweredCallee(
-          IGF, origCalleeType, substitutions);
-      }
-
-      if (origCalleeType->getRepresentation()
-            == SILFunctionType::Representation::Thick) {
-        // @convention(thick) callees are exploded as a pair
-        // consisting of the function and the self value.
-        assert(!selfValue);
-        calleeData = calleeValues.claimNext();
-      } else {
-        calleeData = selfValue;
-      }
+      calleeFn = lv.getSingletonExplosion(IGF);
+      calleeData = selfValue;
       break;
-    }
     }
 
     // Cast the callee pointer to the right function type.
@@ -2079,13 +2075,13 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnTy->getPointerTo());
     break;
   }
-      
-  case LoweredValue::Kind::BoxWithAddress:
-    llvm_unreachable("@box isn't a valid callee");
+
+  case LoweredValue::Kind::EmptyExplosion:
+  case LoweredValue::Kind::OwnedAddress:
   case LoweredValue::Kind::ContainedAddress:
-  case LoweredValue::Kind::Address:
+  case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
-    llvm_unreachable("sil address isn't a valid callee");
+    llvm_unreachable("not a valid callee");
   }
   
   Callee callee = Callee::forKnownFunction(origCalleeType, substCalleeType,
@@ -2243,11 +2239,12 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
 
   switch (lv.kind) {
   case LoweredValue::Kind::ContainedAddress:
-  case LoweredValue::Kind::Address:
+  case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
-    llvm_unreachable("can't partially apply an address");
-  case LoweredValue::Kind::BoxWithAddress:
-    llvm_unreachable("can't partially apply a @box");
+  case LoweredValue::Kind::OwnedAddress:
+  case LoweredValue::Kind::EmptyExplosion:
+    llvm_unreachable("not a valid function");
+
   case LoweredValue::Kind::ObjCMethod:
     llvm_unreachable("objc method partial application shouldn't get here");
 
@@ -2272,34 +2269,27 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     return std::make_tuple(lv.getStaticFunction().getFunction(),
                            context, v->getType().castTo<SILFunctionType>());
   }
-  case LoweredValue::Kind::Explosion: {
+  case LoweredValue::Kind::SingletonExplosion: {
+    llvm::Value *fn = lv.getSingletonExplosion(IGF);
+    llvm::Value *context = nullptr;
+    auto repr = fnType->getRepresentation();
+    assert(repr != SILFunctionType::Representation::Block &&
+           "partial apply of block not implemented");
+    if (repr == SILFunctionType::Representation::WitnessMethod) {
+      context = emitWitnessTableForLoweredCallee(IGF, fnType, subs);
+    }
+    return std::make_tuple(fn, context, fnType);
+  }
+  case LoweredValue::Kind::ExplosionVector: {
+    assert(fnType->getRepresentation()
+             == SILFunctionType::Representation::Thick);
     Explosion ex = lv.getExplosion(IGF);
     llvm::Value *fn = ex.claimNext();
-    llvm::Value *context = nullptr;
-    
-    switch (fnType->getRepresentation()) {
-    case SILFunctionType::Representation::Thin:
-    case SILFunctionType::Representation::Method:
-    case SILFunctionType::Representation::Closure:
-    case SILFunctionType::Representation::ObjCMethod:
-      break;
-    case SILFunctionType::Representation::WitnessMethod:
-      context = emitWitnessTableForLoweredCallee(IGF, fnType, subs);
-      break;
-    case SILFunctionType::Representation::CFunctionPointer:
-      break;
-    case SILFunctionType::Representation::Thick:
-      context = ex.claimNext();
-      break;
-    case SILFunctionType::Representation::Block:
-      llvm_unreachable("partial application of block not implemented");
-    }
-    
+    llvm::Value *context = ex.claimNext();
     return std::make_tuple(fn, context, fnType);
   }
   }
-
-  llvm_unreachable("Not a valid SILFunctionType.");
+  llvm_unreachable("bad kind");
 }
 
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
