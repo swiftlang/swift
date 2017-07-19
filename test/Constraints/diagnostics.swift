@@ -971,9 +971,9 @@ class SR_4692_b {
 
 struct R32101765 { let prop32101765 = 0 }
 let _: KeyPath<R32101765, Float> = \.prop32101765
-// expected-error@-1 {{KeyPath value type 'Int' cannot be converted to contextual type 'Float'}}
+// expected-error@-1 {{key path value type 'Int' cannot be converted to contextual type 'Float'}}
 let _: KeyPath<R32101765, Float> = \R32101765.prop32101765
-// expected-error@-1 {{KeyPath value type 'Int' cannot be converted to contextual type 'Float'}}
+// expected-error@-1 {{key path value type 'Int' cannot be converted to contextual type 'Float'}}
 let _: KeyPath<R32101765, Float> = \.prop32101765.unknown
 // expected-error@-1 {{type 'Int' has no member 'unknown'}}
 let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
