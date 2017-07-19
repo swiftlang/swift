@@ -7946,6 +7946,67 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   tc.diagnose(classDecl, diag::class_without_init,
               classDecl->getDeclaredType());
 
+  // HACK: We've got a special case to look out for and diagnose specifically to
+  // improve the experience of seeing this, and mitigate some confusion.
+  //
+  // For a class A which inherits from Decodable class B, class A may have
+  // additional members which prevent default initializer synthesis (and
+  // inheritance of other initializers). The user may have assumed that this
+  // case would synthesize Encodable/Decodable conformance for class A the same
+  // way it may have for class B, or other classes.
+  //
+  // It is helpful to suggest here that the user may have forgotten to override
+  // init(from:) (and encode(to:), if applicable) in a note, before we start
+  // listing the members that prevented initializer synthesis.
+  // TODO: Add a fixit along with this suggestion.
+  if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
+    ASTContext &C = tc.Context;
+    auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
+    auto superclassType = superclassDecl->getDeclaredInterfaceType();
+    if (auto ref = tc. conformsToProtocol(superclassType, decodableProto,
+                                          superclassDecl,
+                                          ConformanceCheckOptions(),
+                                          SourceLoc())) {
+      // super conforms to Decodable, so we've failed to inherit init(from:).
+      // Let's suggest overriding it here.
+      //
+      // We're going to diagnose on the concrete init(from:) decl if it exists
+      // and isn't implicit; otherwise, on the subclass itself.
+      ValueDecl *diagDest = classDecl;
+      auto initFrom = DeclName(C, C.Id_init, (Identifier[1]){ C.Id_from });
+      auto result = tc.lookupMember(superclassDecl, superclassType, initFrom,
+                                    NameLookupFlags::ProtocolMembers |
+                                    NameLookupFlags::IgnoreAccessibility);
+
+      if (!result.empty() && !result.front()->isImplicit())
+        diagDest = result.front();
+
+      auto diagName = diag::decodable_suggest_overriding_init_here;
+
+      // This is also a bit of a hack, but the best place we've got at the
+      // moment to suggest this.
+      //
+      // If the superclass also conforms to Encodable, it's quite
+      // likely that the user forgot to override its encode(to:). In this case,
+      // we can produce a slightly different diagnostic to suggest doing so.
+      auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
+      if ((ref = tc.conformsToProtocol(superclassType, encodableProto,
+                                       superclassDecl,
+                                       ConformanceCheckOptions(),
+                                       SourceLoc()))) {
+        // We only want to produce this version of the diagnostic if the
+        // subclass doesn't directly implement encode(to:).
+        // The direct lookup here won't see an encode(to:) if it is inherited
+        // from the superclass.
+        auto encodeTo = DeclName(C, C.Id_encode, (Identifier[1]){ C.Id_to });
+        if (classDecl->lookupDirect(encodeTo).empty())
+          diagName = diag::codable_suggest_overriding_init_here;
+      }
+
+      tc.diagnose(diagDest, diagName);
+    }
+  }
+
   for (auto member : classDecl->getMembers()) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd)

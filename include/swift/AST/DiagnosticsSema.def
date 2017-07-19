@@ -2080,6 +2080,10 @@ NOTE(decodable_inaccessible_super_init_here,none,
      "cannot automatically synthesize %0 because required superclass initializer %1 is inaccessible due to "
      "'%select{private|fileprivate|internal|%error|%error}2' protection level",
      (DeclName, DeclName, Accessibility))
+NOTE(decodable_suggest_overriding_init_here,none,
+     "did you mean to override 'init(from:)'?", ())
+NOTE(codable_suggest_overriding_init_here,none,
+     "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
