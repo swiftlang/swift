@@ -249,7 +249,9 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
 
   // We are performing dynamic lookup. Filter out redundant results early.
   llvm::DenseSet<std::tuple<char, ObjCSelector, CanType>> known;
-  result->filter([&](ValueDecl *decl) -> bool {
+  result->filter([&](LookupResultEntry entry) -> bool {
+    auto *decl = entry.getValueDecl();
+
     if (decl->isInvalid())
       return false;
 
@@ -857,7 +859,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TC.resolveTypeInContext(typeDecl, DC,
+    auto type = TC.resolveTypeInContext(typeDecl, nullptr, DC,
                                         TR_InExpression,
                                         /*isSpecialized=*/false);
 

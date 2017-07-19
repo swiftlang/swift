@@ -27,7 +27,7 @@ class DebuggerClient {
 protected:
   ASTContext &Ctx;
 public:
-  typedef SmallVectorImpl<UnqualifiedLookupResult> ResultVector;
+  typedef SmallVectorImpl<LookupResultEntry> ResultVector;
 
   DebuggerClient(ASTContext &C) : Ctx(C) { }
   virtual ~DebuggerClient() = default;

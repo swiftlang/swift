@@ -511,7 +511,9 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                                 /*Implicit=*/true);
 
   // CodingKeys.self expr
-  auto *codingKeysExpr = TypeExpr::createForDecl(SourceLoc(), param,
+  auto *codingKeysExpr = TypeExpr::createForDecl(SourceLoc(),
+                                                 param,
+                                                 param->getDeclContext(),
                                                  /*Implicit=*/true);
   auto *codingKeysMetaTypeExpr = new (C) DotSelfExpr(codingKeysExpr,
                                                      SourceLoc(), SourceLoc());

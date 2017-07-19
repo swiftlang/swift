@@ -1338,6 +1338,7 @@ public:
   
   /// Create a TypeExpr for a TypeDecl at the specified location.
   static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D,
+                                 DeclContext *DC,
                                  bool isImplicit);
 
   /// Create a TypeExpr for a member TypeDecl of the given parent TypeDecl.

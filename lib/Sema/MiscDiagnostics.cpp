@@ -3087,8 +3087,8 @@ class ObjCSelectorWalker : public ASTWalker {
     if (result.size() > 2) return true;
 
     // Dig out the methods.
-    auto firstMethod = dyn_cast<FuncDecl>(result[0].Decl);
-    auto secondMethod = dyn_cast<FuncDecl>(result[1].Decl);
+    auto firstMethod = dyn_cast<FuncDecl>(result[0].getValueDecl());
+    auto secondMethod = dyn_cast<FuncDecl>(result[1].getValueDecl());
     if (!firstMethod || !secondMethod) return true;
 
     // If one is a static/class method and the other is not...

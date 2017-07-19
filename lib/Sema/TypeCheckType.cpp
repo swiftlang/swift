@@ -202,211 +202,9 @@ void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
   }
 }
 
-// Walk up through the type scopes to find the context containing the type
-// being resolved.
-//
-// Name lookup tells us that a given type is visible via unqualified
-// lookup from a given context. Since unqualified lookup visits outer
-// scopes, the type might be defined in an outer context, or a
-// conforming protocol or superclass thereof.
-//
-// FIXME: UnqualifiedLookup already has this information; it needs to be
-// plumbed through.
-//
-// Returns a tuple of the following:
-//
-// - Type: the empty type if the typeDecl is not defined inside another
-//   type. Otherwise, the base type to use for computing the substituted
-//   type of typeDecl.
-//
-//   This is either a type conforming to the protocol in which typeDecl
-//   can be found, or a concrete type that contains typeDecl.
-//
-// - bool: valid: false if the lookup failed.
-static std::tuple<Type, bool>
-findDeclContextForType(TypeChecker &TC,
-                       TypeDecl *typeDecl,
-                       DeclContext *fromDC,
-                       TypeResolutionOptions options,
-                       GenericTypeResolver *resolver) {
-
-  auto ownerDC = typeDecl->getDeclContext();
-
-  // If the type is not nested in another type, there's nothing we can
-  // learn from walking parent contexts.
-  if (!ownerDC->isTypeContext() ||
-      isa<GenericTypeParamDecl>(typeDecl))
-    return std::make_tuple(Type(), true);
-
-  NominalTypeDecl *ownerNominal =
-      ownerDC->getAsNominalTypeOrNominalTypeExtensionContext();
-
-  // We might have an invalid extension that didn't resolve.
-  //
-  // FIXME: How did UnqualifiedLookup find the decl then?
-  if (ownerNominal == nullptr)
-    return std::make_tuple(Type(), false);
-
-  auto getSelfType = [&](DeclContext *DC) -> Type {
-    // When looking up a nominal type declaration inside of a
-    // protocol extension, always use the nominal type and
-    // not the protocol 'Self' type.
-    if (isa<NominalTypeDecl>(typeDecl))
-      return resolver->mapTypeIntoContext(
-        DC->getDeclaredInterfaceType());
-
-    // Otherwise, we want the protocol 'Self' type for
-    // substituting into alias types and associated types.
-    return resolver->mapTypeIntoContext(
-      DC->getSelfInterfaceType());
-  };
-
-  // First, check for direct containment in one of our parent contexts.
-  for (auto parentDC = fromDC; !parentDC->isModuleContext();
-       parentDC = parentDC->getParent()) {
-    auto parentNominal =
-        parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
-
-    // If this type is defined in this exact context, we are done.
-    if (ownerDC == parentDC)
-      return std::make_tuple(getSelfType(parentDC), true);
-
-    // If we're inside a nominal type context and the member type
-    // is defined in a different extension, we are done.
-    if (parentNominal &&
-        parentNominal == ownerNominal)
-      return std::make_tuple(getSelfType(parentDC), true);
-
-    // An unqualified reference to the extended type from within
-    // an extension.
-    //
-    // An extension is formally nested in the module, and not in the
-    // parent type of the extended type -- so we need a special rule
-    // so that 'B' is visible below:
-    //
-    // struct A { struct B { } }
-    // extension A.B { ... B ... }
-    //
-    if (isa<ExtensionDecl>(parentDC) && typeDecl == parentNominal) {
-      assert(parentDC->getParent()->isModuleScopeContext());
-      return std::make_tuple(getSelfType(parentDC), true);
-    }
-
-    // We're going to check the next parent context.
-  }
-
-  // Now, search the supertypes or refined protocols of each parent
-  // context.
-  for (auto parentDC = fromDC; !parentDC->isModuleContext();
-       parentDC = parentDC->getParent()) {
-    // For the next steps we need our parentDC to be a type context
-    if (!parentDC->isTypeContext())
-      continue;
-
-    llvm::SmallPtrSet<NominalTypeDecl *, 8> visited;
-    llvm::SmallVector<ProtocolDecl *, 8> protocols;
-    Type superclass;
-
-    // Break circularity.
-    auto pushProtocol = [&](ProtocolDecl *protocol) -> void {
-      if (visited.insert(protocol).second)
-        protocols.push_back(protocol);
-    };
-
-    auto pushRefined = [&](ProtocolDecl *protocol) -> void {
-      for (auto *refined : protocol->getInheritedProtocols())
-        pushProtocol(refined);
-    };
-
-    // If we are in a protocol or protocol extension there might be other
-    // type aliases and nominal types brought into the context through
-    // requirements on Self, for example:
-    //
-    // extension MyProtocol where Self : YourProtocol { ... }
-    //
-    // FIXME: If we want to support protocols inheriting classes, we need
-    // to walk the protocol requirement signature here.
-    if (auto *proto = parentDC->getAsProtocolOrProtocolExtensionContext()) {
-      pushRefined(proto);
-
-      if (auto ED = dyn_cast<ExtensionDecl>(parentDC)) {
-        if (auto genericSig = ED->getGenericSignature()) {
-          for (auto req : genericSig->getRequirements()) {
-            if (!req.getFirstType()->isEqual(ED->getSelfInterfaceType()))
-              continue;
-
-            switch (req.getKind()) {
-            case RequirementKind::Conformance:
-              pushProtocol(req.getSecondType()->castTo<ProtocolType>()->getDecl());
-              break;
-            case RequirementKind::Superclass: {
-              auto *classDecl = req.getSecondType()->getClassOrBoundGenericClass();
-
-              if (!options.contains(TR_InheritanceClause))
-                for (auto conforms : classDecl->getAllProtocols())
-                  pushProtocol(conforms);
-
-              assert(!superclass);
-              superclass = req.getSecondType();
-              break;
-            }
-            default:
-              break;
-            }
-          }
-        }
-      }
-    } else {
-      // Get the substituted superclass type, if any.
-      superclass = resolver->mapTypeIntoContext(
-        parentDC->getSelfInterfaceType())->getSuperclass();
-
-      // Start with the type of the current context.
-      auto fromNominal = parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
-      if (!fromNominal)
-        return std::make_tuple(Type(), false);
-
-      // Add any protocols this nominal conforms to -- there's no need to do
-      // this for any superclasses that we visit, because this list will
-      // already include protocols from the superclass.
-      if (!options.contains(TR_InheritanceClause))
-        for (auto conforms : fromNominal->getAllProtocols())
-          pushProtocol(conforms);
-    }
-
-    // Walk superclasses.
-    while (superclass) {
-      auto *superclassDecl = superclass->getAnyNominal();
-      if (!visited.insert(superclassDecl).second)
-        break;
-
-      if (superclassDecl == ownerNominal)
-        return std::make_tuple(superclass, true);
-
-      superclass = superclass->getSuperclass();
-    }
-
-    // Walk refined protocols.
-    while (!protocols.empty()) {
-      auto protoDecl = protocols.back();
-
-      // Check if we found the right context.
-      if (protoDecl == ownerNominal)
-        return std::make_tuple(getSelfType(parentDC), true);
-
-      protocols.pop_back();
-
-      // If not, walk into the refined protocols, if any.
-      pushRefined(protoDecl);
-    }
-  }
-
-  assert(false && "Should have found context by now");
-  return std::make_tuple(Type(), false);
-}
-
 Type TypeChecker::resolveTypeInContext(
        TypeDecl *typeDecl,
+       DeclContext *foundDC,
        DeclContext *fromDC,
        TypeResolutionOptions options,
        bool isSpecialized,
@@ -415,14 +213,11 @@ Type TypeChecker::resolveTypeInContext(
   if (!resolver)
     resolver = &defaultResolver;
 
-  // FIXME: selfType should come from UnqualifiedLookup
-  Type selfType;
-  bool valid;
-  std::tie(selfType, valid) =
-      findDeclContextForType(*this, typeDecl, fromDC, options, resolver);
-
-  if (!valid || (selfType && selfType->hasError()))
-    return ErrorType::get(Context);
+  // If we found a generic parameter, map to the archetype if there is one.
+  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
+    return resolver->mapTypeIntoContext(
+      genericParam->getDeclaredInterfaceType());
+  }
 
   // If we are referring to a type within its own context, and we have either
   // a generic type with no generic arguments or a non-generic type, use the
@@ -453,18 +248,11 @@ Type TypeChecker::resolveTypeInContext(
     }
   }
 
-  // If we found a generic parameter, map to the archetype if there is one.
-  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
-    assert(!selfType);
-    return resolver->mapTypeIntoContext(
-      genericParam->getDeclaredInterfaceType());
-  }
-
   // Simple case -- the type is not nested inside of another type.
   // However, it might be nested inside another generic context, so
   // we do want to write the type in terms of interface types or
   // context archetypes, depending on the resolver given to us.
-  if (!selfType) {
+  if (!typeDecl->getDeclContext()->isTypeContext()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
       // For a generic typealias, return the unbound generic form of the type.
       if (aliasDecl->getGenericParams())
@@ -484,6 +272,37 @@ Type TypeChecker::resolveTypeInContext(
     return typeDecl->getDeclaredInterfaceType();
   }
 
+  assert(foundDC);
+
+  Type selfType;
+  if (isa<NominalTypeDecl>(typeDecl)) {
+    // When looking up a nominal type declaration inside of a
+    // protocol extension, always use the nominal type and
+    // not the protocol 'Self' type.
+    if (!foundDC->getDeclaredInterfaceType())
+      return ErrorType::get(Context);
+
+    selfType = resolver->mapTypeIntoContext(
+      foundDC->getDeclaredInterfaceType());
+  } else {
+    // Otherwise, we want the protocol 'Self' type for
+    // substituting into alias types and associated types.
+    selfType = resolver->mapTypeIntoContext(
+      foundDC->getSelfInterfaceType());
+
+    if (selfType->is<GenericTypeParamType>() &&
+        typeDecl->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      // We found a member of a class from a protocol extension.
+      //
+      // Get the superclass of the 'Self' type parameter.
+      auto *sig = foundDC->getGenericSignatureOfContext();
+      auto superclassType = sig->getSuperclassBound(
+        selfType, *foundDC->getParentModule());
+      assert(superclassType);
+      selfType = superclassType;
+    }
+  }
+  
   // Finally, substitute the base type into the member type.
   return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
                                  selfType);
@@ -753,12 +572,13 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
 
 /// \brief Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
-                            DeclContext *dc,
+                            DeclContext *foundDC,
+                            DeclContext *fromDC,
                             GenericIdentTypeRepr *generic,
                             TypeResolutionOptions options,
                             GenericTypeResolver *resolver,
                             UnsatisfiedDependency *unsatisfiedDependency) {
-  assert(dc && "No declaration context for type resolution?");
+  assert(fromDC && "No declaration context for type resolution?");
 
   // If we have a callback to report dependencies, do so.
   if (unsatisfiedDependency) {
@@ -781,7 +601,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
   Type type =
-      TC.resolveTypeInContext(typeDecl, dc, options, generic, resolver);
+    TC.resolveTypeInContext(typeDecl, foundDC, fromDC, options,
+                            generic, resolver);
 
   if (type->is<UnboundGenericType>() && !generic &&
       !options.contains(TR_AllowUnboundGenerics) &&
@@ -793,7 +614,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (generic && !options.contains(TR_ResolveStructure)) {
     // Apply the generic arguments to the type.
-    type = TC.applyGenericArguments(type, typeDecl, loc, dc, generic,
+    type = TC.applyGenericArguments(type, typeDecl, loc, fromDC, generic,
                                     options, resolver, unsatisfiedDependency);
     if (!type)
       return nullptr;
@@ -875,7 +696,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
         tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
           .fixItReplace(comp->getIdLoc(), name);
         comp->overwriteIdentifier(nominal->getName());
-        comp->setValue(nominal);
+        comp->setValue(nominal, nominalDC->getParent());
         return type;
       } else {
         // Attempt to refer to 'Self' from a free function.
@@ -900,14 +721,14 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                  relookupOptions);
     if (!inaccessibleResults.empty()) {
       // FIXME: What if the unviable candidates have different levels of access?
-      auto first = cast<TypeDecl>(inaccessibleResults.front());
+      auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
       tc.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
                   comp->getIdentifier(), first->getFormalAccess());
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
       for (auto lookupResult : inaccessibleResults)
-        tc.diagnose(lookupResult, diag::type_declared_here);
+        tc.diagnose(lookupResult.getValueDecl(), diag::type_declared_here);
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if we do.
@@ -1016,7 +837,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
     // Looks like this is not a member type, but simply a member of parent type.
     if (!memberLookup.empty()) {
-      auto &member = memberLookup[0];
+      auto member = memberLookup[0].getValueDecl();
       tc.diagnose(comp->getIdLoc(), diag::invalid_member_reference,
                   member->getDescriptiveKind(), comp->getIdentifier(),
                   parentType)
@@ -1060,7 +881,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
     if (matchingParam == genericParams->end())
       return Type();
 
-    comp->setValue(*matchingParam);
+    comp->setValue(*matchingParam, nullptr);
     return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
                                              diagnoseErrors, resolver,
                                              unsatisfiedDependency);
@@ -1079,7 +900,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
                    });
 
     if (matchingParam != outerParams->end()) {
-      comp->setValue(*matchingParam);
+      comp->setValue(*matchingParam, nullptr);
       return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
                                                diagnoseErrors, resolver,
                                                unsatisfiedDependency);
@@ -1111,7 +932,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-          comp->setValue(assocType);
+          comp->setValue(assocType, DC);
           return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
                                                    diagnoseErrors, resolver,
                                                    unsatisfiedDependency);
@@ -1142,7 +963,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // that now.
   if (auto *typeDecl = comp->getBoundDecl()) {
     // Resolve the type declaration within this context.
-    return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
+    return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
+                           comp->getDeclContext(), DC,
                            dyn_cast<GenericIdentTypeRepr>(comp), options,
                            resolver, unsatisfiedDependency);
   }
@@ -1201,15 +1023,19 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // Process the names we found.
   Type current;
   TypeDecl *currentDecl = nullptr;
+  DeclContext *currentDC = nullptr;
   bool isAmbiguous = false;
-  for (const auto &typeDecl : globals) {
+  for (const auto entry : globals) {
+    auto *foundDC = entry.getDeclContext();
+    auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
 
     // If necessary, add delayed members to the declaration.
     if (auto nomDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
       TC.forceExternalDeclMembers(nomDecl);
     }
 
-    Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
+    Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
+                                foundDC, DC,
                                 dyn_cast<GenericIdentTypeRepr>(comp), options,
                                 resolver, unsatisfiedDependency);
 
@@ -1223,6 +1049,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (current.isNull()) {
       current = type;
       currentDecl = typeDecl;
+      currentDC = foundDC;
       continue;
     }
 
@@ -1243,8 +1070,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       TC.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
                   comp->getIdentifier())
         .highlight(comp->getIdLoc());
-      for (auto typeDecl : globals) {
-        TC.diagnose(typeDecl, diag::found_candidate);
+      for (auto entry : globals) {
+        TC.diagnose(entry.getValueDecl(), diag::found_candidate);
       }
     }
 
@@ -1263,7 +1090,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                lookupOptions, resolver, unsatisfiedDependency);
   }
 
-  comp->setValue(currentDecl);
+  comp->setValue(currentDecl, currentDC);
   return current;
 }
 
@@ -1464,7 +1291,7 @@ static Type resolveNestedIdentTypeComponent(
   } else {
     memberType = memberTypes.back().second;
     member = memberTypes.back().first;
-    comp->setValue(member);
+    comp->setValue(member, nullptr);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType);

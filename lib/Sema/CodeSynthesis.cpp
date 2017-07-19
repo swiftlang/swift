@@ -1758,7 +1758,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       // sure the property type matches later after validation.
       auto lookup = TC.lookupMember(dc, behaviorProtoTy, TC.Context.Id_value);
       for (auto found : lookup) {
-        if (auto foundVar = dyn_cast<VarDecl>(found.Decl)) {
+        if (auto foundVar = dyn_cast<VarDecl>(found.getValueDecl())) {
           if (valueProp) {
             TC.diagnose(behavior->getLoc(),
                         diag::property_behavior_protocol_reqt_ambiguous,

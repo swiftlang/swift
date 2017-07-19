@@ -247,9 +247,13 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
   /// name binding will resolve this to a specific declaration.
   llvm::PointerUnion<Identifier, TypeDecl *> IdOrDecl;
 
+  /// The declaration context from which the bound declaration was
+  /// found. only valid if IdOrDecl is a TypeDecl.
+  DeclContext *DC;
+
 protected:
   ComponentIdentTypeRepr(TypeReprKind K, SourceLoc Loc, Identifier Id)
-    : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id) {}
+    : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
 
 public:
   SourceLoc getIdLoc() const { return Loc; }
@@ -264,7 +268,15 @@ public:
 
   TypeDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<TypeDecl*>(); }
 
-  void setValue(TypeDecl *TD) { IdOrDecl = TD; }
+  DeclContext *getDeclContext() const {
+    assert(isBound());
+    return DC;
+  }
+
+  void setValue(TypeDecl *TD, DeclContext *DC) {
+    IdOrDecl = TD;
+    this->DC = DC;
+  }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent ||
