@@ -49,6 +49,7 @@ syn keyword swiftDefinitionModifier
       \ rethrows
       \ static
       \ throws
+      \ weak
 
 syn keyword swiftInOutKeyword skipwhite nextgroup=swiftTypeName
       \ inout
@@ -81,6 +82,8 @@ syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
       \ protocol
       \ struct
       \ typealias
+syn match swiftMultiwordTypeDefinition nextgroup=swiftTypeName
+      \ "indirect enum"
 
 syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
       \ let
@@ -173,6 +176,7 @@ hi def link swiftImportComponent Identifier
 hi def link swiftKeyword Statement
 hi def link swiftMultiwordKeyword Statement
 hi def link swiftTypeDefinition Define
+hi def link swiftMultiwordTypeDefinition Define
 hi def link swiftType Type
 hi def link swiftTypePair Type
 hi def link swiftTypeName Function
