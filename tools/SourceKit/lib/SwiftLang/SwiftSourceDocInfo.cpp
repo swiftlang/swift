@@ -455,7 +455,7 @@ template <typename FnTy>
 void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
   ++NamesSeen[VD->getFullName()];
-  SmallVector<UnqualifiedLookupResult, 8> RelatedDecls;
+  SmallVector<LookupResultEntry, 8> RelatedDecls;
 
   if (isa<ParamDecl>(VD))
     return; // Parameters don't have interesting related declarations.

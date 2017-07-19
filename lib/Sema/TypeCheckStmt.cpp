@@ -1470,7 +1470,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
 
     for (auto member : tc.lookupConstructors(fromCtor, superclassTy,
                                              lookupOptions)) {
-      auto superclassCtor = dyn_cast<ConstructorDecl>(member.Decl);
+      auto superclassCtor = dyn_cast<ConstructorDecl>(member.getValueDecl());
       if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
         continue;

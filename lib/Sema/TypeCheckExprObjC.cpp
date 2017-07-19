@@ -264,7 +264,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       // Note all the correction candidates.
       for (auto &result : lookup) {
         noteTypoCorrection(componentName, DeclNameLoc(componentNameLoc),
-                           result);
+                           result.getValueDecl());
       }
 
       isInvalid = true;
@@ -277,13 +277,14 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // If we have more than one result, filter out unavailable or
     // obviously unusable candidates.
     if (lookup.size() > 1) {
-      lookup.filter([&](LookupResult::Result result) -> bool {
+      lookup.filter([&](LookupResultEntry result) -> bool {
           // Drop unavailable candidates.
-          if (result->getAttrs().isUnavailable(Context))
+          if (result.getValueDecl()->getAttrs().isUnavailable(Context))
             return false;
 
           // Drop non-property, non-type candidates.
-          if (!isa<VarDecl>(result.Decl) && !isa<TypeDecl>(result.Decl))
+          if (!isa<VarDecl>(result.getValueDecl()) &&
+              !isa<TypeDecl>(result.getValueDecl()))
             return false;
 
           return true;
@@ -304,13 +305,14 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                  componentName);
 
       for (auto result : lookup) {
-        diagnose(result, diag::decl_declared_here, result->getFullName());
+        diagnose(result.getValueDecl(), diag::decl_declared_here,
+                 result.getValueDecl()->getFullName());
       }
       isInvalid = true;
       break;
     }
 
-    auto found = lookup.front().Decl;
+    auto found = lookup.front().getValueDecl();
 
     // Handle property references.
     if (auto var = dyn_cast<VarDecl>(found)) {

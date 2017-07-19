@@ -253,7 +253,7 @@ static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
 static bool containsDeclRefKind(LookupResult &lookupResult,
                                 DeclRefKind refKind) {
   for (auto candidate : lookupResult) {
-    ValueDecl *D = candidate.Decl;
+    ValueDecl *D = candidate.getValueDecl();
     if (!D || !D->hasInterfaceType())
       continue;
     if (matchesDeclRefKind(D, refKind))
@@ -428,15 +428,15 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
                                                          relookupOptions);
     if (inaccessibleResults) {
       // FIXME: What if the unviable candidates have different levels of access?
-      const ValueDecl *first = inaccessibleResults.front().Decl;
+      const ValueDecl *first = inaccessibleResults.front().getValueDecl();
       diagnose(Loc, diag::candidate_inaccessible,
                Name, first->getFormalAccess());
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
       for (auto lookupResult : inaccessibleResults) {
-        diagnose(lookupResult.Decl, diag::decl_declared_here,
-                 lookupResult.Decl->getFullName());
+        diagnose(lookupResult.getValueDecl(), diag::decl_declared_here,
+                 lookupResult.getValueDecl()->getFullName());
       }
 
       // Don't try to recover here; we'll get more access-related diagnostics
@@ -485,7 +485,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     } else {
       // Note all the correction candidates.
       for (auto &result : Lookup) {
-        noteTypoCorrection(Name, nameLoc, result);
+        noteTypoCorrection(Name, nameLoc, result.getValueDecl());
       }
     }
 
@@ -499,8 +499,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
   // If we have an unambiguous reference to a type decl, form a TypeExpr.
   if (Lookup.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
-      isa<TypeDecl>(Lookup[0].Decl)) {
-    auto *D = cast<TypeDecl>(Lookup[0].Decl);
+      isa<TypeDecl>(Lookup[0].getValueDecl())) {
+    auto *D = cast<TypeDecl>(Lookup[0].getValueDecl());
     // FIXME: This is odd.
     if (isa<ModuleDecl>(D)) {
       return new (Context) DeclRefExpr(D, UDRE->getNameLoc(),
@@ -510,6 +510,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
 
     return TypeExpr::createForDecl(Loc, D,
+                                   Lookup[0].getDeclContext(),
                                    UDRE->isImplicit());
   }
 
@@ -517,13 +518,14 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   SmallVector<ValueDecl*, 4> ResultValues;
   for (auto Result : Lookup) {
     // If we find a member, then all of the results aren't non-members.
-    bool IsMember = Result.Base && !isa<ModuleDecl>(Result.Base);
+    bool IsMember = (Result.getBaseDecl() &&
+                     !isa<ModuleDecl>(Result.getBaseDecl()));
     if (IsMember) {
       AllDeclRefs = false;
       break;
     }
 
-    ValueDecl *D = Result.Decl;
+    ValueDecl *D = Result.getValueDecl();
     if (!D->hasInterfaceType()) validateDecl(D);
 
     // FIXME: Circularity hack.
@@ -588,16 +590,19 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   ResultValues.clear();
   bool AllMemberRefs = true;
   ValueDecl *Base = nullptr;
+  DeclContext *BaseDC = nullptr;
   for (auto Result : Lookup) {
     // Track the base for member declarations.
-    if (Result.Base && !isa<ModuleDecl>(Result.Base)) {
-      ResultValues.push_back(Result.Decl);
-      if (Base && Result.Base != Base) {
+    if (Result.getBaseDecl() &&
+        !isa<ModuleDecl>(Result.getBaseDecl())) {
+      ResultValues.push_back(Result.getValueDecl());
+      if (Base && Result.getBaseDecl() != Base) {
         AllMemberRefs = false;
         break;
       }
 
-      Base = Result.Base;
+      Base = Result.getBaseDecl();
+      BaseDC = Result.getDeclContext();
       continue;
     }
 
@@ -610,9 +615,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     if (auto PD = dyn_cast<ProtocolDecl>(Base)) {
       BaseExpr = TypeExpr::createForDecl(Loc,
                                          PD->getGenericParams()->getParams().front(),
+                                         /*DC*/nullptr,
                                          /*isImplicit=*/true);
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*isImplicit=*/true);
+      BaseExpr = TypeExpr::createForDecl(Loc, NTD, BaseDC, /*isImplicit=*/true);
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
                                            /*Implicit=*/true);
@@ -2609,7 +2615,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   
   SmallVector<ValueDecl*, 4> choices;
   for (auto &result : matchLookup) {
-    choices.push_back(result.Decl);
+    choices.push_back(result.getValueDecl());
   }
   
   if (choices.empty()) {
