@@ -62,7 +62,7 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK: store [[ARG_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
-  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load_borrow [[READ]] : $*AnyObject
+  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK: end_access [[READ]]
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened([[UUID:".*"]]) AnyObject).Type
@@ -141,7 +141,7 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
   // CHECK:   [[PBO:%.*]] = project_box [[OPTBOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
-  // CHECK:   [[OBJCOPY:%[0-9]+]] = load_borrow [[READ]] : $*AnyObject
+  // CHECK:   [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK:   [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened
   // CHECK:   [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]

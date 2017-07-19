@@ -176,7 +176,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // -- Curry the Type onto static method argument lists.
   
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
-  // CHECK: [[C:%[0-9]+]] = load_borrow [[READC]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[META:%.*]] = value_metatype $@thick SomeClass.Type, [[C]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[META]] : {{.*}}, #SomeClass.static_method!1
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
