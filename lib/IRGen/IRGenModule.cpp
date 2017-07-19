@@ -453,7 +453,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     fn->setCallingConv(cc);
 
     if (::useDllStorage(llvm::Triple(Module.getTargetTriple())) &&
-        (fn->getLinkage() == llvm::GlobalValue::ExternalLinkage ||
+        ((fn->isDeclaration() && fn->getLinkage() == llvm::GlobalValue::ExternalLinkage) ||
          fn->getLinkage() == llvm::GlobalValue::AvailableExternallyLinkage))
       fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
