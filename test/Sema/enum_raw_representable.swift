@@ -97,11 +97,11 @@ func rdar32431736() {
 
   let myE1: E = items1.first
   // expected-error@-1 {{cannot convert value of type 'String?' to specified type 'E'}}
-  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: }} {{24-24=!)}}
+  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: }} {{29-29=!)}}
 
   let myE2: E = items2?.first
   // expected-error@-1 {{cannot convert value of type 'String?' to specified type 'E'}}
-  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: (}} {{25-25=)!)}}
+  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: (}} {{30-30=)!)}}
 }
 
 // rdar://problem/32431165 - improve diagnostic for raw representable argument mismatch

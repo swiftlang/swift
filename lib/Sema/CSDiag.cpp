@@ -3638,7 +3638,7 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
                       toType, fromType)
         .highlight(exprRange)
         .fixItInsert(exprRange.Start, fixItBefore)
-        .fixItInsert(exprRange.End, fixItAfter);
+        .fixItInsertAfter(exprRange.End, fixItAfter);
     }
   };
 
