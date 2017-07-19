@@ -152,9 +152,9 @@ public:
   /// a value.  The Initialization is not okay to propagate down, but
   /// the +0/+1-ness is.
   SGFContext withFollowingProjection() const {
-    SGFContext copy;
-    copy.state.setInt(state.getInt());
-    return copy;
+    SGFContext result;
+    result.state.setInt(state.getInt());
+    return result;
   }
 };
 

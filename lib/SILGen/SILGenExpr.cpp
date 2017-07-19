@@ -1299,7 +1299,10 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   // Any writebacks here are tightly scoped.
   FormalEvaluationScope writeback(SGF);
   LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::Read);
-  return SGF.emitLoadOfLValue(E, std::move(lv), C);
+  // We can't load at immediate +0 from the lvalue without deeper analysis,
+  // since the access will be immediately ended and might invalidate the value
+  // we loaded.
+  return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
@@ -2367,7 +2370,9 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   FormalEvaluationScope scope(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
-  return SGF.emitLoadOfLValue(E, std::move(lv), C);
+  // We can't load at +0 without further analysis, since the formal access into
+  // the lvalue will end immediately.
+  return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
 }
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
@@ -2386,7 +2391,9 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   FormalEvaluationScope scope(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
-  return SGF.emitLoadOfLValue(E, std::move(lv), C);
+  // We can't load at +0 without further analysis, since the formal access into
+  // the lvalue will end immediately.
+  return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
 }
 
 RValue RValueEmitter::visitDynamicSubscriptExpr(
