@@ -2088,27 +2088,31 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     ConstraintLocator *Locator;
 
     /// The type of the initializer.
-    Type InitType;
+    llvm::PointerIntPair<Type, 1, bool> InitTypeAndInOut;
 
   public:
     explicit BindingListener(Pattern *&pattern, Expr *&initializer)
       : pattern(pattern), initializer(initializer),
-        Locator(nullptr) { }
+        Locator(nullptr), InitTypeAndInOut(Type(), false) { }
 
-    Type getInitType() const { return InitType; }
+    Type getInitType() const { return InitTypeAndInOut.getPointer(); }
+    bool isInOut() const { return InitTypeAndInOut.getInt(); }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
 
       // Collect constraints from the pattern.
-      InitType = cs.generateConstraints(pattern, Locator);
-      if (!InitType)
+      InitTypeAndInOut.setPointer(cs.generateConstraints(pattern, Locator));
+      InitTypeAndInOut.setInt(expr->isSemanticallyInOutExpr());
+      if (!InitTypeAndInOut.getPointer())
         return true;
 
+      assert(!InitTypeAndInOut.getPointer()->is<InOutType>());
       // Add a conversion constraint between the types.
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       InitType, Locator, /*isFavored*/true);
+                       InitTypeAndInOut.getPointer(), Locator,
+                       /*isFavored*/true);
 
       // The expression has been pre-checked; save it in case we fail later.
       initializer = expr;
@@ -2117,7 +2121,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *foundSolution(Solution &solution, Expr *expr) override {
       // Figure out what type the constraints decided on.
-      InitType = solution.simplifyType(InitType);
+      InitTypeAndInOut.setPointer(solution.simplifyType(InitTypeAndInOut.getPointer()));
+      InitTypeAndInOut.setInt(expr->isSemanticallyInOutExpr());
 
       // Just keep going.
       return expr;
@@ -2126,13 +2131,13 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Convert the initializer to the type of the pattern.
       // ignoreTopLevelInjection = Binding->isConditional()
-      expr = solution.coerceToType(expr, InitType, Locator,
+      expr = solution.coerceToType(expr, InitTypeAndInOut.getPointer(), Locator,
                                    false /* ignoreTopLevelInjection */);
       if (!expr) {
         return nullptr;
       }
 
-      assert(solution.getConstraintSystem().getType(expr)->isEqual(InitType));
+      assert(solution.getConstraintSystem().getType(expr)->isEqual(InitTypeAndInOut.getPointer()));
 
       initializer = expr;
       return expr;
@@ -2176,7 +2181,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     }
 
     // Apply the solution to the pattern as well.
-    if (coercePatternToType(pattern, DC, listener.getInitType(), options)) {
+    if (coercePatternToType(pattern, DC, listener.getInitType(), options,
+                            nullptr, TypeLoc(), listener.isInOut())) {
       return true;
     }
   }

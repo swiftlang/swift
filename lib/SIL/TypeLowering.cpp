@@ -123,7 +123,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
         return CaptureKind::Constant;
 
       // In-out parameters are captured by address.
-      if (var->getType()->is<InOutType>()) {
+      if (var->isInOut()) {
         return CaptureKind::StorageAddress;
       }
 

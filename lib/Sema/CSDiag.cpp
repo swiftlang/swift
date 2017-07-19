@@ -3127,11 +3127,15 @@ namespace {
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
       
-      for (auto paramDeclElt : ParamDeclTypes)
-        paramDeclElt.first->setType(paramDeclElt.second);
+      for (auto paramDeclElt : ParamDeclTypes) {
+        assert(!paramDeclElt.first->isLet() || !paramDeclElt.second->is<InOutType>());
+        paramDeclElt.first->setType(paramDeclElt.second->getInOutObjectType());
+      }
       
-      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
-        paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second);
+      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes) {
+        assert(!paramDeclIfaceElt.first->isLet() || !paramDeclIfaceElt.second->is<InOutType>());
+        paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second->getInOutObjectType());
+      }
       
       for (auto CSE : CollectionSemanticExprs)
         CSE.first->setSemanticExpr(CSE.second);
@@ -4550,9 +4554,11 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
             }
           }
 
+          auto resultTy = CS.getType(exprResult);
           resultElts[inArgNo] = exprResult;
-          resultEltTys[inArgNo] = {CS.getType(exprResult),
-                                   TE->getElementName(inArgNo)};
+          resultEltTys[inArgNo] = {resultTy->getInOutObjectType(),
+                                   TE->getElementName(inArgNo),
+                                   ParameterTypeFlags().withInOut(resultTy->is<InOutType>())};
         }
       }
 
@@ -7281,12 +7287,13 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     for (auto param : *params) {
       auto paramType = param->getType();
       // If this is unresolved 'inout' parameter, it's better to drop
-      // 'inout' from type but keep 'mutability' classifier because that
-      // might help to diagnose actual problem e.g. type inference and
-      // doesn't give us much information anyway.
+      // 'inout' from type because that might help to diagnose actual problem
+      // e.g. type inference doesn't give us much information anyway.
       if (paramType->is<InOutType>() && paramType->hasUnresolvedType()) {
+        assert(!param->isLet() || !paramType->is<InOutType>());
         param->setType(CS.getASTContext().TheUnresolvedType);
-        param->setInterfaceType(param->getType());
+        param->setInterfaceType(param->getType()->getInOutObjectType());
+        param->setSpecifier(swift::VarDecl::Specifier::Owned);
       }
     }
 

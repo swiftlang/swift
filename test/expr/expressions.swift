@@ -821,7 +821,6 @@ func inoutTests(_ arr: inout Int) {
   (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
   // expected-warning @-1 {{expression of type 'inout Int' is unused}}
   let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
-  // expected-error @-1 {{variable has type 'inout Int' which includes nested inout parameters}}
 
   inoutTests(true ? &x : &y);  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
 

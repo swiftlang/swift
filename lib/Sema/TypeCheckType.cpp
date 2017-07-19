@@ -2737,9 +2737,9 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       ty = TC.getArraySliceType(repr->getEllipsisLoc(), ty);
 
     auto paramFlags = isImmediateFunctionInput
-                          ? ParameterTypeFlags::fromParameterType(ty, variadic)
-                          : ParameterTypeFlags();
-    elements.emplace_back(ty, name, paramFlags);
+                    ? ParameterTypeFlags::fromParameterType(ty, variadic).withInOut(tyR->getKind() == TypeReprKind::InOut)
+                    : ParameterTypeFlags();
+    elements.emplace_back(ty->getInOutObjectType(), name, paramFlags);
   }
 
   // Single-element labeled tuples are not permitted outside of declarations

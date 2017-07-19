@@ -1449,10 +1449,9 @@ class ParenType : public TypeBase {
   ParameterTypeFlags parameterFlags;
 
   friend class ASTContext;
+  
   ParenType(Type UnderlyingType, RecursiveTypeProperties properties,
-            ParameterTypeFlags flags)
-      : TypeBase(TypeKind::Paren, nullptr, properties),
-        UnderlyingType(UnderlyingType), parameterFlags(flags) {}
+            ParameterTypeFlags flags);
 
 public:
   Type getUnderlyingType() const { return UnderlyingType; }
@@ -1492,8 +1491,9 @@ public:
   
   bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
-
-  Type getType() const { return ElementType; }
+  
+  Type getRawType() const { return ElementType; }
+  Type getType() const;
 
   ParameterTypeFlags getParameterFlags() const { return Flags; }
 
@@ -1514,14 +1514,10 @@ public:
   Type getVarargBaseTy() const;
   
   /// Retrieve a copy of this tuple type element with the type replaced.
-  TupleTypeElt getWithType(Type T) const {
-    return TupleTypeElt(T, getName(), getParameterFlags());
-  }
+  TupleTypeElt getWithType(Type T) const;
 
   /// Retrieve a copy of this tuple type element with the name replaced.
-  TupleTypeElt getWithName(Identifier name) const {
-    return TupleTypeElt(getType(), name, getParameterFlags());
-  }
+  TupleTypeElt getWithName(Identifier name) const;
 
   /// Retrieve a copy of this tuple type element with no name
   TupleTypeElt getWithoutName() const { return getWithName(Identifier()); }
@@ -2318,12 +2314,8 @@ public:
   
   class Param {
   public:
-    explicit Param(Type t) : Ty(t), Label(Identifier()), Flags() {}
-    explicit Param(const TupleTypeElt &tte)
-      : Ty(tte.isVararg() ? tte.getVarargBaseTy() : tte.getType()),
-        Label(tte.getName()), Flags(tte.getParameterFlags()) {}
-    explicit Param(Type t, Identifier l, ParameterTypeFlags f)
-      : Ty(t), Label(l), Flags(f) {}
+    explicit Param(const TupleTypeElt &tte);
+    explicit Param(Type t, Identifier l, ParameterTypeFlags f);
     
   private:
     /// The type of the parameter. For a variadic parameter, this is the
@@ -2337,11 +2329,15 @@ public:
     ParameterTypeFlags Flags = {};
     
   public:
-    Type getType() const { return Ty; }
+    Type getType() const;
     CanType getCanType() const {
-      assert(Ty->isCanonical());
-      return CanType(Ty);
+      assert(getType()->isCanonical());
+      return CanType(getType());
     }
+    
+    /// FIXME(Remove InOutType): This is mostly for copying between param
+    /// types and should go away.
+    Type getPlainType() const { return Ty; }
     
     Identifier getLabel() const { return Label; }
     
@@ -4787,6 +4783,16 @@ inline Type TupleTypeElt::getVarargBaseTy() const {
   return T;
 }
 
+inline TupleTypeElt TupleTypeElt::getWithName(Identifier name) const {
+  assert(getParameterFlags().isInOut() == getType()->is<InOutType>());
+  return TupleTypeElt(getRawType(), name, getParameterFlags());
+}
+
+inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
+  auto flags = getParameterFlags().withInOut(T->is<InOutType>());
+  return TupleTypeElt(T->getInOutObjectType(), getName(), flags);
+}
+
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
 ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
@@ -4794,6 +4800,10 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
                      paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
                   !paramTy->castTo<AnyFunctionType>()->isNoEscape();
+  // FIXME(Remove InOut): The last caller that needs this is argument
+  // decomposition.  Start by enabling the assertion there and fixing up those
+  // callers, then remove this, then remove
+  // ParameterTypeFlags::fromParameterType entirely.
   bool inOut = paramTy->is<InOutType>();
   return {isVariadic, autoclosure, escaping, inOut};
 }

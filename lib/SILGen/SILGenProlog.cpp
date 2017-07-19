@@ -253,11 +253,10 @@ struct ArgumentInitHelper {
     // Create a shadow copy of inout parameters so they can be captured
     // by closures. The InOutDeshadowing guaranteed optimization will
     // eliminate the variable if it is not needed.
-    if (auto inOutTy = vd->getType()->getAs<InOutType>()) {
-
+    if (vd->isInOut()) {
       SILValue address = argrv.getUnmanagedValue();
 
-      CanType objectType = inOutTy->getObjectType()->getCanonicalType();
+      CanType objectType = vd->getType()->getInOutObjectType()->getCanonicalType();
 
       // As a special case, don't introduce a local variable for
       // Builtin.UnsafeValueBuffer, which is not copyable.

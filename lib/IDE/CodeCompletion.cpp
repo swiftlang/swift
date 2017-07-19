@@ -2111,7 +2111,8 @@ public:
         type = ParamDecl::getVarargBaseTy(type);
 
       Builder.addCallParameter(param->getArgumentName(), type,
-                               param->isVariadic(), true);
+                               param->isVariadic(), /*Outermost*/true,
+                               param->isInOut());
     }
   }
 
@@ -2145,7 +2146,8 @@ public:
       else if (IsTopLevel)
         Builder.addAnnotatedLeftParen();
       Builder.addCallParameter(Identifier(), PT->getUnderlyingType(),
-                               /*IsVarArg*/false, IsTopLevel);
+                               /*IsVarArg*/false, IsTopLevel,
+                               PT->getParameterFlags().isInOut());
       if (IsTopLevel)
         Builder.addRightParen();
       return;
@@ -2156,7 +2158,7 @@ public:
     else if (IsTopLevel)
       Builder.addAnnotatedLeftParen();
 
-    Builder.addCallParameter(Label, T, IsVarArg, IsTopLevel);
+    Builder.addCallParameter(Label, T, IsVarArg, IsTopLevel, /*isInOut*/false);
     if (IsTopLevel)
       Builder.addRightParen();
   }
@@ -2261,9 +2263,10 @@ public:
           auto argName = BodyParams->get(i)->getArgumentName();
           auto bodyName = BodyParams->get(i)->getName();
           Builder.addCallParameter(argName, bodyName, ParamType, TupleElt.isVararg(),
-                                   true);
+                                   true, TupleElt.isInOut());
         } else {
-          Builder.addCallParameter(Name, ParamType, TupleElt.isVararg(), true);
+          Builder.addCallParameter(Name, ParamType, TupleElt.isVararg(),
+                                   /*TopLevel*/true, TupleElt.isInOut());
         }
         modifiedBuilder = true;
         NeedComma = true;
@@ -2271,9 +2274,11 @@ public:
     } else if (!shouldSkipArg(0)) {
       // If it's not a tuple, it could be a unary function.
       Type T = AFT->getInput();
+      bool isInOut = false;
       if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
         // Only unwrap the paren sugar, if it exists.
         T = PT->getUnderlyingType();
+        isInOut = PT->getParameterFlags().isInOut();
       }
 
       modifiedBuilder = true;
@@ -2281,9 +2286,10 @@ public:
         auto argName = BodyParams->get(0)->getArgumentName();
         auto bodyName = BodyParams->get(0)->getName();
         Builder.addCallParameter(argName, bodyName, T,
-                                 /*IsVarArg*/false, true);
+                                 /*IsVarArg*/false, /*Toplevel*/true, isInOut);
       } else
-        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false, true);
+        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false,
+                                 /*TopLevel*/true, isInOut);
     }
 
     return modifiedBuilder;
@@ -2468,12 +2474,16 @@ public:
       Type FirstInputType = FunctionType->castTo<AnyFunctionType>()->getInput();
 
       if (IsImplicitlyCurriedInstanceMethod) {
-        if (auto PT = dyn_cast<ParenType>(FirstInputType.getPointer()))
+        bool isInOut = false;
+        if (auto PT = dyn_cast<ParenType>(FirstInputType.getPointer())) {
           FirstInputType = PT->getUnderlyingType();
+          isInOut = PT->getParameterFlags().isInOut();
+        }
 
         Builder.addLeftParen();
         Builder.addCallParameter(Ctx.Id_self, FirstInputType,
-                                 /*IsVarArg*/ false, true);
+                                 /*IsVarArg*/ false, /*TopLevel*/true,
+                                 isInOut);
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
@@ -3291,7 +3301,9 @@ public:
     builder.addEqual();
     builder.addWhitespace(" ");
     assert(RHSType && resultType);
-    builder.addCallParameter(Identifier(), Identifier(), RHSType, false, true);
+    builder.addCallParameter(Identifier(), Identifier(), RHSType,
+                             /*IsVarArg*/false, /*TopLevel*/true,
+                             /*IsInOut*/false);
     addTypeAnnotation(builder, resultType);
   }
 
@@ -3314,7 +3326,7 @@ public:
     builder.addWhitespace(" ");
     if (RHSType)
       builder.addCallParameter(Identifier(), Identifier(), RHSType, false,
-                               true);
+                               true, /*IsInOut*/false);
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3566,16 +3578,16 @@ public:
       builder.addTextChunk("#colorLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("red"),
-                               floatType, false, true);
+                               floatType, false, true, /*IsInOut*/false);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("green"), floatType,
-                               false, true);
+                               false, true, /*IsInOut*/false);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("blue"), floatType,
-                               false, true);
+                               false, true, /*IsInOut*/false);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("alpha"), floatType,
-                               false, true);
+                               false, true, /*IsInOut*/false);
       builder.addRightParen();
     });
 
@@ -3584,7 +3596,7 @@ public:
       builder.addTextChunk("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
-                               stringType, false, true);
+                               stringType, false, true, /*IsInOut*/false);
       builder.addRightParen();
     });
 

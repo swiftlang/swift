@@ -1641,7 +1641,9 @@ namespace {
       }
 
       auto &ctx = CS.getASTContext();
-      return ParenType::get(ctx, CS.getType(expr->getSubExpr()));
+      auto parenType = CS.getType(expr->getSubExpr())->getInOutObjectType();
+      auto parenFlags = ParameterTypeFlags().withInOut(expr->isSemanticallyInOutExpr());
+      return ParenType::get(ctx, parenType, parenFlags);
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -1650,8 +1652,10 @@ namespace {
       SmallVector<TupleTypeElt, 4> elements;
       elements.reserve(expr->getNumElements());
       for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
-        elements.push_back(TupleTypeElt(CS.getType(expr->getElement(i)),
-                                        expr->getElementName(i)));
+        auto ty = CS.getType(expr->getElement(i));
+        auto flags = ParameterTypeFlags().withInOut(ty->is<InOutType>());
+        elements.push_back(TupleTypeElt(ty->getInOutObjectType(),
+                                        expr->getElementName(i), flags));
       }
 
       return TupleType::get(elements, CS.getASTContext());
@@ -1946,8 +1950,9 @@ namespace {
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
           Type openedType = CS.openUnboundGenericType(type, locator);
-          param->setType(openedType);
-          param->setInterfaceType(openedType);
+          assert(!param->isLet() || !openedType->is<InOutType>());
+          param->setType(openedType->getInOutObjectType());
+          param->setInterfaceType(openedType->getInOutObjectType());
           continue;
         }
 

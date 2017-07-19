@@ -584,7 +584,8 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
     if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
       type = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
                                    wantRValue, retainParens);
-      return ParenType::get(getASTContext(), type);
+      auto flags = parenTy->getParameterFlags().withInOut(type->is<InOutType>());
+      return ParenType::get(getASTContext(), type->getInOutObjectType(), flags);
     }
   }
 
@@ -1205,17 +1206,19 @@ ConstraintSystem::getTypeOfMemberReference(
 
     // If self is a value type and the base type is an lvalue, wrap it in an
     // inout type.
+    auto selfFlags = ParameterTypeFlags();
     if (!outerDC->getDeclaredTypeOfContext()->hasReferenceSemantics() &&
         baseTy->is<LValueType>() &&
         !selfTy->hasError())
-      selfTy = InOutType::get(selfTy);
+      selfFlags = selfFlags.withInOut(true);
 
     // If the storage is generic, add a generic signature.
+    auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), selfFlags);
     if (auto *sig = innerDC->getGenericSignatureOfContext()) {
-      funcType = GenericFunctionType::get(sig, selfTy, refType,
+      funcType = GenericFunctionType::get(sig, {selfParam}, refType,
                                           AnyFunctionType::ExtInfo());
     } else {
-      funcType = FunctionType::get(selfTy, refType,
+      funcType = FunctionType::get({selfParam}, refType,
                                    AnyFunctionType::ExtInfo());
     }
   }
