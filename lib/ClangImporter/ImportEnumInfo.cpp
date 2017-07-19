@@ -36,6 +36,8 @@ using namespace importer;
 /// Classify the given Clang enumeration to describe how to import it.
 void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
                             clang::Preprocessor &pp) {
+  assert(decl->isThisDeclarationADefinition());
+
   // Anonymous enumerations simply get mapped to constants of the
   // underlying type of the enum, because there is no way to conjure up a
   // name for the Swift type.
