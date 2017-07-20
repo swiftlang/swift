@@ -171,15 +171,14 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SILGen/SILGenMaterializeForSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "ASTVisitor.h"
 using namespace swift;
 using namespace Lowering;
 
-std::string
-Lowering::getMaterializeForSetCallbackName(ProtocolConformance *conformance,
-                                           FuncDecl *requirement) {
+static std::string
+getMaterializeForSetCallbackName(ProtocolConformance *conformance,
+                                 FuncDecl *requirement) {
 
   DeclContext *dc = requirement;
   ClosureExpr closure(/*patterns*/ nullptr,
@@ -696,12 +695,12 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   // the actual materializeForSet function), and so we only need to make sure we
   // don't break things in cases when there may be multiple definitions.
   auto callbackLinkage =
-      hasSharedVisibility(Linkage) ? SILLinkage::Shared : SILLinkage::Private;
+      F.isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
 
   auto callback = SGM.M.createFunction(
       callbackLinkage, CallbackName, callbackType, genericEnv,
-      SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(),
-      IsNotThunk, SubclassScope::NotApplicable,
+      SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(), IsNotThunk,
+      SubclassScope::NotApplicable,
       /*inlineStrategy=*/InlineDefault,
       /*EK=*/EffectsKind::Unspecified,
       /*InsertBefore=*/&F);
