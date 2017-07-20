@@ -105,6 +105,5 @@ else()
 endif()
 
 add_subdirectory(public)
-add_subdirectory(internal)
 add_subdirectory(private)
 

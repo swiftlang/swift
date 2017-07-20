@@ -23,9 +23,6 @@ import Foundation
 import Glibc
 #endif
 
-// For experimental Set operators
-import SwiftExperimental
-
 extension Set {
   func _rawIdentifier() -> Int {
     return unsafeBitCast(self, to: Int.self)
@@ -2752,46 +2749,12 @@ SetTestSuite.test("isSubsetOf.Set.Set") {
   expectTrue(s2.isSubset(of: s1))
 }
 
-SetTestSuite.test("⊆.Set.Set") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010, 2020, 3030])
-  expectTrue(Set<Int>().isSubset(of: s1))
-  expectFalse(s1 ⊆ Set<Int>())
-  expectTrue(s1 ⊆ s1)
-  expectTrue(s2 ⊆ s1)
-}
-
-SetTestSuite.test("⊈.Set.Set") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010, 2020, 3030])
-  expectFalse(Set<Int>() ⊈ s1)
-  expectTrue(s1 ⊈ Set<Int>())
-  expectFalse(s1 ⊈ s1)
-  expectFalse(s2 ⊈ s1)
-}
-
 SetTestSuite.test("isSubsetOf.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
   expectTrue(Set<Int>().isSubset(of: s1))
   expectFalse(s1.isSubset(of: Set<Int>()))
   expectTrue(s1.isSubset(of: s1))
-}
-
-SetTestSuite.test("⊆.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(Set<Int>().isSubset(of: s1))
-  expectFalse(s1 ⊆ Set<Int>())
-  expectTrue(s1 ⊆ s1)
-}
-
-SetTestSuite.test("⊈.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectFalse(Set<Int>() ⊈ s1)
-  expectTrue(s1 ⊈ Set<Int>())
-  expectFalse(s1 ⊈ s1)
 }
 
 SetTestSuite.test("isStrictSubsetOf.Set.Set") {
@@ -2802,44 +2765,12 @@ SetTestSuite.test("isStrictSubsetOf.Set.Set") {
   expectFalse(s1.isStrictSubset(of: s1))
 }
 
-SetTestSuite.test("⊂.Set.Set") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010, 2020, 3030])
-  expectTrue(Set<Int>() ⊂ s1)
-  expectFalse(s1 ⊂ Set<Int>())
-  expectFalse(s1 ⊂ s1)
-}
-
-SetTestSuite.test("⊄.Set.Set") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010, 2020, 3030])
-  expectFalse(Set<Int>() ⊄ s1)
-  expectTrue(s1 ⊄ Set<Int>())
-  expectTrue(s1 ⊄ s1)
-}
-
 SetTestSuite.test("isStrictSubsetOf.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
   expectTrue(Set<Int>().isStrictSubset(of: s1))
   expectFalse(s1.isStrictSubset(of: Set<Int>()))
   expectFalse(s1.isStrictSubset(of: s1))
-}
-
-SetTestSuite.test("⊂.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(Set<Int>() ⊂ s1)
-  expectFalse(s1 ⊂ Set<Int>())
-  expectFalse(s1 ⊂ s1)
-}
-
-SetTestSuite.test("⊄.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectFalse(Set<Int>() ⊄ s1)
-  expectTrue(s1 ⊄ Set<Int>())
-  expectTrue(s1 ⊄ s1)
 }
 
 SetTestSuite.test("isSupersetOf.Set.Set") {
@@ -2852,26 +2783,6 @@ SetTestSuite.test("isSupersetOf.Set.Set") {
   expectFalse(Set<Int>().isSuperset(of: s1))
 }
 
-SetTestSuite.test("⊇.Set.Set") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010, 2020, 3030])
-  expectTrue(s1 ⊇ Set<Int>())
-  expectFalse(Set<Int>() ⊇ s1)
-  expectTrue(s1 ⊇ s1)
-  expectTrue(s1 ⊇ s2)
-  expectFalse(Set<Int>() ⊇ s1)
-}
-
-SetTestSuite.test("⊉.Set.Set") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010, 2020, 3030])
-  expectFalse(s1 ⊉ Set<Int>())
-  expectTrue(Set<Int>() ⊉ s1)
-  expectFalse(s1 ⊉ s1)
-  expectFalse(s1 ⊉ s2)
-  expectTrue(Set<Int>() ⊉ s1)
-}
-
 SetTestSuite.test("isSupersetOf.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
@@ -2880,26 +2791,6 @@ SetTestSuite.test("isSupersetOf.Set.Sequence") {
   expectTrue(s1.isSuperset(of: s1))
   expectTrue(s1.isSuperset(of: s2))
   expectFalse(Set<Int>().isSuperset(of: s1))
-}
-
-SetTestSuite.test("⊇.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(s1 ⊇ Set<Int>())
-  expectFalse(Set<Int>() ⊇ s1)
-  expectTrue(s1 ⊇ s1)
-  expectTrue(s1 ⊇ s2)
-  expectFalse(Set<Int>() ⊇ s1)
-}
-
-SetTestSuite.test("⊉.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectFalse(s1 ⊉ Set<Int>())
-  expectTrue(Set<Int>() ⊉ s1)
-  expectFalse(s1 ⊉ s1)
-  expectFalse(s1 ⊉ s2)
-  expectTrue(Set<Int>() ⊉ s1)
 }
 
 SetTestSuite.test("strictSuperset.Set.Set") {
@@ -2911,24 +2802,6 @@ SetTestSuite.test("strictSuperset.Set.Set") {
   expectTrue(s1.isStrictSuperset(of: s2))
 }
 
-SetTestSuite.test("⊃.Set.Set") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010, 2020, 3030])
-  expectTrue(s1 ⊃ Set<Int>())
-  expectFalse(Set<Int>() ⊃ s1)
-  expectFalse(s1 ⊃ s1)
-  expectTrue(s1 ⊃ s2)
-}
-
-SetTestSuite.test("⊅.Set.Set") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010, 2020, 3030])
-  expectFalse(s1 ⊅ Set<Int>())
-  expectTrue(Set<Int>() ⊅ s1)
-  expectTrue(s1 ⊅ s1)
-  expectFalse(s1 ⊅ s2)
-}
-
 SetTestSuite.test("strictSuperset.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
@@ -2936,24 +2809,6 @@ SetTestSuite.test("strictSuperset.Set.Sequence") {
   expectFalse(Set<Int>().isStrictSuperset(of: s1))
   expectFalse(s1.isStrictSuperset(of: s1))
   expectTrue(s1.isStrictSuperset(of: s2))
-}
-
-SetTestSuite.test("⊃.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(s1 ⊃ Set<Int>())
-  expectFalse(Set<Int>() ⊃ s1)
-  expectFalse(s1 ⊃ s1)
-  expectTrue(s1 ⊃ s2)
-}
-
-SetTestSuite.test("⊅.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectFalse(s1 ⊅ Set<Int>())
-  expectTrue(Set<Int>() ⊅ s1)
-  expectTrue(s1 ⊅ s1)
-  expectFalse(s1 ⊅ s2)
 }
 
 SetTestSuite.test("Equatable.Native.Native") {
@@ -3096,32 +2951,6 @@ SetTestSuite.test("union") {
   expectEqual(s1, Set<Int>().union(s1))
 }
 
-SetTestSuite.test("∪") {
-  let s1 = Set([1010, 2020, 3030])
-  let s2 = Set([4040, 5050, 6060])
-  let s3 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-
-  let identity1 = s1._rawIdentifier()
-
-  let s4 = s1 ∪ s2
-  expectEqual(s4, s3)
-
-  // s1 should be unchanged
-  expectEqual(identity1, s1._rawIdentifier())
-  expectEqual(Set([1010, 2020, 3030]), s1)
-
-  // s4 should be a fresh set
-  expectNotEqual(identity1, s4._rawIdentifier())
-  expectEqual(s4, s3)
-
-  let s5 = s1 ∪ s1
-  expectEqual(s5, s1)
-  expectEqual(identity1, s1._rawIdentifier())
-
-  expectEqual(s1, s1 ∪ Set<Int>())
-  expectEqual(s1, Set<Int>() ∪ s1)
-}
-
 SetTestSuite.test("formUnion") {
   // These are anagrams - they should amount to the same sets.
   var s1 = Set("the morse code".characters)
@@ -3139,27 +2968,6 @@ SetTestSuite.test("formUnion") {
   expectEqual(identity1, s1._rawIdentifier())
 
   s1.formUnion(s3)
-  expectNotEqual(s1, s2)
-  expectEqual(identity1, s1._rawIdentifier())
-}
-
-SetTestSuite.test("∪=") {
-  // These are anagrams - they should amount to the same sets.
-  var s1 = Set("the morse code".characters)
-  let s2 = Set("here come dots".characters)
-  let s3 = Set("and then dashes".characters)
-
-  let identity1 = s1._rawIdentifier()
-
-  s1 ∪= "".characters
-  expectEqual(identity1, s1._rawIdentifier())
-
-  expectEqual(s1, s2)
-  s1 ∪= s2
-  expectEqual(s1, s2)
-  expectEqual(identity1, s1._rawIdentifier())
-
-  s1 ∪= s3
   expectNotEqual(s1, s2)
   expectEqual(identity1, s1._rawIdentifier())
 }
@@ -3193,32 +3001,6 @@ SetTestSuite.test("subtract")
   expectEqual(identity1, s1._rawIdentifier())
 }
 
-SetTestSuite.test("∖") {
-  let s1 = Set([1010, 2020, 3030])
-  let s2 = Set([4040, 5050, 6060])
-  let s3 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-
-  let identity1 = s1._rawIdentifier()
-
-  // Subtracting a disjoint set should not create a
-  // unique reference
-  let s4 = s1 ∖ s2
-  expectEqual(s1, s4)
-  expectEqual(identity1, s1._rawIdentifier())
-  expectEqual(identity1, s4._rawIdentifier())
-
-  // Subtracting a superset will leave the set empty
-  let s5 = s1 ∖ s3
-  expectTrue(s5.isEmpty)
-  expectEqual(identity1, s1._rawIdentifier())
-  expectNotEqual(identity1, s5._rawIdentifier())
-
-  // Subtracting the empty set does nothing
-  expectEqual(s1, s1 ∖ Set<Int>())
-  expectEqual(Set<Int>(), Set<Int>() ∖ s1)
-  expectEqual(identity1, s1._rawIdentifier())
-}
-
 SetTestSuite.test("subtract")
   .xfail(.custom({ _isStdlibDebugConfiguration() },
                  reason: "rdar://33358110"))
@@ -3233,27 +3015,6 @@ SetTestSuite.test("subtract")
   expectEqual(identity1, s1._rawIdentifier())
 
   s1.subtract(s3)
-  expectEqual(identity1, s1._rawIdentifier())
-
-  expectEqual(s1, s2)
-  expectEqual(identity1, s1._rawIdentifier())
-}
-
-SetTestSuite.test("∖=")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
-  .code {
-
-  var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010, 2020, 3030])
-  let s3 = Set([4040, 5050, 6060])
-
-  let identity1 = s1._rawIdentifier()
-
-  s1 ∖= Set<Int>()
-  expectEqual(identity1, s1._rawIdentifier())
-
-  s1 ∖= s3
   expectEqual(identity1, s1._rawIdentifier())
 
   expectEqual(s1, s2)
@@ -3277,25 +3038,6 @@ SetTestSuite.test("intersect") {
   expectEqual(Set<Int>(), Set<Int>().intersection(Set<Int>()))
   expectEqual(Set<Int>(), s1.intersection(Set<Int>()))
   expectEqual(Set<Int>(), Set<Int>().intersection(s1))
-}
-
-SetTestSuite.test("∩") {
-  let s1 = Set([1010, 2020, 3030])
-  let s2 = Set([4040, 5050, 6060])
-  var s3 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  var s4 = Set([1010, 2020, 3030])
-
-  let identity1 = s1._rawIdentifier()
-  expectEqual(Set([1010, 2020, 3030]),
-    Set([1010, 2020, 3030]) ∩ Set([1010, 2020, 3030]) as Set<Int>)
-  expectEqual(identity1, s1._rawIdentifier())
-
-  expectEqual(s1, s1 ∩ s3)
-  expectEqual(identity1, s1._rawIdentifier())
-
-  expectEqual(Set<Int>(), Set<Int>() ∩ Set<Int>())
-  expectEqual(Set<Int>(), s1 ∩ Set<Int>())
-  expectEqual(Set<Int>(), Set<Int>() ∩ s1)
 }
 
 SetTestSuite.test("formIntersection") {
@@ -3325,33 +3067,6 @@ SetTestSuite.test("formIntersection") {
   expectEqual(s5, Set<Int>())
 }
 
-SetTestSuite.test("∩=") {
-  var s1 = Set([1010, 2020, 3030])
-  let s2 = Set([4040, 5050, 6060])
-  var s3 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  var s4 = Set([1010, 2020, 3030])
-
-  let identity1 = s1._rawIdentifier()
-  s1 ∩= s4
-  expectEqual(s1, s4)
-  expectEqual(identity1, s1._rawIdentifier())
-
-  s4 ∩= s2
-  expectEqual(Set<Int>(), s4)
-
-  let identity2 = s3._rawIdentifier()
-  s3 ∩= s2
-  expectEqual(s3, s2)
-  expectTrue(s1.isDisjoint(with: s3))
-  expectNotEqual(identity1, s3._rawIdentifier())
-
-  var s5 = Set<Int>()
-  s5 ∩= s5
-  expectEqual(s5, Set<Int>())
-  s5 ∩= s1
-  expectEqual(s5, Set<Int>())
-}
-
 SetTestSuite.test("symmetricDifference") {
 
   // Overlap with 4040, 5050, 6060
@@ -3378,32 +3093,6 @@ SetTestSuite.test("symmetricDifference") {
   expectTrue(s1.symmetricDifference(s1).isEmpty)
 }
 
-SetTestSuite.test("⨁") {
-
-  // Overlap with 4040, 5050, 6060
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([4040, 5050, 6060, 7070, 8080, 9090])
-  let result = Set([1010, 2020, 3030, 7070, 8080, 9090])
-  let universe = Set([1010, 2020, 3030, 4040, 5050, 6060,
-                       7070, 8080, 9090])
-
-  let identity1 = s1._rawIdentifier()
-
-  let s3 = s1 ⨁ s2
-
-  expectEqual(identity1, s1._rawIdentifier())
-
-  expectEqual(s3, result)
-
-  expectEqual(s1 ⨁ s2,
-    (s1 ∪ s2) ∩ (universe ∖ (s1 ∩ s2)))
-
-  expectEqual(s1 ⨁ s2,
-    s1 ∩ (universe ∖ s2) ∪ (universe ∖ s1) ∩ s2)
-
-  expectTrue((s1 ⨁ s1).isEmpty)
-}
-
 SetTestSuite.test("formSymmetricDifference")
   .xfail(.custom({ _isStdlibDebugConfiguration() },
                  reason: "rdar://33358110"))
@@ -3424,31 +3113,6 @@ SetTestSuite.test("formSymmetricDifference")
 
   // A ⨁ A == {}
   s1.formSymmetricDifference(s1)
-  expectTrue(s1.isEmpty)
-
-  // Removing all elements should cause an identity change
-  expectNotEqual(identity1, s1._rawIdentifier())
-}
-
-SetTestSuite.test("⨁=")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
-  .code {
-
-  // Overlap with 4040, 5050, 6060
-  var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = Set([1010])
-  let result = Set([2020, 3030, 4040, 5050, 6060])
-
-  let identity1 = s1._rawIdentifier()
-  s1 ⨁= s2
-
-  // Removing just one element shouldn't cause an identity change
-  expectEqual(identity1, s1._rawIdentifier())
-
-  expectEqual(s1, result)
-
-  s1 ⨁= s1
   expectTrue(s1.isEmpty)
 
   // Removing all elements should cause an identity change
@@ -3505,18 +3169,6 @@ SetTestSuite.test("contains") {
   let s1 = Set([1010, 2020, 3030])
   expectTrue(s1.contains(1010))
   expectFalse(s1.contains(999))
-}
-
-SetTestSuite.test("∈") {
-  let s1 = Set([1010, 2020, 3030])
-  expectTrue(1010  ∈ s1)
-  expectFalse(999 ∈ s1)
-}
-
-SetTestSuite.test("∉") {
-  let s1 = Set([1010, 2020, 3030])
-  expectFalse(1010 ∉ s1)
-  expectTrue(999 ∉ s1)
 }
 
 SetTestSuite.test("memberAtIndex") {
@@ -3795,45 +3447,6 @@ SetTestSuite.test("Hashable") {
   let ss11 = Set([Set([2020] as [Int]), Set([3030] as [Int]), Set([2020] as [Int])])
   let ss2 = Set([Set([9090] as [Int])])
   checkHashable([ss1, ss11, ss2], equalityOracle: { $0 == $1 })
-}
-
-SetTestSuite.test("Operator.Precedence") {
-  let s1 = Set([1010, 2020, 3030])
-  let s2 = Set([3030, 4040, 5050])
-  let s3 = Set([6060, 7070, 8080])
-  let s4 = Set([8080, 9090, 100100])
-
-  // intersection higher precedence than union
-  expectEqual(s1 ∪ (s2 ∩ s3) ∪ s4, s1 ∪ s2 ∩ s3 ∪ s4 as Set<Int>)
-
-  // intersection higher precedence than complement
-  expectEqual(s1 ∖ (s2 ∩ s3) ∖ s4, s1 ∖ s2 ∩ s3 ∖ s4 as Set<Int>)
-
-  // intersection higher precedence than exclusive-or
-  expectEqual(s1 ⨁ (s2 ∩ s3) ⨁ s4, s1 ⨁ s2 ∩ s3 ⨁ s4 as Set<Int>)
-
-  // union/complement/exclusive-or same precedence
-  expectEqual((((s1 ∪ s3) ∖ s2) ⨁ s4), s1 ∪ s3 ∖ s2 ⨁ s4 as Set<Int>)
-
-  // ∪= should happen last.
-  var s5 = Set([1010, 2020, 3030])
-  s5 ∪= Set([4040, 5050, 6060]) ∪ [7070]
-  expectEqual(Set([1010, 2020, 3030, 4040, 5050, 6060, 7070]), s5)
-
-  // ∩= should happen last.
-  var s6 = Set([1010, 2020, 3030])
-  s6 ∩= Set([1010, 2020, 3030]) ∩ [3030]
-  expectEqual(Set([3030]), s6)
-
-  // ⨁= should happen last.
-  var s7 = Set([1010, 2020, 3030])
-  s7 ⨁= Set([1010, 2020, 3030]) ⨁ [1010, 3030]
-  expectEqual(Set([1010, 3030]), s7)
-
-  // ∖= should happen last.
-  var s8 = Set([1010, 2020, 3030])
-  s8 ∖= Set([2020, 3030]) ∖ [3030]
-  expectEqual(Set([1010, 3030]), s8)
 }
 
 //===---

@@ -1,21 +1,4 @@
-//===----------------------------------------------------------------------===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
-// Experimental APIs of the Swift Standard Library
-//
-// This library contains experimental APIs that can be subject to change or
-// removal.  We don't guarantee API or ABI stability for this library.
-//
-//===----------------------------------------------------------------------===//
-import Swift
+// RUN: %target-typecheck-verify-swift
 
 /// The function composition operator is the only user-defined operator that
 /// operates on functions.  That's why the exact precedence does not matter
