@@ -37,7 +37,7 @@ namespace swift {
 namespace irgen {
   class Address;
   class Explosion;
-  class CallEmission;
+  class FunctionPointer;
   class IRGenFunction;
   class IRGenModule;
   class MetadataPath;
@@ -53,12 +53,12 @@ namespace irgen {
   
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
-  void emitWitnessMethodValue(IRGenFunction &IGF,
-                              CanType baseTy,
-                              llvm::Value **baseMetadataCache,
-                              SILDeclRef member,
-                              ProtocolConformanceRef conformance,
-                              Explosion &out);
+  FunctionPointer emitWitnessMethodValue(IRGenFunction &IGF,
+                                         CanType baseTy,
+                                         llvm::Value **baseMetadataCache,
+                                         SILDeclRef member,
+                                         ProtocolConformanceRef conformance,
+                                         CanSILFunctionType fnType);
 
   /// Given a type T and an associated type X of some protocol P to
   /// which T conforms, return the type metadata for T.X.

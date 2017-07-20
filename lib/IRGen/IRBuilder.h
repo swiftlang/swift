@@ -25,6 +25,7 @@
 
 namespace swift {
 namespace irgen {
+class FunctionPointer;
 
 typedef llvm::IRBuilder<> IRBuilderBase;
 
@@ -295,6 +296,9 @@ public:
     setCallingConvUsingCallee(Call);
     return Call;
   }
+
+  llvm::CallInst *CreateCall(const FunctionPointer &fn,
+                             ArrayRef<llvm::Value *> args);
 };
 
 } // end namespace irgen

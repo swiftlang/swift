@@ -32,7 +32,8 @@ namespace swift {
   class Substitution;
 
 namespace irgen {
-  class CallEmission;
+  class Callee;
+  class CalleeInfo;
   class ConstantArrayBuilder;
   class IRGenFunction;
   class IRGenModule;
@@ -83,18 +84,9 @@ namespace irgen {
     }
   };
 
-  CallEmission prepareObjCMethodRootCall(IRGenFunction &IGF,
-                                         SILDeclRef method,
-                                         CanSILFunctionType origFnType,
-                                         CanSILFunctionType substFnType,
-                                         SubstitutionList subs,
-                                         ObjCMessageKind kind);
-
-  void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
-                                          Explosion &emission,
-                                          SILDeclRef method,
-                                          llvm::Value *self,
-                                          SILType superSearchType);
+  /// Prepare a callee for an Objective-C method.
+  Callee getObjCMethodCallee(IRGenFunction &IGF, const ObjCMethod &method,
+                             llvm::Value *selfValue, CalleeInfo &&info);
 
   /// Emit a partial application of an Objective-C method to its 'self'
   /// argument.

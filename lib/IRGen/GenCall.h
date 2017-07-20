@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Types.h"
 #include "llvm/IR/CallingConv.h"
 
 namespace llvm {
@@ -36,14 +37,11 @@ namespace clang {
 }
 
 namespace swift {
-  enum class SILFunctionTypeRepresentation : uint8_t;
-  class SILParameterInfo;
-  class SILType;
-  class Substitution;
-
 namespace irgen {
   class Address;
   class Alignment;
+  class Callee;
+  class CalleeInfo;
   class Explosion;
   class ExplosionSchema;
   class ForeignFunctionInfo;
@@ -64,9 +62,9 @@ namespace irgen {
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention);
 
-  /// Should the given self parameter be given the special treatment
-  /// for self parameters?
-  bool isSelfContextParameter(SILParameterInfo parameter);
+  /// Does the given function have a self parameter that should be given
+  /// the special treatment for self parameters?
+  bool hasSelfContextParameter(CanSILFunctionType fnType);
 
   /// Add function attributes to an attribute set for a byval argument.
   void addByvalArgumentAttributes(IRGenModule &IGM,
@@ -112,7 +110,16 @@ namespace irgen {
   void extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
                             llvm::Value *call, Explosion &out);
 
+  Callee getBlockPointerCallee(IRGenFunction &IGF, llvm::Value *blockPtr,
+                               CalleeInfo &&info);
 
+  Callee getCFunctionPointerCallee(IRGenFunction &IGF, llvm::Value *fnPtr,
+                                   CalleeInfo &&info);
+
+  Callee getSwiftFunctionPointerCallee(IRGenFunction &IGF,
+                                       llvm::Value *fnPtr,
+                                       llvm::Value *contextPtr,
+                                       CalleeInfo &&info);
 } // end namespace irgen
 } // end namespace swift
 
