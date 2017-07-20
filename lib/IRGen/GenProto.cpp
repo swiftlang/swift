@@ -2801,13 +2801,13 @@ void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
   out.push_back(IGM.WitnessTablePtrTy);
 }
 
-void
+FunctionPointer
 irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                               CanType baseTy,
                               llvm::Value **baseMetadataCache,
                               SILDeclRef member,
                               ProtocolConformanceRef conformance,
-                              Explosion &out) {
+                              CanSILFunctionType fnType) {
   auto fn = cast<AbstractFunctionDecl>(member.getDecl());
   auto fnProto = cast<ProtocolDecl>(fn->getDeclContext());
   
@@ -2821,13 +2821,14 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   // Find the witness we're interested in.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(conformance.getRequirement());
   auto index = fnProtoInfo.getFunctionIndex(fn);
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
-  
-  // Cast the witness pointer to i8*.
-  witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
-  
-  // Build the value.
-  out.add(witness);
+  llvm::Value *witnessFnPtr =
+    emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+
+  Signature signature = IGF.IGM.getSignature(fnType);
+  witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
+                                         signature.getType()->getPointerTo());
+
+  return FunctionPointer(witnessFnPtr, signature);
 }
 
 llvm::FunctionType *IRGenModule::getAssociatedTypeMetadataAccessFunctionTy() {

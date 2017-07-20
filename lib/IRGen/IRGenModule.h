@@ -126,6 +126,7 @@ namespace irgen {
   class LoadableTypeInfo;
   class NecessaryBindings;
   class ProtocolInfo;
+  class Signature;
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
@@ -938,6 +939,7 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
+  Signature getSignature(CanSILFunctionType fnType);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeSet &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
