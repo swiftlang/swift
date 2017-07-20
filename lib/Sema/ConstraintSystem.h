@@ -1037,45 +1037,15 @@ private:
     /// \brief Try to solve this candidate sub-expression
     /// and re-write it's OSR domains afterwards.
     ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    ///
     /// \returns true on solver failure, false otherwise.
-    bool solve(llvm::SmallDenseSet<Expr *> &shrunkExprs);
+    bool solve();
 
     /// \brief Apply solutions found by solver as reduced OSR sets for
     /// for current and all of it's sub-expressions.
     ///
     /// \param solutions The solutions found by running solver on the
     /// this candidate expression.
-    ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    void applySolutions(llvm::SmallVectorImpl<Solution> &solutions,
-                        llvm::SmallDenseSet<Expr *> &shrunkExprs) const;
-
-    /// Check if attempt at solving of the candidate makes sense given
-    /// the current conditions - number of shrunk domains which is related
-    /// to the given candidate over the total number of disjunctions present.
-    static bool isTooComplexGiven(ConstraintSystem *const cs,
-                                  llvm::SmallDenseSet<Expr *> &shrunkExprs) {
-      SmallVector<Constraint *, 8> disjunctions;
-      cs->collectDisjunctions(disjunctions);
-
-      unsigned unsolvedDisjunctions = disjunctions.size();
-      for (auto *disjunction : disjunctions) {
-        auto *locator = disjunction->getLocator();
-        if (!locator)
-          continue;
-
-        if (auto *anchor = locator->getAnchor()) {
-          if (shrunkExprs.count(anchor) > 0)
-            --unsolvedDisjunctions;
-        }
-      }
-
-      return unsolvedDisjunctions >= 5;
-    }
+    void applySolutions(llvm::SmallVectorImpl<Solution> &solutions) const;
   };
 
   /// \brief Describes the current solver state.
