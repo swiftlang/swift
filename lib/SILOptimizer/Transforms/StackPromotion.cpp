@@ -159,7 +159,7 @@ class StackPromoter {
     if (!PostDomTreeValid) {
       // The StackPromoter acts as a "graph" for which the post-dominator-tree
       // is calculated.
-      PostDomTree.recalculate(*this);
+      PostDomTree.recalculate(*F);
       PostDomTreeValid = true;
     }
   }
