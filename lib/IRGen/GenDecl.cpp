@@ -485,7 +485,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 ///
 /// We use this when Clang code generation might populate the list.
 static void collectGlobalList(IRGenModule &IGM,
-                              SmallVectorImpl<llvm::WeakVH> &list,
+                              SmallVectorImpl<llvm::WeakTrackingVH> &list,
                               StringRef name) {
   if (auto *existing = IGM.Module.getGlobalVariable(name)) {
     auto *globals = cast<llvm::ConstantArray>(existing->getInitializer());
@@ -497,7 +497,7 @@ static void collectGlobalList(IRGenModule &IGM,
   }
 
   std::for_each(list.begin(), list.end(),
-                [](const llvm::WeakVH &global) {
+                [](const llvm::WeakTrackingVH &global) {
     assert(!isa<llvm::GlobalValue>(global) ||
            !cast<llvm::GlobalValue>(global)->isDeclaration() &&
            "all globals in the 'used' list must be definitions");
@@ -508,7 +508,7 @@ static void collectGlobalList(IRGenModule &IGM,
 /// list of values.  Generally these lists are for various LLVM
 /// metadata or runtime purposes.
 static llvm::GlobalVariable *
-emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
+emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
                StringRef name, StringRef section,
                llvm::GlobalValue::LinkageTypes linkage,
                llvm::Type *eltTy,
@@ -644,7 +644,7 @@ void IRGenModule::emitRuntimeRegistration() {
       }
     }
     
-    for (llvm::WeakVH &ObjCClass : ObjCClasses) {
+    for (llvm::WeakTrackingVH &ObjCClass : ObjCClasses) {
       RegIGF.Builder.CreateCall(getInstantiateObjCClassFn(), {ObjCClass});
     }
       
@@ -1538,7 +1538,7 @@ llvm::Function *swift::irgen::createFunction(IRGenModule &IGM,
                                              LinkInfo &linkInfo,
                                              llvm::FunctionType *fnType,
                                              llvm::CallingConv::ID cc,
-                                             const llvm::AttributeSet &attrs,
+                                             const llvm::AttributeList &attrs,
                                              llvm::Function *insertBefore) {
   auto name = linkInfo.getName();
 
@@ -1567,12 +1567,12 @@ llvm::Function *swift::irgen::createFunction(IRGenModule &IGM,
     IGM.Module.getFunctionList().push_back(fn);
  }
 
-  auto initialAttrs = IGM.constructInitialAttributes();
-  // Merge initialAttrs with attrs.
-  auto updatedAttrs = attrs.addAttributes(IGM.getLLVMContext(),
-                        llvm::AttributeSet::FunctionIndex, initialAttrs);
-  if (!updatedAttrs.isEmpty())
-    fn->setAttributes(updatedAttrs);
+  if (!attrs.isEmpty())
+    fn->setAttributes(attrs);
+  // Merge initial attributes with attrs.
+  llvm::AttrBuilder b;
+  IGM.constructInitialFnAttributes(b);
+  fn->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
@@ -1895,7 +1895,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     IRGen.addLazyFunction(f);
   }
 
-  llvm::AttributeSet attrs;
+  llvm::AttributeList attrs;
   llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
                                                attrs);
 
@@ -1904,11 +1904,13 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
   if (f->getInlineStrategy() == NoInline) {
     attrs = attrs.addAttribute(fnType->getContext(),
-                llvm::AttributeSet::FunctionIndex, llvm::Attribute::NoInline);
+                               llvm::AttributeList::FunctionIndex,
+                               llvm::Attribute::NoInline);
   }
   if (isReadOnlyFunction(f)) {
     attrs = attrs.addAttribute(fnType->getContext(),
-                llvm::AttributeSet::FunctionIndex, llvm::Attribute::ReadOnly);
+                               llvm::AttributeList::FunctionIndex,
+                               llvm::Attribute::ReadOnly);
   }
   fn = createFunction(*this, link, fnType, cc, attrs, insertBefore);
 
@@ -2511,7 +2513,7 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeSet());
+  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -2536,7 +2538,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeSet());
+  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -2851,7 +2853,7 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
       cast<llvm::PointerType>(getValueWitnessTy(index))
         ->getElementType());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeSet());
+  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3007,7 +3009,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
 Address IRGenFunction::createAlloca(llvm::Type *type,
                                     Alignment alignment,
                                     const llvm::Twine &name) {
-  llvm::AllocaInst *alloca = new llvm::AllocaInst(type, name, AllocaIP);
+  llvm::AllocaInst *alloca =
+      new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), name,
+                           AllocaIP);
   alloca->setAlignment(alignment.getValue());
   return Address(alloca, alignment);
 }
@@ -3017,9 +3021,9 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
                                     llvm::Value *ArraySize,
                                     Alignment alignment,
                                     const llvm::Twine &name) {
-  llvm::AllocaInst *alloca = new llvm::AllocaInst(type, ArraySize,
-                                                  alignment.getValue(), name,
-                                                  AllocaIP);
+  llvm::AllocaInst *alloca =
+      new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
+                           alignment.getValue(), name, AllocaIP);
   return Address(alloca, alignment);
 }
 
@@ -3326,7 +3330,7 @@ IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                           Int8PtrPtrTy },
                                         /*varargs*/ false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeSet());
+  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3374,7 +3378,7 @@ IRGenModule::getAddrOfWitnessTableAccessFunction(
   }
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeSet());
+  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3396,7 +3400,7 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
     = llvm::FunctionType::get(WitnessTablePtrTy, false);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeSet());
+  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3447,7 +3451,7 @@ IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
 
   auto fnType = getAssociatedTypeMetadataAccessFunctionTy();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeSet());
+  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3470,7 +3474,7 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
 
   auto fnType = getAssociatedTypeWitnessTableAccessFunctionTy();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeSet());
+  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 

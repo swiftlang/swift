@@ -618,7 +618,7 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
 
 llvm::FunctionType *
 IRGenModule::getFunctionType(CanSILFunctionType type,
-                             llvm::AttributeSet &attrs,
+                             llvm::AttributeList &attrs,
                              ForeignFunctionInfo *foreignInfo) {
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
   Signature sig = sigInfo.getSignature(*this);
@@ -703,18 +703,13 @@ static CanType getArgumentLoweringType(CanType type,
 /// If 'layout' is null, there is a single captured value of
 /// Swift-refcountable type that is being used directly as the
 /// context object.
-static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
-                                   llvm::Function *staticFnPtr,
-                                   bool calleeHasContext,
-                                   llvm::Type *fnTy,
-                                   const llvm::AttributeSet &origAttrs,
-                                   CanSILFunctionType origType,
-                                   CanSILFunctionType substType,
-                                   CanSILFunctionType outType,
-                                   SubstitutionList subs,
-                                   HeapLayout const *layout,
-                                   ArrayRef<ParameterConvention> conventions) {
-  llvm::AttributeSet outAttrs;
+static llvm::Function *emitPartialApplicationForwarder(
+    IRGenModule &IGM, llvm::Function *staticFnPtr, bool calleeHasContext,
+    llvm::Type *fnTy, const llvm::AttributeList &origAttrs,
+    CanSILFunctionType origType, CanSILFunctionType substType,
+    CanSILFunctionType outType, SubstitutionList subs, HeapLayout const *layout,
+    ArrayRef<ParameterConvention> conventions) {
+  llvm::AttributeList outAttrs;
 
   llvm::FunctionType *fwdTy = IGM.getFunctionType(outType, outAttrs);
   SILFunctionConventions outConv(outType, IGM.getSILModule());
@@ -733,11 +728,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setCallingConv(
       expandCallingConv(IGM, SILFunctionTypeRepresentation::Thick));
 
-  auto initialAttrs = IGM.constructInitialAttributes();
-  // Merge initialAttrs with outAttrs.
-  auto updatedAttrs = outAttrs.addAttributes(IGM.getLLVMContext(),
-                        llvm::AttributeSet::FunctionIndex, initialAttrs);
-  fwd->setAttributes(updatedAttrs);
+  fwd->setAttributes(outAttrs);
+  // Merge initial attributes with outAttrs.
+  llvm::AttrBuilder b;
+  IGM.constructInitialFnAttributes(b);
+  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)
@@ -1461,7 +1456,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     assert(bindings.empty());
     assert(args.size() == 1);
 
-    llvm::AttributeSet attrs;
+    llvm::AttributeList attrs;
     auto fnPtrTy = IGF.IGM.getFunctionType(origType, attrs)
       ->getPointerTo();
 
@@ -1542,7 +1537,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   assert(args.empty() && "unused args in partial application?!");
   
   // Create the forwarding stub.
-  llvm::AttributeSet attrs;
+  llvm::AttributeList attrs;
   auto fnPtrTy = IGF.IGM.getFunctionType(origType, attrs)
     ->getPointerTo();
 

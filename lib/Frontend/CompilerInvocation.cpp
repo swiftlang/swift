@@ -270,9 +270,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       assert(!Args.hasArg(OPT_INPUT) && "mixing -filelist with inputs");
     }
   } else {
-    for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT,
-                                                       OPT_primary_file),
-                                   Args.filtered_end())) {
+    for (const Arg *A : Args.filtered(OPT_INPUT, OPT_primary_file)) {
       if (A->getOption().matches(OPT_INPUT)) {
         Opts.InputFilenames.push_back(A->getValue());
       } else if (A->getOption().matches(OPT_primary_file)) {
@@ -883,13 +881,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       !Opts.PrimaryInput && !Opts.ModuleOutputPath.empty();
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_import_module),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_import_module)) {
     Opts.ImplicitImportModuleNames.push_back(A->getValue());
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_Xllvm),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_Xllvm)) {
     Opts.LLVMArgs.push_back(A->getValue());
   }
 
@@ -1071,8 +1067,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.MaxCircularityDepth = threshold;
   }
   
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_D),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_D)) {
     Opts.addCustomConditionalCompilationFlag(A->getValue());
   }
 
@@ -1167,8 +1162,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_index_store_path))
     Opts.IndexStorePath = A->getValue();
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_Xcc),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_Xcc)) {
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
@@ -1218,19 +1212,16 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     return fullPath.str();
   };
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_I),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_I)) {
     Opts.ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_F, OPT_Fsystem),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_F, OPT_Fsystem)) {
     Opts.FrameworkSearchPaths.push_back({resolveSearchPath(A->getValue()),
                            /*isSystem=*/A->getOption().getID() == OPT_Fsystem});
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_L),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
 
@@ -1546,16 +1537,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_Xcc),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_Xcc)) {
     StringRef Opt = A->getValue();
     if (Opt.startswith("-D") || Opt.startswith("-U"))
       Opts.ClangDefines.push_back(Opt);
   }
 
-
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_l, OPT_framework),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_l, OPT_framework)) {
     LibraryKind Kind;
     if (A->getOption().matches(OPT_l)) {
       Kind = LibraryKind::Library;
@@ -1611,14 +1599,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
   
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_verify_type_layout),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_verify_type_layout)) {
     Opts.VerifyTypeLayoutNames.push_back(A->getValue());
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(
-                                   OPT_disable_autolink_framework),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(OPT_disable_autolink_framework)) {
     Opts.DisableAutolinkFrameworks.push_back(A->getValue());
   }
 
@@ -1640,16 +1625,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     // Keep track of backend options so we can embed them in a separate data
     // section and use them when building from the bitcode. This can be removed
     // when all the backend options are recorded in the IR.
-    for (ArgList::const_iterator A = Args.begin(), AE = Args.end();
-         A != AE; ++ A) {
+    for (const Arg *A : Args) {
       // Do not encode output and input.
-      if ((*A)->getOption().getID() == options::OPT_o ||
-          (*A)->getOption().getID() == options::OPT_INPUT ||
-          (*A)->getOption().getID() == options::OPT_primary_file ||
-          (*A)->getOption().getID() == options::OPT_embed_bitcode)
+      if (A->getOption().getID() == options::OPT_o ||
+          A->getOption().getID() == options::OPT_INPUT ||
+          A->getOption().getID() == options::OPT_primary_file ||
+          A->getOption().getID() == options::OPT_embed_bitcode)
         continue;
       ArgStringList ASL;
-      (*A)->render(Args, ASL);
+      A->render(Args, ASL);
       for (ArgStringList::iterator it = ASL.begin(), ie = ASL.end();
           it != ie; ++ it) {
         StringRef ArgStr(*it);
@@ -1754,8 +1738,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
-    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_UNKNOWN),
-                                   ParsedArgs.filtered_end())) {
+    for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
       Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
                      A->getAsString(ParsedArgs));
     }

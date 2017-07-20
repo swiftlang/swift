@@ -57,7 +57,7 @@ namespace llvm {
   class StructType;
   class StringRef;
   class Type;
-  class AttributeSet;
+  class AttributeList;
 }
 namespace clang {
   class ASTContext;
@@ -729,7 +729,7 @@ private:
   /// present in the object file; bitcast to i8*. This is used for
   /// forcing visibility of symbols which may otherwise be optimized
   /// out.
-  SmallVector<llvm::WeakVH, 4> LLVMUsed;
+  SmallVector<llvm::WeakTrackingVH, 4> LLVMUsed;
 
   /// LLVMCompilerUsed - List of global values which are required to be
   /// present in the object file; bitcast to i8*. This is used for
@@ -737,21 +737,18 @@ private:
   /// out.
   ///
   /// Similar to LLVMUsed, but emitted as llvm.compiler.used.
-  SmallVector<llvm::WeakVH, 4> LLVMCompilerUsed;
+  SmallVector<llvm::WeakTrackingVH, 4> LLVMCompilerUsed;
 
   /// Metadata nodes for autolinking info.
-  ///
-  /// This is typed using llvm::Value instead of llvm::MDNode because it
-  /// needs to be used to produce another MDNode during finalization.
-  SmallVector<llvm::Metadata *, 32> AutolinkEntries;
+  SmallVector<llvm::MDNode *, 32> AutolinkEntries;
 
   /// List of Objective-C classes, bitcast to i8*.
-  SmallVector<llvm::WeakVH, 4> ObjCClasses;
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCClasses;
   /// List of Objective-C classes that require nonlazy realization, bitcast to
   /// i8*.
-  SmallVector<llvm::WeakVH, 4> ObjCNonLazyClasses;
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCNonLazyClasses;
   /// List of Objective-C categories, bitcast to i8*.
-  SmallVector<llvm::WeakVH, 4> ObjCCategories;
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
   /// List of protocol conformances to generate records for.
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
@@ -764,10 +761,10 @@ private:
   /// The interesting global variables relating to an ObjC protocol.
   struct ObjCProtocolPair {
     /// The global variable that contains the protocol record.
-    llvm::WeakVH record;
+    llvm::WeakTrackingVH record;
     /// The global variable that contains the indirect reference to the
     /// protocol record.
-    llvm::WeakVH ref;
+    llvm::WeakTrackingVH ref;
   };
 
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
@@ -871,7 +868,7 @@ public:
   ClassDecl *getObjCRuntimeBaseClass(Identifier name, Identifier objcName);
   llvm::Module *getModule() const;
   llvm::Module *releaseModule();
-  llvm::AttributeSet getAllocAttrs();
+  llvm::AttributeList getAllocAttrs();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -880,7 +877,7 @@ private:
   llvm::Constant *ObjCISAMaskPtr = nullptr;
   Optional<llvm::Value*> ObjCRetainAutoreleasedReturnValueMarker;
   llvm::DenseMap<Identifier, ClassDecl*> SwiftRootClasses;
-  llvm::AttributeSet AllocAttrs;
+  llvm::AttributeList AllocAttrs;
 
 #define FUNCTION_ID(Id)             \
 public:                             \
@@ -919,7 +916,8 @@ public:
   /// invalid.
   bool finalize();
 
-  llvm::AttributeSet constructInitialAttributes();
+  void constructInitialFnAttributes(llvm::AttrBuilder &Attrs);
+  llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
@@ -939,7 +937,7 @@ public:
   void finishEmitAfterTopLevel();
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
-                                      llvm::AttributeSet &attrs,
+                                      llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
@@ -1043,10 +1041,10 @@ public:
   void setTrueConstGlobal(llvm::GlobalVariable *var);
 
   /// Add the swiftself attribute.
-  void addSwiftSelfAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
+  void addSwiftSelfAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
   /// Add the swifterror attribute.
-  void addSwiftErrorAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
+  void addSwiftErrorAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
 private:
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,

@@ -677,7 +677,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
          "objc method call must be to a func/initializer/getter/setter/dtor");
 
   ForeignFunctionInfo foreignInfo;
-  llvm::AttributeSet attrs;
+  llvm::AttributeList attrs;
   auto fnTy = IGF.IGM.getFunctionType(origFnType, attrs, &foreignInfo);
   bool indirectResult = foreignInfo.ClangInfo->getReturnInfo().isIndirect();
   if (kind != ObjCMessageKind::Normal)
@@ -787,8 +787,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
  
   assert(resultType->getRepresentation()
            == SILFunctionType::Representation::Thick);
- 
-  llvm::AttributeSet attrs;
+
+  llvm::AttributeList attrs;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType, attrs);
   // FIXME: Give the thunk a real name.
   // FIXME: Maybe cache the thunk by function and closure types?
@@ -799,11 +799,11 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setCallingConv(
       expandCallingConv(IGM, SILFunctionTypeRepresentation::Thick));
 
-  auto initialAttrs = IGM.constructInitialAttributes();
-  // Merge initialAttrs with attrs.
-  auto updatedAttrs = attrs.addAttributes(IGM.getLLVMContext(),
-                        llvm::AttributeSet::FunctionIndex, initialAttrs);
-  fwd->setAttributes(updatedAttrs);
+  fwd->setAttributes(attrs);
+  // Merge initial attributes with attrs.
+  llvm::AttrBuilder b;
+  IGM.constructInitialFnAttributes(b);
+  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
   
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)

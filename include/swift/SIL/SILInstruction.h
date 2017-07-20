@@ -1929,7 +1929,7 @@ public:
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
 /// by an IntegerLiteralExpr.
 class IntegerLiteralInst final : public LiteralInst,
-    private llvm::TrailingObjects<IntegerLiteralInst, llvm::integerPart> {
+    private llvm::TrailingObjects<IntegerLiteralInst, llvm::APInt::WordType> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -1959,7 +1959,7 @@ public:
 /// FloatLiteralInst - Encapsulates a floating point constant, as defined
 /// originally by a FloatLiteralExpr.
 class FloatLiteralInst final : public LiteralInst,
-    private llvm::TrailingObjects<FloatLiteralInst, llvm::integerPart> {
+    private llvm::TrailingObjects<FloatLiteralInst, llvm::APInt::WordType> {
   friend TrailingObjects;
   friend SILBuilder;
 

@@ -22,7 +22,8 @@
 // CHECK-SAME:                              {{..}}-DFOO=foo{{..}}
 // CHECK-SAME:                              {{..}}-UBAR{{..}}
 
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]], line: [[@LINE+1]])
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]], file:
+// CHECK-SAME:              line: [[@LINE+1]])
 import ClangModule.SubModule
 // CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]],
 // CHECK-SAME:              line: [[@LINE+1]])

@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "stack-promotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
@@ -21,6 +20,8 @@
 #include "llvm/Support/GenericDomTree.h"
 #include "llvm/Support/GenericDomTreeConstruction.h"
 #include "llvm/ADT/Statistic.h"
+
+#define DEBUG_TYPE "stack-promotion"
 
 STATISTIC(NumStackPromoted, "Number of objects promoted to the stack");
 
@@ -51,7 +52,7 @@ class StackPromoter {
   //
   // We want to get bb2 as immediate post-dominator of bb1. This is not the case
   // with the regular post-dominator tree.
-  llvm::DominatorTreeBase<SILBasicBlock> PostDomTree;
+  PostDominatorTreeBase PostDomTree;
 
   bool PostDomTreeValid;
 
@@ -158,7 +159,7 @@ class StackPromoter {
     if (!PostDomTreeValid) {
       // The StackPromoter acts as a "graph" for which the post-dominator-tree
       // is calculated.
-      PostDomTree.recalculate(*this);
+      PostDomTree.recalculate(*F);
       PostDomTreeValid = true;
     }
   }
@@ -167,7 +168,7 @@ public:
 
   StackPromoter(SILFunction *F, EscapeAnalysis::ConnectionGraph *ConGraph,
                 DominanceInfo *DT, EscapeAnalysis *EA) :
-    F(F), ConGraph(ConGraph), DT(DT), EA(EA), PostDomTree(true),
+    F(F), ConGraph(ConGraph), DT(DT), EA(EA),
     PostDomTreeValid(false) { }
 
   SILFunction *getFunction() const { return F; }
