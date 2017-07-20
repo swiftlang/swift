@@ -4098,6 +4098,13 @@ namespace {
                              diag::expr_keypath_mutating_getter,
                              property->getFullName());
             }
+            
+            // Key paths don't currently support static members.
+            if (varDecl->isStatic()) {
+              cs.TC.diagnose(origComponent.getLoc(),
+                             diag::expr_keypath_static_member,
+                             property->getFullName());
+            }
           }
           
           // Unwrap if we needed to look through an IUO to find the
