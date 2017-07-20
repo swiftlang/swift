@@ -344,8 +344,9 @@ static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl,
   auto parentDC = cast<DeclContext>(parentDecl);
   rawType       = parentDC->mapTypeIntoContext(rawType);
 
-  if (!enumDecl->getInherited().empty() &&
-      enumDecl->getInherited().front().isError())
+  auto inherited = enumDecl->getInherited();
+  if (!inherited.empty() && inherited.front().wasValidated() &&
+      inherited.front().isError())
     return false;
 
   // The raw type must be Equatable, so that we have a suitable ~= for

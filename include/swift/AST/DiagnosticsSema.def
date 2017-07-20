@@ -2073,13 +2073,15 @@ NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
 NOTE(codable_codingkeys_type_does_not_conform_here,none,
      "cannot automatically synthesize %0 because 'CodingKeys' does not conform to CodingKey", (Type))
 NOTE(decodable_no_super_init_here,none,
-     "cannot automatically synthesize %0 because superclass does not have a callable 'init()' or 'init(from:)'", (DeclName))
+     "cannot automatically synthesize %0 because superclass does not have a callable %1", (DeclName, DeclName))
 NOTE(decodable_super_init_not_designated_here,none,
-     "cannot automatically synthesize %0 because required superclass initializer %1 is not designated", (DeclName, DeclName))
+     "cannot automatically synthesize %0 because implementation would need to call %1, which is not designated", (DeclName, DeclName))
 NOTE(decodable_inaccessible_super_init_here,none,
-     "cannot automatically synthesize %0 because required superclass initializer %1 is inaccessible due to "
+     "cannot automatically synthesize %0 because implementation would need to call %1, which is inaccessible due to "
      "'%select{private|fileprivate|internal|%error|%error}2' protection level",
      (DeclName, DeclName, Accessibility))
+NOTE(decodable_super_init_is_failable_here,none,
+     "cannot automatically synthesize %0 because implementation would need to call %1, which is failable", (DeclName, DeclName))
 NOTE(decodable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)'?", ())
 NOTE(codable_suggest_overriding_init_here,none,
