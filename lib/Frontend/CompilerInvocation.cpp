@@ -1058,6 +1058,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.SolverMemoryThreshold = threshold;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_solver_shrink_unsolved_threshold)) {
+    unsigned threshold;
+    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+
+    Opts.SolverShrinkUnsolvedThreshold = threshold;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {

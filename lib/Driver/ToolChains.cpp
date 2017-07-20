@@ -151,6 +151,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_solver_shrink_unsolved_threshold);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
