@@ -215,7 +215,10 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
 }
 
 
-DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   var d = getCOWFastDictionary()
   var identity1 = d._rawIdentifier()
 
@@ -269,7 +272,11 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
   var d = getCOWSlowDictionary()
   var identity1 = d._rawIdentifier()
 
@@ -477,7 +484,11 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = d1._rawIdentifier()
@@ -598,7 +609,11 @@ DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = d1._rawIdentifier()
@@ -865,7 +880,10 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
 }
 
 
-DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d = getCOWFastDictionary()
     var identity1 = d._rawIdentifier()
@@ -908,7 +926,10 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d = getCOWSlowDictionary()
     var identity1 = d._rawIdentifier()
@@ -950,7 +971,10 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
 }
 
 
-DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = d1._rawIdentifier()
@@ -988,7 +1012,10 @@ DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d1 = getCOWSlowDictionary()
     var identity1 = d1._rawIdentifier()
@@ -2414,7 +2441,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   assert(d.index(forKey: TestObjCKeyTy(10)) == nil)
 }
 
-DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
@@ -2493,7 +2523,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
   }
 }
 
-DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = d._rawIdentifier()

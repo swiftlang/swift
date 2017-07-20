@@ -5,6 +5,7 @@
 
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// UNSUPPORTED: unoptimized_stdlib
 
 import StdlibUnittest
 import StdlibCollectionUnittest
