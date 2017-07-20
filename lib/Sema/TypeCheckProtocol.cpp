@@ -942,6 +942,9 @@ matchWitness(TypeChecker &tc,
       if (reqParams[i].isVariadic() != witnessParams[i].isVariadic())
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
+      if (reqParams[i].isShared() != witnessParams[i].isShared())
+        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+      
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.
       auto types = getTypesToCompare(req, reqParams[i].getType(),

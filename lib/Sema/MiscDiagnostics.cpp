@@ -2306,7 +2306,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     // If this is a 'let' value, any stores to it are actually initializations,
     // not mutations.
     auto isWrittenLet = false;
-    if (var->isLet()) {
+    if (var->isLet() || var->isShared()) {
       isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
     }
@@ -2430,7 +2430,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this is a mutable 'var', and it was never written to, suggest
     // upgrading to 'let'.  We do this even for a parameter.
-    if (!var->isLet() && (access & RK_Written) == 0 &&
+    if (!(var->isLet() || var->isShared()) && (access & RK_Written) == 0 &&
         // Don't warn if we have something like "let (x,y) = ..." and 'y' was
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
