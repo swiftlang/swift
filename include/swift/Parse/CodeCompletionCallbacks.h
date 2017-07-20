@@ -151,6 +151,10 @@ public:
   /// by user.
   virtual void completePostfixExprBeginning(CodeCompletionExpr *E) = 0;
 
+  /// \brief Complete the beginning of expr-postfix in a for-each loop sequqence
+  /// -- no tokens provided by user.
+  virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) = 0;
+
   /// \brief Complete a given expr-postfix.
   virtual void completePostfixExpr(Expr *E, bool hasSpace) = 0;
 

@@ -2098,6 +2098,15 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
     SourceLoc LBraceLoc = Tok.getLoc();
     diagnose(LBraceLoc, diag::expected_foreach_container);
     Container = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
+  } else if (Tok.is(tok::code_complete)) {
+    Container =
+        makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
+    Container.setHasCodeCompletion();
+    Status |= Container;
+    if (CodeCompletion)
+      CodeCompletion->completeForEachSequenceBeginning(
+          cast<CodeCompletionExpr>(Container.get()));
+    consumeToken(tok::code_complete);
   } else {
     Container = parseExprBasic(diag::expected_foreach_container);
     if (Container.isNull())

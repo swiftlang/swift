@@ -141,6 +141,7 @@ struct CustomCompletionInfo {
     Stmt = 1 << 0,
     Expr = 1 << 1,
     Type = 1 << 2,
+    ForEachSequence = 1 << 3,
   };
   swift::OptionSet<Context> Contexts;
 };
