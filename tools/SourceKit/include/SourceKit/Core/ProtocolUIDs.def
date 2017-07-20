@@ -276,6 +276,7 @@ KIND(ObjectLiteral, "source.lang.swift.syntaxtype.objectliteral")
 KIND(Expr, "source.lang.swift.expr")
 KIND(Stmt, "source.lang.swift.stmt")
 KIND(Type, "source.lang.swift.type")
+KIND(ForEachSequence, "source.lang.swift.foreach.sequence")
 
 KIND(DiagNote, "source.diagnostic.severity.note")
 KIND(DiagWarning, "source.diagnostic.severity.warning")
