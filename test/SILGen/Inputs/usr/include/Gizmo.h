@@ -61,11 +61,6 @@ typedef long NSInteger;
 + (instancetype)gizmoWithStuff:(NSInteger)x;
 + (Gizmo*)gizmoWithExactlyStuff:(NSInteger)x;
 
-- (Gizmo*)nonNilGizmo __attribute__((swift_name("nonNilGizmo()")));
-+ (Gizmo*)nonNilGizmo __attribute__((swift_name("nonNilGizmo()")));
-@property Gizmo* nonNilGizmoProperty;
-@property (unsafe_unretained) Gizmo* unownedNonNilGizmoProperty;
-
 @property id originalName __attribute__((swift_name("renamedProp")));
 @end
 
