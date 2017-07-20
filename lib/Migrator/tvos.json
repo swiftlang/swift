@@ -364,17 +364,6 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@MPSPurgeableState@MPSPurgeableStateAllocationDeferred",
-    "LeftComment": "allocationDeferred",
-    "RightUsr": "",
-    "RightComment": "deferred",
-    "ModuleName": "MetalPerformanceShaders"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "WrapOptional",
     "ChildIndex": "0",
@@ -683,204 +672,6 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Constructor",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(cs)MDLAsset(im)initWithURL:vertexDescriptor:bufferAllocator:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "UnwrapOptional",
-    "ChildIndex": "2",
-    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "UnwrapOptional",
-    "ChildIndex": "2",
-    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Constructor",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "3",
-    "LeftUsr": "c:objc(cs)MDLMaterialProperty(im)initWithName:semantic:matrix4x4:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Constructor",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "3",
-    "LeftUsr": "c:objc(cs)MDLMesh(im)initCapsuleWithExtent:cylinderSegments:hemisphereSegments:inwardNormals:geometryType:allocator:",
-    "LeftComment": "Int32",
-    "RightUsr": "",
-    "RightComment": "Int",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "UnwrapOptional",
-    "ChildIndex": "2",
-    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Constructor",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(cs)MDLTransform(im)initWithMatrix:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Constructor",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(cs)MDLTransform(im)initWithMatrix:resetsTransform:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(cs)MDLTransform(im)setMatrix:forTime:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(cs)MDLTransform(im)rotationMatrixAtTime:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:forTime:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MDLTransformComponent(im)localTransformAtTime:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MDLTransformComponent(cm)globalTransformWithObject:atTime:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:forTime:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MDLTransformComponent(im)localTransformAtTime:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MDLTransformComponent(cm)globalTransformWithObject:atTime:",
-    "LeftComment": "matrix_float4x4",
-    "RightUsr": "",
-    "RightComment": "matrix_float4x4",
-    "ModuleName": "ModelIO"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
@@ -987,6 +778,127 @@
     "LeftComment": "",
     "RightUsr": "",
     "RightComment": "clear",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageByApplyingTransform:",
+    "LeftComment": "applying(_:)",
+    "RightUsr": "",
+    "RightComment": "transformed(by:)",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageByApplyingOrientation:",
+    "LeftComment": "applyingOrientation(_:)",
+    "RightUsr": "",
+    "RightComment": "oriented(forExifOrientation:)",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageTransformForOrientation:",
+    "LeftComment": "imageTransform(forOrientation:)",
+    "RightUsr": "",
+    "RightComment": "orientationTransform(forExifOrientation:)",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageByCompositingOverImage:",
+    "LeftComment": "compositingOverImage(_:)",
+    "RightUsr": "",
+    "RightComment": "composited(over:)",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageByCroppingToRect:",
+    "LeftComment": "cropping(to:)",
+    "RightUsr": "",
+    "RightComment": "cropped(to:)",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageByClampingToExtent",
+    "LeftComment": "clampingToExtent()",
+    "RightUsr": "",
+    "RightComment": "clampedToExtent()",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageByClampingToRect:",
+    "LeftComment": "clamping(to:)",
+    "RightUsr": "",
+    "RightComment": "clamped(to:)",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageByApplyingFilter:withInputParameters:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageByApplyingFilter:withInputParameters:",
+    "LeftComment": "applyingFilter(_:withInputParameters:)",
+    "RightUsr": "",
+    "RightComment": "applyingFilter(_:parameters:)",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageBySettingAlphaOneInExtent:",
+    "LeftComment": "settingAlphaOne(inExtent:)",
+    "RightUsr": "",
+    "RightComment": "settingAlphaOne(in:)",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIImage(im)imageByApplyingGaussianBlurWithSigma:",
+    "LeftComment": "applyingGaussianBlur(withSigma:)",
+    "RightUsr": "",
+    "RightComment": "applyingGaussianBlur(sigma:)",
     "ModuleName": "CoreImage"
   },
   {
@@ -2180,6 +2092,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)NSFormatter(im)attributedStringForObjectValue:withDefaultAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "2",
     "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
@@ -2377,6 +2300,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0:0",
+    "LeftUsr": "c:objc(cs)NSError(im)initWithDomain:code:userInfo:",
+    "LeftComment": "AnyHashable",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "2",
@@ -2417,6 +2351,17 @@
     "LeftComment": "AnyObject",
     "RightUsr": "",
     "RightComment": "Any",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:ZFE10FoundationCSo17NSKeyedUnarchiver31unarchiveTopLevelObjectWithDataFzCSo6NSDataGSqPs9AnyObject__",
+    "LeftComment": "NSData",
+    "RightUsr": "",
+    "RightComment": "Data",
     "ModuleName": "Foundation"
   },
   {
@@ -3643,7 +3588,7 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBuffers:offsets:withRange:",
     "LeftComment": "",
@@ -3676,6 +3621,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setTextures:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerState:atIndex:",
@@ -3687,12 +3643,56 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerStates:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerState:lodMinClamp:lodMaxClamp:atIndex:",
     "LeftComment": "setSamplerState(_:lodMinClamp:lodMaxClamp:at:)",
     "RightUsr": "",
     "RightComment": "setSamplerState(_:lodMinClamp:lodMaxClamp:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerStates:lodMinClamps:lodMaxClamps:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerStates:lodMinClamps:lodMaxClamps:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerStates:lodMinClamps:lodMaxClamps:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "Metal"
   },
   {
@@ -3896,7 +3896,7 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBuffers:offsets:withRange:",
     "LeftComment": "",
@@ -3907,7 +3907,7 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "2",
     "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBuffers:offsets:withRange:",
     "LeftComment": "",
@@ -3929,6 +3929,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexTextures:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerState:atIndex:",
@@ -3940,12 +3951,56 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerStates:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerState:lodMinClamp:lodMaxClamp:atIndex:",
     "LeftComment": "setVertexSamplerState(_:lodMinClamp:lodMaxClamp:at:)",
     "RightUsr": "",
     "RightComment": "setVertexSamplerState(_:lodMinClamp:lodMaxClamp:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerStates:lodMinClamps:lodMaxClamps:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerStates:lodMinClamps:lodMaxClamps:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerStates:lodMinClamps:lodMaxClamps:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "Metal"
   },
   {
@@ -3984,7 +4039,7 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBuffers:offsets:withRange:",
     "LeftComment": "",
@@ -3995,7 +4050,7 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "2",
     "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBuffers:offsets:withRange:",
     "LeftComment": "",
@@ -4017,6 +4072,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentTextures:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:atIndex:",
@@ -4028,12 +4094,56 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerStates:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:lodMinClamp:lodMaxClamp:atIndex:",
     "LeftComment": "setFragmentSamplerState(_:lodMinClamp:lodMaxClamp:at:)",
     "RightUsr": "",
     "RightComment": "setFragmentSamplerState(_:lodMinClamp:lodMaxClamp:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerStates:lodMinClamps:lodMaxClamps:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerStates:lodMinClamps:lodMaxClamps:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerStates:lodMinClamps:lodMaxClamps:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "Metal"
   },
   {
@@ -4089,17 +4199,6 @@
     "LeftComment": "campaignTokenKey",
     "RightUsr": "",
     "RightComment": "campaignToken",
-    "ModuleName": "StoreKit"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(cs)SKPaymentQueue(im)resumeDownloads:",
-    "LeftComment": "resume(_:)",
-    "RightUsr": "",
-    "RightComment": "resumeDownloads(_:)",
     "ModuleName": "StoreKit"
   },
   {
@@ -4161,14 +4260,6 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)NSSecureCoding(cpy)supportsSecureCoding",
-    "OldPrintedName": "supportsSecureCoding",
-    "OldTypeName": "CKUserIdentityLookupInfo",
-    "NewPrintedName": "supportsSecureCoding",
-    "NewTypeName": "NSParagraphStyle"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSTabColumnTerminatorsAttributeName",
     "OldPrintedName": "NSTabColumnTerminatorsAttributeName",
     "OldTypeName": "",
@@ -4177,35 +4268,11 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)UIAppearance(cm)appearance",
-    "OldPrintedName": "appearance()",
-    "OldTypeName": "UIView",
-    "NewPrintedName": "appearance()",
-    "NewTypeName": "UIAppearance"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)UIAppearance(cm)appearanceWhenContainedInInstancesOfClasses:",
-    "OldPrintedName": "appearance(whenContainedInInstancesOf:)",
-    "OldTypeName": "UIView",
-    "NewPrintedName": "appearance(whenContainedInInstancesOf:)",
-    "NewTypeName": "UIAppearance"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)UIAppearance(cm)appearanceForTraitCollection:",
-    "OldPrintedName": "appearance(for:)",
-    "OldTypeName": "UIView",
-    "NewPrintedName": "appearance(for:)",
-    "NewTypeName": "UIAppearance"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)UIAppearance(cm)appearanceForTraitCollection:whenContainedInInstancesOfClasses:",
-    "OldPrintedName": "appearance(for:whenContainedInInstancesOf:)",
-    "OldTypeName": "UIView",
-    "NewPrintedName": "appearance(for:whenContainedInInstancesOf:)",
-    "NewTypeName": "UIAppearance"
+    "Usr": "c:objc(pl)NSSecureCoding(cpy)supportsSecureCoding",
+    "OldPrintedName": "supportsSecureCoding",
+    "OldTypeName": "NSParagraphStyle",
+    "NewPrintedName": "supportsSecureCoding",
+    "NewTypeName": "UIBezierPath"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -4457,30 +4524,6 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)UIPopoverBackgroundViewMethods(cm)arrowBase",
-    "OldPrintedName": "arrowBase()",
-    "OldTypeName": "UIPopoverBackgroundViewMethods",
-    "NewPrintedName": "arrowBase()",
-    "NewTypeName": "UIPopoverBackgroundView"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)UIPopoverBackgroundViewMethods(cm)contentViewInsets",
-    "OldPrintedName": "contentViewInsets()",
-    "OldTypeName": "UIPopoverBackgroundViewMethods",
-    "NewPrintedName": "contentViewInsets()",
-    "NewTypeName": "UIPopoverBackgroundView"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)UIPopoverBackgroundViewMethods(cm)arrowHeight",
-    "OldPrintedName": "arrowHeight()",
-    "OldTypeName": "UIPopoverBackgroundViewMethods",
-    "NewPrintedName": "arrowHeight()",
-    "NewTypeName": "UIPopoverBackgroundView"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKModelErrorDomain",
     "OldPrintedName": "MTKModelErrorDomain",
     "OldTypeName": "",
@@ -4622,78 +4665,6 @@
     "OldTypeName": "",
     "NewPrintedName": "ArrayCallback",
     "NewTypeName": "MTKTextureLoader"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)NSObject(im)isEqual:",
-    "OldPrintedName": "isEqual(_:)",
-    "OldTypeName": "NSProxy",
-    "NewPrintedName": "isEqual(_:)",
-    "NewTypeName": "NSObject"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)NSObject(im)performSelector:",
-    "OldPrintedName": "perform(_:)",
-    "OldTypeName": "NSProxy",
-    "NewPrintedName": "perform(_:)",
-    "NewTypeName": "NSObject"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)NSObject(im)performSelector:withObject:",
-    "OldPrintedName": "perform(_:with:)",
-    "OldTypeName": "NSProxy",
-    "NewPrintedName": "perform(_:with:)",
-    "NewTypeName": "NSObject"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)NSObject(im)performSelector:withObject:withObject:",
-    "OldPrintedName": "perform(_:with:with:)",
-    "OldTypeName": "NSProxy",
-    "NewPrintedName": "perform(_:with:with:)",
-    "NewTypeName": "NSObject"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)NSObject(im)isProxy",
-    "OldPrintedName": "isProxy()",
-    "OldTypeName": "NSProxy",
-    "NewPrintedName": "isProxy()",
-    "NewTypeName": "NSObject"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)NSObject(im)isKindOfClass:",
-    "OldPrintedName": "isKind(of:)",
-    "OldTypeName": "NSProxy",
-    "NewPrintedName": "isKind(of:)",
-    "NewTypeName": "NSObject"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)NSObject(im)isMemberOfClass:",
-    "OldPrintedName": "isMember(of:)",
-    "OldTypeName": "NSProxy",
-    "NewPrintedName": "isMember(of:)",
-    "NewTypeName": "NSObject"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)NSObject(im)respondsToSelector:",
-    "OldPrintedName": "responds(to:)",
-    "OldTypeName": "NSProxy",
-    "NewPrintedName": "responds(to:)",
-    "NewTypeName": "NSObject"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:objc(pl)MDLTransformComponent(cm)globalTransformWithObject:atTime:",
-    "OldPrintedName": "globalTransform(with:atTime:)",
-    "OldTypeName": "MDLTransformComponent",
-    "NewPrintedName": "globalTransform(with:atTime:)",
-    "NewTypeName": "MDLTransform"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -10824,6 +10795,22 @@
     "NewTypeName": "XCUIRemote"
   },
   {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@SKCloudServiceSetupOptionsAffiliateTokenKey",
+    "OldPrintedName": "affiliateTokenKey",
+    "OldTypeName": "SKCloudServiceSetupOptionsKey",
+    "NewPrintedName": "affiliateToken",
+    "NewTypeName": "SKCloudServiceSetupOptionsKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@SKCloudServiceSetupOptionsCampaignTokenKey",
+    "OldPrintedName": "campaignTokenKey",
+    "OldTypeName": "SKCloudServiceSetupOptionsKey",
+    "NewPrintedName": "campaignToken",
+    "NewTypeName": "SKCloudServiceSetupOptionsKey"
+  },
+  {
     "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:objc(pl)UIDataSourceTranslating(im)performUsingPresentationValues:",
     "Index": 1
@@ -10914,6 +10901,16 @@
     "Index": 3
   },
   {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSManagedObjectContext(im)performBlockAndWait:",
+    "Index": 1
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSPersistentStoreCoordinator(im)performBlockAndWait:",
+    "Index": 1
+  },
+  {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)UIAccessibilityContainerDataTable(im)accessibilityHeaderElementsForRow:"
   },
@@ -10964,6 +10961,22 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)MPSNNGraph(im)encodeToCommandBuffer:sourceImages:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:So19DispatchSourceTimerP0A0E8scheduleyAC0A4TimeV8deadline_AC0aE8IntervalO9repeatingAI6leewaytF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:So19DispatchSourceTimerP0A0E8scheduleyAC0A4TimeV8deadline_Sd9repeatingAC0aE8IntervalO6leewaytF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:So19DispatchSourceTimerP0A0E8scheduleyAC0A8WallTimeV12wallDeadline_AC0aF8IntervalO9repeatingAI6leewaytF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:So19DispatchSourceTimerP0A0E8scheduleyAC0A8WallTimeV12wallDeadline_Sd9repeatingAC0aF8IntervalO6leewaytF"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -11039,63 +11052,35 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)copyFloatArrayInto:maxCount:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)copyDoubleArrayInto:maxCount:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)resetWithFloatArray:count:atTimes:count:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)resetWithDoubleArray:count:atTimes:count:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)copyFloatArrayInto:maxCount:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)copyDoubleArrayInto:maxCount:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLTexture(im)writeToURL:level:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:forTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:forTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:forTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MDLTransformComponent(im)setLocalTransform:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)CIContext(im)startTaskToRender:toDestination:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)CIContext(im)startTaskToClear:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CIImage(im)imageByApplyingOrientation:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CIImage(im)imageTransformForOrientation:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CIImage(im)imageByApplyingCGOrientation:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CIImage(im)imageTransformForCGOrientation:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CIImage(im)imageByApplyingFilter:withInputParameters:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CIImage(im)imageByApplyingFilter:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -11143,6 +11128,18 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)HMAccessoryDelegate(im)accessory:didAddProfile:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)HMAccessoryDelegate(im)accessory:didRemoveProfile:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)HMAccessoryDelegate(im)accessory:didUpdateFirmwareVersion:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)HMEventTrigger(cm)predicateForEvaluatingTriggerOccurringBeforeSignificantEvent:"
   },
   {
@@ -11163,7 +11160,7 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)SCNCameraController(im)dollyZoomToTarget:"
+    "Usr": "c:objc(cs)SCNCameraController(im)dollyToTarget:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -11172,6 +11169,10 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)SCNNode(im)convertVector:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)lookAt:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -11203,10 +11204,6 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)SCNNode(im)lookAt:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSFileManager(im)createDirectoryAtPath:attributes:"
   },
   {
@@ -11216,6 +11213,30 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSAttributedString(im)attribute:atIndex:effectiveRange:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSItemProvider(im)registerObjectOfClass:visibility:loadHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSItemProvider(im)canLoadObjectOfClass:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSItemProvider(im)loadObjectOfClass:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:So14NSItemProviderC10FoundationE14registerObjectyxm7ofClass_SC0aB24RepresentationVisibilityO10visibilitySo8ProgressCSgyxSg_s5Error_pSgtcc11loadHandlerts21_ObjectiveCBridgeableRzSo0aB7Writing01_O5CTypeRpzlF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:So14NSItemProviderC10FoundationE13canLoadObjectSbxm7ofClass_ts21_ObjectiveCBridgeableRzSo0aB7Reading01_I5CTypeRpzlF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:So14NSItemProviderC10FoundationE10loadObjectSo8ProgressCxm7ofClass_yxSg_s5Error_pSgtc17completionHandlerts21_ObjectiveCBridgeableRzSo0aB7Reading01_L5CTypeRpzlF"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -11383,6 +11404,10 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerStates:withRange:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)MTLDevice(im)newTextureWithDescriptor:"
   },
   {
@@ -11399,7 +11424,15 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerStates:withRange:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:atIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerStates:withRange:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
