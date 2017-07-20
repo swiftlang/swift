@@ -117,12 +117,3 @@ let sr3668Dict2: [Int: (Int, Int) -> Bool] =
      8: { $0 != $1 },  9: { $0 != $1 }, 10: { $0 != $1 }, 11: { $0 != $1 },
     12: { $0 != $1 }, 13: { $0 != $1 }, 14: { $0 != $1 }, 15: { $0 != $1 },
     16: { $0 != $1 }, 17: { $0 != $1 }, 18: { $0 != $1 }, 19: { $0 != $1 } ]
-
-// rdar://problem/32034560 - type-checker hangs trying to solve expression
-struct R32034560 {
-  private var R32034560: Array<Array<UInt32>>
-  private func foo(x: UInt32) -> UInt32 {
-    return ((self.R32034560[0][Int(x >> 24) & 0xFF] &+ self.R32034560[1][Int(x >> 16) & 0xFF]) ^ self.R32034560[2][Int(x >> 8) & 0xFF]) &+ self.R32034560[3][Int(x & 0xFF)]
-    // expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
-  }
-}
