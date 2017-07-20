@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 351; // Last change: open_existential_box_value
+const uint16_t VERSION_MINOR = 352; // Last change: 'shared' type attribute
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -195,6 +195,7 @@ enum class VarDeclSpecifier : uint8_t {
   Let = 0,
   Var,
   InOut,
+  Shared,
 };
 using VarDeclSpecifierField = BCFixed<2>;
   
@@ -617,7 +618,8 @@ namespace decls_block {
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     BCFixed<1>,         // escaping?
-    BCFixed<1>          // inout?
+    BCFixed<1>,         // inout?
+    BCFixed<1>          // shared?
   >;
 
   using TupleTypeLayout = BCRecordLayout<
@@ -631,7 +633,8 @@ namespace decls_block {
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     BCFixed<1>,         // escaping?
-    BCFixed<1>          // inout?
+    BCFixed<1>,         // inout?
+    BCFixed<1>          // shared?
   >;
 
   using FunctionTypeLayout = BCRecordLayout<

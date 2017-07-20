@@ -3796,9 +3796,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   case decls_block::PAREN_TYPE: {
     TypeID underlyingID;
-    bool isVariadic, isAutoClosure, isEscaping, isInOut;
+    bool isVariadic, isAutoClosure, isEscaping, isInOut, isShared;
     decls_block::ParenTypeLayout::readRecord(scratch, underlyingID, isVariadic,
-                                             isAutoClosure, isEscaping, isInOut);
+                                             isAutoClosure, isEscaping,
+                                             isInOut, isShared);
 
     auto underlyingTy = getTypeChecked(underlyingID);
     if (!underlyingTy)
@@ -3806,7 +3807,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     
     typeOrOffset = ParenType::get(
         ctx, underlyingTy.get()->getInOutObjectType(),
-        ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping, isInOut));
+        ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping,
+                           isInOut, isShared));
     break;
   }
 
@@ -3826,9 +3828,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isEscaping, isInOut;
+      bool isVariadic, isAutoClosure, isEscaping, isInOut, isShared;
       decls_block::TupleTypeEltLayout::readRecord(
-          scratch, nameID, typeID, isVariadic, isAutoClosure, isEscaping, isInOut);
+          scratch, nameID, typeID, isVariadic, isAutoClosure, isEscaping,
+          isInOut, isShared);
 
       auto elementTy = getTypeChecked(typeID);
       if (!elementTy)
@@ -3836,7 +3839,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       
       elements.emplace_back(
           elementTy.get()->getInOutObjectType(), getIdentifier(nameID),
-          ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping, isInOut));
+          ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping,
+                             isInOut, isShared));
     }
 
     typeOrOffset = TupleType::get(elements, ctx);
