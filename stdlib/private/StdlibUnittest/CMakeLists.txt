@@ -8,6 +8,10 @@ if(SWIFT_SERIALIZE_STDLIB_UNITTEST)
   list(APPEND swift_stdlib_unittest_compile_flags "-Xfrontend" "-sil-serialize-all")
 endif()
 
+if("${SWIFT_STDLIB_BUILD_TYPE}" STREQUAL "DebugAssert")
+  list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_STDLIB_DEBUG")
+endif()
+
 # TODO: support this on non-POSIX platforms.  It cannot be currently as it
 # depends on pthreads.
 add_swift_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB

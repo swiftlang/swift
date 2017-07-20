@@ -101,7 +101,10 @@ ${Suite}.test("${ArrayType}/Sliceable/Enums") {
   */
 }
 
-${Suite}.test("${ArrayType}/appendNonUnique") {
+${Suite}.test("${ArrayType}/appendNonUnique")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var x: ${ArrayType}<Int> = []
   x.reserveCapacity(10002)
   let capacity = x.capacity
@@ -267,7 +270,10 @@ let withUnsafeMutableBufferPointerIfSupportedTests = [
   WithUnsafeMutableBufferPointerIfSupportedTest([ 10, 20, 30, 40, 50 ]),
 ]
 
-${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported") {
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   for test in withUnsafeMutableBufferPointerIfSupportedTests {
     var a = getFresh${ArrayType}(test.sequence.map(OpaqueValue.init))
     do {
@@ -304,7 +310,10 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported") {
   // FIXME: tests for arrays bridged from Objective-C.
 }
 
-${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1") {
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
     (baseAddress, count) -> OpaqueValue<Int> in
@@ -315,7 +324,10 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
   }
 }
 
-${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2") {
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
     (baseAddress, count) -> OpaqueValue<Int> in
@@ -331,7 +343,10 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
 //===----------------------------------------------------------------------===//
 
 // Test the uniqueness of the raw buffer.
-${Suite}.test("${ArrayType}/withUnsafeMutableBytes") {
+${Suite}.test("${ArrayType}/withUnsafeMutableBytes")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var a = getFresh${ArrayType}([UInt8](repeating: 10, count: 1))
   let b = a
   a.withUnsafeMutableBytes { bytes in
@@ -354,7 +369,10 @@ ${Suite}.test(
 }
 
 ${Suite}.test(
-  "${ArrayType}/mutationDoesNotAffectIterator/subscript/append") {
+  "${ArrayType}/mutationDoesNotAffectIterator/subscript/append")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
   var iter = arr.makeIterator()
   arr.append(1040)

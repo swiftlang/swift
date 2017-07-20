@@ -245,3 +245,11 @@ public func cartesianProduct<C1 : Collection, C2 : Collection>(
   return result
 }
 
+/// Return true if the standard library was compiled in a debug configuration.
+public func _isStdlibDebugConfiguration() -> Bool {
+#if SWIFT_STDLIB_DEBUG
+  return true
+#else
+  return false
+#endif
+}
