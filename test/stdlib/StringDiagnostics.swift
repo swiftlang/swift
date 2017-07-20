@@ -86,3 +86,14 @@ func testStringCollectionTypes(s: String) {
   acceptsBidirectionalCollection(s.characters)
   acceptsRandomAccessCollection(s.characters) // expected-error{{argument type 'String.CharacterView' does not conform to expected type 'RandomAccessCollection'}}
 }
+
+func testSubstringViewIntegrity(ss: Substring) {
+  let s = String(ss)
+  _ = String(s.utf8)
+  _ = String(s.utf16)
+  _ = String(s.unicodeScalars)
+
+  _ = String(ss.utf8) // expected-error {{'init'}}
+  _ = String(ss.utf16) // expected-error {{'init'}}
+  _ = String(ss.unicodeScalars) // expected-error {{'init'}}
+}
