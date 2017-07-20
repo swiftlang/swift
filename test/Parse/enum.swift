@@ -193,8 +193,9 @@ enum RawTypeWithCharacterValues : Character { // expected-error {{'RawTypeWithCh
   case Third = "は"
 }
 
-enum RawTypeWithCharacterValues_Error1 : Character { // expected-error {{'RawTypeWithCharacterValues_Error1' declares raw type 'Character', but does not conform to RawRepresentable and conformance could not be synthesized}}
-  case First = "abc" // expected-error {{cannot convert value of type 'String' to raw type 'Character'}}
+// Permit any String payload, as grapheme breaking is a run-time concern.
+enum RawTypeWithCharacterValues_Error1 : Character {
+  case First = "abc"
 }
 
 enum RawTypeWithFloatValues : Float { // expected-error {{'RawTypeWithFloatValues' declares raw type 'Float', but does not conform to RawRepresentable and conformance could not be synthesized}}

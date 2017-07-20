@@ -3,7 +3,7 @@
 
 // Make sure that the interpolation segments get placed into separate connected
 // components.
-// CHECK: ---Connected components---
+// CHECK-LABEL: ---Connected components---
 // CHECK-NEXT:  0: 
 // CHECK-NEXT:  1: 
 // CHECK-NEXT:  2: 
@@ -22,7 +22,19 @@
 // CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
 
 // CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByStringLiteral) String)
+// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByExtendedGraphemeClusterLiteral) String)
+
+// CHECK: (solving component #
+// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
+
+// CHECK: (solving component #
+// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByExtendedGraphemeClusterLiteral) String)
+
+// CHECK: (solving component #
+// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
+
+// CHECK: (solving component #
+// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByExtendedGraphemeClusterLiteral) String)
 
 // CHECK: (solving component #
 // CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
@@ -30,16 +42,7 @@
 // CHECK: (solving component #
 // CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByStringLiteral) String)
 
-// CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
-
-// CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByStringLiteral) String)
-
-// CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
-
-// CHECK: (solving component #
-// CHECK: literal=3 bindings=(subtypes of) (default from ExpressibleByStringLiteral) String)
+// Anchor FileCheck to this section:
+// CHECK-LABEL: ---Solution---
 
 _ = "\(1), \(2), \(3), \(4)"

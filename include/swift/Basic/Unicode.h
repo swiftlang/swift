@@ -22,10 +22,13 @@ namespace unicode {
 StringRef extractFirstExtendedGraphemeCluster(StringRef S);
 
 static inline bool isSingleExtendedGraphemeCluster(StringRef S) {
-  StringRef First = extractFirstExtendedGraphemeCluster(S);
-  if (First.empty())
-    return false;
-  return First == S;
+  // Graphemes are dictated by the Unicode version, which is decided at run
+  // time. Thus, the compiler cannot provide any static guarantees, other than
+  // WRT the empty string.
+  //
+  // TODO: Remove this function and anything making use of statically determined
+  // grapheme information.
+  return !S.empty();
 }
 
 enum class GraphemeClusterBreakProperty : uint8_t {

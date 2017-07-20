@@ -21,45 +21,7 @@ StringRef swift::unicode::extractFirstExtendedGraphemeCluster(StringRef S) {
   // Standard Annex #29.
   if (S.empty())
     return StringRef();
-
-  const llvm::UTF8 *SourceStart =
-    reinterpret_cast<const llvm::UTF8 *>(S.data());
-
-  const llvm::UTF8 *SourceNext = SourceStart;
-  llvm::UTF32 C[2];
-  llvm::UTF32 *TargetStart = C;
-
-  ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart, C + 1,
-                     llvm::lenientConversion);
-  if (TargetStart == C) {
-    // The source string contains an ill-formed subsequence at the end.
-    return S;
-  }
-
-  GraphemeClusterBreakProperty GCBForC0 = getGraphemeClusterBreakProperty(C[0]);
-  while (true) {
-    if (isExtendedGraphemeClusterBoundaryAfter(GCBForC0))
-      return S.slice(0, SourceNext - SourceStart);
-
-    size_t C1Offset = SourceNext - SourceStart;
-    ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart, C + 2,
-                       llvm::lenientConversion);
-
-    if (TargetStart == C + 1) {
-      // End of source string or the source string contains an ill-formed
-      // subsequence at the end.
-      return S.slice(0, C1Offset);
-    }
-
-    GraphemeClusterBreakProperty GCBForC1 =
-        getGraphemeClusterBreakProperty(C[1]);
-    if (isExtendedGraphemeClusterBoundary(GCBForC0, GCBForC1))
-      return S.slice(0, C1Offset);
-
-    C[0] = C[1];
-    TargetStart = C + 1;
-    GCBForC0 = GCBForC1;
-  }
+  return S;
 }
 
 static bool extractFirstUnicodeScalarImpl(StringRef S, unsigned &Scalar) {
