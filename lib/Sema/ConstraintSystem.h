@@ -3076,13 +3076,6 @@ public:
 
     E->walk(ExprCleanerImpl(this));
   }
-  
-  void disable() {
-    Exprs.clear();
-    TypeLocs.clear();
-    Patterns.clear();
-    Vars.clear();
-  }
 
   ~ExprCleaner() {
     // Check each of the expression nodes to verify that there are no type

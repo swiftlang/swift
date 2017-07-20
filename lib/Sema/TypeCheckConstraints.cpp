@@ -2015,7 +2015,6 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
   }
 
   expr = result;
-  cleanup.disable();
   return false;
 }
 
@@ -2853,7 +2852,6 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   }
 
   expr = result;
-  cleanup.disable();
   return false;
 }
 
