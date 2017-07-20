@@ -372,6 +372,7 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
+    case Node::Kind::Shared:
     case Node::Kind::SILBoxLayout:
     case Node::Kind::SILBoxMutableField:
     case Node::Kind::SILBoxImmutableField:
@@ -984,6 +985,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::InOut:
     Printer << "inout ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::Shared:
+    Printer << "__shared ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NonObjCAttribute:

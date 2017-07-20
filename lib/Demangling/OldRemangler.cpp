@@ -1250,6 +1250,11 @@ void Remangler::mangleWeak(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleShared(Node *node) {
+  Out << 'h';
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleInOut(Node *node) {
   Out << 'R';
   mangleSingleChildNode(node); // type
