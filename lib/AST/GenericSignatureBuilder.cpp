@@ -1688,6 +1688,7 @@ static void concretizeNestedTypeFromConcreteParent(
     witnessType =
       conformance.getConcrete()
         ->getTypeWitness(assocType, builder.getLazyResolver());
+    if (!witnessType) return;
   } else {
     witnessType = DependentMemberType::get(concreteParent, assocType);
   }
