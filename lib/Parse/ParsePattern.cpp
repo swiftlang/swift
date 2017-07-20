@@ -180,25 +180,31 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
     }
     
-    // ('inout' | 'let' | 'var')?
+    // ('inout' | 'let' | 'var' | '__shared' | '__owned')?
     bool hasSpecifier = false;
-    while (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var)) {
+    while (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var,
+                     tok::kw___shared, tok::kw___owned)) {
       if (!hasSpecifier) {
         if (Tok.is(tok::kw_inout)) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = VarDecl::Specifier::InOut;
+          param.SpecifierLoc = consumeToken();
+        } else if (Tok.is(tok::kw___shared)) {
+          // This case is handled later when mapping to ParamDecls for
+          // better fixits.
+          param.SpecifierKind = VarDecl::Specifier::Shared;
+          param.SpecifierLoc = consumeToken();
         } else {
-          diagnose(Tok, diag::parameter_let_var_as_attr,
-                   unsigned(Tok.is(tok::kw_let)))
+          diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
             .fixItRemove(Tok.getLoc());
+          consumeToken();
         }
-        param.SpecifierLoc = consumeToken();
         hasSpecifier = true;
       } else {
         // Redundant specifiers are fairly common, recognize, reject, and
         // recover from this gracefully.
-        diagnose(Tok, diag::parameter_inout_var_let_repeated)
+        diagnose(Tok, diag::parameter_specifier_repeated)
           .fixItRemove(Tok.getLoc());
         consumeToken();
       }
@@ -359,13 +365,25 @@ mapParsedParameters(Parser &parser,
       if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
         auto InOutLoc = paramInfo.SpecifierLoc;
         if (isa<InOutTypeRepr>(type)) {
-          parser.diagnose(InOutLoc, diag::parameter_inout_var_let_repeated)
+          parser.diagnose(InOutLoc, diag::parameter_specifier_repeated)
             .fixItRemove(InOutLoc);
         } else {
-          parser.diagnose(InOutLoc, diag::inout_as_attr_disallowed)
+          parser.diagnose(InOutLoc, diag::inout_as_attr_disallowed, "'inout'")
             .fixItRemove(InOutLoc)
             .fixItInsert(type->getStartLoc(), "inout ");
           type = new (ctx) InOutTypeRepr(type, InOutLoc);
+        }
+      } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Shared) {
+        auto SpecifierLoc = paramInfo.SpecifierLoc;
+        if (isa<SharedTypeRepr>(type)) {
+          parser.diagnose(SpecifierLoc, diag::parameter_specifier_repeated)
+            .fixItRemove(SpecifierLoc);
+        } else {
+          parser.diagnose(SpecifierLoc, diag::inout_as_attr_disallowed,
+                          "'__shared'")
+            .fixItRemove(SpecifierLoc)
+            .fixItInsert(type->getStartLoc(), "__shared ");
+          type = new (ctx) SharedTypeRepr(type, SpecifierLoc);
         }
       }
       param->getTypeLoc() = TypeLoc(type);
@@ -376,8 +394,21 @@ mapParsedParameters(Parser &parser,
       
       param->getTypeLoc() = TypeLoc::withoutLoc(ErrorType::get(ctx));
       param->setInvalid();
-    } else if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
-      parser.diagnose(paramInfo.SpecifierLoc, diag::inout_must_have_type);
+    } else if (paramInfo.SpecifierLoc.isValid()) {
+      StringRef specifier;
+      switch (paramInfo.SpecifierKind) {
+      case VarDecl::Specifier::InOut:
+        specifier = "'inout'";
+        break;
+      case VarDecl::Specifier::Shared:
+        specifier = "'shared'";
+        break;
+      case VarDecl::Specifier::Let:
+      case VarDecl::Specifier::Var:
+        llvm_unreachable("can't have let or var here");
+      }
+      parser.diagnose(paramInfo.SpecifierLoc, diag::specifier_must_have_type,
+                      specifier);
       paramInfo.SpecifierLoc = SourceLoc();
       paramInfo.SpecifierKind = VarDecl::Specifier::Owned;
     }

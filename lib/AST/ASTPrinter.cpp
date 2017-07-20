@@ -2190,6 +2190,8 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer << "@autoclosure ";
   if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
     printer << "@escaping ";
+  if (flags.isShared())
+    printer << "__shared ";
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -2205,7 +2207,22 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (!Options.SkipIntroducerKeywords) {
     if (decl->isStatic())
       printStaticKeyword(decl->getCorrectStaticSpelling());
-    Printer << (decl->isLet() ? tok::kw_let : tok::kw_var) << " ";
+    if (decl->getKind() == DeclKind::Var
+        || Options.PrintParameterSpecifiers) {
+      // Map all non-let specifiers to 'var'.  This is not correct, but
+      // SourceKit relies on this for info about parameter decls.
+      switch (decl->getSpecifier()) {
+        case VarDecl::Specifier::Owned:
+          Printer << tok::kw_let;
+          break;
+        case VarDecl::Specifier::Var:
+        case VarDecl::Specifier::InOut:
+        case VarDecl::Specifier::Shared:
+          Printer << tok::kw_var;
+          break;
+      }
+      Printer << " ";
+    }
   }
   printContextIfNeeded(decl);
   recordDeclLoc(decl,

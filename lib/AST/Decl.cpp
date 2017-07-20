@@ -4248,7 +4248,7 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
 }
 
 ParameterTypeFlags ParamDecl::getParameterFlags() const {
-  return ParameterTypeFlags::fromParameterType(getType(), isVariadic())
+  return ParameterTypeFlags::fromParameterType(getType(), isVariadic(), isShared())
             .withInOut(isInOut());
 }
 

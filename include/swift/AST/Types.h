@@ -1399,8 +1399,9 @@ class ParameterTypeFlags {
     AutoClosure = 1 << 1,
     Escaping    = 1 << 2,
     InOut       = 1 << 3,
-    
-    NumBits = 4
+    Shared      = 1 << 4,
+
+    NumBits = 5
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1410,22 +1411,25 @@ class ParameterTypeFlags {
 public:
   ParameterTypeFlags() = default;
 
-  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping, bool inOut)
+  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping, bool inOut, bool shared)
       : value((variadic ? Variadic : 0) |
               (autoclosure ? AutoClosure : 0) |
               (escaping ? Escaping : 0) |
-              (inOut ? InOut : 0)) {}
+              (inOut ? InOut : 0) |
+              (shared ? Shared : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags fromParameterType(Type paramTy,
-                                                     bool isVariadic);
+                                                     bool isVariadic,
+                                                     bool isShared);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
   bool isAutoClosure() const { return value.contains(AutoClosure); }
   bool isEscaping() const { return value.contains(Escaping); }
   bool isInOut() const { return value.contains(InOut); }
-  
+  bool isShared() const { return value.contains(Shared); }
+
   ParameterTypeFlags withEscaping(bool escaping) const {
     return ParameterTypeFlags(escaping ? value | ParameterTypeFlags::Escaping
                                        : value - ParameterTypeFlags::Escaping);
@@ -1434,6 +1438,11 @@ public:
   ParameterTypeFlags withInOut(bool isInout) const {
     return ParameterTypeFlags(isInout ? value | ParameterTypeFlags::InOut
                                       : value - ParameterTypeFlags::InOut);
+  }
+  
+  ParameterTypeFlags withShared(bool isShared) const {
+    return ParameterTypeFlags(isShared ? value | ParameterTypeFlags::Shared
+                                       : value - ParameterTypeFlags::Shared);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2354,6 +2363,9 @@ public:
     
     /// Whether the parameter is marked 'inout'
     bool isInOut() const { return Flags.isInOut(); }
+    
+    /// Whether the parameter is marked 'shared'
+    bool isShared() const { return Flags.isShared(); }
   };
 
   class CanParam : public Param {
@@ -4795,7 +4807,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
-ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
+ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShared) {
   bool autoclosure = paramTy->is<AnyFunctionType>() &&
                      paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
@@ -4805,7 +4817,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
   // callers, then remove this, then remove
   // ParameterTypeFlags::fromParameterType entirely.
   bool inOut = paramTy->is<InOutType>();
-  return {isVariadic, autoclosure, escaping, inOut};
+  return {isVariadic, autoclosure, escaping, inOut, isShared};
 }
 
 #define TYPE(id, parent)
