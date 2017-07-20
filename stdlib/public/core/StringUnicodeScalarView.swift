@@ -170,25 +170,6 @@ extension String {
       }
     }
 
-    /// Accesses the Unicode scalar values in the given range.
-    ///
-    /// The example below uses this subscript to access the scalar values up
-    /// to, but not including, the first comma (`","`) in the string.
-    ///
-    ///     let str = "All this happened, more or less."
-    ///     let i = str.unicodeScalars.index(of: ",")!
-    ///     let substring = str.unicodeScalars[str.unicodeScalars.startIndex ..< i]
-    ///     print(String(substring))
-    ///     // Prints "All this happened"
-    ///
-    /// - Complexity: O(*n*) if the underlying string is bridged from
-    ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-    public subscript(r: Range<Index>) -> UnicodeScalarView {
-      let rawSubRange = _toCoreIndex(r.lowerBound)..<_toCoreIndex(r.upperBound)
-      return UnicodeScalarView(_core[rawSubRange],
-        coreOffset: r.lowerBound.encodedOffset)
-    }
-
     /// An iterator over the Unicode scalars that make up a `UnicodeScalarView`
     /// collection.
     public struct Iterator : IteratorProtocol {
@@ -461,10 +442,10 @@ extension String.UnicodeScalarView {
   // NOTE: Don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
-    if !_isOnUnicodeScalarBoundary(i) { return false }
     if i == startIndex || i == endIndex {
       return true
     }
+    if !_isOnUnicodeScalarBoundary(i) { return false }
     let precedingScalar = self[index(before: i)]
 
     let graphemeClusterBreakProperty =
@@ -523,5 +504,49 @@ extension String.UnicodeScalarView {
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public subscript(i: Index?) -> Unicode.Scalar {
     return self[i!]
+  }
+}
+
+//===--- Slicing Support --------------------------------------------------===//
+/// In Swift 3.2, in the absence of type context,
+///
+///   someString.unicodeScalars[
+///     someString.unicodeScalars.startIndex
+///     ..< someString.unicodeScalars.endIndex]
+///
+/// was deduced to be of type `String.UnicodeScalarView`.  Provide a
+/// more-specific Swift-3-only `subscript` overload that continues to produce
+/// `String.UnicodeScalarView`.
+extension String.UnicodeScalarView {
+  public typealias SubSequence = Substring.UnicodeScalarView
+
+  @available(swift, introduced: 4)
+  public subscript(r: Range<Index>) -> String.UnicodeScalarView.SubSequence {
+    return String.UnicodeScalarView.SubSequence(self, _bounds: r)
+  }
+
+  /// Accesses the Unicode scalar values in the given range.
+  ///
+  /// The example below uses this subscript to access the scalar values up
+  /// to, but not including, the first comma (`","`) in the string.
+  ///
+  ///     let str = "All this happened, more or less."
+  ///     let i = str.unicodeScalars.index(of: ",")!
+  ///     let substring = str.unicodeScalars[str.unicodeScalars.startIndex ..< i]
+  ///     print(String(substring))
+  ///     // Prints "All this happened"
+  ///
+  /// - Complexity: O(*n*) if the underlying string is bridged from
+  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
+  @available(swift, obsoleted: 4)
+  public subscript(r: Range<Index>) -> String.UnicodeScalarView {
+    let rawSubRange = _toCoreIndex(r.lowerBound)..<_toCoreIndex(r.upperBound)
+    return String.UnicodeScalarView(
+      _core[rawSubRange], coreOffset: r.lowerBound.encodedOffset)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: ClosedRange<Index>) -> String.UnicodeScalarView {
+    return self[bounds.relative(to: self)]
   }
 }
