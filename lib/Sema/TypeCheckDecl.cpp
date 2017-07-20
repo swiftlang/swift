@@ -7959,8 +7959,8 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
                                     NameLookupFlags::ProtocolMembers |
                                     NameLookupFlags::IgnoreAccessibility);
 
-      if (!result.empty() && !result.front()->isImplicit())
-        diagDest = result.front();
+      if (!result.empty() && !result.front().getValueDecl()->isImplicit())
+        diagDest = result.front().getValueDecl();
 
       auto diagName = diag::decodable_suggest_overriding_init_here;
 
@@ -7979,7 +7979,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
         // subclass doesn't directly implement encode(to:).
         // The direct lookup here won't see an encode(to:) if it is inherited
         // from the superclass.
-        auto encodeTo = DeclName(C, C.Id_encode, (Identifier[1]){ C.Id_to });
+        auto encodeTo = DeclName(C, C.Id_encode, C.Id_to);
         if (classDecl->lookupDirect(encodeTo).empty())
           diagName = diag::codable_suggest_overriding_init_here;
       }

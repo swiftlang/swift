@@ -2,7 +2,7 @@
 
 // Non-Decodable superclasses of synthesized Decodable classes must implement
 // init().
-class NonDecodableSuper { // expected-note {{cannot automatically synthesize 'init(from:)' because superclass does not have a callable 'init()' or 'init(from:)'}}
+class NonDecodableSuper { // expected-note {{cannot automatically synthesize 'init(from:)' because superclass does not have a callable 'init()'}}
   init(_: Int) {}
 }
 
@@ -12,7 +12,7 @@ class NonDecodableSub : NonDecodableSuper, Decodable { // expected-error {{type 
 // Non-Decodable superclasses of synthesized Decodable classes must have
 // designated init()'s.
 class NonDesignatedNonDecodableSuper {
-  convenience init() { // expected-note {{cannot automatically synthesize 'init(from:)' because required superclass initializer 'init()' is not designated}}
+  convenience init() { // expected-note {{cannot automatically synthesize 'init(from:)' because implementation would need to call 'init()', which is not designated}}
     self.init(42)
   }
 
@@ -25,7 +25,7 @@ class NonDesignatedNonDecodableSub : NonDesignatedNonDecodableSuper, Decodable {
 // Non-Decodable superclasses of synthesized Decodable classes must have an
 // accessible init().
 class InaccessibleNonDecodableSuper {
-  private init() {} // expected-note {{cannot automatically synthesize 'init(from:)' because required superclass initializer 'init()' is inaccessible due to 'private' protection level}}
+  private init() {} // expected-note {{cannot automatically synthesize 'init(from:)' because implementation would need to call 'init()', which is inaccessible due to 'private' protection level}}
 }
 
 class InaccessibleNonDecodableSub : InaccessibleNonDecodableSuper, Decodable { // expected-error {{type 'InaccessibleNonDecodableSub' does not conform to protocol 'Decodable'}}
