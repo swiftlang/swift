@@ -130,6 +130,20 @@ extension NSCoder {
 }
 
 //===----------------------------------------------------------------------===//
+// NSKeyedArchiver
+//===----------------------------------------------------------------------===//
+
+extension NSKeyedArchiver {
+  @nonobjc
+  @available(OSX 10.11, iOS 9.0, *)
+  public func encodeEncodable<T : Encodable>(_ value: T, forKey key: String) throws {
+    let plistEncoder = PropertyListEncoder()
+    let plist = try plistEncoder.encodeToTopLevelContainer(value)
+    self.encode(plist, forKey: key)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // NSKeyedUnarchiver
 //===----------------------------------------------------------------------===//
 
@@ -152,6 +166,48 @@ extension NSKeyedUnarchiver {
     let result = __NSKeyedUnarchiverUnarchiveObject(self, data as NSData, &error)
     try resolveError(error)
     return result
+  }
+  
+  @nonobjc
+  private static let __plistClasses: [AnyClass] = [
+    NSArray.self,
+    NSData.self,
+    NSDate.self,
+    NSDictionary.self,
+    NSNumber.self,
+    NSString.self
+  ]
+
+  @nonobjc
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeDecodable<T : Decodable>(_ type: T.Type, forKey key: String) -> T? {
+      guard let value = self.decodeObject(of: NSKeyedUnarchiver.__plistClasses, forKey: key) else {
+          return nil
+      }
+
+      let plistDecoder = PropertyListDecoder()
+      do {
+          return try plistDecoder.decode(T.self, fromTopLevel: value)
+      } catch {
+          self.failWithError(error)
+          return nil
+      }
+  }
+
+  @nonobjc
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelDecodable<T : Decodable>(_ type: T.Type, forKey key: String) throws  -> T? {
+    guard let value = try self.decodeTopLevelObject(of: NSKeyedUnarchiver.__plistClasses, forKey: key) else {
+      return nil
+    }
+
+    let plistDecoder = PropertyListDecoder()
+    do {
+      return try plistDecoder.decode(T.self, fromTopLevel: value)
+    } catch {
+      self.failWithError(error)
+      throw error;
+    }
   }
 }
 
