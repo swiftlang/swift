@@ -1207,6 +1207,12 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   if (viable.size() == 1)
     return 0;
 
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    log.indent(solverState->depth * 2)
+        << "Comparing " << viable.size() << " viable solutions\n";
+  }
+
   SolutionDiff diff(viable);
 
   // Find a potential best.
