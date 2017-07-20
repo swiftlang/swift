@@ -2845,6 +2845,11 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     fromType = sub->getType();
   }
 
+  // Bail on constraints that don't relate two types.
+  if (constraint->getKind() == ConstraintKind::Disjunction
+      || constraint->getKind() == ConstraintKind::BindOverload)
+    return false;
+
   fromType = fromType->getRValueType();
   auto toType = CS->simplifyType(constraint->getSecondType())
                   ->getWithoutImmediateLabel();
