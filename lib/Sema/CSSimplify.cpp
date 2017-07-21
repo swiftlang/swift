@@ -2891,7 +2891,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   result.OverallResult = MemberLookupResult::HasResults;
   
   // If we're looking for a subscript, consider key path operations.
-  if (memberName.isSimpleName(getASTContext().Id_subscript)) {
+  if (memberName.isSimpleName(getASTContext().Id_subscript)
+      && (isa<SubscriptExpr>(memberLocator->getAnchor())
+          || isa<KeyPathExpr>(memberLocator->getAnchor()))) {
     result.ViableCandidates.push_back(
         OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
   }
