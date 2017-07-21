@@ -330,9 +330,9 @@ void swift::__swift_stdlib_ubrk_close(
 
 swift::__swift_stdlib_UBreakIterator *swift::__swift_stdlib_ubrk_open(
     swift::__swift_stdlib_UBreakIteratorType type, const char *locale,
-    const UChar *text, int32_t textLength, __swift_stdlib_UErrorCode *status) {
+    const __swift_stdlib_UChar *text, int32_t textLength, __swift_stdlib_UErrorCode *status) {
   return ptr_cast<swift::__swift_stdlib_UBreakIterator>(
-      ubrk_open(static_cast<UBreakIteratorType>(type), locale, text, textLength,
+      ubrk_open(static_cast<UBreakIteratorType>(type), locale, reinterpret_cast<const UChar*>(text), textLength,
                 ptr_cast<UErrorCode>(status)));
 }
 

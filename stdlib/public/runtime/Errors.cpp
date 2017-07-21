@@ -50,6 +50,8 @@
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
+#elif defined(_WIN32)
+#include <Dbghelp.h>
 #endif
 
 namespace FatalErrorFlags {
@@ -78,17 +80,27 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   // demangle with swift. We are taking advantage of __cxa_demangle actually
   // providing failure status instead of just returning the original string like
   // swift demangle.
-  int status;
-  char *demangled = abi::__cxa_demangle(syminfo.symbolName, 0, 0, &status);
-  if (status == 0) {
-    assert(demangled != nullptr && "If __cxa_demangle succeeds, demangled "
-                                   "should never be nullptr");
-    symbolName += demangled;
-    free(demangled);
-    return true;
-  }
-  assert(demangled == nullptr && "If __cxa_demangle fails, demangled should "
-                                 "be a nullptr");
+  
+#if defined(_WIN32)
+    char demangled[1024];
+    DWORD length = UnDecorateSymbolName(syminfo.symbolName, demangled, 1024, 0);
+    if (length > 0) {
+        symbolName += demangled;
+        return true;
+    }
+#else
+    int status;
+    char *demangled = abi::__cxa_demangle(syminfo.symbolName, 0, 0, &status);
+    if (status == 0) {
+        assert(demangled != nullptr && "If __cxa_demangle succeeds, demangled "
+               "should never be nullptr");
+        symbolName += demangled;
+        free(demangled);
+        return true;
+    }
+    assert(demangled == nullptr && "If __cxa_demangle fails, demangled should "
+           "be a nullptr");
+#endif
 
   // Otherwise, try to demangle with swift. If swift fails to demangle, it will
   // just pass through the original output.

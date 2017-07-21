@@ -93,7 +93,7 @@
 
 #else
 # if defined(__CYGWIN__)
-#  define SWIFT_RUNTIME_EXPORT
+#  define SWIFT_EXPORT_ATTRIBUTE
 # else
 #  if defined(swiftCore_EXPORTS)
 #   define SWIFT_EXPORT_ATTRIBUTE __declspec(dllexport)
