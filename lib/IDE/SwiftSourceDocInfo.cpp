@@ -312,6 +312,8 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
 }
 
 CharSourceRange ResolvedRangeInfo::getContent() {
+  if (TokensInRange.empty())
+    return CharSourceRange();
   auto StartTok = TokensInRange.front();
   auto EndTok = TokensInRange.back();
   auto StartLoc = StartTok.hasComment() ?
