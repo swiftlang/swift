@@ -2025,8 +2025,6 @@ namespace {
         // FIXME: Need a better locator for a pattern as a base.
         Type openedType = CS.openUnboundGenericType(typedPattern->getType(),
                                                     locator);
-        if (auto weakTy = openedType->getAs<WeakStorageType>())
-          openedType = weakTy->getReferentType();
 
         // For a typed pattern, simply return the opened type of the pattern.
         // FIXME: Error recovery if the type is an error type?
