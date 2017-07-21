@@ -36,82 +36,162 @@ namespace irgen {
   class Callee;
   class IRGenFunction;
 
-  class Callee {
+  class CalleeInfo {
+  public:
     /// The unsubstituted function type being called.
     CanSILFunctionType OrigFnType;
 
     /// The substituted result type of the function being called.
     CanSILFunctionType SubstFnType;
 
-    /// The clang information for the function being called, if applicable.
-    ForeignFunctionInfo ForeignInfo;
-
-    /// The pointer to the actual function.
-    llvm::Value *FnPtr;
-
-    /// The data pointer required by the function.  There's an
-    /// invariant that this never stores an llvm::ConstantPointerNull.
-    llvm::Value *DataPtr;
-
     /// The archetype substitutions under which the function is being
     /// called.
     std::vector<Substitution> Substitutions;
 
+    CalleeInfo(CanSILFunctionType origFnType,
+               CanSILFunctionType substFnType,
+               SubstitutionList substitutions)
+      : OrigFnType(origFnType), SubstFnType(substFnType),
+        Substitutions(substitutions.begin(), substitutions.end()) {
+    }
+  };
+
+  /// A function pointer value.
+  class FunctionPointer {
+    /// The actual function pointer.
+    llvm::Value *Value;
+
+    Signature Sig;
+
   public:
-    Callee() = default;
-
-    /// Prepare a callee for a known function with a known data pointer.
-    static Callee forKnownFunction(CanSILFunctionType origFnType,
-                                   CanSILFunctionType substFnType,
-                                   SubstitutionList subs,
-                                   llvm::Value *fn, llvm::Value *data,
-                                   ForeignFunctionInfo foreignInfo) {
-      // Invariant on the function pointer.
-      assert(fn->getType()->getPointerElementType()->isFunctionTy());
-      assert((foreignInfo.ClangInfo != nullptr) ==
-             (origFnType->getLanguage() == SILFunctionLanguage::C));
-
-      Callee result;
-      result.OrigFnType = origFnType;
-      result.SubstFnType = substFnType;
-      result.FnPtr = fn;
-      result.DataPtr = data;
-      result.Substitutions = subs;
-      result.ForeignInfo = foreignInfo;
-      return result;
+    /// Construct a FunctionPointer for an arbitrary pointer value.
+    /// We may add more arguments to this; try to use the other
+    /// constructors/factories if possible.
+    explicit FunctionPointer(llvm::Value *value, const Signature &signature)
+        : Value(value), Sig(signature) {
+      // The function pointer should have function type.
+      assert(value->getType()->getPointerElementType()->isFunctionTy());
+      // TODO: maybe assert similarity to signature.getType()?
     }
-    
+
+    static FunctionPointer forDirect(IRGenModule &IGM,
+                                     llvm::Constant *value,
+                                     CanSILFunctionType fnType);
+
+    static FunctionPointer forDirect(llvm::Constant *value,
+                                     const Signature &signature) {
+      return FunctionPointer(value, signature);
+    }
+
+    static FunctionPointer forExplosionValue(IRGenFunction &IGF,
+                                             llvm::Value *fnPtr,
+                                             CanSILFunctionType fnType);
+
+    /// Return the actual function pointer.
+    llvm::Value *getPointer() const { return Value; }
+
+    /// Given that this value is known to have been constructed from
+    /// a direct function, return the function pointer.
+    llvm::Constant *getDirectPointer() const {
+      return cast<llvm::Constant>(Value);
+    }
+
+    llvm::FunctionType *getFunctionType() const {
+      return cast<llvm::FunctionType>(
+                                  Value->getType()->getPointerElementType());
+    }
+
+    const Signature &getSignature() const {
+      return Sig;
+    }
+
+    llvm::CallingConv::ID getCallingConv() const {
+      return Sig.getCallingConv();
+    }
+
+    llvm::AttributeList getAttributes() const {
+      return Sig.getAttributes();
+    }
+    llvm::AttributeList &getMutableAttributes() & {
+      return Sig.getMutableAttributes();
+    }
+
+    ForeignFunctionInfo getForeignInfo() const {
+      return Sig.getForeignInfo();
+    }
+
+    llvm::Value *getExplosionValue(IRGenFunction &IGF,
+                                   CanSILFunctionType fnType) const;
+  };
+
+  class Callee {
+    CalleeInfo Info;
+
+    /// The actual function pointer to invoke.
+    FunctionPointer Fn;
+
+    /// The first data pointer required by the function invocation.
+    llvm::Value *FirstData;
+
+    /// The second data pointer required by the function invocation.
+    llvm::Value *SecondData;
+
+  public:
+    Callee(const Callee &other) = delete;
+    Callee &operator=(const Callee &other) = delete;
+
+    Callee(Callee &&other) = default;
+    Callee &operator=(Callee &&other) = default;
+
+    Callee(CalleeInfo &&info, const FunctionPointer &fn,
+           llvm::Value *firstData = nullptr,
+           llvm::Value *secondData = nullptr);
+
     SILFunctionTypeRepresentation getRepresentation() const {
-      return OrigFnType->getRepresentation();
+      return Info.OrigFnType->getRepresentation();
     }
 
-    CanSILFunctionType getOrigFunctionType() const { return OrigFnType; }
-    CanSILFunctionType getSubstFunctionType() const { return SubstFnType; }
+    CanSILFunctionType getOrigFunctionType() const {
+      return Info.OrigFnType;
+    }
+    CanSILFunctionType getSubstFunctionType() const {
+      return Info.SubstFnType;
+    }
 
-    bool hasSubstitutions() const { return !Substitutions.empty(); }
-    SubstitutionList getSubstitutions() const { return Substitutions; }
+    bool hasSubstitutions() const { return !Info.Substitutions.empty(); }
+    SubstitutionList getSubstitutions() const { return Info.Substitutions; }
 
-    llvm::Value *getFunction() const { return FnPtr; }
+    const FunctionPointer &getFunctionPointer() const { return Fn; }
 
     llvm::FunctionType *getLLVMFunctionType() {
-      return cast<llvm::FunctionType>(FnPtr->getType()->getPointerElementType());
+      return Fn.getFunctionType();
     }
 
-    const ForeignFunctionInfo &getForeignInfo() const {
-      return ForeignInfo;
+    llvm::AttributeList getAttributes() const {
+      return Fn.getAttributes();
+    }
+    llvm::AttributeList &getMutableAttributes() & {
+      return Fn.getMutableAttributes();
     }
 
-    /// Return the function pointer as an i8*.
-    llvm::Value *getOpaqueFunctionPointer(IRGenFunction &IGF) const;
+    ForeignFunctionInfo getForeignInfo() const {
+      return Fn.getForeignInfo();
+    }
 
-    /// Return the function pointer as an appropriate pointer-to-function.
-    llvm::Value *getFunctionPointer() const { return FnPtr; }
+    /// If this callee has a value for the Swift context slot, return
+    /// it; otherwise return non-null.
+    llvm::Value *getSwiftContext() const;
 
-    /// Is it possible that this function requires a non-null data pointer?
-    bool hasDataPointer() const { return DataPtr != nullptr; }
+    /// Given that this callee is a block, return the block pointer.
+    llvm::Value *getBlockObject() const;
 
-    /// Return the data pointer as a %swift.refcounted*.
-    llvm::Value *getDataPointer(IRGenFunction &IGF) const;
+    /// Given that this callee is an ObjC method, return the receiver
+    /// argument.  This might not be 'self' anymore.
+    llvm::Value *getObjCMethodReceiver() const;
+
+    /// Given that this callee is an ObjC method, return the receiver
+    /// argument.  This might not be 'self' anymore.
+    llvm::Value *getObjCMethodSelector() const;
   };
 
 } // end namespace irgen

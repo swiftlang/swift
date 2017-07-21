@@ -394,7 +394,7 @@ public:
 
 class SDKNodeRoot :public SDKNode {
   /// This keeps track of all decl descendants with USRs.
-  llvm::StringMap<SDKNodeDecl*> DescendantDeclTable;
+  llvm::StringMap<llvm::SmallSetVector<SDKNodeDecl*, 2>> DescendantDeclTable;
 
 public:
   SDKNodeRoot(SDKNodeInitInfo Info) : SDKNode(Info, SDKNodeKind::Root) {}
@@ -403,13 +403,11 @@ public:
   void registerDescendant(SDKNode *D) {
     if (auto DD = dyn_cast<SDKNodeDecl>(D)) {
       assert(!DD->getUsr().empty());
-      DescendantDeclTable[DD->getUsr()] = DD;
+      DescendantDeclTable[DD->getUsr()].insert(DD);
     }
   }
-  Optional<SDKNodeDecl*> getDescendantByUsr(StringRef Usr) {
-    if (DescendantDeclTable.count(Usr))
-      return DescendantDeclTable[Usr];
-    return None;
+  ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
+    return DescendantDeclTable[Usr].getArrayRef();
   }
 };
 
@@ -729,8 +727,9 @@ public:
   Optional<SDKNodeTypeDecl*> getSuperclass() const {
     if (SuperclassUsr.empty())
       return None;
-    if (auto SC = getRootNode()->getDescendantByUsr(SuperclassUsr)) {
-      return (*SC)->getAs<SDKNodeTypeDecl>();
+    auto Descendants = getRootNode()->getDescendantsByUsr(SuperclassUsr);
+    if (!Descendants.empty()) {
+      return Descendants.front()->getAs<SDKNodeTypeDecl>();
     }
     return None;
   }
@@ -2197,43 +2196,13 @@ public:
   }
 };
 
-// For a given SDK node tree, this will build up a mapping from USR to node
-using USRToNodeMap = llvm::StringMap<NodePtr, llvm::BumpPtrAllocator>;
-
-// Class to build up mappings from USR to SDKNode
-class MapUSRToNode : public SDKNodeVisitor {
-  friend class SDKNode; // for visit()
-  USRToNodeMap usrMap;
-
-  void visit(NodePtr ptr) override {
-    if (auto D = dyn_cast<SDKNodeDecl>(ptr)) {
-      usrMap[D->getUsr()] = ptr;
-    }
-  }
-
-public:
-  MapUSRToNode() = default;
-
-  const USRToNodeMap &getMap() const { return usrMap; }
-
-  void map(NodePtr ptr) {
-    SDKNode::preorderVisit(ptr, *this);
-  }
-
-  void dump(llvm::raw_ostream &) const;
-  void dump() const { dump(llvm::errs()); }
-
-private:
-  MapUSRToNode(MapUSRToNode &) = delete;
-  MapUSRToNode &operator=(MapUSRToNode &) = delete;
-};
 
 // Class to build up a diff of structurally different nodes, based on the given
 // USR map for the left (original) side of the diff, based on parent types.
 class TypeMemberDiffFinder : public SDKNodeVisitor {
   friend class SDKNode; // for visit()
 
-  const USRToNodeMap &diffAgainst;
+  SDKNodeRoot *diffAgainst;
 
   // Vector of {givenNodePtr, diffAgainstPtr}
   NodePairVector TypeMemberDiffs;
@@ -2245,10 +2214,22 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
       return;
     auto usr = declNode->getUsr();
     auto &usrName = usr;
-    if (!diffAgainst.count(usrName))
+
+    // If we can find no nodes in the other tree with the same usr, abort.
+    auto candidates = diffAgainst->getDescendantsByUsr(usrName);
+    if (candidates.empty())
       return;
 
-    auto diffNode = diffAgainst.lookup(usrName);
+    // If any of the candidates has the same kind and name with the node, we
+    // shouldn't continue.
+    for (auto Can : candidates) {
+      if (Can->getKind() == declNode->getKind() &&
+          Can->getAs<SDKNodeDecl>()->getFullyQualifiedName() ==
+            declNode->getFullyQualifiedName())
+        return;
+    }
+
+    auto diffNode = candidates.front();
     assert(node && diffNode && "nullptr visited?");
     auto nodeParent = node->getParent();
     auto diffParent = diffNode->getParent();
@@ -2261,9 +2242,7 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
     // Move from a member variable to another member variable
     if (nodeParent->getKind() == SDKNodeKind::TypeDecl &&
         diffParent->getKind() == SDKNodeKind::TypeDecl &&
-        declNode->isStatic() &&
-        nodeParent->getAs<SDKNodeDecl>()->getFullyQualifiedName() !=
-          diffParent->getAs<SDKNodeDecl>()->getFullyQualifiedName())
+        declNode->isStatic())
       TypeMemberDiffs.insert({diffNode, node});
     // Move from a getter/setter function to a property
     else if (node->getKind() == SDKNodeKind::Getter &&
@@ -2280,8 +2259,8 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
   }
 
 public:
-  TypeMemberDiffFinder(const USRToNodeMap &rightUSRMap)
-      : diffAgainst(rightUSRMap) {}
+  TypeMemberDiffFinder(SDKNodeRoot *diffAgainst):
+    diffAgainst(diffAgainst) {}
 
   void findDiffsFor(NodePtr ptr) { SDKNode::preorderVisit(ptr, *this); }
 
@@ -2444,19 +2423,6 @@ static void printNode(llvm::raw_ostream &os, NodePtr node) {
     }
   }
   os << "}";
-}
-
-void MapUSRToNode::dump(llvm::raw_ostream &os) const {
-  for (auto &elt : usrMap) {
-    auto &node = elt.getValue();
-    os << elt.getKey() << " ==> ";
-    printNode(os, node);
-    if (node->getParent()) {
-      os << "  parent: ";
-      printNode(os, node->getParent());
-    }
-    os << "\n";
-  }
 }
 
 void TypeMemberDiffFinder::dump(llvm::raw_ostream &os) const {
@@ -3102,12 +3068,7 @@ static Optional<uint8_t> findSelfIndex(SDKNode* Node) {
 /// Find cases where a diff is due to a change to being a type member
 static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
                                 TypeMemberDiffVector &out) {
-  // Mapping from USR to SDKNode
-  MapUSRToNode leftMapper;
-  leftMapper.map(leftSDKRoot);
-  auto &leftMap = leftMapper.getMap();
-
-  TypeMemberDiffFinder diffFinder(leftMap);
+  TypeMemberDiffFinder diffFinder(cast<SDKNodeRoot>(leftSDKRoot));
   diffFinder.findDiffsFor(rightSDKRoot);
   RenameDetectorForMemberDiff Detector;
   for (auto pair : diffFinder.getDiffs()) {

@@ -430,7 +430,7 @@ extension Mirror {
       if case let label as String = e {
         position = children.index { $0.label == label } ?? children.endIndex
       }
-      else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
+      else if let offset = (e as? Int).map({ Int64($0) }) ?? (e as? Int64) {
         position = children.index(children.startIndex,
           offsetBy: offset,
           limitedBy: children.endIndex) ?? children.endIndex

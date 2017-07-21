@@ -593,10 +593,10 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(SILDeclRef method) {
   return getAddrOfObjCSelectorRef(Selector(method).str());
 }
 
-static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
-                              llvm::Value *selfValue,
-                              Explosion &selfValues,
-                              SILType searchClass) {
+static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
+                                      bool isInstanceMethod,
+                                      llvm::Value *selfValue,
+                                      CanType searchClass) {
   // Allocate an objc_super struct.
   Address super = IGF.createAlloca(IGF.IGM.ObjCSuperStructTy,
                                    IGF.IGM.getPointerAlignment(),
@@ -608,16 +608,14 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   // Generate the search class object reference.
   llvm::Value *searchValue;
   if (isInstanceMethod) {
-    searchValue = emitClassHeapMetadataRef(IGF, searchClass.getSwiftRValueType(),
+    searchValue = emitClassHeapMetadataRef(IGF, searchClass,
                                            MetadataValueType::ObjCClass,
                                            /*allow uninitialized*/ true);
   } else {
-    ClassDecl *searchClassDecl =
-      searchClass.castTo<MetatypeType>().getInstanceType()
-        .getClassOrBoundGenericClass();
+    searchClass = cast<MetatypeType>(searchClass).getInstanceType();
+    ClassDecl *searchClassDecl = searchClass.getClassOrBoundGenericClass();
     if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, searchClassDecl)) {
-      searchValue = emitClassHeapMetadataRef(IGF,
-                                             searchClass.castTo<MetatypeType>().getInstanceType(),
+      searchValue = emitClassHeapMetadataRef(IGF, searchClass,
                                              MetadataValueType::ObjCClass,
                                              /*allow uninitialized*/ true);
       searchValue = emitLoadOfObjCHeapMetadataRef(IGF, searchValue);
@@ -629,25 +627,16 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   }
   
   // Store the receiver and class to the struct.
-  llvm::Value *selfIndices[2] = {
-    IGF.Builder.getInt32(0),
-    IGF.Builder.getInt32(0)
-  };
-  llvm::Value *selfAddr = IGF.Builder.CreateGEP(super.getAddress(),
-                                                selfIndices);
-  IGF.Builder.CreateStore(self, selfAddr, super.getAlignment());
+  Address selfAddr = IGF.Builder.CreateStructGEP(super, 0, Size(0));
+  IGF.Builder.CreateStore(self, selfAddr);
 
-  llvm::Value *searchIndices[2] = {
-    IGF.Builder.getInt32(0),
-    IGF.Builder.getInt32(1)
-  };
-  llvm::Value *searchAddr = IGF.Builder.CreateGEP(super.getAddress(),
-                                                  searchIndices);
-  IGF.Builder.CreateStore(searchValue, searchAddr, super.getAlignment());
+  Address searchAddr =
+    IGF.Builder.CreateStructGEP(super, 1, IGF.IGM.getPointerSize());
+  IGF.Builder.CreateStore(searchValue, searchAddr);
   
   // Pass a pointer to the objc_super struct to the messenger.
   // Project the ownership semantics of 'self' to the super argument.
-  selfValues.add(super.getAddress());
+  return super.getAddress();
 }
 
 static llvm::FunctionType *getMsgSendSuperTy(IRGenModule &IGM,
@@ -661,14 +650,11 @@ static llvm::FunctionType *getMsgSendSuperTy(IRGenModule &IGM,
   return llvm::FunctionType::get(fnTy->getReturnType(), args, fnTy->isVarArg());
 }
 
-/// Prepare a call using ObjC method dispatch without applying the 'self' and
-/// '_cmd' arguments.
-CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
-                                              SILDeclRef method,
-                                              CanSILFunctionType origFnType,
-                                              CanSILFunctionType substFnType,
-                                              SubstitutionList subs,
-                                              ObjCMessageKind kind) {
+Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
+                                  const ObjCMethod &methodInfo,
+                                  llvm::Value *selfValue,
+                                  CalleeInfo &&info) {
+  SILDeclRef method = methodInfo.getMethod();
   assert((method.kind == SILDeclRef::Kind::Initializer
           || method.kind == SILDeclRef::Kind::Allocator
           || method.kind == SILDeclRef::Kind::Func
@@ -676,67 +662,46 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
           || method.kind == SILDeclRef::Kind::Deallocator) &&
          "objc method call must be to a func/initializer/getter/setter/dtor");
 
-  ForeignFunctionInfo foreignInfo;
-  llvm::AttributeList attrs;
-  auto fnTy = IGF.IGM.getFunctionType(origFnType, attrs, &foreignInfo);
-  bool indirectResult = foreignInfo.ClangInfo->getReturnInfo().isIndirect();
-  if (kind != ObjCMessageKind::Normal)
-    fnTy = getMsgSendSuperTy(IGF.IGM, fnTy, indirectResult);
+  auto kind = methodInfo.getMessageKind();
 
-  // Create the appropriate messenger function.
-  // FIXME: this needs to be target-specific.
-  llvm::Constant *messenger;
-  if (indirectResult && IGF.IGM.TargetInfo.ObjCUseStret) {
-    switch (kind) {
-    case ObjCMessageKind::Normal:
-      messenger = IGF.IGM.getObjCMsgSendStretFn();
-      break;
-
-    case ObjCMessageKind::Peer:
-      messenger = IGF.IGM.getObjCMsgSendSuperStretFn();
-      break;
-
-    case ObjCMessageKind::Super:
-      messenger = IGF.IGM.getObjCMsgSendSuperStret2Fn();
-      break;
-    }
-  } else {
-    switch (kind) {
-    case ObjCMessageKind::Normal:
-      messenger = IGF.IGM.getObjCMsgSendFn();
-      break;
-
-    case ObjCMessageKind::Peer:
-      messenger = IGF.IGM.getObjCMsgSendSuperFn();
-      break;
-
-    case ObjCMessageKind::Super:
-      messenger = IGF.IGM.getObjCMsgSendSuper2Fn();
-      break;
-    }
+  Signature sig = IGF.IGM.getSignature(info.OrigFnType);
+  bool indirectResult =
+    sig.getForeignInfo().ClangInfo->getReturnInfo().isIndirect();
+  if (kind != ObjCMessageKind::Normal) {
+    sig.setType(getMsgSendSuperTy(IGF.IGM, sig.getType(), indirectResult));
   }
 
-  // Cast the messenger to the right type.
-  messenger = llvm::ConstantExpr::getBitCast(messenger, fnTy->getPointerTo());
+  // Create the appropriate messenger function.
+  // FIXME: this needs to be target-specific.  Ask Clang for it!
+  llvm::Constant *messenger = [&]() -> llvm::Constant* {
+    if (indirectResult && IGF.IGM.TargetInfo.ObjCUseStret) {
+      switch (kind) {
+      case ObjCMessageKind::Normal:
+        return IGF.IGM.getObjCMsgSendStretFn();
 
-  CallEmission emission(IGF,
-                        Callee::forKnownFunction(origFnType,
-                                                 substFnType,
-                                                 subs,
-                                                 messenger, nullptr,
-                                                 foreignInfo));
-  return emission;
-}
+      case ObjCMessageKind::Peer:
+        return IGF.IGM.getObjCMsgSendSuperStretFn();
 
-/// Emit the 'self'/'super' and '_cmd' arguments for an ObjC method dispatch.
-void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
-                                               Explosion &args,
-                                               SILDeclRef method,
-                                               llvm::Value *self,
-                                               SILType searchType) {
-  // Compute the selector.
-  Selector selector(method);
-    
+      case ObjCMessageKind::Super:
+        return IGF.IGM.getObjCMsgSendSuperStret2Fn();
+      }
+    } else {
+      switch (kind) {
+      case ObjCMessageKind::Normal:
+        return IGF.IGM.getObjCMsgSendFn();
+
+      case ObjCMessageKind::Peer:
+        return IGF.IGM.getObjCMsgSendSuperFn();
+
+      case ObjCMessageKind::Super:
+        return IGF.IGM.getObjCMsgSendSuper2Fn();
+      }
+    }
+  }();
+
+  messenger = llvm::ConstantExpr::getBitCast(messenger,
+                                             sig.getType()->getPointerTo());
+
   // super.constructor references an instance method (even though the
   // decl is really a 'static' member). Similarly, destructors refer
   // to the instance method -dealloc.
@@ -745,15 +710,21 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
       || method.kind == SILDeclRef::Kind::Deallocator
       || method.getDecl()->isInstanceMember();
 
-  if (searchType) {
-    emitSuperArgument(IGF, isInstanceMethod, self, args, searchType);
+  llvm::Value *receiverValue;
+  if (auto searchType = methodInfo.getSearchType()) {
+    receiverValue =
+      emitSuperArgument(IGF, isInstanceMethod, selfValue,
+                        searchType.getSwiftRValueType());
   } else {
-    args.add(self);
+    receiverValue = selfValue;
   }
-  assert(args.size() == 1);
-  
-  // Add the selector value.
-  args.add(IGF.emitObjCSelectorRefLoad(selector.str()));
+
+  // Compute the selector.
+  Selector selector(method);
+  llvm::Value *selectorValue = IGF.emitObjCSelectorRefLoad(selector.str());
+
+  auto fn = FunctionPointer::forDirect(messenger, sig);
+  return Callee(std::move(info), fn, receiverValue, selectorValue);
 }
 
 /// Call [self allocWithZone: nil].
@@ -882,6 +853,10 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   // Translate direct parameters passed indirectly.
   Explosion translatedParams;
 
+  // Add the formal indirect return here.
+  if (formalIndirectResult)
+    translatedParams.add(formalIndirectResult);
+
   // We already handled self.
   assert(origMethodType->hasSelfParam());
   auto origParamInfos = origMethodType->getParameters();
@@ -911,23 +886,11 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   }
 
   // Prepare the call to the underlying method.
+  CallEmission emission(subIGF,
+                        getObjCMethodCallee(subIGF, method, self,
+                          CalleeInfo(origMethodType, origMethodType, {})));
   
-  CallEmission emission
-    = prepareObjCMethodRootCall(subIGF, method.getMethod(),
-                                origMethodType, origMethodType,
-                                SubstitutionList{},
-                                method.getMessageKind());
-  
-  Explosion args;
-
-  // Take care of formal indirect returns ourselves.
-  if (formalIndirectResult)
-    args.add(formalIndirectResult);
-
-  addObjCMethodCallImplicitArguments(subIGF, args, method.getMethod(), self,
-                                     method.getSearchType());
-  args.add(translatedParams.claimAll());
-  emission.setArgs(args);
+  emission.setArgs(translatedParams);
   
   // Cleanup that always has to occur after the function call.
   auto cleanup = [&]{

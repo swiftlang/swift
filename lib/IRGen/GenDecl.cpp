@@ -62,6 +62,7 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
+#include "Signature.h"
 
 using namespace swift;
 using namespace irgen;
@@ -1895,11 +1896,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     IRGen.addLazyFunction(f);
   }
 
-  llvm::AttributeList attrs;
-  llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
-                                               attrs);
+  Signature signature = getSignature(f->getLoweredFunctionType());
+  llvm::FunctionType *fnType = signature.getType();
+  auto cc = signature.getCallingConv();
+  auto attrs = signature.getAttributes();
 
-  auto cc = expandCallingConv(*this, f->getRepresentation());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   if (f->getInlineStrategy() == NoInline) {

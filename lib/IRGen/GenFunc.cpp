@@ -86,6 +86,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/StringSwitch.h"
 
+#include "Callee.h"
 #include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
@@ -592,7 +593,7 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM) const {
     return TheSignature;
 
   // Update the cache and return.
-  TheSignature = Signature::get(IGM, FormalType);
+  TheSignature = Signature::getUncached(IGM, FormalType);
   assert(TheSignature.isValid());
   return TheSignature;
 }
@@ -614,6 +615,12 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
     return ti.as<FuncTypeInfo>();
   }
   llvm_unreachable("bad function type representation");
+}
+
+Signature
+IRGenModule::getSignature(CanSILFunctionType type) {
+  auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
+  return sigInfo.getSignature(*this);
 }
 
 llvm::FunctionType *
@@ -703,15 +710,19 @@ static CanType getArgumentLoweringType(CanType type,
 /// If 'layout' is null, there is a single captured value of
 /// Swift-refcountable type that is being used directly as the
 /// context object.
-static llvm::Function *emitPartialApplicationForwarder(
-    IRGenModule &IGM, llvm::Function *staticFnPtr, bool calleeHasContext,
-    llvm::Type *fnTy, const llvm::AttributeList &origAttrs,
-    CanSILFunctionType origType, CanSILFunctionType substType,
-    CanSILFunctionType outType, SubstitutionList subs, HeapLayout const *layout,
-    ArrayRef<ParameterConvention> conventions) {
-  llvm::AttributeList outAttrs;
-
-  llvm::FunctionType *fwdTy = IGM.getFunctionType(outType, outAttrs);
+static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
+                                   llvm::Function *staticFnPtr,
+                                   bool calleeHasContext,
+                                   const Signature &origSig,
+                                   CanSILFunctionType origType,
+                                   CanSILFunctionType substType,
+                                   CanSILFunctionType outType,
+                                   SubstitutionList subs,
+                                   HeapLayout const *layout,
+                                   ArrayRef<ParameterConvention> conventions) {
+  auto outSig = IGM.getSignature(outType);
+  llvm::AttributeList outAttrs = outSig.getAttributes();
+  llvm::FunctionType *fwdTy = outSig.getType();
   SILFunctionConventions outConv(outType, IGM.getSILModule());
 
   StringRef FnName;
@@ -725,8 +736,7 @@ static llvm::Function *emitPartialApplicationForwarder(
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
                            llvm::StringRef(thunkName), &IGM.Module);
-  fwd->setCallingConv(
-      expandCallingConv(IGM, SILFunctionTypeRepresentation::Thick));
+  fwd->setCallingConv(outSig.getCallingConv());
 
   fwd->setAttributes(outAttrs);
   // Merge initial attributes with outAttrs.
@@ -935,9 +945,7 @@ static llvm::Function *emitPartialApplicationForwarder(
   }
 
   auto haveContextArgument =
-      calleeHasContext ||
-      (origType->hasSelfParam() &&
-       isSelfContextParameter(origType->getSelfParameter()));
+      calleeHasContext || hasSelfContextParameter(origType);
 
   // Witness method calls expect self, followed by the self type followed by,
   // the witness table at the end of the parameter list. But polymorphic
@@ -995,8 +1003,7 @@ static llvm::Function *emitPartialApplicationForwarder(
     if (haveContextArgument)
       argIndex += polyArgs.size();
 
-    llvm::Type *expectedArgTy =
-        fnTy->getPointerElementType()->getFunctionParamType(argIndex);
+    llvm::Type *expectedArgTy = origSig.getType()->getParamType(argIndex);
 
     llvm::Value *argValue;
     if (isIndirectFormalParameter(argConvention)) {
@@ -1141,6 +1148,7 @@ static llvm::Function *emitPartialApplicationForwarder(
 
   // Derive the callee function pointer.  If we found a function
   // pointer statically, great.
+  auto fnTy = origSig.getType()->getPointerTo();
   llvm::Value *fnPtr;
   if (staticFnPtr) {
     assert(staticFnPtr->getType() == fnTy && "static function type mismatch?!");
@@ -1217,9 +1225,9 @@ static llvm::Function *emitPartialApplicationForwarder(
     call->setCallingConv(staticFnPtr->getCallingConv());
   } else {
     // Otherwise, use the default attributes for the dynamic type.
-    call->setAttributes(origAttrs);
+    call->setAttributes(origSig.getAttributes());
     // Use the calling convention of the partially applied function type.
-    call->setCallingConv(expandCallingConv(IGM, origType->getRepresentation()));
+    call->setCallingConv(origSig.getCallingConv());
   }
   if (addressesToDeallocate.empty() && !needsAllocas &&
       (!consumesContext || !dependsOnContextLifetime))
@@ -1283,7 +1291,7 @@ static llvm::Function *emitPartialApplicationForwarder(
 /// set of argument values.
 void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            SILFunction &SILFn,
-                                           llvm::Value *fnPtr,
+                                           const FunctionPointer &fn,
                                            llvm::Value *fnContext,
                                            Explosion &args,
                                            ArrayRef<SILParameterInfo> params,
@@ -1301,6 +1309,8 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
+
+  llvm::Value *fnPtr = fn.getPointer();
 
   // Reserve space for polymorphic bindings.
   SubstitutionMap subMap;
@@ -1456,13 +1466,11 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     assert(bindings.empty());
     assert(args.size() == 1);
 
-    llvm::AttributeList attrs;
-    auto fnPtrTy = IGF.IGM.getFunctionType(origType, attrs)
-      ->getPointerTo();
+    auto origSig = IGF.IGM.getSignature(origType);
 
     llvm::Function *forwarder =
       emitPartialApplicationForwarder(IGF.IGM, staticFn, fnContext != nullptr,
-                                      fnPtrTy, attrs, origType, substType,
+                                      origSig, origType, substType,
                                       outType, subs, nullptr, argConventions);
     llvm::Value *forwarderValue =
       IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
@@ -1537,15 +1545,12 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   assert(args.empty() && "unused args in partial application?!");
   
   // Create the forwarding stub.
-  llvm::AttributeList attrs;
-  auto fnPtrTy = IGF.IGM.getFunctionType(origType, attrs)
-    ->getPointerTo();
+  auto origSig = IGF.IGM.getSignature(origType);
 
   llvm::Function *forwarder = emitPartialApplicationForwarder(IGF.IGM,
                                                               staticFn,
                                                           fnContext != nullptr,
-                                                              fnPtrTy,
-                                                              attrs,
+                                                              origSig,
                                                               origType,
                                                               substType,
                                                               outType,
@@ -1633,7 +1638,7 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
 void irgen::emitBlockHeader(IRGenFunction &IGF,
                             Address storage,
                             CanSILBlockStorageType blockTy,
-                            llvm::Function *invokeFunction,
+                            llvm::Constant *invokeFunction,
                             CanSILFunctionType invokeTy,
                             ForeignFunctionInfo foreignInfo) {
   auto &storageTL

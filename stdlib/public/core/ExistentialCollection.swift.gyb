@@ -308,7 +308,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   @_versioned
   @_inlineable
   internal func _index(
-    _ i: _AnyIndexBox, offsetBy n: IntMax
+    _ i: _AnyIndexBox, offsetBy n: Int64
   ) -> _AnyIndexBox {
     _abstract()
   }
@@ -316,21 +316,21 @@ internal class _AnyRandomAccessCollectionBox<Element>
   @_versioned
   @_inlineable
   internal func _index(
-    _ i: _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
+    _ i: _AnyIndexBox, offsetBy n: Int64, limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
     _abstract()
   }
 
   @_versioned
   @_inlineable
-  internal func _formIndex(_ i: inout _AnyIndexBox, offsetBy n: IntMax) {
+  internal func _formIndex(_ i: inout _AnyIndexBox, offsetBy n: Int64) {
     _abstract()
   }
 
   @_versioned
   @_inlineable
   internal func _formIndex(
-    _ i: inout _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
+    _ i: inout _AnyIndexBox, offsetBy n: Int64, limitedBy limit: _AnyIndexBox
   ) -> Bool {
     _abstract()
   }
@@ -339,7 +339,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   @_inlineable
   internal func _distance(
     from start: _AnyIndexBox, to end: _AnyIndexBox
-  ) -> IntMax {
+  ) -> Int64 {
     _abstract()
   }
 
@@ -357,7 +357,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   */
 
   @_versioned
-  internal var _count: IntMax { _abstract() }
+  internal var _count: Int64 { _abstract() }
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
@@ -609,7 +609,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   @_versioned
   @_inlineable
   internal override func _index(
-    _ i: _AnyIndexBox, offsetBy n: IntMax
+    _ i: _AnyIndexBox, offsetBy n: Int64
   ) -> _AnyIndexBox {
     return _IndexBox(_base: _base.index(_unbox(i), offsetBy: numericCast(n)))
   }
@@ -618,7 +618,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   @_inlineable
   internal override func _index(
     _ i: _AnyIndexBox,
-    offsetBy n: IntMax,
+    offsetBy n: Int64,
     limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
     return _base.index(
@@ -631,7 +631,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   @_versioned
   @_inlineable
   internal override func _formIndex(
-    _ i: inout _AnyIndexBox, offsetBy n: IntMax
+    _ i: inout _AnyIndexBox, offsetBy n: Int64
   ) {
     if let box = i as? _IndexBox<S.Index> {
       return _base.formIndex(&box._base, offsetBy: numericCast(n))
@@ -642,7 +642,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   @_versioned
   @_inlineable
   internal override func _formIndex(
-    _ i: inout _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
+    _ i: inout _AnyIndexBox, offsetBy n: Int64, limitedBy limit: _AnyIndexBox
   ) -> Bool {
     if let box = i as? _IndexBox<S.Index> {
       return _base.formIndex(
@@ -658,13 +658,13 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   internal override func _distance(
     from start: _AnyIndexBox,
     to end: _AnyIndexBox
-  ) -> IntMax {
+  ) -> Int64 {
     return numericCast(_base.distance(from: _unbox(start), to: _unbox(end)))
   }
 
   @_versioned
   @_inlineable
-  internal override var _count: IntMax {
+  internal override var _count: Int64 {
     return numericCast(_base.count)
   }
 
@@ -1079,7 +1079,7 @@ public struct ${Self}<Element>
 %   end
 
   public typealias Index = AnyIndex
-  public typealias IndexDistance = IntMax
+  public typealias IndexDistance = Int64
 
   /// The position of the first element in a non-empty collection.
   ///
@@ -1144,14 +1144,14 @@ public struct ${Self}<Element>
   }
 
   @_inlineable
-  public func index(_ i: AnyIndex, offsetBy n: IntMax) -> AnyIndex {
+  public func index(_ i: AnyIndex, offsetBy n: Int64) -> AnyIndex {
     return AnyIndex(_box: _box._index(i._box, offsetBy: n))
   }
 
   @_inlineable
   public func index(
     _ i: AnyIndex,
-    offsetBy n: IntMax,
+    offsetBy n: Int64,
     limitedBy limit: AnyIndex
   ) -> AnyIndex? {
     return _box._index(i._box, offsetBy: n, limitedBy: limit._box)
@@ -1159,7 +1159,7 @@ public struct ${Self}<Element>
   }
 
   @_inlineable
-  public func formIndex(_ i: inout AnyIndex, offsetBy n: IntMax) {
+  public func formIndex(_ i: inout AnyIndex, offsetBy n: Int64) {
     if _isUnique(&i._box) {
       return _box._formIndex(&i._box, offsetBy: n)
     } else {
@@ -1170,7 +1170,7 @@ public struct ${Self}<Element>
   @_inlineable
   public func formIndex(
     _ i: inout AnyIndex,
-    offsetBy n: IntMax,
+    offsetBy n: Int64,
     limitedBy limit: AnyIndex
   ) -> Bool {
     if _isUnique(&i._box) {
@@ -1185,7 +1185,7 @@ public struct ${Self}<Element>
   }
 
   @_inlineable
-  public func distance(from start: AnyIndex, to end: AnyIndex) -> IntMax {
+  public func distance(from start: AnyIndex, to end: AnyIndex) -> Int64 {
     return _box._distance(from: start._box, to: end._box)
   }
 
@@ -1199,7 +1199,7 @@ public struct ${Self}<Element>
 % end
   /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(*n*)'}
   @_inlineable
-  public var count: IntMax {
+  public var count: Int64 {
     return _box._count
   }
 

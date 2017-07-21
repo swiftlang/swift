@@ -641,7 +641,6 @@ static bool shouldContractEdge(ConstraintKind kind) {
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
-  case ConstraintKind::BindOverload:
 
   // We currently only allow subtype contractions for the purpose of 
   // parameter binding constraints.

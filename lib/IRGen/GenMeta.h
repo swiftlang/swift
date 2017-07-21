@@ -42,6 +42,7 @@ namespace irgen {
   class ConstantReference;
   class Explosion;
   class FieldTypeInfo;
+  class FunctionPointer;
   class GenericTypeRequirements;
   class IRGenFunction;
   class IRGenModule;
@@ -229,12 +230,12 @@ namespace irgen {
 
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.
-  llvm::Value *emitVirtualMethodValue(IRGenFunction &IGF,
-                                      llvm::Value *base,
-                                      SILType baseType,
-                                      SILDeclRef method,
-                                      CanSILFunctionType methodType,
-                                      bool useSuperVTable);
+  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,
+                                         llvm::Value *base,
+                                         SILType baseType,
+                                         SILDeclRef method,
+                                         CanSILFunctionType methodType,
+                                         bool useSuperVTable);
 
   /// Get the offset of the given class method within the class's vtables.
   unsigned getVirtualMethodIndex(IRGenModule &IGM, SILDeclRef method);

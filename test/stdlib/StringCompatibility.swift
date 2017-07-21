@@ -336,6 +336,19 @@ Tests.test("LosslessStringConvertible/generic/\(swift)") {
   f(String.self)
 }
 
+#if swift(>=4)
+public typealias ExpectedUTF8ViewSlice = String.UTF8View.SubSequence
+#else
+public typealias ExpectedUTF8ViewSlice = String.UTF8View
+#endif
+
+Tests.test("UTF8ViewSlicing") {
+  let s = "Hello, String.UTF8View slicing world!".utf8
+  var slice = s[s.startIndex..<s.endIndex]
+  expectType(ExpectedUTF8ViewSlice.self, &slice)
+  _ = s[s.startIndex..<s.endIndex] as String.UTF8View.SubSequence
+}
+
 #if !swift(>=4)
 Tests.test("LosslessStringConvertible/force unwrap/\(swift)") {
   // Force unwrap should still work in Swift 3 mode

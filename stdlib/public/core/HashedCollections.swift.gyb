@@ -1739,9 +1739,9 @@ public struct Dictionary<Key : Hashable, Value> :
       self = Dictionary(minimumCapacity: keysAndValues.underestimatedCount)
       // '_MergeError.keyCollision' is caught and handled with an appropriate
       // error message one level down, inside _variantBuffer.merge(_:...).
-      try! _variantBuffer.merge(keysAndValues, uniquingKeysWith: { _ in
-        throw _MergeError.keyCollision
-      })
+      try! _variantBuffer.merge(
+        keysAndValues,
+        uniquingKeysWith: { _, _ in throw _MergeError.keyCollision})
     }
   }
 
@@ -5885,7 +5885,7 @@ extension ${Self} {
   @_inlineable
   @available(swift, obsoleted: 4.0)
   public func filter(
-    _ isIncluded: (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
   ) rethrows -> [Element] {
     var result: [Element] = []
     for x in self {

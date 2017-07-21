@@ -256,6 +256,10 @@ def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
+def solver_shrink_unsolved_threshold : Separate<["-"], "solver-shrink-unsolved-threshold">,
+Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+HelpText<"Set The upper bound to number of sub-expressions unsolved before termination of the shrink phrase">;
+
 def value_recursion_threshold : Separate<["-"], "value-recursion-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum depth for direct recursion in value types">;

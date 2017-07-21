@@ -51,17 +51,29 @@ class Signature {
   llvm::FunctionType *Type = nullptr;
   llvm::AttributeList Attributes;
   ForeignFunctionInfo ForeignInfo;
+  llvm::CallingConv::ID CallingConv;
 
 public:
   bool isValid() const {
     return Type != nullptr;
   }
 
-  static Signature get(IRGenModule &IGM, CanSILFunctionType formalType);
+  /// Compute the signature of the given type.
+  ///
+  /// This is a private detail of the implementation of
+  /// IRGenModule::getSignature(CanSILFunctionType), which is what
+  /// clients should generally be using.
+  static Signature getUncached(IRGenModule &IGM,
+                               CanSILFunctionType formalType);
 
   llvm::FunctionType *getType() const {
     assert(isValid());
     return Type;
+  }
+
+  llvm::CallingConv::ID getCallingConv() const {
+    assert(isValid());
+    return CallingConv;
   }
 
   llvm::AttributeList getAttributes() const {
@@ -69,10 +81,24 @@ public:
     return Attributes;
   }
 
-  const ForeignFunctionInfo &getForeignInfo() const {
+  ForeignFunctionInfo getForeignInfo() const {
     assert(isValid());
     return ForeignInfo;
   }
+
+  // The mutators below should generally only be used when building up
+  // a callee.
+
+  void setType(llvm::FunctionType *type) {
+    Type = type;
+  }
+
+  llvm::AttributeSet &getMutableAttributes() & {
+    assert(isValid());
+    return Attributes;
+  }
+
+
 };
 
 } // end namespace irgen

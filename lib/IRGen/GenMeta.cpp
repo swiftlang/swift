@@ -4611,12 +4611,12 @@ namespace {
 } // end anonymous namespace
 
 /// Load the correct virtual function for the given class method.
-llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
-                                           llvm::Value *base,
-                                           SILType baseType,
-                                           SILDeclRef method,
-                                           CanSILFunctionType methodType,
-                                           bool useSuperVTable) {
+FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
+                                              llvm::Value *base,
+                                              SILType baseType,
+                                              SILDeclRef method,
+                                              CanSILFunctionType methodType,
+                                              bool useSuperVTable) {
   AbstractFunctionDecl *methodDecl
     = cast<AbstractFunctionDecl>(method.getDecl());
 
@@ -4661,14 +4661,16 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
 
   // Use the type of the method we were type-checked against, not the
   // type of the overridden method.
-  llvm::AttributeList attrs;
-  auto fnTy = IGF.IGM.getFunctionType(methodType, attrs)->getPointerTo();
+  auto sig = IGF.IGM.getSignature(methodType);
 
   auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
   auto index = FindClassMethodIndex(IGF.IGM, declaringClass, overridden)
                  .getTargetIndex();
 
-  return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index, fnTy);
+  auto fnPtr = emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index,
+                                             sig.getType()->getPointerTo());
+
+  return FunctionPointer(fnPtr, sig);
 }
 
 unsigned irgen::getVirtualMethodIndex(IRGenModule &IGM,
