@@ -107,7 +107,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     var source = source
     if source < 0 as T {
       if source.bitWidth <= UInt64.bitWidth {
-        let sourceMag = Int(extendingOrTruncating: source).magnitude
+        let sourceMag = Int(truncatingIfNeeded: source).magnitude
         self = _BigInt(sourceMag)
         self.isNegative = true
         return
@@ -123,7 +123,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     _sanityCheck(wordRatio != 0)
     for var sourceWord in source.words {
       for _ in 0..<wordRatio {
-        _data.append(Word(extendingOrTruncating: sourceWord))
+        _data.append(Word(truncatingIfNeeded: sourceWord))
         sourceWord >>= Word.bitWidth
       }
     }
@@ -134,7 +134,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     self.init(source)
   }
 
-  public init<T : BinaryInteger>(extendingOrTruncating source: T) {
+  public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     self.init(source)
   }
 
@@ -156,7 +156,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     if Word.bitWidth > UInt32.bitWidth {
       return Word(arc4random()) << 32 | Word(arc4random())
     } else {
-      return Word(extendingOrTruncating: arc4random())
+      return Word(truncatingIfNeeded: arc4random())
     }
   }
 
@@ -667,7 +667,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     var word: UInt = 0
     var shift = 0
     for w in twosComplementData {
-      word |= UInt(extendingOrTruncating: w) << shift
+      word |= UInt(truncatingIfNeeded: w) << shift
       shift += Word.bitWidth
       if shift == UInt.bitWidth {
         words.append(word)
@@ -1218,7 +1218,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     }
   }
 
-  init<T: BinaryInteger>(extendingOrTruncating source: T) {
+  init<T: BinaryInteger>(truncatingIfNeeded source: T) {
     value = UInt8(source & 1)
   }
 
@@ -1619,7 +1619,7 @@ BigIntTests.test("BinaryInteger interop") {
   expectTrue(z < zComp + 1)
 
   let w = BigInt(UInt.max)
-  let wComp = UInt(extendingOrTruncating: w)
+  let wComp = UInt(truncatingIfNeeded: w)
   expectTrue(w == wComp)
   expectTrue(wComp == w)
   expectTrue(wComp - (1 as UInt) < w)
@@ -1739,7 +1739,7 @@ BigInt8Tests.test("BinaryInteger interop") {
   expectTrue(z < zComp + 1)
 
   let w = BigInt8(UInt.max)
-  let wComp = UInt(extendingOrTruncating: w)
+  let wComp = UInt(truncatingIfNeeded: w)
   expectTrue(w == wComp)
   expectTrue(wComp == w)
   expectTrue(wComp - (1 as UInt) < w)
@@ -1802,8 +1802,8 @@ BigInt8Tests.test("Bitwise").forEach(in: [
     expectTrue(x & ~0 == x)
     expectTrue(x ^ 0 == x)
     expectTrue(x ^ ~0 == ~x)
-    expectTrue(x == BigInt8(Int(extendingOrTruncating: x)))
-    expectTrue(~x == BigInt8(~Int(extendingOrTruncating: x)))
+    expectTrue(x == BigInt8(Int(truncatingIfNeeded: x)))
+    expectTrue(~x == BigInt8(~Int(truncatingIfNeeded: x)))
   }
 }
 

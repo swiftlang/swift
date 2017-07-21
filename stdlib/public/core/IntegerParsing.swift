@@ -18,14 +18,14 @@ internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
   let lower = _ascii16("a")..._ascii16("z")
   let upper = _ascii16("A")..._ascii16("Z")
 
-  let u = UInt16(extendingOrTruncating: u_)
+  let u = UInt16(truncatingIfNeeded: u_)
   let d: UInt16
   if _fastPath(digit ~= u) { d = u &- digit.lowerBound }
   else if _fastPath(upper ~= u) { d = u &- upper.lowerBound &+ 10 }
   else if _fastPath(lower ~= u) { d = u &- lower.lowerBound &+ 10 }
   else { return nil }
   guard _fastPath(d < radix) else { return nil }
-  return Result(extendingOrTruncating: d)
+  return Result(truncatingIfNeeded: d)
 }
 
 @inline(__always)

@@ -216,7 +216,7 @@ struct _${name}Bitmap {
 %   if underlyingType == 'UInt':
       let iAsUnderlyingType = UInt(bitPattern: i)
 %   elif underlyingType == 'UInt32':
-      let iAsUnderlyingType = UInt32(extendingOrTruncating: i)
+      let iAsUnderlyingType = UInt32(truncatingIfNeeded: i)
 %   end
       _bits =
         (_bits & ~(1 << iAsUnderlyingType))
@@ -229,7 +229,7 @@ struct _${name}Bitmap {
 %   if underlyingType == 'UInt':
       let iAsUnderlyingType = UInt(bitPattern: i)
 %   elif underlyingType == 'UInt32':
-      let iAsUnderlyingType = UInt32(extendingOrTruncating: i)
+      let iAsUnderlyingType = UInt32(truncatingIfNeeded: i)
 %   end
     let lowBits = _bits & ((1 << iAsUnderlyingType) - 1)
     return _${name}Bitmap(_bits: lowBits).setBitCount
