@@ -765,7 +765,7 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
 }
 
 bool ConstraintSystem::Candidate::solve(
-    llvm::SmallDenseSet<Expr *> &shrunkExprs) {
+    llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) {
   // Don't attempt to solve candidate if there is closure
   // expression involved, because it's handled specially
   // by parent constraint system (e.g. parameter lists).
@@ -879,7 +879,7 @@ bool ConstraintSystem::Candidate::solve(
 
 void ConstraintSystem::Candidate::applySolutions(
     llvm::SmallVectorImpl<Solution> &solutions,
-    llvm::SmallDenseSet<Expr *> &shrunkExprs) const {
+    llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) const {
   // A collection of OSRs with their newly reduced domains,
   // it's domains are sets because multiple solutions can have the same
   // choice for one of the type variables, and we want no duplication.
@@ -922,8 +922,10 @@ void ConstraintSystem::Candidate::applySolutions(
     if (OSR->getDecls().size() == choices.size()) continue;
 
     // Update the expression with the reduced domain.
-    MutableArrayRef<ValueDecl *> decls
-      = TC.Context.AllocateUninitialized<ValueDecl *>(choices.size());
+    MutableArrayRef<ValueDecl *> decls(
+                                Allocator.Allocate<ValueDecl *>(choices.size()),
+                                choices.size());
+
     std::uninitialized_copy(choices.begin(), choices.end(), decls.begin());
     OSR->setDecls(decls);
 
@@ -1238,7 +1240,7 @@ void ConstraintSystem::shrink(Expr *expr) {
   // so we can start solving them separately.
   expr->walk(collector);
 
-  llvm::SmallDenseSet<Expr *> shrunkExprs;
+  llvm::SmallDenseSet<OverloadSetRefExpr *> shrunkExprs;
   for (auto &candidate : collector.Candidates) {
     // If there are no results, let's forget everything we know about the
     // system so far. This actually is ok, because some of the expressions
@@ -1260,6 +1262,17 @@ void ConstraintSystem::shrink(Expr *expr) {
         return childExpr;
       });
     }
+  }
+
+  // Once "shrinking" is done let's re-allocate final version of
+  // the candidate list to the permanent arena, so it could
+  // survive even after primary constraint system is destroyed.
+  for (auto &OSR : shrunkExprs) {
+    auto choices = OSR->getDecls();
+    auto decls = TC.Context.AllocateUninitialized<ValueDecl *>(choices.size());
+
+    std::uninitialized_copy(choices.begin(), choices.end(), decls.begin());
+    OSR->setDecls(decls);
   }
 }
 
