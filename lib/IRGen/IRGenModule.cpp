@@ -392,7 +392,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AtomicBoolAlign = Alignment(ClangASTContext->getTypeSize(atomicBoolTy));
   }
 
-  IsSwiftErrorInRegister =
+  IsSwiftErrorInRegister = UseSwiftCC &&
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
       ClangCodeGen->CGM());
 }
