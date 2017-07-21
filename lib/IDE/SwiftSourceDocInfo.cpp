@@ -242,7 +242,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   }
   OS << "</Kind>\n";
 
-  OS << "<Content>" << Content.str() << "</Content>\n";
+  OS << "<Content>" << getContent().str() << "</Content>\n";
 
   if (auto Ty = getType()) {
     OS << "<Type>";
@@ -309,6 +309,18 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
 
   OS << "<ASTNodes>" << ContainedNodes.size() << "</ASTNodes>\n";
   OS << "<end>\n";
+}
+
+CharSourceRange ResolvedRangeInfo::getContent() {
+  if (TokensInRange.empty())
+    return CharSourceRange();
+  auto StartTok = TokensInRange.front();
+  auto EndTok = TokensInRange.back();
+  auto StartLoc = StartTok.hasComment() ?
+    StartTok.getCommentStart() : StartTok.getLoc();
+  auto EndLoc = EndTok.getRange().getEnd();
+  return CharSourceRange(StartLoc, (char*)EndLoc.getOpaquePointerValue() -
+    (char*)StartLoc.getOpaquePointerValue());
 }
 
 bool DeclaredDecl::operator==(const DeclaredDecl& Other) {
@@ -409,11 +421,12 @@ private:
   };
 
   std::vector<Token> AllTokens;
-  Token &StartTok;
-  Token &EndTok;
+  ArrayRef<Token> TokensInRange;
+  const Token &StartTok;
+  const Token &EndTok;
   SourceLoc Start;
   SourceLoc End;
-  CharSourceRange Content;
+
   Optional<ResolvedRangeInfo> Result;
   std::vector<ContextInfo> ContextStack;
   ContextInfo &getCurrentDC() {
@@ -496,7 +509,7 @@ private:
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
                                resolveNodeType(Node, RangeKind::SingleExpression),
-                               Content,
+                               TokensInRange,
                                getImmediateContext(),
                                /*Common Parent Expr*/nullptr,
                                SingleEntry,
@@ -507,7 +520,8 @@ private:
     else if (Node.is<Stmt*>())
       return ResolvedRangeInfo(RangeKind::SingleStatement,
                                resolveNodeType(Node, RangeKind::SingleStatement),
-                               Content, getImmediateContext(),
+                               TokensInRange,
+                               getImmediateContext(),
                                /*Common Parent Expr*/nullptr,
                                SingleEntry,
                                UnhandledError, Kind,
@@ -517,7 +531,8 @@ private:
     else {
       assert(Node.is<Decl*>());
       return ResolvedRangeInfo(RangeKind::SingleDecl,
-                               ReturnInfo(), Content,
+                               ReturnInfo(),
+                               TokensInRange,
                                getImmediateContext(),
                                /*Common Parent Expr*/nullptr,
                                SingleEntry,
@@ -547,8 +562,11 @@ private:
   Implementation(SourceFile &File, std::vector<Token> AllTokens,
                  unsigned StartIdx, unsigned EndIdx) :
     File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr),
-    AllTokens(AllTokens), StartTok(AllTokens[StartIdx]), EndTok(AllTokens[EndIdx]),
-    Start(StartTok.getLoc()), End(EndTok.getLoc()), Content(getContentRange()) {
+    AllTokens(AllTokens),
+    TokensInRange(llvm::makeArrayRef(this->AllTokens.data() + StartIdx,
+                                     EndIdx - StartIdx + 1)),
+    StartTok(TokensInRange.front()), EndTok(TokensInRange.back()),
+    Start(StartTok.getLoc()), End(EndTok.getLoc()) {
       assert(Start.isValid() && End.isValid());
   }
 
@@ -576,7 +594,9 @@ public:
     if (!hasResult() && !Node.isImplicit() && nodeContainSelection(Node)) {
       if (auto Parent = Node.is<Expr*>() ? Node.get<Expr*>() : nullptr) {
         Result = {
-          RangeKind::PartOfExpression, ReturnInfo(), Content,
+          RangeKind::PartOfExpression,
+          ReturnInfo(),
+          TokensInRange,
           getImmediateContext(),
           Parent,
           hasSingleEntryPoint(ContainedASTNodes),
@@ -795,7 +815,8 @@ public:
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back(),
-                                RangeKind::MultiStatement), Content,
+                                RangeKind::MultiStatement),
+                TokensInRange,
                 getImmediateContext(), nullptr,
                 hasSingleEntryPoint(ContainedASTNodes),
                 hasUnhandledError(ContainedASTNodes),
@@ -842,7 +863,7 @@ public:
   ResolvedRangeInfo getResult() {
     if (Result.hasValue())
       return Result.getValue();
-    return ResolvedRangeInfo(Content);
+    return ResolvedRangeInfo(TokensInRange);
   }
 
   void analyzeDeclRef(ValueDecl *VD, SourceLoc Start, Type Ty,
@@ -894,13 +915,6 @@ private:
       return RangeMatchKind::EndMatch;
     else
       return RangeMatchKind::NoneMatch;
-  }
-
-  CharSourceRange getContentRange() {
-    SourceManager &SM = File.getASTContext().SourceMgr;
-    return CharSourceRange(SM, StartTok.hasComment() ?
-                            StartTok.getCommentStart() : StartTok.getLoc(),
-                           Lexer::getLocForEndOfToken(SM, End));
   }
 };
 
@@ -963,7 +977,7 @@ visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
 
 ResolvedRangeInfo RangeResolver::resolve() {
   if (!Impl)
-    return ResolvedRangeInfo(CharSourceRange());
+    return ResolvedRangeInfo({});
   Impl->enter(ASTNode());
   walk(Impl->File);
   return Impl->getResult();
