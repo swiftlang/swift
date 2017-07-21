@@ -320,6 +320,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::DumpParse;
     } else if (Opt.matches(OPT_dump_ast)) {
       Action = FrontendOptions::DumpAST;
+    } else if (Opt.matches(OPT_emit_syntax)) {
+      Action = FrontendOptions::EmitSyntax;
     } else if (Opt.matches(OPT_dump_scope_maps)) {
       Action = FrontendOptions::DumpScopeMaps;
 
@@ -531,6 +533,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
+    case FrontendOptions::EmitSyntax:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
@@ -743,6 +746,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
+    case FrontendOptions::EmitSyntax:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
@@ -774,6 +778,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
+    case FrontendOptions::EmitSyntax:
     case FrontendOptions::PrintAST:
     case FrontendOptions::EmitPCH:
     case FrontendOptions::DumpScopeMaps:
@@ -806,6 +811,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
+    case FrontendOptions::EmitSyntax:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
@@ -840,6 +846,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
+    case FrontendOptions::EmitSyntax:
     case FrontendOptions::PrintAST:
     case FrontendOptions::EmitPCH:
     case FrontendOptions::DumpScopeMaps:

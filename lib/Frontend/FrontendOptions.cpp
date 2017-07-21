@@ -23,6 +23,7 @@ bool FrontendOptions::actionHasOutput() const {
   case Typecheck:
   case DumpParse:
   case DumpAST:
+  case EmitSyntax:
   case DumpInterfaceHash:
   case PrintAST:
   case DumpScopeMaps:
@@ -56,6 +57,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case Typecheck:
   case DumpParse:
   case DumpAST:
+  case EmitSyntax:
   case DumpInterfaceHash:
   case PrintAST:
   case DumpScopeMaps:

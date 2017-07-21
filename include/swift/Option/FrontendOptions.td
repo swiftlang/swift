@@ -400,6 +400,9 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
            "ease diffing">;
 
+def emit_syntax : Flag<["-"], "emit-syntax">,
+  HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
