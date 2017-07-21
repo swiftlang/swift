@@ -1330,7 +1330,7 @@ public protocol BinaryInteger :
   ///     // y == nil
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
-  init?<T : FloatingPoint>(exactly source: T)
+  init?<T : BinaryFloatingPoint>(exactly source: T)
 
   /// Creates an integer from the given floating-point value, rounding toward
   /// zero.
@@ -1348,7 +1348,7 @@ public protocol BinaryInteger :
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
   ///   `source` must be representable in this type after rounding toward zero.
-  init<T : FloatingPoint>(_ source: T)
+  init<T : BinaryFloatingPoint>(_ source: T)
 
   /// Creates a new instance from the given integer.
   ///
@@ -1528,7 +1528,7 @@ extension BinaryInteger {
     self = 0
   }
 
-  public init?<T : FloatingPoint>(exactly source: T) {
+  public init?<T : BinaryFloatingPoint>(exactly source: T) {
     // FIXME(integers): implement
     fatalError()
   }
@@ -2952,7 +2952,7 @@ ${assignmentOperatorComment(x.operator, True)}
 
 extension ${Self} {
   // FIXME(integers): implement me in a less terrible way
-  public init<T : FloatingPoint>(_ source: T) {
+  public init<T : BinaryFloatingPoint>(_ source: T) {
 %   for (FloatType, FloatBits) in [
 %     ('Float', 32), ('Double', 64), ('Float80', 80)]:
 %     if FloatType == 'Float80':

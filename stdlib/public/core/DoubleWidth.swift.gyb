@@ -97,14 +97,14 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
   }
 
-  public init<T : FloatingPoint>(_ source: T) {
+  public init<T : BinaryFloatingPoint>(_ source: T) {
     fatalError()
   }
 
-  public init?<T : FloatingPoint>(exactly source: T) {
+  public init?<T : BinaryFloatingPoint>(exactly source: T) {
     fatalError()
   }
-    
+
   public init<T : BinaryFloatingPoint>(_ source: T)
     where T.RawSignificand : FixedWidthInteger
   {
