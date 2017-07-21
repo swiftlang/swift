@@ -368,17 +368,19 @@ extension StringProtocol {
 %   ('characters', 'Character')
 % ]:
 %   View = ViewPrefix + 'View'
+%   RangeReplaceable = 'RangeReplaceable' if property == 'unicodeScalars' else ''
 extension Substring {
   public struct ${View} {
-    let _slice: BidirectionalSlice<String.${View}>
+    var _slice: ${RangeReplaceable}BidirectionalSlice<String.${View}>
   }
 }
 
 extension Substring.${View} : BidirectionalCollection {
   public typealias Index = String.Index
-  
+  public typealias SubSequence = Substring.${View}
+
   internal init(_ base: String.${View}, _bounds: Range<Index>) {
-    _slice = BidirectionalSlice(
+    _slice = ${RangeReplaceable}BidirectionalSlice(
       base: String(base._core).${property},
       bounds: _bounds)
   }
@@ -398,6 +400,9 @@ extension Substring.${View} : BidirectionalCollection {
   public subscript(i: Index) -> String.${View}.Element {
     return _slice[i]
   }
+  public subscript(r: Range<Index>) -> SubSequence {
+    return Substring.${View}(_wholeString.${property}, _bounds: r)
+  }
 }
 
 extension Substring {
@@ -411,6 +416,17 @@ extension Substring {
   }
 }
 % end
+
+// FIXME: The other String views should be RangeReplaceable too. 
+extension Substring.UnicodeScalarView : RangeReplaceableCollection {
+  public init() { _slice = RangeReplaceableBidirectionalSlice.init() }
+  
+  public mutating func replaceSubrange<C : Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) where C.Element == Element {
+    _slice.replaceSubrange(target, with: replacement)
+  }
+}
 
 #if _runtime(_ObjC)
 

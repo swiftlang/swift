@@ -244,18 +244,6 @@ extension String {
     }
 #endif
 
-    /// Accesses the contiguous subrange of elements enclosed by the specified
-    /// range.
-    ///
-    /// - Complexity: O(*n*) if the underlying string is bridged from
-    ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-    public subscript(bounds: Range<Index>) -> UTF16View {
-      return UTF16View(
-        _core,
-        offset: _internalIndex(at: bounds.lowerBound.encodedOffset),
-        length: bounds.upperBound.encodedOffset - bounds.lowerBound.encodedOffset)
-    }
-
     internal init(_ _core: _StringCore) {
       self.init(_core, offset: 0, length: _core.count)
     }
@@ -507,5 +495,35 @@ extension String.UTF16View {
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public subscript(i: Index?) -> Unicode.UTF16.CodeUnit {
     return self[i!]
+  }
+}
+
+//===--- Slicing Support --------------------------------------------------===//
+/// In Swift 3.2, in the absence of type context,
+///
+///   someString.utf16[someString.utf16.startIndex..<someString.utf16.endIndex]
+///
+/// was deduced to be of type `String.UTF16View`.  Provide a more-specific
+/// Swift-3-only `subscript` overload that continues to produce
+/// `String.UTF16View`.
+extension String.UTF16View {
+  public typealias SubSequence = Substring.UTF16View
+  
+  @available(swift, introduced: 4)
+  public subscript(r: Range<Index>) -> String.UTF16View.SubSequence {
+    return String.UTF16View.SubSequence(self, _bounds: r)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<Index>) -> String.UTF16View {
+    return String.UTF16View(
+      _core,
+      offset: _internalIndex(at: bounds.lowerBound.encodedOffset),
+      length: bounds.upperBound.encodedOffset - bounds.lowerBound.encodedOffset)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: ClosedRange<Index>) -> String.UTF16View {
+    return self[bounds.relative(to: self)]
   }
 }
