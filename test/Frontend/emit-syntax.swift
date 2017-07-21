@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -dump-serialized-syntax-tree %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-syntax %s | %FileCheck %s
 
-// CHECK: "kind": "kw_struct",
+// CHECK: "kind": "kw_struct"
 // CHECK: "kind": "identifier",
-// CHECK: "text": "Foo",
+// CHECK: "text": "Foo"
 // CHECK: "kind": "l_brace"
 struct Foo {
   // CHECK: "kind": "kw_let"

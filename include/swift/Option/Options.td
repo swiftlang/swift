@@ -554,10 +554,6 @@ def dump_parse : Flag<["-"], "dump-parse">,
 def dump_ast : Flag<["-"], "dump-ast">,
   HelpText<"Parse and type-check input file(s) and dump AST(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def dump_serialized_syntax_tree : Flag<["-"], "dump-serialized-syntax-tree">,
-  HelpText<"Parse input file(s) and dump the Syntax tree(s) as JSON">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
-         DoesNotAffectIncrementalBuild]>;
 def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
   HelpText<"Parse and type-check input file(s) and dump the scope map(s)">,
   MetaVarName<"<expanded-or-list-of-line:column>">,
