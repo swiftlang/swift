@@ -244,13 +244,13 @@ public:
 
   /// Constructor for the value \p Def with a specific set of users of Def's
   /// users.
-  ValueLifetimeAnalysis(SILValue Def, ArrayRef<SILInstruction*> UserList) :
+  ValueLifetimeAnalysis(SILInstruction *Def, ArrayRef<SILInstruction*> UserList) :
       DefValue(Def), UserSet(UserList.begin(), UserList.end()) {
     propagateLiveness();
   }
 
   /// Constructor for the value \p Def considering all the value's uses.
-  ValueLifetimeAnalysis(SILValue Def) : DefValue(Def) {
+  ValueLifetimeAnalysis(SILInstruction *Def) : DefValue(Def) {
     for (Operand *Op : Def->getUses()) {
       UserSet.insert(Op->getUser());
     }
@@ -266,22 +266,34 @@ public:
     /// a critical edges.
     AllowToModifyCFG,
     
-    /// Ignore exit edges from the lifetime region at all.
-    IgnoreExitEdges
+    /// Require that all users must commonly post-dominate the definition. In
+    /// other words: All paths from the definition to the function exit must
+    /// contain at least one use. Fail if this is not the case.
+    UsersMustPostDomDef
   };
 
   /// Computes and returns the lifetime frontier for the value in \p Fr.
+  ///
   /// Returns true if all instructions in the frontier could be found in
   /// non-critical edges.
   /// Returns false if some frontier instructions are located on critical edges.
   /// In this case, if \p mode is AllowToModifyCFG, those critical edges are
   /// split, otherwise nothing is done and the returned \p Fr is not valid.
-  bool computeFrontier(Frontier &Fr, Mode mode);
+  ///
+  /// If \p DEBlocks is provided, all dead-end blocks are ignored. This prevents
+  /// unreachable-blocks to be included in the frontier.
+  bool computeFrontier(Frontier &Fr, Mode mode,
+                       DeadEndBlocks *DEBlocks = nullptr);
 
   /// Returns true if the instruction \p Inst is located within the value's
   /// lifetime.
   /// It is assumed that \p Inst is located after the value's definition.
   bool isWithinLifetime(SILInstruction *Inst);
+
+  /// Returns true if the value is alive at the begin of block \p BB.
+  bool isAliveAtBeginOfBlock(SILBasicBlock *BB) {
+    return LiveBlocks.count(BB) && BB != DefValue->getParentBlock();
+  }
 
   /// For debug dumping.
   void dump() const;
@@ -289,7 +301,7 @@ public:
 private:
 
   /// The value.
-  SILValue DefValue;
+  SILInstruction *DefValue;
 
   /// The set of blocks where the value is live.
   llvm::SmallSetVector<SILBasicBlock *, 16> LiveBlocks;
@@ -303,11 +315,6 @@ private:
 
   /// Returns the last use of the value in the live block \p BB.
   SILInstruction *findLastUserInBlock(SILBasicBlock *BB);
-
-  /// Returns true if the value is alive at the begin of block \p BB.
-  bool isAliveAtBeginOfBlock(SILBasicBlock *BB) {
-    return LiveBlocks.count(BB) && BB != DefValue->getParentBlock();
-  }
 };
 
 /// Base class for BB cloners.
