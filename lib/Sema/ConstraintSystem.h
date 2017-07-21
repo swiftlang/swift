@@ -1074,7 +1074,8 @@ private:
         }
       }
 
-      return unsolvedDisjunctions >= 5;
+      unsigned threshold = cs->TC.getLangOpts().SolverShrinkUnsolvedThreshold;
+      return unsolvedDisjunctions >= threshold;
     }
   };
 
