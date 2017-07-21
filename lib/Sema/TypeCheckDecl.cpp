@@ -7963,17 +7963,17 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     ASTContext &C = tc.Context;
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
-    if (auto ref = tc. conformsToProtocol(superclassType, decodableProto,
-                                          superclassDecl,
-                                          ConformanceCheckOptions(),
-                                          SourceLoc())) {
+    if (auto ref = tc.conformsToProtocol(superclassType, decodableProto,
+                                         superclassDecl,
+                                         ConformanceCheckOptions(),
+                                         SourceLoc())) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
       //
       // We're going to diagnose on the concrete init(from:) decl if it exists
       // and isn't implicit; otherwise, on the subclass itself.
       ValueDecl *diagDest = classDecl;
-      auto initFrom = DeclName(C, C.Id_init, (Identifier[1]){ C.Id_from });
+      auto initFrom = DeclName(C, C.Id_init, C.Id_from);
       auto result = tc.lookupMember(superclassDecl, superclassType, initFrom,
                                     NameLookupFlags::ProtocolMembers |
                                     NameLookupFlags::IgnoreAccessibility);
@@ -8204,10 +8204,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // NOTE: Lookups of synthesized initializers MUST come after
   //       decl->setAddedImplicitInitializers() in case synthesis requires
   //       protocol conformance checking, which might be recursive here.
+  // FIXME: Disable this code and prevent _any_ implicit constructors from doing
+  //        this. Investigate why this hasn't worked otherwise.
   DeclName synthesizedInitializers[1] = {
     // init(from:) is synthesized by derived conformance to Decodable.
-    DeclName(Context, DeclBaseName(Context.Id_init),
-             (Identifier[1]) { Context.Id_from })
+    DeclName(Context, DeclBaseName(Context.Id_init), Context.Id_from)
   };
 
   auto initializerIsSynthesized = [=](ConstructorDecl *initializer) {

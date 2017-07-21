@@ -31,7 +31,10 @@ struct InitialValueNoInitializers {
 
   func foo() {
     // The struct should receive a memberwise initializer.
-    let _ = NoInitializers.init(x:)
+    let _ = InitialValueNoInitializers.init(x:)
+
+    // The struct should receive a no-argument initializer.
+    let _ = InitialValueNoInitializers.init()
   }
 }
 
@@ -40,10 +43,13 @@ struct InitialValueCodableNoExplicitInitializers : Codable {
 
   func foo() {
     // The struct should receive a synthesized init(from:) and encode(to:).
-    let _ = CodableNoExplicitInitializers.init(from:)
-    let _ = CodableNoExplicitInitializers.encode(to:)
+    let _ = InitialValueCodableNoExplicitInitializers.init(from:)
+    let _ = InitialValueCodableNoExplicitInitializers.encode(to:)
 
     // It should still receive a memberwise initializer.
-    let _ = CodableNoExplicitInitializers.init(x:)
+    let _ = InitialValueCodableNoExplicitInitializers.init(x:)
+
+    // It should still receive a no-argument initializer.
+    let _ = InitialValueCodableNoExplicitInitializers.init()
   }
 }

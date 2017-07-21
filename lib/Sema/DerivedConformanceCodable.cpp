@@ -804,12 +804,8 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
 
 /// Synthesizes the body for `init(from decoder: Decoder) throws`.
 ///
-/// \param tc The \c TypeChecker to use in looking up potential superclass
-///           Decodable conformance.
-///
 /// \param initDecl The function decl whose body to synthesize.
-static BraceStmt *deriveBodyDecodable_init(TypeChecker &tc,
-                                           AbstractFunctionDecl *initDecl) {
+static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
   // struct Foo : Codable {
   //   var x: Int
   //   var y: String
@@ -971,10 +967,7 @@ static BraceStmt *deriveBodyDecodable_init(TypeChecker &tc,
   // superclass is Decodable, or super.init() if it is not.
   if (auto *classDecl = dyn_cast<ClassDecl>(targetDecl)) {
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
-      auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (tc.conformsToProtocol(superType,
-                                C.getProtocol(KnownProtocolKind::Decodable),
-                                superclassDecl, ConformanceCheckOptions())) {
+      if (superclassIsDecodable(classDecl)) {
         // Need to generate `try super.init(from: container.superDecoder())`
 
         // container.superDecoder
@@ -1014,12 +1007,15 @@ static BraceStmt *deriveBodyDecodable_init(TypeChecker &tc,
         DeclName initName(C, C.Id_init, ArrayRef<Identifier>());
 
         // We need to look this up in the superclass to see if it throws.
-        ConstructorDecl *superInitDecl = nullptr;
         auto result = superclassDecl->lookupDirect(initName);
 
         // We should have bailed one level up if this were not available.
-        assert(!result.empty() &&
-               (superInitDecl = dyn_cast<ConstructorDecl>(result.front())));
+        assert(!result.empty());
+
+        // If the init is failable, we should have already bailed one level
+        // above.
+        ConstructorDecl *superInitDecl = cast<ConstructorDecl>(result.front());
+        assert(superInitDecl->getFailability() == OTK_None);
 
         // super
         auto *superRef = new (C) SuperRefExpr(initDecl->getImplicitSelfDecl(),
@@ -1034,10 +1030,6 @@ static BraceStmt *deriveBodyDecodable_init(TypeChecker &tc,
                                                   ArrayRef<Expr *>(),
                                                   ArrayRef<Identifier>());
 
-        // If super.init is failable, super.init()!
-        if (superInitDecl->getFailability() != OTK_None)
-          callExpr = new (C) ForceValueExpr(callExpr, SourceLoc());
-
         // If super.init throws, try super.init()
         if (superInitDecl->hasThrows())
           callExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
@@ -1048,8 +1040,9 @@ static BraceStmt *deriveBodyDecodable_init(TypeChecker &tc,
     }
   }
 
-  return BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
-                           /*implicit=*/true);
+  auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
+                                 /*implicit=*/true);
+  initDecl->setBody(body);
 }
 
 /// Synthesizes a function declaration for `init(from: Decoder) throws` with a
@@ -1114,7 +1107,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
                                            SourceLoc(), selfDecl, paramList,
                                            /*GenericParams=*/nullptr, target);
   initDecl->setImplicit();
-  initDecl->setBody(deriveBodyDecodable_init(tc, initDecl));
+  initDecl->setBodySynthesizer(deriveBodyDecodable_init);
 
   // This constructor should be marked as `required` for non-final classes.
   if (isa<ClassDecl>(target) && !target->getAttrs().hasAttribute<FinalAttr>()) {
@@ -1229,6 +1222,7 @@ static bool canSynthesize(TypeChecker &tc, NominalTypeDecl *target,
           // isn't failable.
           tc.diagnose(initializer, diag::decodable_super_init_is_failable_here,
                       requirement->getFullName(), memberName);
+          return false;
         }
       }
     }

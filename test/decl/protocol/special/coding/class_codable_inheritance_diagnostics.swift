@@ -31,6 +31,30 @@ class InaccessibleNonDecodableSuper {
 class InaccessibleNonDecodableSub : InaccessibleNonDecodableSuper, Decodable { // expected-error {{type 'InaccessibleNonDecodableSub' does not conform to protocol 'Decodable'}}
 }
 
+// Non-Decodable superclasses of synthesized Decodable classes must have a
+// non-failable init().
+class FailableNonDecodableSuper {
+  init?() {} // expected-note {{cannot automatically synthesize 'init(from:)' because implementation would need to call 'init()', which is failable}}
+}
+
+class FailableNonDecodableSub : FailableNonDecodableSuper, Decodable { // expected-error {{type 'FailableNonDecodableSub' does not conform to protocol 'Decodable'}}
+}
+
+// Subclasses of classes whose Decodable synthesis fails should not inherit
+// conformance.
+class FailedSynthesisDecodableSuper : Decodable { // expected-error {{type 'FailedSynthesisDecodableSuper' does not conform to protocol 'Decodable'}}
+  enum CodingKeys : String, CodingKey {
+    case nonexistent // expected-note {{CodingKey case 'nonexistent' does not match any stored properties}}
+  }
+}
+
+class FailedSynthesisDecodableSub : FailedSynthesisDecodableSuper { // expected-note {{did you mean 'init'?}}
+  func foo() {
+    // Decodable should fail to synthesis or be inherited.
+    let _ = FailedSynthesisDecodableSub.init(from:) // expected-error {{type 'FailedSynthesisDecodableSub' has no member 'init(from:)'}}
+  }
+}
+
 // Subclasses of Decodable classes which can't inherit their initializers should
 // produce diagnostics.
 class DecodableSuper : Decodable {
