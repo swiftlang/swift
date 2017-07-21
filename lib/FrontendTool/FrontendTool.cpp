@@ -32,6 +32,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/LegacyASTTransformer.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
@@ -56,6 +57,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Syntax/Serialization/SyntaxSerialization.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
@@ -568,6 +570,7 @@ static bool performCompile(CompilerInstance &Instance,
   // so dump or print the main source file and return.
   if (Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpAST ||
+      Action == FrontendOptions::DumpSerializedSyntaxTree ||
       Action == FrontendOptions::PrintAST ||
       Action == FrontendOptions::DumpScopeMaps ||
       Action == FrontendOptions::DumpTypeRefinementContexts ||
@@ -627,7 +630,45 @@ static bool performCompile(CompilerInstance &Instance,
       SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
     else if (Action == FrontendOptions::DumpInterfaceHash)
       SF->dumpInterfaceHash(llvm::errs());
-    else
+    else if (Action == FrontendOptions::DumpSerializedSyntaxTree) {
+      auto bufferID = SF->getBufferID();
+      assert(bufferID && "frontend should have a buffer ID "
+             "for the main source file");
+
+      // Get a full token stream with associated Trivia.
+      syntax::TokenPositionList tokens =
+        tokenizeWithTrivia(Invocation.getLangOptions(),
+                           Instance.getSourceMgr(), *bufferID);
+
+      llvm::SmallVector<Decl *, 16> topLevelDecls;
+      SF->getTopLevelDecls(topLevelDecls);
+
+      // Convert the old ASTs to the Syntax tree and print
+      // them out.
+      SyntaxASTMap ASTMap;
+      std::vector<RC<syntax::RawSyntax>> topLevelRaw;
+      for (auto *decl : topLevelDecls) {
+        if (decl->escapedFromIfConfig()) {
+          continue;
+        }
+        auto newNode = transformAST(ASTNode(decl), ASTMap,
+                                    Instance.getSourceMgr(),
+                                    *bufferID, tokens);
+        if (newNode.hasValue()) {
+          topLevelRaw.push_back(newNode->getRaw());
+        }
+      }
+
+      // Push the EOF token -- this ensures that any remaining trivia in the
+      // file is serialized as the EOF's leading trivia.
+      if (!tokens.empty() && tokens.back().first->getTokenKind() == tok::eof) {
+        topLevelRaw.push_back(tokens.back().first);
+      }
+
+      json::Output jsonOut(llvm::outs());
+      jsonOut << topLevelRaw;
+      llvm::outs() << "\n";
+    } else
       SF->dump();
     return Context.hadError();
   } else if (Action == FrontendOptions::EmitImportedModules) {
