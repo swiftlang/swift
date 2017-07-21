@@ -151,9 +151,9 @@ public struct _StringCore {
     self._baseAddress = baseAddress
 
     self._countAndFlags
-      = (UInt(extendingOrTruncating: elementShift) &<< (UInt.bitWidth - 1))
+      = (UInt(truncatingIfNeeded: elementShift) &<< (UInt.bitWidth - 1))
       | ((hasCocoaBuffer ? 1 : 0) &<< (UInt.bitWidth - 2))
-      | UInt(extendingOrTruncating: count)
+      | UInt(truncatingIfNeeded: count)
 
     self._owner = owner
     _sanityCheck(UInt(count) & _flagMask == (0 as UInt),
@@ -375,7 +375,7 @@ public struct _StringCore {
       || encoding == Unicode.UTF16.self
       || encoding == Unicode.UTF32.self {
         bytes.forEach {
-          processCodeUnit(Encoding.CodeUnit(extendingOrTruncating: $0))
+          processCodeUnit(Encoding.CodeUnit(truncatingIfNeeded: $0))
         }
       }
       else {
@@ -667,7 +667,7 @@ extension _StringCore : RangeReplaceableCollection {
       if _fastPath(elementWidth == 1) {
         var dst = rangeStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
         for u in newElements {
-          dst.pointee = UInt8(extendingOrTruncating: u)
+          dst.pointee = UInt8(truncatingIfNeeded: u)
           dst += 1
         }
       }

@@ -289,7 +289,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     by rhs: DoubleWidth
   ) -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
     let (carry, product) = multipliedFullWidth(by: rhs)
-    let result = DoubleWidth(extendingOrTruncating: product)
+    let result = DoubleWidth(truncatingIfNeeded: product)
     
     let isNegative = (self < (0 as DoubleWidth)) != (rhs < (0 as DoubleWidth))
     let didCarry = isNegative
@@ -447,7 +447,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     
     // Shift is exactly the width of `Base`, so low -> high.
     if rhs._storage.low == Base.bitWidth {
-      lhs = DoubleWidth((High(extendingOrTruncating: lhs._storage.low), 0))
+      lhs = DoubleWidth((High(truncatingIfNeeded: lhs._storage.low), 0))
       return
     }
     
@@ -472,7 +472,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     if rhs._storage.low == Base.bitWidth {
       lhs = DoubleWidth((
         lhs < (0 as DoubleWidth) ? ~0 : 0,
-        Low(extendingOrTruncating: lhs._storage.high)
+        Low(truncatingIfNeeded: lhs._storage.high)
       ))
       return
     }
@@ -485,10 +485,10 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
     lhs._storage.high <<= High(rhs._storage.low)
     if Base.bitWidth > rhs._storage.low {
-      lhs._storage.high |= High(extendingOrTruncating: lhs._storage.low >>
+      lhs._storage.high |= High(truncatingIfNeeded: lhs._storage.low >>
         (numericCast(Base.bitWidth) - rhs._storage.low))
     } else {
-      lhs._storage.high |= High(extendingOrTruncating: lhs._storage.low <<
+      lhs._storage.high |= High(truncatingIfNeeded: lhs._storage.low <<
         (rhs._storage.low - numericCast(Base.bitWidth)))
     }
     lhs._storage.low <<= rhs._storage.low
@@ -500,14 +500,14 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     lhs._storage.low >>= rhs._storage.low
     if Base.bitWidth > rhs._storage.low {
       lhs._storage.low |= Low(
-        extendingOrTruncating:
+        truncatingIfNeeded:
         lhs._storage.high << (numericCast(Base.bitWidth) - rhs._storage.low))
     } else {
       lhs._storage.low |= Low(
-        extendingOrTruncating: lhs._storage.high >>
+        truncatingIfNeeded: lhs._storage.high >>
         (rhs._storage.low - numericCast(Base.bitWidth)))
     }
-    lhs._storage.high >>= High(extendingOrTruncating: rhs._storage.low)
+    lhs._storage.high >>= High(truncatingIfNeeded: rhs._storage.low)
   }
   
 %{
@@ -578,8 +578,8 @@ binaryOperators = [
 
   @_transparent
   public var byteSwapped: DoubleWidth {
-    return DoubleWidth((High(extendingOrTruncating: low.byteSwapped),
-      Low(extendingOrTruncating: high.byteSwapped)))
+    return DoubleWidth((High(truncatingIfNeeded: low.byteSwapped),
+      Low(truncatingIfNeeded: high.byteSwapped)))
   }
 }
 

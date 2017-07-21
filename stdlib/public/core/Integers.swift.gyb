@@ -1242,7 +1242,7 @@ extension Numeric {
 /// Bit Pattern Conversion
 /// ----------------------
 ///
-/// Use the `init(extendingOrTruncating:)` initializer to create a new instance
+/// Use the `init(truncatingIfNeeded:)` initializer to create a new instance
 /// with the same bit pattern as the passed value, extending or truncating the
 /// value's representation as necessary. Note that the value may not be
 /// preserved, particularly when converting between signed to unsigned integer
@@ -1253,11 +1253,11 @@ extension Numeric {
 ///     let q: Int16 = 850
 ///     // q == 0b00000011_01010010
 ///
-///     let r = Int8(extendingOrTruncating: q)      // truncate 'q' to fit in 8 bits
+///     let r = Int8(truncatingIfNeeded: q)      // truncate 'q' to fit in 8 bits
 ///     // r == 82
 ///     //   == 0b01010010
 ///
-///     let s = Int16(extendingOrTruncating: s)     // extend 'r' to fill 16 bits
+///     let s = Int16(truncatingIfNeeded: s)     // extend 'r' to fill 16 bits
 ///     // s == 82
 ///     //   == 0b00000000_01010010
 ///
@@ -1272,15 +1272,15 @@ extension Numeric {
 ///     // t == -100
 ///     // t's binary representation == 0b10011100
 ///
-///     let u = UInt8(extendingOrTruncating: t)
+///     let u = UInt8(truncatingIfNeeded: t)
 ///     // u == 156
 ///     // u's binary representation == 0b10011100
 ///
-///     let v = Int16(extendingOrTruncating: t)
+///     let v = Int16(truncatingIfNeeded: t)
 ///     // v == -100
 ///     // v's binary representation == 0b11111111_10011100
 ///
-///     let w = UInt16(extendingOrTruncating: t)
+///     let w = UInt16(truncatingIfNeeded: t)
 ///     // w == 65436
 ///     // w's binary representation == 0b11111111_10011100
 ///
@@ -1378,7 +1378,7 @@ public protocol BinaryInteger :
   ///
   ///     let p: Int16 = -500
   ///     // 'p' has a binary representation of 11111110_00001100
-  ///     let q = Int8(extendingOrTruncating: p)
+  ///     let q = Int8(truncatingIfNeeded: p)
   ///     // q == 12
   ///     // 'q' has a binary representation of 00001100
   ///
@@ -1389,21 +1389,21 @@ public protocol BinaryInteger :
   ///
   ///     let u: Int8 = 21
   ///     // 'u' has a binary representation of 00010101
-  ///     let v = Int16(extendingOrTruncating: u)
+  ///     let v = Int16(truncatingIfNeeded: u)
   ///     // v == 21
   ///     // 'v' has a binary representation of 00000000_00010101
   ///
   ///     let w: Int8 = -21
   ///     // 'w' has a binary representation of 11101011
-  ///     let x = Int16(extendingOrTruncating: w)
+  ///     let x = Int16(truncatingIfNeeded: w)
   ///     // x == -21
   ///     // 'x' has a binary representation of 11111111_11101011
-  ///     let y = UInt16(extendingOrTruncating: w)
+  ///     let y = UInt16(truncatingIfNeeded: w)
   ///     // y == 65515
   ///     // 'y' has a binary representation of 11111111_11101011
   ///
   /// - Parameter source: An integer to convert to this type.
-  init<T : BinaryInteger>(extendingOrTruncating source: T)
+  init<T : BinaryInteger>(truncatingIfNeeded source: T)
 
   /// Creates a new instance with the representable value that's closest to the
   /// given integer.
@@ -1567,7 +1567,7 @@ ${operatorComment(x.operator, False)}
   public static func ${x.operator} <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Self {
-    return lhs ${x.operator} Self(extendingOrTruncating: rhs)
+    return lhs ${x.operator} Self(truncatingIfNeeded: rhs)
   }
 
 ${assignmentOperatorComment(x.operator, False)}
@@ -1670,16 +1670,16 @@ extension BinaryInteger {
     //    sign bit. Therefore it is safe to convert to the unsigned type.
 
     if lhs.bitWidth < rhs.bitWidth {
-      return Other(extendingOrTruncating: lhs) == rhs
+      return Other(truncatingIfNeeded: lhs) == rhs
     }
     if lhs.bitWidth > rhs.bitWidth {
-      return lhs == Self(extendingOrTruncating: rhs)
+      return lhs == Self(truncatingIfNeeded: rhs)
     }
 
     if Self.isSigned {
-      return Other(extendingOrTruncating: lhs) == rhs
+      return Other(truncatingIfNeeded: lhs) == rhs
     }
-    return lhs == Self(extendingOrTruncating: rhs)
+    return lhs == Self(truncatingIfNeeded: rhs)
   }
 
   /// Returns a Boolean value indicating whether the two given values are not
@@ -1730,14 +1730,14 @@ extension BinaryInteger {
     // values of the other type. Otherwise, lhs and rhs are positive, and one
     // of Self, Other may be signed and the other unsigned.
 
-    let rhsAsSelf = Self(extendingOrTruncating: rhs)
+    let rhsAsSelf = Self(truncatingIfNeeded: rhs)
     let rhsAsSelfNegative = rhsAsSelf < (0 as Self)
 
 
     // Can we round-trip rhs through Other?
-    if Other(extendingOrTruncating: rhsAsSelf) == rhs &&
+    if Other(truncatingIfNeeded: rhsAsSelf) == rhs &&
       // This additional check covers the `Int8.max < (128 as UInt8)` case.
-      // Since the types are of the same width, init(extendingOrTruncating:)
+      // Since the types are of the same width, init(truncatingIfNeeded:)
       // will result in a simple bitcast, so that rhsAsSelf would be -128, and
       // `lhs < rhsAsSelf` will return false.
       // We basically guard against that bitcast by requiring rhs and rhsAsSelf
@@ -1746,7 +1746,7 @@ extension BinaryInteger {
       return lhs < rhsAsSelf
     }
 
-    return Other(extendingOrTruncating: lhs) < rhs
+    return Other(truncatingIfNeeded: lhs) < rhs
   }
 
   /// Returns a Boolean value indicating whether the value of the first
@@ -1873,7 +1873,7 @@ extension BinaryInteger {
       return
     }
 %     end
-    lhs ${x.operator}= Self(extendingOrTruncating: rhs)
+    lhs ${x.operator}= Self(truncatingIfNeeded: rhs)
   }
 %   end
 }
@@ -1922,7 +1922,7 @@ public enum ArithmeticOverflow {
 ///         var binaryString: String {
 ///             var result: [String] = []
 ///             for i in 0..<(Self.bitWidth / 8) {
-///                 let byte = UInt8(extendingOrTruncating: self >> (i * 8))
+///                 let byte = UInt8(truncatingIfNeeded: self >> (i * 8))
 ///                 let byteString = String(byte, radix: 2)
 ///                 let padding = String(repeating: "0",
 ///                                      count: 8 - byteString.count)
@@ -2229,7 +2229,7 @@ ${operatorComment(x.nonMaskingOperator, True)}
     let overshiftL: Self = 0
     if _fastPath(rhs >= 0) {
       if _fastPath(rhs < Self.bitWidth) {
-        return lhs ${x.operator} Self(extendingOrTruncating: rhs)
+        return lhs ${x.operator} Self(truncatingIfNeeded: rhs)
       }
       return overshift${'LR'[isRightShift]}
     }
@@ -2252,7 +2252,7 @@ extension FixedWidthInteger {
     else if _slowPath(source > Self.max) {
       self = Self.max
     }
-    else { self = Self(extendingOrTruncating: source) }
+    else { self = Self(truncatingIfNeeded: source) }
   }
 
 % for x in binaryArithmetic['Numeric'] + binaryArithmetic["BinaryInteger"][:1]:
@@ -2291,7 +2291,7 @@ ${unsafeOperationComment(x.operator)}
 % end
 
   @inline(__always)
-  public init<T : BinaryInteger>(extendingOrTruncating source: T) {
+  public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= ${word_bits} {
       self = Self.init(_truncatingBits: source._lowWord)
     }
@@ -2359,7 +2359,7 @@ extension UnsignedInteger {
   /// A textual representation of this value.
   public var description: String {
     if self.bitWidth <= ${word_bits} {
-      return _uint64ToString(UInt64(extendingOrTruncating: self))
+      return _uint64ToString(UInt64(truncatingIfNeeded: self))
     }
     if self == (0 as Self) {
       return "0"
@@ -2379,7 +2379,7 @@ extension UnsignedInteger {
       x /= 10
       buf.append(
         Unicode.Scalar(
-          ascii0 + Int(UInt(extendingOrTruncating: r)._value))!)
+          ascii0 + Int(UInt(truncatingIfNeeded: r)._value))!)
     }
     while x != (0 as Self)
     return String(buf.reversed().lazy.map { Character($0) })
@@ -2399,7 +2399,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
       _precondition(source <= Self.max,
         "Not enough bits to represent a signed value")
     }
-    self.init(extendingOrTruncating: source)
+    self.init(truncatingIfNeeded: source)
   }
 
   @_semantics("optimize.sil.specialize.generic.partial.never")
@@ -2414,7 +2414,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
        source > Self.max {
       return nil
     }
-    self.init(extendingOrTruncating: source)
+    self.init(truncatingIfNeeded: source)
   }
 
   /// The maximum representable integer in this type.
@@ -2451,7 +2451,7 @@ extension SignedInteger {
   /// A textual representation of this value.
   public var description: String {
     if self.bitWidth <= ${word_bits} {
-      return _int64ToString(Int64(extendingOrTruncating: self))
+      return _int64ToString(Int64(truncatingIfNeeded: self))
     }
 
     let base = magnitude.description
@@ -2480,7 +2480,7 @@ extension SignedInteger where Self : FixedWidthInteger {
       _precondition(source <= Self.max,
         "Not enough bits to represent a signed value")
     }
-    self.init(extendingOrTruncating: source)
+    self.init(truncatingIfNeeded: source)
   }
 
   @_semantics("optimize.sil.specialize.generic.partial.never")
@@ -2496,7 +2496,7 @@ extension SignedInteger where Self : FixedWidthInteger {
        source > Self.max {
       return nil
     }
-    self.init(extendingOrTruncating: source)
+    self.init(truncatingIfNeeded: source)
   }
 
   /// The maximum representable integer in this type.
@@ -2989,8 +2989,8 @@ extension ${Self} : Hashable {
 % elif bits == word_bits * 2:
       // We have twice as many bits as we need to return.
       return
-        Int(extendingOrTruncating: self) ^
-        Int(extendingOrTruncating: self &>> 32)
+        Int(truncatingIfNeeded: self) ^
+        Int(truncatingIfNeeded: self &>> 32)
 % else:
       _Unimplemented()
 % end
@@ -3021,7 +3021,7 @@ extension ${Self} {
   ///
   /// - Parameter source: An integer to use as the source of the new value's
   ///   bit pattern.
-  @available(swift, obsoleted: 4.0, renamed: "init(extendingOrTruncating:)")
+  @available(swift, obsoleted: 4.0, renamed: "init(truncatingIfNeeded:)")
   @_transparent
   public init(truncatingBitPattern source: ${Src}) {
     let src = source._value

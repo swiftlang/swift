@@ -754,11 +754,11 @@ extension ${Self} : Hashable {
     %if bits <= word_bits:
       return Int(bitPattern: UInt(bitPattern))
     %elif bits == 64: # Double -> 32-bit Int
-      return Int(extendingOrTruncating: bitPattern &>> 32) ^
-             Int(extendingOrTruncating: bitPattern)
+      return Int(truncatingIfNeeded: bitPattern &>> 32) ^
+             Int(truncatingIfNeeded: bitPattern)
     %elif word_bits == 32: # Float80 -> 32-bit Int
-      return Int(extendingOrTruncating: significandBitPattern &>> 32) ^
-             Int(extendingOrTruncating: significandBitPattern) ^
+      return Int(truncatingIfNeeded: significandBitPattern &>> 32) ^
+             Int(truncatingIfNeeded: significandBitPattern) ^
              Int(_representation.signAndExponent)
     %else: # Float80 -> 64-bit Int
       return Int(bitPattern: UInt(significandBitPattern)) ^

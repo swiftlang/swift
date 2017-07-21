@@ -448,7 +448,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
   
   public mutating func next() -> Unicode.UTF8.CodeUnit? {
     if _fastPath(_buffer != 0) {
-      let r = UInt8(extendingOrTruncating: _buffer) &- 1
+      let r = UInt8(truncatingIfNeeded: _buffer) &- 1
       _buffer >>= 8
       return r
     }
@@ -488,7 +488,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
     while _sourceIndex != _source.endIndex && shift < _OutputBuffer.bitWidth {
       let u = _source[_sourceIndex]
       if u >= 0x80 { break }
-      _buffer |= _OutputBuffer(UInt8(extendingOrTruncating: u &+ 1)) &<< shift
+      _buffer |= _OutputBuffer(UInt8(truncatingIfNeeded: u &+ 1)) &<< shift
       _sourceIndex += 1
       shift = shift &+ 8
     }
@@ -516,7 +516,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
       _sourceIndex = i._position &- parser._buffer.count
     }
     guard _fastPath(_buffer != 0) else { return nil }
-    let result = UInt8(extendingOrTruncating: _buffer) &- 1
+    let result = UInt8(truncatingIfNeeded: _buffer) &- 1
     _buffer >>= 8
     return result
   }
