@@ -32,6 +32,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/LegacyASTTransformer.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
@@ -56,6 +57,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Syntax/Serialization/SyntaxSerialization.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
@@ -228,17 +230,72 @@ static bool emitLoadedModuleTrace(ASTContext &ctxt,
   return true;
 }
 
+
+/// Gets an output stream for the provided output filename, or diagnoses to the
+/// provided AST Context and returns null if there was an error getting the
+/// stream.
+static std::unique_ptr<llvm::raw_fd_ostream>
+getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
+  std::error_code errorCode;
+  auto os = llvm::make_unique<llvm::raw_fd_ostream>(
+              OutputFilename, errorCode, llvm::sys::fs::F_None);
+  if (errorCode) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                       OutputFilename, errorCode.message());
+    return nullptr;
+  }
+  return os;
+}
+
+/// Writes the Syntax tree to the given file
+static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
+                       SourceManager &SM, StringRef OutputFilename) {
+  auto bufferID = SF->getBufferID();
+  assert(bufferID && "frontend should have a buffer ID "
+         "for the main source file");
+
+  // Get a full token stream with associated Trivia.
+  syntax::TokenPositionList tokens =
+    tokenizeWithTrivia(LangOpts, SM, *bufferID);
+
+  llvm::SmallVector<Decl *, 16> topLevelDecls;
+  SF->getTopLevelDecls(topLevelDecls);
+
+  // Convert the old ASTs to the Syntax tree and print
+  // them out.
+  SyntaxASTMap ASTMap;
+  std::vector<RC<syntax::RawSyntax>> topLevelRaw;
+  for (auto *decl : topLevelDecls) {
+    if (decl->escapedFromIfConfig()) {
+      continue;
+    }
+    auto newNode = transformAST(ASTNode(decl), ASTMap, SM, *bufferID, tokens);
+    if (newNode.hasValue()) {
+      topLevelRaw.push_back(newNode->getRaw());
+    }
+  }
+
+  // Push the EOF token -- this ensures that any remaining trivia in the
+  // file is serialized as the EOF's leading trivia.
+  if (!tokens.empty() && tokens.back().first->getTokenKind() == tok::eof) {
+    topLevelRaw.push_back(tokens.back().first);
+  }
+
+  auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
+  if (!os) return true;
+
+  json::Output jsonOut(*os);
+  jsonOut << topLevelRaw;
+  *os << "\n";
+  return false;
+}
+
 /// Writes SIL out to the given file.
 static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
                      StringRef OutputFilename, bool SortSIL) {
-  std::error_code EC;
-  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
-  if (EC) {
-    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                      OutputFilename, EC.message());
-    return true;
-  }
-  SM.print(OS, EmitVerboseSIL, M, SortSIL);
+  auto OS = getFileOutputStream(OutputFilename, M->getASTContext());
+  if (!OS) return true;
+  SM.print(*OS, EmitVerboseSIL, M, SortSIL);
   return false;
 }
 
@@ -568,6 +625,7 @@ static bool performCompile(CompilerInstance &Instance,
   // so dump or print the main source file and return.
   if (Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpAST ||
+      Action == FrontendOptions::EmitSyntax ||
       Action == FrontendOptions::PrintAST ||
       Action == FrontendOptions::DumpScopeMaps ||
       Action == FrontendOptions::DumpTypeRefinementContexts ||
@@ -627,7 +685,10 @@ static bool performCompile(CompilerInstance &Instance,
       SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
     else if (Action == FrontendOptions::DumpInterfaceHash)
       SF->dumpInterfaceHash(llvm::errs());
-    else
+    else if (Action == FrontendOptions::EmitSyntax) {
+      emitSyntax(SF, Invocation.getLangOptions(), Instance.getSourceMgr(),
+                 opts.getSingleOutputFilename());
+    } else
       SF->dump();
     return Context.hadError();
   } else if (Action == FrontendOptions::EmitImportedModules) {
