@@ -499,11 +499,13 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
     lhs._storage.low >>= rhs._storage.low
     if Base.bitWidth > rhs._storage.low {
-      lhs._storage.low |= Low(extendingOrTruncating: lhs._storage.high <<
-        numericCast(numericCast(Base.bitWidth) - rhs._storage.low))
+      lhs._storage.low |= Low(
+        extendingOrTruncating:
+        lhs._storage.high << (numericCast(Base.bitWidth) - rhs._storage.low))
     } else {
-      lhs._storage.low |= Low(extendingOrTruncating: lhs._storage.high >>
-        numericCast(rhs._storage.low - numericCast(Base.bitWidth)))
+      lhs._storage.low |= Low(
+        extendingOrTruncating: lhs._storage.high >>
+        (rhs._storage.low - numericCast(Base.bitWidth)))
     }
     lhs._storage.high >>= High(extendingOrTruncating: rhs._storage.low)
   }
