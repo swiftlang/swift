@@ -209,8 +209,8 @@ sil hidden_external @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 // It should contain alloc_ref and alloc_stack instructions using opened archetypes.
 // CHECK-LABEL: sil @bar
 // CHECK: open_existential{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
-// CHECK: alloc_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
 // CHECK: alloc_stack{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK: alloc_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
 // CHECK-NOT: function_ref @use
 // CHECK: function_ref @use 
 // CHECK-NOT: function_ref
