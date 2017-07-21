@@ -142,11 +142,11 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     self.init(source)
   }
 
-  public init<T : FloatingPoint>(_ source: T) {
+  public init<T : BinaryFloatingPoint>(_ source: T) {
     fatalError("Not implemented")
   }
 
-  public init?<T : FloatingPoint>(exactly source: T) {
+  public init?<T : BinaryFloatingPoint>(exactly source: T) {
     fatalError("Not implemented")
   }
 
@@ -1197,7 +1197,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     self = value
   }
 
-  init?<T: FloatingPoint>(exactly source: T) {
+  init?<T: BinaryFloatingPoint>(exactly source: T) {
     switch source {
     case T(0): value = 0
     case T(1): value = 1
@@ -1206,7 +1206,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     }
   }
 
-  init<T: FloatingPoint>(_ source: T) {
+  init<T: BinaryFloatingPoint>(_ source: T) {
     self = Bit(exactly: source.rounded(.down))!
   }
 
