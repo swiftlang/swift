@@ -87,6 +87,7 @@ void EscapeAnalysis::ConnectionGraph::clear() {
   Nodes.clear();
   ReturnNode = nullptr;
   UsePoints.clear();
+  UsePointTable.clear();
   NodeAllocator.DestroyAll();
   assert(ToMerge.empty());
 }
@@ -547,6 +548,16 @@ bool EscapeAnalysis::ConnectionGraph::isUsePoint(ValueBase *V, CGNode *Node) {
   return Node->UsePoints.test(Idx);
 }
 
+void EscapeAnalysis::ConnectionGraph::
+getUsePoints(CGNode *Node, llvm::SmallVectorImpl<ValueBase *> &UsePoints) {
+  assert(Node->getEscapeState() < EscapeState::Global &&
+         "Use points are only valid for non-escaping nodes");
+  for (int Idx = Node->UsePoints.find_first(); Idx >= 0;
+       Idx = Node->UsePoints.find_next(Idx)) {
+    UsePoints.push_back(UsePointTable[Idx]);
+  }
+}
+
 bool EscapeAnalysis::ConnectionGraph::isReachable(CGNode *From, CGNode *To) {
   // See if we can reach the From-node by transitively visiting the
   // predecessor nodes of the To-node.
@@ -879,11 +890,6 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
   }
   sortNodes(SortedNodes);
 
-  llvm::DenseMap<int, ValueBase *> Idx2UsePoint;
-  for (auto Iter : UsePoints) {
-    Idx2UsePoint[Iter.second] = Iter.first;
-  }
-
   for (CGNode *Nd : SortedNodes) {
     OS << "  " << Nd->getTypeStr() << ' ' << NodeStr(Nd) << " Esc: ";
     switch (Nd->getEscapeState()) {
@@ -891,7 +897,7 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
         const char *Separator = "";
         for (unsigned VIdx = Nd->UsePoints.find_first(); VIdx != -1u;
              VIdx = Nd->UsePoints.find_next(VIdx)) {
-          ValueBase *V = Idx2UsePoint[VIdx];
+          ValueBase *V = UsePointTable[VIdx];
           OS << Separator << '%' << InstToIDMap[V];
           Separator = ",";
         }

@@ -159,9 +159,13 @@ bb1:
 }
 
 // CHECK-LABEL: sil @promote_in_loop_with_if
-// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
-// CHECK: {{^}}bb4({{.*}}):
-// CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
+// CHECK:        [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK:      bb2:
+// CHECK:        strong_release
+// CHECK-NEXT:   dealloc_ref [stack] [[O]] : $XX
+// CHECK:      bb3:
+// CHECK-NEXT:   strong_release
+// CHECK-NEXT:   dealloc_ref [stack] [[O]] : $XX
 // CHECK: return
 sil @promote_in_loop_with_if : $@convention(thin) () -> Int32 {
 bb0:
@@ -180,6 +184,7 @@ bb2:
   br bb4(%l2 : $Int32)
 
 bb3:
+  strong_release %n1 : $XX
   %i1 = integer_literal $Builtin.Int32, 0
   %i2 = struct $Int32 (%i1 : $Builtin.Int32)
   br bb4(%i2 : $Int32)
@@ -262,6 +267,7 @@ bb2:
 // CHECK-LABEL: sil @promote_with_use_in_loop
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: {{^}}bb2:
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
 // CHECK-NEXT: return
 sil @promote_with_use_in_loop : $@convention(thin) () -> Int32 {
@@ -272,18 +278,21 @@ bb0:
   br bb1
 
 bb1:
+  strong_retain %n1 : $XX
   %l1 = ref_element_addr %n1 : $XX, #XX.x
   %l2 = load %l1 : $*Int32
   strong_release %n1 : $XX
   cond_br undef, bb1, bb2
 
 bb2:
+  strong_release %n1 : $XX
   return %l2 : $Int32
 }
 
 // CHECK-LABEL: sil @promote_with_use_in_multi_block_backedge_loop
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: {{^}}bb4:
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
 // CHECK-NEXT: return
 sil @promote_with_use_in_multi_block_backedge_loop : $@convention(thin) () -> Int32 {
@@ -294,6 +303,7 @@ bb0:
   br bb1
 
 bb1:
+  strong_retain %n1 : $XX
   %l1 = ref_element_addr %n1 : $XX, #XX.x
   %l2 = load %l1 : $*Int32
   strong_release %n1 : $XX
@@ -306,6 +316,7 @@ bb3:
   br bb1
 
 bb4:
+  strong_release %n1 : $XX
   return %l2 : $Int32
 }
 
@@ -345,15 +356,15 @@ bb5:
   return %a1 : $Int32
 }
 
-// CHECK-LABEL: sil @promote_and_move_alloc_before_alloc_stack1
-// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK-LABEL: sil @promote_and_fix_stack_nesting1
 // CHECK: alloc_stack
 // CHECK: {{^}}bb2:
-// CHECK: dealloc_stack
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: strong_release
 // CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: dealloc_stack
 // CHECK: return
-sil @promote_and_move_alloc_before_alloc_stack1 : $@convention(thin) () -> Int32 {
+sil @promote_and_fix_stack_nesting1 : $@convention(thin) () -> Int32 {
 bb0:
   %s1 = alloc_stack $Int32
   cond_br undef, bb1, bb2
@@ -372,14 +383,15 @@ bb2:
   return %l2 : $Int32
 }
 
-// CHECK-LABEL: sil @promote_and_move_alloc_before_alloc_stack2
-// CHECK: alloc_ref [stack] $XX
-// CHECK-NEXT: alloc_stack
+// CHECK-LABEL: sil @promote_and_fix_stack_nesting2
+// CHECK: alloc_stack
+// CHECK-NEXT: alloc_ref [stack] $XX
 // CHECK: {{^}}bb3:
 // CHECK: strong_release
 // CHECK-NEXT: dealloc_ref [stack]
+// CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return
-sil @promote_and_move_alloc_before_alloc_stack2 : $@convention(thin) () -> Int32 {
+sil @promote_and_fix_stack_nesting2 : $@convention(thin) () -> Int32 {
 bb0:
   %s1 = alloc_stack $Int32
   %o1 = alloc_ref $XX
@@ -402,11 +414,15 @@ bb3:
   return %l2 : $Int32
 }
 
-// CHECK-LABEL: sil @dont_move_above_operand_1
-// CHECK: alloc_ref [tail_elems $Int32
-// CHECK-NOT: dealloc_ref
+// CHECK-LABEL: sil @promote_and_fix_stack_nesting3
+// CHECK: alloc_stack
+// CHECK: {{^}}bb2:
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] [tail_elems{{.*}}] $XX
+// CHECK: strong_release
+// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack
 // CHECK: return
-sil @dont_move_above_operand_1 : $@convention(thin) () -> Int32 {
+sil @promote_and_fix_stack_nesting3 : $@convention(thin) () -> Int32 {
 bb0:
   %s1 = alloc_stack $Int32
   %i = integer_literal $Builtin.Word, 1
@@ -426,11 +442,15 @@ bb2:
   return %l2 : $Int32
 }
 
-// CHECK-LABEL: sil @dont_move_above_operand_2
-// CHECK: alloc_ref [tail_elems $Int32
-// CHECK-NOT: dealloc_ref
+// CHECK-LABEL: sil @promote_and_fix_stack_nesting4
+// CHECK: alloc_stack
+// CHECK: {{^}}bb2:
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] [tail_elems{{.*}}] $XX
+// CHECK: strong_release
+// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack
 // CHECK: return
-sil @dont_move_above_operand_2 : $@convention(thin) () -> Int32 {
+sil @promote_and_fix_stack_nesting4 : $@convention(thin) () -> Int32 {
 bb0:
   %s1 = alloc_stack $Int32
   cond_br undef, bb1, bb2
@@ -450,11 +470,15 @@ bb2:
   return %l2 : $Int32
 }
 
-// CHECK-LABEL: sil @dont_move_above_operand_3
-// CHECK: alloc_ref [tail_elems $Int32
-// CHECK-NOT: dealloc_ref
+// CHECK-LABEL: sil @promote_and_fix_stack_nesting5
+// CHECK: alloc_stack
+// CHECK: {{^}}bb2({{.*}}):
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] [tail_elems{{.*}}] $XX
+// CHECK: strong_release
+// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack
 // CHECK: return
-sil @dont_move_above_operand_3 : $@convention(thin) (Builtin.Word) -> Int32 {
+sil @promote_and_fix_stack_nesting5 : $@convention(thin) (Builtin.Word) -> Int32 {
 bb0(%0 : $Builtin.Word):
   %s1 = alloc_stack $Int32
   cond_br undef, bb1, bb2(%0 : $Builtin.Word)

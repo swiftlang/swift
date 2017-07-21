@@ -1024,6 +1024,30 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
 }
 
 //===----------------------------------------------------------------------===//
+//                             DeadEndBlocks
+//===----------------------------------------------------------------------===//
+
+void DeadEndBlocks::compute() {
+  assert(ReachableBlocks.empty() && "Computed twice");
+
+  // First step: find blocks which end up in a no-return block (terminated by
+  // an unreachable instruction).
+  // Search for function-exiting blocks, i.e. return and throw.
+  for (SILBasicBlock &BB : *F) {
+    TermInst *TI = BB.getTerminator();
+    if (TI->isFunctionExiting())
+      ReachableBlocks.insert(&BB);
+  }
+  // Propagate the reachability up the control flow graph.
+  unsigned Idx = 0;
+  while (Idx < ReachableBlocks.size()) {
+    SILBasicBlock *BB = ReachableBlocks[Idx++];
+    for (SILBasicBlock *Pred : BB->getPredecessorBlocks())
+      ReachableBlocks.insert(Pred);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                             Value Lifetime
 //===----------------------------------------------------------------------===//
 
@@ -1032,6 +1056,7 @@ void ValueLifetimeAnalysis::propagateLiveness() {
 
   auto DefBB = DefValue->getParentBlock();
   llvm::SmallVector<SILBasicBlock *, 64> Worklist;
+  int NumUsersBeforeDef = 0;
 
   // Find the initial set of blocks where the value is live, because
   // it is used in those blocks.
@@ -1039,6 +1064,17 @@ void ValueLifetimeAnalysis::propagateLiveness() {
     SILBasicBlock *UserBlock = User->getParent();
     if (LiveBlocks.insert(UserBlock))
       Worklist.push_back(UserBlock);
+
+    // A user in the DefBB could potentially be located before the DefValue.
+    if (UserBlock == DefBB)
+      NumUsersBeforeDef++;
+  }
+  // Don't count any users in the DefBB which are actually located _after_
+  // the DefValue.
+  auto InstIter = DefValue->getIterator();
+  while (NumUsersBeforeDef > 0 && ++InstIter != DefBB->end()) {
+    if (UserSet.count(&*InstIter))
+      NumUsersBeforeDef--;
   }
 
   // Now propagate liveness backwards until we hit the block that defines the
@@ -1047,7 +1083,7 @@ void ValueLifetimeAnalysis::propagateLiveness() {
     auto *BB = Worklist.pop_back_val();
 
     // Don't go beyond the definition.
-    if (BB == DefBB)
+    if (BB == DefBB && NumUsersBeforeDef == 0)
       continue;
 
     for (SILBasicBlock *Pred : BB->getPredecessorBlocks()) {
@@ -1070,7 +1106,11 @@ SILInstruction *ValueLifetimeAnalysis:: findLastUserInBlock(SILBasicBlock *BB) {
   llvm_unreachable("Expected to find use of value in block!");
 }
 
-bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
+bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode,
+                                            DeadEndBlocks *DEBlocks) {
+  assert(!isAliveAtBeginOfBlock(DefValue->getFunction()->getEntryBlock()) &&
+         "Can't compute frontier for def which does not dominate all uses");
+
   bool NoCriticalEdges = true;
 
   // Exit-blocks from the lifetime region. The value is live at the end of
@@ -1083,12 +1123,15 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
 
   /// The lifetime ends if we have a live block and a not-live successor.
   for (SILBasicBlock *BB : LiveBlocks) {
+    if (DEBlocks && DEBlocks->isDeadEnd(BB))
+      continue;
+
     bool LiveInSucc = false;
     bool DeadInSucc = false;
     for (const SILSuccessor &Succ : BB->getSuccessors()) {
       if (isAliveAtBeginOfBlock(Succ)) {
         LiveInSucc = true;
-      } else {
+      } else if (!DEBlocks || !DEBlocks->isDeadEnd(Succ)) {
         DeadInSucc = true;
       }
     }
@@ -1105,7 +1148,10 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
       // frontier (see below).
       assert(DeadInSucc && "The final using TermInst must have successors");
     }
-    if (DeadInSucc && mode != IgnoreExitEdges) {
+    if (DeadInSucc) {
+      if (mode == UsersMustPostDomDef)
+        return false;
+
       // The value is not live in some of the successor blocks.
       LiveOutBlocks.insert(BB);
       for (const SILSuccessor &Succ : BB->getSuccessors()) {
@@ -1119,6 +1165,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
   // Handle "exit" edges from the lifetime region.
   llvm::SmallPtrSet<SILBasicBlock *, 16> UnhandledFrontierBlocks;
   for (SILBasicBlock *FrontierBB: FrontierBlocks) {
+    assert(mode != UsersMustPostDomDef);
     bool needSplit = false;
     // If the value is live only in part of the predecessor blocks we have to
     // split those predecessor edges.
@@ -1141,6 +1188,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
   // Split critical edges from the lifetime region to not yet handled frontier
   // blocks.
   for (SILBasicBlock *FrontierPred : LiveOutBlocks) {
+    assert(mode != UsersMustPostDomDef);
     auto *T = FrontierPred->getTerminator();
     // Cache the successor blocks because splitting critical edges invalidates
     // the successor list iterator of T.
@@ -1150,6 +1198,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
 
     for (unsigned i = 0, e = SuccBlocks.size(); i != e; ++i) {
       if (UnhandledFrontierBlocks.count(SuccBlocks[i])) {
+        assert(mode == AllowToModifyCFG);
         assert(isCriticalEdge(T, i) && "actually not a critical edge?");
         SILBasicBlock *NewBlock = splitEdge(T, i);
         // The single terminator instruction is part of the frontier.

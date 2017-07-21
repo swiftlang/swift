@@ -531,7 +531,8 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
 // TODO: This relies on the lowest level array.uninitialized not being
 // inlined. To do better we could either run this pass before semantic inlining,
 // or we could also handle calls to array.init.
-static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
+static bool removeAndReleaseArray(SILInstruction *NewArrayValue,
+                                  DeadEndBlocks &DEBlocks) {
   TupleExtractInst *ArrayDef = nullptr;
   TupleExtractInst *StorageAddress = nullptr;
   for (auto *Op : NewArrayValue->getUses()) {
@@ -586,12 +587,15 @@ static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
       return false;
   }
   // For each store location, insert releases.
-  // This makes a strong assumption that the allocated object is released on all
-  // paths in which some object initialization occurs.
   SILSSAUpdater SSAUp;
   ValueLifetimeAnalysis::Frontier ArrayFrontier;
-  CFGChanged |= !VLA.computeFrontier(ArrayFrontier,
-                                     ValueLifetimeAnalysis::IgnoreExitEdges);
+  if (!VLA.computeFrontier(ArrayFrontier,
+                           ValueLifetimeAnalysis::UsersMustPostDomDef,
+                           &DEBlocks)) {
+    // In theory the allocated object must be released on all paths in which
+    // some object initialization occurs. If not (for some reason) we bail.
+    return false;
+  }
 
   DeadStorage.visitStoreLocations([&] (ArrayRef<StoreInst*> Stores) {
       insertReleases(Stores, ArrayFrontier, SSAUp);
@@ -619,7 +623,6 @@ namespace {
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
   llvm::SmallVector<SILInstruction*, 16> Allocations;
-  bool CFGChanged = false;
 
   void collectAllocations(SILFunction &Fn) {
     for (auto &BB : Fn)
@@ -634,9 +637,10 @@ class DeadObjectElimination : public SILFunctionTransform {
   bool processAllocRef(AllocRefInst *ARI);
   bool processAllocStack(AllocStackInst *ASI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
-  bool processAllocApply(ApplyInst *AI);
+  bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
 
   bool processFunction(SILFunction &Fn) {
+    DeadEndBlocks DEBlocks(&Fn);
     Allocations.clear();
     DestructorAnalysisCache.clear();
     bool Changed = false;
@@ -649,17 +653,14 @@ class DeadObjectElimination : public SILFunctionTransform {
       else if (auto *A = dyn_cast<AllocBoxInst>(II))
         Changed |= processAllocBox(A);
       else if (auto *A = dyn_cast<ApplyInst>(II))
-        Changed |= processAllocApply(A);
+        Changed |= processAllocApply(A, DEBlocks);
     }
     return Changed;
   }
 
   void run() override {
-    CFGChanged = false;
     if (processFunction(*getFunction())) {
-      invalidateAnalysis(CFGChanged ?
-                         SILAnalysis::InvalidationKind::FunctionBody :
-                         SILAnalysis::InvalidationKind::CallsAndInstructions);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
 
@@ -730,7 +731,8 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   return true;
 }
 
-bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
+bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
+                                              DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
   if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
     return false;
@@ -746,7 +748,7 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
       return false;
   }
 
-  if (!removeAndReleaseArray(AI, CFGChanged))
+  if (!removeAndReleaseArray(AI, DEBlocks))
     return false;
 
   DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
