@@ -2660,13 +2660,16 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   printAttributes(decl);
   printAccessibility(decl);
 
-  if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
-       decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
-      !decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
-    Printer.printKeyword("convenience");
-    Printer << " ";
-  } else if (decl->getInitKind() == CtorInitializerKind::Factory) {
+  auto container = decl->getDeclContext();
+  if (container && container->getAsClassOrClassExtensionContext()) {
+    if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
+          decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
+        !decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
+      Printer.printKeyword("convenience");
+      Printer << " ";
+    } else if (decl->getInitKind() == CtorInitializerKind::Factory) {
       Printer << "/*not inherited*/ ";
+    }
   }
 
   printContextIfNeeded(decl);
