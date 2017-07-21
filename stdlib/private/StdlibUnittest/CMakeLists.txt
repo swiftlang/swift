@@ -8,7 +8,8 @@ if(SWIFT_SERIALIZE_STDLIB_UNITTEST)
   list(APPEND swift_stdlib_unittest_compile_flags "-Xfrontend" "-sil-serialize-all")
 endif()
 
-if("${SWIFT_STDLIB_BUILD_TYPE}" STREQUAL "DebugAssert")
+is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" IS_BUILD_TYPE_OPTIMIZED)
+if (NOT IS_BUILD_TYPE_OPTIMIZED)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_STDLIB_DEBUG")
 endif()
 
