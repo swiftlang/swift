@@ -78,7 +78,7 @@ set swift_source_dir=path-to-directory-containing-all-cloned-repositories
 ```
 
 ### 5. Build CMark
-- This must be done from within a developer command prompt, and could take up to 10 minutes.
+- This must be done from within a developer command prompt.
 ```
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
@@ -88,9 +88,9 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/"
 ```
 
 ### 6. Build LLVM/Clang/Compiler-RT
-- This must be done from within a developer command prompt, and could take up to 5 hours.
+- This must be done from within a developer command prompt.
 ```
-mklink /J "%swift_source_dir%/llvm/tools/clang" "%swift_source_dir%my-swift/clang"
+mklink /J "%swift_source_dir%/llvm/tools/clang" "%swift_source_dir%/clang"
 mklink /J "%swift_source_dir%/llvm/tools/compiler-rt" "%swift_source_dir%/compiler-rt"
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
@@ -110,6 +110,7 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 ### 7. Build Swift
 - This must be done from within a developer command prompt, and could take up to 2 hours.
 - You may need to adjust the SWIFT_WINDOWS_LIB_DIRECTORY parameter depending on your target platform or Windows SDK version.
+- Using clang-cl is recommended (see instructions below).
 ```
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
@@ -145,12 +146,13 @@ cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
 
 ## Clang-cl
 
-Follow the instructions for MSVC, but add the following lines to each CMake configuration command. We need to use LLVM's `lld-link.exe` linker, as MSVC's `link.exe` crashes due to corrupt PDB files using `clang-cl`. `Clang-cl` 3.9.0 has been tested. You can remove the `SWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE` definition, as overlays are supported with `clang-cl`, as it supports modules. 
+Follow the instructions for MSVC, but add the following lines to each CMake configuration command. `Clang-cl` 4.0.1 has been tested. You can remove the `SWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE` definition, as overlays are supported with `clang-cl`, as it supports modules. The `Z7` flag is required to produce PDB files that MSVC's `link.exe` can read, and also enables proper stack traces.
 
 ```
  -DCMAKE_C_COMPILER="<path-to-llvm-bin>/clang-cl.exe"^
  -DCMAKE_CXX_COMPILER="<path-to-llvm-bin>/bin/clang-cl.exe"^
- -DCMAKE_LINKER="<path-to-llvm-bin>/lld-link.exe"^
+ -DCMAKE_C_FLAGS="-fms-compatibility-version=19.00 /Z7"^
+ -DCMAKE_CXX_FLAGS="-fms-compatibility-version=19.00 -Z7" ^
 ```
 
 ## Windows Subsystem for Linux (WSL)
