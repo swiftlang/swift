@@ -42,7 +42,11 @@ extension String : StringProtocol, RangeReplaceableCollection {
     self._core = CharacterView(other)._core
   }
   
-  // This initializer satisfies the LosslessStringConvertible conformance
+  // The defaulted argument prevents this initializer from satisfies the
+  // LosslessStringConvertible conformance.  You can satisfy a protocol 
+  // requirement with something that's not yet available, but not with
+  // something that has become unavailable. Without this, the code won't
+  // compile as Swift 4.
   @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
   public init?(_ other: String, obsoletedInSwift4: () = ()) {
     self.init(other._core)
