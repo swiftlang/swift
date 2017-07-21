@@ -8,7 +8,7 @@ class NoInitializers { // expected-error {{class 'NoInitializers' has no initial
 
   func foo() {
     // The class should not receive a default constructor.
-    let _ = NoInitializers.init // expected-error {{type 'NoInitializers' has no member 'init'}}
+    let _ = NoInitializers.init() // expected-error {{type 'NoInitializers' has no member 'init'}}
   }
 }
 
@@ -23,7 +23,7 @@ class CodableNoExplicitInitializers : Codable {
     let _ = CodableNoExplicitInitializers.encode(to:)
 
     // It should not, however, receive a default constructor.
-    let _ = CodableNoExplicitInitializers.init
+    let _ = CodableNoExplicitInitializers.init() // expected-error {{missing argument for parameter 'from' in call}}
   }
 }
 
@@ -32,7 +32,7 @@ class DefaultConstructed {
   var x: Double = .pi
 
   func foo() {
-    let _ = DefaultConstructed.init
+    let _ = DefaultConstructed.init()
   }
 }
 
