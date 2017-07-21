@@ -35,6 +35,8 @@ using namespace Lowering;
 
 SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
                                            SILConstantInfo constantInfo) {
+  assert(constant.kind != SILDeclRef::Kind::Allocator &&
+         "allocating entry point for constructor is never dynamic");
   // Mangle the constant with a _TTD header.
   auto name = constant.mangle(SILDeclRef::ManglingKind::DynamicThunk);
 

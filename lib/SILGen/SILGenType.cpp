@@ -45,7 +45,8 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // If the member is dynamic, reference its dynamic dispatch thunk so that
   // it will be redispatched, funneling the method call through the runtime
   // hook point.
-  if (derived.getDecl()->isDynamic()) {
+  if (derived.getDecl()->isDynamic()
+      && derived.kind != SILDeclRef::Kind::Allocator) {
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived));
     implLinkage = SILLinkage::Public;
   } else {
