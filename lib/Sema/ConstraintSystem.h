@@ -3087,9 +3087,8 @@ public:
     }
 
     for (auto TL : TypeLocs) {
-      if (TL->getTypeRepr() && TL->getType() &&
-          TL->getType()->hasTypeVariable())
-        TL->setType(Type(), false);
+      if (TL->getType() && TL->getType()->hasTypeVariable())
+        TL->setType(Type(), /*was validated*/false);
     }
 
     for (auto P : Patterns) {
