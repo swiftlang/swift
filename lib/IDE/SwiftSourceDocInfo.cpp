@@ -561,7 +561,7 @@ private:
                  unsigned StartIdx, unsigned EndIdx) :
     File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr),
     AllTokens(AllTokens),
-    TokensInRange(llvm::makeArrayRef(AllTokens.data() + StartIdx,
+    TokensInRange(llvm::makeArrayRef(this->AllTokens.data() + StartIdx,
                                      EndIdx - StartIdx + 1)),
     StartTok(TokensInRange.front()), EndTok(TokensInRange.back()),
     Start(StartTok.getLoc()), End(EndTok.getLoc()) {
