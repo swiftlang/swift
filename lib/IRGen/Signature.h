@@ -93,7 +93,7 @@ public:
     Type = type;
   }
 
-  llvm::AttributeSet &getMutableAttributes() & {
+  llvm::AttributeList &getMutableAttributes() & {
     assert(isValid());
     return Attributes;
   }
