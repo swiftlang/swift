@@ -623,6 +623,11 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
   if (auto *BOE = dyn_cast<BindOptionalExpr>(expr))
     return resolveImmutableBase(BOE->getSubExpr(), CS);
   
+  // Look through implicit conversions
+  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(expr))
+    if (!isa<LoadExpr>(ICE->getSubExpr()))
+      return resolveImmutableBase(ICE->getSubExpr(), CS);
+
   return { expr, nullptr };
 }
 
