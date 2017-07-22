@@ -442,10 +442,10 @@ extension String.UnicodeScalarView {
   // NOTE: Don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
-    if !_isOnUnicodeScalarBoundary(i) { return false }
     if i == startIndex || i == endIndex {
       return true
     }
+    if !_isOnUnicodeScalarBoundary(i) { return false }
     let precedingScalar = self[index(before: i)]
 
     let graphemeClusterBreakProperty =

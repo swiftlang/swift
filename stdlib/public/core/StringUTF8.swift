@@ -134,7 +134,8 @@ extension String {
     ///
     /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
     public var endIndex: Index {
-    var r = Index(encodedOffset: _core.endIndex)
+      var r = Index(encodedOffset: _core.endIndex)
+      _sanityCheck(_legacyOffsets.end <= 0 && _legacyOffsets.end >= -3)
       switch _legacyOffsets.end {
       case 0: return r
       case -3: r = index(before: r); fallthrough
@@ -372,29 +373,6 @@ extension String {
   ///
   /// If `utf8` is an ill-formed UTF-8 code sequence, the result is `nil`.
   ///
-  /// You can use this initializer to create a new string from
-  /// another string's `utf8` view.
-  ///
-  ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.utf8.index(of: 32) {
-  ///         let adjective = String(picnicGuest.utf8[..<i])
-  ///         print(adjective)
-  ///     }
-  ///     // Prints "Deserving"
-  ///
-  /// The `adjective` constant is created by calling this initializer with a
-  /// slice of the `picnicGuest.utf8` view.
-  ///
-  /// - Parameter utf8: A UTF-8 code sequence.
-  public init(_ utf8: UTF8View) {
-    self = String(utf8._core)
-  }
-
-  /*
-  /// Creates a string corresponding to the given sequence of UTF-8 code units.
-  ///
-  /// If `utf8` is an ill-formed UTF-8 code sequence, the result is `nil`.
-  ///
   /// You can use this initializer to create a new string from a slice of
   /// another string's `utf8` view.
   ///
@@ -410,16 +388,38 @@ extension String {
   ///
   /// - Parameter utf8: A UTF-8 code sequence.
   @available(swift, deprecated: 3.2, obsoleted: 4.0)
-  public init?(_ utf8: UTF8View.SubSequence) {
-    let wholeString = utf8._wholeString
-    if let start = utf8.startIndex.samePosition(in: wholeString),
-       let end = utf8.endIndex.samePosition(in: wholeString) {
-      self = String(wholeString[start..<end])
-      return
+  public init?(_ utf8: UTF8View) {
+    if utf8.startIndex._transcodedOffset != 0
+    || utf8.endIndex._transcodedOffset != 0 {
+      return nil
     }
-    return nil
+    // Attempt to recover the whole string, the better to implement the actual
+    // Swift 3.1 semantics, which are not as documented above!  Full Swift 3.1
+    // semantics may be impossible to preserve in the case of string literals,
+    // since we no longer have access to the length of the original string when
+    // there is no owner and elements have been dropped from the end.
+    if let nativeBuffer = utf8._core.nativeBuffer {
+      let wholeString = String(_StringCore(nativeBuffer))
+      let offset = (utf8._core._baseAddress! - nativeBuffer.start)
+        &>> utf8._core.elementShift
+      
+      if Index(
+        encodedOffset: utf8.startIndex.encodedOffset + offset
+      ).samePosition(in: wholeString) == nil
+      || Index(
+        encodedOffset: utf8.endIndex.encodedOffset + offset
+      ).samePosition(in: wholeString) == nil {
+        return nil
+      }
+    }
+    self = String(utf8._core)
   }
-  */
+
+  /// Creates a string corresponding to the given sequence of UTF-8 code units.
+  @available(swift, introduced: 4.0)
+  public init(_ utf8: UTF8View) {
+    self = String(utf8._core)
+  }
   
   /// The index type for subscripting a string's `utf8` view.
   public typealias UTF8Index = UTF8View.Index

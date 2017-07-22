@@ -158,10 +158,10 @@ SubstringTests.test("UTF16View") {
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
   
-  expectEqual("", String(t.dropFirst(10))!)
-  expectEqual("", String(t.dropLast(10))!)
-  expectEqual("", String(u.dropFirst(10))!)
-  expectEqual("", String(u.dropLast(10))!)
+  expectEqual("", String(t.dropFirst(10)))
+  expectEqual("", String(t.dropLast(10)))
+  expectEqual("", String(u.dropFirst(10)))
+  expectEqual("", String(u.dropLast(10)))
 }
 
 SubstringTests.test("UTF8View") {
@@ -176,10 +176,10 @@ SubstringTests.test("UTF8View") {
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
 
-  expectEqual("", String(t.dropFirst(10))!)
-  expectEqual("", String(t.dropLast(10))!)
-  expectEqual("", String(u.dropFirst(10))!)
-  expectEqual("", String(u.dropLast(10))!)
+  expectEqual("", String(t.dropFirst(10)))
+  expectEqual("", String(t.dropLast(10)))
+  expectEqual("", String(u.dropFirst(10)))
+  expectEqual("", String(u.dropLast(10)))
 }
 
 runAllTests()

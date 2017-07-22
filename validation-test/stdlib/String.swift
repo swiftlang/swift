@@ -59,7 +59,7 @@ StringTests.test("AssociatedTypes-UTF8View") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: View.Iterator.self,
-    subSequenceType: BidirectionalSlice<View>.self,
+    subSequenceType: Substring.UTF8View.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)
@@ -70,7 +70,7 @@ StringTests.test("AssociatedTypes-UTF16View") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
+    subSequenceType: Substring.UTF16View.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: View.Indices.self)
@@ -81,7 +81,7 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: View.Iterator.self,
-    subSequenceType: View.self,
+    subSequenceType: Substring.UnicodeScalarView.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)

@@ -379,12 +379,14 @@ extension Substring.${View} : BidirectionalCollection {
   public typealias Index = String.Index
   public typealias SubSequence = Substring.${View}
 
+  /// Creates an instance that slices `base` at `_bounds`.
   internal init(_ base: String.${View}, _bounds: Range<Index>) {
     _slice = ${RangeReplaceable}BidirectionalSlice(
       base: String(base._core).${property},
       bounds: _bounds)
   }
 
+  /// The entire String onto whose slice this view is a projection.
   internal var _wholeString: String {
     return String(_slice._base._core)
   }
@@ -411,9 +413,51 @@ extension Substring {
       return ${View}(_wholeString.${property}, _bounds: startIndex..<endIndex)
     }
     set {
-      self = _wholeString[newValue.startIndex..<newValue.endIndex]
+      self = Substring(newValue)
     }
   }
+
+  /// Creates a Substring having the given content.
+  ///
+  /// - Complexity: O(1)
+  public init(_ content: ${View}) {
+    self = content._wholeString[content.startIndex..<content.endIndex]
+  }
+}
+
+extension String {
+  /// Creates a String having the given content.
+  ///
+  /// - Complexity: O(N), where N is the length of the resulting `String`'s
+  ///   UTF-16.
+  % if property in ('utf8', 'utf16'):
+  // Avoid colliding with the legacy failable init below, which will otherwise
+  // be counted as a redeclaration.
+  @available(swift, introduced: 4.0) 
+  % end
+  public init(_ content: Substring.${View}) {
+    self = String(Substring(content))
+  }
+
+  /// Creates a String having the given content.
+  ///
+  /// If `${property}` is an ill-formed code sequence, the result is `nil`.
+  ///
+  /// - Complexity: O(N), where N is the length of the resulting `String`'s
+  ///   UTF-16.
+  % if property in ('utf8', 'utf16'):
+  // Avoid colliding with a legacy failable init, which will otherwise be
+  // counted as a redeclaration.
+  @available(swift, obsoleted: 4.0, renamed: "init(_:)") 
+  public init?(_ ${property}: Substring.${View}) {
+    let wholeString = ${property}._wholeString
+    guard
+      ${property}.startIndex.samePosition(in: wholeString) != nil
+      && ${property}.endIndex.samePosition(in: wholeString) != nil
+    else { return nil }
+    self = String(Substring(${property}))
+  }
+  % end
 }
 % end
 
