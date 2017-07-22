@@ -1355,7 +1355,7 @@ static void resolveRange(SwiftLangSupport &Lang,
       ASTInvok->applyTo(CompInvok);
       RangeInfo Result;
       Result.RangeKind = Lang.getUIDForRangeKind(Info.Kind);
-      Result.RangeContent = Info.getContent().str();
+      Result.RangeContent = Info.ContentRange.str();
       switch (Info.Kind) {
       case RangeKind::SingleExpression: {
         SmallString<64> SS;

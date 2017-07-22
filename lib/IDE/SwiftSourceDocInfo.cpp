@@ -242,7 +242,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   }
   OS << "</Kind>\n";
 
-  OS << "<Content>" << getContent().str() << "</Content>\n";
+  OS << "<Content>" << ContentRange.str() << "</Content>\n";
 
   if (auto Ty = getType()) {
     OS << "<Type>";
@@ -311,11 +311,12 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   OS << "<end>\n";
 }
 
-CharSourceRange ResolvedRangeInfo::getContent() {
-  if (TokensInRange.empty())
+CharSourceRange ResolvedRangeInfo::
+calculateContentRange(ArrayRef<Token> Tokens) {
+  if (Tokens.empty())
     return CharSourceRange();
-  auto StartTok = TokensInRange.front();
-  auto EndTok = TokensInRange.back();
+  auto StartTok = Tokens.front();
+  auto EndTok = Tokens.back();
   auto StartLoc = StartTok.hasComment() ?
     StartTok.getCommentStart() : StartTok.getLoc();
   auto EndLoc = EndTok.getRange().getEnd();
@@ -420,8 +421,8 @@ private:
     }
   };
 
-  std::vector<Token> AllTokens;
-  ArrayRef<Token> TokensInRange;
+
+  std::vector<Token> TokensInRange;
   const Token &StartTok;
   const Token &EndTok;
   SourceLoc Start;
@@ -559,14 +560,13 @@ private:
     return static_cast<DeclContext*>(&File);
   }
 
-  Implementation(SourceFile &File, std::vector<Token> AllTokens,
-                 unsigned StartIdx, unsigned EndIdx) :
+  Implementation(SourceFile &File, ArrayRef<Token> TokensInRange) :
     File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr),
-    AllTokens(AllTokens),
-    TokensInRange(llvm::makeArrayRef(this->AllTokens.data() + StartIdx,
-                                     EndIdx - StartIdx + 1)),
-    StartTok(TokensInRange.front()), EndTok(TokensInRange.back()),
-    Start(StartTok.getLoc()), End(EndTok.getLoc()) {
+    TokensInRange(TokensInRange),
+    StartTok(TokensInRange.front()),
+    EndTok(TokensInRange.back()),
+    Start(StartTok.getLoc()),
+    End(EndTok.getLoc()) {
       assert(Start.isValid() && End.isValid());
   }
 
@@ -641,10 +641,8 @@ public:
     // The start token is inclusive.
     unsigned StartIdx = StartIt - AllTokens.begin();
 
-    // The end token is exclusive.
-    unsigned EndIdx = EndIt - 1 - AllTokens.begin();
     return std::unique_ptr<Implementation>(new Implementation(File,
-      std::move(AllTokens), StartIdx, EndIdx));
+      llvm::makeArrayRef(AllTokens.data() + StartIdx, EndIt - StartIt)));
   }
 
   static std::unique_ptr<Implementation>
