@@ -440,6 +440,12 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/utime.h"
       export *
     }
+% if CMAKE_SDK in ["LINUX"]:
+    module xattr {
+        header "${GLIBC_INCLUDE_PATH}/sys/xattr.h"
+        export *
+    }
+% end
   }
 }
 
