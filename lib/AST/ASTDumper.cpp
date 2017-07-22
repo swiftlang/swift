@@ -2126,12 +2126,14 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitInOutToPointerExpr(InOutToPointerExpr *E) {
-    printCommon(E, "inout_to_pointer") << '\n';
+    printCommon(E, "inout_to_pointer")
+      << (E->isNonAccessing() ? " nonaccessing" : "") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitArrayToPointerExpr(ArrayToPointerExpr *E) {
-    printCommon(E, "array_to_pointer") << '\n';
+    printCommon(E, "array_to_pointer")
+      << (E->isNonAccessing() ? " nonaccessing" : "") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
