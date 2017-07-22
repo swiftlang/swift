@@ -1110,3 +1110,13 @@ typedef enum __attribute__((ns_error_domain(NSLaundryErrorDomain))) __attribute_
     NSLaundryErrorTooMuchSoap = 1,
     NSLaundryErrorCatInWasher = 2
 };
+
+@interface NSObject ()
+- (void) addObserver: (id) observer
+         forKeyPath: (NSString*) keyPath
+         options: (NSInteger) options
+         context: (void*) context;
+- (void) removeObserver: (id) observer
+         forKeyPath: (NSString*) keyPath
+         context: (void*) options;
+@end

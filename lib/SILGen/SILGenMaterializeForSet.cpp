@@ -467,7 +467,8 @@ public:
       WitnessStorage->getAccessStrategy(TheAccessSemantics, accessKind);
 
     // Drill down to the member storage.
-    lv.addMemberComponent(gen, loc, WitnessStorage, WitnessSubs, IsSuper,
+    lv.addMemberComponent(gen, loc, WitnessStorage, WitnessSubs,
+                          LValueOptions(), IsSuper,
                           accessKind, TheAccessSemantics, strategy,
                           SubstStorageType, std::move(indices));
 

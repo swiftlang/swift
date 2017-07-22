@@ -100,6 +100,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
   LValue lvalue =
     gen.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
                            bridgedErrorPtrType, pointeeProperty,
+                           LValueOptions(),
                            AccessKind::Write,
                            AccessSemantics::Ordinary);
   RValue rvalue(gen, loc, bridgedErrorProto,
