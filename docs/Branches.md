@@ -37,9 +37,9 @@ Note that these branches come not from the "development" branches (above), but t
 
 `upstream-with-swift` is a branch for LLVM that includes all changes necessary to support Swift. Changes from llvm.org's master branch are automatically merged in. Why isn't this just `stable`? Well, because LLVM changes *very* rapidly, and that wouldn't be very stable. However, we do want to make sure the Swift stuff keeps working.
 
-If you are making changes to LLVM to support Swift, you'll probably need to work on them in `stable` to test them against Swift itself, but they should be committed to `upstream-with-swift`, and possibly cherry-picked to the current release branch (`swift-x.y-branch`) if needed.
+If you are making changes to LLVM to support Swift, you'll probably need to work on them in `stable` to test them against Swift itself, but they should be committed to `upstream-with-swift`, and cherry-picked to the current release branch (`swift-x.y-branch`) if needed. Remember, the release branches are automerged into `stable` on a regular basis.
 
-(If you're making changes to LLVM or LLDB that *aren't* about Swift, they should generally be made on llvm.org instead.)
+(If you're making changes to LLVM or LLDB that *aren't* about Swift, they should generally be made on llvm.org instead, then cherry-picked to the active release branch or `stable`.)
 
 `master-next` is an effort to keep Swift building with the latest LLVM changes. Ideally when LLVM changes, no Swift updates are needed, but that isn't always the case. In these situations, any adjustments can go into Swift's `master-next` branch. Changes from Swift's `master` are automatically merged into `master-next` as well.
 
