@@ -3194,7 +3194,8 @@ getWitnessDispatchKind(Type selfType, SILDeclRef witness, bool isFree) {
   auto *decl = witness.getDecl();
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (decl->isDynamic())
+  if (decl->isDynamic()
+      && witness.kind != SILDeclRef::Kind::Allocator)
     return WitnessDispatchKind::Dynamic;
 
   bool isFinal = (decl->isFinal() || C->isFinal());
