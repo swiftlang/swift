@@ -272,6 +272,7 @@ struct ResolvedRangeInfo {
   RangeKind Kind;
   ReturnInfo ExitInfo;
   ArrayRef<Token> TokensInRange;
+  CharSourceRange ContentRange;
   bool HasSingleEntry;
   bool ThrowingUnhandledError;
   OrphanKind Orphan;
@@ -293,6 +294,7 @@ struct ResolvedRangeInfo {
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
                       ExitInfo(ExitInfo),
                       TokensInRange(TokensInRange),
+                      ContentRange(calculateContentRange(TokensInRange)),
                       HasSingleEntry(HasSingleEntry),
                       ThrowingUnhandledError(ThrowingUnhandledError),
                       Orphan(Orphan), ContainedNodes(ContainedNodes),
@@ -308,7 +310,9 @@ struct ResolvedRangeInfo {
   void print(llvm::raw_ostream &OS);
   ExitState exit() const { return ExitInfo.Exit; }
   Type getType() const { return ExitInfo.ReturnType; }
-  CharSourceRange getContent();
+
+private:
+  static CharSourceRange calculateContentRange(ArrayRef<Token> Tokens);
 };
 
 class RangeResolver : public SourceEntityWalker {
