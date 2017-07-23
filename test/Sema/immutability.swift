@@ -596,8 +596,7 @@ func sr4214() {
     return f(x)
   }
 
-  // expected-error@+1 {{expression type '(inout MutableSubscripts) -> ()' is ambiguous without more context}}
-  let closure = { val in val.x = 7 } as (inout MutableSubscripts) -> ()
+  let closure = { val in val.x = 7 } as (inout MutableSubscripts) -> () // Ok
   var v = MutableSubscripts()
   closure(&v)
   // FIXME: This diagnostic isn't really all that much better

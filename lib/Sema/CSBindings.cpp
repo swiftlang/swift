@@ -25,6 +25,32 @@ ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   TypeVariableType *bestTypeVar = nullptr;
   PotentialBindings bestBindings;
+
+  // For purposes of best binding identification
+  // right-hand of `parameter binding` constraint
+  // is equivalent to the left-hand side, which
+  // represents declaration of the parameter and
+  // should drive the search.
+
+  SolverScope scope(*this);
+
+  for (auto &constraint : getConstraints()) {
+    if (constraint.getKind() != ConstraintKind::BindParam)
+      continue;
+
+    auto *lhs = constraint.getFirstType()->getAs<TypeVariableType>();
+    auto *rhs = constraint.getSecondType()->getAs<TypeVariableType>();
+
+    if (!(lhs && rhs))
+      continue;
+
+    auto rep1 = getRepresentative(lhs);
+    auto rep2 = getRepresentative(rhs);
+
+    if (rep1 != rep2)
+      mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/false);
+  }
+
   for (auto typeVar : getTypeVariables()) {
     // Skip any type variables that are bound.
     if (typeVar->getImpl().hasRepresentativeOrFixed())
