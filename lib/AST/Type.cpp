@@ -1296,10 +1296,7 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
                      ? InOutType::get(baseType)
                      : baseType),
     parameterFlags(flags) {
-  if (flags.isInOut())
-    assert(!baseType->is<InOutType>() && "caller did not pass a base type");
-  if (baseType->is<InOutType>())
-    assert(flags.isInOut() && "caller did not set flags correctly");
+  assert(!baseType->is<InOutType>() && "caller did not pass a base type");
 }
 
 
