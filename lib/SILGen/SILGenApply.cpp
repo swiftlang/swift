@@ -2978,7 +2978,10 @@ private:
   bool emitDelayedConversion(InOutToPointerExpr *pointerExpr,
                              OriginalArgument original) {
     auto info = SGF.getPointerAccessInfo(pointerExpr->getType());
-    LValue lv = SGF.emitLValue(pointerExpr->getSubExpr(), info.AccessKind);
+    LValueOptions options;
+    options.IsNonAccessing = pointerExpr->isNonAccessing();
+    LValue lv = SGF.emitLValue(pointerExpr->getSubExpr(), info.AccessKind,
+                               options);
     DelayedArguments.emplace_back(info, std::move(lv), pointerExpr, original);
     Args.push_back(ManagedValue());
     return true;
@@ -2993,7 +2996,9 @@ private:
     if (arrayExpr->isSemanticallyInOutExpr()) {
       auto info = SGF.getArrayAccessInfo(pointerExpr->getType(),
                                          arrayExpr->getType()->getInOutObjectType());
-      LValue lv = SGF.emitLValue(arrayExpr, info.AccessKind);
+      LValueOptions options;
+      options.IsNonAccessing = pointerExpr->isNonAccessing();
+      LValue lv = SGF.emitLValue(arrayExpr, info.AccessKind, options);
       DelayedArguments.emplace_back(info, std::move(lv), pointerExpr,
                                     original);
       Args.push_back(ManagedValue());

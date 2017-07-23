@@ -1180,7 +1180,7 @@ RValue SILGenFunction::emitRValueForPropertyLoad(
   // If the base is a reference type, just handle this as loading the lvalue.
   if (baseFormalType->hasReferenceSemantics()) {
     LValue LV = emitPropertyLValue(loc, base, baseFormalType, field,
-                                   AccessKind::Read,
+                                   LValueOptions(), AccessKind::Read,
                                    AccessSemantics::DirectToStorage);
     return emitLoadOfLValue(loc, std::move(LV), C, isGuaranteedValid);
   }
@@ -2972,10 +2972,11 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
   SmallVector<Substitution, 4> subsList;
   if (subs.getGenericSignature())
     subs.getGenericSignature()->getSubstitutions(subs, subsList);
-  
-  lv.addMemberVarComponent(subSGF, loc, property, subsList, /*super*/ false,
-                           AccessKind::Write, AccessSemantics::Ordinary,
-                           strategy, propertyType);
+
+  LValueOptions lvOptions;
+  lv.addMemberVarComponent(subSGF, loc, property, subsList, lvOptions,
+                           /*super*/ false, AccessKind::Write,
+                           AccessSemantics::Ordinary, strategy, propertyType);
 
   subSGF.emitAssignToLValue(loc,
     RValue(subSGF, loc, propertyType, valueSubst),
