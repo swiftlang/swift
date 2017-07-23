@@ -448,8 +448,10 @@ extension String {
   % if property in ('utf8', 'utf16'):
   // Avoid colliding with a legacy failable init, which will otherwise be
   // counted as a redeclaration.
-  @available(swift, obsoleted: 4.0, renamed: "init(_:)") 
-  public init?(_ ${property}: Substring.${View}) {
+  @available(
+    swift, deprecated: 4.0,
+    message: "Use the non-failable version of this initializer.")
+  public init?(_ ${property}: Substring.${View}, deprecatedInSwift4: () = ()) {
     let wholeString = ${property}._wholeString
     guard
       ${property}.startIndex.samePosition(in: wholeString) != nil
