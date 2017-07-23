@@ -4,10 +4,10 @@
 
 ### 1. Setup Visual Studio Environment Variables
 Building for Windows requires that the Visual Studio environment variables are
-setup similar to the values on Windows.  The following assumes that
+setup similar to the values on Windows. The following assumes that
 `WINKIT_ROOT` points to the path where the Windows 10 SDK is available and that
 `VC_ROOT` points to the path where the Visual Studio VC headers and libraries
-are available.  Currently, the runtime has been tested to build against the
+are available. Currently, the runtime has been tested to build against the
 Windows 10 SDK at revision 10.10.586.
 
 ```
@@ -20,17 +20,17 @@ export LIB='${VC_ROOT}/lib;${WINKIT_ROOT}/Lib/10.0.10586.0/ucrt/x86;${WINKIT_ROO
 ### 2. Setup `visualc` and `ucrt` modules
 The `visualc.modulemap` located at
 `swift/stdlib/public/Platform/visualc.modulemap` needs to be copied into
-`${VC_ROOT}/include`.  The `ucrt.modulemap` located at
+`${VC_ROOT}/include`. The `ucrt.modulemap` located at
 `swift/stdlib/public/Platform/ucrt.modulemap` needs to be copied into
 `${WINKIT_ROOT}/Include/10.0.10586.0/ucrt`.
 
 ### 3. Configure the runtime to be built with the just built clang
 Ensure that we use the tools from the just built LLVM and clang tools to build
-the Windows SDK.  You will need to pass a few extra options to cmake via the
-`build-script` invocation to achieve this.  You will need to expand out the
-path where llvm-ar and llvm-ranlib are built.  These are needed to correctly
-build the static libraries.  Note that cross-compiling will require the use of
-lld.  Ensure that lld-link.exe (lld-link) is available to clang via your path.
+the Windows SDK. You will need to pass a few extra options to cmake via the
+`build-script` invocation to achieve this. You will need to expand out the
+path where llvm-ar and llvm-ranlib are built. These are needed to correctly
+build the static libraries. Note that cross-compiling will require the use of
+lld. Ensure that lld-link.exe (lld-link) is available to clang via your path.
 Additionally, the ICU headers and libraries need to be provided for the build.
 
 ```
@@ -78,7 +78,7 @@ set swift_source_dir=path-to-directory-containing-all-cloned-repositories
 ```
 
 ### 5. Build CMark
-- This must be done from within a developer command prompt.
+- This must be done from within a developer command prompt. CMark is a fairly small project, and it should only take a few minutes to build.
 ```
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
@@ -88,7 +88,8 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/"
 ```
 
 ### 6. Build LLVM/Clang/Compiler-RT
-- This must be done from within a developer command prompt.
+- This must be done from within a developer command prompt. LLVM and Clang are large projects so building might take a few hours. Make sure that the build type (e.g. Debug/Release) for LLVM/Clang matches the build type for Swift.
+- Optionally, you can omit building compiler-rt by removing all lines referring to `compiler-rt` below, which should give faster build times.
 ```
 mklink /J "%swift_source_dir%/llvm/tools/clang" "%swift_source_dir%/clang"
 mklink /J "%swift_source_dir%/llvm/tools/compiler-rt" "%swift_source_dir%/compiler-rt"
@@ -108,9 +109,9 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 ```
 
 ### 7. Build Swift
-- This must be done from within a developer command prompt, and could take up to 2 hours.
+- This must be done from within a developer command prompt, and could take up to two hours depending on your system.
 - You may need to adjust the SWIFT_WINDOWS_LIB_DIRECTORY parameter depending on your target platform or Windows SDK version.
-- Using clang-cl is recommended (see instructions below).
+- While the commands here use MSVC to build, using clang-cl is recommended (see the **Clang-cl** section below).
 ```
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
@@ -137,7 +138,7 @@ popd
 cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
 ```
 
-- To create a VisualStudio project, you'll need to change the generator and, if you have a 64 bit processor, specify the generator platform. Note that you may get multiple build errors compiling the `swift` project due to an MSBuild limitation that file paths cannot exceed 260 characters. These can be ignored, as they occur after the build, writing the last build status to a file.
+- To create a VisualStudio project, you'll need to change the generator and, if you have a 64 bit processor, specify the generator platform. Note that you may get multiple build errors compiling the `swift` project due to an MSBuild limitation that file paths cannot exceed 260 characters. These can be ignored, as they occur after the build when writing the last build status to a file.
 ```
 cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
  -DCMAKE_GENERATOR_PLATFORM="x64"^
