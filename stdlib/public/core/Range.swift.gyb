@@ -857,14 +857,14 @@ public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
 /// You create `CountablePartialRangeFrom` instances by using the postfix range
 /// operator (postfix `...`).
 ///
-///     let atLeastFive = 5.0...
+///     let atLeastFive = 5...
 ///
 /// You can use a countable partial range to quickly check if a value is
 /// contained in a particular range of values. For example:
 ///
-///     atLeastFive.contains(4.0)     // false
-///     atLeastFive.contains(5.0)     // true
-///     atLeastFive.contains(6.0)     // true
+///     atLeastFive.contains(4)     // false
+///     atLeastFive.contains(5)     // true
+///     atLeastFive.contains(6)     // true
 ///
 /// You can use a countable partial range of a collection's indices to
 /// represent the range from the partial range's lower bound up to the end of
