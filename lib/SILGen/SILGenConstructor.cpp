@@ -767,7 +767,7 @@ static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
     ->getInOutObjectType()->getCanonicalType();
   auto self = emitSelfForMemberInit(SGF, loc, selfDecl);
   return SGF.emitPropertyLValue(loc, self, selfFormalType, property,
-                                AccessKind::Write,
+                                LValueOptions(), AccessKind::Write,
                                 AccessSemantics::DirectToStorage);
 }
 

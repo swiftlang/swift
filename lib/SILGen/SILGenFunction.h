@@ -67,6 +67,28 @@ inline ApplyOptions &operator-=(ApplyOptions &lhs, ApplyOptions rhs) {
   return (lhs = (lhs - rhs));
 }
 
+struct LValueOptions {
+  bool IsNonAccessing = false;
+
+  /// Derive options for accessing the base of an l-value, given that
+  /// applying the derived component might touch the memory.
+  LValueOptions forComputedBaseLValue() const {
+    auto copy = *this;
+
+    // Assume we're going to access the base.
+    copy.IsNonAccessing = false;
+
+    return copy;
+  }
+
+  /// Derive options for accessing the base of an l-value, given that
+  /// applying the derived component will not touch the memory.
+  LValueOptions forProjectedBaseLValue() const {
+    auto copy = *this;
+    return copy;
+  }
+};
+
 class PatternMatchContext;
 
 /// A formal section of the function.  This is a SILGen-only concept,
@@ -1649,7 +1671,8 @@ public:
                                               ExistentialRepresentation repr);
 
   /// Evaluate an Expr as an lvalue.
-  LValue emitLValue(Expr *E, AccessKind accessKind);
+  LValue emitLValue(Expr *E, AccessKind accessKind,
+                    LValueOptions options = LValueOptions());
 
   /// Emit a reference to a variable as an lvalue.
   LValue emitLValueForAddressedNonMemberVarDecl(SILLocation loc, VarDecl *var,
@@ -1661,6 +1684,7 @@ public:
   /// (without going through getters or setters).
   LValue emitPropertyLValue(SILLocation loc, ManagedValue base,
                             CanType baseFormalType, VarDecl *var,
+                            LValueOptions options,
                             AccessKind accessKind, AccessSemantics semantics);
 
   struct PointerAccessInfo {
