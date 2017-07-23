@@ -2661,10 +2661,7 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
 
 ParenType *ParenType::get(const ASTContext &C, Type underlying,
                           ParameterTypeFlags fl) {
-  if (fl.isInOut())
-    assert(!underlying->is<InOutType>() && "caller did not pass a base type");
-  if (underlying->is<InOutType>())
-    assert(fl.isInOut() && "caller did not set flags correctly");
+  assert(!underlying->is<InOutType>() && "caller did not pass a base type");
   
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
@@ -2742,10 +2739,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
 TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
                            ParameterTypeFlags fl)
   : Name(name), ElementType(ty), Flags(fl) {
-  if (fl.isInOut())
-    assert(!ty->is<InOutType>() && "caller did not pass a base type");
-  if (ty->is<InOutType>())
-    assert(fl.isInOut() && "caller did not set flags correctly");
+  assert(!ty->is<InOutType>() && "caller did not pass a base type");
 }
 
 Type TupleTypeElt::getType() const {
@@ -2761,10 +2755,8 @@ AnyFunctionType::Param::Param(const TupleTypeElt &tte)
 
 AnyFunctionType::Param::Param(Type t, Identifier l, ParameterTypeFlags f)
   : Ty(t), Label(l), Flags(f) {
-  if (f.isInOut())
+  if (!t.isNull())
     assert(!t->is<InOutType>() && "caller did not pass a base type");
-  if (!t.isNull() && t->is<InOutType>())
-    assert(f.isInOut() && "caller did not set flags correctly");
 }
 
 Type AnyFunctionType::Param::getType() const {
