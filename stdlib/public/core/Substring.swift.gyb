@@ -426,38 +426,28 @@ extension Substring {
 }
 
 extension String {
+  % if property in ('utf8', 'utf16'):
+  /// Creates a String having the given content.
+  ///
+  /// If `codeUnits` is an ill-formed code unit sequence, the result is `nil`.
+  ///
+  /// - Complexity: O(N), where N is the length of the resulting `String`'s
+  ///   UTF-16.
+  public init?(_ codeUnits: Substring.${View}) {
+    let wholeString = codeUnits._wholeString
+    guard
+      codeUnits.startIndex.samePosition(in: wholeString.unicodeScalars) != nil
+      && codeUnits.endIndex.samePosition(in: wholeString.unicodeScalars) != nil
+    else { return nil }
+    self = String(Substring(codeUnits))
+  }
+  % else:
   /// Creates a String having the given content.
   ///
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
-  % if property in ('utf8', 'utf16'):
-  // Avoid colliding with the legacy failable init below, which will otherwise
-  // be counted as a redeclaration.
-  @available(swift, introduced: 4.0) 
-  % end
   public init(_ content: Substring.${View}) {
     self = String(Substring(content))
-  }
-
-  /// Creates a String having the given content.
-  ///
-  /// If `${property}` is an ill-formed code sequence, the result is `nil`.
-  ///
-  /// - Complexity: O(N), where N is the length of the resulting `String`'s
-  ///   UTF-16.
-  % if property in ('utf8', 'utf16'):
-  // Avoid colliding with a legacy failable init, which will otherwise be
-  // counted as a redeclaration.
-  @available(
-    swift, deprecated: 4.0,
-    message: "Use the non-failable version of this initializer.")
-  public init?(_ ${property}: Substring.${View}, deprecatedInSwift4: () = ()) {
-    let wholeString = ${property}._wholeString
-    guard
-      ${property}.startIndex.samePosition(in: wholeString) != nil
-      && ${property}.endIndex.samePosition(in: wholeString) != nil
-    else { return nil }
-    self = String(Substring(${property}))
   }
   % end
 }
