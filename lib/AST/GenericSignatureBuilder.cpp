@@ -4036,8 +4036,9 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            std::vector<Constraint<T>> &constraints,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
-                           llvm::function_ref<ConstraintRelation(const T&)>
-                             checkConstraint,
+                           llvm::function_ref<
+                             ConstraintRelation(const Constraint<T>&)>
+                               checkConstraint,
                            Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
@@ -4101,8 +4102,9 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            std::vector<Constraint<T>> &constraints,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
-                           llvm::function_ref<ConstraintRelation(const T&)>
-                             checkConstraint,
+                           llvm::function_ref<
+                             ConstraintRelation(const Constraint<T>&)>
+                               checkConstraint,
                            Optional<Diag<unsigned, Type, DiagT, DiagT>>
                              conflictingDiag,
                            Diag<Type, DiagT> redundancyDiag,
@@ -4139,7 +4141,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
     // Leave the representative alone.
     if (constraint == *representativeConstraint) continue;
 
-    switch (checkConstraint(constraint.value)) {
+    switch (checkConstraint(constraint)) {
     case ConstraintRelation::Unrelated:
       continue;
 
@@ -4218,6 +4220,42 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
   return *representativeConstraint;
 }
 
+/// Determine whether this is a redundantly inheritable Objective-C protocol.
+///
+/// If we do have a redundantly inheritable Objective-C protocol, record that
+/// the conformance was restated on the protocol whose requirement signature
+/// we are computing.
+///
+/// At present, there is only one such protocol that we know about:
+/// JavaScriptCore's JSExport.
+static bool isRedundantlyInheritableObjCProtocol(
+                                             ProtocolDecl *proto,
+                                             const RequirementSource *source) {
+  if (!proto->isObjC()) return false;
+
+  // Only JSExport protocol behaves this way.
+  if (!proto->getName().is("JSExport")) return false;
+
+  // Only do this for the requirement signature computation.
+  auto parentSource = source->parent;
+  if (!parentSource ||
+      parentSource->kind != RequirementSource::RequirementSignatureSelf)
+    return false;
+
+  // If the inheriting protocol already has @_restatedObjCConformance with
+  // this protocol, we're done.
+  auto inheritingProto = parentSource->getProtocolDecl();
+  for (auto *attr : inheritingProto->getAttrs()
+                      .getAttributes<RestatedObjCConformanceAttr>()) {
+    if (attr->Proto == proto) return true;
+  }
+
+  // Otherwise, add @_restatedObjCConformance.
+  auto &ctx = proto->getASTContext();
+  inheritingProto->getAttrs().add(new (ctx) RestatedObjCConformanceAttr(proto));
+  return true;
+}
+
 void GenericSignatureBuilder::checkConformanceConstraints(
                           ArrayRef<GenericTypeParamType *> genericParams,
                           PotentialArchetype *pa) {
@@ -4263,8 +4301,16 @@ void GenericSignatureBuilder::checkConformanceConstraints(
       [](const Constraint<ProtocolDecl *> &constraint) {
         return true;
       },
-      [&](ProtocolDecl *proto) {
+      [&](const Constraint<ProtocolDecl *> &constraint) {
+        auto proto = constraint.value;
         assert(proto == entry.first && "Mixed up protocol constraints");
+
+        // If this is a redundantly inherited Objective-C protocol, treat it
+        // as "unrelated" to silence the warning about the redundant
+        // conformance.
+        if (isRedundantlyInheritableObjCProtocol(proto, constraint.source))
+          return ConstraintRelation::Unrelated;
+
         return ConstraintRelation::Redundant;
       },
       None,
@@ -4572,7 +4618,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     checkConstraintList<PotentialArchetype *, Type>(
       genericParams, constraints,
       [](const Constraint<PotentialArchetype *> &) { return true; },
-      [](PotentialArchetype *) {
+      [](const Constraint<PotentialArchetype *> &) {
         return ConstraintRelation::Redundant;
       },
       None,
@@ -4699,7 +4745,9 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     [&](const ConcreteConstraint &constraint) {
       return constraint.value->isEqual(equivClass->concreteType);
     },
-    [&](Type concreteType) {
+    [&](const Constraint<Type> &constraint) {
+      Type concreteType = constraint.value;
+
       // If the concrete type is equivalent, the constraint is redundant.
       // FIXME: Should check this constraint after substituting in the
       // archetype anchors for each dependent type.
@@ -4746,7 +4794,9 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       [&](const ConcreteConstraint &constraint) {
         return constraint.value->isEqual(equivClass->superclass);
       },
-      [&](Type superclass) {
+      [&](const Constraint<Type> &constraint) {
+        Type superclass = constraint.value;
+
         // If this class is a superclass of the "best"
         if (superclass->isExactSuperclassOf(equivClass->superclass))
           return ConstraintRelation::Redundant;
@@ -4813,7 +4863,9 @@ void GenericSignatureBuilder::checkLayoutConstraints(
     [&](const Constraint<LayoutConstraint> &constraint) {
       return constraint.value == equivClass->layout;
     },
-    [&](LayoutConstraint layout) {
+    [&](const Constraint<LayoutConstraint> &constraint) {
+      auto layout = constraint.value;
+
       // If the layout constraints are mergable, i.e. compatible,
       // it is a redundancy.
       if (layout.merge(equivClass->layout)->isKnownLayout())
