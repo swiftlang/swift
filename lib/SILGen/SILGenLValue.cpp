@@ -1092,8 +1092,8 @@ namespace {
       ArgumentSource self = [&] {
         if (!baseLV.isValid()) {
           return ArgumentSource();
-        } else if (cast<FuncDecl>(setter.getDecl())->computeInterfaceSelfType()
-                     ->is<InOutType>()) {
+        } else if (computeSelfParam(cast<FuncDecl>(setter.getDecl()))
+                     .getParameterFlags().isInOut()) {
           return ArgumentSource(loc, std::move(baseLV));
         } else {
           return emitBaseValueForAccessor(SGF, loc, std::move(baseLV),

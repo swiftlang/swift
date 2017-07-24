@@ -2651,15 +2651,15 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     // Set the initializer interface type of the constructor.
     auto allocType = ctor->getInterfaceType();
-    auto selfTy = ctor->computeInterfaceSelfType(/*isInitializingCtor=*/true);
+    auto selfParam = computeSelfParam(ctor, /*isInitializingCtor=*/true);
     if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
       ctor->setInitializerInterfaceType(
               GenericFunctionType::get(polyFn->getGenericSignature(),
-                                       selfTy, polyFn->getResult(),
+                                       {selfParam}, polyFn->getResult(),
                                        polyFn->getExtInfo()));
     } else {
       auto fn = allocType->castTo<FunctionType>();
-      ctor->setInitializerInterfaceType(FunctionType::get(selfTy,
+      ctor->setInitializerInterfaceType(FunctionType::get({selfParam},
                                                           fn->getResult(),
                                                           fn->getExtInfo()));
     }

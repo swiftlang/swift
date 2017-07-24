@@ -4423,61 +4423,6 @@ SourceRange SubscriptDecl::getSourceRange() const {
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
 }
 
-Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor,
-                                                    bool wantDynamicSelf) {
-  auto *dc = getDeclContext();
-  auto &Ctx = dc->getASTContext();
-  
-  // Determine the type of the container.
-  auto containerTy = dc->getDeclaredInterfaceType();
-  if (!containerTy || containerTy->hasError())
-    return ErrorType::get(Ctx);
-
-  // Determine the type of 'self' inside the container.
-  auto selfTy = dc->getSelfInterfaceType();
-  if (!selfTy || selfTy->hasError())
-    return ErrorType::get(Ctx);
-
-  bool isStatic = false;
-  bool isMutating = false;
-
-  if (auto *FD = dyn_cast<FuncDecl>(this)) {
-    isStatic = FD->isStatic();
-    isMutating = FD->isMutating();
-
-    if (wantDynamicSelf && FD->hasDynamicSelf())
-      selfTy = DynamicSelfType::get(selfTy, Ctx);
-  } else if (isa<ConstructorDecl>(this)) {
-    if (isInitializingCtor) {
-      // initializing constructors of value types always have an implicitly
-      // inout self.
-      isMutating = true;
-    } else {
-      // allocating constructors have metatype 'self'.
-      isStatic = true;
-    }
-  } else if (isa<DestructorDecl>(this)) {
-    // destructors of value types always have an implicitly inout self.
-    isMutating = true;
-  }
-
-  // 'static' functions have 'self' of type metatype<T>.
-  if (isStatic)
-    return MetatypeType::get(selfTy, Ctx);
-
-  // Reference types have 'self' of type T.
-  if (containerTy->hasReferenceSemantics())
-    return selfTy;
-
-  // Mutating methods are always passed inout so we can receive the side
-  // effect.
-  if (isMutating)
-    return InOutType::get(selfTy);
-
-  // Nonmutating methods on structs and enums pass the receiver by value.
-  return selfTy;
-}
-
 DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   if (getFullName())
     return getFullName();

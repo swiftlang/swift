@@ -4807,6 +4807,22 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
   bool inOut = paramTy->is<InOutType>();
   return {isVariadic, autoclosure, escaping, inOut};
 }
+  
+/// \brief If this is a method in a type or extension thereof, compute
+/// and return a parameter to be used for the 'self' argument.  The type of
+/// the parameter is the empty Type() if no 'self' argument should exist. This
+/// can only be used after name binding has resolved types.
+///
+/// \param isInitializingCtor Specifies whether we're computing the 'self'
+/// type of an initializing constructor, which accepts an instance 'self'
+/// rather than a metatype 'self'.
+///
+/// \param wantDynamicSelf Specifies whether the 'self' type should be
+/// wrapped in a DynamicSelfType, which is the case for the 'self' parameter
+/// type inside a class method returning 'Self'.
+AnyFunctionType::Param computeSelfParam(AbstractFunctionDecl *AFD,
+                                        bool isInitializingCtor=false,
+                                        bool wantDynamicSelf=false);
 
 #define TYPE(id, parent)
 #define SUGARED_TYPE(id, parent) \
