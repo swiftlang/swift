@@ -80,7 +80,7 @@ testRace(name: "GlobalStructMutatingMethod",
         thread: { _ = globalForGlobalStructMutatingMethod.read() },
         thread: { globalForGlobalStructMutatingMethod.mutate() } )
 // CHECK-LABEL: Running GlobalStructMutatingMethod
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is global
 
 var globalForGlobalStructDifferentStoredPropertiesInout = UninstrumentedStruct()
@@ -88,7 +88,7 @@ testRace(name: "GlobalStructDifferentStoredPropertiesInout",
         thread: { uninstrumentedTakesInout(&globalForGlobalStructDifferentStoredPropertiesInout.storedProperty1) },
         thread: { uninstrumentedTakesInout(&globalForGlobalStructDifferentStoredPropertiesInout.storedProperty2) } )
 // CHECK-LABEL: Running GlobalStructDifferentStoredPropertiesInout
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is global
 
 var globalForGlobalStructSameStoredPropertyInout = UninstrumentedStruct()
@@ -96,7 +96,7 @@ testRace(name: "GlobalStructSameStoredPropertyInout",
         thread: { uninstrumentedTakesInout(&globalForGlobalStructSameStoredPropertyInout.storedProperty1) },
         thread: { uninstrumentedTakesInout(&globalForGlobalStructSameStoredPropertyInout.storedProperty1) } )
 // CHECK-LABEL: Running GlobalStructSameStoredPropertyInout
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 
 
 var globalForGlobalStructSubscriptDifferentIndexesInout = UninstrumentedStruct()
@@ -104,7 +104,7 @@ testRace(name: "GlobalStructSubscriptDifferentIndexesInout",
         thread: { uninstrumentedTakesInout(&globalForGlobalStructSubscriptDifferentIndexesInout[0]) },
         thread: { uninstrumentedTakesInout(&globalForGlobalStructSubscriptDifferentIndexesInout[1]) } )
 // CHECK-LABEL: Running GlobalStructSubscriptDifferentIndexes
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is global
 
 
@@ -113,7 +113,7 @@ testRace(name: "GlobalStructSubscriptDifferentIndexesGetSet",
         thread: { _ = globalForGlobalStructSubscriptDifferentIndexesGetSet[0] },
         thread: { globalForGlobalStructSubscriptDifferentIndexesGetSet[1] = 12 } )
 // CHECK-LABEL: Running GlobalStructSubscriptDifferentIndexesGetSet
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is global
 
 var globalForGlobalClassGeneralMethods = UninstrumentedClass()
@@ -121,21 +121,21 @@ testRace(name: "GlobalClassGeneralMethods",
         thread: { _ = globalForGlobalClassGeneralMethods.read() },
         thread: { globalForGlobalClassGeneralMethods.mutate() } )
 // CHECK-LABEL: Running GlobalClassGeneralMethods
-// CHECK-NOT: ThreadSanitizer: data race
+// CHECK-NOT: ThreadSanitizer: {{.*}} race
 
 var globalForGlobalClassDifferentStoredPropertiesInout = UninstrumentedClass()
 testRace(name: "GlobalClassDifferentStoredPropertiesInout",
         thread: { uninstrumentedTakesInout(&globalForGlobalClassDifferentStoredPropertiesInout.storedProperty1) },
         thread: { uninstrumentedTakesInout(&globalForGlobalClassDifferentStoredPropertiesInout.storedProperty2) } )
 // CHECK-LABEL: Running GlobalClassDifferentStoredPropertiesInout
-// CHECK-NOT: ThreadSanitizer: data race
+// CHECK-NOT: ThreadSanitizer: {{.*}} race
 
 var globalForGlobalClassSubscriptDifferentIndexesInout = UninstrumentedClass()
 testRace(name: "GlobalClassSubscriptDifferentIndexesInout",
         thread: { uninstrumentedTakesInout(&globalForGlobalClassSubscriptDifferentIndexesInout[0]) },
         thread: { uninstrumentedTakesInout(&globalForGlobalClassSubscriptDifferentIndexesInout[1]) } )
 // CHECK-LABEL: Running GlobalClassSubscriptDifferentIndexesInout
-// CHECK-NOT: ThreadSanitizer: data race
+// CHECK-NOT: ThreadSanitizer: {{.*}} race
 
 
 var globalForGlobalClassSameStoredPropertyInout = UninstrumentedClass()
@@ -143,7 +143,7 @@ testRace(name: "GlobalClassSameStoredPropertyInout",
         thread: { uninstrumentedTakesInout(&globalForGlobalClassSameStoredPropertyInout.storedProperty1) },
         thread: { uninstrumentedTakesInout(&globalForGlobalClassSameStoredPropertyInout.storedProperty1) } )
 // CHECK-LABEL: Running GlobalClassSameStoredPropertyInout
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is heap block
 
 // These access a global declared in the TSanUninstrumented module
@@ -151,7 +151,7 @@ testRace(name: "InoutAccessToStoredGlobalInUninstrumentedModule",
         thread: { uninstrumentedTakesInout(&storedGlobalInUninstrumentedModule1) },
         thread: { uninstrumentedTakesInout(&storedGlobalInUninstrumentedModule1) } )
 // CHECK-LABEL: Running InoutAccessToStoredGlobalInUninstrumentedModule
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is global
 
 // These access a global declared in the TSanUninstrumented module.
@@ -169,14 +169,14 @@ testRace(name: "InoutAccessToComputedGlobalInUninstrumentedModule",
         thread: { uninstrumentedTakesInout(&computedGlobalInUninstrumentedModule1) },
         thread: { uninstrumentedTakesInout(&computedGlobalInUninstrumentedModule1) } )
 // CHECK-LABEL: Running InoutAccessToComputedGlobalInUninstrumentedModule
-// CHECK-NOT: ThreadSanitizer: data race
+// CHECK-NOT: ThreadSanitizer: {{.*}} race
 
 // These access a computed global declared in the TSanUninstrumented module
 testRace(name: "ReadAndWriteToComputedGlobalInUninstrumentedModule",
         thread: { computedGlobalInUninstrumentedModule2 = 7 },
         thread: { _ = computedGlobalInUninstrumentedModule2 } )
 // CHECK-LABEL: Running ReadAndWriteToComputedGlobalInUninstrumentedModule
-// CHECK-NOT: ThreadSanitizer: data race
+// CHECK-NOT: ThreadSanitizer: {{.*}} race
 
 
 
@@ -187,7 +187,7 @@ testRace(name: "GlobalUninstrumentedClassStoredPropertyMutatingMethod",
         thread: { _ = globalForGlobalUninstrumentedClassStoredPropertyMutatingMethod.storedStructProperty.read() },
         thread: { globalForGlobalUninstrumentedClassStoredPropertyMutatingMethod.storedStructProperty.mutate() } )
 // CHECK-LABEL: Running GlobalUninstrumentedClassStoredPropertyMutatingMethod
-// CHECK-NOT: ThreadSanitizer: data race
+// CHECK-NOT: ThreadSanitizer: {{.*}} race
 
 // Note: TSan doesn't see a race above because it doesn't see any load on the
 // read side because the getter for the class property is not instrumented.
@@ -198,7 +198,7 @@ testRace(name: "GlobalUninstrumentedClassStoredPropertyInout",
         thread: { uninstrumentedTakesInout(&globalForGlobalUninstrumentedClassStoredPropertyInout.storedStructProperty.storedProperty1) },
         thread: { uninstrumentedTakesInout(&globalForGlobalUninstrumentedClassStoredPropertyInout.storedStructProperty.storedProperty2) } )
 // CHECK-LABEL: Running GlobalUninstrumentedClassStoredPropertyInout
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is heap block
 
 // Note: TSan sees the race above because the inout instrumentation adds an
@@ -210,7 +210,7 @@ testRace(name: "GlobalUninstrumentedClassComputedPropertyInout",
         thread: { uninstrumentedTakesInout(&globalForGlobalUninstrumentedClassComputedPropertyInout.computedStructProperty.storedProperty1) },
         thread: { uninstrumentedTakesInout(&globalForGlobalUninstrumentedClassComputedPropertyInout.computedStructProperty.storedProperty1) } )
 // CHECK-LABEL: Running GlobalUninstrumentedClassComputedPropertyInout
-// CHECK-NO: ThreadSanitizer: data race
+// CHECK-NOT: ThreadSanitizer: {{.*}} race
 
 // In the above the write in instrumented code is to the value buffer allocated
 // at the call site so there is no data race if the getter and setters themselves
@@ -223,7 +223,7 @@ testRace(name: "GlobalInstrumentedClassStoredPropertyMutatingMethod",
         thread: { _ = globalForGlobalInstrumentedClassStoredPropertyMutatingMethod.storedStructProperty.read() },
         thread: { globalForGlobalInstrumentedClassStoredPropertyMutatingMethod.storedStructProperty.mutate() } )
 // CHECK-LABEL: Running GlobalInstrumentedClassStoredPropertyMutatingMethod
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is heap block
 //
 // TSan does see this above race because the getter and materializeForSet is instrumented
@@ -254,7 +254,7 @@ func runCapturedLocalStructMutatingMethod() {
          thread: { l.mutate() } )
 }
 // CHECK-LABEL: Running CapturedLocalStructMutatingMethod
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is heap block
 
 
@@ -265,7 +265,7 @@ func runCapturedLocalStructDifferentStoredPropertiesInout() {
          thread: { uninstrumentedTakesInout(&l.storedProperty2) } )
 }
 // CHECK-LABEL: Running CapturedLocalStructDifferentStoredPropertiesInout
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is heap block
 
 
@@ -276,7 +276,7 @@ func runCapturedLocalClassGeneralMethods() {
           thread: { l.mutate() } )
 }
 // CHECK-LABEL: Running CapturedLocalClassGeneralMethods
-// CHECK-NOT: ThreadSanitizer: data race
+// CHECK-NOT: ThreadSanitizer: {{.*}} race
 
 
 func runCapturedLocalDifferentStoredPropertiesInout() {
@@ -286,7 +286,7 @@ func runCapturedLocalDifferentStoredPropertiesInout() {
           thread: { uninstrumentedTakesInout(&l.storedProperty2) } )
 }
 // CHECK-LABEL: Running CapturedLocalClassDifferentStoredPropertiesInout
-// CHECK-NOT: ThreadSanitizer: data race
+// CHECK-NOT: ThreadSanitizer: {{.*}} race
 
 func runCapturedLocalSameStoredPropertyInout() {
   let l = UninstrumentedClass()
@@ -295,7 +295,7 @@ func runCapturedLocalSameStoredPropertyInout() {
           thread: { uninstrumentedTakesInout(&l.storedProperty1) } )
 }
 // CHECK-LABEL: Running CapturedLocalClassSameStoredPropertyInout
-// CHECK: ThreadSanitizer: data race
+// CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is heap block
 
 runLocalTests()

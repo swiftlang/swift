@@ -1210,11 +1210,11 @@ FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
          ARGS(ErrorPtrTy, Int8PtrPtrTy, OpenedErrorTriplePtrTy),
          ATTRS(NoUnwind))
 
-// void __tsan_write1(void *addr);
+// void __tsan_external_write(void *addr, void *caller_pc, void *tag);
 // This is a Thread Sanitizer instrumentation entry point in compiler-rt.
-FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
+FUNCTION(TSanInoutAccess, __tsan_external_write, C_CC,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(GetKeyPath, swift_getKeyPath, C_CC,
