@@ -731,7 +731,8 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
   bool hadError = false;
   
   for (auto param : *PL) {
-    if (!param->getTypeLoc().getTypeRepr() &&
+    auto typeRepr = param->getTypeLoc().getTypeRepr();
+    if (!typeRepr &&
         param->hasInterfaceType()) {
       hadError |= param->isInvalid();
       continue;
@@ -763,8 +764,12 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     }
     
     checkTypeModifyingDeclAttributes(param);
-    if (!hadError && param->getTypeLoc().getTypeRepr()->getKind() == TypeReprKind::InOut) {
-      param->setSpecifier(VarDecl::Specifier::InOut);
+    if (!hadError) {
+      if (isa<InOutTypeRepr>(typeRepr)) {
+        param->setSpecifier(VarDecl::Specifier::InOut);
+      } else if (isa<SharedTypeRepr>(typeRepr)) {
+        param->setSpecifier(VarDecl::Specifier::Shared);
+      }
     }
   }
   

@@ -1240,6 +1240,11 @@ void Remangler::mangleInOut(Node *node) {
   Buffer << 'z';
 }
 
+void Remangler::mangleShared(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << 'h';
+}
+
 void Remangler::mangleInfixOperator(Node *node) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "oi";

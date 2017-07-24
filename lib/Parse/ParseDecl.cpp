@@ -1803,17 +1803,32 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
 ///     /*empty*/
 ///     attribute-list-clause attribute-list
 ///     'inout' attribute-list-clause attribute-list
+///     '__shared' attribute-list-clause attribute-list
+///     '__owned' attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
 /// \endverbatim
-bool Parser::parseTypeAttributeListPresent(SourceLoc &InOutLoc,
+bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
+                                           SourceLoc &SpecifierLoc,
                                            TypeAttributes &Attributes) {
-  while (Tok.is(tok::kw_inout)) {
-    if (InOutLoc.isValid())
-      diagnose(Tok, diag::parameter_inout_var_let_repeated)
-        .fixItRemove(InOutLoc);
-    InOutLoc = consumeToken();
+  Specifier = VarDecl::Specifier::Owned;
+  while (Tok.isAny(tok::kw_inout, tok::kw___shared, tok::kw___owned)) {
+    if (SpecifierLoc.isValid()) {
+      diagnose(Tok, diag::parameter_specifier_repeated)
+        .fixItRemove(SpecifierLoc);
+    } else {
+      if (Tok.is(tok::kw___owned)) {
+        Specifier = VarDecl::Specifier::Owned;
+      } else if (Tok.is(tok::kw_inout)) {
+        Specifier = VarDecl::Specifier::InOut;
+      } else if (Tok.is(tok::kw___shared)) {
+        Specifier = VarDecl::Specifier::Shared;
+      } else {
+        llvm_unreachable("unhandled specifier kind?");
+      }
+    }
+    SpecifierLoc = consumeToken();
   }
 
   while (Tok.is(tok::at_sign)) {

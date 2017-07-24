@@ -28,14 +28,15 @@
 using namespace swift;
 
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
-                                       SourceLoc InOutLoc,
-                                       const TypeAttributes &attrs) {
+                                       const TypeAttributes &attrs,
+                                       VarDecl::Specifier specifier,
+                                       SourceLoc specifierLoc) {
   // Apply those attributes that do apply.
   if (!attrs.empty())
     ty = new (Context) AttributedTypeRepr(attrs, ty);
 
-  // Apply 'inout'
-  if (InOutLoc.isValid()) {
+  // Apply 'inout' or '__shared'
+  if (specifierLoc.isValid()) {
     if (auto *fnTR = dyn_cast<FunctionTypeRepr>(ty)) {
       // If the input to the function isn't parenthesized, apply the inout
       // to the first (only) parameter, as we would in Swift 2. (This
@@ -43,7 +44,7 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
       TypeRepr *argsTR = fnTR->getArgsTypeRepr();
       if (!isa<TupleTypeRepr>(argsTR)) {
         auto *newArgsTR =
-          new (Context) InOutTypeRepr(argsTR, InOutLoc);
+          new (Context) InOutTypeRepr(argsTR, specifierLoc);
         auto *newTR =
           new (Context) FunctionTypeRepr(fnTR->getGenericParams(),
               newArgsTR,
@@ -54,7 +55,19 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
         return newTR;
       }
     }
-    ty = new (Context) InOutTypeRepr(ty, InOutLoc);
+    switch (specifier) {
+    case VarDecl::Specifier::Owned:
+      break;
+    case VarDecl::Specifier::InOut:
+      ty = new (Context) InOutTypeRepr(ty, specifierLoc);
+      break;
+    case VarDecl::Specifier::Shared:
+      ty = new (Context) SharedTypeRepr(ty, specifierLoc);
+      break;
+    case VarDecl::Specifier::Var:
+      llvm_unreachable("cannot have var as specifier");
+      break;
+    }
   }
 
   return ty;
@@ -157,8 +170,19 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
                                                bool HandleCodeCompletion) {
   ParserResult<TypeRepr> ty;
   // If this is an "inout" marker for an identifier type, consume the inout.
-  SourceLoc InOutLoc;
-  consumeIf(tok::kw_inout, InOutLoc);
+  SourceLoc SpecifierLoc;
+  VarDecl::Specifier TypeSpecifier;
+  if (Tok.is(tok::kw_inout)) {
+    SpecifierLoc = consumeToken();
+    TypeSpecifier = VarDecl::Specifier::InOut;
+  } else if (Tok.is(tok::kw___shared)) {
+    SpecifierLoc = consumeToken();
+    TypeSpecifier = VarDecl::Specifier::Shared;
+  } else if (Tok.is(tok::kw___owned)) {
+    SpecifierLoc = consumeToken();
+    TypeSpecifier = VarDecl::Specifier::Owned;
+
+  }
 
   switch (Tok.getKind()) {
   case tok::kw_Self:
@@ -249,10 +273,23 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     break;
   }
 
-  // If we parsed an inout modifier, prepend it.
-  if (InOutLoc.isValid() && ty.isNonNull())
-    ty = makeParserResult(new (Context) InOutTypeRepr(ty.get(),
-                                                      InOutLoc));
+  // If we parsed any specifier, prepend it.
+  if (SpecifierLoc.isValid() && ty.isNonNull()) {
+    TypeRepr *repr = ty.get();
+    switch (TypeSpecifier) {
+    case VarDecl::Specifier::InOut:
+      repr = new (Context) InOutTypeRepr(repr, SpecifierLoc);
+      break;
+    case VarDecl::Specifier::Shared:
+      repr = new (Context) SharedTypeRepr(repr, SpecifierLoc);
+      break;
+    case VarDecl::Specifier::Owned:
+      break;
+    case VarDecl::Specifier::Var:
+      llvm_unreachable("tried to create var type specifier?");
+    }
+    ty = makeParserResult(repr);
+  }
 
   return ty;
 }
@@ -327,7 +364,9 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   auto repr = SILBoxTypeRepr::create(Context, generics,
                                      LBraceLoc, Fields, RBraceLoc,
                                      LAngleLoc, Args, RAngleLoc);
-  return makeParserResult(applyAttributeToType(repr, SourceLoc(), attrs));
+  return makeParserResult(applyAttributeToType(repr, attrs,
+                                               VarDecl::Specifier::Owned,
+                                               SourceLoc()));
 }
 
 
@@ -344,9 +383,10 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
                                          bool IsSILFuncDecl) {
   // Parse attributes.
-  SourceLoc inoutLoc;
+  VarDecl::Specifier specifier;
+  SourceLoc specifierLoc;
   TypeAttributes attrs;
-  parseTypeAttributeList(inoutLoc, attrs);
+  parseTypeAttributeList(specifier, specifierLoc, attrs);
 
   Optional<Scope> GenericsScope;
 
@@ -426,7 +466,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       tyR->walk(walker);
   }
 
-  return makeParserResult(applyAttributeToType(tyR, inoutLoc, attrs));
+  return makeParserResult(applyAttributeToType(tyR, attrs, specifier,
+                                               specifierLoc));
 }
 
 ParserResult<TypeRepr> Parser::parseTypeForInheritance(
@@ -791,8 +832,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
     // If this is a deprecated use of the inout marker in an argument list,
     // consume the inout.
-    SourceLoc InOutLoc;
-    consumeIf(tok::kw_inout, InOutLoc);
+    SourceLoc SpecifierLoc;
+    consumeIf(tok::kw_inout, SpecifierLoc);
 
     // If the tuple element starts with a potential argument label followed by a
     // ':' or another potential argument label, then the identifier is an
@@ -830,9 +871,9 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       element.Type = type.get();
 
       // Complain obsoleted 'inout' position; (inout name: Ty)
-      if (InOutLoc.isValid() && !isa<InOutTypeRepr>(element.Type))
-        diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed)
-          .fixItRemove(InOutLoc)
+      if (SpecifierLoc.isValid() && !isa<InOutTypeRepr>(element.Type))
+        diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed, "'inout'")
+          .fixItRemove(SpecifierLoc)
           .fixItInsert(postColonLoc, "inout ");
     } else {
       // Otherwise, this has to be a type.
@@ -847,12 +888,12 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     // If an 'inout' marker was specified, build inout type.
     // Note that we bury the inout locator within the named locator.
     // This is weird but required by Sema apparently.
-    if (InOutLoc.isValid()) {
-      if (isa<InOutTypeRepr>(element.Type))
-        diagnose(Tok, diag::parameter_inout_var_let_repeated)
-          .fixItRemove(InOutLoc);
+    if (SpecifierLoc.isValid()) {
+      if (isa<InOutTypeRepr>(element.Type) || isa<SharedTypeRepr>(element.Type))
+        diagnose(Tok, diag::parameter_specifier_repeated)
+          .fixItRemove(SpecifierLoc);
       else
-        element.Type = new (Context) InOutTypeRepr(element.Type, InOutLoc);
+        element.Type = new (Context) InOutTypeRepr(element.Type, SpecifierLoc);
     }
 
     ElementsR.push_back(element);

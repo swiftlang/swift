@@ -1598,8 +1598,8 @@ namespace {
     bool resolveSingleSILResult(TypeRepr *repr, TypeResolutionOptions options,
                                 SmallVectorImpl<SILResultInfo> &results,
                                 Optional<SILResultInfo> &errorResult);
-    Type resolveInOutType(InOutTypeRepr *repr,
-                          TypeResolutionOptions options);
+    Type resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
+                                  TypeResolutionOptions options);
     Type resolveArrayType(ArrayTypeRepr *repr,
                           TypeResolutionOptions options);
     Type resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -1659,6 +1659,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   // Strip the "is function input" bits unless this is a type that knows about
   // them.
   if (!isa<InOutTypeRepr>(repr) &&
+      !isa<SharedTypeRepr>(repr) &&
       !isa<TupleTypeRepr>(repr) &&
       !isa<AttributedTypeRepr>(repr) &&
       !isa<FunctionTypeRepr>(repr) &&
@@ -1681,7 +1682,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::Attributed:
     return resolveAttributedType(cast<AttributedTypeRepr>(repr), options);
   case TypeReprKind::InOut:
-    return resolveInOutType(cast<InOutTypeRepr>(repr), options);
+  case TypeReprKind::Shared:
+    return resolveSpecifierTypeRepr(cast<SpecifierTypeRepr>(repr), options);
 
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -2552,8 +2554,8 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
   return resolveSingleSILResult(repr, options, ordinaryResults, errorResult);
 }
 
-Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
-                                    TypeResolutionOptions options) {
+Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
+                                            TypeResolutionOptions options) {
   // inout is only valid for (non-subscript) function parameters.
   if ((options & TR_SubscriptParameters) ||
         (!(options & TR_FunctionInput) &&
@@ -2566,7 +2568,10 @@ Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
     } else {
       diagID = diag::attr_only_on_parameters;
     }
-    TC.diagnose(repr->getInOutLoc(), diagID, "'inout'");
+    TC.diagnose(repr->getSpecifierLoc(), diagID,
+                (repr->getKind() == TypeReprKind::InOut)
+                  ? "'inout'"
+                  : "'__shared'");
     repr->setInvalid();
     return ErrorType::get(Context);
   }
@@ -2576,9 +2581,10 @@ Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
   options -= TR_FunctionInput;
   options -= TR_TypeAliasUnderlyingType;
 
-  Type ty = resolveType(cast<InOutTypeRepr>(repr)->getBase(), options);
+  Type ty = resolveType(repr->getBase(), options);
   if (!ty || ty->hasError()) return ty;
-  return InOutType::get(ty);
+  if (repr->getKind() == TypeReprKind::InOut) return InOutType::get(ty);
+  return ty;
 }
 
 
@@ -2736,9 +2742,13 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (variadic)
       ty = TC.getArraySliceType(repr->getEllipsisLoc(), ty);
 
-    auto paramFlags = isImmediateFunctionInput
-                    ? ParameterTypeFlags::fromParameterType(ty, variadic).withInOut(tyR->getKind() == TypeReprKind::InOut)
-                    : ParameterTypeFlags();
+    ParameterTypeFlags paramFlags;
+    if (isImmediateFunctionInput) {
+      bool isShared = (tyR->getKind() == TypeReprKind::Shared);
+      bool isInOut = (tyR->getKind() == TypeReprKind::InOut);
+      paramFlags = ParameterTypeFlags::fromParameterType(ty, variadic, isShared)
+                     .withInOut(isInOut);
+    }
     elements.emplace_back(ty->getInOutObjectType(), name, paramFlags);
   }
 

@@ -279,7 +279,8 @@ struct ArgumentInitHelper {
         }
       }
     } else {
-      assert(vd->isLet() && "expected parameter to be immutable!");
+      assert((vd->isLet() || vd->isShared())
+             && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.

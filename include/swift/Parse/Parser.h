@@ -756,12 +756,15 @@ public:
   bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
-  bool parseTypeAttributeList(SourceLoc &InOutLoc, TypeAttributes &Attributes) {
-    if (Tok.is(tok::at_sign) || Tok.is(tok::kw_inout))
-      return parseTypeAttributeListPresent(InOutLoc, Attributes);
+  bool parseTypeAttributeList(VarDecl::Specifier &Specifier,
+                              SourceLoc &SpecifierLoc,
+                              TypeAttributes &Attributes) {
+    if (Tok.isAny(tok::at_sign, tok::kw_inout, tok::kw___shared, tok::kw___owned))
+      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
     return false;
   }
-  bool parseTypeAttributeListPresent(SourceLoc &InOutLoc,
+  bool parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
+                                     SourceLoc &SpecifierLoc,
                                      TypeAttributes &Attributes);
   bool parseTypeAttribute(TypeAttributes &Attributes,
                           bool justChecking = false);
@@ -933,8 +936,9 @@ public:
   bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, SourceLoc InOutLoc,
-                                 const TypeAttributes &Attr);
+  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
+                                 VarDecl::Specifier Specifier,
+                                 SourceLoc SpecifierLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing

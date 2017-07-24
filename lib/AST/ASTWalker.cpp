@@ -1675,6 +1675,10 @@ bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitSharedTypeRepr(SharedTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
 bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {
   return false;
 }
