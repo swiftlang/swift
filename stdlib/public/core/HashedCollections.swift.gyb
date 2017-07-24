@@ -766,8 +766,10 @@ public struct Set<Element : Hashable> :
       switch s._variantBuffer {
         case .native(let buffer):
           _variantBuffer = .native(buffer)
+#if _runtime(_ObjC)
         case .cocoa(let owner):
           _variantBuffer = .cocoa(owner)
+#endif
       }
     } else {
       for item in sequence {
@@ -1238,17 +1240,13 @@ extension Set {
       }
       return true
 
+  #if _runtime(_ObjC)
     case (_VariantSetBuffer.cocoa(let lhsCocoa),
         _VariantSetBuffer.cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
       return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
-  #else
-        _sanityCheckFailure("internal error: unexpected cocoa set")
-  #endif
 
     case (_VariantSetBuffer.native(let lhsNative),
       _VariantSetBuffer.cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
 
       if lhsNative.count != rhsCocoa.count {
         return false
@@ -1270,15 +1268,9 @@ extension Set {
         return false
       }
       return true
-  #else
-        _sanityCheckFailure("internal error: unexpected cocoa set")
-  #endif
 
     case (_VariantSetBuffer.cocoa, _VariantSetBuffer.native):
-  #if _runtime(_ObjC)
       return rhs == lhs
-  #else
-        _sanityCheckFailure("internal error: unexpected cocoa set")
   #endif
     }
   }
@@ -2622,16 +2614,12 @@ extension Dictionary where Value : Equatable {
       }
       return true
 
-    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
   #if _runtime(_ObjC)
+    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       return _stdlib_NSObject_isEqual(
         lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-  #endif
 
     case (.native(let lhsNative), .cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
 
       if lhsNative.count != rhsCocoa.count {
         return false
@@ -2654,15 +2642,9 @@ extension Dictionary where Value : Equatable {
         continue
       }
       return true
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-  #endif
 
     case (.cocoa, .native):
-  #if _runtime(_ObjC)
       return rhs == lhs
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
   #endif
     }
   }
@@ -4436,10 +4418,6 @@ internal struct _Cocoa${Self}Buffer : _HashBuffer {
     _sanityCheckFailure("this function should never be called")
   }
 }
-#else
-@_versioned
-@_fixed_layout
-internal struct _Cocoa${Self}Buffer {}
 #endif
 
 @_versioned
@@ -4448,7 +4426,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
   internal typealias NativeBuffer = _Native${Self}Buffer<${TypeParameters}>
   internal typealias NativeIndex = _Native${Self}Index<${TypeParameters}>
+#if _runtime(_ObjC)
   internal typealias CocoaBuffer = _Cocoa${Self}Buffer
+#endif
   internal typealias SequenceElement = ${Sequence}
   internal typealias SequenceElementWithoutLabels = ${Sequence}
   internal typealias SelfType = _Variant${Self}Buffer
@@ -4459,7 +4439,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 %end
 
   case native(NativeBuffer)
+#if _runtime(_ObjC)
   case cocoa(CocoaBuffer)
+#endif
 
   @_versioned
   @_transparent
@@ -4477,10 +4459,12 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return _isUnique_native(&self)
+#if _runtime(_ObjC)
     case .cocoa:
       // Don't consider Cocoa buffer mutable, even if it is mutable and is
       // uniquely referenced.
       return false
+#endif
     }
   }
 
@@ -4490,8 +4474,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       switch self {
       case .native(let buffer):
         return buffer
+#if _runtime(_ObjC)
       case .cocoa:
         _sanityCheckFailure("internal error: not backed by native buffer")
+#endif
       }
     }
     set {
@@ -4552,8 +4538,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       return (reallocated: true,
               capacityChanged: oldCapacity != newNativeBuffer.capacity)
 
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       let cocoa${Self} = cocoaBuffer.cocoa${Self}
       var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
       let oldCocoaIterator = _Cocoa${Self}Iterator(cocoa${Self})
@@ -4576,8 +4562,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
       self = .native(newNativeBuffer)
       return (reallocated: true, capacityChanged: true)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4616,11 +4600,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     case .native:
       return Int(Double(asNative.capacity) /
         _hashContainerDefaultMaxLoadFactorInverse)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return cocoaBuffer.count
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4639,11 +4621,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return ._native(asNative.startIndex)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return ._cocoa(cocoaBuffer.startIndex)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4656,11 +4636,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return ._native(asNative.endIndex)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return ._cocoa(cocoaBuffer.endIndex)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4674,11 +4652,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return ._native(asNative.index(after: i._nativeIndex))
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return ._cocoa(cocoaBuffer.index(after: i._cocoaIndex))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4704,15 +4680,13 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
         return ._native(nativeIndex)
       }
       return nil
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
       if let cocoaIndex = cocoaBuffer.index(forKey: anyObjectKey) {
         return ._cocoa(cocoaIndex)
       }
       return nil
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4725,8 +4699,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return asNative.assertingGet(i._nativeIndex)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
 %if Self == 'Set':
       let anyObjectValue: AnyObject = cocoaBuffer.assertingGet(i._cocoaIndex)
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
@@ -4738,8 +4712,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
       return (nativeKey, nativeValue)
 %end
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4752,14 +4724,12 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return asNative.assertingGet(key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       // FIXME: This assumes that Key and Value are bridged verbatim.
       let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
       let anyObjectValue: AnyObject = cocoaBuffer.assertingGet(anyObjectKey)
       return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4788,11 +4758,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return asNative.maybeGet(key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return SelfType.maybeGetFromCocoaBuffer(cocoaBuffer, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4846,12 +4814,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativeUpdateValue(value, forKey: key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       migrateDataToNativeBuffer(cocoaBuffer)
       return nativeUpdateValue(value, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4872,8 +4838,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativePointerToValue(at: i)
-    case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaStorage):
       // We have to migrate the data to native storage before we can return a
       // mutable pointer. But after we migrate, the Cocoa index becomes
       // useless, so get the key first.
@@ -4885,8 +4851,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       let nativeIndex = asNative.index(forKey: key)!
 
       return nativePointerToValue(at: ._native(nativeIndex))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4938,12 +4902,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativeInsert(value, forKey: key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       migrateDataToNativeBuffer(cocoaBuffer)
       return nativeInsert(value, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4978,8 +4940,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return try nativeMapValues(transform)
-    case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaStorage):
       var storage: _Variant${Self}Buffer<Key, T> = .native(
         _Native${Self}Buffer<Key, T>(capacity: cocoaStorage.count))
 
@@ -4993,8 +4955,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       }
 
       return storage
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5042,12 +5002,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       try nativeMerge(keysAndValues, uniquingKeysWith: combine)
-    case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaStorage):
       migrateDataToNativeBuffer(cocoaStorage)
       try nativeMerge(keysAndValues, uniquingKeysWith: combine)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5203,8 +5161,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativeRemove(at: index._nativeIndex)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       // We have to migrate the data first.  But after we do so, the Cocoa
       // index becomes useless, so get the key first.
       //
@@ -5222,8 +5180,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 %elif Self == 'Dictionary':
       return (key, value._unsafelyUnwrappedUnchecked)
 %end
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5237,16 +5193,14 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativeRemoveObject(forKey: key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
       if cocoaBuffer.maybeGet(anyObjectKey) == nil {
         return nil
       }
       migrateDataToNativeBuffer(cocoaBuffer)
       return nativeRemoveObject(forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5287,11 +5241,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       nativeRemoveAll()
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       self = .native(NativeBuffer(minimumCapacity: cocoaBuffer.count))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5304,11 +5256,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return asNative.count
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return cocoaBuffer.count
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5323,11 +5273,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     case .native(let buffer):
       return ._native(
         start: asNative.startIndex, end: asNative.endIndex, buffer: buffer)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return ._cocoa(_Cocoa${Self}Iterator(cocoaBuffer.cocoa${Self}))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5441,17 +5389,19 @@ extension _Cocoa${Self}Index {
 % end
 
 }
-#else
-internal struct _Cocoa${Self}Index {}
 #endif
 
 internal enum ${Self}IndexRepresentation<${TypeParametersDecl}> {
   typealias _Index = ${Self}Index<${TypeParameters}>
   typealias _NativeIndex = _Index._NativeIndex
+#if _runtime(_ObjC)
   typealias _CocoaIndex = _Index._CocoaIndex
+#endif
 
   case _native(_NativeIndex)
+#if _runtime(_ObjC)
   case _cocoa(_CocoaIndex)
+#endif
 }
 
 extension ${Self} {
@@ -5484,7 +5434,9 @@ public struct Index : Comparable {
   // type for bridged NS${Self} in terms of Cocoa enumeration facilities.
 
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
+#if _runtime(_ObjC)
   internal typealias _CocoaIndex = _Cocoa${Self}Index
+#endif
 
 %if Self == 'Set':
   internal typealias Key = ${TypeParameters}
@@ -5515,8 +5467,10 @@ public struct Index : Comparable {
     switch _value {
     case ._native(let nativeIndex):
       return nativeIndex
+#if _runtime(_ObjC)
     case ._cocoa:
       _sanityCheckFailure("internal error: does not contain a native index")
+#endif
     }
   }
 
@@ -5550,11 +5504,9 @@ extension ${Self}.Index {
     switch (lhs._value, rhs._value) {
     case (._native(let lhsNative), ._native(let rhsNative)):
       return lhsNative == rhsNative
-    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
   #if _runtime(_ObjC)
+    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
       return lhsCocoa == rhsCocoa
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
   #endif
     default:
       _preconditionFailure("comparing indexes from different sets")
@@ -5572,11 +5524,9 @@ extension ${Self}.Index {
     switch (lhs._value, rhs._value) {
     case (._native(let lhsNative), ._native(let rhsNative)):
       return lhsNative < rhsNative
-    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
   #if _runtime(_ObjC)
+    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
       return lhsCocoa < rhsCocoa
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
   #endif
     default:
       _preconditionFailure("comparing indexes from different sets")
@@ -5665,8 +5615,6 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
 %end
   }
 }
-#else
-final internal class _Cocoa${Self}Iterator {}
 #endif
 
 @_versioned
@@ -5684,7 +5632,9 @@ internal enum ${Self}IteratorRepresentation<${TypeParametersDecl}> {
   // state, so it should keep its own reference to the buffer.
   case _native(
     start: _NativeIndex, end: _NativeIndex, buffer: _NativeBuffer)
+#if _runtime(_ObjC)
   case _cocoa(_Cocoa${Self}Iterator)
+#endif
 }
 
 /// An iterator over the members of a `${Self}<${TypeParameters}>`.
@@ -5743,8 +5693,10 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
       _state =
         ._native(start: buffer.index(after: startIndex), end: endIndex, buffer: buffer)
       return result
+#if _runtime(_ObjC)
     case ._cocoa:
       _sanityCheckFailure("internal error: not backed by NS${Self}")
+#endif
     }
   }
 
@@ -5761,8 +5713,8 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
     switch _state {
     case ._native:
       return _nativeNext()
-    case ._cocoa(let cocoaIterator):
 #if _runtime(_ObjC)
+    case ._cocoa(let cocoaIterator):
 %if Self == 'Set':
       if let anyObjectElement = cocoaIterator.next() {
         return _forceBridgeFromObjectiveC(anyObjectElement, Element.self)
@@ -5775,8 +5727,6 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
       }
 %end
       return nil
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
