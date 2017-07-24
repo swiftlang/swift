@@ -9,14 +9,20 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift
+//
+// RUN: %empty-directory(%t)
+//
+// RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
+// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestNSNumberBridging
+// 
+// RUN: %target-run %t/TestNSNumberBridging
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-
 
 import StdlibUnittest
 import Foundation
 import CoreGraphics
+import FoundationBridgeObjC
 
 extension Float {
     init?(reasonably value: Float) {
@@ -898,6 +904,17 @@ func testNSNumberBridgeAnyHashable() {
     }
 }
 
+func testNSNumberBridgeAnyHashableObjc() {
+    let range = -Int(UInt8.min) ... Int(UInt8.max)
+    var dict = [AnyHashable : Any]()
+    for i in range {
+        dict[i] = "\(i)"
+    }
+
+    let verifier = NumberBridgingTester()
+    expectTrue(verifier.verifyKeys(in: NSRange(range), existIn: dict))
+}
+
 nsNumberBridging.test("Bridge Int8") { testNSNumberBridgeFromInt8() }
 nsNumberBridging.test("Bridge UInt8") { testNSNumberBridgeFromUInt8() }
 nsNumberBridging.test("Bridge Int16") { testNSNumberBridgeFromInt16() }
@@ -913,4 +930,5 @@ nsNumberBridging.test("Bridge Double") { testNSNumberBridgeFromDouble() }
 nsNumberBridging.test("Bridge CGFloat") { testNSNumberBridgeFromCGFloat() }
 nsNumberBridging.test("bitPattern to exactly") { test_numericBitPatterns_to_floatingPointTypes() }
 nsNumberBridging.test("Bridge AnyHashable") { testNSNumberBridgeAnyHashable() }
+nsNumberBridging.test("Bridge AnyHashable (ObjC)") { testNSNumberBridgeAnyHashableObjc() }
 runAllTests()
