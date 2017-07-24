@@ -23,7 +23,7 @@ sil @_T020tsan_instrumentation11inoutAccessyyF : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @_T020tsan_instrumentation1gSiv : $*Int
   %1 = builtin "tsanInoutAccess"(%0 : $*Int) : $()
-// CHECK:  call void @__tsan_write1(i8* bitcast ([[GLOBAL]]* @_T020tsan_instrumentation1gSiv to i8*))
+// CHECK:  call void @__tsan_external_write(i8* bitcast ([[GLOBAL]]* @_T020tsan_instrumentation1gSiv to i8*), i8* null, i8* inttoptr ({{(i32|i64)}} 1 to i8*))
 
   %2 = tuple ()
   return %2 : $()
