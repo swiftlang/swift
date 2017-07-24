@@ -7959,8 +7959,8 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
                                     NameLookupFlags::ProtocolMembers |
                                     NameLookupFlags::IgnoreAccessibility);
 
-      if (!result.empty() && !result.front().getValueDecl()->isImplicit())
-        diagDest = result.front().getValueDecl();
+      if (!result.empty() && !result.front()->isImplicit())
+        diagDest = result.front();
 
       auto diagName = diag::decodable_suggest_overriding_init_here;
 

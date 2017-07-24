@@ -1197,8 +1197,7 @@ static bool canSynthesize(TypeChecker &tc, NominalTypeDecl *target,
         // already), so just bail with a general error.
         return false;
       } else {
-        auto *initializer =
-          cast<ConstructorDecl>(result.front().getValueDecl());
+        auto *initializer = cast<ConstructorDecl>(result.front().Decl);
         if (!initializer->isDesignatedInit()) {
           // We must call a superclass's designated initializer.
           tc.diagnose(initializer,
