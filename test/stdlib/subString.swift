@@ -182,4 +182,11 @@ SubstringTests.test("UTF8View") {
   expectEqual("", String(u.dropLast(10))!)
 }
 
+SubstringTests.test("Persistent Content") {
+  var str = "abc"
+  str += "def"
+  expectEqual("bcdefg", str.dropFirst(1) + "g")
+  expectEqual("bcdefg", (str.dropFirst(1) + "g") as String)
+}
+
 runAllTests()
