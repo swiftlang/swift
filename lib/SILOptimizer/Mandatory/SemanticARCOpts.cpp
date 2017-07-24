@@ -14,7 +14,7 @@
 #include "swift/SIL/OwnershipChecker.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/TransitivelyUnreachableBlocks.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -146,9 +146,8 @@ struct SemanticARCOpts : SILFunctionTransform {
     bool MadeChange = false;
     SILFunction *F = getFunction();
 
-    auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
-    TransitivelyUnreachableBlocksInfo TUB(*PO);
-    OwnershipChecker Checker{F->getModule(), TUB, {}, {}, {}};
+    DeadEndBlocks DEBlocks(F);
+    OwnershipChecker Checker{F->getModule(), DEBlocks, {}, {}, {}};
 
     // First as a special case, handle guaranteed SIL function arguments.
     //

@@ -36,7 +36,7 @@ class SILFunction;
 class SILInstruction;
 class SILLocation;
 class SILModule;
-class TransitivelyUnreachableBlocksInfo;
+class DeadEndBlocks;
 class ValueBaseUseIterator;
 class ValueUseIterator;
 
@@ -304,7 +304,7 @@ public:
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(SILModule &Mod,
-                       TransitivelyUnreachableBlocksInfo *TUB = nullptr) const;
+                       DeadEndBlocks *DEBlocks = nullptr) const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored
