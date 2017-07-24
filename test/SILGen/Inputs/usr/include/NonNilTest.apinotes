@@ -1,16 +1,16 @@
 ---
-Name: gizmo
+Name: NonNilTest
 Classes:
-- Name: Gizmo
+- Name: NonNilTest
   Methods:
-  - Selector: nonNilGizmo
+  - Selector: nonNilObject
     MethodKind: Instance
     NullabilityOfRet: N
-  - Selector: nonNilGizmo
+  - Selector: nonNilObject
     MethodKind: Class
     NullabilityOfRet: N
   Properties:
-  - Name: nonNilGizmoProperty
+  - Name: nonNilObjectProperty
     Nullability: N
-  - Name: unownedNonNilGizmoProperty
+  - Name: unownedNonNilObjectProperty
     Nullability: N
