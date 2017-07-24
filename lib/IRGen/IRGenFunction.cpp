@@ -250,7 +250,18 @@ void IRGenFunction::emitTSanInoutAccessCall(llvm::Value *address) {
   llvm::Function *fn = cast<llvm::Function>(IGM.getTSanInoutAccessFn());
 
   llvm::Value *castAddress = Builder.CreateBitCast(address, IGM.Int8PtrTy);
-  Builder.CreateCall(fn, {castAddress});
+
+  // Passing 0 as the caller PC causes compiler-rt to get our PC.
+  llvm::Value *callerPC = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+
+  // A magic number agreed upon with compiler-rt to indicate a modifying
+  // access.
+  const unsigned kExternalTagSwiftModifyingAccess = 0x1;
+  llvm::Value *tagValue =
+      llvm::ConstantInt::get(IGM.SizeTy, kExternalTagSwiftModifyingAccess);
+  llvm::Value *castTag = Builder.CreateIntToPtr(tagValue, IGM.Int8PtrTy);
+
+  Builder.CreateCall(fn, {castAddress, callerPC, castTag});
 }
 
 
