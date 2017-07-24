@@ -2409,14 +2409,19 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
     underlying = mapTypeOutOfContext(underlying);
   UnderlyingTy.setType(underlying);
 
-  // Create a NameAliasType which will resolve to the underlying type.
-  ASTContext &Ctx = getASTContext();
-  auto aliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
-  aliasTy->setRecursiveProperties(getUnderlyingTypeLoc().getType()
-      ->getRecursiveProperties());
+  // FIXME -- if we already have an interface type, we're changing the
+  // underlying type. See the comment in the ProtocolDecl case of
+  // validateDecl().
+  if (!hasInterfaceType()) {
+    // Create a NameAliasType which will resolve to the underlying type.
+    ASTContext &Ctx = getASTContext();
+    auto aliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
+    aliasTy->setRecursiveProperties(getUnderlyingTypeLoc().getType()
+        ->getRecursiveProperties());
 
-  // Set the interface type of this declaration.
-  setInterfaceType(MetatypeType::get(aliasTy, Ctx));
+    // Set the interface type of this declaration.
+    setInterfaceType(MetatypeType::get(aliasTy, Ctx));
+  }
 }
 
 UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
