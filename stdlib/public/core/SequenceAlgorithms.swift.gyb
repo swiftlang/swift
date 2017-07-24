@@ -653,6 +653,64 @@ extension Sequence {
   }
 }
 
+
+//===----------------------------------------------------------------------===//
+// reduce(into:_:)
+//===----------------------------------------------------------------------===//
+
+extension Sequence {
+  /// Returns the result of combining the elements of the sequence using the
+  /// given closure.
+  ///
+  /// Use the `reduce(into:_:)` method to produce a single value from the elements
+  /// of an entire sequence. For example, you can use this method on an array
+  /// of numbers to find their sum or product.
+  ///
+  /// The `nextPartialResult` closure is called sequentially with an
+  /// accumulating value initialized to `initialResult` and each element of
+  /// the sequence. This example shows how to find the sum of an array of
+  /// numbers.
+  ///
+  ///     let numbers = [1, 2, 3, 4]
+  ///     let numberSum = numbers.reduce(into: 0, { (x: inout Int, y) in
+  ///         x += y
+  ///     })
+  ///     // numberSum == 10
+  ///
+  /// When `numbers.reduce(into:_:)` is called, the following steps occur:
+  ///
+  /// 1. The `nextPartialResult` closure is called with an inout parameter
+  ///    `x` containing `initialResult`---`0` in this case---and the first
+  ///    element of `numbers`---`1`---. The value of `x` is changed to `1`.
+  /// 2. The closure is called again repeatedly with `x` and each element
+  //     of the sequence.
+  /// 3. When the sequence is exhausted, the last value of `x` is returned
+  //     to the caller.
+  ///
+  /// If the sequence has no elements, `nextPartialResult` is never executed
+  /// and `initialResult` is the result of the call to `reduce(into:_:)`.
+  ///
+  /// - Parameters:
+  ///   - initialResult: The value to use as the initial accumulating value.
+  ///     The accumulating value is set to `initialResult`.
+  ///   - nextPartialResult: A closure that changes the accumulating value given
+  ///     an element of the sequence.
+  /// - Returns: The final accumulated value. If the sequence has no elements,
+  ///   the result is `initialResult`.
+  @_inlineable
+  public func reduce<Result>(
+    into initialResult: Result,
+    _ nextPartialResult:
+      (_ partialResult: inout Result, ${GElement}) throws -> ()
+  ) rethrows -> Result {
+    var accumulator = initialResult
+    for element in self {
+      try nextPartialResult(&accumulator, element)
+    }
+    return accumulator
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // reversed()
 //===----------------------------------------------------------------------===//
