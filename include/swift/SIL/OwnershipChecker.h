@@ -22,7 +22,7 @@ class SILBasicBlock;
 class SILInstruction;
 class SILModule;
 class SILValue;
-class TransitivelyUnreachableBlocksInfo;
+class DeadEndBlocks;
 
 /// This class is a higher level interface to the ownership checker meant for
 /// use with SILPasses. It uses the actual checker as an internal PImpl detail
@@ -31,9 +31,9 @@ struct OwnershipChecker {
   /// The module that we are in.
   SILModule &Mod;
 
-  /// A cache of unreachable function blocks that we use to determine if we can
+  /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
-  const TransitivelyUnreachableBlocksInfo &TUB;
+  DeadEndBlocks &DEBlocks;
 
   /// The list of regular users from the last run of the checker.
   llvm::SmallVector<SILInstruction *, 16> RegularUsers;

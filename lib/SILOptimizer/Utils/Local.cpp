@@ -23,6 +23,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1021,30 +1022,6 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
   Callbacks.DeleteInst(Closure);
 
   return true;
-}
-
-//===----------------------------------------------------------------------===//
-//                             DeadEndBlocks
-//===----------------------------------------------------------------------===//
-
-void DeadEndBlocks::compute() {
-  assert(ReachableBlocks.empty() && "Computed twice");
-
-  // First step: find blocks which end up in a no-return block (terminated by
-  // an unreachable instruction).
-  // Search for function-exiting blocks, i.e. return and throw.
-  for (SILBasicBlock &BB : *F) {
-    TermInst *TI = BB.getTerminator();
-    if (TI->isFunctionExiting())
-      ReachableBlocks.insert(&BB);
-  }
-  // Propagate the reachability up the control flow graph.
-  unsigned Idx = 0;
-  while (Idx < ReachableBlocks.size()) {
-    SILBasicBlock *BB = ReachableBlocks[Idx++];
-    for (SILBasicBlock *Pred : BB->getPredecessorBlocks())
-      ReachableBlocks.insert(Pred);
-  }
 }
 
 //===----------------------------------------------------------------------===//

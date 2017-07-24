@@ -34,7 +34,7 @@
 #include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/TransitivelyUnreachableBlocks.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -1341,9 +1341,9 @@ class SILValueOwnershipChecker {
   /// The module that we are in.
   SILModule &Mod;
 
-  /// A cache of unreachable function blocks that we use to determine if we can
+  /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
-  const TransitivelyUnreachableBlocksInfo &TUB;
+  DeadEndBlocks &DEBlocks;
 
   /// The value whose ownership we will check.
   SILValue Value;
@@ -1379,10 +1379,11 @@ class SILValueOwnershipChecker {
 
 public:
   SILValueOwnershipChecker(
-      SILModule &M, const TransitivelyUnreachableBlocksInfo &TUB, SILValue V,
+      SILModule &M, DeadEndBlocks &DEBlocks, SILValue V,
       ErrorBehaviorKind ErrorBehavior,
       llvm::SmallPtrSet<SILBasicBlock *, 32> &VisitedBlocks)
-      : Result(), Mod(M), TUB(TUB), Value(V), ErrorBehavior(ErrorBehavior),
+      : Result(), Mod(M), DEBlocks(DEBlocks), Value(V),
+        ErrorBehavior(ErrorBehavior),
         VisitedBlocks(VisitedBlocks) {
     assert(Value && "Can not initialize a checker with an empty SILValue");
   }
@@ -1741,7 +1742,7 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
     break;
   }
 
-  if (TUB.isUnreachable(Arg->getParent()))
+  if (DEBlocks.isDeadEnd(Arg->getParent()))
     return true;
 
   return !handleError([&] {
@@ -1771,7 +1772,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
     return true;
 
   if (auto *ParentBlock = Value->getParentBlock()) {
-    if (TUB.isUnreachable(ParentBlock)) {
+    if (DEBlocks.isDeadEnd(ParentBlock)) {
       DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
                          << "without users!\n"
                          << "    Function: '" << Value->getFunction()->getName()
@@ -1991,7 +1992,7 @@ bool SILValueOwnershipChecker::checkDataflow() {
 
       // Then check if the successor is a transitively unreachable block. In
       // such a case, we ignore it since we are going to leak along that path.
-      if (TUB.isUnreachable(SuccBlock))
+      if (DEBlocks.isDeadEnd(SuccBlock))
         continue;
 
       // Otherwise, add the successor to our SuccessorBlocksThatMustBeVisited
@@ -2049,7 +2050,7 @@ bool SILValueOwnershipChecker::checkDataflow() {
   // free.
   if (!BlocksWithNonLifetimeEndingUses.empty()) {
     for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
-      if (TUB.isUnreachable(Pair.first)) {
+      if (DEBlocks.isDeadEnd(Pair.first)) {
         continue;
       }
 
@@ -2117,8 +2118,7 @@ void SILInstruction::verifyOperandOwnership() const {
 #endif
 }
 
-void SILValue::verifyOwnership(SILModule &Mod,
-                               TransitivelyUnreachableBlocksInfo *TUB) const {
+void SILValue::verifyOwnership(SILModule &Mod, DeadEndBlocks *DEBlocks) const {
 #ifndef NDEBUG
   // If we are SILUndef, just bail. SILUndef can pair with anything. Any uses of
   // the SILUndef will make sure that the matching checks out.
@@ -2142,13 +2142,12 @@ void SILValue::verifyOwnership(SILModule &Mod,
     ErrorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
   }
   llvm::SmallPtrSet<SILBasicBlock *, 32> LiveBlocks;
-  if (TUB) {
-    SILValueOwnershipChecker(Mod, *TUB, *this, ErrorBehavior, LiveBlocks)
+  if (DEBlocks) {
+    SILValueOwnershipChecker(Mod, *DEBlocks, *this, ErrorBehavior, LiveBlocks)
         .check();
   } else {
-    PostOrderFunctionInfo NewPOFI((*this)->getFunction());
-    TransitivelyUnreachableBlocksInfo TUB(NewPOFI);
-    SILValueOwnershipChecker(Mod, TUB, *this, ErrorBehavior, LiveBlocks)
+    DeadEndBlocks DEBlocks((*this)->getFunction());
+    SILValueOwnershipChecker(Mod, DEBlocks, *this, ErrorBehavior, LiveBlocks)
         .check();
   }
 #endif
@@ -2175,7 +2174,8 @@ bool OwnershipChecker::checkValue(SILValue Value) {
     return false;
 
   ErrorBehaviorKind ErrorBehavior(ErrorBehaviorKind::ReturnFalse);
-  SILValueOwnershipChecker Checker(Mod, TUB, Value, ErrorBehavior, LiveBlocks);
+  SILValueOwnershipChecker Checker(Mod, DEBlocks, Value, ErrorBehavior,
+                                   LiveBlocks);
   if (!Checker.check()) {
     return false;
   }
