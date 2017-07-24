@@ -122,6 +122,18 @@ func arrayToPointer() {
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]]
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]([[DEPENDENT]])
   // CHECK: destroy_value [[OWNER]]
+
+  takesOptConstPointer(ints, and: sideEffect1())
+  // CHECK: [[TAKES_OPT_CONST_POINTER:%.*]] = function_ref @_T018pointer_conversion20takesOptConstPointerySPySiGSg_Si3andtF :
+  // CHECK: [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK: [[RESULT1:%.*]] = apply [[SIDE1]]()
+  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[OWNER:%.*]] = apply [[CONVERT_CONST]]<Int, UnsafePointer<Int>>([[POINTER_BUF:%[0-9]*]],
+  // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
+  // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafePointer<Int> on [[OWNER]]
+  // CHECK: [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt.1, [[DEPENDENT]]
+  // CHECK: apply [[TAKES_OPT_CONST_POINTER]]([[OPTPTR]], [[RESULT1]])
+  // CHECK: destroy_value [[OWNER]]
 }
 
 // CHECK-LABEL: sil hidden @_T018pointer_conversion15stringToPointerySSF 
@@ -142,6 +154,18 @@ func stringToPointer(_ s: String) {
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]]
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]([[DEPENDENT]])
+  // CHECK: destroy_value [[OWNER]]
+
+  takesOptConstRawPointer(s, and: sideEffect1())
+  // CHECK: [[TAKES_OPT_CONST_RAW_POINTER:%.*]] = function_ref @_T018pointer_conversion23takesOptConstRawPointerySVSg_Si3andtF :
+  // CHECK: [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK: [[RESULT1:%.*]] = apply [[SIDE1]]()
+  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArgument{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
+  // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
+  // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]]
+  // CHECK: [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEPENDENT]]
+  // CHECK: apply [[TAKES_OPT_CONST_RAW_POINTER]]([[OPTPTR]], [[RESULT1]])
   // CHECK: destroy_value [[OWNER]]
 }
 
