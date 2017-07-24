@@ -194,6 +194,12 @@ public extension P5 where T1 : Comparable {
   public func foo4() {}
 }
 
+public extension P5 where T1 : AnyObject {
+
+  /// This should not crash
+  public func foo5() {}
+}
+
 public extension P5 {
 
   /// This is not picked
@@ -303,6 +309,8 @@ extension S13 : P5 {
 // CHECK11-NEXT:    public func <loc>foo3()</loc></decl>
 // CHECK11-NEXT:  <decl:Func>/// This is picked
 // CHECK11-NEXT:    public func <loc>foo4()</loc></decl>
+// CHECK11-NEXT:  <decl:Func>/// This should not crash
+// CHECK11-NEXT:    public func <loc>foo5()</loc></decl>
 // CHECK11-NEXT: }</synthesized>
 
 // CHECK12:       <decl:Protocol>public protocol <loc>P6</loc> {
@@ -327,4 +335,6 @@ extension S13 : P5 {
 // CHECK14-NEXT:     public func <loc>foo3()</loc></decl>
 // CHECK14-NEXT: <decl:Func>/// This is picked
 // CHECK14-NEXT:     public func <loc>foo4()</loc></decl>
+// CHECK14-NEXT: <decl:Func>/// This should not crash
+// CHECK14-NEXT:     public func <loc>foo5()</loc></decl>
 // CHECK14-NEXT: }</synthesized>
