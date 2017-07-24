@@ -1432,10 +1432,15 @@ void ASTMangler::appendParams(Type ParamsTy, bool forceSingleParam) {
       return;
     }
     if (forceSingleParam && Tuple->getNumElements() > 1) {
-      if (ParenType *Paren = dyn_cast<ParenType>(ParamsTy.getPointer()))
+      auto flags = ParameterTypeFlags();
+      if (ParenType *Paren = dyn_cast<ParenType>(ParamsTy.getPointer())) {
         ParamsTy = Paren->getUnderlyingType();
+        flags = Paren->getParameterFlags();
+      }
 
       appendType(ParamsTy);
+      if (flags.isShared())
+        appendOperator("h");
       appendListSeparator();
       appendOperator("t");
       return;
@@ -1454,7 +1459,11 @@ void ASTMangler::appendTypeList(Type listTy) {
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      appendType(field.getType());
+      appendType(field.getType()->getInOutObjectType());
+      if (field.isInOut())
+        appendOperator("z");
+      if (field.getParameterFlags().isShared())
+        appendOperator("h");
       if (field.hasName())
         appendIdentifier(field.getName().str());
       if (field.isVararg())

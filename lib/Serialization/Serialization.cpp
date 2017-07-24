@@ -2310,6 +2310,8 @@ static uint8_t getRawStableVarDeclSpecifier(swift::VarDecl::Specifier sf) {
     return uint8_t(serialization::VarDeclSpecifier::Var);
   case swift::VarDecl::Specifier::InOut:
     return uint8_t(serialization::VarDeclSpecifier::InOut);
+  case swift::VarDecl::Specifier::Shared:
+    return uint8_t(serialization::VarDeclSpecifier::Shared);
   }
   llvm_unreachable("bad variable decl specifier kind");
 }
@@ -3271,7 +3273,7 @@ void Serializer::writeType(Type ty) {
     ParenTypeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()),
         paramFlags.isVariadic(), paramFlags.isAutoClosure(),
-        paramFlags.isEscaping(), paramFlags.isInOut());
+        paramFlags.isEscaping(), paramFlags.isInOut(), paramFlags.isShared());
     break;
   }
 
@@ -3288,7 +3290,7 @@ void Serializer::writeType(Type ty) {
           Out, ScratchRecord, abbrCode, addDeclBaseNameRef(elt.getName()),
           addTypeRef(elt.getType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isEscaping(),
-          paramFlags.isInOut());
+          paramFlags.isInOut(), paramFlags.isShared());
     }
 
     break;

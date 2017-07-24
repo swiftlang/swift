@@ -155,6 +155,10 @@ public:
   FoundResult visitInOutTypeRepr(InOutTypeRepr *T) {
     return visit(T->getBase());
   }
+  
+  FoundResult visitSharedTypeRepr(SharedTypeRepr *T) {
+    return visit(T->getBase());
+  }
 
   FoundResult visitArrayTypeRepr(ArrayTypeRepr *T) {
     return handleParent(T, T->getBase());

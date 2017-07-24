@@ -1059,9 +1059,10 @@ bool SILParser::parseSILType(SILType &Result,
   }
 
   // Parse attributes.
-  SourceLoc inoutLoc;
+  VarDecl::Specifier specifier;
+  SourceLoc specifierLoc;
   TypeAttributes attrs;
-  P.parseTypeAttributeList(inoutLoc, attrs);
+  P.parseTypeAttributeList(specifier, specifierLoc, attrs);
 
   // Global functions are implicitly @convention(thin) if not specified otherwise.
   if (IsFuncDecl && !attrs.has(TAK_convention)) {
@@ -1113,7 +1114,7 @@ bool SILParser::parseSILType(SILType &Result,
       GenericEnv = env;
   
   // Apply attributes to the type.
-  TypeLoc Ty = P.applyAttributeToType(TyR.get(), inoutLoc, attrs);
+  TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
 
   if (performTypeLocChecking(Ty, /*IsSILType=*/true, nullptr))
     return true;

@@ -4336,6 +4336,7 @@ public:
     
     Owned  = Let,
     InOut = 2,
+    Shared = 3,
   };
   
 protected:
@@ -4486,6 +4487,8 @@ public:
 
   /// Is this an immutable 'let' property?
   bool isLet() const { return getSpecifier() == Specifier::Let; }
+  /// Is this an immutable 'shared' property?
+  bool isShared() const { return getSpecifier() == Specifier::Shared; }
   
   /// Is this an element in a capture list?
   bool isCaptureList() const { return VarDeclBits.IsCaptureList; }

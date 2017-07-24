@@ -345,7 +345,7 @@ func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
 
-func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
+func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{26-30=}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{20-25=}}{{34-34=inout }}
 }
 func invalid_var(var x: Int) { // expected-error {{'var' as a parameter attribute is not allowed}}

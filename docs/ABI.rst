@@ -1039,7 +1039,8 @@ Types
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
-  list-type ::= type identifier? 'z'? 'd'?   // type with optional label, inout convention and variadic specifier
+                                                  // FIXME: Consider replacing 'h' with a two-char code
+  list-type ::= type identifier? 'z'? 'h'? 'd'?   // type with optional label, inout convention, shared convention, and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation

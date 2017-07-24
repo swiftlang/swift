@@ -988,7 +988,7 @@ std::pair<bool, Pattern*> ModelASTWalker::walkToPatternPre(Pattern *P) {
       if (auto InOutT =
            dyn_cast_or_null<InOutTypeRepr>(TyPat->getTypeLoc().getTypeRepr())) {
         if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
-                                CharSourceRange(InOutT->getInOutLoc(),
+                                CharSourceRange(InOutT->getSpecifierLoc(),
                                                 /*'inout'*/5)
                               }))
           return { false, nullptr };
