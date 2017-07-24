@@ -984,7 +984,28 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       ++score1;
     else if (isa<VarDecl>(decl2) && isa<FuncDecl>(decl1))
       ++score2;
-    
+
+    // If both are class properties with the same name, prefer
+    // the one attached to the subclass because it could only be
+    // found if requested directly.
+    if (!decl1->isInstanceMember() && !decl2->isInstanceMember()) {
+      if (isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
+        auto *nominal1 = dc1->getAsNominalTypeOrNominalTypeExtensionContext();
+        auto *nominal2 = dc2->getAsNominalTypeOrNominalTypeExtensionContext();
+
+        if (nominal1 && nominal2 && nominal1 != nominal2) {
+          auto base1 = nominal1->getDeclaredType();
+          auto base2 = nominal2->getDeclaredType();
+
+          if (isNominallySuperclassOf(base1, base2))
+            ++score2;
+
+          if (isNominallySuperclassOf(base2, base1))
+            ++score1;
+        }
+      }
+    }
+
     // If we haven't found a refinement, record whether one overload is in
     // any way more constrained than another. We'll only utilize this
     // information in the case of a potential ambiguity.
