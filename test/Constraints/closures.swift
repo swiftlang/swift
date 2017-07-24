@@ -29,6 +29,25 @@ struct X2 {
 
 _ = f0(X2(), {$0.g()})
 
+// Closures with inout arguments and '__shared' conversions.
+
+func inoutToSharedConversions() {
+  func fooOW<T, U>(_ f : (__owned T) -> U) {}
+  fooOW({ (x : Int) in return Int(5) }) // '__owned'-to-'__owned' allowed
+  fooOW({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__owned' allowed
+  fooOW({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(_) -> _'}}
+  
+  func fooIO<T, U>(_ f : (inout T) -> U) {}
+  fooIO({ (x : inout Int) in return Int(5) }) // 'inout'-to-'inout' allowed
+  fooIO({ (x : __shared Int) in return Int(5) }) // expected-error {{cannot convert value of type '(__shared Int) -> Int' to expected argument type '(inout _) -> _'}}
+  fooIO({ (x : Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(inout _) -> _'}}
+
+  func fooSH<T, U>(_ f : (__shared T) -> U) {}
+  fooSH({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__shared' allowed
+  fooSH({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(__shared _) -> _'}}
+  fooSH({ (x : Int) in return Int(5) }) // '__owned'-to-'__shared' allowed
+}
+
 // Autoclosure
 func f1(f: @autoclosure () -> Int) { }
 func f2() -> Int { }

@@ -477,8 +477,8 @@ enum class ConventionsKind : uint8_t {
       }
     }
 
-    void visitSelfType(AbstractionPattern origType, CanType substType,
-                       SILFunctionTypeRepresentation rep) {
+    void visitSharedType(AbstractionPattern origType, CanType substType,
+                         SILFunctionTypeRepresentation rep) {
       NextOrigParamIndex++;
 
       auto &substTL =
@@ -548,16 +548,29 @@ enum class ConventionsKind : uint8_t {
                                                    /*canonicalVararg*/true)
                         ->getCanonicalType();
         CanTupleType tty = dyn_cast<TupleType>(ty);
-        if (!tty || (origType.isTypeParameter() && !tty->hasInOutElement())) {
-          visit(origType, ty);
-          return;
-        }
-        
         // If the abstraction pattern is opaque, and the tuple type is
         // materializable -- if it doesn't contain an l-value type -- then it's
         // a valid target for substitution and we should not expand it.
+        if (!tty || (origType.isTypeParameter() && !tty->hasInOutElement())) {
+          auto flags = (params.size() == 1)
+                     ? params.front().getParameterFlags()
+                     : ParameterTypeFlags();
+          if (flags.isShared()) {
+            visitSharedType(origType, ty, extInfo.getSILRepresentation());
+          } else {
+            visit(origType, ty);
+          }
+          return;
+        }
+
         for (auto i : indices(tty.getElementTypes())) {
-          visit(origType.getTupleElementType(i), tty.getElementType(i));
+          if (tty->getElement(i).getParameterFlags().isShared()) {
+            visitSharedType(origType.getTupleElementType(i),
+                            tty.getElementType(i),
+                            extInfo.getSILRepresentation());
+          } else {
+            visit(origType.getTupleElementType(i), tty.getElementType(i));
+          }
         }
         return;
       }
@@ -569,15 +582,19 @@ enum class ConventionsKind : uint8_t {
         CanType ty =  params[i].getType();
         CanTupleType tty = dyn_cast<TupleType>(ty);
         AbstractionPattern eltPattern = origType.getTupleElementType(i);
+        // If the abstraction pattern is opaque, and the tuple type is
+        // materializable -- if it doesn't contain an l-value type -- then it's
+        // a valid target for substitution and we should not expand it.
         if (!tty || (eltPattern.isTypeParameter() && !tty->hasInOutElement())) {
-          visit(eltPattern, ty);
+          if (params[i].getParameterFlags().isShared()) {
+            visitSharedType(eltPattern, ty, extInfo.getSILRepresentation());
+          } else {
+            visit(eltPattern, ty);
+          }
           continue;
         }
         
         assert(eltPattern.isTuple());
-        // If the abstraction pattern is opaque, and the tuple type is
-        // materializable -- if it doesn't contain an l-value type -- then it's
-        // a valid target for substitution and we should not expand it.
         for (unsigned j = 0; j < eltPattern.getNumTupleElements(); ++j) {
           visit(eltPattern.getTupleElementType(j), tty.getElementType(j));
         }
@@ -586,9 +603,9 @@ enum class ConventionsKind : uint8_t {
       // Process the self parameter.  Note that we implicitly drop self
       // if this is a static foreign-self import.
       if (!Foreign.Self.isImportAsMember()) {
-        visitSelfType(origType.getTupleElementType(numNonSelfParams),
-                      params[numNonSelfParams].getType(),
-                      extInfo.getSILRepresentation());
+        visitSharedType(origType.getTupleElementType(numNonSelfParams),
+                        params[numNonSelfParams].getType(),
+                        extInfo.getSILRepresentation());
       }
 
       // Clear the foreign-self handler for safety.
