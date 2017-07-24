@@ -150,13 +150,6 @@ extension StringProtocol {
     }
     return String(String.CharacterView(self))
   }
-
-  internal var _persistentString : String {
-    if _fastPath(self is _SwiftStringView) {
-      return (self as! _SwiftStringView)._persistentContent
-    }
-    return String(String.CharacterView(self))
-  }
 }
 
 extension String : _SwiftStringView {
