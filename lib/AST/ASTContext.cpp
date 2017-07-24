@@ -2775,6 +2775,61 @@ Type AnyFunctionType::Param::getType() const {
   return Ty;
 }
 
+AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
+                                               bool isInitializingCtor,
+                                               bool wantDynamicSelf) {
+  auto *dc = AFD->getDeclContext();
+  auto &Ctx = dc->getASTContext();
+  
+  // Determine the type of the container.
+  auto containerTy = dc->getDeclaredInterfaceType();
+  if (!containerTy || containerTy->hasError())
+    return AnyFunctionType::Param(ErrorType::get(Ctx), Identifier(),
+                                  ParameterTypeFlags());
+
+  // Determine the type of 'self' inside the container.
+  auto selfTy = dc->getSelfInterfaceType();
+  if (!selfTy || selfTy->hasError())
+    return AnyFunctionType::Param(ErrorType::get(Ctx), Identifier(),
+                                  ParameterTypeFlags());
+
+  bool isStatic = false;
+  bool isMutating = false;
+
+  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+    isStatic = FD->isStatic();
+    isMutating = FD->isMutating();
+
+    if (wantDynamicSelf && FD->hasDynamicSelf())
+      selfTy = DynamicSelfType::get(selfTy, Ctx);
+  } else if (isa<ConstructorDecl>(AFD)) {
+    if (isInitializingCtor) {
+      // initializing constructors of value types always have an implicitly
+      // inout self.
+      isMutating = true;
+    } else {
+      // allocating constructors have metatype 'self'.
+      isStatic = true;
+    }
+  } else if (isa<DestructorDecl>(AFD)) {
+    // destructors of value types always have an implicitly inout self.
+    isMutating = true;
+  }
+
+  // 'static' functions have 'self' of type metatype<T>.
+  if (isStatic)
+    return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx), Identifier(),
+                                  ParameterTypeFlags());
+
+  // Reference types have 'self' of type T.
+  if (containerTy->hasReferenceSemantics())
+    return AnyFunctionType::Param(selfTy, Identifier(),
+                                  ParameterTypeFlags());
+
+  return AnyFunctionType::Param(selfTy, Identifier(),
+                                ParameterTypeFlags().withInOut(isMutating));
+}
+
 void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
                                  GenericTypeDecl *TheDecl, Type Parent) {
   ID.AddPointer(TheDecl);

@@ -277,7 +277,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
 
   // Compute the interface type.
   Type interfaceTy;
-  Type selfIfaceTy = eqDecl->computeInterfaceSelfType();
+  auto selfParam = computeSelfParam(eqDecl);
   if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
     eqDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
 
@@ -288,11 +288,12 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
     auto ifaceParamsTy = TupleType::get(ifaceParamElts, C);
     interfaceTy = FunctionType::get(ifaceParamsTy, boolTy,
                                     AnyFunctionType::ExtInfo());
-    interfaceTy = GenericFunctionType::get(genericSig, selfIfaceTy, interfaceTy,
+    interfaceTy = GenericFunctionType::get(genericSig, {selfParam}, interfaceTy,
                                            AnyFunctionType::ExtInfo());
   } else {
     interfaceTy = FunctionType::get(paramsTy, boolTy);
-    interfaceTy = FunctionType::get(selfIfaceTy, interfaceTy);
+    interfaceTy = FunctionType::get({selfParam}, interfaceTy,
+                                    FunctionType::ExtInfo());
   }
   eqDecl->setInterfaceType(interfaceTy);
 
@@ -419,13 +420,14 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
 
   // Compute the interface type of hashValue().
   Type interfaceType;
-  Type selfIfaceType = getterDecl->computeInterfaceSelfType();
+  auto selfParam = computeSelfParam(getterDecl);
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     getterDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, selfIfaceType, methodType,
+    interfaceType = GenericFunctionType::get(sig, {selfParam}, methodType,
                                              AnyFunctionType::ExtInfo());
   } else
-    interfaceType = FunctionType::get(selfIfaceType, methodType);
+    interfaceType = FunctionType::get({selfParam}, methodType,
+                                      AnyFunctionType::ExtInfo());
   
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(std::max(Accessibility::Internal,

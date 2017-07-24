@@ -1068,21 +1068,23 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
     initDecl->getAttrs().add(reqAttr);
   }
 
-  Type selfType = initDecl->computeInterfaceSelfType();
-  Type selfInitType = initDecl->computeInterfaceSelfType(/*init=*/true);
+  auto selfParam = computeSelfParam(initDecl);
+  auto initSelfParam = computeSelfParam(initDecl, /*init=*/true);
   Type interfaceType;
   Type initializerType;
   if (auto sig = target->getGenericSignatureOfContext()) {
     // Evaluate the below, but in a generic environment (if Self is generic).
     initDecl->setGenericEnvironment(target->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, selfType, innerType,
+    interfaceType = GenericFunctionType::get(sig, {selfParam}, innerType,
                                              FunctionType::ExtInfo());
-    initializerType = GenericFunctionType::get(sig, selfInitType, innerType,
+    initializerType = GenericFunctionType::get(sig, {initSelfParam}, innerType,
                                                FunctionType::ExtInfo());
   } else {
     // (Self) -> (Decoder) throws -> (Self)
-    interfaceType = FunctionType::get(selfType, innerType);
-    initializerType = FunctionType::get(selfInitType, innerType);
+    interfaceType = FunctionType::get({selfParam}, innerType,
+                                      FunctionType::ExtInfo());
+    initializerType = FunctionType::get({initSelfParam}, innerType,
+                                        FunctionType::ExtInfo());
   }
 
   initDecl->setInterfaceType(interfaceType);

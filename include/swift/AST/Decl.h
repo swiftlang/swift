@@ -5045,21 +5045,6 @@ public:
     return getParameterLists()[i];
   }
 
-  /// \brief If this is a method in a type or extension thereof, compute
-  /// and return the type to be used for the 'self' argument of the interface
-  /// type, or an empty Type() if no 'self' argument should exist.  This can
-  /// only be used after name binding has resolved types.
-  ///
-  /// \param isInitializingCtor Specifies whether we're computing the 'self'
-  /// type of an initializing constructor, which accepts an instance 'self'
-  /// rather than a metatype 'self'.
-  ///
-  /// \param wantDynamicSelf Specifies whether the 'self' type should be
-  /// wrapped in a DynamicSelfType, which is the case for the 'self' parameter
-  /// type inside a class method returning 'Self'.
-  Type computeInterfaceSelfType(bool isInitializingCtor=false,
-                                bool wantDynamicSelf=false);
-
   /// \brief This method returns the implicit 'self' decl.
   ///
   /// Note that some functions don't have an implicit 'self' decl, for example,

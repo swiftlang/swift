@@ -511,48 +511,76 @@ enum class ConventionsKind : uint8_t {
     void visitTopLevelParams(AbstractionPattern origType,
                              CanAnyFunctionType::CanParamArrayRef params,
                              AnyFunctionType::ExtInfo extInfo) {
-      // If we don't have 'self', we don't need to do anything special.
-      if (!extInfo.hasSelfParam() && !Foreign.Self.isImportAsMember()) {
-        // Add any leading foreign parameters.
-        maybeAddForeignParameters();
-
-        if (params.empty()) {
-          visit(origType, M.getASTContext().TheEmptyTupleType);
-        } else {
-          CanType ty = AnyFunctionType::composeInput(M.getASTContext(), params,
-                                                     /*canonicalVararg*/true)
-                        ->getCanonicalType();
-          visit(origType, ty);
-        }
-        return;
-      }
-
-      // Okay, handle 'self'.
-
       unsigned numEltTypes = params.size();
-      assert(numEltTypes > 0);
       unsigned numNonSelfParams = numEltTypes - 1;
-
+      
       // We have to declare this out here so that the lambda scope lasts for
       // the duration of the loop below.
       auto handleForeignSelf = [&] {
         visit(origType.getTupleElementType(numNonSelfParams),
               params[numNonSelfParams].getType());
       };
-
+      
       // If we have a foreign-self, install handleSelf as the handler.
       if (Foreign.Self.isInstance()) {
+        assert(numEltTypes > 0);
         // This is safe because function_ref just stores a pointer to the
         // existing lambda object.
         HandleForeignSelf = handleForeignSelf;
       }
-
-      // Now we can add any leading foreign parameters.
+      
+      // Add any leading foreign parameters.
       maybeAddForeignParameters();
+      
+      // If we have no parameters, even 'self' parameters, bail unless we need
+      // to substitute.
+      if (params.empty()) {
+        if (origType.isTypeParameter())
+          visit(origType, M.getASTContext().TheEmptyTupleType);
+        return;
+      }
+      
+      assert(numEltTypes > 0);
+      
+      // If we don't have 'self', we don't need to do anything special.
+      if (!extInfo.hasSelfParam() && !Foreign.Self.isImportAsMember()) {
+        CanType ty = AnyFunctionType::composeInput(M.getASTContext(), params,
+                                                   /*canonicalVararg*/true)
+                        ->getCanonicalType();
+        CanTupleType tty = dyn_cast<TupleType>(ty);
+        if (!tty || (origType.isTypeParameter() && !tty->hasInOutElement())) {
+          visit(origType, ty);
+          return;
+        }
+        
+        // If the abstraction pattern is opaque, and the tuple type is
+        // materializable -- if it doesn't contain an l-value type -- then it's
+        // a valid target for substitution and we should not expand it.
+        for (auto i : indices(tty.getElementTypes())) {
+          visit(origType.getTupleElementType(i), tty.getElementType(i));
+        }
+        return;
+      }
+      
+      // Okay, handle 'self'.
 
       // Process all the non-self parameters.
       for (unsigned i = 0; i != numNonSelfParams; ++i) {
-        visit(origType.getTupleElementType(i), params[i].getType());
+        CanType ty =  params[i].getType();
+        CanTupleType tty = dyn_cast<TupleType>(ty);
+        AbstractionPattern eltPattern = origType.getTupleElementType(i);
+        if (!tty || (eltPattern.isTypeParameter() && !tty->hasInOutElement())) {
+          visit(eltPattern, ty);
+          continue;
+        }
+        
+        assert(eltPattern.isTuple());
+        // If the abstraction pattern is opaque, and the tuple type is
+        // materializable -- if it doesn't contain an l-value type -- then it's
+        // a valid target for substitution and we should not expand it.
+        for (unsigned j = 0; j < eltPattern.getNumTupleElements(); ++j) {
+          visit(eltPattern.getTupleElementType(j), tty.getElementType(j));
+        }
       }
 
       // Process the self parameter.  Note that we implicitly drop self
@@ -568,15 +596,10 @@ enum class ConventionsKind : uint8_t {
     }
 
     void visit(AbstractionPattern origType, CanType substType) {
-      // Expand tuples.  But if the abstraction pattern is opaque, and
-      // the tuple type is materializable -- if it doesn't contain an
-      // l-value type -- then it's a valid target for substitution and
-      // we should not expand it.
+      // Expand tuples.
       CanTupleType substTupleTy = dyn_cast<TupleType>(substType);
-      if (substTupleTy &&
-          (!origType.isTypeParameter() || substTupleTy->hasInOutElement())) {
-        assert(origType.isTypeParameter() ||
-               origType.getNumTupleElements() == substTupleTy->getNumElements());
+      if (substTupleTy && !origType.isTypeParameter()) {
+        assert(origType.getNumTupleElements() == substTupleTy->getNumElements());
         for (auto i : indices(substTupleTy.getElementTypes())) {
           visit(origType.getTupleElementType(i),
                 substTupleTy.getElementType(i));
