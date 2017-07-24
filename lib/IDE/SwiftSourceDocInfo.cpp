@@ -423,8 +423,6 @@ private:
 
 
   std::vector<Token> TokensInRange;
-  const Token &StartTok;
-  const Token &EndTok;
   SourceLoc Start;
   SourceLoc End;
 
@@ -563,10 +561,8 @@ private:
   Implementation(SourceFile &File, ArrayRef<Token> TokensInRange) :
     File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr),
     TokensInRange(TokensInRange),
-    StartTok(TokensInRange.front()),
-    EndTok(TokensInRange.back()),
-    Start(StartTok.getLoc()),
-    End(EndTok.getLoc()) {
+    Start(TokensInRange.front().getLoc()),
+    End(TokensInRange.back().getLoc()) {
       assert(Start.isValid() && End.isValid());
   }
 
