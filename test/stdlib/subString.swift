@@ -92,6 +92,14 @@ SubstringTests.test("Comparison") {
 		["apple", "pen", "pen", "pineapple"])
 }
 
+SubstringTests.test("Filter") {
+  var name = "😂Edward Woodward".dropFirst()
+  var filtered = name.filter { $0 != "d" }
+  expectType(Substring.self, &name)
+  expectType(String.self, &filtered)
+  expectEqual("Ewar Woowar", filtered)
+}
+
 SubstringTests.test("CharacterView") {
   let s = "abcdefg"
   var t = s.characters.dropFirst(2)

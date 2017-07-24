@@ -428,6 +428,12 @@ extension Substring {
   public func uppercased() -> String {
     return String(self).uppercased()
   }
+  
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> String {
+    return try String(self.lazy.filter(isIncluded))
+  }
 }
 
 extension Substring : TextOutputStream {
