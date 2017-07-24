@@ -300,17 +300,14 @@ struct SwiftEditorCharRange {
   bool intersects(const SwiftSyntaxToken &Token) const {
     return this->Offset < (Token.endOffset()) && this->EndOffset > Token.Offset;
   }
-  void extendToInclude(unsigned OtherOffset) {
-    if (OtherOffset < Offset)
-      Offset = OtherOffset;
-    else if (OtherOffset > EndOffset)
-      EndOffset = OtherOffset;
-  }
   void extendToInclude(const SwiftEditorCharRange &Range) {
     if (Range.Offset < Offset)
       Offset = Range.Offset;
     if (Range.EndOffset > EndOffset)
       EndOffset = Range.EndOffset;
+  }
+  void extendToInclude(unsigned OtherOffset) {
+    extendToInclude({OtherOffset, OtherOffset});
   }
 };
 
