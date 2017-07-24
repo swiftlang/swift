@@ -873,6 +873,31 @@ func test_numericBitPatterns_to_floatingPointTypes() {
     }
 }
 
+func testNSNumberBridgeAnyHashable() {
+    var dict = [AnyHashable : Any]()
+    for i in -Int(UInt8.min) ... Int(UInt8.max) {
+        dict[i] = "\(i)"
+    }
+
+    // When bridging a dictionary to NSDictionary, we should be able to access
+    // the keys through either an Int (the original type boxed in AnyHashable)
+    // or NSNumber (the type Int bridged to).
+    let ns_dict = dict as NSDictionary
+    for i in -Int(UInt8.min) ... Int(UInt8.max) {
+        guard let value = ns_dict[i] as? String else {
+            expectUnreachable("Unable to look up value by Int key.")
+            continue
+        }
+
+        guard let ns_value = ns_dict[NSNumber(value: i)] as? String else {
+            expectUnreachable("Unable to look up value by NSNumber key.")
+            continue
+        }
+        
+        expectEqual(value, ns_value)
+    }
+}
+
 nsNumberBridging.test("Bridge Int8") { testNSNumberBridgeFromInt8() }
 nsNumberBridging.test("Bridge UInt8") { testNSNumberBridgeFromUInt8() }
 nsNumberBridging.test("Bridge Int16") { testNSNumberBridgeFromInt16() }
@@ -887,4 +912,5 @@ nsNumberBridging.test("Bridge Float") { testNSNumberBridgeFromFloat() }
 nsNumberBridging.test("Bridge Double") { testNSNumberBridgeFromDouble() }
 nsNumberBridging.test("Bridge CGFloat") { testNSNumberBridgeFromCGFloat() }
 nsNumberBridging.test("bitPattern to exactly") { test_numericBitPatterns_to_floatingPointTypes() }
+nsNumberBridging.test("Bridge AnyHashable") { testNSNumberBridgeAnyHashable() }
 runAllTests()
