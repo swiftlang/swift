@@ -19,7 +19,17 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the length of `substring`.
   public init(_ substring: Substring) {
-    self = String(substring._slice)
+    let x = substring._wholeString
+    let start = substring.startIndex
+    let end = substring.endIndex
+    let u16 = x._core[start.encodedOffset..<end.encodedOffset]
+    if start.samePosition(in: x.unicodeScalars) != nil
+    && end.samePosition(in: x.unicodeScalars) != nil {
+      self = String(_StringCore(u16))
+    }
+    else {
+      self = String(decoding: u16, as: UTF16.self)
+    }
   }
 }
 
