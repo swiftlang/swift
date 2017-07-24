@@ -3183,6 +3183,14 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   }
 
   if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
+    // FIXME: If this is a protocol typealias and we haven't built the
+    // protocol's generic environment yet, do so now, to ensure the
+    // typealias's underlying type has fully resoved dependent
+    // member types.
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(aliasDecl->getDeclContext()))
+      if (protoDecl->getGenericEnvironment() == nullptr)
+        validateDecl(protoDecl);
+
     if (aliasDecl->getGenericParams()) {
       return UnboundGenericType::get(
           aliasDecl, baseTy,
