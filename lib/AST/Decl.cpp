@@ -3877,7 +3877,7 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
                          const DeclRefExpr *base) const {
   // If this is a 'var' decl, then we're settable if we have storage or a
   // setter.
-  if (!isLet())
+  if (!isLet() && !isShared())
     return ::isSettable(this);
 
   // If the decl has a value bound to it but has no PBD, then it is
