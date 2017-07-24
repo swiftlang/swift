@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -emit-sil -O -sdk %S/Inputs -I %S/Inputs -I %S/Inputs/objc_nonnull_lie_hack/ -enable-source-import -primary-file %s | %FileCheck -check-prefix=OPT %s
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar33495516
 
 import Foundation
 import NonNilTest
