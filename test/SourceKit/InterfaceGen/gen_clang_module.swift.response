@@ -4633,6 +4633,15 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     ]
   },
   {
+    key.kind: source.lang.swift.decl.typealias,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "FooStruct1Pointer",
+    key.offset: 1543,
+    key.length: 62,
+    key.nameoffset: 1553,
+    key.namelength: 17
+  },
+  {
     key.kind: source.lang.swift.decl.struct,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "FooStruct2",
@@ -4706,6 +4715,15 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     ]
   },
   {
+    key.kind: source.lang.swift.decl.typealias,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "FooStructTypedef1",
+    key.offset: 1751,
+    key.length: 40,
+    key.nameoffset: 1761,
+    key.namelength: 17
+  },
+  {
     key.kind: source.lang.swift.decl.struct,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "FooStructTypedef2",
@@ -4777,6 +4795,15 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         ]
       }
     ]
+  },
+  {
+    key.kind: source.lang.swift.decl.typealias,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "FooTypedef1",
+    key.offset: 1974,
+    key.length: 29,
+    key.nameoffset: 1984,
+    key.namelength: 11
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -5347,6 +5374,15 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.namelength: 15
       }
     ]
+  },
+  {
+    key.kind: source.lang.swift.decl.typealias,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "typedef_int_t",
+    key.offset: 4624,
+    key.length: 31,
+    key.nameoffset: 4634,
+    key.namelength: 13
   },
   {
     key.kind: source.lang.swift.decl.var.global,

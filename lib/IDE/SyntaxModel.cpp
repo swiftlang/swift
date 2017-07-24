@@ -954,6 +954,16 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         popStructureNode();
       }
     }
+  } else if (auto *TypeAliasD = dyn_cast<TypeAliasDecl>(D)) {
+    SyntaxStructureNode SN;
+    SN.Dcl = TypeAliasD;
+    SN.Kind = SyntaxStructureKind::TypeAlias;
+    SN.Range = charSourceRangeFromSourceRange(SM,
+                                              TypeAliasD->getSourceRange());
+    SN.NameRange = CharSourceRange(TypeAliasD->getNameLoc(),
+                                   TypeAliasD->getName().getLength());
+    SN.Attrs = TypeAliasD->getAttrs();
+    pushStructureNode(SN, TypeAliasD);
   }
 
   return true;
