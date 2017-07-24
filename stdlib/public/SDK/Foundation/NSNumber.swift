@@ -647,28 +647,35 @@ extension NSNumber : _HasCustomAnyHashableRepresentation {
     // AnyHashable to NSObject.
     @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
+        // The custom AnyHashable representation here is used when checking for
+        // equality during bridging NSDictionary to Dictionary (or looking up
+        // values in a Dictionary bridged to NSDictionary).
+        // 
+        // When we've got NSNumber values as keys that we want to compare
+        // through an AnyHashable box, we want to compare values through the
+        // largest box size we've got available to us (i.e. upcast numbers).
+        // This happens to resemble the representation that NSNumber uses
+        // internally: (long long | unsigned long long | double).
+        // 
+        // This allows us to compare things like
+        // 
+        //     ([Int : Any] as [AnyHashable : Any]) vs. [NSNumber : Any]
+        // 
+        // because Int can be upcast to Int64 and compared with the number's
+        // Int64 value.
+        // 
+        // If NSNumber adds 128-bit representations, this will need to be
+        // updated to use those.
         if let nsDecimalNumber: NSDecimalNumber = self as? NSDecimalNumber {
             return AnyHashable(nsDecimalNumber.decimalValue)
         } else if self === kCFBooleanTrue as NSNumber {
             return AnyHashable(true)
         } else if self === kCFBooleanFalse as NSNumber {
             return AnyHashable(false)
-        } else if NSNumber(value: int8Value) == self {
-            return AnyHashable(int8Value)
-        } else  if NSNumber(value: uint8Value) == self {
-            return AnyHashable(uint8Value)
-        } else if NSNumber(value: int16Value) == self {
-            return AnyHashable(int16Value)
-        } else if NSNumber(value: uint16Value) == self {
-            return AnyHashable(uint16Value)
-        } else if NSNumber(value: int32Value) == self {
-            return AnyHashable(int32Value)
-        } else if NSNumber(value: uint32Value) == self {
-            return AnyHashable(uint32Value)
         } else if NSNumber(value: int64Value) == self {
             return AnyHashable(int64Value)
-        } else if NSNumber(value: floatValue) == self {
-            return AnyHashable(floatValue)
+        } else if NSNumber(value: uint64Value) == self {
+            return AnyHashable(uint64Value)
         } else if NSNumber(value: doubleValue) == self {
             return AnyHashable(doubleValue)
         } else {
@@ -676,4 +683,3 @@ extension NSNumber : _HasCustomAnyHashableRepresentation {
         }
     }
 }
-
