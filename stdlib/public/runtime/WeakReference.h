@@ -109,7 +109,7 @@ class WeakReferenceBits {
                 "native marker value must not interfere with ObjC bits");
 #endif
 
-  uintptr_t bits;
+  uintptr_t bits = 0;
 
  public:
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -122,7 +122,7 @@ class WeakReferenceBits {
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool isNativeOrNull() const {
-    return bits == 0  ||  (bits & NativeMarkerMask) == NativeMarkerValue;
+    return bits == 0 || (bits & NativeMarkerMask) == NativeMarkerValue;
   }
     
   LLVM_ATTRIBUTE_ALWAYS_INLINE
