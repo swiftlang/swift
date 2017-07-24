@@ -35,6 +35,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Utils/IndexTrie.h"
 #include "swift/SILOptimizer/Utils/Local.h"

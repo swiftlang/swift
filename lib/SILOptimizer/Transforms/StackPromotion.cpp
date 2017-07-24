@@ -18,6 +18,7 @@
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
 #include "llvm/ADT/Statistic.h"
 

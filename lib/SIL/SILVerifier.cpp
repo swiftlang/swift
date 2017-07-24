@@ -31,7 +31,7 @@
 #include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/TransitivelyUnreachableBlocks.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -111,8 +111,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
-  llvm::Optional<PostOrderFunctionInfo> PostOrderInfo;
-  llvm::Optional<TransitivelyUnreachableBlocksInfo> UnreachableBlockInfo;
+  DeadEndBlocks DEBlocks;
   bool SingleFunction = true;
 
   SILVerifier(const SILVerifier&) = delete;
@@ -434,8 +433,7 @@ public:
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getLoweredFunctionType(), F.getModule()),
         TC(F.getModule().Types), OpenedArchetypes(F), Dominance(nullptr),
-        PostOrderInfo(), UnreachableBlockInfo(),
-        SingleFunction(SingleFunction) {
+        DEBlocks(&F), SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
       
@@ -448,10 +446,6 @@ public:
     }
 
     Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
-    if (isSILOwnershipEnabled()) {
-      PostOrderInfo.emplace(const_cast<SILFunction *>(&F));
-      UnreachableBlockInfo.emplace(PostOrderInfo.getValue());
-    }
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
@@ -502,8 +496,7 @@ public:
     // ownership.
     if (!F->hasQualifiedOwnership())
       return;
-    SILValue(V).verifyOwnership(F->getModule(),
-                                &UnreachableBlockInfo.getValue());
+    SILValue(V).verifyOwnership(F->getModule(), &DEBlocks);
   }
 
   void checkSILInstruction(SILInstruction *I) {
