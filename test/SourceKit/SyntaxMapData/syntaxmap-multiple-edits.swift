@@ -224,7 +224,7 @@
 
 // CHECK: {{^}}{
 // CHECK-NEXT: key.offset: 0,
-// CHECK-NEXT: key.length: 25,
+// CHECK-NEXT: key.length: 21,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
 // CHECK-NEXT:   {
