@@ -407,8 +407,9 @@ static bool canSynthesizeCodingKey(TypeChecker &tc, Decl *parentDecl,
       return false;
   }
 
-  if (!enumDecl->getInherited().empty() &&
-      enumDecl->getInherited().front().isError())
+  auto inherited = enumDecl->getInherited();
+  if (!inherited.empty() && inherited.front().wasValidated() &&
+      inherited.front().isError())
     return false;
 
   // If it meets all of those requirements, we can synthesize CodingKey
