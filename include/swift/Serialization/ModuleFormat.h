@@ -1323,6 +1323,8 @@ namespace decls_block {
   using ImplementsDeclAttrLayout = BCRecordLayout<Implements_DECL_ATTR>;
   using ObjCRuntimeNameDeclAttrLayout
     = BCRecordLayout<ObjCRuntimeName_DECL_ATTR>;
+  using RestatedObjCConformanceDeclAttrLayout
+    = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,
