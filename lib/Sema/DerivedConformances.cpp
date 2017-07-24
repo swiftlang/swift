@@ -160,15 +160,16 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   // Compute the interface type of the getter.
   Type interfaceType = FunctionType::get(TupleType::getEmpty(C),
                                          propertyInterfaceType);
-  Type selfInterfaceType = getterDecl->computeInterfaceSelfType();
+  auto selfParam = computeSelfParam(getterDecl);
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     getterDecl->setGenericEnvironment(
         parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, selfInterfaceType,
+    interfaceType = GenericFunctionType::get(sig, {selfParam},
                                              interfaceType,
                                              FunctionType::ExtInfo());
   } else
-    interfaceType = FunctionType::get(selfInterfaceType, interfaceType);
+    interfaceType = FunctionType::get({selfParam}, interfaceType,
+                                      FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(std::max(typeDecl->getFormalAccess(),
                                         Accessibility::Internal));

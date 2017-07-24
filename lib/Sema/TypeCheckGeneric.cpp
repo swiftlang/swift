@@ -858,22 +858,12 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     SmallVector<AnyFunctionType::Param, 4> argTy;
     SmallVector<AnyFunctionType::Param, 4> initArgTy;
     
-    if (i == e-1 && hasSelf) {
-      auto ifTy = func->computeInterfaceSelfType();
-      auto selfTy = AnyFunctionType::Param(ifTy->getInOutObjectType(),
-                                           Identifier(),
-                                           ParameterTypeFlags().withInOut(ifTy->is<InOutType>()));
-      
+    if (i == e-1 && hasSelf) {      
       // Substitute in our own 'self' parameter.
       
-      argTy.push_back(selfTy);
+      argTy.push_back(computeSelfParam(func));
       if (initFuncTy) {
-        auto ifTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
-
-        initArgTy.push_back(
-          AnyFunctionType::Param(
-            ifTy->getInOutObjectType(),
-            Identifier(), ParameterTypeFlags().withInOut(ifTy->is<InOutType>())));
+        initArgTy.push_back(computeSelfParam(func, /*isInitializingCtor=*/true));
       }
     } else {
       AnyFunctionType::decomposeInput(paramLists[e - i - 1]->getInterfaceType(Context), argTy);

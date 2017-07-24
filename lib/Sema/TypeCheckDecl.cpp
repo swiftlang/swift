@@ -1268,31 +1268,29 @@ static void configureImplicitSelf(TypeChecker &tc,
   auto selfDecl = func->getImplicitSelfDecl();
 
   // Compute the type of self.
-  Type selfIfaceTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true,
-                                                    /*wantDynamicSelf*/true);
-  assert(selfDecl && selfIfaceTy && "Not a method");
+  auto selfParam = computeSelfParam(func, /*isInitializingCtor*/true,
+                                    /*wantDynamicSelf*/true);
+  assert(selfDecl && selfParam.getPlainType() && "Not a method");
 
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
-  auto specifier = selfIfaceTy->is<InOutType>()
+  auto specifier = selfParam.getParameterFlags().isInOut()
                  ? VarDecl::Specifier::InOut
                  : VarDecl::Specifier::Owned;
   selfDecl->setSpecifier(specifier);
 
-  selfDecl->setInterfaceType(selfIfaceTy->getInOutObjectType());
+  selfDecl->setInterfaceType(selfParam.getPlainType());
 }
 
 /// Record the context type of 'self' after the generic environment of
 /// the function has been determined.
 static void recordSelfContextType(AbstractFunctionDecl *func) {
   auto selfDecl = func->getImplicitSelfDecl();
-  Type selfTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true,
-                                               /*wantDynamicSelf*/true);
+  auto selfParam = computeSelfParam(func, /*isInitializingCtor*/true,
+                                    /*wantDynamicSelf*/true);
 
-  selfTy = func->mapTypeIntoContext(selfTy);
-  // FIXME(Remove InOutType): 'computeInterfaceSelfType' should tell us if
-  // we need to do this.
-  if (selfTy->is<InOutType>()) {
+  auto selfTy = func->mapTypeIntoContext(selfParam.getType());
+  if (selfParam.getParameterFlags().isInOut()) {
     selfDecl->setSpecifier(VarDecl::Specifier::InOut);
   }
   selfDecl->setType(selfTy->getInOutObjectType());

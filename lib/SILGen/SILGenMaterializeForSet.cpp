@@ -435,7 +435,7 @@ public:
     }
 
     CanType witnessSelfType =
-      Witness->computeInterfaceSelfType()->getCanonicalType(
+      computeSelfParam(Witness).getType()->getCanonicalType(
         GenericSig, *SGM.M.getSwiftModule());
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
 
