@@ -95,6 +95,7 @@ import RC4
 import RGBHistogram
 import RangeAssignment
 import RecursiveOwnedParameter
+import ReduceInto
 import ReversedCollections
 import SetTests
 import SevenBoom
@@ -237,6 +238,10 @@ addTo(&precommitTests, "EqualSubstringString", run_EqualSubstringString)
 addTo(&precommitTests, "EqualSubstringSubstring", run_EqualSubstringSubstring)
 addTo(&precommitTests, "EqualSubstringSubstringGenericEquatable", run_EqualSubstringSubstringGenericEquatable)
 addTo(&precommitTests, "ErrorHandling", run_ErrorHandling)
+addTo(&precommitTests, "FilterEvenUsingReduce", run_FilterEvenUsingReduce)
+addTo(&precommitTests, "FilterEvenUsingReduceInto", run_FilterEvenUsingReduceInto)
+addTo(&precommitTests, "FrequenciesUsingReduce", run_FrequenciesUsingReduce)
+addTo(&precommitTests, "FrequenciesUsingReduceInto", run_FrequenciesUsingReduceInto)
 addTo(&precommitTests, "GlobalClass", run_GlobalClass)
 addTo(&precommitTests, "Hanoi", run_Hanoi)
 addTo(&precommitTests, "HashTest", run_HashTest)
@@ -408,6 +413,8 @@ addTo(&precommitTests, "SuffixCountableRange", run_SuffixCountableRange)
 addTo(&precommitTests, "SuffixCountableRangeLazy", run_SuffixCountableRangeLazy)
 addTo(&precommitTests, "SuffixSequence", run_SuffixSequence)
 addTo(&precommitTests, "SuffixSequenceLazy", run_SuffixSequenceLazy)
+addTo(&precommitTests, "SumUsingReduce", run_SumUsingReduce)
+addTo(&precommitTests, "SumUsingReduceInto", run_SumUsingReduceInto)
 addTo(&precommitTests, "SuperChars", run_SuperChars)
 addTo(&precommitTests, "TwoSum", run_TwoSum)
 addTo(&precommitTests, "TypeFlood", run_TypeFlood)
