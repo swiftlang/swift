@@ -129,10 +129,48 @@ public func enumCallee(_ x: LargeEnum) {
     case .Empty2: break
   }
 }
-// CHECK-LABEL-64: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10enumCalleeyAA9LargeEnumOF(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable(34)) #0 {
+// CHECK-LABEL-64: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10enumCalleeyAA9LargeEnumOF(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable({{.*}})) #0 {
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO05InnerF0O
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
 // CHECK-64: call %swift.type* @_T0ypMa()
 // CHECK-64: ret void
+
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*) #0 {
+// CHECK: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK: call swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror %swifterror)
+// CHECK: ret void
+class SuperBase {
+  func boom() -> BigStruct {
+    return BigStruct()
+  }
+}
+
+class SuperSub : SuperBase {
+  override func boom() -> BigStruct {
+    return BigStruct()
+  }
+  func f() {
+    let _ = {
+      nil ?? super.boom()
+    }
+  }
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgfg(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}})) #0 {
+// CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK: [[LOAD:%.*]] = load %swift.refcounted*, %swift.refcounted** %.callInternalLet.data
+// CHECK: call swiftcc void %6(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
+// CHECK: ret void
+public struct MUseStruct {
+  var x = BigStruct()
+  public var superclassMirror: BigStruct? {
+    return callInternalLet()
+  }
+
+  internal let callInternalLet: () -> BigStruct?
+}
