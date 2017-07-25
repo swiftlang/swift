@@ -76,15 +76,17 @@ func qualifiedType() {
                           // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{14-26=)}}
 }
 
-/* TODO allow '.Type' in expr context
+// We allow '.Type' in expr context
 func metaType() {
-  let ty = Foo.Type.self
-  let metaTy = Foo.Type.self
+  let _ = Foo.Type.self
+  let _ = Foo.Type.self
 
-  let badTy = Foo.Type
-  let badMetaTy = type(of: Foo.Type)
+  let _ = Foo.Type // expected-error{{expected member name or constructor call after type name}}
+  // expected-note@-1 {{use '.self' to reference the type object}}
+
+  let _ = type(of: Foo.Type) // expected-error{{expected member name or constructor call after type name}}
+  // expected-note@-1 {{use '.self' to reference the type object}}
 }
- */
 
 func genType() {
   _ = Gen<Foo>.self
