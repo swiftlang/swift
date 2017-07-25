@@ -1057,7 +1057,7 @@ protected:
   
 public:
   /// The operand number of the first argument.
-  static unsigned getArgumentOperandNumber() { return 1; }
+  static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
   SILValue getCallee() const { return Operands[Callee].get(); }
 
@@ -1114,8 +1114,6 @@ public:
   SubstitutionList getSubstitutions() const {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
-
-  static unsigned getOperandIndexOfFirstArgument() { return NumStaticOperands; }
 
   /// The arguments passed to this instruction.
   MutableArrayRef<Operand> getArgumentOperands() {
@@ -6444,7 +6442,7 @@ public:
   }
 
   unsigned getOperandIndexOfFirstArgument() {
-    FOREACH_IMPL_RETURN(getOperandIndexOfFirstArgument());
+    FOREACH_IMPL_RETURN(getArgumentOperandNumber());
   }
 
 #undef FOREACH_IMPL_RETURN
