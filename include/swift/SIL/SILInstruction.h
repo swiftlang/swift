@@ -6480,7 +6480,7 @@ public:
 
   // Translate the index of the argument to the full apply or partial_apply into
   // to the corresponding index into the arguments of the called function.
-  unsigned getCalleeArgIndex(Operand &oper) {
+  unsigned getCalleeArgIndex(const Operand &oper) {
     assert(oper.getUser() == Inst);
     assert(oper.getOperandNumber() >= getOperandIndexOfFirstArgument());
 
