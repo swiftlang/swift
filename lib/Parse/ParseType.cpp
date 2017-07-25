@@ -1156,6 +1156,7 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   case tok::code_complete:
   case tok::exclaim_postfix:
   case tok::question_postfix:
+  case tok::colon:
     return true;
 
   case tok::oper_binary_spaced:
