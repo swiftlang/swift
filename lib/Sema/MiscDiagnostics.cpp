@@ -257,17 +257,26 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           checkTupleSplat(Call);
 
         // Check the callee, looking through implicit conversions.
-        auto Base = Call->getFn();
-        while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
-          Base = Conv->getSubExpr();
-        while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(Base))
-          Base = ignoredBase->getRHS();
-        if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
-          checkNoEscapeParameterUse(DRE, Call, OperandKind::Callee);
-          checkForSuspiciousBitCasts(DRE, Call);
+        auto base = Call->getFn();
+        unsigned uncurryLevel = 0;
+        while (auto conv = dyn_cast<ImplicitConversionExpr>(base))
+          base = conv->getSubExpr();
+        while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(base))
+          base = ignoredBase->getRHS();
+        auto *calleeDRE = dyn_cast<DeclRefExpr>(base);
+        if (calleeDRE) {
+          checkNoEscapeParameterUse(calleeDRE, Call, OperandKind::Callee);
+          checkForSuspiciousBitCasts(calleeDRE, Call);
+
+        // Otherwise, try to drill down through member calls for the purposes
+        // of argument-matching code below.
+        } else if (auto selfApply = dyn_cast<SelfApplyExpr>(base)) {
+          uncurryLevel++;
+          base = selfApply->getSemanticFn();
+          calleeDRE = dyn_cast<DeclRefExpr>(base);
         }
 
-        visitArguments(Call, [&](Expr *arg) {
+        visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
           // InOutExpr's are allowed in argument lists directly.
           if (auto *IOE = dyn_cast<InOutExpr>(arg)) {
             if (isa<CallExpr>(Call))
@@ -277,12 +286,24 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           Expr *unwrapped = arg;
           if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(arg))
             unwrapped = IIO->getSubExpr();
-          if (auto *ICO = dyn_cast<ImplicitConversionExpr>(unwrapped)) {
-            if (isa<InOutToPointerExpr>(ICO) ||
-                isa<ArrayToPointerExpr>(ICO) ||
-                isa<ErasureExpr>(ICO))
-              if (auto *IOE = dyn_cast<InOutExpr>(ICO->getSubExpr()))
-                AcceptableInOutExprs.insert(IOE);
+
+          if (isa<InOutToPointerExpr>(unwrapped) ||
+              isa<ArrayToPointerExpr>(unwrapped) ||
+              isa<ErasureExpr>(unwrapped)) {
+            auto operand =
+              cast<ImplicitConversionExpr>(unwrapped)->getSubExpr();
+            if (auto *IOE = dyn_cast<InOutExpr>(operand)) {
+              AcceptableInOutExprs.insert(IOE);
+              operand = IOE->getSubExpr();
+            }
+
+            // Also do some additional work based on how the function uses
+            // the argument.
+            if (calleeDRE) {
+              checkConvertedPointerArgument(calleeDRE->getDeclRef(),
+                                            uncurryLevel, argIndex,
+                                            unwrapped, operand);
+            }
           }
 
           // Also give special treatment to noescape function arguments.
@@ -332,7 +353,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     }
 
     static void visitArguments(ApplyExpr *apply,
-                               llvm::function_ref<void(Expr*)> fn) {
+                               llvm::function_ref<void(unsigned, Expr*)> fn) {
       auto *arg = apply->getArg();
 
       // The argument could be shuffled if it includes default arguments,
@@ -342,12 +363,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // The argument is either a ParenExpr or TupleExpr.
       if (auto *TE = dyn_cast<TupleExpr>(arg)) {
-        for (auto elt : TE->getElements())
-          fn(elt);
+        auto elts = TE->getElements();
+        for (auto i : indices(elts))
+          fn(i, elts[i]);
       } else if (auto *PE = dyn_cast<ParenExpr>(arg)) {
-        fn(PE->getSubExpr());
+        fn(0, PE->getSubExpr());
       } else {
-        fn(arg);
+        fn(0, arg);
       }
     }
 
@@ -366,6 +388,58 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     Expr *walkToExprPost(Expr *E) override {
       checkInvalidPartialApplication(E);
       return E;
+    }
+
+    void checkConvertedPointerArgument(ConcreteDeclRef callee,
+                                       unsigned uncurryLevel,
+                                       unsigned argIndex,
+                                       Expr *pointerExpr,
+                                       Expr *storage) {
+      if (!isPointerIdentityArgument(callee, uncurryLevel, argIndex))
+        return;
+
+      // Flag that the argument is non-accessing.
+      if (auto inout = dyn_cast<InOutToPointerExpr>(pointerExpr)) {
+        inout->setNonAccessing(true);
+      } else if (auto array = dyn_cast<ArrayToPointerExpr>(pointerExpr)) {
+        array->setNonAccessing(true);
+      }
+
+      // TODO: warn if taking the address of 'storage' will definitely
+      // yield a temporary address.
+    }
+
+    /// Is the given call argument, known to be of pointer type, just used
+    /// for its pointer identity?
+    bool isPointerIdentityArgument(ConcreteDeclRef ref, unsigned uncurryLevel,
+                                   unsigned argIndex) {
+      // FIXME: derive this from an attribute instead of hacking it based
+      // on the target name!
+      auto decl = ref.getDecl();
+
+      // Assume that == and != are non-accessing uses.
+      if (decl->isOperator()) {
+        auto op = decl->getBaseName();
+        if (op == "==" || op == "!=")
+          return true;
+        return false;
+      }
+
+      // NSObject.addObserver(_:forKeyPath:options:context:)
+      if (uncurryLevel == 1 && argIndex == 3) {
+        return decl->getFullName().isCompoundName("addObserver",
+                                                  { "", "forKeyPath",
+                                                    "options", "context" });
+      }
+
+      // NSObject.removeObserver(_:forKeyPath:context:)
+      if (uncurryLevel == 1 && argIndex == 2) {
+        return decl->getFullName().isCompoundName("removeObserver",
+                                                  { "", "forKeyPath",
+                                                    "context" });
+      }
+
+      return false;
     }
 
     /// We have a collection literal with a defaulted type, e.g. of [Any].  Emit
@@ -509,7 +583,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       NoEscapeArgument noescapeArgument;
       Expr *problematicArg = nullptr;
 
-      visitArguments(apply, [&](Expr *arg) {
+      visitArguments(apply, [&](unsigned argIndex, Expr *arg) {
         // Just find the first problematic argument.
         if (noescapeArgument) return;
 

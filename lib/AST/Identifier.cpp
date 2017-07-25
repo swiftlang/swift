@@ -104,6 +104,30 @@ int DeclName::compare(DeclName other) const {
   return argNames.size() < otherArgNames.size() ? -1 : 1;
 }
 
+static bool equals(ArrayRef<Identifier> idents, ArrayRef<StringRef> strings) {
+  if (idents.size() != strings.size())
+    return false;
+  for (size_t i = 0, e = idents.size(); i != e; ++i) {
+    if (!idents[i].is(strings[i]))
+      return false;
+  }
+  return true;
+}
+
+bool DeclName::isCompoundName(DeclBaseName baseName,
+                              ArrayRef<StringRef> argNames) const {
+  return (isCompoundName() &&
+          getBaseName() == baseName &&
+          equals(getArgumentNames(), argNames));
+}
+
+bool DeclName::isCompoundName(StringRef baseName,
+                              ArrayRef<StringRef> argNames) const {
+  return (isCompoundName() &&
+          getBaseName() == baseName &&
+          equals(getArgumentNames(), argNames));
+}
+
 void DeclName::dump() const {
   llvm::errs() << *this << "\n";
 }

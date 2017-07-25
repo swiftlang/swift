@@ -68,6 +68,8 @@ public:
   }
   
   bool empty() const { return Pointer == nullptr; }
+
+  bool is(StringRef string) const { return str().equals(string); }
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
@@ -239,7 +241,7 @@ public:
   }
 
   bool operator==(StringRef Str) const {
-    return !isSpecial() && getIdentifier().str() == Str;
+    return !isSpecial() && getIdentifier().is(Str);
   }
   bool operator!=(StringRef Str) const { return !(*this == Str); }
 
@@ -325,7 +327,7 @@ class DeclName {
     MutableArrayRef<Identifier> getArgumentNames() {
       return {getTrailingObjects<Identifier>(), NumArgs};
     }
-      
+
     /// Uniquing for the ASTContext.
     static void Profile(llvm::FoldingSetNodeID &id, DeclBaseName baseName,
                         ArrayRef<Identifier> argumentNames);
@@ -430,14 +432,16 @@ public:
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
-    if (!isSimpleName())
-      return false;
-
-    if (getBaseName().isSpecial())
-      return false;
-
-    return getBaseIdentifier().str().equals(name);
+    return isSimpleName() && getBaseName() == name;
   }
+
+  /// True if this name is a compound name equal to the given base name and
+  /// argument names.
+  bool isCompoundName(DeclBaseName base, ArrayRef<StringRef> args) const;
+
+  /// True if this name is a compound name equal to the given normal
+  /// base name and argument names.
+  bool isCompoundName(StringRef base, ArrayRef<StringRef> args) const;
   
   /// True if this name is an operator.
   bool isOperator() const {
