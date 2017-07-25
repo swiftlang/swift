@@ -120,3 +120,9 @@ _ = "hello\(
             """)!"
             // expected-error@-4 {{unterminated string literal}}
             // expected-error@-2 {{unterminated string literal}}
+
+_ = """
+  line one \ non-whitepace
+  line two
+  """
+  // expected-error@-3 {{invalid escape sequence in literal}}
