@@ -4385,6 +4385,19 @@ void GenericSignatureBuilder::checkConformanceConstraints(
         auto proto = constraint.value;
         assert(proto == entry.first && "Mixed up protocol constraints");
 
+        // If this conformance requirement recursively makes a protocol
+        // conform to itself, don't complain here.
+        auto source = constraint.source;
+        auto rootSource = source->getRoot();
+        if (rootSource->kind == RequirementSource::RequirementSignatureSelf &&
+            source != rootSource &&
+            proto == rootSource->getProtocolDecl() &&
+            rootSource->getRootPotentialArchetype()
+              ->isInSameEquivalenceClassAs(
+                                 source->getAffectedPotentialArchetype())) {
+          return ConstraintRelation::Unrelated;
+        }
+
         // If this is a redundantly inherited Objective-C protocol, treat it
         // as "unrelated" to silence the warning about the redundant
         // conformance.
