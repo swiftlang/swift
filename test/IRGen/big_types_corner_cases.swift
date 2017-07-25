@@ -33,6 +33,15 @@ class OptionalInoutFuncType {
   }
 }
 
+// CHECK-LABEL: define{{( protected)?}} i32 @main(i32, i8**) #0 {
+// CHECK: call void @llvm.lifetime.start
+// CHECK: call void @llvm.memcpy
+// CHECK: call void @llvm.lifetime.end
+// CHECK: ret i32 0
+let bigStructGlobalArray : [BigStruct] = [
+  BigStruct()
+]
+
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases21OptionalInoutFuncTypeC7executeys5Error_pSgFyycfU_(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIxcx_Sg* nocapture dereferenceable({{.*}})
 // CHECK: call void @_T0SqWy
 // CHECK: call void @_T0SqWe

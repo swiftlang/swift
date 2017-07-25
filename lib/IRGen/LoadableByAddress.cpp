@@ -1104,19 +1104,19 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
 }
 
 void LoadableStorageAllocation::allocateLoadableStorage() {
+  // We need to map all functions exists
+  // required for Apply result's allocations
+  // Else we might get the following error:
+  // "stack dealloc does not match most recent stack alloc"
+  // When we dealloc later
+  LargeValueVisitor(pass).mapReturnInstrs();
   if (modifiableFunction(pass.F->getLoweredFunctionType())) {
-    // We need to map all functions exists
-    // required for Apply result's allocations
-    // Else we might get the following error:
-    // "stack dealloc does not match most recent stack alloc"
-    // When we dealloc later
-    LargeValueVisitor(pass).mapReturnInstrs();
     // Turn by-value function args to by-address ones
     convertIndirectFunctionArgs();
-    convertApplyResults();
   } else {
     convertIndirectFunctionPointerArgsForUnmodifiable();
   }
+  convertApplyResults();
 
   // Populate the pass' data structs
   LargeValueVisitor(pass).mapValueStorage();
@@ -2106,8 +2106,9 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
   invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
 
   // If we modified the function arguments - add to list of functions to clone
-  if (rewrittenReturn || !pass.largeLoadableArgs.empty() ||
-      !pass.funcSigArgs.empty()) {
+  if (modifiableFunction(funcType) &&
+      (rewrittenReturn || !pass.largeLoadableArgs.empty() ||
+       !pass.funcSigArgs.empty())) {
     modFuncs.insert(F);
   }
   // If we modified any applies - add them to the global list for recreation
