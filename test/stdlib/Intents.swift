@@ -41,6 +41,17 @@ if #available(iOS 11.0, *) {
       expectUnreachable()
     }
   }
+
+  IntentsTestSuite.test("INSetProfileInCarIntent/defaultProfile availability/\(swiftVersion)") {
+    func f(profile: INSetProfileInCarIntent) {
+      var isDefaultProfile = profile.isDefaultProfile
+      expectType(Bool?.self, &isDefaultProfile)
+#if !swift(>=4)
+      var defaultProfile = profile.defaultProfile
+      expectType(Int?.self, &defaultProfile)
+#endif
+    }
+  }
 }
 #endif
 
