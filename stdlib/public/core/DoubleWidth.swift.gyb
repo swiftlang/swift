@@ -12,8 +12,7 @@
 
 /// A fixed-width integer that is twice the size of its base type.
 public struct DoubleWidth<Base : FixedWidthInteger> :
-  FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral
-  where Base.Words : Collection, Base.Magnitude.Words : Collection {
+  FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral {
 
   public typealias High = Base
   public typealias Low = Base.Magnitude
