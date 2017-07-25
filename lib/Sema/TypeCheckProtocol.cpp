@@ -3452,6 +3452,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
       switch (reqt.getKind()) {
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
+        // FIXME: This is the wrong check
         if (selfTy->isEqual(reqt.getFirstType())
             && !TC.isSubtypeOf(Conformance->getType(),reqt.getSecondType(), DC))
           return false;
@@ -4064,7 +4065,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
     if (!t2)
       return true;
     
-    return TC.isSubtypeOf(t1, t2, DC);
+    return TC.isSubclassOf(t1, t2, DC);
   };
   
   bool protos1AreSubsetOf2 = protos1.empty();
