@@ -419,6 +419,11 @@ bool RequirementSource::isSelfDerivedConformance(
     switch (source->kind) {
     case ProtocolRequirement:
     case InferredProtocolRequirement: {
+      // For a requirement signature, we ignore the 'Self: P' requirement
+      // for the purposes of the self-derived check.
+      if (source->parent->kind == RequirementSource::RequirementSignatureSelf)
+        return false;
+
       // Note that we've seen a protocol requirement.
       sawProtocolRequirement = true;
 
