@@ -1408,6 +1408,7 @@ private:
   void recreateApplies();
   void recreateSingleApply(SILInstruction *applyInst);
   void recreateConvInstrs();
+  void recreateBuiltinInstrs();
   void recreateLoadInstrs();
   void recreateUncheckedEnumDataInstrs();
   void recreateUncheckedTakeEnumDataAddrInst();
@@ -1416,6 +1417,7 @@ private:
 private:
   llvm::SetVector<SILFunction *> modFuncs;
   llvm::SetVector<SILInstruction *> conversionInstrs;
+  llvm::SetVector<BuiltinInst *> builtinInstrs;
   llvm::SetVector<LoadInst *> loadInstrsOfFunc;
   llvm::SetVector<UncheckedEnumDataInst *> uncheckedEnumDataOfFunc;
   llvm::SetVector<UncheckedTakeEnumDataAddrInst *>
@@ -2121,6 +2123,25 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
   }
 }
 
+static SmallVector<Substitution, 4>
+getNewSubs(SubstitutionList origSubs, swift::irgen::IRGenModule *currIRMod,
+           swift::GenericEnvironment *genEnv) {
+  SmallVector<Substitution, 4> newSubs;
+  for (auto sub : origSubs) {
+    Type origType = sub.getReplacement();
+    CanType origCanType = origType->getCanonicalType();
+    if (!origCanType->isLegalSILType()) {
+      newSubs.push_back(sub);
+      continue;
+    }
+    SILType origSILType = SILType::getPrimitiveObjectType(origCanType);
+    SILType newSILType = getNewSILType(genEnv, origSILType, *currIRMod);
+    Type newType = newSILType.getSwiftRValueType()->getRValueType();
+    newSubs.push_back(Substitution(newType, sub.getConformances()));
+  }
+  return newSubs;
+}
+
 void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   auto *F = applyInst->getFunction();
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
@@ -2152,7 +2173,6 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   CanSILFunctionType newCanSILFuncType(newSILFunctionType);
   SILFunctionConventions newSILFunctionConventions(newCanSILFuncType,
                                                    *getModule());
-  SmallVector<Substitution, 4> newSubs;
   SmallVector<SILValue, 8> callArgs;
   SILBuilder applyBuilder(applyInst);
   // If we turned a direct result into an indirect parameter
@@ -2166,18 +2186,8 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto newAlloc = allApplyRetToAllocMap[applyInst];
     callArgs.push_back(newAlloc);
   }
-  for (Substitution sub : applySite.getSubstitutions()) {
-    Type origType = sub.getReplacement();
-    CanType origCanType = origType->getCanonicalType();
-    if (!origCanType->isLegalSILType()) {
-      newSubs.push_back(sub);
-      continue;
-    }
-    SILType origSILType = SILType::getPrimitiveObjectType(origCanType);
-    SILType newSILType = getNewSILType(genEnv, origSILType, *currIRMod);
-    Type newType = newSILType.getSwiftRValueType()->getRValueType();
-    newSubs.push_back(Substitution(newType, sub.getConformances()));
-  }
+  SmallVector<Substitution, 4> newSubs =
+      getNewSubs(applySite.getSubstitutions(), currIRMod, genEnv);
   // Collect arg operands
   for (Operand &operand : applySite.getArgumentOperands()) {
     SILValue currOperand = operand.get();
@@ -2400,6 +2410,35 @@ void LoadableByAddress::recreateConvInstrs() {
   }
 }
 
+void LoadableByAddress::recreateBuiltinInstrs() {
+  for (auto *builtinInstr : builtinInstrs) {
+    auto *currIRMod =
+        getIRGenModule()->IRGen.getGenModule(builtinInstr->getFunction());
+    auto *F = builtinInstr->getFunction();
+    GenericEnvironment *genEnv = F->getGenericEnvironment();
+    auto loweredTy = F->getLoweredFunctionType();
+    if (!genEnv && loweredTy->isPolymorphic()) {
+      genEnv = getGenericEnvironment(F->getModule(), loweredTy);
+    }
+    auto resultTy = builtinInstr->getType();
+    auto newResultTy = getNewSILType(genEnv, resultTy, *currIRMod);
+    auto newSubs =
+        getNewSubs(builtinInstr->getSubstitutions(), currIRMod, genEnv);
+
+    llvm::SmallVector<SILValue, 5> newArgs;
+    for (auto oldArg : builtinInstr->getArguments()) {
+      newArgs.push_back(oldArg);
+    }
+
+    SILBuilder builtinBuilder(builtinInstr);
+    auto *newInstr = builtinBuilder.createBuiltin(
+        builtinInstr->getLoc(), builtinInstr->getName(), newResultTy, newSubs,
+        newArgs);
+    builtinInstr->replaceAllUsesWith(newInstr);
+    builtinInstr->getParent()->erase(builtinInstr);
+  }
+}
+
 void LoadableByAddress::updateLoweredTypes(SILFunction *F) {
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
   CanSILFunctionType funcType = F->getLoweredFunctionType();
@@ -2449,6 +2488,11 @@ void LoadableByAddress::run() {
               }
               case ValueKind::ThinToThickFunctionInst: {
                 conversionInstrs.insert(currInstr);
+                break;
+              }
+              case ValueKind::BuiltinInst: {
+                auto *instr = dyn_cast<BuiltinInst>(currInstr);
+                builtinInstrs.insert(instr);
                 break;
               }
               default:
@@ -2520,6 +2564,9 @@ void LoadableByAddress::run() {
 
   // Re-create all conversions for which we modified the FunctionRef
   recreateConvInstrs();
+
+  // Re-create all builtins for which we modified the FunctionRef
+  recreateBuiltinInstrs();
 
   // Re-create all unchecked enum data instrs of function pointers
   recreateUncheckedEnumDataInstrs();
