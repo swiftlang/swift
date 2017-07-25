@@ -698,6 +698,41 @@ static CanType getArgumentLoweringType(CanType type,
   }
 }
 
+static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
+                                                IRGenFunction &IGF,
+                                                CanSILFunctionType substType,
+                                                unsigned paramIdx) {
+  auto param = substType->getParameters()[paramIdx];
+  SILType argType = IGM.silConv.getSILType(param);
+  auto argLoweringTy =
+    getArgumentLoweringType(argType.getSwiftRValueType(), param);
+  auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+  // Empty values don't matter.
+  return ti.getSchema().size() == 0 && !param.isFormalIndirect();
+}
+
+/// Find the parameter index for the one (assuming there was only one) partially
+/// applied argument ignoring empty types that are not passed as part of the
+/// ABI.
+static unsigned findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
+    IRGenFunction &IGF, CanSILFunctionType substType,
+    CanSILFunctionType outType) {
+  auto substParameters = substType->getParameters();
+  auto outParamters = outType->getParameters();
+  unsigned firstNonEmpty = -1U;
+  for (unsigned paramIdx = outParamters.size() ; paramIdx != substParameters.size(); ++paramIdx) {
+    bool isEmpty =
+        isABIIgnoredParameterWithoutStorage(IGF.IGM, IGF, substType, paramIdx);
+    assert((isEmpty || firstNonEmpty == -1U) && "Expect at most one partially "
+                                                "applied that is passed as an "
+                                                "ABI argument");
+    if (!isEmpty)
+      firstNonEmpty = paramIdx;
+  }
+  assert(firstNonEmpty != -1U);
+  return firstNonEmpty;
+}
+
 /// Emit the forwarding stub function for a partial application.
 ///
 /// If 'layout' is null, there is a single captured value of
@@ -919,11 +954,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // care for the former for the purpose of reconstructing polymorphic
     // parameters from regular arguments.
     if (!calleeHasContext) {
-      unsigned paramI = substType->getParameters().size() - 1;
-      assert(substType->getParameters().size() -
-                     outType->getParameters().size() ==
-                 1 &&
-             "Expect one partially applied argument");
+      unsigned paramI =
+          findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
+              subIGF, substType, outType);
       auto paramInfo = substType->getParameters()[paramI];
       auto &ti = IGM.getTypeInfoForLowered(paramInfo.getType());
       Explosion param;
@@ -1095,13 +1128,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
       // Skip empty parameters.
       while (origParamI < origType->getParameters().size()) {
-        auto param = substType->getParameters()[origParamI];
-        SILType argType = IGM.silConv.getSILType(param);
-        auto argLoweringTy =
-            getArgumentLoweringType(argType.getSwiftRValueType(), param);
-        auto &ti = subIGF.getTypeInfoForLowered(argLoweringTy);
-        // Empty values don't matter.
-        if (ti.getSchema().size() != 0 || param.isFormalIndirect())
+        if (!isABIIgnoredParameterWithoutStorage(IGM, subIGF, substType,
+                                                 origParamI))
           break;
         origParamI++;
       }
