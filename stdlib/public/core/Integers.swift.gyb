@@ -1431,7 +1431,7 @@ public protocol BinaryInteger :
   // See <rdar://problem/31798916> for why it isn't.
   /// A type that represents the words of a binary integer. 
   /// Must implement the `Collection` protocol with an `UInt` element type.
-  associatedtype Words : Collection where Words.Element == UInt
+  associatedtype Words : Sequence, _Indexable where Words.Element == UInt
 
   /// Returns a collection containing the words of this value's binary
   /// representation, in order from the least significant to most significant.
