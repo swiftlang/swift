@@ -468,18 +468,16 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     }
     // FIXME: getting attributes here without setting them does
     // nothing. This cannot be fixed until the attributes are correctly specified.
-    fn->getAttributes().
-      addAttributes(Module.getContext(),
-                    llvm::AttributeSet::FunctionIndex,
-                    llvm::AttributeSet::get(Module.getContext(),
-                                            llvm::AttributeSet::FunctionIndex,
-                                            buildFnAttr));
-    fn->getAttributes().
-      addAttributes(Module.getContext(),
-                    llvm::AttributeSet::ReturnIndex,
-                    llvm::AttributeSet::get(Module.getContext(),
-                                            llvm::AttributeSet::ReturnIndex,
-                                            buildRetAttr));
+    fn->setAttributes(fn->getAttributes().addAttributes(
+        Module.getContext(), llvm::AttributeSet::FunctionIndex,
+        llvm::AttributeSet::get(Module.getContext(),
+                                llvm::AttributeSet::FunctionIndex,
+                                buildFnAttr)));
+    fn->setAttributes(fn->getAttributes().addAttributes(
+        Module.getContext(), llvm::AttributeSet::ReturnIndex,
+        llvm::AttributeSet::get(Module.getContext(),
+                                llvm::AttributeSet::ReturnIndex,
+                                buildRetAttr)));
   }
 
   return cache;
