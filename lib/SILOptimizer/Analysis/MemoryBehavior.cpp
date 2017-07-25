@@ -243,8 +243,8 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
   // We can ignore mayTrap().
   bool any_in_guaranteed_params = false;
   for (auto op : enumerate(AI->getArgumentOperands())) {
-    if (op.Value.get() == V &&
-        AI->getSubstCalleeConv().getSILArgumentConvention(op.Index) == swift::SILArgumentConvention::Indirect_In_Guaranteed) {
+    if (op.value().get() == V &&
+        AI->getSubstCalleeConv().getSILArgumentConvention(op.index()) == swift::SILArgumentConvention::Indirect_In_Guaranteed) {
       any_in_guaranteed_params = true;
       break;
     }
