@@ -1342,7 +1342,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 
     case RequirementKind::Superclass:
       // Superclass requirements.
-      if (!isSubtypeOf(firstType, secondType, dc)) {
+      if (!isSubclassOf(firstType, secondType, dc)) {
         if (loc.isValid()) {
           // FIXME: Poor source-location information.
           diagnose(loc, diag::type_does_not_inherit, owner, firstType,

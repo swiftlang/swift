@@ -1046,6 +1046,9 @@ void ConstraintSystem::openGeneric(
       auto subjectTy = openType(req.getFirstType(), replacements);
       auto boundTy = openType(req.getSecondType(), replacements);
       addConstraint(ConstraintKind::Subtype, subjectTy, boundTy, locatorPtr);
+      addConstraint(ConstraintKind::ConformsTo, subjectTy,
+                    TC.Context.getAnyObjectType(),
+                    locatorPtr);
       break;
     }
 
