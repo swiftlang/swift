@@ -75,15 +75,14 @@ class RValue {
 public:
   RValue() : elementsToBeAdded(Null) {}
   
-  RValue(RValue &&rv)
-    : values(std::move(rv.values)),
-      type(rv.type),
-      elementsToBeAdded(rv.elementsToBeAdded)
-  {
+  RValue(RValue &&rv) : values(std::move(rv.values)),
+                        type(rv.type),
+                        elementsToBeAdded(rv.elementsToBeAdded) {
     assert((rv.isComplete() || rv.isInSpecialState())
            && "moving rvalue that wasn't complete?!");
     rv.elementsToBeAdded = Used;
   }
+
   RValue &operator=(RValue &&rv) {
     assert((isNull() || isUsed()) && "reassigning an valid rvalue?!");
     
