@@ -51,7 +51,7 @@ namespace swift {
 struct SerializedSwiftName {
   /// The kind of the name if it is a special name
   DeclBaseName::Kind Kind;
-  /// The name of the idenifier if it is not a special name
+  /// The name of the identifier if it is not a special name
   StringRef Name;
 
   SerializedSwiftName() : Kind(DeclBaseName::Kind::Normal), Name(StringRef()) {}

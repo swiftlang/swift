@@ -724,7 +724,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // FIXME: The following attempts to do an initial ReadAST invocation to verify
   // the PCH, without affecting the existing CompilerInstance.
   // Look into combining creating the ASTReader along with verification + update
-  // if necesary, so that we can create and use one ASTReader in the common case
+  // if necessary, so that we can create and use one ASTReader in the common case
   // when there is no need for update.
 
   CompilerInstance &CI = *Impl.Instance;

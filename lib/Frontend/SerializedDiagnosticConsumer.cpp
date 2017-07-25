@@ -285,7 +285,7 @@ void SerializedDiagnosticConsumer::addRangeToRecord(CharSourceRange Range,
   addLocToRecord(Range.getEnd(), SM, Filename, Record);
 }
 
-/// \brief Map a Swift DiagosticKind to the diagnostic level expected
+/// \brief Map a Swift DiagnosticKind to the diagnostic level expected
 /// for serialized diagnostics.
 static clang::serialized_diags::Level getDiagnosticLevel(DiagnosticKind Kind) {
   switch (Kind) {
