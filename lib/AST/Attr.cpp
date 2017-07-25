@@ -566,6 +566,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
+  case DAK_RestatedObjCConformance:
+    return "_restatedObjCConformance";
   case DAK_Inline: {
     switch (cast<InlineAttr>(this)->getKind()) {
     case InlineKind::Never:

@@ -1156,6 +1156,23 @@ public:
   }
 };
 
+/// Attribute that specifies a protocol conformance that has been restated
+/// (i.e., is redundant) but should still be emitted in Objective-C metadata.
+class RestatedObjCConformanceAttr : public DeclAttribute {
+public:
+  explicit RestatedObjCConformanceAttr(ProtocolDecl *proto)
+    : DeclAttribute(DAK_RestatedObjCConformance, SourceLoc(), SourceRange(),
+                    /*Implicit=*/true),
+      Proto(proto) {}
+
+  /// The protocol to which this type conforms.
+  ProtocolDecl * const Proto;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_RestatedObjCConformance;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
