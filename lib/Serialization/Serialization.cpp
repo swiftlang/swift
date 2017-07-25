@@ -1340,6 +1340,9 @@ void Serializer::writeNormalConformance(
     return false;
   });
 
+  unsigned numSignatureConformances =
+      conformance->getSignatureConformances().size();
+
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
   auto ownerID = addDeclContextRef(conformance->getDeclContext());
@@ -1347,6 +1350,7 @@ void Serializer::writeNormalConformance(
                                               addDeclRef(protocol), ownerID,
                                               numValueWitnesses,
                                               numTypeWitnesses,
+                                              numSignatureConformances,
                                               data);
 
   // Write requirement signature conformances.
