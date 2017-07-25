@@ -1949,8 +1949,11 @@ static bool requiresNewVTableEntry(SILDeclRef method) {
     return true;
   if (method.kind == SILDeclRef::Kind::Allocator) {
     auto *ctor = cast<ConstructorDecl>(method.getDecl());
-    if (ctor->isRequired() && !ctor->getOverriddenDecl()->isRequired())
-      return true;
+    if (ctor->isRequired()) {
+      if (!ctor->getOverriddenDecl()->isRequired()
+          || ctor->getOverriddenDecl()->hasClangNode())
+        return true;
+    }
   }
   return false;
 }
