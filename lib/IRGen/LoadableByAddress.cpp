@@ -159,10 +159,11 @@ static bool newResultsDiffer(GenericEnvironment *GenericEnv,
 
 static SmallVector<SILResultInfo, 2>
 getNewResults(GenericEnvironment *GenericEnv,
-              ArrayRef<SILResultInfo> origResults, irgen::IRGenModule &Mod) {
+              SILFunctionType *currSILFunctionType, irgen::IRGenModule &Mod) {
   // Get new SIL Function results - same as old results UNLESS:
   // 1) Function type results might have a different signature
   // 2) Large loadables are replaced by @out version
+  auto origResults = currSILFunctionType->getResults();
   SmallVector<SILResultInfo, 2> newResults;
   for (auto result : origResults) {
     SILType currResultTy = result.getSILStorageType();
@@ -174,7 +175,9 @@ getNewResults(GenericEnvironment *GenericEnv,
       SILResultInfo newResult(newSILType.getSwiftRValueType(),
                               result.getConvention());
       newResults.push_back(newResult);
-    } else if (newSILType != currResultTy) {
+    } else if ((newSILType != currResultTy) &&
+               modResultType(GenericEnv,
+                             CanSILFunctionType(currSILFunctionType), Mod)) {
       // Case (2) Above
       SILResultInfo newSILResultInfo(newSILType.getSwiftRValueType(),
                                      ResultConvention::Indirect);
@@ -197,7 +200,7 @@ getNewSILFunctionTypePtr(GenericEnvironment *GenericEnv,
       currSILFunctionType->getGenericSignature(),
       currSILFunctionType->getExtInfo(),
       currSILFunctionType->getCalleeConvention(), newArgTys,
-      getNewResults(GenericEnv, currSILFunctionType->getResults(), Mod),
+      getNewResults(GenericEnv, currSILFunctionType, Mod),
       currSILFunctionType->getOptionalErrorResult(),
       currSILFunctionType->getASTContext());
   return newSILFunctionType;
