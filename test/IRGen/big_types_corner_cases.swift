@@ -138,11 +138,11 @@ public func enumCallee(_ x: LargeEnum) {
 // CHECK-64: ret void
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*) #0 {
-// CHECK: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
-// CHECK: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
-// CHECK: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK: call swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror %swifterror)
+// CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK-64: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK-64: call swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror %swifterror)
 // CHECK: ret void
 class SuperBase {
   func boom() -> BigStruct {
@@ -173,4 +173,14 @@ public struct MUseStruct {
   }
 
   internal let callInternalLet: () -> BigStruct?
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases18stringAndSubstringSS_s0G0VtyF(<{ %TSS, %Ts9SubstringV }>* noalias nocapture sret) #0 {
+// CHECK: alloca %Ts9SubstringV
+// CHECK: alloca %Ts9SubstringV
+// CHECK: ret void
+public func stringAndSubstring() -> (String, Substring) {
+  let s = "Hello, World"
+  let a = Substring(s).dropFirst()
+  return (s, a)
 }
