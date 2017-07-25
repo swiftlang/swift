@@ -184,7 +184,8 @@ public struct MUseStruct {
   internal let callInternalLet: () -> BigStruct?
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases18stringAndSubstringSS_s0G0VtyF(<{ %TSS, %Ts9SubstringV }>* noalias nocapture sret) #0 {
+// CHECK-LABEL-64: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases18stringAndSubstringSS_s0G0VtyF(<{ %TSS, %Ts9SubstringV }>* noalias nocapture sret) #0 {
+// CHECK-LABEL-32: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases18stringAndSubstringSS_s0G0VtyF(<{ %TSS, [4 x i8], %Ts9SubstringV }>* noalias nocapture sret) #0 {
 // CHECK: alloca %Ts9SubstringV
 // CHECK: alloca %Ts9SubstringV
 // CHECK: ret void
