@@ -591,8 +591,9 @@ private:
                            std::vector<Constraint<T>> &constraints,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
-                           llvm::function_ref<ConstraintRelation(const T&)>
-                             checkConstraint,
+                           llvm::function_ref<
+                             ConstraintRelation(const Constraint<T>&)>
+                               checkConstraint,
                            Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
@@ -615,8 +616,9 @@ private:
                            std::vector<Constraint<T>> &constraints,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
-                           llvm::function_ref<ConstraintRelation(const T&)>
-                             checkConstraint,
+                           llvm::function_ref<
+                             ConstraintRelation(const Constraint<T>&)>
+                               checkConstraint,
                            Optional<Diag<unsigned, Type, DiagT, DiagT>>
                              conflictingDiag,
                            Diag<Type, DiagT> redundancyDiag,

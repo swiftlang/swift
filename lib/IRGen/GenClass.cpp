@@ -1159,14 +1159,23 @@ namespace {
     ClassDataBuilder(IRGenModule &IGM, ProtocolDecl *theProtocol)
       : IGM(IGM), TheEntity(theProtocol), TheExtension(nullptr)
     {
-      // Gather protocol references for all of the explicitly-specified
+      llvm::SmallSetVector<ProtocolDecl *, 2> protocols;
+
+      // Gather protocol references for all of the directly inherited
       // Objective-C protocol conformances.
-      // FIXME: We can't use visitConformances() because there are no
-      // conformances for protocols to protocols right now.
       for (ProtocolDecl *p : theProtocol->getInheritedProtocols()) {
-        if (!p->isObjC())
-          continue;
-        Protocols.push_back(p);
+        getObjCProtocols(p, protocols);
+      }
+
+      // Add any restated Objective-C protocol conformances.
+      for (auto *attr :
+             theProtocol
+               ->getAttrs().getAttributes<RestatedObjCConformanceAttr>()) {
+        getObjCProtocols(attr->Proto, protocols);
+      }
+
+      for (ProtocolDecl *proto : protocols) {
+        Protocols.push_back(proto);
       }
 
       for (Decl *member : theProtocol->getMembers())
