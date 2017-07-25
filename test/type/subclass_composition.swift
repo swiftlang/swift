@@ -538,3 +538,13 @@ func takesBaseIntAndPArray(_: [Base<Int> & P2]) {}
 func passesBaseIntAndPArray() {
   takesBaseIntAndPArray([Base<Int> & P2]())
 }
+
+//
+// Superclass constrained generic parameters
+//
+
+struct DerivedBox<T : Derived> {}
+// expected-note@-1 {{requirement specified as 'T' : 'Derived' [with T = Derived & P3]}}
+
+func takesBoxWithP3(_: DerivedBox<Derived & P3>) {}
+// expected-error@-1 {{'DerivedBox' requires that 'Derived & P3' inherit from 'Derived'}}
