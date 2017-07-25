@@ -3387,9 +3387,16 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
         // Nothing else can appear outside of @_specialize yet, and Sema
         // doesn't know how to check.
         break;
-      case RequirementKind::Superclass:
+      case RequirementKind::Superclass: {
         createMemberConstraint(Req, ConstraintKind::Subtype);
+
+        auto First = resolveType(Req.getFirstType());
+        CS.addConstraint(ConstraintKind::ConformsTo, First,
+                         CS.getASTContext().getAnyObjectType(),
+                         Loc);
+
         break;
+      }
       case RequirementKind::SameType:
         createMemberConstraint(Req, ConstraintKind::Equal);
         break;

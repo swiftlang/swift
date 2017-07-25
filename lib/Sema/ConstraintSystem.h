@@ -2216,7 +2216,7 @@ public:
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   SolutionKind matchSuperclassTypes(Type type1, Type type2,
-                                    ConstraintKind kind, TypeMatchOptions flags,
+                                    TypeMatchOptions flags,
                                     ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two types that
@@ -2248,7 +2248,7 @@ public: // FIXME: public due to statics in CSSimplify.cpp
   /// trivial subtyping, subtyping, or conversion.
   ///
   /// \param flags A set of flags composed from the TMF_* constants, which
-  /// indicates how
+  /// indicates how the constraint should be simplified.
   ///
   /// \param locator The locator that will be used to track the location of
   /// the specific types being matched.
@@ -2308,8 +2308,8 @@ private:
   /// valueType initializer and the result type will be the result of
   /// calling that initializer.
   ///
-  /// \param flags Flags that indicate how the constraint should be
-  /// simplified.
+  /// \param flags A set of flags composed from the TMF_* constants, which
+  /// indicates how the constraint should be simplified.
   /// 
   /// \param locator Locator describing where this construction
   /// occurred.
@@ -2322,7 +2322,7 @@ private:
 
   /// \brief Attempt to simplify the given conformance constraint.
   ///
-  /// \param type The type being testing.
+  /// \param type The type being tested.
   /// \param protocol The protocol to which the type should conform.
   /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
   /// ConstraintKind::ConformsTo.
@@ -2334,7 +2334,7 @@ private:
 
   /// \brief Attempt to simplify the given conformance constraint.
   ///
-  /// \param type The type being testing.
+  /// \param type The type being tested.
   /// \param protocol The protocol or protocol composition type to which the
   /// type should conform.
   /// \param locator Locator describing where this constraint occurred.

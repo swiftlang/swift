@@ -263,6 +263,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     for (auto Req : Ext->getGenericSignature()->getRequirements()) {
       auto Kind = Req.getKind();
 
+      // FIXME: Could do something here
+      if (Kind == RequirementKind::Layout)
+        continue;
+
       auto First = Req.getFirstType();
       auto Second = Req.getSecondType();
       if (!BaseType->isExistentialType()) {
@@ -279,8 +283,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
       switch (Kind) {
         case RequirementKind::Conformance:
-        case RequirementKind::Layout:
         case RequirementKind::Superclass:
+          // FIXME: This could be more accurate; check
+          // conformance instead of subtyping
           if (!canPossiblyConvertTo(First, Second, *DC))
             return {Result, MergeInfo};
           else if (!isConvertibleTo(First, Second, *DC))
@@ -294,6 +299,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
             MergeInfo.addRequirement(First, Second, Kind);
           }
           break;
+
+        case RequirementKind::Layout:
+          llvm_unreachable("Handled above");
       }
     }
     Result.Ext = Ext;

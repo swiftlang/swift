@@ -1129,6 +1129,15 @@ public:
   /// \returns true if \c t1 is a subtype of \c t2.
   bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
 
+  /// \brief Determine whether one type is a subclass of another.
+  ///
+  /// \param t1 The potential subtype.
+  /// \param t2 The potential supertype.
+  /// \param dc The context of the check.
+  ///
+  /// \returns true if \c t1 is a subtype of \c t2.
+  bool isSubclassOf(Type t1, Type t2, DeclContext *dc);
+  
   /// \brief Determine whether one type is implicitly convertible to another.
   ///
   /// \param t1 The potential source type of the conversion.
