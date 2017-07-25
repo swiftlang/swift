@@ -672,16 +672,26 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   makeUsed();
 }
 
-RValue::RValue(const RValue &copied, SILGenFunction &SGF, SILLocation l)
-  : type(copied.type),
-    elementsToBeAdded(copied.elementsToBeAdded)
-{
-  assert((copied.isComplete() || copied.isInSpecialState())
-         && "can't copy incomplete rvalue");
-  values.reserve(copied.values.size());
-  for (ManagedValue value : copied.values) {
-    values.push_back(value.copy(SGF, l));
+RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't copy an incomplete rvalue");
+  std::vector<ManagedValue> copiedValues;
+  copiedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    copiedValues.emplace_back(v.copy(SGF, loc));
   }
+  return RValue(std::move(copiedValues), type, elementsToBeAdded);
+}
+
+RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't borrow incomplete rvalue");
+  std::vector<ManagedValue> borrowedValues;
+  borrowedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    borrowedValues.emplace_back(v.borrow(SGF, loc));
+  }
+  return RValue(std::move(borrowedValues), type, elementsToBeAdded);
 }
 
 ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
@@ -731,6 +741,7 @@ bool RValue::areObviouslySameValue(SILValue lhs, SILValue rhs) {
 void RValue::dump() const {
   dump(llvm::errs());
 }
+
 void RValue::dump(raw_ostream &OS, unsigned indent) const {
   if (isInContext()) {
     OS.indent(indent) << "InContext\n";
