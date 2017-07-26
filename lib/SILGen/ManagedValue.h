@@ -236,7 +236,7 @@ public:
   }
 
   /// Emit a copy of this value with independent ownership.
-  ManagedValue copy(SILGenFunction &SGF, SILLocation loc);
+  ManagedValue copy(SILGenFunction &SGF, SILLocation loc) const;
 
   /// Emit a copy of this value with independent ownership into the current
   /// formal evaluation scope.
