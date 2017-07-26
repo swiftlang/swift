@@ -44,13 +44,15 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   bool FileHasEntryPoint;
   bool SILSerializeWitnessTables;
 
+  bool InsideAbstractStorageDecl = false;
+
   void addSymbol(StringRef name) {
     auto isNewValue = Symbols.insert(name).second;
     (void)isNewValue;
     assert(isNewValue && "already inserted");
   }
 
-  void addSymbol(SILDeclRef declRef, bool checkSILOnly = true);
+  void addSymbol(SILDeclRef declRef);
 
   void addSymbol(LinkEntity entity) {
     auto linkage =
@@ -85,8 +87,8 @@ public:
       addMembers(ED->getMembers());
     else if (auto NTD = dyn_cast<NominalTypeDecl>(D))
       addMembers(NTD->getMembers());
-    else if (auto VD = dyn_cast<VarDecl>(D))
-      VD->getAllAccessorFunctions(members);
+    else if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
+      ASD->getAllAccessorFunctions(members);
 
     for (auto member : members) {
       ASTVisitor::visit(member);
@@ -103,19 +105,17 @@ public:
     // any information here is encoded elsewhere
   }
 
-  void visitSubscriptDecl(SubscriptDecl *SD) {
-    // Any getters and setters etc. exist as independent FuncDecls in the AST,
-    // so get processed elsewhere; subscripts don't have any symbols other than
-    // these.
-  }
-
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
 
   void visitClassDecl(ClassDecl *CD);
 
+  void visitConstructorDecl(ConstructorDecl *CD);
+
   void visitExtensionDecl(ExtensionDecl *ED);
 
   void visitProtocolDecl(ProtocolDecl *PD);
+
+  void visitAbstractStorageDecl(AbstractStorageDecl *ASD);
 
   void visitVarDecl(VarDecl *VD);
 
@@ -138,13 +138,13 @@ void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
       auto declRef =
           SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
       // Stored property initializers for public properties are currently
-      // public, even when the initializer is marked as SIL only (transparent).
-      addSymbol(declRef, /*checkSILOnly=*/false);
+      // public.
+      addSymbol(declRef);
     }
   }
 }
 
-void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
+void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   bool isPrivate = !hasPublicVisibility(declRef.getLinkage(ForDefinition));
   // Even private methods of open classes (specifically, private methods that
   // are in the vtable) have public symbols, because external subclasses
@@ -155,7 +155,6 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
     // unconditionally, even if they're theoretically SIL only.
     if (isPrivate) {
       isPrivate = false;
-      checkSILOnly = false;
     }
     break;
   case SubclassScope::Internal:
@@ -165,10 +164,9 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
   if (isPrivate)
     return;
 
-  // (Most) transparent things don't exist, even if they're public.
-  // FIXME: isTransparent should really be "is SIL only".
-  if (checkSILOnly && declRef.isTransparent())
-    return;
+  // FIXME: this includes too many symbols. There are some that are considered
+  // SIL-only, but it isn't obvious how to determine this (e.g. it seems that
+  // many, but not all, transparent functions result in object-file symbols)
 
   addSymbol(declRef.mangle());
 }
@@ -256,6 +254,14 @@ void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
 }
 
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+  if (auto FD = dyn_cast<FuncDecl>(AFD)) {
+    // Accessors also appear nested inside the storage decl, which we treat as
+    // the canonical location, so skip if we've got an accessor that isn't
+    // inside the var decl.
+    if (FD->getAccessorStorageDecl() && !InsideAbstractStorageDecl)
+      return;
+  }
+
   // Default arguments (of public functions) are public symbols, as the default
   // values are computed at the call site.
   auto index = 0;
@@ -275,25 +281,27 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   visitValueDecl(AFD);
 }
 
+void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
+  assert(!InsideAbstractStorageDecl &&
+         "unexpected nesting of abstract storage decls");
+  InsideAbstractStorageDecl = true;
+  visitMembers(ASD);
+  InsideAbstractStorageDecl = false;
+}
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
-  if (isPrivateDecl(VD))
-    return;
-
   // statically/globally stored variables have some special handling.
   if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
     // The actual variable has a symbol.
     Mangle::ASTMangler mangler;
     addSymbol(mangler.mangleEntity(VD, false));
 
-    // Variables in the main file don't get accessors, despite otherwise looking
-    // like globals.
-    if (!FileHasEntryPoint)
+    // Top-level variables (*not* statics) in the main file don't get accessors,
+    // despite otherwise looking like globals.
+    if (!FileHasEntryPoint || VD->isStatic())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
-
-    // In this case, the members of the VarDecl don't also appear as top-level
-    // decls, so we need to explicitly walk them.
-    visitMembers(VD);
   }
+
+  visitAbstractStorageDecl(VD);
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
@@ -344,8 +352,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       continue;
 
     auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset =
-        !isGeneric && var && var->hasStorage() && !var->isStatic();
+    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {
       // FIXME: a field only has one sort of offset, but it is moderately
       // non-trivial to compute which one. Including both is less painful than
@@ -354,10 +361,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/true));
     }
 
-    // The non-allocating forms of the constructors and destructors.
-    if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
-      addSymbol(SILDeclRef(ctor, SILDeclRef::Kind::Initializer));
-    } else if (auto dtor = dyn_cast<DestructorDecl>(value)) {
+    // The non-allocating forms of the destructors.
+    if (auto dtor = dyn_cast<DestructorDecl>(value)) {
       // ObjC classes don't have a symbol for their destructor.
       if (!isObjC)
         addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
@@ -365,6 +370,16 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   }
 
   visitNominalTypeDecl(CD);
+}
+
+void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
+  if (CD->getParent()->getAsClassOrClassExtensionContext()) {
+    // Class constructors come in two forms, allocating and non-allocating. The
+    // default ValueDecl handling gives the allocating one, so we have to
+    // manually include the non-allocating one.
+    addSymbol(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+  }
+  visitAbstractFunctionDecl(CD);
 }
 
 void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
@@ -380,14 +395,15 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
 #ifndef NDEBUG
-  // There's no (currently) relevant information about members of a protocol
-  // at individual protocols, each conforming type has to handle them
-  // individually. Let's assert this fact:
+  // There's no (currently) relevant information about members of a protocol at
+  // individual protocols, each conforming type has to handle them individually
+  // (NB. anything within an active IfConfigDecls also appears outside). Let's
+  // assert this fact:
   for (auto *member : PD->getMembers()) {
     auto isExpectedKind =
         isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
         isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
-        isa<AbstractFunctionDecl>(member);
+        isa<AbstractFunctionDecl>(member) || isa<IfConfigDecl>(member);
     assert(isExpectedKind &&
            "unexpected member of protocol during TBD generation");
   }
