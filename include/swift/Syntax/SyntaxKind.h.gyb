@@ -4,7 +4,6 @@
   grouped_nodes = { kind: [] for kind in SYNTAX_BASE_KINDS }
   for node in SYNTAX_NODES:
     grouped_nodes[node.base_kind].append(node)
-  print(grouped_nodes)
   # -*- mode: C++ -*-
   # Ignore the following admonition; it applies to the resulting .h file only
 }%
