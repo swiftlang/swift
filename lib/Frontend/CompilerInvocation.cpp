@@ -1343,7 +1343,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          IRGenOptions &IRGenOpts,
                          FrontendOptions &FEOpts,
                          DiagnosticEngine &Diags,
-                         const llvm::Triple &Triple) {
+                         const llvm::Triple &Triple,
+                         ClangImporterOptions &ClangOpts) {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_sil_inline_threshold)) {
@@ -1398,6 +1399,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       assert(A->getOption().matches(OPT_O));
       IRGenOpts.Optimize = true;
       Opts.Optimization = SILOptions::SILOptMode::Optimize;
+    }
+
+    if (IRGenOpts.Optimize) {
+      ClangOpts.Optimization = "-Os";
     }
   }
 
@@ -1782,7 +1787,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags,
-                   LangOpts.Target)) {
+                   LangOpts.Target, ClangImporterOpts)) {
     return true;
   }
 
