@@ -1134,7 +1134,7 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
 }
 
 void LoadableStorageAllocation::convertApplyResults() {
-  auto &silModue = pass.F->getModule();
+  auto &silModule = pass.F->getModule();
   for (auto &BB : *pass.F) {
     for (auto &II : BB) {
       auto *currIns = &II;
@@ -1145,10 +1145,10 @@ void LoadableStorageAllocation::convertApplyResults() {
       SILFunctionType *origSILFunctionType = applySite.getSubstCalleeType();
       auto canSILFunctionType = CanSILFunctionType(origSILFunctionType);
       Lowering::GenericContextScope GenericScope(
-          silModue.Types, canSILFunctionType->getGenericSignature());
+          silModule.Types, canSILFunctionType->getGenericSignature());
       GenericEnvironment *genEnv = nullptr;
       if (origSILFunctionType->isPolymorphic()) {
-        genEnv = getGenericEnvironment(silModue, canSILFunctionType);
+        genEnv = getGenericEnvironment(silModule, canSILFunctionType);
       }
       if (!modResultType(genEnv, canSILFunctionType, pass.Mod)) {
         continue;
