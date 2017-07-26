@@ -244,18 +244,6 @@ extension String {
     }
 #endif
 
-    /// Accesses the contiguous subrange of elements enclosed by the specified
-    /// range.
-    ///
-    /// - Complexity: O(*n*) if the underlying string is bridged from
-    ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-    public subscript(bounds: Range<Index>) -> UTF16View {
-      return UTF16View(
-        _core,
-        offset: _internalIndex(at: bounds.lowerBound.encodedOffset),
-        length: bounds.upperBound.encodedOffset - bounds.lowerBound.encodedOffset)
-    }
-
     internal init(_ _core: _StringCore) {
       self.init(_core, offset: 0, length: _core.count)
     }
@@ -309,21 +297,35 @@ extension String {
   /// slice of the `picnicGuest.utf16` view.
   ///
   /// - Parameter utf16: A UTF-16 code sequence.
+  @available(swift, deprecated: 3.2, obsoleted: 4.0)
   public init?(_ utf16: UTF16View) {
-    let wholeString = String(utf16._core)
+    // Attempt to recover the whole string, the better to implement the actual
+    // Swift 3.1 semantics, which are not as documented above!  Full Swift 3.1
+    // semantics may be impossible to preserve in the case of string literals,
+    // since we no longer have access to the length of the original string when
+    // there is no owner and elements are dropped from the end.
+    let wholeString = utf16._core.nativeBuffer.map { String(_StringCore($0)) } 
+       ?? String(utf16._core)
 
     guard
-      let start = UTF16Index(encodedOffset: utf16._offset)
+      let start = UTF16Index(_offset: utf16._offset)
         .samePosition(in: wholeString),
-      let end = UTF16Index(encodedOffset: utf16._offset + utf16._length)
+      let end = UTF16Index(_offset: utf16._offset + utf16._length)
         .samePosition(in: wholeString)
       else
     {
         return nil
     }
-    self = String(wholeString[start..<end])
+    self = wholeString[start..<end]
+    
   }
 
+  /// Creates a string corresponding to the given sequence of UTF-16 code units.
+  @available(swift, introduced: 4.0)
+  public init(_ utf16: UTF16View) {
+    self = String(utf16._core)
+  }
+  
   /// The index type for subscripting a string's `utf16` view.
   public typealias UTF16Index = UTF16View.Index
 }
@@ -507,5 +509,35 @@ extension String.UTF16View {
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public subscript(i: Index?) -> Unicode.UTF16.CodeUnit {
     return self[i!]
+  }
+}
+
+//===--- Slicing Support --------------------------------------------------===//
+/// In Swift 3.2, in the absence of type context,
+///
+///   someString.utf16[someString.utf16.startIndex..<someString.utf16.endIndex]
+///
+/// was deduced to be of type `String.UTF16View`.  Provide a more-specific
+/// Swift-3-only `subscript` overload that continues to produce
+/// `String.UTF16View`.
+extension String.UTF16View {
+  public typealias SubSequence = Substring.UTF16View
+  
+  @available(swift, introduced: 4)
+  public subscript(r: Range<Index>) -> String.UTF16View.SubSequence {
+    return String.UTF16View.SubSequence(self, _bounds: r)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<Index>) -> String.UTF16View {
+    return String.UTF16View(
+      _core,
+      offset: _internalIndex(at: bounds.lowerBound.encodedOffset),
+      length: bounds.upperBound.encodedOffset - bounds.lowerBound.encodedOffset)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: ClosedRange<Index>) -> String.UTF16View {
+    return self[bounds.relative(to: self)]
   }
 }
