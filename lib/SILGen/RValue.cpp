@@ -429,6 +429,7 @@ RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
     return;
   }
 
+  verifyConsistentOwnership();
 }
 
 RValue RValue::withPreExplodedElements(ArrayRef<ManagedValue> values,
@@ -450,6 +451,7 @@ RValue::RValue(SILGenFunction &SGF, SILLocation l, CanType formalType,
 
   ExplodeTupleValue(values, SGF, l).visit(formalType, v);
   assert(values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
@@ -464,6 +466,7 @@ RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
   assert(v && "creating r-value with consumed value");
   ExplodeTupleValue(values, SGF, expr).visit(type, v);
   assert(values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 RValue::RValue(CanType type)
@@ -485,6 +488,7 @@ void RValue::addElement(RValue &&element) & {
   element.makeUsed();
 
   assert(!isComplete() || values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
@@ -498,6 +502,7 @@ void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
   ExplodeTupleValue(values, SGF, l).visit(formalType, element);
 
   assert(!isComplete() || values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 SILValue RValue::forwardAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
@@ -752,4 +757,30 @@ void RValue::dump(raw_ostream &OS, unsigned indent) const {
   for (auto &value : values) {
     value.dump(OS, indent + 2);
   }
+}
+
+void RValue::verifyConsistentOwnership() const {
+// This is a no-op in non-assert builds.
+#ifndef NDEBUG
+  auto result = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
+  Optional<bool> sameHaveCleanups;
+  for (ManagedValue v : values) {
+    ValueOwnershipKind kind = v.getOwnershipKind();
+    if (kind == ValueOwnershipKind::Trivial)
+      continue;
+
+    // Merge together whether or not the RValue has cleanups.
+    if (!sameHaveCleanups.hasValue()) {
+      sameHaveCleanups = v.hasCleanup();
+    } else {
+      assert(*sameHaveCleanups == v.hasCleanup());
+    }
+
+    // This variable is here so that if the assert below fires, the current
+    // reduction value is still available.
+    auto newResult = result.getValue().merge(kind);
+    assert(newResult.hasValue());
+    result = newResult;
+  }
+#endif
 }
