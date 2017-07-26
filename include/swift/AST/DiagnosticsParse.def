@@ -142,6 +142,8 @@ NOTE(lex_multiline_string_indent_should_match_here,none,
       "should match %select{space|tab}0 here", (unsigned))
 NOTE(lex_multiline_string_indent_change_line,none,
       "change indentation of %select{this line|these lines}0 to match closing delimiter", (bool))
+ERROR(lex_escaped_newline_at_lastline,none,
+      "escaped newline at the last line is not allowed", ())
 
 ERROR(lex_invalid_character,none,
        "invalid character in source file", ())
