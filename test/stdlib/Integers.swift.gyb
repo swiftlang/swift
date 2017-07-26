@@ -87,7 +87,7 @@ func expectEqual<T : FixedWidthInteger>(
 }
 
 func expectEqual<T : FixedWidthInteger>(
-  _ expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
+  _ expected: (T, Bool), _ actual: (T, Bool),
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -620,6 +620,5 @@ tests.test("signum/concrete") {
 %   end
 % end
 }
-
 
 runAllTests()

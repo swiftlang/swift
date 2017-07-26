@@ -819,8 +819,8 @@ def overflowOperationComment(operator):
   /// - Parameter rhs: The value to add to this value.
   /// - Returns: A tuple containing the result of the addition along with a
   ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire sum. If
-  ///   the `overflow` component is `.overflow`, an overflow occurred and the
+  ///   is `false`, the `partialValue` component contains the entire sum. If
+  ///   the `overflow` component is `true`, an overflow occurred and the
   ///   `partialValue` component contains the truncated sum of this value and
   ///   `rhs`.
 """,
@@ -831,8 +831,8 @@ def overflowOperationComment(operator):
   /// - Parameter rhs: The value to subtract from this value.
   /// - Returns: A tuple containing the result of the subtraction along with a
   ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire
-  ///   difference. If the `overflow` component is `.overflow`, an overflow
+  ///   is `false`, the `partialValue` component contains the entire
+  ///   difference. If the `overflow` component is `true`, an overflow
   ///   occurred and the `partialValue` component contains the truncated
   ///   result of `rhs` subtracted from this value.
 """,
@@ -843,8 +843,8 @@ def overflowOperationComment(operator):
   /// - Parameter rhs: The value to multiply by this value.
   /// - Returns: A tuple containing the result of the multiplication along with
   ///   a flag indicating whether overflow occurred. If the `overflow`
-  ///   component is `.none`, the `partialValue` component contains the entire
-  ///   product. If the `overflow` component is `.overflow`, an overflow
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   product. If the `overflow` component is `true`, an overflow
   ///   occurred and the `partialValue` component contains the truncated
   ///   product of this value and `rhs`.
 """,
@@ -853,13 +853,13 @@ def overflowOperationComment(operator):
   /// a flag indicating whether overflow occurred in the operation.
   ///
   /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, .overflow)`.
+  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, true)`.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the division along with a
   ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire quotient.
-  ///   If the `overflow` component is `.overflow`, an overflow occurred and
+  ///   is `false`, the `partialValue` component contains the entire quotient.
+  ///   If the `overflow` component is `true`, an overflow occurred and
   ///   the `partialValue` component contains the truncated quotient.
 """,
         '%': """\
@@ -868,13 +868,13 @@ def overflowOperationComment(operator):
   /// a flag indicating whether overflow occurred in the operation.
   ///
   /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, .overflow)`.
+  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, true)`.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the division along with a
   ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire quotient.
-  ///   If the `overflow` component is `.overflow`, an overflow occurred and
+  ///   is `false`, the `partialValue` component contains the entire quotient.
+  ///   If the `overflow` component is `true`, an overflow occurred and
   ///   the `partialValue` component contains the truncated quotient.
 """,
     }
@@ -1844,28 +1844,6 @@ extension BinaryInteger {
 //===--- FixedWidthInteger ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// An indicator of whether an arithmetic operation overflowed.
-///
-/// Some arithmetic operations on fixed-width integers return an
-/// `ArithmeticOverflow` instance to indicate whether an overflow has
-/// occurred. For example, adding `UInt8.max` to itself results in a value that
-/// can't be represented by an `UInt8` instance without overflowing.
-///
-///     let x = UInt8.max
-///     // x == 255
-///     let (y, overflow) = x.addingReportingOverflow(x)
-///     // y == 254
-///     // overflow == ArithmeticOverflow.overflow
-@_fixed_layout
-public enum ArithmeticOverflow {
-  @_transparent
-  public init(_ overflow: Bool) { self = overflow ? .overflow : .none }
-  /// An indication that no overflow occurred in the operation.
-  case none
-  /// An indication that an overflow did occur in the operation.
-  case overflow
-}
-
 /// An integer type that uses a fixed size for every instance.
 ///
 /// The `FixedWidthInteger` protocol adds binary bitwise operations, bit
@@ -1909,7 +1887,7 @@ public enum ArithmeticOverflow {
 ///
 ///     func squared<T: FixedWidthInteger>(_ x: T) -> T? {
 ///         let (result, overflow) = x.multipliedReportingOverflow(by: x)
-///         guard overflow == .none else {
+///         if overflow {
 ///             return nil
 ///         }
 ///         return result
@@ -1960,7 +1938,7 @@ public protocol FixedWidthInteger : BinaryInteger, _BitwiseOperations {
 ${overflowOperationComment(x.operator)}
   func ${x.name}ReportingOverflow(
     ${x.firstArg} rhs: Self
-  ) -> (partialValue: Self, overflow: ArithmeticOverflow)
+  ) -> (partialValue: Self, overflow: Bool)
 % end
 
   /// Returns a tuple containing the high and low parts of the result of
@@ -2251,7 +2229,7 @@ ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self) {
     let (result, overflow) = lhs.${x.name}ReportingOverflow(${callLabel}rhs)
-    _precondition(overflow == .none, "Overflow in ${x.operator}=")
+    _precondition(!overflow, "Overflow in ${x.operator}=")
     lhs = result
   }
 #endif
@@ -2262,7 +2240,7 @@ ${unsafeOperationComment(x.operator)}
   public func unsafe${capitalize(x.name)}(${x.firstArg} other: Self) -> Self {
     let (result, overflow) = self.${x.name}ReportingOverflow(${callLabel}other)
 
-    if (overflow != .none) {
+    if overflow {
       if (_isDebugAssertConfiguration()) {
         _preconditionFailure("overflow in unsafe${capitalize(x.name)}")
       }
@@ -2646,7 +2624,7 @@ public struct ${Self}
   @_transparent
   public func ${x.name}ReportingOverflow(
     ${x.firstArg} other: ${Self}
-  ) -> (partialValue: ${Self}, overflow: ArithmeticOverflow) {
+  ) -> (partialValue: ${Self}, overflow: Bool) {
 
 %         if x.kind == '/':
     // No LLVM primitives for checking overflow of division
@@ -2655,7 +2633,7 @@ public struct ${Self}
       other == (0 as ${Self})
       ${'|| self == %s.min && other == (-1 as %s)' % (Self, Self) if signed else ''}
     ) {
-      return (partialValue: self, overflow: .overflow)
+      return (partialValue: self, overflow: true)
     }
 
     let (newStorage, overflow) = (
@@ -2671,7 +2649,7 @@ public struct ${Self}
 
     return (
       partialValue: ${Self}(newStorage),
-      overflow: ArithmeticOverflow(Bool(overflow)))
+      overflow: Bool(overflow))
   }
 %       end
 
@@ -3218,7 +3196,7 @@ extension FixedWidthInteger {
   ) -> (Self, overflow: Bool) {
     let (partialValue, overflow) =
       lhs.${newPrefix}ReportingOverflow(${argLabel} rhs)
-    return (partialValue, overflow == .overflow)
+    return (partialValue, overflow: overflow)
   }
 
 % end
