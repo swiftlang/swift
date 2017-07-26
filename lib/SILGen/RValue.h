@@ -33,8 +33,10 @@ class Initialization;
 class SILGenFunction;
 
 /// An "exploded" SIL rvalue, in which tuple values are recursively
-/// destructured. (In SILGen we don't try to explode structs, because doing so
-/// would require considering resilience, a job we want to delegate to IRGen).
+/// destructured.
+///
+/// *NOTE* In SILGen we don't try to explode structs, because doing so would
+/// require considering resilience, a job we want to delegate to IRGen.
 class RValue {
   std::vector<ManagedValue> values;
   CanType type;
@@ -60,12 +62,18 @@ class RValue {
     elementsToBeAdded = Used;
     values = {};
   }
-  
-  /// Private constructor used by copy().
-  RValue(const RValue &copied, SILGenFunction &SGF, SILLocation l);
-  
-  /// Construct an RValue from a pre-exploded set of
-  /// ManagedValues. Used to implement the extractElement* methods.
+
+  /// Private constructor used by copy() and borrow().
+  RValue(std::vector<ManagedValue> &&values, CanType type,
+         unsigned elementsToBeAdded)
+      : values(std::move(values)), type(type),
+        elementsToBeAdded(elementsToBeAdded) {}
+
+  /// Construct an RValue from a pre-exploded set of ManagedValues.
+  ///
+  /// Used to implement the extractElement* methods. *NOTE* This constructor
+  /// assumes that the constructed RValue is fully formed and thus has
+  /// elementsToBeAdded set to zero.
   RValue(ArrayRef<ManagedValue> values, CanType type);
 
   RValue(unsigned state) : elementsToBeAdded(state) {
@@ -75,15 +83,14 @@ class RValue {
 public:
   RValue() : elementsToBeAdded(Null) {}
   
-  RValue(RValue &&rv)
-    : values(std::move(rv.values)),
-      type(rv.type),
-      elementsToBeAdded(rv.elementsToBeAdded)
-  {
+  RValue(RValue &&rv) : values(std::move(rv.values)),
+                        type(rv.type),
+                        elementsToBeAdded(rv.elementsToBeAdded) {
     assert((rv.isComplete() || rv.isInSpecialState())
            && "moving rvalue that wasn't complete?!");
     rv.elementsToBeAdded = Used;
   }
+
   RValue &operator=(RValue &&rv) {
     assert((isNull() || isUsed()) && "reassigning an valid rvalue?!");
     
@@ -107,8 +114,9 @@ public:
   /// will be exploded.
   RValue(SILGenFunction &SGF, SILLocation l, CanType type, ManagedValue v);
 
-  /// Construct an RValue from a pre-exploded set of
-  /// ManagedValues. Used to implement the extractElement* methods.
+  /// Construct an RValue from a pre-exploded set of ManagedValues.
+  ///
+  /// This is used to implement the extractElement* methods.
   static RValue withPreExplodedElements(ArrayRef<ManagedValue> values,
                                         CanType type);
 
@@ -260,9 +268,10 @@ public:
   }
   
   /// Emit an equivalent value with independent ownership.
-  RValue copy(SILGenFunction &SGF, SILLocation l) const & {
-    return RValue(*this, SGF, l);
-  }
+  RValue copy(SILGenFunction &SGF, SILLocation loc) const &;
+
+  /// Borrow all subvalues of the rvalue.
+  RValue borrow(SILGenFunction &SGF, SILLocation loc) const &;
 
   static bool areObviouslySameValue(SILValue lhs, SILValue rhs);
   bool isObviouslyEqual(const RValue &rhs) const;
