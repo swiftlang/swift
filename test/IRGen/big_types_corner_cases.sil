@@ -1,19 +1,22 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s --check-prefix=CHECK-%target-cpu
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s
+
 // UNSUPPORTED: resilient_stdlib
+
+// REQUIRES: CPU=x86_64
 
 sil_stage canonical
 import c_layout
 
-// CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testBitfieldInBlock
-// CHECK-x86_64:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testBitfieldInBlock
+// CHECK:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
 entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
   %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
   return %r : $BitfieldOne
 }
 
-// CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testTupleExtract
-// CHECK-x86_64:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testTupleExtract
+// CHECK:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
 sil @testTupleExtract : $@convention(thin) (@owned (BitfieldOne, @convention(block) (BitfieldOne) -> BitfieldOne), BitfieldOne) -> BitfieldOne  {
 entry(%b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), %x : $BitfieldOne):
   %a = tuple_extract %b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), 1
