@@ -353,6 +353,7 @@ public:
 
   /// Encode a Clang named declaration as an entry in the table.
   static uint64_t encodeEntry(clang::NamedDecl *decl) {
+    assert(decl);
     auto bits = reinterpret_cast<uintptr_t>(decl);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits;
@@ -360,6 +361,7 @@ public:
 
   // Encode a Clang macro as an entry in the table.
   static uint64_t encodeEntry(clang::MacroInfo *macro) {
+    assert(macro);
     auto bits = reinterpret_cast<uintptr_t>(macro);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits | 0x01;
@@ -367,6 +369,7 @@ public:
 
   // Encode a Clang macro as an entry in the table.
   static uint64_t encodeEntry(clang::ModuleMacro *macro) {
+    assert(macro);
     auto bits = reinterpret_cast<uintptr_t>(macro);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits | 0x01;

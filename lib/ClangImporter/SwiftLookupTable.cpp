@@ -73,50 +73,23 @@ enum class MacroConflictAction {
 /// If we're not currently building a module, then the "latest" macro wins,
 /// which (by the same assumption) should be the existing macro.
 static MacroConflictAction
-considerReplacingExistingMacro(const clang::MacroInfo *newMacro,
-                               const clang::MacroInfo *existingMacro,
+considerReplacingExistingMacro(const clang::ModuleMacro *newMacro,
+                               SwiftLookupTable::SingleEntry existingEntry,
                                const clang::Preprocessor *PP) {
   assert(PP);
   assert(newMacro);
+  assert(existingEntry);
+  const auto *existingMacro = existingEntry.dyn_cast<clang::ModuleMacro *>();
   assert(existingMacro);
-  // assert(newMacro->getOwningModuleID() == 0);
-  // assert(existingMacro->getOwningModuleID() == 0);
 
-  // if (PP->getLangOpts().CurrentModule.empty())
-    return MacroConflictAction::Discard;
+  const clang::Module *newModule = newMacro->getOwningModule();
+  const clang::Module *existingModule = existingMacro->getOwningModule();
 
-  // clang::ModuleMap &moduleInfo = PP->getHeaderSearchInfo().getModuleMap();
-  // const clang::SourceManager &sourceMgr = PP->getSourceManager();
-  //
-  // auto findContainingExplicitModule =
-  //     [&moduleInfo, &sourceMgr](const clang::MacroInfo *macro)
-  //       -> const clang::Module * {
-  //
-  //   clang::SourceLocation definitionLoc = macro->getDefinitionLoc();
-  //   assert(definitionLoc.isValid() &&
-  //          "implicitly-defined macros shouldn't show up in a module's lookup");
-  //   clang::FullSourceLoc fullLoc(definitionLoc, sourceMgr);
-  //
-  //   const clang::Module *module = moduleInfo.inferModuleFromLocation(fullLoc);
-  //   assert(module && "we are building a module; everything should be modular");
-  //
-  //   while (module->isSubModule()) {
-  //     if (module->IsExplicit)
-  //       break;
-  //     module = module->Parent;
-  //   }
-  //   return module;
-  // };
-  //
-  // const clang::Module *newModule = findContainingExplicitModule(newMacro);
-  // const clang::Module *existingModule =
-  //     findContainingExplicitModule(existingMacro);
-  //
-  // if (existingModule == newModule)
-  //   return MacroConflictAction::Discard;
-  // if (existingModule->isSubModuleOf(newModule))
-  //   return MacroConflictAction::Replace;
-  // return MacroConflictAction::AddAsAlternative;
+  if (existingModule == newModule)
+   return MacroConflictAction::Discard;
+  if (existingModule->isSubModuleOf(newModule))
+   return MacroConflictAction::Replace;
+  return MacroConflictAction::AddAsAlternative;
 }
 
 namespace swift {
@@ -447,28 +420,45 @@ bool SwiftLookupTable::addLocalEntry(SingleEntry newEntry,
   auto decl = newEntry.dyn_cast<clang::NamedDecl *>();
   auto macro = newEntry.dyn_cast<clang::MacroInfo *>();
   auto moduleMacro = newEntry.dyn_cast<clang::ModuleMacro *>();
+
+  bool assumeModule = false;
+  if (PP) {
+    if (PP->getLangOpts().isCompilingModule()) {
+      assumeModule = true;
+      assert(!macro);
+    } else {
+      assert(!moduleMacro);
+    }
+  }
+
   for (auto &existingEntry : entries) {
     // If it matches an existing declaration, there's nothing to do.
     if (decl && isDeclEntry(existingEntry) &&
         matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
       return false;
 
-    // If it matches an existing macro, decide on the best course of action.
+    // If a textual macro matches an existing macro, just drop the new
+    // definition.
     if (macro && isMacroEntry(existingEntry)) {
       return false;
-      // MacroConflictAction action =
-      //    considerReplacingExistingMacro(macro,
-      //                                   mapStoredMacro(existingEntry),
-      //                                   PP);
-      // switch (action) {
-      // case MacroConflictAction::Discard:
-      //   return false;
-      // case MacroConflictAction::Replace:
-      //   existingEntry = encodeEntry(macro);
-      //   return false;
-      // case MacroConflictAction::AddAsAlternative:
-      //   break;
-      // }
+    }
+
+    // If a module macro matches an existing macro, be a bit more discerning.
+    if (moduleMacro && isMacroEntry(existingEntry)) {
+      MacroConflictAction action =
+          considerReplacingExistingMacro(moduleMacro,
+                                         mapStoredMacro(existingEntry,
+                                                        assumeModule),
+                                         PP);
+      switch (action) {
+      case MacroConflictAction::Discard:
+        return false;
+      case MacroConflictAction::Replace:
+        existingEntry = encodeEntry(moduleMacro);
+        return false;
+      case MacroConflictAction::AddAsAlternative:
+        break;
+      }
     }
   }
 
@@ -485,6 +475,8 @@ bool SwiftLookupTable::addLocalEntry(SingleEntry newEntry,
 void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
                                 EffectiveClangContext effectiveContext,
                                 const clang::Preprocessor *PP) {
+  assert(newEntry);
+
   // Translate the context.
   auto contextOpt = translateContext(effectiveContext);
   if (!contextOpt) {
@@ -1746,7 +1738,7 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
         table.addEntry(name, info, tu, &pp);
     };
 
-    ArrayRef<clang::ModuleMacro *> moduleMacros = 
+    ArrayRef<clang::ModuleMacro *> moduleMacros =
         macro.second.getActiveModuleMacros(pp, macro.first);
     if (moduleMacros.empty()) {
       // Handle the bridging header case.
@@ -1757,10 +1749,15 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
       // If we hit a builtin macro, we're done.
       maybeAddMacro(MD->getMacroInfo(), nullptr);
     } else {
-      for (clang::ModuleMacro *moduleMacro : moduleMacros) {
+      SmallVector<clang::ModuleMacro *, 8> worklist;
+      worklist.append(moduleMacros.begin(), moduleMacros.end());
+      while (!worklist.empty()) {
+        clang::ModuleMacro *moduleMacro = worklist.pop_back_val();
         clang::Module *owningModule = moduleMacro->getOwningModule();
         if (!owningModule->isSubModuleOf(pp.getCurrentModule()))
           continue;
+        worklist.append(moduleMacro->overrides_begin(),
+                        moduleMacro->overrides_end());
         maybeAddMacro(moduleMacro->getMacroInfo(), moduleMacro);
       }
     }
