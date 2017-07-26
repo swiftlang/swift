@@ -286,12 +286,26 @@ static Optional<std::pair<llvm::APSInt, Type>>
   } else if (token.is(clang::tok::identifier) &&
              token.getIdentifierInfo()->hasMacroDefinition()) {
 
-    auto rawID      = token.getIdentifierInfo();
-    auto macroInfo  = impl.getClangPreprocessor().getMacroInfo(rawID);
-    if (!macroInfo)
+    auto rawID = token.getIdentifierInfo();
+    auto definition = impl.getClangPreprocessor().getMacroDefinition(rawID);
+    if (!definition)
       return None;
+
+    ClangNode macroNode;
+    const clang::MacroInfo *macroInfo;
+    if (definition.getModuleMacros().empty()) {
+      macroInfo = definition.getMacroInfo();
+      macroNode = macroInfo;
+    } else {
+      // Follow MacroDefinition::getMacroInfo in preferring the last ModuleMacro
+      // rather than the first.
+      const clang::ModuleMacro *moduleMacro =
+          definition.getModuleMacros().back();
+      macroInfo = moduleMacro->getMacroInfo();
+      macroNode = moduleMacro;
+    }
     auto importedID = impl.getNameImporter().importMacroName(rawID, macroInfo);
-    impl.importMacro(importedID, macroInfo);
+    (void)impl.importMacro(importedID, macroNode);
 
     auto searcher = impl.ImportedMacroConstants.find(macroInfo);
     if (searcher == impl.ImportedMacroConstants.end()) {
