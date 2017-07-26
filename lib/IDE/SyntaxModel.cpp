@@ -954,6 +954,14 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         popStructureNode();
       }
     }
+  } else if (auto *SubscriptDeclD = dyn_cast<SubscriptDecl>(D)) {
+      SyntaxStructureNode SN;
+      SN.Dcl = SubscriptDeclD;
+      SN.Kind = SyntaxStructureKind::Subscript;
+      SN.Range = charSourceRangeFromSourceRange(SM,
+                                            SubscriptDeclD->getSourceRange());
+      SN.Attrs = SubscriptDeclD->getAttrs();
+      pushStructureNode(SN, SubscriptDeclD);
   }
 
   return true;

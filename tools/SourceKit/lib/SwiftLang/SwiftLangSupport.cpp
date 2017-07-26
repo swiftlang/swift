@@ -375,6 +375,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindDeclEnumCase;
     case SyntaxStructureKind::EnumElement:
       return KindDeclEnumElement;
+    case SyntaxStructureKind::Subscript:
+      return KindDeclSubscript;
     case SyntaxStructureKind::Parameter:
       return KindDeclVarParam;
     case SyntaxStructureKind::ForEachStatement:
