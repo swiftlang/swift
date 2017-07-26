@@ -46,7 +46,7 @@ using llvm::StringRef;
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)                    \
   (assert(Raw->getChild(Cursor)->Kind == ExpectedKind));
 #else
-#define syntax_assert_child_kind(Raw, Cursor, Kind) ({});
+#define syntax_assert_child_kind(Raw, Cursor, ExpectedKind) ({});
 #endif
 
 #ifndef NDEBUG
@@ -66,7 +66,7 @@ using llvm::StringRef;
     }                                                                          \
   })
 #else
-#define syntax_assert_child_token(Raw, Cursor, ...) ({});
+#define syntax_assert_child_token(Raw, CursorName, ...) ({});
 #endif
 
 #ifndef NDEBUG
@@ -87,7 +87,7 @@ using llvm::StringRef;
     }                                                                          \
   })
 #else
-#define syntax_assert_child_token_text(Raw, Cursor, TokenKind, Text) ({});
+#define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...) ({});
 #endif
 
 #ifndef NDEBUG
