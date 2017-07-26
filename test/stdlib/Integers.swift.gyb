@@ -87,7 +87,7 @@ func expectEqual<T : FixedWidthInteger>(
 }
 
 func expectEqual<T : FixedWidthInteger>(
-  _ expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
+  _ expected: (T, Bool), _ actual: (T, Bool),
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -706,7 +706,7 @@ dwTests.test("Nested") {
     let (y, o) = x.addingReportingOverflow(1)
     expectEqual(y, 0)
     expectTrue(y == (0 as Int))
-    expectTrue(o == .overflow)
+    expectTrue(o)
   }
 
   do {
@@ -716,7 +716,7 @@ dwTests.test("Nested") {
     expectLT(y, 0)
     expectTrue(y < (0 as Int))
     expectTrue(y < (0 as UInt))
-    expectTrue(o == .overflow)
+    expectTrue(o)
   }
 
   expectFalse(UInt1024.isSigned)

@@ -40,7 +40,7 @@ where Rest.Element : UnsignedInteger {
   if !positive {
     let (result0, overflow0)
       = (0 as Result).subtractingReportingOverflow(result)
-    guard _fastPath(overflow0 == .none) else { return nil }
+    guard _fastPath(!overflow0) else { return nil }
     result = result0
   }
   
@@ -51,7 +51,7 @@ where Rest.Element : UnsignedInteger {
     let (result2, overflow2) = positive
       ? result1.addingReportingOverflow(d)
       : result1.subtractingReportingOverflow(d)
-    guard _fastPath(overflow1 == .none && overflow2 == .none)
+    guard _fastPath(!overflow1 && !overflow2)
     else { return nil }
     result = result2
   }

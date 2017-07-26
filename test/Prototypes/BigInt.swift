@@ -24,7 +24,7 @@ extension FixedWidthInteger {
   func addingFullWidth(_ other: Self) ->
     (high: Self, low: Self) {
     let sum = self.addingReportingOverflow(other)
-    return (sum.overflow == .overflow ? 1 : 0, sum.partialValue)
+    return (sum.overflow ? 1 : 0, sum.partialValue)
   }
 
   /// Returns the high and low parts of two seqeuential potentially overflowing
@@ -33,8 +33,8 @@ extension FixedWidthInteger {
     (high: Self, low: Self) {
     let xy = x.addingReportingOverflow(y)
     let xyz = xy.partialValue.addingReportingOverflow(z)
-    let high: Self = (xy.overflow == .overflow ? 1 : 0) +
-      (xyz.overflow == .overflow ? 1 : 0)
+    let high: Self = (xy.overflow ? 1 : 0) +
+      (xyz.overflow ? 1 : 0)
     return (high, xyz.partialValue)
   }
 
@@ -43,7 +43,7 @@ extension FixedWidthInteger {
   func subtractingWithBorrow(_ rhs: Self) ->
     (borrow: Self, partialValue: Self) {
     let difference = subtractingReportingOverflow(rhs)
-    return (difference.overflow == .overflow ? 1 : 0, difference.partialValue)
+    return (difference.overflow ? 1 : 0, difference.partialValue)
   }
 
   /// Returns a tuple containing the value that would be borrowed from a higher
@@ -53,8 +53,8 @@ extension FixedWidthInteger {
     let firstDifference = subtractingReportingOverflow(x)
     let secondDifference =
       firstDifference.partialValue.subtractingReportingOverflow(y)
-    let borrow: Self = (firstDifference.overflow == .overflow ? 1 : 0) +
-      (secondDifference.overflow == .overflow ? 1 : 0)
+    let borrow: Self = (firstDifference.overflow ? 1 : 0) +
+      (secondDifference.overflow ? 1 : 0)
     return (borrow, secondDifference.partialValue)
   }
 }
@@ -513,8 +513,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
         //      0b11111111 + (0b11111101_____00000010) + 0b11111111
         //                   (0b11111110_____00000001) + 0b11111111
         //                   (0b11111111_____00000000)
-        _sanityCheck(
-          product.high.addingReportingOverflow(carry).overflow == .none)
+        _sanityCheck(!product.high.addingReportingOverflow(carry).overflow)
         carry = product.high &+ carry
       }
 
@@ -1302,60 +1301,60 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
 
   // Arithmetic Operations / Operators
 
-  func _checkOverflow(_ v: UInt8) -> ArithmeticOverflow {
+  func _checkOverflow(_ v: UInt8) -> Bool {
     let mask: UInt8 = ~0 << 1
-    return v & mask == 0 ? .none : .overflow
+    return v & mask != 0
   }
   
   func addingReportingOverflow(_ rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
+    (partialValue: Bit, overflow: Bool) {
       let result = value &+ rhs.value
       return (Bit(result & 1), _checkOverflow(result))
   }
 
   func subtractingReportingOverflow(_ rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
+    (partialValue: Bit, overflow: Bool) {
       let result = value &- rhs.value
       return (Bit(result & 1), _checkOverflow(result))
   }
 
   func multipliedReportingOverflow(by rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
+    (partialValue: Bit, overflow: Bool) {
       let result = value &* rhs.value
-      return (Bit(result), .none)
+      return (Bit(result), false)
   }
 
   func dividedReportingOverflow(by rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
-      return rhs == 0 ? (self, .none) : (self, .overflow)
+    (partialValue: Bit, overflow: Bool) {
+      return (self, rhs != 0)
   }
 
   func remainderReportingOverflow(dividingBy rhs: Bit) ->
-    (partialValue: Bit, overflow: ArithmeticOverflow) {
+    (partialValue: Bit, overflow: Bool) {
       fatalError()
   }
 
   static func +=(lhs: inout Bit, rhs: Bit) {
     let result = lhs.addingReportingOverflow(rhs)
-    assert(result.overflow == .none, "Addition overflow")
+    assert(!result.overflow, "Addition overflow")
     lhs = result.partialValue
   }
 
   static func -=(lhs: inout Bit, rhs: Bit) {
     let result = lhs.subtractingReportingOverflow(rhs)
-    assert(result.overflow == .none, "Subtraction overflow")
+    assert(!result.overflow, "Subtraction overflow")
     lhs = result.partialValue
   }
 
   static func *=(lhs: inout Bit, rhs: Bit) {
     let result = lhs.multipliedReportingOverflow(by: rhs)
-    assert(result.overflow == .none, "Multiplication overflow")
+    assert(!result.overflow, "Multiplication overflow")
     lhs = result.partialValue
   }
 
   static func /=(lhs: inout Bit, rhs: Bit) {
     let result = lhs.dividedReportingOverflow(by: rhs)
-    assert(result.overflow == .none, "Division overflow")
+    assert(!result.overflow, "Division overflow")
     lhs = result.partialValue
   }
 
