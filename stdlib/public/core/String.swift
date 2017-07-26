@@ -430,7 +430,7 @@ extension String {
 /// storage. Substrings present the same interface as strings.
 ///
 ///     print("\(name)'s first name has \(firstName.count) letters.")
-///     // Prints "Marie Curie's name has 5 letters."
+///     // Prints "Marie Curie's first name has 5 letters."
 ///
 /// Accessing a String's Unicode Representation
 /// ===========================================
