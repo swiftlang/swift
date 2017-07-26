@@ -266,10 +266,16 @@ extension Substring : _SwiftStringView {
   var _persistentContent : String {
     let wholeCore = _slice._base._core
     let native = wholeCore.nativeBuffer
-    if _fastPath(native != nil), let n = native {
+    if _fastPath(native != nil) {
+      let wholeString = String(wholeCore)
+      let n = native._unsafelyUnwrappedUnchecked
       if _fastPath(
-        n.start == wholeCore._baseAddress && n.usedCount == wholeCore.count) {
-        return String(wholeCore)
+        n.start == wholeCore._baseAddress
+        && n.usedCount == wholeCore.count
+        && _slice.startIndex == wholeString.startIndex
+        && _slice.endIndex == wholeString.endIndex
+      ) {
+        return wholeString
       }
     }
     var r = String()
