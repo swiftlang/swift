@@ -2704,7 +2704,16 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     if (!eltTy) continue;
     
     properties |= eltTy->getRecursiveProperties();
-    hasInOut |= Elt.getParameterFlags().isInOut();
+    // Recur into paren types and canonicalized paren types.  'inout' in nested
+    // non-paren tuples are malformed and will be diagnosed later.
+    if (auto *TTy = Elt.getType()->getAs<TupleType>()) {
+      if (TTy->getNumElements() == 1)
+        hasInOut |= TTy->hasInOutElement();
+    } else if (auto *Pty = dyn_cast<ParenType>(Elt.getType().getPointer())) {
+      hasInOut |= Pty->getParameterFlags().isInOut();
+    } else {
+      hasInOut |= Elt.getParameterFlags().isInOut();
+    }
   }
 
   auto arena = getArena(properties);
