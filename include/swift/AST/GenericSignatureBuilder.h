@@ -190,6 +190,9 @@ public:
     /// potential archetype (which represents itself).
     EquivalenceClass(PotentialArchetype *representative);
 
+    /// Note that this equivalence class has been modified.
+    void modified(GenericSignatureBuilder &builder);
+
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
     /// that concrete type as written.
@@ -561,9 +564,6 @@ public:
   void processDelayedRequirements();
 
 private:
-  /// Bump the generation count due to a change.
-  void bumpGeneration();
-
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
   enum class ConstraintRelation {

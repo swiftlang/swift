@@ -1466,10 +1466,9 @@ bool PotentialArchetype::addConformance(ProtocolDecl *proto,
     return false;
   }
 
-  builder.bumpGeneration();
-
   // Add the conformance along with this constraint.
   equivClass->conformsTo[proto].push_back({this, proto, source});
+  equivClass->modified(builder);
   ++NumConformanceConstraints;
   ++NumConformances;
 
@@ -1979,7 +1978,9 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     switch (kind) {
     case ArchetypeResolutionKind::CompleteWellFormed:
     case ArchetypeResolutionKind::WellFormed: {
-      builder.bumpGeneration();
+      // Creating a new potential archetype in an equivalence class is a
+      // modification.
+      getOrCreateEquivalenceClass()->modified(builder);
 
       if (assocType)
         resultPA = new PotentialArchetype(this, assocType);
@@ -2398,6 +2399,10 @@ EquivalenceClass::EquivalenceClass(PotentialArchetype *representative)
     recursiveSuperclassType(false)
 {
   members.push_back(representative);
+}
+
+void EquivalenceClass::modified(GenericSignatureBuilder &builder) {
+  builder.Impl->Generation++;
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
@@ -2884,6 +2889,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
 
   // Record this layout constraint.
   equivClass->layoutConstraints.push_back({PAT, Layout, Source});
+  equivClass->modified(*this);
   ++NumLayoutConstraints;
 
   // Update the layout in the equivalence class, if we didn't have one already.
@@ -2930,8 +2936,6 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
 
     return ConstraintResult::Resolved;
   }
-
-  bumpGeneration();
 
   auto pa = resolvedSubject->getPotentialArchetype();
   return addLayoutRequirementDirect(pa, layout, source.getSource(pa));
@@ -3013,11 +3017,11 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
                                             Type superclass,
                                             const RequirementSource *source) {
   // Record the constraint.
-  T->getOrCreateEquivalenceClass()->superclassConstraints
-    .push_back(ConcreteConstraint{T, superclass, source});
+  auto equivClass = T->getOrCreateEquivalenceClass();
+  equivClass->superclassConstraints.push_back(
+                                    ConcreteConstraint{T, superclass, source});
+  equivClass->modified(*this);
   ++NumSuperclassConstraints;
-
-  bumpGeneration();
 
   // Update the equivalence class with the constraint.
   updateSuperclass(T, superclass, source);
@@ -3183,8 +3187,6 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   if (T1 == T2)
     return ConstraintResult::Resolved;
 
-  bumpGeneration();
-
   unsigned nestingDepth1 = T1->getNestingDepth();
   unsigned nestingDepth2 = T2->getNestingDepth();
 
@@ -3198,6 +3200,8 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Merge the equivalence classes.
   auto equivClass = T1->getOrCreateEquivalenceClass();
+  equivClass->modified(*this);
+
   auto equivClass1Members = equivClass->members;
   auto equivClass2Members = T2->getEquivalenceClassMembers();
   for (auto equiv : equivClass2Members)
@@ -3208,6 +3212,10 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   SWIFT_DEFER {
     delete equivClass2;
   };
+
+  // Consider the second equivalence class to be modified.
+  if (equivClass2)
+    equivClass->modified(*this);
 
   // Same-type requirements.
   if (equivClass2) {
@@ -3318,9 +3326,8 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   // Record the concrete type and its source.
   equivClass->concreteTypeConstraints.push_back(
                                       ConcreteConstraint{T, Concrete, Source});
+  equivClass->modified(*this);
   ++NumConcreteTypeConstraints;
-
-  bumpGeneration();
 
   // If we've already been bound to a type, match that type.
   if (equivClass->concreteType) {
@@ -4184,10 +4191,6 @@ void GenericSignatureBuilder::processDelayedRequirements() {
       anyChanges = true;
     }
   } while (anySolved);
-}
-
-void GenericSignatureBuilder::bumpGeneration() {
-  ++Impl->Generation;
 }
 
 template<typename T>
