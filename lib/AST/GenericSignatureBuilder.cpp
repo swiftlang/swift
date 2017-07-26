@@ -1251,34 +1251,35 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
                                    FloatingRequirementSource source,
                                    EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling) {
-  switch (unresolvedHandling) {
-  case UnresolvedHandlingKind::GenerateConstraints: {
-    DelayedRequirement::Kind delayedKind;
-    switch (kind) {
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-      delayedKind = DelayedRequirement::Type;
-      break;
+  // Record the delayed requirement.
+  DelayedRequirement::Kind delayedKind;
+  switch (kind) {
+  case RequirementKind::Conformance:
+  case RequirementKind::Superclass:
+    delayedKind = DelayedRequirement::Type;
+    break;
 
-    case RequirementKind::Layout:
-      delayedKind = DelayedRequirement::Layout;
-      break;
+  case RequirementKind::Layout:
+    delayedKind = DelayedRequirement::Layout;
+    break;
 
-    case RequirementKind::SameType:
-      delayedKind = DelayedRequirement::SameType;
-      break;
-    }
-
-    if (unresolvedEquivClass) {
-      unresolvedEquivClass->delayedRequirements.push_back(
-                                            {delayedKind, lhs, rhs, source});
-    } else {
-      Impl->DelayedRequirements.push_back({delayedKind, lhs, rhs, source});
-    }
-    return ConstraintResult::Resolved;
+  case RequirementKind::SameType:
+    delayedKind = DelayedRequirement::SameType;
+    break;
   }
 
-  case UnresolvedHandlingKind::ReturnUnresolved:
+  if (unresolvedEquivClass) {
+    unresolvedEquivClass->delayedRequirements.push_back(
+                                          {delayedKind, lhs, rhs, source});
+  } else {
+    Impl->DelayedRequirements.push_back({delayedKind, lhs, rhs, source});
+  }
+
+  switch (unresolvedHandling) {
+  case UnresolvedHandlingKind::GenerateConstraints:
+    return ConstraintResult::Resolved;
+
+  case UnresolvedHandlingKind::GenerateUnresolved:
     return ConstraintResult::Unresolved;
   }
 }
@@ -4159,19 +4160,19 @@ void GenericSignatureBuilder::processDelayedRequirements() {
       case DelayedRequirement::Type:
         reqResult = addTypeRequirement(
                        req.lhs, asUnresolvedType(req.rhs), req.source,
-                       UnresolvedHandlingKind::ReturnUnresolved);
+                       UnresolvedHandlingKind::GenerateUnresolved);
         break;
 
       case DelayedRequirement::Layout:
         reqResult = addLayoutRequirement(
                            req.lhs, req.rhs.get<LayoutConstraint>(), req.source,
-                           UnresolvedHandlingKind::ReturnUnresolved);
+                           UnresolvedHandlingKind::GenerateUnresolved);
         break;
 
       case DelayedRequirement::SameType:
         reqResult = addSameTypeRequirement(
                                req.lhs, asUnresolvedType(req.rhs), req.source,
-                               UnresolvedHandlingKind::ReturnUnresolved);
+                               UnresolvedHandlingKind::GenerateUnresolved);
         break;
       }
 
@@ -4194,7 +4195,6 @@ void GenericSignatureBuilder::processDelayedRequirements() {
       case ConstraintResult::Unresolved:
         // Add the requirement back.
         ++NumDelayedRequirementUnresolved;
-        Impl->DelayedRequirements.push_back(req);
         break;
       }
     }

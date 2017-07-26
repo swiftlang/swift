@@ -260,9 +260,9 @@ public:
     /// "resolved" at this point.
     GenerateConstraints = 0,
 
-    /// Do not generate a new constraint; rather, return
-    /// \c ConstraintResult::Unresolved and let the caller handle it.
-    ReturnUnresolved = 1,
+    /// Generate an unresolved constraint but still return
+    /// \c ConstraintResult::Unresolved so the caller knows what happened.
+    GenerateUnresolved = 1,
   };
 
 private:
