@@ -555,3 +555,33 @@ extension A_SR_5030 {
     // expected-error@-1 {{cannot convert value of type '(idx: (Int))' to closure result type 'Int'}}
   }
 }
+
+// rdar://problem/33429010
+
+struct I_33429010 : IteratorProtocol {
+    func next() -> Int? {
+        fatalError()
+    }
+}
+
+extension Sequence {
+    public func rdar33429010<Result>(into initialResult: Result,
+                                     _ nextPartialResult: (_ partialResult: inout Result, Iterator.Element) throws -> ()
+        ) rethrows -> Result {
+        return initialResult
+    }
+}
+
+extension Int {
+   public mutating func rdar33429010_incr(_ inc: Int) {
+     self += inc
+   }
+}
+
+func rdar33429010_2() {
+  let iter = I_33429010()
+  var acc: Int = 0 // expected-warning {{}}
+  let _: Int = AnySequence { iter }.rdar33429010(into: acc, { $0 + $1 })
+  // expected-warning@-1 {{result of operator '+' is unused}}
+  let _: Int = AnySequence { iter }.rdar33429010(into: acc, { $0.rdar33429010_incr($1) })
+}
