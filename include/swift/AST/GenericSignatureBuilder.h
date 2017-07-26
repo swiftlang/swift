@@ -89,6 +89,7 @@ public:
 
   using UnresolvedType = llvm::PointerUnion<PotentialArchetype *, Type>;
   struct ResolvedType;
+  class ResolveResult;
 
   using RequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
@@ -280,6 +281,7 @@ private:
                                    UnresolvedType lhs,
                                    RequirementRHS rhs,
                                    FloatingRequirementSource source,
+                                   EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling);
 
   /// Resolve the conformance of the given potential archetype to
@@ -658,6 +660,21 @@ private:
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
+  /// \brief Resolve the given type to the potential archetype it names.
+  ///
+  /// The \c resolutionKind parameter describes how resolution should be
+  /// performed. If the potential archetype named by the given dependent type
+  /// already exists, it will be always returned. If it doesn't exist yet,
+  /// the \c resolutionKind dictates whether the potential archetype will
+  /// be created or whether null will be returned.
+  ///
+  /// For any type that cannot refer to an archetype, this routine returns the
+  /// equivalence class that would have to change to make the potential
+  /// archetype resolvable.
+  llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
+  resolvePotentialArchetype(Type type,
+                            ArchetypeResolutionKind resolutionKind);
+
 public:
   /// \brief Resolve the given type to the potential archetype it names.
   ///
@@ -676,9 +693,9 @@ public:
   /// If successful, this returns either a non-typealias potential archetype
   /// or a Type, if \c type is concrete.
   /// If the type cannot be resolved, e.g., because it is "too" recursive
-  /// given the source, returns \c None.
-  Optional<ResolvedType> resolve(UnresolvedType type,
-                                 FloatingRequirementSource source);
+  /// given the source, returns an unresolved result containing the equivalence
+  /// class that would need to change to resolve this type.
+  ResolveResult resolve(UnresolvedType type, FloatingRequirementSource source);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(

@@ -1249,6 +1249,7 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
                                    UnresolvedType lhs,
                                    RequirementRHS rhs,
                                    FloatingRequirementSource source,
+                                   EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling) {
   switch (unresolvedHandling) {
   case UnresolvedHandlingKind::GenerateConstraints: {
@@ -1370,6 +1371,46 @@ public:
   }
 
   bool isType() const { return paOrT.is<Type>(); }
+};
+
+class GenericSignatureBuilder::ResolveResult {
+  union {
+    ResolvedType type;
+    EquivalenceClass *equivClass;
+  };
+
+  const bool resolved;
+
+public:
+  /// Form a resolved result with the given type.
+  ResolveResult(ResolvedType type) : resolved(true) {
+    this->type = type;
+  }
+
+  /// Form an unresolved result dependent on the given equivalence class.
+  ResolveResult(EquivalenceClass *equivClass) : resolved(false) {
+    this->equivClass = equivClass;
+  }
+
+  /// Determine whether this result was resolved.
+  explicit operator bool() const { return resolved; }
+
+  /// Retrieve the resolved result.
+  ResolvedType operator*() const {
+    assert(*this);
+    return type;
+  }
+
+  const ResolvedType *operator->() const {
+    assert(*this);
+    return &type;
+  }
+
+  /// Retrieve the unresolved result.
+  EquivalenceClass *getUnresolvedEquivClass() const {
+    assert(!*this);
+    return equivClass;
+  }
 };
 
 /// If there is a same-type requirement to be added for the given nested type
@@ -2394,38 +2435,66 @@ LazyResolver *GenericSignatureBuilder::getLazyResolver() const {
   return Context.getLazyResolver();
 }
 
-PotentialArchetype *GenericSignatureBuilder::resolveArchetype(
+auto GenericSignatureBuilder::resolvePotentialArchetype(
                                      Type type,
-                                     ArchetypeResolutionKind resolutionKind) {
+                                     ArchetypeResolutionKind resolutionKind)
+  -> llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
+{
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
     unsigned index = GenericParamKey(genericParam).findIndexIn(
                                                            Impl->GenericParams);
     if (index < Impl->GenericParams.size())
       return Impl->PotentialArchetypes[index];
 
-    return nullptr;
+    return (EquivalenceClass *)nullptr;
   }
 
   if (auto dependentMember = type->getAs<DependentMemberType>()) {
-    auto base = resolveArchetype(dependentMember->getBase(), resolutionKind);
-    if (!base)
-      return nullptr;
+    auto base = resolvePotentialArchetype(
+                  dependentMember->getBase(), resolutionKind);
+    auto basePA = base.dyn_cast<PotentialArchetype *>();
+    if (!basePA)
+      return base;
 
     // If we know the associated type already, get that specific type.
-    if (auto assocType = dependentMember->getAssocType())
-      return base->updateNestedTypeForConformance(assocType, resolutionKind);
+    PotentialArchetype *nestedPA;
+    if (auto assocType = dependentMember->getAssocType()) {
+      nestedPA =
+        basePA->updateNestedTypeForConformance(assocType, resolutionKind);
+    } else {
+      // Resolve based on name alone.
+      auto name = dependentMember->getName();
+      nestedPA = basePA->getNestedArchetypeAnchor(name, *this, resolutionKind);
+    }
 
-    // Resolve based on name alone.
-    auto name = dependentMember->getName();
-    return base->getNestedArchetypeAnchor(name, *this, resolutionKind);
+    // If we found a nested potential archetype, return it.
+    if (nestedPA)
+      return nestedPA;
+
+    // Otherwise, get/create an equivalence class for the base potential
+    // archetype.
+    return basePA->getOrCreateEquivalenceClass();
   }
+
+  return (EquivalenceClass *)nullptr;
+}
+
+PotentialArchetype *GenericSignatureBuilder::resolveArchetype(
+                                      Type type,
+                                      ArchetypeResolutionKind resolutionKind) {
+  if (!type->isTypeParameter())
+    return nullptr;
+
+  auto result = resolvePotentialArchetype(type, resolutionKind);
+  if (auto pa = result.dyn_cast<PotentialArchetype *>())
+    return pa;
 
   return nullptr;
 }
 
 auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
                                       FloatingRequirementSource source)
-    -> Optional<ResolvedType> {
+    -> ResolveResult {
   auto pa = paOrT.dyn_cast<PotentialArchetype *>();
   if (auto type = paOrT.dyn_cast<Type>()) {
     // If it's not a type parameter,
@@ -2440,8 +2509,9 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
 
     // Attempt to resolve the type parameter to a potential archetype. If this
     // fails, it's because we weren't allowed to resolve anything now.
-    pa = resolveArchetype(type, resolutionKind);
-    if (!pa) return None;
+    auto resolved = resolvePotentialArchetype(type, resolutionKind);
+    pa = resolved.dyn_cast<PotentialArchetype *>();
+      if (!pa) return resolved.get<EquivalenceClass *>();
   }
 
   return ResolvedType::forPotentialArchetype(pa);
@@ -2837,8 +2907,11 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
   // Resolve the subject.
   auto resolvedSubject = resolve(subject, source);
   if (!resolvedSubject) {
-    return handleUnresolvedRequirement(RequirementKind::Layout, subject,
-                                       layout, source, unresolvedHandling);
+    return handleUnresolvedRequirement(
+                                   RequirementKind::Layout, subject,
+                                   layout, source,
+                                   resolvedSubject.getUnresolvedEquivClass(),
+                                   unresolvedHandling);
   }
 
   // If this layout constraint applies to a concrete type, we can fully
@@ -2968,9 +3041,11 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   // Resolve the constraint.
   auto resolvedConstraint = resolve(constraint, source);
   if (!resolvedConstraint) {
-    return handleUnresolvedRequirement(RequirementKind::Conformance, subject,
-                                       toRequirementRHS(constraint), source,
-                                       unresolvedHandling);
+    return handleUnresolvedRequirement(
+                                 RequirementKind::Conformance, subject,
+                                 toRequirementRHS(constraint), source,
+                                 resolvedConstraint.getUnresolvedEquivClass(),
+                                 unresolvedHandling);
   }
 
   // The right-hand side needs to be concrete.
@@ -3011,8 +3086,11 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       constraintType->isExistentialType()
         ? RequirementKind::Conformance
         : RequirementKind::Superclass;
-    return handleUnresolvedRequirement(recordedKind, subject, constraintType,
-                                       source, unresolvedHandling);
+    return handleUnresolvedRequirement(
+                                     recordedKind, subject, constraintType,
+                                     source,
+                                     resolvedSubject.getUnresolvedEquivClass(),
+                                     unresolvedHandling);
   }
 
   // If the resolved subject is a type, we can probably perform diagnostics
@@ -3337,6 +3415,7 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
   if (!resolved1) {
     return handleUnresolvedRequirement(RequirementKind::SameType, paOrT1,
                                        toRequirementRHS(paOrT2), source,
+                                       resolved1.getUnresolvedEquivClass(),
                                        unresolvedHandling);
   }
 
@@ -3344,6 +3423,7 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
   if (!resolved2) {
     return handleUnresolvedRequirement(RequirementKind::SameType, paOrT1,
                                        toRequirementRHS(paOrT2), source,
+                                       resolved2.getUnresolvedEquivClass(),
                                        unresolvedHandling);
   }
 
