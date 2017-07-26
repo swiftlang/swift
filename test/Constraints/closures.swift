@@ -585,3 +585,6 @@ func rdar33429010_2() {
   // expected-warning@-1 {{result of operator '+' is unused}}
   let _: Int = AnySequence { iter }.rdar33429010(into: acc, { $0.rdar33429010_incr($1) })
 }
+
+// Ensure that we still do the appropriate pointer conversion here.
+_ = "".withCString { UnsafeMutableRawPointer(mutating: $0) }

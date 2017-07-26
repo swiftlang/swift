@@ -2527,6 +2527,9 @@ private:
     /// The number of defaultable bindings.
     unsigned NumDefaultableBindings = 0;
 
+    /// Is this type variable on the RHS of a BindParam constraint?
+    bool IsRHSOfBindParam = false;
+
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
@@ -2539,12 +2542,14 @@ private:
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
-      return std::make_tuple(!x.hasNonDefaultableBindings(), x.FullyBound,
+      return std::make_tuple(!x.hasNonDefaultableBindings(),
+                             x.FullyBound, x.IsRHSOfBindParam,
                              x.SubtypeOfExistentialType,
                              static_cast<unsigned char>(x.LiteralBinding),
                              x.InvolvesTypeVariables,
                              -(x.Bindings.size() - x.NumDefaultableBindings)) <
-             std::make_tuple(!y.hasNonDefaultableBindings(), y.FullyBound,
+             std::make_tuple(!y.hasNonDefaultableBindings(),
+                             y.FullyBound, y.IsRHSOfBindParam,
                              y.SubtypeOfExistentialType,
                              static_cast<unsigned char>(y.LiteralBinding),
                              y.InvolvesTypeVariables,
