@@ -92,6 +92,7 @@ enum class SyntaxStructureKind : uint8_t {
   ClassVariable,
   EnumCase,
   EnumElement,
+  TypeAlias,
 
   ForEachStatement,
   ForStatement,
