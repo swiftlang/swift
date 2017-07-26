@@ -673,8 +673,7 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
 }
 
 RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
-  assert((isComplete() || isInSpecialState()) &&
-         "can't copy an incomplete rvalue");
+  assert(isComplete() && "can't copy an incomplete rvalue");
   std::vector<ManagedValue> copiedValues;
   copiedValues.reserve(values.size());
   for (ManagedValue v : values) {
@@ -684,8 +683,7 @@ RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
 }
 
 RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
-  assert((isComplete() || isInSpecialState()) &&
-         "can't borrow incomplete rvalue");
+  assert(isComplete() && "can't borrow an incomplete rvalue");
   std::vector<ManagedValue> borrowedValues;
   borrowedValues.reserve(values.size());
   for (ManagedValue v : values) {
