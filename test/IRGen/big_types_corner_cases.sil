@@ -1,0 +1,13 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s --check-prefix=CHECK-%target-cpu
+// UNSUPPORTED: resilient_stdlib
+
+sil_stage canonical
+import c_layout
+
+// CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testBitfieldInBlock
+// CHECK-x86_64:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
+sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
+entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
+  %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
+  return %r : $BitfieldOne
+}

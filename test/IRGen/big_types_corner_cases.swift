@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-large-loadable-types %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// UNSUPPORTED: resilient_stdlib
 
 public struct BigStruct {
   var i0 : Int32 = 0
@@ -193,4 +194,14 @@ public func stringAndSubstring() -> (String, Substring) {
   let s = "Hello, World"
   let a = Substring(s).dropFirst()
   return (s, a)
+}
+
+func bigStructGet() -> BigStruct {
+  return BigStruct()
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases11testGetFuncyyF() #0 {
+// CHECK: ret void
+public func testGetFunc() {
+  let testGetPtr: @convention(thin) () -> BigStruct = bigStructGet
 }

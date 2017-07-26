@@ -87,6 +87,10 @@ static bool modifiableFunction(CanSILFunctionType funcType) {
     // ObjC functions should use the old ABI
     return false;
   }
+  if (funcType->getLanguage() == SILFunctionLanguage::C) {
+    // C functions should use the old ABI
+    return false;
+  }
   if (funcType->getRepresentation() ==
       SILFunctionTypeRepresentation::CFunctionPointer) {
     // C functions should use the old ABI
@@ -565,6 +569,9 @@ static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
       SILFunctionTypeRepresentation::ObjCMethod) {
     return false;
   }
+  if (applySite.getSubstCalleeType()->getLanguage() == SILFunctionLanguage::C) {
+    return false;
+  }
   if (applySite.getSubstCalleeType()->getRepresentation() ==
       SILFunctionTypeRepresentation::CFunctionPointer) {
     return false;
@@ -631,6 +638,10 @@ static bool isMethodInstUnmodifiable(MethodInst *instr) {
       ApplySite applySite = ApplySite(user->getUser());
       if (applySite.getSubstCalleeType()->getRepresentation() ==
           SILFunctionTypeRepresentation::ObjCMethod) {
+        return true;
+      }
+      if (applySite.getSubstCalleeType()->getLanguage() ==
+          SILFunctionLanguage::C) {
         return true;
       }
       if (applySite.getSubstCalleeType()->getRepresentation() ==
@@ -2493,6 +2504,10 @@ void LoadableByAddress::run() {
               case ValueKind::BuiltinInst: {
                 auto *instr = dyn_cast<BuiltinInst>(currInstr);
                 builtinInstrs.insert(instr);
+                break;
+              }
+              case ValueKind::DebugValueAddrInst:
+              case ValueKind::DebugValueInst: {
                 break;
               }
               default:
