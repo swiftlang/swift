@@ -204,6 +204,30 @@ public:
     return value;
   }
 
+  /// Returns true if this is an rvalue that can be used safely as a +1 rvalue.
+  ///
+  /// This returns true iff:
+  ///
+  /// 1. All sub-values are trivially typed.
+  /// 2. There exists at least one non-trivial typed sub-value and all such
+  /// sub-values all have cleanups.
+  ///
+  /// *NOTE* Due to 1. isPlusOne and isPlusZero both return true for rvalues
+  /// consisting of only trivial values.
+  bool isPlusOne(SILGenFunction &SGF) const &;
+
+  /// Returns true if this is an rvalue that can be used safely as a +0 rvalue.
+  ///
+  /// Specifically, we return true if:
+  ///
+  /// 1. All sub-values are trivially typed.
+  /// 2. At least 1 subvalue is non-trivial and all such non-trivial values do
+  /// not have a cleanup.
+  ///
+  /// *NOTE* Due to 1. isPlusOne and isPlusZero both return true for rvalues
+  /// consisting of only trivial values.
+  bool isPlusZero(SILGenFunction &SGF) const &;
+
   /// Use this rvalue to initialize an Initialization.
   void forwardInto(SILGenFunction &SGF, SILLocation loc, Initialization *I) &&;
 
