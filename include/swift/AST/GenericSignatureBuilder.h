@@ -175,6 +175,10 @@ public:
     /// only the derived same-type constraints in the graph.
     std::vector<DerivedSameTypeComponent> derivedSameTypeComponents;
 
+    /// Delayed requirements that could be resolved by a change to this
+    /// equivalence class.
+    std::vector<DelayedRequirement> delayedRequirements;
+
     /// Whether we have detected recursion during the substitution of
     /// the concrete type.
     unsigned recursiveConcreteType : 1;

@@ -1268,7 +1268,13 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
       delayedKind = DelayedRequirement::SameType;
       break;
     }
-    Impl->DelayedRequirements.push_back({delayedKind, lhs, rhs, source});
+
+    if (unresolvedEquivClass) {
+      unresolvedEquivClass->delayedRequirements.push_back(
+                                            {delayedKind, lhs, rhs, source});
+    } else {
+      Impl->DelayedRequirements.push_back({delayedKind, lhs, rhs, source});
+    }
     return ConstraintResult::Resolved;
   }
 
@@ -2403,6 +2409,12 @@ EquivalenceClass::EquivalenceClass(PotentialArchetype *representative)
 
 void EquivalenceClass::modified(GenericSignatureBuilder &builder) {
   builder.Impl->Generation++;
+
+  // Transfer any delayed requirements to the primary queue, because they
+  // might be resolvable now.
+  builder.Impl->DelayedRequirements.append(delayedRequirements.begin(),
+                                           delayedRequirements.end());
+  delayedRequirements.clear();
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
