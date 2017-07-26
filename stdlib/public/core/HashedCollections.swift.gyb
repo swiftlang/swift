@@ -5507,9 +5507,9 @@ extension ${Self}.Index {
   #if _runtime(_ObjC)
     case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
       return lhsCocoa == rhsCocoa
-  #endif
     default:
       _preconditionFailure("comparing indexes from different sets")
+  #endif
     }
   }
 
@@ -5527,9 +5527,9 @@ extension ${Self}.Index {
   #if _runtime(_ObjC)
     case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
       return lhsCocoa < rhsCocoa
-  #endif
     default:
       _preconditionFailure("comparing indexes from different sets")
+  #endif
     }
   }
 }
