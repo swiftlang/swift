@@ -2495,6 +2495,10 @@ void LoadableByAddress::run() {
                 builtinInstrs.insert(instr);
                 break;
               }
+              case ValueKind::DebugValueAddrInst:
+              case ValueKind::DebugValueInst: {
+                break;
+              }
               default:
                 llvm_unreachable("Unhandled use of FunctionRefInst");
               }

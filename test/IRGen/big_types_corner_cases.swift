@@ -194,3 +194,13 @@ public func stringAndSubstring() -> (String, Substring) {
   let a = Substring(s).dropFirst()
   return (s, a)
 }
+
+func bigStructGet() -> BigStruct {
+  return BigStruct()
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases11testGetFuncyyF() #0 {
+// CHECK: ret void
+public func testGetFunc() {
+  let testGetPtr: @convention(thin) () -> BigStruct = bigStructGet
+}
