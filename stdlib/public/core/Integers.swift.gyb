@@ -1426,26 +1426,21 @@ public protocol BinaryInteger :
   /// - Parameter source: An integer to convert to this type.
   init<T : BinaryInteger>(clamping source: T)
 
-  /// Returns the n-th word, counting from the least significant to most
-  /// significant, of this value's binary representation.
-  ///
-  /// The `_word(at:)` method returns negative values in two's complement
-  /// representation, regardless of a type's underlying implementation. If `n`
-  /// is greater than the number of words in this value's current
-  /// representation, the result is `0` for positive numbers and `~0` for
-  /// negative numbers.
-  ///
-  /// - Parameter n: The word to return, counting from the least significant to
-  ///   most significant. `n` must be greater than or equal to zero.
-  /// - Returns: An word-sized, unsigned integer with the bit pattern of the
-  ///   n-th word of this value.
-  func _word(at n: Int) -> UInt
-
-  // FIXME(integers): add doc comments
-  // FIXME: Should be `Words : Collection where Words.Iterator.Element == UInt`
+  // FIXME: Should be `Words : Collection where Words.Element == UInt`
   // See <rdar://problem/31798916> for why it isn't.
-  associatedtype Words
+  /// A type that represents the words of a binary integer. 
+  /// Must implement the `Collection` protocol with an `UInt` element type.
+  associatedtype Words : Sequence where Words.Element == UInt
+
+  /// Returns a collection containing the words of this value's binary
+  /// representation, in order from the least significant to most significant.
+  ///
+  /// Negative values are returned in two's complement representation,
+  /// regardless of the type's underlying implementation.
   var words: Words { get }
+
+  /// The least significant word in this value's binary representation.
+  var _lowWord: UInt { get }
 
   /// The number of bits in the current binary representation of this value.
   ///
@@ -1542,13 +1537,10 @@ extension BinaryInteger {
     return (self > (0 as Self) ? 1 : 0) - (self < (0 as Self) ? 1 : 0)
   }
 
-  /// The number of words used for the current binary representation of this
-  /// value.
-  ///
-  /// This property is a constant for instances of fixed-width integer types.
   @_transparent
-  public var _countRepresentedWords: Int {
-    return (self.bitWidth + ${word_bits} - 1) / ${word_bits}
+  public var _lowWord: UInt {
+    var it = words.makeIterator()
+    return it.next() ?? 0
   }
 
   public func quotientAndRemainder(dividingBy rhs: Self)
@@ -1885,19 +1877,6 @@ extension BinaryInteger {
 %   end
 }
 #endif
-
-extension BinaryInteger {
-  // FIXME(integers): inefficient. Should get rid of _word(at:) and
-  // _countRepresentedWords, and make `words` the basic operation.
-  public var words: [UInt] {
-    var result = [UInt]()
-    result.reserveCapacity(_countRepresentedWords)
-    for i in 0..<self._countRepresentedWords {
-      result.append(_word(at: i))
-    }
-    return result
-  }
-}
 
 //===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
@@ -2282,21 +2261,21 @@ ${unsafeOperationComment(x.operator)}
   @inline(__always)
   public init<T : BinaryInteger>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} {
-      self = Self.init(_truncatingBits: source._word(at: 0))
+      self = Self.init(_truncatingBits: source._lowWord)
     }
     else {
-      var result: Self = source < (0 as T) ? ~0 : 0
-      // start with the most significant word
-      var n = source._countRepresentedWords
-      while n >= 0 {
-        // masking is OK here because this we have already ensured
-        // that Self.bitWidth > ${word_bits}.  Not masking results in
+      let neg = source < (0 as T)
+      var result: Self = neg ? ~0 : 0
+      var shift: Self = 0
+      let width = Self(_truncatingBits: Self.bitWidth._lowWord)
+      for word in source.words {
+        guard shift < width else { break }
+        // masking shift is OK here because we have already ensured
+        // that shift < Self.bitWidth. Not masking results in
         // infinite recursion.
-        result &<<= (${word_bits} as Self)
-        result |= Self(_truncatingBits: source._word(at: n))
-        n -= 1
+        result ^= Self(_truncatingBits: neg ? ~word : word) &<< shift
+        shift += ${word_bits}
       }
-
       self = result
     }
   }
@@ -2740,7 +2719,7 @@ ${assignmentOperatorComment(x.operator, True)}
     return Int(
       ${Self}(
         Builtin.int_ctlz_Int${bits}(self._value, false._value)
-      )._lowUWord._value)
+      )._lowWord._value)
   }
 
   @_transparent
@@ -2748,7 +2727,7 @@ ${assignmentOperatorComment(x.operator, True)}
     return Int(
       ${Self}(
         Builtin.int_cttz_Int${bits}(self._value, false._value)
-      )._lowUWord._value)
+      )._lowWord._value)
   }
 
   @_transparent
@@ -2756,29 +2735,55 @@ ${assignmentOperatorComment(x.operator, True)}
     return Int(
       ${Self}(
         Builtin.int_ctpop_Int${bits}(self._value)
-      )._lowUWord._value)
+      )._lowWord._value)
+  }
+
+  // FIXME should be RandomAccessCollection
+  public struct Words : BidirectionalCollection {
+    public typealias Indices = CountableRange<Int>
+    public typealias SubSequence = BidirectionalSlice<${Self}.Words>
+
+    var _value: ${Self}
+
+    public init(_ value: ${Self}) {
+      self._value = value
+    }
+
+    public var count: Int {
+      return (${bits} + ${word_bits} - 1) / ${word_bits}
+    }
+
+    public var startIndex: Int { return 0 }
+
+    public var endIndex: Int { return count }
+
+    public var indices: Indices { return startIndex ..< endIndex }
+
+    @_transparent
+    public func index(after i: Int) -> Int { return i + 1 }
+
+    @_transparent
+    public func index(before i: Int) -> Int { return i - 1 }
+
+    public subscript(position: Int) -> UInt {
+      get {
+        _precondition(position >= 0, "Negative word index")
+        _precondition(position < endIndex, "Word index out of range")
+        let shift = UInt(position._value) &* ${word_bits}
+        _sanityCheck(shift < UInt(_value.bitWidth._value))
+        return (_value &>> ${Self}(_truncatingBits: shift))._lowWord
+      }
+    }
   }
 
   @_transparent
-  public func _word(at n: Int) -> UInt {
-    _precondition(n >= 0, "Negative word index")
-    if _fastPath(n < _countRepresentedWords) {
-      let shift = UInt(n._value) &* ${word_bits}
-      let bitWidth = UInt(self.bitWidth._value)
-      _sanityCheck(shift < bitWidth)
-      return (self &>> ${Self}(_truncatingBits: shift))._lowUWord
-    }
-% if signed:
-    return self < (0 as ${Self}) ? ~0 : 0
-% else:
-    return 0
-% end
+  public var words: Words {
+    return Words(self)
   }
-
 
   @_transparent
   public // transparent
-  var _lowUWord: UInt {
+  var _lowWord: UInt {
     % truncOrExt = z + 'ext' if bits <= word_bits else 'trunc'
     return UInt(
       Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_value)
