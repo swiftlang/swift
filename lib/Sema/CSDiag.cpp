@@ -4597,7 +4597,10 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     if (!elExpr) return nullptr; // already diagnosed.
     
     resultElts.push_back(elExpr);
-    resultEltTys.push_back({CS.getType(elExpr), TE->getElementName(i)});
+    auto resFlags =
+        ParameterTypeFlags().withInOut(elExpr->isSemanticallyInOutExpr());
+    resultEltTys.push_back({CS.getType(elExpr)->getInOutObjectType(),
+                            TE->getElementName(i), resFlags});
   }
 
   auto TT = TupleType::get(resultEltTys, CS.getASTContext());
