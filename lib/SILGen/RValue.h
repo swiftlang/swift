@@ -67,7 +67,9 @@ class RValue {
   RValue(std::vector<ManagedValue> &&values, CanType type,
          unsigned elementsToBeAdded)
       : values(std::move(values)), type(type),
-        elementsToBeAdded(elementsToBeAdded) {}
+        elementsToBeAdded(elementsToBeAdded) {
+    verifyConsistentOwnership();
+  }
 
   /// Construct an RValue from a pre-exploded set of ManagedValues.
   ///
@@ -278,6 +280,13 @@ public:
 
   void dump() const;
   void dump(raw_ostream &OS, unsigned indent = 0) const;
+
+private:
+  /// Assert that all non-trivial ManagedValues in this RValue either all have a
+  /// cleanup or all do not have a cleanup.
+  ///
+  /// *NOTE* This is a no-op in non-assert builds.
+  void verifyConsistentOwnership() const;
 };
 
 } // end namespace Lowering
