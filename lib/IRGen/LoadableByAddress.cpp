@@ -82,17 +82,7 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
 }
 
 static bool modifiableFunction(CanSILFunctionType funcType) {
-  if (funcType->getRepresentation() ==
-      SILFunctionTypeRepresentation::ObjCMethod) {
-    // ObjC functions should use the old ABI
-    return false;
-  }
   if (funcType->getLanguage() == SILFunctionLanguage::C) {
-    // C functions should use the old ABI
-    return false;
-  }
-  if (funcType->getRepresentation() ==
-      SILFunctionTypeRepresentation::CFunctionPointer) {
     // C functions should use the old ABI
     return false;
   }
@@ -197,7 +187,9 @@ static SILFunctionType *
 getNewSILFunctionTypePtr(GenericEnvironment *GenericEnv,
                          SILFunctionType *currSILFunctionType,
                          irgen::IRGenModule &Mod) {
-  assert(modifiableFunction(CanSILFunctionType(currSILFunctionType)));
+  if (!modifiableFunction(CanSILFunctionType(currSILFunctionType))) {
+    return currSILFunctionType;
+  }
   SmallVector<SILParameterInfo, 4> newArgTys =
       getNewArgTys(GenericEnv, currSILFunctionType, Mod);
   SILFunctionType *newSILFunctionType = SILFunctionType::get(
@@ -565,15 +557,7 @@ void LargeValueVisitor::mapValueStorage() {
 
 static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
   // If the callee is a method then use the old ABI
-  if (applySite.getSubstCalleeType()->getRepresentation() ==
-      SILFunctionTypeRepresentation::ObjCMethod) {
-    return false;
-  }
   if (applySite.getSubstCalleeType()->getLanguage() == SILFunctionLanguage::C) {
-    return false;
-  }
-  if (applySite.getSubstCalleeType()->getRepresentation() ==
-      SILFunctionTypeRepresentation::CFunctionPointer) {
     return false;
   }
   auto callee = applySite.getCallee();
@@ -636,16 +620,8 @@ static bool isMethodInstUnmodifiable(MethodInst *instr) {
   for (auto *user : instr->getUses()) {
     if (ApplySite::isa(user->getUser())) {
       ApplySite applySite = ApplySite(user->getUser());
-      if (applySite.getSubstCalleeType()->getRepresentation() ==
-          SILFunctionTypeRepresentation::ObjCMethod) {
-        return true;
-      }
       if (applySite.getSubstCalleeType()->getLanguage() ==
           SILFunctionLanguage::C) {
-        return true;
-      }
-      if (applySite.getSubstCalleeType()->getRepresentation() ==
-          SILFunctionTypeRepresentation::CFunctionPointer) {
         return true;
       }
     }
