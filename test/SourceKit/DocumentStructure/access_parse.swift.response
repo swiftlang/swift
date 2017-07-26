@@ -650,6 +650,42 @@
           key.bodylength: 0
         }
       ]
+    },
+    {
+      key.kind: source.lang.swift.decl.typealias,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "defAlias",
+      key.offset: 1633,
+      key.length: 24,
+      key.nameoffset: 1643,
+      key.namelength: 8
+    },
+    {
+      key.kind: source.lang.swift.decl.typealias,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "pubAlias",
+      key.offset: 1665,
+      key.length: 24,
+      key.nameoffset: 1675,
+      key.namelength: 8
+    },
+    {
+      key.kind: source.lang.swift.decl.typealias,
+      key.accessibility: source.lang.swift.accessibility.private,
+      key.name: "privAlias",
+      key.offset: 1698,
+      key.length: 25,
+      key.nameoffset: 1708,
+      key.namelength: 9
+    },
+    {
+      key.kind: source.lang.swift.decl.typealias,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "intAlias",
+      key.offset: 1733,
+      key.length: 24,
+      key.nameoffset: 1743,
+      key.namelength: 8
     }
   ]
 }

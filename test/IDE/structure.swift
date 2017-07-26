@@ -184,3 +184,6 @@ class A {
   func perform() {foo(5, animations: {})}
 // CHECK:  <ifunc>func <name>perform()</name> {<call><name>foo</name>(<arg>5</arg>, <arg><name>animations</name>: <brace>{}</brace></arg>)</call>}</ifunc>
 }
+
+// CHECK: <typealias>typealias <name>OtherA</name> = A</typealias>
+typealias OtherA = A
