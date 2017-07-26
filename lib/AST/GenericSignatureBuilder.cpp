@@ -36,6 +36,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 
 using namespace swift;
@@ -72,6 +73,16 @@ STATISTIC(NumArchetypeAnchorCacheHits,
           "# of hits in the archetype anchor cache");
 STATISTIC(NumArchetypeAnchorCacheMisses,
           "# of misses in the archetype anchor cache");
+STATISTIC(NumProcessDelayedRequirements,
+          "# of times we process delayed requirements");
+STATISTIC(NumProcessDelayedRequirementsUnchanged,
+          "# of times we process delayed requirements without change");
+STATISTIC(NumDelayedRequirementConcrete,
+          "Delayed requirements resolved as concrete");
+STATISTIC(NumDelayedRequirementResolved,
+          "Delayed requirements resolved");
+STATISTIC(NumDelayedRequirementUnresolved,
+          "Delayed requirements left unresolved");
 
 struct GenericSignatureBuilder::Implementation {
   /// Function used to look up conformances.
@@ -89,6 +100,16 @@ struct GenericSignatureBuilder::Implementation {
 
   /// The set of requirements that have been delayed for some reason.
   SmallVector<DelayedRequirement, 4> DelayedRequirements;
+
+  /// The generation number, which is incremented whenever we successfully
+  /// introduce a new constraint.
+  unsigned Generation = 0;
+
+  /// The generation at which we last processed all of the delayed requirements.
+  unsigned LastProcessedGeneration = 0;
+
+  /// Whether we are currently processing delayed requirements.
+  bool ProcessingDelayedRequirements = false;
 
 #ifndef NDEBUG
   /// Whether we've already finalized the builder.
@@ -398,6 +419,11 @@ bool RequirementSource::isSelfDerivedConformance(
     switch (source->kind) {
     case ProtocolRequirement:
     case InferredProtocolRequirement: {
+      // For a requirement signature, we ignore the 'Self: P' requirement
+      // for the purposes of the self-derived check.
+      if (source->parent->kind == RequirementSource::RequirementSignatureSelf)
+        return false;
+
       // Note that we've seen a protocol requirement.
       sawProtocolRequirement = true;
 
@@ -1399,6 +1425,8 @@ bool PotentialArchetype::addConformance(ProtocolDecl *proto,
     return false;
   }
 
+  builder.bumpGeneration();
+
   // Add the conformance along with this constraint.
   equivClass->conformsTo[proto].push_back({this, proto, source});
   ++NumConformanceConstraints;
@@ -1867,6 +1895,15 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   if (!assocType && !concreteDecl)
     return nullptr;
 
+  // If we were asked for a complete, well-formed archetype, make sure we
+  // process delayed requirements if anything changed.
+  SWIFT_DEFER {
+    ASTContext &ctx = assocType ? assocType->getASTContext()
+                                : concreteDecl->getASTContext();
+    if (ctx.LangOpts.EnableRecursiveConstraints)
+      getBuilder()->processDelayedRequirements();
+  };
+
   Identifier name = assocType ? assocType->getName() : concreteDecl->getName();
   ProtocolDecl *proto =
     assocType ? assocType->getProtocol()
@@ -1901,6 +1938,8 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     switch (kind) {
     case ArchetypeResolutionKind::CompleteWellFormed:
     case ArchetypeResolutionKind::WellFormed: {
+      builder.bumpGeneration();
+
       if (assocType)
         resultPA = new PotentialArchetype(this, assocType);
       else
@@ -2819,6 +2858,8 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
     return ConstraintResult::Resolved;
   }
 
+  bumpGeneration();
+
   auto pa = resolvedSubject->getPotentialArchetype();
   return addLayoutRequirementDirect(pa, layout, source.getSource(pa));
 }
@@ -2902,6 +2943,8 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
   T->getOrCreateEquivalenceClass()->superclassConstraints
     .push_back(ConcreteConstraint{T, superclass, source});
   ++NumSuperclassConstraints;
+
+  bumpGeneration();
 
   // Update the equivalence class with the constraint.
   updateSuperclass(T, superclass, source);
@@ -3062,6 +3105,8 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   if (T1 == T2)
     return ConstraintResult::Resolved;
 
+  bumpGeneration();
+
   unsigned nestingDepth1 = T1->getNestingDepth();
   unsigned nestingDepth2 = T2->getNestingDepth();
 
@@ -3196,6 +3241,8 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   equivClass->concreteTypeConstraints.push_back(
                                       ConcreteConstraint{T, Concrete, Source});
   ++NumConcreteTypeConstraints;
+
+  bumpGeneration();
 
   // If we've already been bound to a type, match that type.
   if (equivClass->concreteType) {
@@ -3979,8 +4026,27 @@ static GenericSignatureBuilder::UnresolvedType asUnresolvedType(
 }
 
 void GenericSignatureBuilder::processDelayedRequirements() {
-  bool anySolved = !Impl->DelayedRequirements.empty();
-  while (anySolved) {
+  // If we're already up-to-date, do nothing.
+  if (Impl->Generation == Impl->LastProcessedGeneration) { return; }
+
+  // If there are no delayed requirements, do nothing.
+  if (Impl->DelayedRequirements.empty()) { return; }
+
+  if (Impl->ProcessingDelayedRequirements) { return; }
+
+  ++NumProcessDelayedRequirements;
+
+  llvm::SaveAndRestore<bool> processing(Impl->ProcessingDelayedRequirements,
+                                        true);
+  bool anyChanges = false;
+  SWIFT_DEFER {
+    Impl->LastProcessedGeneration = Impl->Generation;
+    if (!anyChanges)
+      ++NumProcessDelayedRequirementsUnchanged;
+  };
+
+  bool anySolved;
+  do {
     // Steal the delayed requirements so we can reprocess them.
     anySolved = false;
     auto delayed = std::move(Impl->DelayedRequirements);
@@ -4013,21 +4079,35 @@ void GenericSignatureBuilder::processDelayedRequirements() {
       // Update our state based on what happened.
       switch (reqResult) {
       case ConstraintResult::Concrete:
+        ++NumDelayedRequirementConcrete;
+        anySolved = true;
+        break;
+
       case ConstraintResult::Conflicting:
         anySolved = true;
         break;
 
       case ConstraintResult::Resolved:
+        ++NumDelayedRequirementResolved;
         anySolved = true;
         break;
 
       case ConstraintResult::Unresolved:
         // Add the requirement back.
+        ++NumDelayedRequirementUnresolved;
         Impl->DelayedRequirements.push_back(req);
         break;
       }
     }
-  }
+
+    if (anySolved) {
+      anyChanges = true;
+    }
+  } while (anySolved);
+}
+
+void GenericSignatureBuilder::bumpGeneration() {
+  ++Impl->Generation;
 }
 
 template<typename T>
@@ -4304,6 +4384,19 @@ void GenericSignatureBuilder::checkConformanceConstraints(
       [&](const Constraint<ProtocolDecl *> &constraint) {
         auto proto = constraint.value;
         assert(proto == entry.first && "Mixed up protocol constraints");
+
+        // If this conformance requirement recursively makes a protocol
+        // conform to itself, don't complain here.
+        auto source = constraint.source;
+        auto rootSource = source->getRoot();
+        if (rootSource->kind == RequirementSource::RequirementSignatureSelf &&
+            source != rootSource &&
+            proto == rootSource->getProtocolDecl() &&
+            rootSource->getRootPotentialArchetype()
+              ->isInSameEquivalenceClassAs(
+                                 source->getAffectedPotentialArchetype())) {
+          return ConstraintRelation::Unrelated;
+        }
 
         // If this is a redundantly inherited Objective-C protocol, treat it
         // as "unrelated" to silence the warning about the redundant

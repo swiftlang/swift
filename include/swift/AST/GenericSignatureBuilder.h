@@ -559,6 +559,9 @@ public:
   void processDelayedRequirements();
 
 private:
+  /// Bump the generation count due to a change.
+  void bumpGeneration();
+
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
   enum class ConstraintRelation {
