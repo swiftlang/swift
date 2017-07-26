@@ -21,6 +21,7 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
 
@@ -783,4 +784,22 @@ void RValue::verifyConsistentOwnership() const {
     result = newResult;
   }
 #endif
+}
+
+bool RValue::isPlusOne(SILGenFunction &SGF) const & {
+  return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
+    if (mv.getType().isTrivial(SGF.F.getModule()) ||
+        mv.getOwnershipKind() == ValueOwnershipKind::Trivial)
+      return false;
+    return !mv.hasCleanup();
+  });
+}
+
+bool RValue::isPlusZero(SILGenFunction &SGF) const & {
+  return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
+    if (mv.getType().isTrivial(SGF.F.getModule()) ||
+        mv.getOwnershipKind() == ValueOwnershipKind::Trivial)
+      return false;
+    return mv.hasCleanup();
+  });
 }
