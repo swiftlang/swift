@@ -47,6 +47,10 @@ public:
   /// header, place it in this directory.
   std::string PrecompiledHeaderOutputDir;
 
+  /// The optimizaton setting.  This doesn't typically matter for
+  /// import, but it can affect Clang's IR generation of static functions.
+  std::string Optimization;
+
   /// Disable validating the persistent PCH.
   bool PCHDisableValidation = false;
 

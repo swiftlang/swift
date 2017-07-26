@@ -20,3 +20,7 @@ static inline void log_a_thing(const a_thing thing) {
  useInt(thing.val[0]);
  useInt(thing.val[7]);
 }
+
+static inline unsigned int return7(void) {
+  return 7;
+}
