@@ -26,8 +26,7 @@ import UsesSubmodule
 _ = LinkFramework.IComeFromLinkFramework
 UsesSubmodule.useSomethingFromSubmodule()
 
-// CHECK: !{{[0-9]+}} = !{i32 6, !"Linker Options", ![[LINK_LIST:[0-9]+]]}
-// CHECK: ![[LINK_LIST]] = !{
+// CHECK: !llvm.linker.options = !{
 
 // CHECK-DAG: !{{[0-9]+}} = !{!"-lLock"}
 // CHECK-DAG: !{{[0-9]+}} = !{!"-lStock"}

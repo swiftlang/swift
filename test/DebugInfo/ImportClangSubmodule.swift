@@ -33,10 +33,10 @@ import OtherClangModule.SubModule
 // submodule's top-level-module, even if we didn't ask for it.
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]]
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[CLANGMODULE]])
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[CLANGMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]]
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERCLANGMODULE]])
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERCLANGMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]]
 
