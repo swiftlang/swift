@@ -2367,6 +2367,9 @@ void LoadableByAddress::recreateConvInstrs() {
     IRGenModule *currIRMod =
         getIRGenModule()->IRGen.getGenModule(convInstr->getFunction());
     SILType currSILType = convInstr->getType();
+    if (auto *thinToPointer = dyn_cast<ThinFunctionToPointerInst>(convInstr)) {
+      currSILType = thinToPointer->getOperand()->getType();
+    }
     CanType currCanType = currSILType.getSwiftRValueType();
     SILFunctionType *currSILFunctionType =
         dyn_cast<SILFunctionType>(currCanType.getPointer());
@@ -2392,6 +2395,15 @@ void LoadableByAddress::recreateConvInstrs() {
           dyn_cast<ThinToThickFunctionInst>(convInstr);
       assert(instr && "Unexpected conversion instruction");
       newInstr = convBuilder.createThinToThickFunction(
+          instr->getLoc(), instr->getOperand(), newType);
+      break;
+    }
+    case ValueKind::ThinFunctionToPointerInst: {
+      ThinFunctionToPointerInst *instr =
+          dyn_cast<ThinFunctionToPointerInst>(convInstr);
+      assert(instr && "Unexpected conversion instruction");
+      newType = getNewSILType(genEnv, instr->getType(), *getIRGenModule());
+      newInstr = convBuilder.createThinFunctionToPointer(
           instr->getLoc(), instr->getOperand(), newType);
       break;
     }
@@ -2486,6 +2498,7 @@ void LoadableByAddress::run() {
                 }
                 break;
               }
+              case ValueKind::ThinFunctionToPointerInst:
               case ValueKind::ThinToThickFunctionInst: {
                 conversionInstrs.insert(currInstr);
                 break;

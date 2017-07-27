@@ -83,3 +83,14 @@ bb1(%ret : $BigStruct):
 bb2(%err : $Error):
   throw %err : $Error
 }
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @testThinFuncPointer(%swift.type* %"BigTempStruct<Element>", %T22big_types_corner_cases13BigTempStructV* noalias nocapture swiftself dereferenceable({{.*}}) #0 {
+// CHECK-NEXT: entry
+// CHECK-NEXT: ret i8* bitcast (i8* (%swift.type*, %T22big_types_corner_cases13BigTempStructV*)* @testThinFuncPointer to i8*)
+sil @testThinFuncPointer : $@convention(method) <Element> (@guaranteed BigTempStruct<Element>) -> @owned Builtin.RawPointer {
+bb0(%0 : $BigTempStruct<Element>):
+  // function_ref specialized BigTempStruct.subscript.getter
+  %fref = function_ref @testThinFuncPointer : $@convention(method) <τ_0_0> (@guaranteed BigTempStruct<τ_0_0>) -> @owned Builtin.RawPointer
+  %ret = thin_function_to_pointer %fref : $@convention(method) <τ_0_0> (@guaranteed BigTempStruct<τ_0_0>) -> @owned Builtin.RawPointer to $Builtin.RawPointer
+  return %ret : $Builtin.RawPointer
+}
