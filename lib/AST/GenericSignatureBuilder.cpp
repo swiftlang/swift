@@ -296,6 +296,17 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
   // If it's not a derived requirement, it's not self-derived.
   if (!isDerivedRequirement()) return false;
 
+  /// Keep track of all of the protocol requirements we've seen along the way.
+  /// If we see the same requirement twice, we have a self-derived source.
+  llvm::DenseSet<std::pair<PotentialArchetype *, ProtocolDecl *>>
+    constraintsSeen;
+
+  // Note that we've now seen a new conformance constraint, returning true if
+  // we've seen it before.
+  auto addConstraint = [&](PotentialArchetype *pa, ProtocolDecl *proto) {
+    return !constraintsSeen.insert({pa->getRepresentative(), proto}).second;
+  };
+
   return visitPotentialArchetypesAlongPath(
            [&](PotentialArchetype *currentPA, const RequirementSource *source) {
     switch (source->kind) {
@@ -319,7 +330,8 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
       // Note whether we saw derivation through a concrete type.
       if (currentPA->isConcreteType())
         derivedViaConcrete = true;
-      return false;
+
+      return addConstraint(currentPA, source->getProtocolDecl());
 
     case RequirementSource::NestedTypeNameMatch:
     case RequirementSource::Concrete:

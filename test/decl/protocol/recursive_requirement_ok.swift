@@ -26,3 +26,15 @@ protocol P2 {
   associatedtype Y : P1 where Y.X == Self
   associatedtype Z : P1
 }
+
+// SR-5473
+protocol P3 {
+	associatedtype X : P4
+}
+
+// CHECK: .P4@
+// CHECK: Requirement signature: <Self where Self == Self.Y.X, Self.Y : P3, Self.Z : P3, Self.Y.X == Self.Z.X>
+protocol P4 {
+	associatedtype Y: P3 where Y.X == Self
+	associatedtype Z: P3 where Z.X == Self
+}
