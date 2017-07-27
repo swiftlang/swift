@@ -369,9 +369,9 @@ tests.test("Parsing/LosslessStringConvertible") {
     return text.split(separator: " ").map { T(String($0)) }.flatMap { $0 }
   }
 
-  expectEqualSequence([1, 2, 3], _toArray("1 2 3"))
+  expectEqualSequence([1, 2, 3], _toArray("1 2 3") as [Int])
   expectEqualSequence(
-    [Int](), _toArray("21-50 ff6600 10000000000000000000000000"))
+    [Int](), _toArray("21-50 ff6600 10000000000000000000000000") as [Int])
 }
 
 tests.test("HeterogeneousEquality") {
