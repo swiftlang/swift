@@ -370,7 +370,8 @@ tests.test("Parsing/LosslessStringConvertible") {
   }
 
   expectEqualSequence([1, 2, 3], _toArray("1 2 3"))
-  expectEqualSequence([], _toArray("21-50 ff6600 10000000000000000000000000"))
+  expectEqualSequence(
+    [Int](), _toArray("21-50 ff6600 10000000000000000000000000"))
 }
 
 tests.test("HeterogeneousEquality") {
