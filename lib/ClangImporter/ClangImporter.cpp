@@ -2448,10 +2448,11 @@ static bool isVisibleClangEntry(clang::ASTContext &ctx,
     return false;
   }
 
-  // Check whether the macro is defined.
-  // auto clangMacro = entry.get<clang::MacroInfo *>();
-  // if (module)
-  //   return module->NameVisibility == clang::Module::AllVisible;
+  // If it's a macro from a module, check whether the module has been imported.
+  if (auto moduleMacro = entry.dyn_cast<clang::ModuleMacro *>()) {
+    clang::Module *module = moduleMacro->getOwningModule();
+    return module->NameVisibility == clang::Module::AllVisible;
+  }
 
   return true;
 }

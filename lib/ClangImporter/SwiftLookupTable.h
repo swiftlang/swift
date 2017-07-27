@@ -353,6 +353,7 @@ public:
 
   /// Encode a Clang named declaration as an entry in the table.
   static uint64_t encodeEntry(clang::NamedDecl *decl) {
+    assert(decl);
     auto bits = reinterpret_cast<uintptr_t>(decl);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits;
@@ -360,6 +361,7 @@ public:
 
   // Encode a Clang macro as an entry in the table.
   static uint64_t encodeEntry(clang::MacroInfo *macro) {
+    assert(macro);
     auto bits = reinterpret_cast<uintptr_t>(macro);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits | 0x01;
@@ -367,6 +369,7 @@ public:
 
   // Encode a Clang macro as an entry in the table.
   static uint64_t encodeEntry(clang::ModuleMacro *macro) {
+    assert(macro);
     auto bits = reinterpret_cast<uintptr_t>(macro);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits | 0x01;
@@ -407,8 +410,7 @@ private:
   /// present.
   ///
   /// \returns true if the entry was added, false otherwise.
-  bool addLocalEntry(SingleEntry newEntry, SmallVectorImpl<uint64_t> &entries,
-                     const clang::Preprocessor *PP);
+  bool addLocalEntry(SingleEntry newEntry, SmallVectorImpl<uint64_t> &entries);
 
 public:
   explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
@@ -435,8 +437,7 @@ public:
   /// \param newEntry The Clang declaration or macro.
   /// \param effectiveContext The effective context in which name lookup occurs.
   void addEntry(DeclName name, SingleEntry newEntry,
-                EffectiveClangContext effectiveContext,
-                const clang::Preprocessor *PP = nullptr);
+                EffectiveClangContext effectiveContext);
 
   /// Add an Objective-C category or extension to the table.
   void addCategory(clang::ObjCCategoryDecl *category);
