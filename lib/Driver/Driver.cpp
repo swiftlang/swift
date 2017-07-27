@@ -1133,13 +1133,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       break;
 
-    case options::OPT_emit_tbd:
-      OI.CompilerOutputType = types::TY_TBD;
-      // We want the symbols from the whole module, so let's do it in one
-      // invocation.
-      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
-      break;
-
     // BEGIN APPLE-ONLY OUTPUT ACTIONS
     case options::OPT_index_file:
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
@@ -2240,6 +2233,20 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       }
 
       Output->setAdditionalOutputForType(types::TY_ModuleTrace, filename);
+    }
+
+    if (C.getArgs().hasArg(options::OPT_emit_tbd, options::OPT_emit_tbd_path)) {
+      if (OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
+        llvm::outs() << "TBD emission has been disabled, because it requires a "
+                     << "single compiler invocation: consider enabling the "
+                     << "-whole-module-optimization flag.\n";
+      } else {
+        auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
+            OI, C.getArgs(), options::OPT_emit_tbd_path, types::TY_TBD,
+            /*TreatAsTopLevelOutput=*/true, "tbd", Buf);
+
+        Output->setAdditionalOutputForType(types::TY_TBD, filename);
+      }
     }
   }
 
