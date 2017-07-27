@@ -369,14 +369,8 @@ tests.test("Parsing/LosslessStringConvertible") {
     return text.split(separator: " ").map { T(String($0)) }.flatMap { $0 }
   }
 
-  let i: [Int] = _toArray("1 2 3")
-  expectEqual(i.count, 3)
-  expectEqual(i[0], 1)
-  expectEqual(i[1], 2)
-  expectEqual(i[2], 3)
-
-  let j: [Int] = _toArray("21-50 ff6600 10000000000000000000000000")
-  expectEqual(j.count, 0)
+  expectEqualSequence([1, 2, 3], _toArray("1 2 3"))
+  expectEqualSequence([], _toArray("21-50 ff6600 10000000000000000000000000"))
 }
 
 tests.test("HeterogeneousEquality") {
