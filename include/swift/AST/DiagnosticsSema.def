@@ -1387,6 +1387,14 @@ NOTE(type_does_not_inherit_requirement,none,
 ERROR(types_not_equal,none,
       "%0 requires the types %1 and %2 be equivalent",
       (Type, Type, Type))
+NOTE(candidate_types_equal_requirement,none,
+     "candidate requires that the types %0 and %1 be equivalent "
+     "(requirement specified as %2 == %3%4)",
+     (Type, Type, Type, Type, StringRef))
+NOTE(candidate_types_inheritance_requirement,none,
+     "candidate requires that %1 inherit from %2 "
+     "(requirement specified as %2 : %3%4)",
+     (Type, Type, Type, Type, StringRef))
 NOTE(types_not_equal_requirement,none,
      "requirement specified as %0 == %1%2", (Type, Type, StringRef))
 ERROR(non_class_cannot_conform_to_class_protocol,none,
