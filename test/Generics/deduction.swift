@@ -216,11 +216,12 @@ func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
 }
 
 func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}
-// expected-note@-1 {{requirement specified as 'A.Element' == 'B.Element' [with A = IndexingIterator<[Int]>, B = IndexingIterator<[Double]>]}}
+// expected-note@-1 {{candidate requires that the types 'Int' and 'Double' be equivalent (requirement specified as 'A.Element' == 'B.Element' [with A = IndexingIterator<[Int]>, B = IndexingIterator<[Double]>])}}
 func compareIterators() {
   var a: [Int] = []
   var b: [Double] = []
-  testEqualIterElementTypes(a.makeIterator(), b.makeIterator()) // expected-error {{'<A, B where A : IteratorProtocol, B : IteratorProtocol, A.Element == B.Element> (A, B) -> ()' requires the types 'Int' and 'Double' be equivalent}}
+  testEqualIterElementTypes(a.makeIterator(), b.makeIterator())
+  // expected-error@-1 {{cannot invoke 'testEqualIterElementTypes(_:_:)' with an argument list of type '(IndexingIterator<[Int]>, IndexingIterator<[Double]>)'}}
 }
 
 protocol P_GI {
@@ -233,9 +234,9 @@ class C_GI : P_GI {
 
 class GI_Diff {}
 func genericInheritsA<T>(_ x: T) where T : P_GI, T.Y : GI_Diff {}
-// expected-note@-1 {{requirement specified as 'T.Y' : 'GI_Diff' [with T = C_GI]}}
-genericInheritsA(C_GI()) // expected-error {{<T where T : P_GI, T.Y : GI_Diff> (T) -> ()' requires that 'C_GI.Y' (aka 'Double') inherit from 'GI_Diff'}}
-
+// expected-note@-1 {{candidate requires that 'GI_Diff' inherit from 'T.Y' (requirement specified as 'T.Y' : 'GI_Diff' [with T = C_GI])}}
+genericInheritsA(C_GI())
+// expected-error@-1 {{cannot invoke 'genericInheritsA(_:)' with an argument list of type '(C_GI)'}}
 
 //===----------------------------------------------------------------------===//
 // Deduction for member operators
@@ -318,3 +319,24 @@ func foo() {
     let l = min(3, oi) // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
 }
 
+infix operator +&
+func +&<R, S>(lhs: inout R, rhs: S) where R : RangeReplaceableCollection, S : Sequence, R.Element == S.Element {}
+// expected-note@-1 {{candidate requires that the types 'String' and 'String.Element' (aka 'Character') be equivalent (requirement specified as 'R.Element' == 'S.Element' [with R = [String], S = String])}}
+
+func rdar33477726_1() {
+  var arr: [String] = []
+  arr +& "hello"
+  // expected-error@-1 {{binary operator '+&(_:_:)' cannot be applied to operands of type '[String]' and 'String'}}
+}
+
+func rdar33477726_2<R, S>(_: R, _: S) where R: Sequence, S == R.Element {}
+// expected-note@-1 {{candidate requires that the types 'Int' and 'String.Element' (aka 'Character') be equivalent (requirement specified as 'S' == 'R.Element' [with R = String, S = Int])}}
+rdar33477726_2("answer", 42)
+// expected-error@-1 {{cannot invoke 'rdar33477726_2(_:_:)' with an argument list of type '(String, Int)'}}
+
+prefix operator +-
+prefix func +-<T>(_: T) where T: Sequence, T.Element == Int {}
+// expected-note@-1 {{candidate requires that the types 'String.Element' (aka 'Character') and 'Int' be equivalent (requirement specified as 'T.Element' == 'Int' [with T = String])}}
+
++-"hello"
+// expected-error@-1 {{unary operator '+-(_:)' cannot be applied to an operand of type 'String'}}
