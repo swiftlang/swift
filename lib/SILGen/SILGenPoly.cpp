@@ -1433,7 +1433,7 @@ static void forwardFunctionArguments(SILGenFunction &gen,
       continue;
     }
 
-    if (argTy.getConvention() == ParameterConvention::Direct_Guaranteed) {
+    if (isGuaranteedParameter(argTy.getConvention())) {
       forwardedArgs.push_back(
           gen.emitManagedBeginBorrow(loc, arg.getValue()).getValue());
       continue;
