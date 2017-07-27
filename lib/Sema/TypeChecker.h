@@ -375,6 +375,20 @@ public:
   /// \param conformance The conformance itself.
   virtual void satisfiedConformance(Type depTy, Type replacementTy,
                                     ProtocolConformanceRef conformance);
+
+  /// Callback to diagnose problem with unsatisfied generic requirement.
+  ///
+  /// \param req The unsatisfied generic requirement.
+  ///
+  /// \param first The left-hand side type assigned to the requirement,
+  /// possibly represented by its generic substitute.
+  ///
+  /// \param second The right-hand side type assigned to the requirement,
+  /// possibly represented by its generic substitute.
+  ///
+  /// \returns true if problem has been diagnosed, false otherwise.
+  virtual bool diagnoseUnsatisfiedRequirement(const Requirement &req,
+                                              Type first, Type second);
 };
 
 /// The result of `checkGenericRequirement`.

@@ -1231,8 +1231,12 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       secondType = req->getSecondType();
     }
 
+    bool requirementFailure = false;
     if (listener && !listener->shouldCheck(kind, firstType, secondType))
       continue;
+
+    Diag<Type, Type, Type> diagnostic;
+    Diag<Type, Type, StringRef> diagnosticNote;
 
     switch (kind) {
     case RequirementKind::Conformance: {
@@ -1242,6 +1246,8 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       // or non-private dependency.
       // FIXME: Do we really need "used" at this point?
       // FIXME: Poor location information. How much better can we do here?
+      // FIXME: This call should support listener to be able to properly
+      //        diagnose problems with conformances.
       auto result =
           conformsToProtocol(firstType, proto->getDecl(), dc,
                              conformanceOptions, loc, unsatisfiedDependency);
@@ -1274,37 +1280,37 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     case RequirementKind::Superclass:
       // Superclass requirements.
       if (!isSubclassOf(firstType, secondType, dc)) {
-        if (loc.isValid()) {
-          // FIXME: Poor source-location information.
-          diagnose(loc, diag::type_does_not_inherit, owner, firstType,
-                   secondType);
-
-          diagnose(noteLoc, diag::type_does_not_inherit_requirement,
-                   rawFirstType, rawSecondType,
-                   genericSig->gatherGenericParamBindingsText(
-                       {rawFirstType, rawSecondType}, substitutions));
-        }
-
-        return RequirementCheckResult::Failure;
+        diagnostic = diag::type_does_not_inherit;
+        diagnosticNote = diag::type_does_not_inherit_requirement;
+        requirementFailure = true;
       }
-      continue;
+      break;
 
     case RequirementKind::SameType:
       if (!firstType->isEqual(secondType)) {
-        if (loc.isValid()) {
-          // FIXME: Better location info for both diagnostics.
-          diagnose(loc, diag::types_not_equal, owner, firstType, secondType);
-
-          diagnose(noteLoc, diag::types_not_equal_requirement, rawFirstType,
-                   rawSecondType,
-                   genericSig->gatherGenericParamBindingsText(
-                       {rawFirstType, rawSecondType}, substitutions));
-        }
-
-        return RequirementCheckResult::Failure;
+        diagnostic = diag::types_not_equal;
+        diagnosticNote = diag::types_not_equal_requirement;
+        requirementFailure = true;
       }
-      continue;
+      break;
     }
+
+    if (!requirementFailure)
+      continue;
+
+    if (listener &&
+        listener->diagnoseUnsatisfiedRequirement(rawReq, firstType, secondType))
+      return RequirementCheckResult::Failure;
+
+    if (loc.isValid()) {
+      // FIXME: Poor source-location information.
+      diagnose(loc, diagnostic, owner, firstType, secondType);
+      diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
+               genericSig->gatherGenericParamBindingsText(
+                   {rawFirstType, rawSecondType}, substitutions));
+    }
+
+    return RequirementCheckResult::Failure;
   }
 
   if (valid)

@@ -2143,8 +2143,8 @@ private:
 
   /// Produce diagnostic for failures related to unfulfilled requirements
   /// of the generic parameters used as arguments.
-  bool diagnoseArgumentGenericRequirements(TypeChecker &TC, Expr *fnExpr,
-                                           Expr *argExpr,
+  bool diagnoseArgumentGenericRequirements(TypeChecker &TC, Expr *callExpr,
+                                           Expr *fnExpr, Expr *argExpr,
                                            CalleeCandidateInfo &candidates,
                                            ArrayRef<Identifier> argLabels);
 
@@ -5918,16 +5918,18 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
 }
 
 bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
-    TypeChecker &TC, Expr *fnExpr, Expr *argExpr,
+    TypeChecker &TC, Expr *callExpr, Expr *fnExpr, Expr *argExpr,
     CalleeCandidateInfo &candidates, ArrayRef<Identifier> argLabels) {
   if (candidates.closeness != CC_ExactMatch || candidates.size() != 1)
     return false;
 
-  auto DRE = dyn_cast<DeclRefExpr>(fnExpr);
-  if (!DRE)
-    return false;
+  AbstractFunctionDecl *AFD = nullptr;
+  if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
+    AFD = dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
+  } else if (auto *candidate = candidates[0].getDecl()) {
+    AFD = dyn_cast<AbstractFunctionDecl>(candidate);
+  }
 
-  auto AFD = dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
   if (!AFD || !AFD->isGeneric() || !AFD->hasInterfaceType())
     return false;
 
@@ -5956,14 +5958,19 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
   // requirements e.g. <A, B where A.Element == B.Element>.
   for (unsigned i = 0, e = bindings.size(); i != e; ++i) {
     auto param = params[i];
-    auto archetype = param.getType()->getAs<ArchetypeType>();
+    auto paramType = param.getType()->getInOutObjectType();
+
+    auto archetype = paramType->getAs<ArchetypeType>();
     if (!archetype)
       continue;
 
     // Bindings specify the arguments that source the parameter. The only case
     // this returns a non-singular value is when there are varargs in play.
     for (auto argNo : bindings[i]) {
-      auto argType = args[argNo].getType()->getWithoutSpecifierType();
+      auto argType = args[argNo]
+                         .getType()
+                         ->getWithoutSpecifierType()
+                         ->getRValueObjectType();
 
       if (argType->is<ArchetypeType>()) {
         diagnoseUnboundArchetype(archetype, fnExpr);
@@ -5984,18 +5991,89 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   class RequirementsListener : public GenericRequirementsCheckListener {
+    ConstraintSystem &CS;
+    AbstractFunctionDecl *Candidate;
+    TypeSubstitutionFn Substitutions;
+
+    Expr *CallExpr;
+    Expr *FnExpr;
+    Expr *ArgExpr;
+
   public:
+    RequirementsListener(ConstraintSystem &cs, AbstractFunctionDecl *AFD,
+                         TypeSubstitutionFn subs,
+                         Expr *callExpr, Expr *fnExpr, Expr *argExpr)
+        : CS(cs), Candidate(AFD), Substitutions(subs), CallExpr(callExpr),
+          FnExpr(fnExpr), ArgExpr(argExpr) {}
+
     bool shouldCheck(RequirementKind kind, Type first, Type second) override {
       // This means that we have encountered requirement which references
       // generic parameter not used in the arguments, we can't diagnose it here.
       return !(first->hasTypeParameter() || first->isTypeVariableOrMember());
     }
+
+    bool diagnoseUnsatisfiedRequirement(const Requirement &req, Type first,
+                                        Type second) override {
+      Diag<Type, Type, Type, Type, StringRef> note;
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+      case RequirementKind::Layout:
+        return false;
+
+      case RequirementKind::Superclass:
+        note = diag::candidate_types_inheritance_requirement;
+        break;
+
+      case RequirementKind::SameType:
+        note = diag::candidate_types_equal_requirement;
+        break;
+      }
+
+      TypeChecker &TC = CS.TC;
+      SmallVector<char, 8> scratch;
+      auto overloadName = Candidate->getFullName().getString(scratch);
+
+      if (isa<BinaryExpr>(CallExpr) && isa<TupleExpr>(ArgExpr)) {
+        auto argTuple = cast<TupleExpr>(ArgExpr);
+        auto lhsExpr = argTuple->getElement(0),
+             rhsExpr = argTuple->getElement(1);
+        auto lhsType = CS.getType(lhsExpr)->getRValueType();
+        auto rhsType = CS.getType(rhsExpr)->getRValueType();
+
+        TC.diagnose(FnExpr->getLoc(), diag::cannot_apply_binop_to_args,
+                    overloadName, lhsType, rhsType)
+            .highlight(lhsExpr->getSourceRange())
+            .highlight(rhsExpr->getSourceRange());
+      } else if (isa<PrefixUnaryExpr>(CallExpr) ||
+                 isa<PostfixUnaryExpr>(CallExpr)) {
+        TC.diagnose(ArgExpr->getLoc(), diag::cannot_apply_unop_to_arg,
+                    overloadName, CS.getType(ArgExpr));
+      } else {
+        bool isInitializer = isa<ConstructorDecl>(Candidate);
+        TC.diagnose(ArgExpr->getLoc(), diag::cannot_call_with_params,
+                    overloadName, getTypeListString(CS.getType(ArgExpr)),
+                    isInitializer);
+      }
+
+      auto rawFirstType = req.getFirstType();
+      auto rawSecondType = req.getSecondType();
+      auto *genericSig = Candidate->getGenericSignature();
+
+      TC.diagnose(Candidate, note, first, second,
+                  rawFirstType, rawSecondType,
+                  genericSig->gatherGenericParamBindingsText(
+                                 {rawFirstType, rawSecondType}, Substitutions));
+      return true;
+    }
   };
 
-  auto dc = env->getOwningDeclContext();
-  RequirementsListener genericReqListener;
+  auto *dc = env->getOwningDeclContext();
+  auto substitutionFn = QueryTypeSubstitutionMap{substitutions};
+  RequirementsListener genericReqListener(CS, AFD, substitutionFn,
+                                          callExpr, fnExpr, argExpr);
+
   auto result = TC.checkGenericArguments(
-      dc, argExpr->getLoc(), AFD->getLoc(), AFD->getInterfaceType(),
+      dc, callExpr->getLoc(), fnExpr->getLoc(), AFD->getInterfaceType(),
       env->getGenericSignature(), QueryTypeSubstitutionMap{substitutions},
       LookUpConformanceInModule{dc->getParentModule()}, nullptr,
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
@@ -6686,6 +6764,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       }
     }
 
+    if (diagnoseArgumentGenericRequirements(CS.TC, callExpr, fnExpr, argExpr,
+                                            calleeInfo, argLabels))
+      return true;
+
     if (isContextualConversionFailure(argTuple))
       return false;
 
@@ -6719,13 +6801,13 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true;
   }
 
-  // If all of the arguments are a perfect match, so let's check if there
+  // If all of the arguments are a perfect match, let's check if there
   // are problems with requirements placed on generic parameters, because
   // CalleeCandidateInfo validates only conformance of the parameters
   // to their protocol types (if any) but it doesn't check additional
   // requirements placed on e.g. nested types or between parameters.
-  if (diagnoseArgumentGenericRequirements(CS.TC, fnExpr, argExpr, calleeInfo,
-                                          argLabels))
+  if (diagnoseArgumentGenericRequirements(CS.TC, callExpr, fnExpr, argExpr,
+                                          calleeInfo, argLabels))
     return true;
 
   if (isContextualConversionFailure(argExpr))
