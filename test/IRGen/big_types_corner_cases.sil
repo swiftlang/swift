@@ -1,22 +1,53 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s --check-prefix=CHECK-%target-cpu
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s
+
 // UNSUPPORTED: resilient_stdlib
+
+// REQUIRES: CPU=x86_64
+
+// REQUIRES: OS=macosx
 
 sil_stage canonical
 import c_layout
+import Builtin
+import Swift
 
-// CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testBitfieldInBlock
-// CHECK-x86_64:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
+struct BigTempStruct<T> {
+  var i0 : Int32
+  var i1 : Int32
+  var i2 : Int32
+  var i3 : Int32
+  var i4 : Int32
+  var i5 : Int32
+  var i6 : Int32
+  var i7 : Int32
+  var i8 : Int32
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testBitfieldInBlock
+// CHECK:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
 entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
   %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
   return %r : $BitfieldOne
 }
 
-// CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testTupleExtract
-// CHECK-x86_64:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testTupleExtract
+// CHECK:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
 sil @testTupleExtract : $@convention(thin) (@owned (BitfieldOne, @convention(block) (BitfieldOne) -> BitfieldOne), BitfieldOne) -> BitfieldOne  {
 entry(%b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), %x : $BitfieldOne):
   %a = tuple_extract %b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), 1
   %r = apply %a(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
   return %r : $BitfieldOne
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testBigTempStruct(%T22big_types_corner_cases13BigTempStructV* noalias nocapture sret, %swift.bridge*, %swift.type* %Element) #0 {
+// CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases13BigTempStructV
+// CHECK: call swiftcc void @testBigTempStruct(%T22big_types_corner_cases13BigTempStructV* noalias nocapture sret [[ALLOC]], %swift.bridge* %1, %swift.type* %Element)
+// CHECK: ret void
+sil @testBigTempStruct : $@convention(method) <Element> (@guaranteed _ArrayBuffer<Element>) -> @owned BigTempStruct<Element> {
+bb0(%0 : $_ArrayBuffer<Element>):
+  // function_ref specialized _ArrayBuffer.subscript.getter
+  %4 = function_ref @testBigTempStruct : $@convention(method) <τ_0_0> (@guaranteed _ArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
+  %9 = apply %4<Element>(%0) : $@convention(method) <τ_0_0> (@guaranteed _ArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
+  return %9 : $BigTempStruct<Element>
 }
