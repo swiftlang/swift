@@ -256,8 +256,6 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   if (options.contains(NameLookupFlags::IgnoreAccessibility))
     subOptions |= NL_IgnoreAccessibility;
 
-  NominalTypeDecl *nominalLookupType = type->getAnyNominal();
-
   if (options.contains(NameLookupFlags::ProtocolMembers))
     subOptions |= NL_ProtocolMembers;
 
@@ -265,40 +263,13 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   subOptions &= ~NL_RemoveOverridden;
   subOptions &= ~NL_RemoveNonVisible;
 
-  // Local function that performs lookup.
-  auto doLookup = [&]() {
-    result.clear();
+  LookupResultBuilder builder(*this, result, dc, options,
+                              /*memberLookup*/true);
+  SmallVector<ValueDecl *, 4> lookupResults;
+  dc->lookupQualified(type, name, subOptions, this, lookupResults);
 
-    LookupResultBuilder builder(*this, result, dc, options,
-                                /*memberLookup*/true);
-    SmallVector<ValueDecl *, 4> lookupResults;
-    dc->lookupQualified(type, name, subOptions, this, lookupResults);
-
-    for (auto found : lookupResults) {
-      // FIXME: This should pass in 'dc'
-      builder.add(found, nominalLookupType, type);
-    }
-  };
-
-  doLookup();
-
-  if (result.empty()) {
-    // If we didn't find anything, /and/ this is a nominal type, check to see
-    // if any of the nominal's protocols are derivable and contain the
-    // name we're looking for. (Note that we are not including extensions
-    // here -- default derivation doesn't apply in extensions.)
-    if (!nominalLookupType)
-      return result;
-    
-    // Force the creation of any delayed members, to ensure proper member
-    // lookup.
-    this->forceExternalDeclMembers(nominalLookupType);
-
-    // Perform the lookup again.
-    // FIXME: This is only because forceExternalDeclMembers() might do something
-    // interesting.
-    doLookup();
-  }
+  for (auto found : lookupResults)
+    builder.add(found, nullptr, type);
 
   return result;
 }
