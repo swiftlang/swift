@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -892,6 +893,55 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   }
 }
 
+static SILValue createLifetimeExtendedAllocStack(
+    SILBuilder &Builder, SILLocation Loc, SILValue Arg,
+    ArrayRef<SILBasicBlock *> ExitingBlocks, InstModCallbacks Callbacks) {
+  AllocStackInst *ASI = nullptr;
+  {
+    // Save our insert point and create a new alloc_stack in the initial BB and
+    // dealloc_stack in all exit blocks.
+    auto *OldInsertPt = &*Builder.getInsertionPoint();
+    Builder.setInsertionPoint(Builder.getFunction().begin()->begin());
+    ASI = Builder.createAllocStack(Loc, Arg->getType());
+    Callbacks.CreatedNewInst(ASI);
+
+    for (auto *BB : ExitingBlocks) {
+      Builder.setInsertionPoint(BB->getTerminator());
+      Callbacks.CreatedNewInst(Builder.createDeallocStack(Loc, ASI));
+    }
+    Builder.setInsertionPoint(OldInsertPt);
+  }
+  assert(ASI != nullptr);
+
+  // Then perform a copy_addr [take] [init] right after the partial_apply from
+  // the original address argument to the new alloc_stack that we have
+  // created.
+  Callbacks.CreatedNewInst(
+      Builder.createCopyAddr(Loc, Arg, ASI, IsTake, IsInitialization));
+
+  // Return the new alloc_stack inst that has the appropriate live range to
+  // destroy said values.
+  return ASI;
+}
+
+static bool shouldDestroyPartialApplyCapturedArg(SILValue Arg,
+                                                 SILParameterInfo PInfo,
+                                                 SILModule &M) {
+  // If we have a non-trivial type and the argument is passed in @inout, we do
+  // not need to destroy it here. This is something that is implicit in the
+  // partial_apply design that will be revisited when partial_apply is
+  // redesigned.
+  if (PInfo.isIndirectMutating())
+    return false;
+
+  // If we have a trivial type, we do not need to put in any extra releases.
+  if (Arg->getType().isTrivial(M))
+    return false;
+
+  // We handle all other cases.
+  return true;
+}
+
 // *HEY YOU, YES YOU, PLEASE READ*. Even though a textual partial apply is
 // printed with the convention of the closed over function upon it, all
 // non-inout arguments to a partial_apply are passed at +1. This includes
@@ -902,20 +952,14 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
 void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
                                            SILValue Arg, SILParameterInfo PInfo,
                                            InstModCallbacks Callbacks) {
-  // If we have a non-trivial type and the argument is passed in @inout, we do
-  // not need to destroy it here. This is something that is implicit in the
-  // partial_apply design that will be revisited when partial_apply is
-  // redesigned.
-  if (PInfo.isIndirectMutating())
+  if (!shouldDestroyPartialApplyCapturedArg(Arg, PInfo, Builder.getModule()))
     return;
 
-  // If we have a trivial type, we do not need to put in any extra releases.
-  if (Arg->getType().isTrivial(Builder.getModule()))
-    return;
-
-  // Otherwise, we need to destroy the argument. If we have an address, just
-  // emit a destroy_addr.
+  // Otherwise, we need to destroy the argument. If we have an address, we
+  // insert a destroy_addr and return. Any live range issues must have been
+  // dealt with by our caller.
   if (Arg->getType().isAddress()) {
+    // Then emit the destroy_addr for this arg
     SILInstruction *NewInst = Builder.emitDestroyAddrAndFold(Loc, Arg);
     Callbacks.CreatedNewInst(NewInst);
     return;
@@ -959,7 +1003,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
 /// For each captured argument of PAI, decrement the ref count of the captured
 /// argument as appropriate at each of the post dominated release locations
 /// found by Tracker.
-static void releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
+static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
                                                   ReleaseTracker &Tracker,
                                                   InstModCallbacks Callbacks) {
   SILBuilderWithScope Builder(PAI);
@@ -967,22 +1011,60 @@ static void releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   CanSILFunctionType PAITy =
       PAI->getCallee()->getType().getAs<SILFunctionType>();
 
-  // Emit a destroy value for each captured closure argument.
   ArrayRef<SILParameterInfo> Params = PAITy->getParameters();
-  auto Args = PAI->getArguments();
+  llvm::SmallVector<SILValue, 8> Args;
+  for (SILValue v : PAI->getArguments()) {
+    // If any of our arguments contain open existentials, bail. We do not
+    // support this for now so that we can avoid having to re-order stack
+    // locations (a larger change).
+    if (v->getType().hasOpenedExistential())
+      return false;
+    Args.emplace_back(v);
+  }
   unsigned Delta = Params.size() - Args.size();
   assert(Delta <= Params.size() && "Error, more Args to partial apply than "
                                    "params in its interface.");
+  Params = Params.drop_front(Delta);
 
+  llvm::SmallVector<SILBasicBlock *, 2> ExitingBlocks;
+  PAI->getFunction()->findExitingBlocks(ExitingBlocks);
+
+  // Go through our argument list and create new alloc_stacks for each
+  // non-trivial address value. This ensures that the memory location that we
+  // are cleaning up has the same live range as the partial_apply. Otherwise, we
+  // may be inserting destroy_addr of alloc_stack that have already been passed
+  // to a dealloc_stack.
+  for (unsigned i : reversed(indices(Args))) {
+    SILValue Arg = Args[i];
+    SILParameterInfo PInfo = Params[i];
+
+    // If we are not going to destroy this partial_apply, continue.
+    if (!shouldDestroyPartialApplyCapturedArg(Arg, PInfo, Builder.getModule()))
+      continue;
+
+    // If we have an object, we will not have live range issues, just continue.
+    if (Arg->getType().isObject())
+      continue;
+
+    // Now that we know that we have a non-argument address, perform a take-init
+    // of Arg into a lifetime extended alloc_stack
+    Args[i] = createLifetimeExtendedAllocStack(Builder, Loc, Arg, ExitingBlocks,
+                                               Callbacks);
+  }
+
+  // Emit a destroy for each captured closure argument at each final release
+  // point.
   for (auto *FinalRelease : Tracker.getFinalReleases()) {
     Builder.setInsertionPoint(FinalRelease);
-    for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
-      SILValue Arg = Args[AI];
-      SILParameterInfo Param = Params[AI + Delta];
+    for (unsigned i : indices(Args)) {
+      SILValue Arg = Args[i];
+      SILParameterInfo Param = Params[i];
 
       releasePartialApplyCapturedArg(Builder, Loc, Arg, Param, Callbacks);
     }
   }
+
+  return true;
 }
 
 /// TODO: Generalize this to general objects.
@@ -1007,8 +1089,12 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
 
   // If we have a partial_apply, release each captured argument at each one of
   // the final release locations of the partial apply.
-  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
-    releaseCapturedArgsOfDeadPartialApply(PAI, Tracker, Callbacks);
+  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure)) {
+    // If we can not decrement the ref counts of the dead partial apply for any
+    // reason, bail.
+    if (!releaseCapturedArgsOfDeadPartialApply(PAI, Tracker, Callbacks))
+      return false;
+  }
 
   // Then delete all user instructions.
   for (auto *User : Tracker.getTrackedUsers()) {
