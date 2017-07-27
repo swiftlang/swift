@@ -227,7 +227,7 @@ public struct Substring : StringProtocol {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   public func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
-    return try _slice._base._core._withCSubstringAndLength(
+    return try _wholeString._core._withCSubstringAndLength(
       in: startIndex.encodedOffset..<endIndex.encodedOffset,
       encoding: UTF8.self) {
       p, length in try p.withMemoryRebound(to: CChar.self, capacity: length) {
@@ -256,15 +256,15 @@ public struct Substring : StringProtocol {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    return try _slice._base._core._withCSubstring(
+    return try _wholeString._core._withCSubstring(
       in: startIndex.encodedOffset..<endIndex.encodedOffset,
       encoding: targetEncoding, body)
   }
 }
 
 extension Substring : _SwiftStringView {
-  var _persistentContent : String {
-    let wholeCore = _slice._base._core
+  var _persistentContent: String {
+    let wholeCore = _wholeString._core
     let native = wholeCore.nativeBuffer
     if _fastPath(native != nil) {
       let wholeString = String(wholeCore)
@@ -284,9 +284,9 @@ extension Substring : _SwiftStringView {
     return r
   }
 
-  public // @testablw
-  var _ephemeralContent : String {
-    let wholeCore = _slice._base._core
+  public // @testable
+  var _ephemeralContent: String {
+    let wholeCore = _wholeString._core
     let subCore : _StringCore = wholeCore[
       startIndex.encodedOffset..<endIndex.encodedOffset]
     // Check that we haven't allocated a new buffer for the result, if we have
@@ -295,6 +295,11 @@ extension Substring : _SwiftStringView {
       subCore._owner === wholeCore._owner || !wholeCore.hasContiguousStorage)
 
     return String(subCore)
+  }
+
+  internal
+  var _wholeString: String {
+    return _slice._base
   }
 }
 
@@ -362,24 +367,107 @@ extension StringProtocol {
   }
 }
 
-extension Substring {
 % for (property, ViewPrefix) in [
 %   ('utf8', 'UTF8'),
 %   ('utf16', 'UTF16'),
 %   ('unicodeScalars', 'UnicodeScalar'),
-%   ('characters', 'Character')]:
-  public typealias ${ViewPrefix}Index = String.${ViewPrefix}View.Index
+%   ('characters', 'Character')
+% ]:
+%   View = ViewPrefix + 'View'
+%   RangeReplaceable = 'RangeReplaceable' if property == 'unicodeScalars' else ''
+extension Substring {
+  public struct ${View} {
+    var _slice: ${RangeReplaceable}BidirectionalSlice<String.${View}>
+  }
+}
 
-  public var ${property}: String.${ViewPrefix}View {
+extension Substring.${View} : BidirectionalCollection {
+  public typealias Index = String.Index
+  public typealias SubSequence = Substring.${View}
+
+  /// Creates an instance that slices `base` at `_bounds`.
+  internal init(_ base: String.${View}, _bounds: Range<Index>) {
+    _slice = ${RangeReplaceable}BidirectionalSlice(
+      base: String(base._core).${property},
+      bounds: _bounds)
+  }
+
+  /// The entire String onto whose slice this view is a projection.
+  internal var _wholeString: String {
+    return String(_slice._base._core)
+  }
+
+  public var startIndex: Index { return _slice.startIndex }
+  public var endIndex: Index { return _slice.endIndex }
+  public func index(after i: Index) -> Index {
+    return _slice.index(after: i)
+  }
+  public func index(before i: Index) -> Index {
+    return _slice.index(before: i)
+  }
+  public subscript(i: Index) -> String.${View}.Element {
+    return _slice[i]
+  }
+  public subscript(r: Range<Index>) -> SubSequence {
+    return Substring.${View}(_wholeString.${property}, _bounds: r)
+  }
+}
+
+extension Substring {
+  public var ${property}: ${View} {
     get {
-      return String(self).${property}
+      return ${View}(_wholeString.${property}, _bounds: startIndex..<endIndex)
     }
     set {
-      let base = String(describing: newValue)
-      self = Substring(_base: base, base.startIndex ..< base.endIndex)
+      self = Substring(newValue)
     }
   }
+
+  /// Creates a Substring having the given content.
+  ///
+  /// - Complexity: O(1)
+  public init(_ content: ${View}) {
+    self = content._wholeString[content.startIndex..<content.endIndex]
+  }
+}
+
+extension String {
+  % if property in ('utf8', 'utf16'):
+  /// Creates a String having the given content.
+  ///
+  /// If `codeUnits` is an ill-formed code unit sequence, the result is `nil`.
+  ///
+  /// - Complexity: O(N), where N is the length of the resulting `String`'s
+  ///   UTF-16.
+  public init?(_ codeUnits: Substring.${View}) {
+    let wholeString = codeUnits._wholeString
+    guard
+      codeUnits.startIndex.samePosition(in: wholeString.unicodeScalars) != nil
+      && codeUnits.endIndex.samePosition(in: wholeString.unicodeScalars) != nil
+    else { return nil }
+    self = String(Substring(codeUnits))
+  }
+  % else:
+  /// Creates a String having the given content.
+  ///
+  /// - Complexity: O(N), where N is the length of the resulting `String`'s
+  ///   UTF-16.
+  public init(_ content: Substring.${View}) {
+    self = String(Substring(content))
+  }
+  % end
+}
 % end
+
+// FIXME: The other String views should be RangeReplaceable too.
+extension Substring.UnicodeScalarView : RangeReplaceableCollection {
+  public init() { _slice = RangeReplaceableBidirectionalSlice.init() }
+
+  public mutating func replaceSubrange<C : Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) where C.Element == Element {
+    _slice.replaceSubrange(target, with: replacement)
+  }
 }
 
 #if _runtime(_ObjC)
