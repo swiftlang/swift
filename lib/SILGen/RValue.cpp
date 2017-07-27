@@ -787,19 +787,18 @@ void RValue::verifyConsistentOwnership() const {
 }
 
 bool RValue::isPlusOne(SILGenFunction &SGF) const & {
-  return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
+  return llvm::all_of(values, [&SGF](ManagedValue mv) -> bool {
+    // Ignore trivial values and objects with trivial value ownership kind.
     if (mv.getType().isTrivial(SGF.F.getModule()) ||
-        mv.getOwnershipKind() == ValueOwnershipKind::Trivial)
-      return false;
-    return !mv.hasCleanup();
+        (mv.getType().isObject() &&
+         mv.getOwnershipKind() == ValueOwnershipKind::Trivial))
+      return true;
+    return mv.hasCleanup();
   });
 }
 
 bool RValue::isPlusZero(SILGenFunction &SGF) const & {
   return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
-    if (mv.getType().isTrivial(SGF.F.getModule()) ||
-        mv.getOwnershipKind() == ValueOwnershipKind::Trivial)
-      return false;
     return mv.hasCleanup();
   });
 }
