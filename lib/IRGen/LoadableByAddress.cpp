@@ -1145,7 +1145,13 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
     genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
   }
   auto singleResult = loweredTy->getSingleResult();
-  auto resultStorageType = singleResult.getSILStorageType();
+  SILType resultStorageType = singleResult.getSILStorageType();
+  auto canType = resultStorageType.getSwiftRValueType();
+  if (canType->hasTypeParameter()) {
+    assert(genEnv && "Expected a GenericEnv");
+    canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+  }
+  resultStorageType = SILType::getPrimitiveObjectType(canType);
 
   auto &ctx = pass.F->getModule().getASTContext();
   auto var = new (ctx) ParamDecl(
