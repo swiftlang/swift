@@ -296,6 +296,17 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
   // If it's not a derived requirement, it's not self-derived.
   if (!isDerivedRequirement()) return false;
 
+  /// Keep track of all of the protocol requirements we've seen along the way.
+  /// If we see the same requirement twice, we have a self-derived source.
+  llvm::DenseSet<std::pair<PotentialArchetype *, ProtocolDecl *>>
+    constraintsSeen;
+
+  // Note that we've now seen a new conformance constraint, returning true if
+  // we've seen it before.
+  auto addConstraint = [&](PotentialArchetype *pa, ProtocolDecl *proto) {
+    return !constraintsSeen.insert({pa->getRepresentative(), proto}).second;
+  };
+
   return visitPotentialArchetypesAlongPath(
            [&](PotentialArchetype *currentPA, const RequirementSource *source) {
     switch (source->kind) {
@@ -319,7 +330,8 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
       // Note whether we saw derivation through a concrete type.
       if (currentPA->isConcreteType())
         derivedViaConcrete = true;
-      return false;
+
+      return addConstraint(currentPA, source->getProtocolDecl());
 
     case RequirementSource::NestedTypeNameMatch:
     case RequirementSource::Concrete:
@@ -391,12 +403,12 @@ static PotentialArchetype *replaceSelfWithPotentialArchetype(
   return selfPA;
 }
 
-bool RequirementSource::isSelfDerivedConformance(
+const RequirementSource *RequirementSource::getMinimalConformanceSource(
                                              PotentialArchetype *currentPA,
                                              ProtocolDecl *proto,
                                              bool &derivedViaConcrete) const {
   /// Keep track of all of the requirements we've seen along the way. If
-  /// we see the same requirement twice, it's a self-derived conformance.
+  /// we see the same requirement twice, we have found a shorter path.
   llvm::DenseSet<std::pair<PotentialArchetype *, ProtocolDecl *>>
     constraintsSeen;
 
@@ -413,17 +425,13 @@ bool RequirementSource::isSelfDerivedConformance(
   bool sawProtocolRequirement = false;
 
   PotentialArchetype *rootPA = nullptr;
+  const RequirementSource *minimalSource = nullptr;
   auto resultPA = visitPotentialArchetypesAlongPath(
                     [&](PotentialArchetype *parentPA,
                         const RequirementSource *source) {
     switch (source->kind) {
     case ProtocolRequirement:
     case InferredProtocolRequirement: {
-      // For a requirement signature, we ignore the 'Self: P' requirement
-      // for the purposes of the self-derived check.
-      if (source->parent->kind == RequirementSource::RequirementSignatureSelf)
-        return false;
-
       // Note that we've seen a protocol requirement.
       sawProtocolRequirement = true;
 
@@ -432,8 +440,14 @@ bool RequirementSource::isSelfDerivedConformance(
         derivedViaConcrete = true;
 
       // The parent potential archetype must conform to the protocol in which
-      // this requirement resides.
-      return addConstraint(parentPA, source->getProtocolDecl());
+      // this requirement resides. Add this constraint.
+      if (!addConstraint(parentPA, source->getProtocolDecl())) return false;
+
+      // We found the shortest source to derive this information; record it
+      // and stop the algorithm.
+      if (source->getProtocolDecl() == proto)
+        minimalSource = source->parent;
+      return true;
     }
 
     case Concrete:
@@ -452,21 +466,21 @@ bool RequirementSource::isSelfDerivedConformance(
   });
 
   // If we saw a constraint twice, it's self-derived.
-  if (!resultPA) return true;
+  if (!resultPA) return minimalSource;
 
   // If we haven't seen a protocol requirement, we're done.
-  if (!sawProtocolRequirement) return false;
+  if (!sawProtocolRequirement) return this;
 
   // The root archetype might be a nested type, which implies constraints
   // for each of the protocols of the associated types referenced (if any).
   for (auto pa = rootPA; pa->getParent(); pa = pa->getParent()) {
     if (auto assocType = pa->getResolvedAssociatedType()) {
       if (addConstraint(pa->getParent(), assocType->getProtocol()))
-        return true;
+        return nullptr;
     }
   }
 
-  return false;
+  return this;
 }
 
 #define REQUIREMENT_SOURCE_FACTORY_BODY(ProfileArgs, ConstructorArgs,      \
@@ -4397,29 +4411,68 @@ void GenericSignatureBuilder::checkConformanceConstraints(
   for (auto &entry : equivClass->conformsTo) {
     // Remove self-derived constraints.
     assert(!entry.second.empty() && "No constraints to work with?");
+
+    // Local function to establish whether a conformance constraint is
+    // self-derived.
     Optional<Constraint<ProtocolDecl *>> remainingConcrete;
+    SmallVector<Constraint<ProtocolDecl *>, 4> minimalSources;
+    auto isSelfDerived =
+      [&](const Constraint<ProtocolDecl *> &constraint) {
+        // Determine whether there is a subpath of this requirement source that
+        // derives the same conformance.
+        bool derivedViaConcrete;
+        auto minimalSource =
+          constraint.source->getMinimalConformanceSource(constraint.archetype,
+                                                         entry.first,
+                                                         derivedViaConcrete);
+        if (minimalSource != constraint.source) {
+          // The minimal source is smaller than the original source, so the
+          // original source is self-derived.
+          ++NumSelfDerived;
+
+          if (minimalSource) {
+            // Record a constraint with a minimized source.
+            minimalSources.push_back(
+                             {minimalSource->getAffectedPotentialArchetype(),
+                              constraint.value,
+                              minimalSource});
+          }
+
+          return true;
+        }
+
+        if (!derivedViaConcrete)
+          return false;
+
+        // Drop derived-via-concrete requirements.
+        if (!remainingConcrete)
+          remainingConcrete = constraint;
+
+        ++NumSelfDerived;
+        return true;
+      };
+
+    // Erase all self-derived constraints.
     entry.second.erase(
-      std::remove_if(entry.second.begin(), entry.second.end(),
-                     [&](const Constraint<ProtocolDecl *> &constraint) {
-                       bool derivedViaConcrete;
-                       if (constraint.source->isSelfDerivedConformance(
-                                constraint.archetype, entry.first,
-                                derivedViaConcrete)) {
-                         ++NumSelfDerived;
-                         return true;
-                       }
-
-                       if (!derivedViaConcrete)
-                         return false;
-
-                       // Drop derived-via-concrete requirements.
-                       if (!remainingConcrete)
-                         remainingConcrete = constraint;
-
-                       ++NumSelfDerived;
-                       return true;
-                     }),
+      std::remove_if(entry.second.begin(), entry.second.end(), isSelfDerived),
       entry.second.end());
+
+    // If we found any mininal sources, add them now, avoiding introducing any
+    // redundant sources.
+    if (!minimalSources.empty()) {
+      // Collect the sources we already know about.
+      SmallPtrSet<const RequirementSource *, 4> sources;
+      for (const auto &constraint : entry.second) {
+        sources.insert(constraint.source);
+      }
+
+      // Add any minimal sources we didn't know about.
+      for (const auto &minimalSource : minimalSources) {
+        if (sources.insert(minimalSource.source).second) {
+          entry.second.push_back(minimalSource);
+        }
+      }
+    }
 
     // If we only had concrete conformances, put one back.
     if (entry.second.empty() && remainingConcrete)

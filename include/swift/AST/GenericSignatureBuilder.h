@@ -1096,11 +1096,17 @@ public:
   bool isSelfDerivedSource(PotentialArchetype *pa,
                            bool &derivedViaConcrete) const;
 
-  /// Determine whether a requirement \c pa: proto, when formed from this
-  /// requirement source, is dependent on itself.
-  bool isSelfDerivedConformance(PotentialArchetype *pa,
-                                ProtocolDecl *proto,
-                                bool &derivedViaConcrete) const;
+  /// For a requirement source that describes the requirement \c pa:proto,
+  /// retrieve the minimal subpath of this requirement source that will
+  /// compute that requirement.
+  ///
+  /// When the result is different from (i.e., a subpath of) \c this or is
+  /// nullptr (indicating an embedded, distinct self-derived subpath), the
+  /// conformance requirement is considered to be "self-derived".
+  const RequirementSource *getMinimalConformanceSource(
+                                            PotentialArchetype *pa,
+                                            ProtocolDecl *proto,
+                                            bool &derivedViaConcrete) const;
 
   /// Retrieve a source location that corresponds to the requirement.
   SourceLoc getLoc() const;
