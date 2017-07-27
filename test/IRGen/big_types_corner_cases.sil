@@ -23,6 +23,22 @@ struct BigTempStruct<T> {
   var i8 : Int32
 }
 
+public struct BigStruct {
+  var i0 : Int32 = 0
+  var i1 : Int32 = 1
+  var i2 : Int32 = 2
+  var i3 : Int32 = 3
+  var i4 : Int32 = 4
+  var i5 : Int32 = 5
+  var i6 : Int32 = 6
+  var i7 : Int32 = 7
+  var i8 : Int32 = 8
+}
+
+public struct BigBigStruct {
+  var s : BigStruct
+}
+
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @testBitfieldInBlock
 // CHECK:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
@@ -50,4 +66,20 @@ bb0(%0 : $_ArrayBuffer<Element>):
   %4 = function_ref @testBigTempStruct : $@convention(method) <τ_0_0> (@guaranteed _ArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
   %9 = apply %4<Element>(%0) : $@convention(method) <τ_0_0> (@guaranteed _ArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
   return %9 : $BigTempStruct<Element>
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testTryApply(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i8*, %swift.refcounted*, %swift.refcounted* swiftself, %swift.error** swifterror) #0 {
+// CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC]]
+// CHECK: ret void
+sil @testTryApply : $@convention(thin)(() -> (@owned BigStruct, @error Error)) -> (@owned BigStruct, @error Error) {
+bb0(%0 : $() -> (@owned BigStruct, @error Error)):
+  try_apply %0() : $() -> (@owned BigStruct, @error Error), normal bb1, error bb2
+
+bb1(%ret : $BigStruct):
+  %s = struct $BigBigStruct (%ret : $BigStruct)
+  return %ret : $BigStruct
+  
+bb2(%err : $Error):
+  throw %err : $Error
 }

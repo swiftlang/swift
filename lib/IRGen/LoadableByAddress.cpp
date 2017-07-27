@@ -1329,8 +1329,15 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
         dyn_cast<SILInstruction>(pass.allocToApplyRetMap[allocInstr]);
     assert(applyInst && "Value is not an apply");
     auto II = applyInst->getIterator();
-    ++II;
     SILBuilder loadBuilder(II);
+    if (auto *tryApply = dyn_cast<TryApplyInst>(applyInst)) {
+      auto *tgtBB = tryApply->getNormalBB();
+      assert(tgtBB && "Could not find try apply's target BB");
+      loadBuilder.setInsertionPoint(tgtBB->begin());
+    } else {
+      ++II;
+      loadBuilder.setInsertionPoint(II);
+    }
     if (pass.F->hasUnqualifiedOwnership()) {
       load = loadBuilder.createLoad(applyInst->getLoc(), value,
                                     LoadOwnershipQualifier::Unqualified);
