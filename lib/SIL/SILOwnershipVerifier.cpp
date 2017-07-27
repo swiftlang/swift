@@ -195,6 +195,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::StructInst:
   case ValueKind::EnumInst:
   case ValueKind::OpenExistentialRefInst:
+  case ValueKind::OpenExistentialValueInst:
   case ValueKind::UpcastInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::ConvertFunctionInst:
@@ -345,9 +346,11 @@ public:
   OwnershipUseCheckerResult visitTransformingTerminatorInst(TermInst *TI);
 
   OwnershipUseCheckerResult
-  visitApplyArgument(ValueOwnershipKind RequiredConvention, bool ShouldCheck);
-  OwnershipUseCheckerResult
   visitNonTrivialEnum(EnumDecl *E, ValueOwnershipKind RequiredConvention);
+  OwnershipUseCheckerResult
+  visitApplyParameter(ValueOwnershipKind RequiredConvention, bool ShouldCheck);
+  OwnershipUseCheckerResult
+  visitFullApply(FullApplySite apply);
 
   /// Check if \p User as compatible ownership with the SILValue that we are
   /// checking.
@@ -449,7 +452,6 @@ CONSTANT_OWNERSHIP_INST(Owned, true, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, StrongUnpin)
 CONSTANT_OWNERSHIP_INST(Owned, true, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, InitExistentialRef)
-CONSTANT_OWNERSHIP_INST(Owned, true, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Trivial, false, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, false, BeginAccess)
@@ -649,6 +651,7 @@ FORWARD_ANY_OWNERSHIP_INST(Tuple)
 FORWARD_ANY_OWNERSHIP_INST(Struct)
 FORWARD_ANY_OWNERSHIP_INST(Enum)
 FORWARD_ANY_OWNERSHIP_INST(OpenExistentialRef)
+FORWARD_ANY_OWNERSHIP_INST(OpenExistentialValue)
 FORWARD_ANY_OWNERSHIP_INST(Upcast)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedRefCast)
 FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
@@ -988,8 +991,8 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitNonTrivialEnum(
 // non-trivial argument positions. This fits with modeling of a
 // SILFunctionArgument as a phi in a global program graph.
 OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitApplyArgument(ValueOwnershipKind Kind,
-                                                     bool ShouldCheck) {
+OwnershipCompatibilityUseChecker::visitApplyParameter(ValueOwnershipKind Kind,
+                                                      bool ShouldCheck) {
   // Check if we have an enum. If not, then we just check against the passed in
   // convention.
   EnumDecl *E = getType().getEnumOrBoundGenericEnum();
@@ -999,64 +1002,47 @@ OwnershipCompatibilityUseChecker::visitApplyArgument(ValueOwnershipKind Kind,
   return visitNonTrivialEnum(E, Kind);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
+// Handle Apply and TryApply.
+OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::
+visitFullApply(FullApplySite apply) {
   // If we are visiting the callee, handle it specially.
   if (getOperandIndex() == 0)
-    return visitCallee(I->getSubstCalleeType());
+    return visitCallee(apply.getSubstCalleeType());
 
-  switch (I->getArgumentConvention(getOperandIndex() - 1)) {
-  case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Constant:
-  case SILArgumentConvention::Indirect_In_Guaranteed:
-  case SILArgumentConvention::Indirect_Inout:
-  case SILArgumentConvention::Indirect_InoutAliasable:
-  case SILArgumentConvention::Indirect_Out:
+  // Indirect return arguments are address types.
+  if (isAddressOrTrivialType())
     return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
-  case SILArgumentConvention::Direct_Owned:
-    return visitApplyArgument(ValueOwnershipKind::Owned, true);
-  case SILArgumentConvention::Direct_Unowned:
-    if (isAddressOrTrivialType())
-      return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+
+  unsigned argIndex = apply.getCalleeArgIndex(Op);
+  SILParameterInfo paramInfo =
+    apply.getSubstCalleeConv().getParamInfoForSILArg(argIndex);
+
+  switch (paramInfo.getConvention()) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Direct_Owned:
+    return visitApplyParameter(ValueOwnershipKind::Owned, true);
+  case ParameterConvention::Indirect_In_Constant:
+  case ParameterConvention::Direct_Unowned:
     // We accept unowned, owned, and guaranteed in unowned positions.
     return {true, false};
-  case SILArgumentConvention::Direct_Guaranteed:
-    return visitApplyArgument(ValueOwnershipKind::Guaranteed, false);
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("No ownership associated with deallocating");
+  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Direct_Guaranteed:
+    return visitApplyParameter(ValueOwnershipKind::Guaranteed, false);
+  // The following conventions should take address types.
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
+}
 
-  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
+  return visitFullApply(I);
 }
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitTryApplyInst(TryApplyInst *I) {
-  // If we are visiting the callee, handle it specially.
-  if (getOperandIndex() == 0)
-    return visitCallee(I->getSubstCalleeType());
-
-  switch (I->getArgumentConvention(getOperandIndex() - 1)) {
-  case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Constant:
-  case SILArgumentConvention::Indirect_In_Guaranteed:
-  case SILArgumentConvention::Indirect_Inout:
-  case SILArgumentConvention::Indirect_InoutAliasable:
-  case SILArgumentConvention::Indirect_Out:
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
-  case SILArgumentConvention::Direct_Owned:
-    return visitApplyArgument(ValueOwnershipKind::Owned, true);
-  case SILArgumentConvention::Direct_Unowned:
-    if (isAddressOrTrivialType())
-      return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
-    // We accept unowned, owned, and guaranteed in unowned positions.
-    return {true, false};
-  case SILArgumentConvention::Direct_Guaranteed:
-    return visitApplyArgument(ValueOwnershipKind::Guaranteed, false);
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("No ownership associated with deallocating");
-  }
-
-  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
+  return visitFullApply(I);
 }
 
 OwnershipUseCheckerResult
