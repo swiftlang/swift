@@ -195,6 +195,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::StructInst:
   case ValueKind::EnumInst:
   case ValueKind::OpenExistentialRefInst:
+  case ValueKind::OpenExistentialValueInst:
   case ValueKind::UpcastInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::ConvertFunctionInst:
@@ -451,7 +452,6 @@ CONSTANT_OWNERSHIP_INST(Owned, true, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, StrongUnpin)
 CONSTANT_OWNERSHIP_INST(Owned, true, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, InitExistentialRef)
-CONSTANT_OWNERSHIP_INST(Owned, true, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Trivial, false, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, false, BeginAccess)
@@ -651,6 +651,7 @@ FORWARD_ANY_OWNERSHIP_INST(Tuple)
 FORWARD_ANY_OWNERSHIP_INST(Struct)
 FORWARD_ANY_OWNERSHIP_INST(Enum)
 FORWARD_ANY_OWNERSHIP_INST(OpenExistentialRef)
+FORWARD_ANY_OWNERSHIP_INST(OpenExistentialValue)
 FORWARD_ANY_OWNERSHIP_INST(Upcast)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedRefCast)
 FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
