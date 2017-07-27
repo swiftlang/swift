@@ -1005,7 +1005,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
 
   /// The greatest representable value that compares less than this value.
   ///
-  /// For any finite value `x`, `x.nextDown` is greater than `x`. For `nan` or
+  /// For any finite value `x`, `x.nextDown` is less than `x`. For `nan` or
   /// `-infinity`, `x.nextDown` is `x` itself. The following special cases
   /// also apply:
   ///
