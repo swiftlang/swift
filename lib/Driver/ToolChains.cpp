@@ -231,9 +231,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_ImportedModules:
       FrontendModeOption = "-emit-imported-modules";
       break;
-    case types::TY_TBD:
-      FrontendModeOption = "-emit-tbd";
-      break;
 
     // BEGIN APPLE-ONLY OUTPUT TYPES
     case types::TY_IndexData:
@@ -263,6 +260,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_Image:
     case types::TY_SwiftDeps:
     case types::TY_ModuleTrace:
+    case types::TY_TBD:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -433,6 +431,13 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (!LoadedModuleTracePath.empty()) {
     Arguments.push_back("-emit-loaded-module-trace-path");
     Arguments.push_back(LoadedModuleTracePath.c_str());
+  }
+
+  const std::string &TBDPath =
+      context.Output.getAdditionalOutputForType(types::TY_TBD);
+  if (!TBDPath.empty()) {
+    Arguments.push_back("-emit-tbd-path");
+    Arguments.push_back(TBDPath.c_str());
   }
 
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
