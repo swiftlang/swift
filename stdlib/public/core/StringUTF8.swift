@@ -134,15 +134,19 @@ extension String {
     ///
     /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
     public var endIndex: Index {
+      _sanityCheck(_legacyOffsets.end >= -3 && _legacyOffsets.end <= 0,
+        "out of bounds legacy end")
+
       var r = Index(encodedOffset: _core.endIndex)
+      if _fastPath(_legacyOffsets.end == 0) {
+        return r
+      }
       switch _legacyOffsets.end {
-      case 0: return r
       case -3: r = index(before: r); fallthrough
       case -2: r = index(before: r); fallthrough
-      case -1: r = index(before: r); fallthrough
-      default: break
+      case -1: return index(before: r)
+      default: Builtin.unreachable()
       }
-      return r
     }
 
     @_versioned
