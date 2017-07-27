@@ -297,6 +297,37 @@ public protocol _Indexable : _IndexableBase {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
+
+  /// A Boolean value indicating whether the collection is empty.
+  ///
+  /// When you need to check whether your collection is empty, use the
+  /// `isEmpty` property instead of checking that the `count` property is
+  /// equal to zero. For collections that don't conform to
+  /// `RandomAccessCollection`, accessing the `count` property iterates
+  /// through the elements of the collection.
+  ///
+  ///     let horseName = "Silver"
+  ///     if horseName.isEmpty {
+  ///         print("I've been through the desert on a horse with no name.")
+  ///     } else {
+  ///         print("Hi ho, \(horseName)!")
+  ///     }
+  ///     // Prints "Hi ho, Silver!")
+  ///
+  /// - Complexity: O(1)
+  var isEmpty: Bool { get }
+
+  /// The number of elements in the collection.
+  ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
+  ///   of the collection.
+  var count: IndexDistance { get }  
 }
 
 /// A type that iterates over a collection using its indices.
@@ -853,37 +884,6 @@ public protocol Collection : _Indexable, Sequence
   /// - Complexity: O(1)
   func prefix(through position: Index) -> SubSequence
 
-  /// A Boolean value indicating whether the collection is empty.
-  ///
-  /// When you need to check whether your collection is empty, use the
-  /// `isEmpty` property instead of checking that the `count` property is
-  /// equal to zero. For collections that don't conform to
-  /// `RandomAccessCollection`, accessing the `count` property iterates
-  /// through the elements of the collection.
-  ///
-  ///     let horseName = "Silver"
-  ///     if horseName.isEmpty {
-  ///         print("I've been through the desert on a horse with no name.")
-  ///     } else {
-  ///         print("Hi ho, \(horseName)!")
-  ///     }
-  ///     // Prints "Hi ho, Silver!")
-  ///
-  /// - Complexity: O(1)
-  var isEmpty: Bool { get }
-
-  /// The number of elements in the collection.
-  ///
-  /// To check whether a collection is empty, use its `isEmpty` property
-  /// instead of comparing `count` to zero. Unless the collection guarantees
-  /// random-access performance, calculating `count` can be an O(*n*)
-  /// operation.
-  ///
-  /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
-  ///   of the collection.
-  var count: IndexDistance { get }
-  
   // The following requirement enables dispatching for index(of:) when
   // the element type is Equatable.
   /// Returns `Optional(Optional(index))` if an element was found
