@@ -3737,8 +3737,9 @@ static bool trySequenceSubsequenceConversionFixIts(InFlightDiagnostic &diag,
   // Wrap in String.init
   if (fromType->isEqual(Substring)) {
     if (toType->isEqual(String)) {
-      diag.fixItInsert(expr->getLoc(), "String(");
-      diag.fixItInsertAfter(expr->getSourceRange().End, ")");
+      auto range = expr->getSourceRange();
+      diag.fixItInsert(range.Start, "String(");
+      diag.fixItInsertAfter(range.End, ")");
       return true;
     }
   }
