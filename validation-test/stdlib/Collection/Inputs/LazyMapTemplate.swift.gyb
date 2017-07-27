@@ -1,5 +1,28 @@
+%{
+# This is a template of validation-test/stdlib/Collection/LazyMap*.swift
+#
+# cd validation-test/stdlib/Collection
+# ../../../utils/gyb --line-directive="" Inputs/LazyMapTemplate.swift.gyb | ../../../utils/split_file.py
+
+variations = [
+  ('', 'Sequence'),
+  ('', 'Collection'),
+  ('Bidirectional', 'Collection'),
+  ('RandomAccess', 'Collection')
+  ]
+}%
+
+
+% for (traversal, kind) in variations:
+// BEGIN LazyMap${traversal}${kind}.swift
 // -*- swift -*-
-// RUN: %target-run-simple-swiftgyb
+
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Collection/Inputs/LazyMapTemplate.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -7,12 +30,7 @@ import StdlibCollectionUnittest
 
 var CollectionTests = TestSuite("Collection")
 
-%{
-variations = [('', 'Sequence'), ('', 'Collection'), ('Bidirectional', 'Collection'), ('RandomAccess', 'Collection')]
-}%
-
 // Test collections using value types as elements.
-% for (traversal, kind) in variations:
 CollectionTests.add${traversal}${kind}Tests(
   make${kind}: { (elements: [OpaqueValue<Int>]) -> LazyMap${traversal}${kind}<Minimal${traversal}${kind}<OpaqueValue<Int>>, OpaqueValue<Int>> in
     Minimal${traversal}${kind}(elements: elements).lazy.map(identity)
@@ -25,10 +43,8 @@ CollectionTests.add${traversal}${kind}Tests(
   wrapValueIntoEquatable: identityEq,
   extractValueFromEquatable: identityEq
 )
-% end
 
 // Test collections using reference types as elements.
-% for (traversal, kind) in variations:
 CollectionTests.add${traversal}${kind}Tests(
   make${kind}: { (elements: [LifetimeTracked]) -> LazyMap${traversal}${kind}<Minimal${traversal}${kind}<LifetimeTracked>, LifetimeTracked> in
     Minimal${traversal}${kind}(elements: elements).lazy.map { $0 }
@@ -49,10 +65,8 @@ CollectionTests.add${traversal}${kind}Tests(
     MinimalEquatableValue(element.value, identity: element.identity)
   }
 )
-% end
 
 // Test sequence instances and iterators.
-% for (traversal, kind) in variations:
 CollectionTests.test("LazyMapCollection instances (${traversal}${kind})") {
   do {
     let expected = ["convent", "conform", "constrict", "condone"]
@@ -90,6 +104,7 @@ CollectionTests.test("LazyMapCollection instances (${traversal}${kind})") {
 % end
   }
 }
-% end
 
 runAllTests()
+
+% end # for (traversal, kind) in variations

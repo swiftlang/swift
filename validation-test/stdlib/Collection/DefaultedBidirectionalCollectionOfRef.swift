@@ -13,18 +13,23 @@ import StdlibCollectionUnittest
 
 var CollectionTests = TestSuite("Collection")
 
-// Test collections using value types as elements.
+// Test collections using a reference type as element.
 do {
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
 
   CollectionTests.addBidirectionalCollectionTests(
-    makeCollection: { (elements: [OpaqueValue<Int>]) in
+    makeCollection: { (elements: [LifetimeTracked]) in
       return DefaultedBidirectionalCollection(elements: elements)
     },
-    wrapValue: identity,
-    extractValue: identity,
+    wrapValue: { (element: OpaqueValue<Int>) in
+      LifetimeTracked(element.value, identity: element.identity)
+    },
+    extractValue: { (element: LifetimeTracked) in
+      OpaqueValue(element.value, identity: element.identity)
+    },
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      // FIXME: use LifetimeTracked.
       return DefaultedBidirectionalCollection(elements: elements)
     },
     wrapValueIntoEquatable: identityEq,
@@ -34,5 +39,3 @@ do {
 }
 
 runAllTests()
-
-
