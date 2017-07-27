@@ -1347,6 +1347,7 @@ func _projectKeyPathReferenceWritable<Root, Value>(
 // constrained by being overrides, and so that we can use exact-type constraints
 // on `Self` to prevent dynamically-typed methods from being inherited by
 // statically-typed key paths.
+@_show_in_interface
 public protocol _AppendKeyPath {}
 
 extension _AppendKeyPath where Self == AnyKeyPath {
