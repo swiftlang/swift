@@ -1074,6 +1074,30 @@ func s500_______getAnyHash(_ value: ConvertibleToP?) -> P? {
   return value?.asP()
 }
 
+public protocol FooP {
+  func foo() -> Self
+}
+
+// Test emitting a protocol witness for a method (with @in_guaranteed self) on a dependent generic type.
+// ---
+// CHECK-LABEL: sil private [transparent] [thunk] @_T020opaque_values_silgen21s510_______OpaqueSelfVyxGAA4FooPAAlAaEP3fooxyFTW : $@convention(witness_method) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0> {
+// CHECK: bb0(%0 : $s510_______OpaqueSelf<τ_0_0>):
+// CHECK:   [[COPY:%.*]] = copy_value %0 : $s510_______OpaqueSelf<τ_0_0>
+// CHECK:   [[FN:%.*]] = function_ref @_T020opaque_values_silgen21s510_______OpaqueSelfV3fooACyxGyF : $@convention(method) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0>
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[COPY]] : $s510_______OpaqueSelf<τ_0_0>
+// CHECK:   [[RESULT:%.*]] = apply [[FN]]<τ_0_0>([[BORROW]]) : $@convention(method) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0>
+// CHECK:   end_borrow [[BORROW]] from [[COPY]] : $s510_______OpaqueSelf<τ_0_0>
+// CHECK:   destroy_value [[COPY]] : $s510_______OpaqueSelf<τ_0_0>
+// CHECK:   return [[RESULT]] : $s510_______OpaqueSelf<τ_0_0>
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s510_______OpaqueSelfVyxGAA4FooPAAlAaEP3fooxyFTW'
+struct s510_______OpaqueSelf<Base> : FooP {
+  var x: Base
+
+  func foo() -> s510_______OpaqueSelf<Base> {
+    return self
+  }
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
