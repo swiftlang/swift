@@ -322,6 +322,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::DumpAST;
     } else if (Opt.matches(OPT_emit_syntax)) {
       Action = FrontendOptions::EmitSyntax;
+    } else if (Opt.matches(OPT_merge_modules)) {
+      Action = FrontendOptions::MergeModules;
     } else if (Opt.matches(OPT_dump_scope_maps)) {
       Action = FrontendOptions::DumpScopeMaps;
 
@@ -559,6 +561,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Suffix = SIB_EXTENSION;
       break;
 
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
       Suffix = SERIALIZED_MODULE_EXTENSION;
       break;
@@ -724,7 +727,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.RequestedAction == FrontendOptions::EmitSIB ||
     Opts.RequestedAction == FrontendOptions::EmitSIBGen;
   bool canUseMainOutputForModule =
-    Opts.RequestedAction == FrontendOptions::EmitModuleOnly || IsSIB;
+    Opts.RequestedAction == FrontendOptions::MergeModules ||
+    Opts.RequestedAction == FrontendOptions::EmitModuleOnly ||
+    IsSIB;
   auto ext = IsSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
   auto sibOpt = Opts.RequestedAction == FrontendOptions::EmitSIB ?
     OPT_emit_sib : OPT_emit_sibgen;
@@ -756,6 +761,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       return true;
     case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitPCH:
     case FrontendOptions::EmitSILGen:
@@ -789,6 +795,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       return true;
     case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
@@ -821,6 +828,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                      diag::error_mode_cannot_emit_loaded_module_trace);
       return true;
     case FrontendOptions::Typecheck:
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitPCH:
     case FrontendOptions::EmitSILGen:
@@ -859,6 +867,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       else
         Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
       return true;
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSIL:
     case FrontendOptions::EmitSIBGen:

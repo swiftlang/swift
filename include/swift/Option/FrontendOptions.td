@@ -40,6 +40,10 @@ def emit_module_doc_path
   : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
     HelpText<"Output module documentation file <path>">;
 
+def merge_modules
+  : Flag<["-"], "merge-modules">, ModeOpt,
+    HelpText<"Merge the input modules without otherwise processing them">;
+
 def emit_dependencies_path
   : Separate<["-"], "emit-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output basic Make-compatible dependencies file to <path>">;

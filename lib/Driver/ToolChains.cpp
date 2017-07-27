@@ -663,8 +663,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   Arguments.push_back("-frontend");
 
-  // We just want to emit a module, so pass -emit-module without any other
-  // mode options.
+  Arguments.push_back("-merge-modules");
   Arguments.push_back("-emit-module");
 
   if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
