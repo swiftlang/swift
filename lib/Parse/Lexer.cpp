@@ -1424,13 +1424,28 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       continue;
     case '\n':
     case '\r': {
-      auto bytes = start + 1;
-      auto length = end-(start+1);
-      
-      auto bytesLoc = Lexer::getSourceLoc(bytes);
-      auto string = StringRef(bytes, length);
-      
-      return std::make_tuple(string, bytesLoc);
+      start++;
+      auto startLoc = Lexer::getSourceLoc(start);
+      auto string = StringRef(start, end - start);
+
+      // Disallow escaped newline in the last line.
+      if (Diags) {
+        auto *Ptr = start - 1;
+        if (*Ptr == '\n') --Ptr;
+        if (*Ptr == '\r') --Ptr;
+        auto *LineEnd = Ptr + 1;
+        while (Ptr > begin && (*Ptr == ' ' || *Ptr == '\t')) --Ptr;
+        if (*Ptr == '\\') {
+          auto escapeLoc = Lexer::getSourceLoc(Ptr);
+          bool invalid = true;
+          while (*--Ptr == '\\') invalid = !invalid;
+          if (invalid)
+            Diags->diagnose(escapeLoc, diag::lex_escaped_newline_at_lastline)
+              .fixItRemoveChars(escapeLoc, Lexer::getSourceLoc(LineEnd));
+        }
+      }
+
+      return std::make_tuple(string, startLoc);
     }
     default:
       sawNonWhitespace = true;
