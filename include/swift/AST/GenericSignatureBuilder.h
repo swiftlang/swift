@@ -89,6 +89,7 @@ public:
 
   using UnresolvedType = llvm::PointerUnion<PotentialArchetype *, Type>;
   struct ResolvedType;
+  class ResolveResult;
 
   using RequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
@@ -174,6 +175,10 @@ public:
     /// only the derived same-type constraints in the graph.
     std::vector<DerivedSameTypeComponent> derivedSameTypeComponents;
 
+    /// Delayed requirements that could be resolved by a change to this
+    /// equivalence class.
+    std::vector<DelayedRequirement> delayedRequirements;
+
     /// Whether we have detected recursion during the substitution of
     /// the concrete type.
     unsigned recursiveConcreteType : 1;
@@ -188,6 +193,9 @@ public:
     /// Construct a new equivalence class containing only the given
     /// potential archetype (which represents itself).
     EquivalenceClass(PotentialArchetype *representative);
+
+    /// Note that this equivalence class has been modified.
+    void modified(GenericSignatureBuilder &builder);
 
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
@@ -252,9 +260,9 @@ public:
     /// "resolved" at this point.
     GenerateConstraints = 0,
 
-    /// Do not generate a new constraint; rather, return
-    /// \c ConstraintResult::Unresolved and let the caller handle it.
-    ReturnUnresolved = 1,
+    /// Generate an unresolved constraint but still return
+    /// \c ConstraintResult::Unresolved so the caller knows what happened.
+    GenerateUnresolved = 1,
   };
 
 private:
@@ -280,6 +288,7 @@ private:
                                    UnresolvedType lhs,
                                    RequirementRHS rhs,
                                    FloatingRequirementSource source,
+                                   EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling);
 
   /// Resolve the conformance of the given potential archetype to
@@ -416,10 +425,6 @@ private:
   /// Visit all of the potential archetypes.
   template<typename F>
   void visitPotentialArchetypes(F f);
-
-  void markPotentialArchetypeRecursive(PotentialArchetype *pa,
-                                       ProtocolDecl *proto,
-                                       const RequirementSource *source);
 
 public:
   /// Construct a new generic signature builder.
@@ -559,9 +564,6 @@ public:
   void processDelayedRequirements();
 
 private:
-  /// Bump the generation count due to a change.
-  void bumpGeneration();
-
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
   enum class ConstraintRelation {
@@ -658,6 +660,21 @@ private:
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
+  /// \brief Resolve the given type to the potential archetype it names.
+  ///
+  /// The \c resolutionKind parameter describes how resolution should be
+  /// performed. If the potential archetype named by the given dependent type
+  /// already exists, it will be always returned. If it doesn't exist yet,
+  /// the \c resolutionKind dictates whether the potential archetype will
+  /// be created or whether null will be returned.
+  ///
+  /// For any type that cannot refer to an archetype, this routine returns the
+  /// equivalence class that would have to change to make the potential
+  /// archetype resolvable.
+  llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
+  resolvePotentialArchetype(Type type,
+                            ArchetypeResolutionKind resolutionKind);
+
 public:
   /// \brief Resolve the given type to the potential archetype it names.
   ///
@@ -676,9 +693,9 @@ public:
   /// If successful, this returns either a non-typealias potential archetype
   /// or a Type, if \c type is concrete.
   /// If the type cannot be resolved, e.g., because it is "too" recursive
-  /// given the source, returns \c None.
-  Optional<ResolvedType> resolve(UnresolvedType type,
-                                 FloatingRequirementSource source);
+  /// given the source, returns an unresolved result containing the equivalence
+  /// class that would need to change to resolve this type.
+  ResolveResult resolve(UnresolvedType type, FloatingRequirementSource source);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -1337,23 +1354,20 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// that share a name.
   llvm::MapVector<Identifier, StoredNestedType> NestedTypes;
 
-  /// \brief Recursively conforms to itself.
-  unsigned IsRecursive : 1;
-
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
   PotentialArchetype(PotentialArchetype *parent, Identifier name);
 
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
-    : parentOrBuilder(parent), identifier(assocType), IsRecursive(false)
+    : parentOrBuilder(parent), identifier(assocType)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
 
   /// \brief Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
-    : parentOrBuilder(parent), identifier(concreteDecl), IsRecursive(false)
+    : parentOrBuilder(parent), identifier(concreteDecl)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
@@ -1361,8 +1375,7 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// \brief Construct a new potential archetype for a generic parameter.
   PotentialArchetype(GenericSignatureBuilder *builder,
                      GenericParamKey genericParam)
-    : parentOrBuilder(builder), identifier(genericParam),
-      IsRecursive(false)
+    : parentOrBuilder(builder), identifier(genericParam)
   {
   }
 
@@ -1604,9 +1617,6 @@ public:
 
     return Type();
   }
-
-  void setIsRecursive() { IsRecursive = true; }
-  bool isRecursive() const { return IsRecursive; }
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const,
