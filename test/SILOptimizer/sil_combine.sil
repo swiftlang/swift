@@ -2878,8 +2878,8 @@ bb2:
 // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $T
 // CHECK: [[FN:%.*]] = function_ref @generic_callee
 // CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[TMP]] : $*T
-// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
 // CHECK-NEXT: destroy_addr [[ARG1]]
+// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
 // CHECK-NEXT: destroy_addr [[TMP]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: dealloc_stack [[TMP]]
