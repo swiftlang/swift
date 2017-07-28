@@ -250,12 +250,14 @@ ParserStatus Parser::parseGenericWhereClause(
   do {
     // Parse the leading type-identifier.
     ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
+
+    if (FirstType.hasCodeCompletion()) {
+      Status.setHasCodeCompletion();
+      FirstTypeInComplete = true;
+    }
+
     if (FirstType.isNull()) {
       Status.setIsParseError();
-      if (FirstType.hasCodeCompletion()) {
-        Status.setHasCodeCompletion();
-        FirstTypeInComplete = true;
-      }
       break;
     }
 
