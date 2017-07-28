@@ -97,14 +97,14 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
   }
 
-  public init<T : FloatingPoint>(_ source: T) {
+  public init<T : BinaryFloatingPoint>(_ source: T) {
     fatalError()
   }
 
-  public init?<T : FloatingPoint>(exactly source: T) {
+  public init?<T : BinaryFloatingPoint>(exactly source: T) {
     fatalError()
   }
-    
+
   public init<T : BinaryFloatingPoint>(_ source: T)
     where T.RawSignificand : FixedWidthInteger
   {
@@ -269,27 +269,23 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 % for (operator, name) in [('+', 'adding'), ('-', 'subtracting')]:
 %   highAffectedByLowOverflow = 'Base.max' if operator == '+' else 'Base.min'
   public func ${name}ReportingOverflow(_ rhs: DoubleWidth)
-    -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
+    -> (partialValue: DoubleWidth, overflow: Bool) {
     let (low, lowOverflow) =
       _storage.low.${name}ReportingOverflow(rhs._storage.low)
     let (high, highOverflow) =
       _storage.high.${name}ReportingOverflow(rhs._storage.high)
-    let isLowOverflow = lowOverflow == .overflow
-    let result = (high &${operator} (isLowOverflow ? 1 : 0), low)
-    let overflow = ArithmeticOverflow(
-      highOverflow == .overflow ||
-      high == ${highAffectedByLowOverflow} && isLowOverflow
-    )
-    return (partialValue: DoubleWidth(result),
-      overflow: overflow)
+    let result = (high &${operator} (lowOverflow ? 1 : 0), low)
+    let overflow = highOverflow ||
+      high == ${highAffectedByLowOverflow} && lowOverflow
+    return (partialValue: DoubleWidth(result), overflow: overflow)
   }
 % end
 
   public func multipliedReportingOverflow(
     by rhs: DoubleWidth
-  ) -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
+  ) -> (partialValue: DoubleWidth, overflow: Bool) {
     let (carry, product) = multipliedFullWidth(by: rhs)
-    let result = DoubleWidth(extendingOrTruncating: product)
+    let result = DoubleWidth(truncatingIfNeeded: product)
     
     let isNegative = (self < (0 as DoubleWidth)) != (rhs < (0 as DoubleWidth))
     let didCarry = isNegative
@@ -298,7 +294,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let hadPositiveOverflow = !isNegative &&
       DoubleWidth.isSigned && product.leadingZeroBitCount == 0
 
-    return (result, ArithmeticOverflow(didCarry || hadPositiveOverflow))
+    return (result, didCarry || hadPositiveOverflow)
   }
 
   public func quotientAndRemainder(dividingBy other: DoubleWidth)
@@ -350,25 +346,25 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   }
 
   public func dividedReportingOverflow(by other: DoubleWidth)
-    -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
+    -> (partialValue: DoubleWidth, overflow: Bool) {
     if other == (0 as DoubleWidth) ||
       (DoubleWidth.isSigned && other == (-1 as Int) && self == .min)
     {
-      return (self, .overflow)
+      return (self, true)
     }
 
-    return (quotientAndRemainder(dividingBy: other).quotient, .none)
+    return (quotientAndRemainder(dividingBy: other).quotient, false)
   }
 
   public func remainderReportingOverflow(dividingBy other: DoubleWidth)
-    -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
+    -> (partialValue: DoubleWidth, overflow: Bool) {
     if other == 0 ||
       (DoubleWidth.isSigned && other == -1 && self == .min)
     {
-      return (self, .overflow)
+      return (self, true)
     }
 
-    return (quotientAndRemainder(dividingBy: other).remainder, .none)
+    return (quotientAndRemainder(dividingBy: other).remainder, false)
   }
 
   public func multipliedFullWidth(by other: DoubleWidth)
@@ -384,8 +380,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     func sum(_ x: Low, _ y: Low, _ z: Low) -> (partial: Low, carry: Low) {
       let (sum1, overflow1) = x.addingReportingOverflow(y)
       let (sum2, overflow2) = sum1.addingReportingOverflow(z)
-      let carry: Low = (overflow1 == .overflow ? 1 : 0) +
-        (overflow2 == .overflow ? 1 : 0)
+      let carry: Low = (overflow1 ? 1 : 0) + (overflow2 ? 1 : 0)
       return (sum2, carry)
     }
         
@@ -406,7 +401,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
         
     if isNegative {
       let (lowComplement, overflow) = (~low).addingReportingOverflow(1)
-      return (~high + (overflow == .overflow ? 1 : 0), lowComplement)
+      return (~high + (overflow ? 1 : 0), lowComplement)
     } else {
       return (high, low)
     }
@@ -447,7 +442,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     
     // Shift is exactly the width of `Base`, so low -> high.
     if rhs._storage.low == Base.bitWidth {
-      lhs = DoubleWidth((High(extendingOrTruncating: lhs._storage.low), 0))
+      lhs = DoubleWidth((High(truncatingIfNeeded: lhs._storage.low), 0))
       return
     }
     
@@ -472,7 +467,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     if rhs._storage.low == Base.bitWidth {
       lhs = DoubleWidth((
         lhs < (0 as DoubleWidth) ? ~0 : 0,
-        Low(extendingOrTruncating: lhs._storage.high)
+        Low(truncatingIfNeeded: lhs._storage.high)
       ))
       return
     }
@@ -485,10 +480,10 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
     lhs._storage.high <<= High(rhs._storage.low)
     if Base.bitWidth > rhs._storage.low {
-      lhs._storage.high |= High(extendingOrTruncating: lhs._storage.low >>
+      lhs._storage.high |= High(truncatingIfNeeded: lhs._storage.low >>
         (numericCast(Base.bitWidth) - rhs._storage.low))
     } else {
-      lhs._storage.high |= High(extendingOrTruncating: lhs._storage.low <<
+      lhs._storage.high |= High(truncatingIfNeeded: lhs._storage.low <<
         (rhs._storage.low - numericCast(Base.bitWidth)))
     }
     lhs._storage.low <<= rhs._storage.low
@@ -500,14 +495,14 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     lhs._storage.low >>= rhs._storage.low
     if Base.bitWidth > rhs._storage.low {
       lhs._storage.low |= Low(
-        extendingOrTruncating:
+        truncatingIfNeeded:
         lhs._storage.high << (numericCast(Base.bitWidth) - rhs._storage.low))
     } else {
       lhs._storage.low |= Low(
-        extendingOrTruncating: lhs._storage.high >>
+        truncatingIfNeeded: lhs._storage.high >>
         (rhs._storage.low - numericCast(Base.bitWidth)))
     }
-    lhs._storage.high >>= High(extendingOrTruncating: rhs._storage.low)
+    lhs._storage.high >>= High(truncatingIfNeeded: rhs._storage.low)
   }
   
 %{
@@ -535,7 +530,7 @@ binaryOperators = [
     lhs: inout DoubleWidth, rhs: DoubleWidth
   ) {
     let (result, overflow) = lhs.${name}ReportingOverflow(${argumentLabel}rhs)
-    _precondition(overflow == .none, "Overflow in ${operator}=")
+    _precondition(!overflow, "Overflow in ${operator}=")
     lhs = result
   }
 % end
@@ -578,8 +573,8 @@ binaryOperators = [
 
   @_transparent
   public var byteSwapped: DoubleWidth {
-    return DoubleWidth((High(extendingOrTruncating: low.byteSwapped),
-      Low(extendingOrTruncating: high.byteSwapped)))
+    return DoubleWidth((High(truncatingIfNeeded: low.byteSwapped),
+      Low(truncatingIfNeeded: high.byteSwapped)))
   }
 }
 

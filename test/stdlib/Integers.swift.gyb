@@ -87,7 +87,7 @@ func expectEqual<T : FixedWidthInteger>(
 }
 
 func expectEqual<T : FixedWidthInteger>(
-  _ expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
+  _ expected: (T, Bool), _ actual: (T, Bool),
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -322,46 +322,46 @@ tests.test("ConversionDWordToWordC") {
   _ = UWord(tooLarge)
 }
 
-tests.test("extendingOrTruncating") {
+tests.test("truncatingIfNeeded") {
 
-  expectEqual(-2, Int8(extendingOrTruncating: UInt8.max - 1))
-  expectEqual(3, Int8(extendingOrTruncating: 3 as UInt8))
-  expectEqual(UInt8.max - 1, UInt8(extendingOrTruncating: -2 as Int8))
-  expectEqual(3, UInt8(extendingOrTruncating: 3 as Int8))
+  expectEqual(-2, Int8(truncatingIfNeeded: UInt8.max - 1))
+  expectEqual(3, Int8(truncatingIfNeeded: 3 as UInt8))
+  expectEqual(UInt8.max - 1, UInt8(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, UInt8(truncatingIfNeeded: 3 as Int8))
 
-  expectEqual(-2, DWord(extendingOrTruncating: UDWord.max - 1))
-  expectEqual(3, DWord(extendingOrTruncating: 3 as UDWord))
-  expectEqual(UDWord.max - 1, UDWord(extendingOrTruncating: -2 as DWord))
-  expectEqual(3, UDWord(extendingOrTruncating: 3 as DWord))
+  expectEqual(-2, DWord(truncatingIfNeeded: UDWord.max - 1))
+  expectEqual(3, DWord(truncatingIfNeeded: 3 as UDWord))
+  expectEqual(UDWord.max - 1, UDWord(truncatingIfNeeded: -2 as DWord))
+  expectEqual(3, UDWord(truncatingIfNeeded: 3 as DWord))
 
-  expectEqual(-2, Int32(extendingOrTruncating: -2 as Int8))
-  expectEqual(3, Int32(extendingOrTruncating: 3 as Int8))
-  expectEqual(127, Int32(extendingOrTruncating: 127 as UInt8))
-  expectEqual(129, Int32(extendingOrTruncating: 129 as UInt8))
-  expectEqual((1 << 31 - 1) << 1, UInt32(extendingOrTruncating: -2 as Int8))
-  expectEqual(3, UInt32(extendingOrTruncating: 3 as Int8))
-  expectEqual(128, UInt32(extendingOrTruncating: 128 as UInt8))
-  expectEqual(129, UInt32(extendingOrTruncating: 129 as UInt8))
+  expectEqual(-2, Int32(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, Int32(truncatingIfNeeded: 3 as Int8))
+  expectEqual(127, Int32(truncatingIfNeeded: 127 as UInt8))
+  expectEqual(129, Int32(truncatingIfNeeded: 129 as UInt8))
+  expectEqual((1 << 31 - 1) << 1, UInt32(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, UInt32(truncatingIfNeeded: 3 as Int8))
+  expectEqual(128, UInt32(truncatingIfNeeded: 128 as UInt8))
+  expectEqual(129, UInt32(truncatingIfNeeded: 129 as UInt8))
 
-  expectEqual(-2, DWord(extendingOrTruncating: -2 as Int8))
-  expectEqual(3, DWord(extendingOrTruncating: 3 as Int8))
-  expectEqual(127, DWord(extendingOrTruncating: 127 as UInt8))
-  expectEqual(129, DWord(extendingOrTruncating: 129 as UInt8))
+  expectEqual(-2, DWord(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, DWord(truncatingIfNeeded: 3 as Int8))
+  expectEqual(127, DWord(truncatingIfNeeded: 127 as UInt8))
+  expectEqual(129, DWord(truncatingIfNeeded: 129 as UInt8))
   expectEqual(
     (1 << ${word_bits*2-1} - 1) << 1,
-    UDWord(extendingOrTruncating: -2 as Int8))
-  expectEqual(3, UDWord(extendingOrTruncating: 3 as Int8))
-  expectEqual(128, UDWord(extendingOrTruncating: 128 as UInt8))
-  expectEqual(129, UDWord(extendingOrTruncating: 129 as UInt8))
+    UDWord(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, UDWord(truncatingIfNeeded: 3 as Int8))
+  expectEqual(128, UDWord(truncatingIfNeeded: 128 as UInt8))
+  expectEqual(129, UDWord(truncatingIfNeeded: 129 as UInt8))
 
-  expectEqual(-2, Int8(extendingOrTruncating: -2 as DWord))
-  expectEqual(-2, Int8(extendingOrTruncating: -1 << 67 - 2 as DWord))
-  expectEqual(127, Int8(extendingOrTruncating: 127 as UDWord))
-  expectEqual(-127, Int8(extendingOrTruncating: 129 as UDWord))
-  expectEqual(0b1111_1100, UInt8(extendingOrTruncating: -4 as DWord))
-  expectEqual(0b1111_1100, UInt8(extendingOrTruncating: -1 << 67 - 4 as DWord))
-  expectEqual(128, UInt8(extendingOrTruncating: 128 + 1024 as UDWord))
-  expectEqual(129, UInt8(extendingOrTruncating: 129 + 1024 as UDWord))
+  expectEqual(-2, Int8(truncatingIfNeeded: -2 as DWord))
+  expectEqual(-2, Int8(truncatingIfNeeded: -1 << 67 - 2 as DWord))
+  expectEqual(127, Int8(truncatingIfNeeded: 127 as UDWord))
+  expectEqual(-127, Int8(truncatingIfNeeded: 129 as UDWord))
+  expectEqual(0b1111_1100, UInt8(truncatingIfNeeded: -4 as DWord))
+  expectEqual(0b1111_1100, UInt8(truncatingIfNeeded: -1 << 67 - 4 as DWord))
+  expectEqual(128, UInt8(truncatingIfNeeded: 128 + 1024 as UDWord))
+  expectEqual(129, UInt8(truncatingIfNeeded: 129 + 1024 as UDWord))
 }
 
 tests.test("HeterogeneousEquality") {
@@ -706,7 +706,7 @@ dwTests.test("Nested") {
     let (y, o) = x.addingReportingOverflow(1)
     expectEqual(y, 0)
     expectTrue(y == (0 as Int))
-    expectTrue(o == .overflow)
+    expectTrue(o)
   }
 
   do {
@@ -716,7 +716,7 @@ dwTests.test("Nested") {
     expectLT(y, 0)
     expectTrue(y < (0 as Int))
     expectTrue(y < (0 as UInt))
-    expectTrue(o == .overflow)
+    expectTrue(o)
   }
 
   expectFalse(UInt1024.isSigned)
@@ -732,7 +732,7 @@ dwTests.test("inits") {
 
   expectTrue(DWU16(UInt16.max) == UInt16.max)
   expectNil(DWU16(exactly: UInt32.max))
-  expectEqual(DWU16(extendingOrTruncating: UInt64.max), DWU16.max)
+  expectEqual(DWU16(truncatingIfNeeded: UInt64.max), DWU16.max)
 
   expectCrashLater()
   _ = DWU16(UInt32.max)
@@ -741,7 +741,7 @@ dwTests.test("inits") {
 dwTests.test("TwoWords") {
   typealias DW = DoubleWidth<Int>
 
-  expectEqual(-1 as DW, DW(extendingOrTruncating: -1 as Int8))
+  expectEqual(-1 as DW, DW(truncatingIfNeeded: -1 as Int8))
 
   expectNil(Int(exactly: DW(Int.min) - 1))
   expectNil(Int(exactly: DW(Int.max) + 1))
