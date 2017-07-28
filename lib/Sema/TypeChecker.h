@@ -849,7 +849,7 @@ private:
   /// Intended for debugging purposes only.
   unsigned WarnLongFunctionBodies = 0;
 
-  /// If non-zero, warn when type-chcking an expression takes longer
+  /// If non-zero, warn when type-checking an expression takes longer
   /// than this many milliseconds.
   ///
   /// Intended for debugging purposes only.
@@ -928,7 +928,7 @@ public:
     ExpressionTimeoutThreshold = timeInSeconds;
   }
 
-  /// Return the current settting for the threshold that determines
+  /// Return the current setting for the threshold that determines
   /// the upper bound for the number of seconds we'll let the
   /// expression type checker run before considering an expression
   /// "too complex".

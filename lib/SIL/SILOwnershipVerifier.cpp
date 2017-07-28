@@ -1136,7 +1136,7 @@ public:
 
 } // end anonymous namespace
 
-// This is correct today since we do not ahve any builtins which return
+// This is correct today since we do not have any builtins which return
 // @guaranteed parameters. This means that we can only have a lifetime ending
 // use with our builtins if it is owned.
 #define CONSTANT_OWNERSHIP_BUILTIN(OWNERSHIP, LIFETIME_ENDING_USE, ID)         \
