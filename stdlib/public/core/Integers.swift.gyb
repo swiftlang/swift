@@ -2129,7 +2129,7 @@ ${operatorComment(x.operator, False)}
   public static func ${x.operator} <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Self {
-    return lhs ${x.operator} Self(extendingOrTruncating: rhs)
+    return lhs ${x.operator} Self(truncatingIfNeeded: rhs)
   }
 
   // Heterogeneous masking shift assignment
