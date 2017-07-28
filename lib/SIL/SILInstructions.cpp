@@ -814,11 +814,10 @@ UncheckedRefCastAddrInst::UncheckedRefCastAddrInst(SILDebugLocation Loc,
       Operands(this, src, dest), SourceType(srcType), TargetType(targetType) {}
 
 UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
-    SILDebugLocation Loc, CastConsumptionKind consumption, SILValue src,
-    CanType srcType, SILValue dest, CanType targetType)
+    SILDebugLocation Loc, SILValue src, CanType srcType, SILValue dest,
+    CanType targetType)
     : SILInstruction(ValueKind::UnconditionalCheckedCastAddrInst, Loc),
-      Operands(this, src, dest), ConsumptionKind(consumption),
-      SourceType(srcType), TargetType(targetType) {}
+      Operands(this, src, dest), SourceType(srcType), TargetType(targetType) {}
 
 StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
                                ArrayRef<SILValue> Elements, SILFunction &F) {
@@ -1868,8 +1867,7 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
 }
 
 UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
-    SILDebugLocation DebugLoc, CastConsumptionKind consumption,
-    SILValue Operand, SILType DestTy, SILFunction &F,
+    SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -1880,7 +1878,7 @@ UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
   void *Buffer =
       Mod.allocateInst(size, alignof(UnconditionalCheckedCastValueInst));
   return ::new (Buffer) UnconditionalCheckedCastValueInst(
-      DebugLoc, consumption, Operand, TypeDependentOperands, DestTy);
+      DebugLoc, Operand, TypeDependentOperands, DestTy);
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(

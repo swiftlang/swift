@@ -1209,7 +1209,6 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
          getBuilder().createUnconditionalCheckedCastAddr(OpLoc,
-                                                    Inst->getConsumptionKind(),
                                                          SrcValue, SrcType,
                                                          DestValue, TargetType));
 }
@@ -1221,8 +1220,9 @@ void SILCloner<ImplClass>::visitUnconditionalCheckedCastValueInst(
   SILValue OpValue = getOpValue(Inst->getOperand());
   SILType OpType = getOpType(Inst->getType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createUnconditionalCheckedCastValue(
-                          OpLoc, Inst->getConsumptionKind(), OpValue, OpType));
+  doPostProcess(
+      Inst,
+      getBuilder().createUnconditionalCheckedCastValue(OpLoc, OpValue, OpType));
 }
 
 template <typename ImplClass>
