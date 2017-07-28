@@ -818,21 +818,21 @@ private:
         if (AvAttr->Obsoleted.hasValue()) {
           os << ",obsoleted=" << AvAttr->Obsoleted.getValue().getAsString();
         }
-        if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
-          // NB: Don't bother getting obj-c names, we can't get one for the rename
-          os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
-             << "' has been renamed to '";
-          printEncodedString(AvAttr->Rename, false);
-          os << '\'';
-          if (!AvAttr->Message.empty()) {
-            os << ": ";
-            printEncodedString(AvAttr->Message, false);
-          }
-          os << "\"";
-        } else if (!AvAttr->Message.empty()) {
-          os << ",message=";
-          printEncodedString(AvAttr->Message);
+      }
+      if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
+        // NB: Don't bother getting obj-c names, we can't get one for the rename
+        os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
+           << "' has been renamed to '";
+        printEncodedString(AvAttr->Rename, false);
+        os << '\'';
+        if (!AvAttr->Message.empty()) {
+          os << ": ";
+          printEncodedString(AvAttr->Message, false);
         }
+        os << "\"";
+      } else if (!AvAttr->Message.empty()) {
+        os << ",message=";
+        printEncodedString(AvAttr->Message);
       }
       os << ")";
     }

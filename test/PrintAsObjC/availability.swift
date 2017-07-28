@@ -38,6 +38,9 @@
 // CHECK-NEXT: - (void)multiPlatCombined
 // CHECK-DAG: SWIFT_AVAILABILITY(macos,introduced=10.6,deprecated=10.8,obsoleted=10.9)
 // CHECK-DAG: SWIFT_AVAILABILITY(ios,introduced=7.0,deprecated=9.0,obsoleted=10.0)
+// CHECK-NEXT: - (void)platUnavailableMessage SWIFT_AVAILABILITY(macos,unavailable,message="help I'm trapped in an availability factory");
+// CHECK-NEXT: - (void)platUnavailableRename SWIFT_AVAILABILITY(macos,unavailable,message="'platUnavailableRename' has been renamed to 'plea'");
+// CHECK-NEXT: - (void)platUnavailableRenameWithMessage SWIFT_AVAILABILITY(macos,unavailable,message="'platUnavailableRenameWithMessage' has been renamed to 'anotherPlea': still trapped");
 // CHECK-NEXT: - (void)extensionUnavailable
 // CHECK-DAG: SWIFT_AVAILABILITY(macos_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(ios_app_extension,unavailable)
@@ -126,6 +129,13 @@
     @available(macOS, introduced: 10.6, deprecated: 10.8, obsoleted: 10.9)
     @available(iOS, introduced: 7.0, deprecated: 9.0, obsoleted: 10.0)
     @objc func multiPlatCombined() {}
+
+    @available(macOS, unavailable, message: "help I'm trapped in an availability factory")
+    @objc func platUnavailableMessage() {}
+    @available(macOS, unavailable, renamed: "plea")
+    @objc func platUnavailableRename() {}
+    @available(macOS, unavailable, renamed: "anotherPlea", message: "still trapped")
+    @objc func platUnavailableRenameWithMessage() {}
 
     @available(macOSApplicationExtension, unavailable)
     @available(iOSApplicationExtension, unavailable)
