@@ -12,27 +12,26 @@
 
 @_exported import AVFoundation // Clang module
 import Foundation
+import CoreGraphics
 
 
 #if os(iOS)
-@available(iOS, introduced: 11.0)
-extension AVCaptureSynchronizedDataCollection : Sequence {
-  public func makeIterator() -> Iterator {
-    return Iterator(self)
+  
+extension AVMetadataMachineReadableCodeObject {
+  @available(swift, obsoleted: 4.0)
+  @available(iOS, introduced: 7.0)
+  @nonobjc
+  public var corners: [Any]! {
+    return __corners
   }
-
-  public struct Iterator : IteratorProtocol {
-    internal var fastIterator: NSFastEnumerationIterator
-
-    internal init(_ collection: AVCaptureSynchronizedDataCollection) {
-      self.fastIterator = NSFastEnumerationIterator(collection)
-    }
-
-    public mutating func next() -> AVCaptureSynchronizedData? {
-      guard let nextAny = fastIterator.next() else { return nil }
-      return (nextAny as! AVCaptureSynchronizedData)
-    }
+  
+  @available(swift, introduced: 4.0)
+  @available(iOS, introduced: 7.0)
+  @nonobjc
+  public var corners: [CGPoint] {
+    return __corners.map { CGPoint(dictionaryRepresentation: $0 as CFDictionary)! }
   }
 }
-
+  
 #endif
+
