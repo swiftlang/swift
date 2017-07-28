@@ -81,21 +81,22 @@ class ArgumentSource {
     }
   };
 
-  static int getStorageIndexForKind(Kind kind) {
+  using StorageMembers =
+    ExternalUnionMembers<void, RValueStorage, LValueStorage,
+                         Expr*, TupleStorage>;
+
+  static StorageMembers::Index getStorageIndexForKind(Kind kind) {
     switch (kind) {
-    case Kind::Invalid: return -1;
-    case Kind::RValue: return 0;
-    case Kind::LValue: return 1;
-    case Kind::Expr: return 2;
-    case Kind::Tuple: return 3;
+    case Kind::Invalid: return StorageMembers::indexOf<void>();
+    case Kind::RValue: return StorageMembers::indexOf<RValueStorage>();
+    case Kind::LValue: return StorageMembers::indexOf<LValueStorage>();
+    case Kind::Expr: return StorageMembers::indexOf<Expr*>();
+    case Kind::Tuple: return StorageMembers::indexOf<TupleStorage>();
     }
     llvm_unreachable("bad kind");
   }
 
-  using StorageType =
-    ExternalUnion<Kind, getStorageIndexForKind,
-                  RValueStorage, LValueStorage, Expr*, TupleStorage>;
-  StorageType Storage;
+  ExternalUnion<Kind, StorageMembers, getStorageIndexForKind> Storage;
   Kind StoredKind;
 
 public:
