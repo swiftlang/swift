@@ -19,6 +19,9 @@ extension ARCamera {
      */
     public enum TrackingState {
         public enum Reason {
+            /** Tracking is limited due to initialization in progress. */
+            case initializing
+            
             /** Tracking is limited due to a excessive motion of the camera. */
             case excessiveMotion
             
@@ -47,6 +50,7 @@ extension ARCamera {
             let reason: TrackingState.Reason
             
             switch __trackingStateReason {
+            case .initializing: reason = .initializing
             case .excessiveMotion: reason = .excessiveMotion
             default: reason = .insufficientFeatures
             }
