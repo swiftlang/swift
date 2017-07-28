@@ -190,7 +190,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     return DependentMemberType::get(baseTy, assocType);
   }
 
-  // Otherwise, the nested type comes from a concrete tpye. Substitute the
+  // Otherwise, the nested type comes from a concrete type. Substitute the
   // base type into it.
   auto concrete = ref->getBoundDecl();
   TC.validateDeclForNameLookup(concrete);
