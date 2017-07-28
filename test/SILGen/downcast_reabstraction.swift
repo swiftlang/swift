@@ -14,7 +14,7 @@ func condFunctionFromAny(_ x: Any) {
 }
 
 // CHECK-LABEL: sil hidden @_T022downcast_reabstraction21uncondFunctionFromAnyyypF : $@convention(thin) (@in Any) -> () {
-// CHECK:         unconditional_checked_cast_addr take_always Any in [[IN:%.*]] : $*Any to () -> () in [[OUT:%.*]] : $*@callee_owned (@in ()) -> @out ()
+// CHECK:         unconditional_checked_cast_addr Any in [[IN:%.*]] : $*Any to () -> () in [[OUT:%.*]] : $*@callee_owned (@in ()) -> @out ()
 // CHECK:         [[ORIG_VAL:%.*]] = load [take] [[OUT]]
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @_T0ytytIxir_Ix_TR
 // CHECK:         [[SUBST_VAL:%.*]] = partial_apply [[REABSTRACT]]([[ORIG_VAL]])
