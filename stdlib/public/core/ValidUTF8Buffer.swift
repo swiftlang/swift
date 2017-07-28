@@ -35,7 +35,7 @@ public struct _ValidUTF8Buffer<
   internal init(_containing e: Element) {
     _sanityCheck(
       e != 192 && e != 193 && !(245...255).contains(e), "invalid UTF8 byte")
-    _biasedBits = Storage(extendingOrTruncating: e &+ 1)
+    _biasedBits = Storage(truncatingIfNeeded: e &+ 1)
   }
 }
 
@@ -48,7 +48,7 @@ extension _ValidUTF8Buffer : Sequence {
     public mutating func next() -> Element? {
       if _biasedBits == 0 { return nil }
       defer { _biasedBits >>= 8 }
-      return Element(extendingOrTruncating: _biasedBits) &- 1
+      return Element(truncatingIfNeeded: _biasedBits) &- 1
     }
     internal var _biasedBits: Storage
   }
@@ -94,7 +94,7 @@ extension _ValidUTF8Buffer : Collection {
   }
 
   public subscript(i: Index) -> Element {
-    return Element(extendingOrTruncating: i._biasedBits) &- 1
+    return Element(truncatingIfNeeded: i._biasedBits) &- 1
   }
 }
 
@@ -177,7 +177,7 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
   public mutating func append<T>(contentsOf other: _ValidUTF8Buffer<T>) {
     _debugPrecondition(count + other.count <= capacity)
     _biasedBits |= Storage(
-      extendingOrTruncating: other._biasedBits) &<< (count &<< 3)
+      truncatingIfNeeded: other._biasedBits) &<< (count &<< 3)
   }
 }
 
