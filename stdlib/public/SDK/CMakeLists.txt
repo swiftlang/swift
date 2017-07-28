@@ -10,7 +10,7 @@ endif()
 
 list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "${STDLIB_SIL_SERIALIZE_WITNESS_TABLES}")
 
-set(all_overlays "Accelerate;AppKit;ARKit;AssetsLibrary;AVFoundation;CallKit;CloudKit;Contacts;CoreAudio;CoreData;CoreFoundation;CoreGraphics;CoreImage;CoreLocation;CoreMedia;CryptoTokenKit;Dispatch;Foundation;GameplayKit;GLKit;HomeKit;IOKit;Intents;MapKit;MediaPlayer;ModelIO;ObjectiveC;OpenCL;os;Photos;QuartzCore;SafariServices;SceneKit;simd;SpriteKit;UIKit;WatchKit;XCTest;XPC")
+set(all_overlays "Accelerate;AppKit;ARKit;AssetsLibrary;AVFoundation;CallKit;CloudKit;Contacts;CoreAudio;CoreData;CoreFoundation;CoreGraphics;CoreImage;CoreLocation;CoreMedia;CryptoTokenKit;Dispatch;Foundation;GameplayKit;GLKit;HomeKit;IOKit;Intents;MapKit;ModelIO;ObjectiveC;OpenCL;os;Photos;QuartzCore;SafariServices;SceneKit;simd;SpriteKit;UIKit;WatchKit;XCTest;XPC")
 
 if(DEFINED SWIFT_OVERLAY_TARGETS)
   set(overlays_to_build ${SWIFT_OVERLAY_TARGETS})

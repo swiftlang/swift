@@ -16,23 +16,9 @@ import Foundation
 
 #if os(iOS)
 @available(iOS, introduced: 11.0)
-extension AVCaptureSynchronizedDataCollection : Sequence {
-  public func makeIterator() -> Iterator {
-    return Iterator(self)
-  }
-
-  public struct Iterator : IteratorProtocol {
-    internal var fastIterator: NSFastEnumerationIterator
-
-    internal init(_ collection: AVCaptureSynchronizedDataCollection) {
-      self.fastIterator = NSFastEnumerationIterator(collection)
-    }
-
-    public mutating func next() -> AVCaptureSynchronizedData? {
-      guard let nextAny = fastIterator.next() else { return nil }
-      return (nextAny as! AVCaptureSynchronizedData)
-    }
+extension AVCaptureSynchronizedDataCollection: Sequence {
+  public func makeIterator() -> NSFastEnumerationIterator {
+    return NSFastEnumerationIterator(self)
   }
 }
-
 #endif

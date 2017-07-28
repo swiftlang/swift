@@ -2,12 +2,8 @@ cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
 add_swift_library(swiftAVFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-  AVCaptureDevice.swift
-  AVCapturePhotoOutput.swift
   AVCaptureSynchronizedDataCollection.swift
-  AVCaptureVideoDataOutput.swift
   AVError.swift
-  AVMetadataObject.swift
   NSValue.swift.gyb
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR

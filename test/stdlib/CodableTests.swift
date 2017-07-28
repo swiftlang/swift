@@ -108,7 +108,6 @@ struct UUIDCodingWrapper : Codable, Equatable {
 class TestCodable : TestCodableSuper {
     // MARK: - AffineTransform
 #if os(OSX)
-    // FIXME: Comment the tests back in once rdar://problem/33363218 is in the SDK.
     lazy var affineTransformValues: [AffineTransform] = [
         AffineTransform.identity,
         AffineTransform(),
@@ -117,10 +116,10 @@ class TestCodable : TestCodableSuper {
         AffineTransform(rotationByDegrees: .pi / 2),
 
         AffineTransform(m11: 1.0, m12: 2.5, m21: 66.2, m22: 40.2, tX: -5.5, tY: 3.7),
-        // AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33),
+        AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33),
         AffineTransform(m11: 4.5, m12: 1.1, m21: 0.025, m22: 0.077, tX: -0.55, tY: 33.2),
-        // AffineTransform(m11: 7.0, m12: -2.3, m21: 6.7, m22: 0.25, tX: 0.556, tY: 0.99),
-        // AffineTransform(m11: 0.498, m12: -0.284, m21: -0.742, m22: 0.3248, tX: 12, tY: 44)
+        AffineTransform(m11: 7.0, m12: -2.3, m21: 6.7, m22: 0.25, tX: 0.556, tY: 0.99),
+        AffineTransform(m11: 0.498, m12: -0.284, m21: -0.742, m22: 0.3248, tX: 12, tY: 44)
     ]
 
     func test_AffineTransform_JSON() {
@@ -199,17 +198,16 @@ class TestCodable : TestCodableSuper {
 
     // MARK: - CGAffineTransform
     lazy var cg_affineTransformValues: [CGAffineTransform] = {
-        // FIXME: Comment the tests back in once rdar://problem/33363218 is in the SDK.
         var values = [
             CGAffineTransform.identity,
             CGAffineTransform(),
             CGAffineTransform(translationX: 2.0, y: 2.0),
             CGAffineTransform(scaleX: 2.0, y: 2.0),
             CGAffineTransform(a: 1.0, b: 2.5, c: 66.2, d: 40.2, tx: -5.5, ty: 3.7),
-            // CGAffineTransform(a: -55.66, b: 22.7, c: 1.5, d: 0.0, tx: -22, ty: -33),
+            CGAffineTransform(a: -55.66, b: 22.7, c: 1.5, d: 0.0, tx: -22, ty: -33),
             CGAffineTransform(a: 4.5, b: 1.1, c: 0.025, d: 0.077, tx: -0.55, ty: 33.2),
-            // CGAffineTransform(a: 7.0, b: -2.3, c: 6.7, d: 0.25, tx: 0.556, ty: 0.99),
-            // CGAffineTransform(a: 0.498, b: -0.284, c: -0.742, d: 0.3248, tx: 12, ty: 44)
+            CGAffineTransform(a: 7.0, b: -2.3, c: 6.7, d: 0.25, tx: 0.556, ty: 0.99),
+            CGAffineTransform(a: 0.498, b: -0.284, c: -0.742, d: 0.3248, tx: 12, ty: 44)
         ]
 
         if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
@@ -289,16 +287,15 @@ class TestCodable : TestCodableSuper {
 
     // MARK: - CGRect
     lazy var cg_rectValues: [CGRect] = {
-        // FIXME: Comment the tests back in once rdar://problem/33363218 is in the SDK.
         var values = [
             CGRect.zero,
-            // CGRect.null,
+            CGRect.null,
             CGRect(x: 10, y: 20, width: 30, height: 40)
         ]
 
         if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
             // Limit on magnitude in JSON. See rdar://problem/12717407
-            // values.append(CGRect.infinite)
+            values.append(CGRect.infinite)
         }
 
         return values
@@ -318,10 +315,9 @@ class TestCodable : TestCodableSuper {
 
     // MARK: - CGVector
     lazy var cg_vectorValues: [CGVector] = {
-        // FIXME: Comment the tests back in once rdar://problem/33363218 is in the SDK.
         var values = [
             CGVector.zero,
-            // CGVector(dx: 0.0, dy: -9.81)
+            CGVector(dx: 0.0, dy: -9.81)
         ]
 
         if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {

@@ -8,7 +8,6 @@ add_swift_library(swiftIntents ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_O
   INGetCarLockStatusIntentResponse.swift
   INGetCarPowerLevelStatusIntentResponse.swift
   INIntegerResolutionResult.swift
-  INNotebookItemTypeResolutionResult.swift
   INParameter.swift
   INRequestRideIntent.swift
   INRideOption.swift

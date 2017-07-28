@@ -20,34 +20,25 @@ import _SwiftXCTestOverlayShims
 public extension XCTContext {
 
   /// Create and run a new activity with provided name and block.
-  public class func runActivity<Result>(named name: String, block: (XCTActivity) throws -> Result) rethrows -> Result {
+  public class func runActivity(named name: String, block: (XCTActivity) throws -> ()) rethrows {
     let context = _XCTContextCurrent()
 
     if _XCTContextShouldStartActivity(context, XCTActivityTypeUserCreated) {
-      return try autoreleasepool {
+      try autoreleasepool {
         let activity = _XCTContextWillStartActivity(context, name, XCTActivityTypeUserCreated)
-        defer {
+        do {
+          try block(activity)
           _XCTContextDidFinishActivity(context, activity)
+        } catch {
+          _XCTContextDidFinishActivity(context, activity)
+          throw error
         }
-        return try block(activity)
       }
     } else {
-      fatalError("XCTContext.runActivity(named:block:) failed because activities are disallowed in the current configuration.")
+      XCTFail("XCTContext.runActivity(named:block:) failed because activities are disallowed in the current configuration.")
     }
   }
 }
-
-#if os(macOS)
-@available(swift 4.0)
-@available(macOS 10.11, *)
-public extension XCUIElement {
-  /// Types a single key from the XCUIKeyboardKey enumeration with the specified modifier flags.
-  @nonobjc public func typeKey(_ key: XCUIKeyboardKey, modifierFlags: XCUIKeyModifierFlags) {
-    // Call the version of the method defined in XCTest.framework.
-    typeKey(key.rawValue, modifierFlags: modifierFlags)
-  }
-}
-#endif
 
 // --- Failure Formatting ---
 

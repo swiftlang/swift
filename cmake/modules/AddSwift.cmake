@@ -1554,17 +1554,9 @@ function(add_swift_library name)
         endif()
 
         # Add PrivateFrameworks, rdar://28466433
-        set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
         if(SWIFTLIB_IS_SDK_OVERLAY)
           list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${SWIFT_SDK_${sdk}_PATH}/System/Library/PrivateFrameworks/")
         endif()
-       
-       if("${sdk}" STREQUAL "IOS_SIMULATOR")
-         if("${name}" STREQUAL "swiftMediaPlayer")
-           message("DISABLING AUTOLINK FOR swiftMediaPlayer")
-           list(APPEND swiftlib_link_flags_all "-Xlinker" "-ignore_auto_link")
-         endif()
-       endif()
 
         # Add this library variant.
         _add_swift_library_single(
@@ -1585,7 +1577,7 @@ function(add_swift_library name)
           FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
           C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
           SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all}
-          LINK_FLAGS ${swiftlib_link_flags_all}
+          LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
           PRIVATE_LINK_LIBRARIES ${swiftlib_private_link_libraries_targets}
           INCORPORATE_OBJECT_LIBRARIES ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES}
           INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY}
