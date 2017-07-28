@@ -90,8 +90,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 /// - Value conversion from one integer type to another. Use the destination
 ///   type's initializer or the `numericCast(_:)` function.
 /// - Bitwise conversion from one integer type to another. Use the destination
-///   type's `init(extendingOrTruncating:)` or `init(bitPattern:)`
-///   initializer.
+///   type's `init(truncatingIfNeeded:)` or `init(bitPattern:)` initializer.
 /// - Conversion from a pointer to an integer value with the bit pattern of the
 ///   pointer's address in memory, or vice versa. Use the `init(bitPattern:)`
 ///   initializer for the destination type.

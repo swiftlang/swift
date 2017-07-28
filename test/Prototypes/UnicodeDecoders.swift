@@ -195,7 +195,7 @@ func checkStringProtocol<S : StringProtocol, Encoding: Unicode.Encoding>(
 
   if !utfStr.contains(0) {
     if Encoding.self == Unicode.UTF8.self {
-      var ntbs = utfStr.map { CChar(extendingOrTruncating: $0) }
+      var ntbs = utfStr.map { CChar(truncatingIfNeeded: $0) }
       ntbs.append(0)
       expectEqualSequence(
         expected, utf32(S(cString: ntbs)), "\(S.self) init(cString:)")

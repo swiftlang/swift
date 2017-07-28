@@ -16,7 +16,7 @@ import StdlibUnittest
 // not folded.
 
 func expectOverflow<T>(
-  _ res: (T, overflow: Bool),
+  _ res: (partialValue: T, overflow: Bool),
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
@@ -29,7 +29,7 @@ func expectOverflow<T>(
 }
 
 func expectNoOverflow<T>(
-  _ res: (T, overflow: Bool),
+  _ res: (partialValue: T, overflow: Bool),
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
@@ -38,32 +38,6 @@ func expectNoOverflow<T>(
 ) {
   expectFalse(
     res.overflow, "expected no overflow",
-    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-}
-
-func expectOverflow<T>(
-  _ res: (partialValue: T, overflow: ArithmeticOverflow),
-  //===--- TRACE boilerplate ----------------------------------------------===//
-  _ message: @autoclosure () -> String = "",
-    showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),
-    file: String = #file, line: UInt = #line
-) {
-  expectTrue(
-    res.overflow == .overflow, "expected overflow",
-    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-}
-
-func expectNoOverflow<T>(
-  _ res: (partialValue: T, overflow: ArithmeticOverflow),
-  //===--- TRACE boilerplate ----------------------------------------------===//
-  _ message: @autoclosure () -> String = "",
-    showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),
-    file: String = #file, line: UInt = #line
-) {
-  expectTrue(
-    res.overflow == .none, "expected no overflow",
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 

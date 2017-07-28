@@ -10,8 +10,8 @@
   1.#^LITERAL1^#
 }
 // LITERAL1:          Begin completions
-// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      bigEndian[#Int#]; name=bigEndian{{$}}
-// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      littleEndian[#Int#]; name=littleEndian{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/Super:            bigEndian[#Int#]; name=bigEndian{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/Super:            littleEndian[#Int#]; name=littleEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      byteSwapped[#Int#]; name=byteSwapped{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      nonzeroBitCount[#Int#]; name=nonzeroBitCount{{$}}
 
