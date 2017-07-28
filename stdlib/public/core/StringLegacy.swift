@@ -57,15 +57,6 @@ extension String {
     }
   }
 
-  public var _lines : [String] {
-    return _split(separator: "\n")
-  }
-  
-  public func _split(separator: Unicode.Scalar) -> [String] {
-    let scalarSlices = unicodeScalars.split { $0 == separator }
-    return scalarSlices.map { String($0) }
-  }
-
   /// A Boolean value indicating whether a string has no characters.
   public var isEmpty: Bool {
     return _core.count == 0

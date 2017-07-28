@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// REQUIRES: optimized_stdlib
 
 // Opaque, unoptimizable functions to call.
 @_silgen_name("takesConstRawPointer")

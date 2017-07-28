@@ -1644,6 +1644,11 @@ void GenericRequirementsCheckListener::satisfiedConformance(
                                           ProtocolConformanceRef conformance) {
 }
 
+bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
+    const Requirement &req, Type first, Type second) {
+  return false;
+}
+
 bool TypeChecker::
 solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    FreeTypeVariableBinding allowFreeTypeVariables,

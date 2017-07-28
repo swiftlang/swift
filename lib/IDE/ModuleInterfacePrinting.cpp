@@ -494,7 +494,7 @@ void swift::ide::printSubmoduleInterface(
   });
 
   // If the group name is specified, we sort them according to their source order,
-  // which is the order preserved by getTopLeveDecls.
+  // which is the order preserved by getTopLevelDecls.
   if (GroupNames.empty()) {
     std::sort(SwiftDecls.begin(), SwiftDecls.end(),
       [&](Decl *LHS, Decl *RHS) -> bool {

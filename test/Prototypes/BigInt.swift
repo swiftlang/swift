@@ -1089,16 +1089,18 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     data.removeFirst(Swift.min(data.count, words))
   }
 
-  public static func <<=(lhs: inout _BigInt, rhs: Int) {
+  public static func <<= <RHS : BinaryInteger>(lhs: inout _BigInt, rhs: RHS) {
     defer { lhs._checkInvariants() }
     guard rhs != 0 else { return }
     guard rhs > 0 else {
-      lhs >>= -rhs
+      lhs >>= 0 - rhs
       return
     }
 
+    let wordWidth = RHS(Word.bitWidth)
+    
     // We can add `rhs / bits` extra words full of zero at the low end.
-    let extraWords = rhs / Word.bitWidth
+    let extraWords = Int(rhs / wordWidth)
     lhs._data.reserveCapacity(lhs._data.count + extraWords + 1)
     _BigInt._shiftLeft(&lhs._data, byWords: extraWords)
 
@@ -1106,7 +1108,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // For each pair of words, we'll use the high `offset` bits of the
     // lower word and the low `Word.bitWidth - offset` bits of the higher
     // word.
-    let highOffset = rhs % Word.bitWidth
+    let highOffset = Int(rhs % wordWidth)
     let lowOffset = Word.bitWidth - highOffset
 
     // If there's no offset, we're finished, as `rhs` was a multiple of
@@ -1125,19 +1127,20 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     lhs._standardize()
   }
 
-  public static func >>=(lhs: inout _BigInt, rhs: Int) {
+  public static func >>= <RHS : BinaryInteger>(lhs: inout _BigInt, rhs: RHS) {
     defer { lhs._checkInvariants() }
     guard rhs != 0 else { return }
     guard rhs > 0 else {
-      lhs <<= -rhs
+      lhs <<= 0 - rhs
       return
     }
 
     var tempData = lhs._dataAsTwosComplement()
 
+    let wordWidth = RHS(Word.bitWidth)
     // We can remove `rhs / bits` full words at the low end.
     // If that removes the entirety of `_data`, we're done.
-    let wordsToRemove = rhs / Word.bitWidth
+    let wordsToRemove = Int(rhs / wordWidth)
     _BigInt._shiftRight(&tempData, byWords: wordsToRemove)
     guard tempData.count != 0 else {
       lhs = lhs.isNegative ? -1 : 0
@@ -1148,7 +1151,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // For each pair of words, we'll use the low `offset` bits of the
     // higher word and the high `_BigInt.Word.bitWidth - offset` bits of
     // the lower word.
-    let lowOffset = rhs % Word.bitWidth
+    let lowOffset = Int(rhs % wordWidth)
     let highOffset = Word.bitWidth - lowOffset
 
     // If there's no offset, we're finished, as `rhs` was a multiple of
@@ -1167,18 +1170,6 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // Finally, shift the highest word and standardize the result.
     tempData[tempData.count - 1] >>= lowOffset
     lhs = _BigInt(_twosComplementData: tempData)
-  }
-
-  public static func <<(lhs: _BigInt, rhs: Int) -> _BigInt {
-    var lhs = lhs
-    lhs <<= rhs
-    return lhs
-  }
-
-  public static func >>(lhs: _BigInt, rhs: Int) -> _BigInt {
-    var lhs = lhs
-    lhs >>= rhs
-    return lhs
   }
 }
 
@@ -1787,7 +1778,8 @@ BigInt8Tests.test("Bitshift") {
 
   (x, y) = (BigInt(UInt.max), UInt.max)
   for i in 0...64 {   // test 64-bit shift, should both be zero
-    expectTrue(x >> i == y >> i)
+    expectTrue(x >> i == y >> i,
+    "\(x) as \(type(of:x)) >> \(i) => \(x >> i)  !=  \(y) as \(type(of:y)) >> \(i) => \(y >> i)")
   }
 
   x = BigInt(-1)

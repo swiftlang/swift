@@ -40,6 +40,10 @@ def emit_module_doc_path
   : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
     HelpText<"Output module documentation file <path>">;
 
+def merge_modules
+  : Flag<["-"], "merge-modules">, ModeOpt,
+    HelpText<"Merge the input modules without otherwise processing them">;
+
 def emit_dependencies_path
   : Separate<["-"], "emit-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output basic Make-compatible dependencies file to <path>">;
@@ -108,9 +112,6 @@ def disable_target_os_checking :
 
 def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
   HelpText<"Enable ASTScope-based unqualified name lookup">;
-
-def enable_recursive_constraints : Flag<["-"], "enable-recursive-constraints">,
-  HelpText<"Enable SE-0157: Recursive Protocol Constraints">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;

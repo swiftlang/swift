@@ -1489,7 +1489,7 @@ ${assignmentOperatorComment(x.operator, False)}
   /// - Complexity: O(1).
   static prefix func ~ (_ x: Self) -> Self
 
-% for x in binaryBitwise + maskingShifts:
+% for x in binaryBitwise:
 ${operatorComment(x.operator, False)}
   static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
 
@@ -1497,6 +1497,17 @@ ${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
+% for x in maskingShifts:
+${operatorComment(x.nonMaskingOperator, False)}
+  static func ${x.nonMaskingOperator}<RHS: BinaryInteger>(
+    _ lhs: Self, _ rhs: RHS
+  ) -> Self
+
+${assignmentOperatorComment(x.nonMaskingOperator, False)}
+  static func ${x.nonMaskingOperator}=<RHS: BinaryInteger>(
+    _ lhs: inout Self, _ rhs: RHS)
+% end
+ 
   /// Returns the quotient and remainder of this value divided by the given
   /// value.
   ///
@@ -1549,8 +1560,9 @@ extension BinaryInteger {
     return (self / rhs, self % rhs)
   }
 
-  % for x in binaryBitwise + maskingShifts:
+  % for x in binaryBitwise:
 
+  // Homogeneous
 ${operatorComment(x.operator, False)}
   @_transparent
   public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
@@ -1561,24 +1573,18 @@ ${operatorComment(x.operator, False)}
 
   % end
 
-  % for x in maskingShifts:
-
-${operatorComment(x.operator, False)}
-  public static func ${x.operator} <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Self {
-    return lhs ${x.operator} Self(truncatingIfNeeded: rhs)
+% for x in maskingShifts:
+  // Heterogeneous non-masking shift in terms of shift-assignment
+${operatorComment(x.nonMaskingOperator, False)}
+  public static func ${x.nonMaskingOperator}<RHS: BinaryInteger>(
+    _ lhs: Self, _ rhs: RHS
+  ) -> Self {
+    var r = lhs
+    r ${x.nonMaskingOperator}= rhs
+    return r
   }
+% end
 
-${assignmentOperatorComment(x.operator, False)}
-  @_transparent
-  public static func ${x.operator}= <
-    Other : BinaryInteger
-  >(lhs: inout Self, rhs: Other) {
-    lhs = lhs ${x.operator} rhs
-  }
-
-  % end
 }
 
 // Strideable conformance
@@ -1836,50 +1842,6 @@ extension BinaryInteger {
 }
 
 //===----------------------------------------------------------------------===//
-//===--- BinaryInteger smart shifts ---------------------------------------===//
-//===----------------------------------------------------------------------===//
-// FIXME(integers): uncomment once <rdar://problem/29643515> gets fixed
-#if false
-extension BinaryInteger {
-%   for x in maskingShifts:
-  @_transparent
-  public static func ${x.nonMaskingOperator} <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Self {
-    var lhs = lhs
-    lhs ${x.nonMaskingOperator}= rhs
-    return lhs
-  }
-
-  // It is hard to imagine overshift to the left in an arbitrarily sized
-  // integer, but shifting too far to the right and negative shift cases are
-  // supported.
-%     reversedOperator = x.operator.translate(maketrans('<>', '><'))
-%     isRightShift = '>' in x.operator
-  @_transparent
-  public static func ${x.nonMaskingOperator}= <
-    Other : BinaryInteger
-  >(lhs: inout Self, rhs: Other) {
-    if rhs < (0 as Other) {
-      lhs ${reversedOperator}= (0 - rhs)
-      return
-    }
-%     if isRightShift:
-    let overshift = Self.isSigned
-      ? (lhs < (0 as Self) ? ~(0 as Self) : 0 )
-      : 0
-    if rhs >= lhs.bitWidth {
-      lhs = overshift
-      return
-    }
-%     end
-    lhs ${x.operator}= Self(truncatingIfNeeded: rhs)
-  }
-%   end
-}
-#endif
-
-//===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
@@ -2083,6 +2045,15 @@ ${overflowOperationComment(x.operator)}
 
   /// A representation of this integer with the byte order swapped.
   var byteSwapped: Self { get }
+
+% for x in maskingShifts:
+${operatorComment(x.operator, False)}
+  static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
+
+${assignmentOperatorComment(x.operator, False)}
+  static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
+% end
+
 }
 
 extension FixedWidthInteger {
@@ -2140,6 +2111,37 @@ extension FixedWidthInteger {
     return byteSwapped
 #endif
   }
+  
+  % for x in maskingShifts:
+  
+  // Homogeneous masking shift
+${operatorComment(x.operator, False)}
+  @_transparent
+  public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
+  }
+
+
+  // Heterogeneous masking shift
+${operatorComment(x.operator, False)}
+  public static func ${x.operator} <
+    Other : BinaryInteger
+  >(lhs: Self, rhs: Other) -> Self {
+    return lhs ${x.operator} Self(extendingOrTruncating: rhs)
+  }
+
+  // Heterogeneous masking shift assignment
+${assignmentOperatorComment(x.operator, False)}
+  @_transparent
+  public static func ${x.operator}= <
+    Other : BinaryInteger
+  >(lhs: inout Self, rhs: Other) {
+    lhs = lhs ${x.operator} rhs
+  }
+
+  % end
 }
 
 //===----------------------------------------------------------------------===//
@@ -2167,20 +2169,6 @@ ${operatorComment(x.nonMaskingOperator, True)}
     ${x.helper}Generic(&lhs, rhs)
     return lhs
   }
-
-// FIXME(integers): uncommenting this overload results in a compiler not being
-// able to typecheck expression like `(int64 >> 8) & 0xFF`.
-#if false
-  @_transparent
-  public static func ${x.nonMaskingOperator} (_ lhs: Self, _ rhs: Int) -> Self {
-    return ${x.helper}(lhs, rhs)
-  }
-
-  @_transparent
-  public static func ${x.nonMaskingOperator}= (_ lhs: inout Self, _ rhs: Int) {
-    lhs = ${x.helper}(lhs, rhs)
-  }
-#endif
 
   @_transparent
   public static func ${x.nonMaskingOperator}= <

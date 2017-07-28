@@ -1000,7 +1000,7 @@ FUNCTION(DynamicCast, swift_dynamicCast, RegisterPreservingCC,
          RETURNS(Int1Ty),
          ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               SizeTy),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(ZExt, NoUnwind))
 
 // type* swift_dynamicCastTypeToObjCProtocolUnconditional(type* object,
 //                                               size_t numProtocols,
@@ -1064,14 +1064,14 @@ FUNCTION(IsClassType,
          swift_isClassType, DefaultCC,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(ZExt, NoUnwind, ReadNone))
 
 // bool swift_isOptionalType(type*);
 FUNCTION(IsOptionalType,
          swift_isOptionalType, DefaultCC,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(ZExt, NoUnwind, ReadNone))
 
 // void swift_once(swift_once_t *predicate,
 //                 void (*function_code)(RefCounted*),

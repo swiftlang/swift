@@ -131,10 +131,10 @@ extension FixedWidthInteger {
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  public init?/*<S : StringProtocol>*/(_ text: String, radix: Int = 10) {
+  public init?<S : StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     let r = Self(radix)
-    let s = text// ._ephemeralString
+    let s = text._ephemeralString
     defer { _fixLifetime(s) }
     
     let c = s._core

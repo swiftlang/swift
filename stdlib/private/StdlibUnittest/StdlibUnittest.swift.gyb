@@ -28,6 +28,19 @@ import Glibc
 import ObjectiveC
 #endif
 
+extension String {
+  /// Returns the lines in `self`.
+  public var _lines : [String] {
+    return _split(separator: "\n")
+  }
+
+  /// Splits `self` at occurrences of `separator`.
+  public func _split(separator: Unicode.Scalar) -> [String] {
+    let scalarSlices = unicodeScalars.split { $0 == separator }
+    return scalarSlices.map { String(String.UnicodeScalarView($0)) }
+  }
+}
+
 public struct SourceLoc {
   public let file: String
   public let line: UInt
