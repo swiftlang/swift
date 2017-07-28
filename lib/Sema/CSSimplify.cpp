@@ -3092,11 +3092,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (includeInaccessibleMembers)
       lookupOptions |= NameLookupFlags::IgnoreAccessibility;
 
-    // If a constructor is only visible as a witness for a protocol
-    // requirement, it must be an invalid override. Also, protocol
-    // extensions cannot yet define designated initializers.
-    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-
     LookupResult ctors = TC.lookupConstructors(DC, instanceTy, lookupOptions);
     if (!ctors)
       return result;    // No result.

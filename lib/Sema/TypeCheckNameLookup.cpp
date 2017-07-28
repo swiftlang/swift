@@ -146,9 +146,7 @@ namespace {
       // If we found something within the protocol itself, and our
       // search began somewhere that is not in a protocol or extension
       // thereof, remap this declaration to the witness.
-      if (foundInType->is<ArchetypeType>() ||
-          foundInType->isExistentialType() ||
-          Options.contains(NameLookupFlags::PerformConformanceCheck)) {
+      if (Options.contains(NameLookupFlags::PerformConformanceCheck)) {
         // Dig out the protocol conformance.
         auto conformance = TC.conformsToProtocol(conformingType, foundProto, DC,
                                                  conformanceOptions);
