@@ -107,8 +107,6 @@ static bool containsLargeLoadable(GenericEnvironment *GenericEnv,
                         Mod)) {
         return true;
       }
-    } else if (isa<SILBlockStorageType>(currCanType.getPointer())) {
-      continue;
     } else {
       switch (param.getConvention()) {
       case ParameterConvention::Indirect_In_Guaranteed:
@@ -346,9 +344,6 @@ static SILType getNewSILType(GenericEnvironment *GenericEnv,
     return newSILType;
   }
   CanType currCanType = storageType.getSwiftRValueType();
-  if (isa<SILBlockStorageType>(currCanType.getPointer())) {
-    return storageType;
-  }
   if (SILFunctionType *currSILFunctionType =
           dyn_cast<SILFunctionType>(currCanType.getPointer())) {
     if (containsLargeLoadable(GenericEnv, currSILFunctionType->getParameters(),
@@ -559,15 +554,6 @@ static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
   // If the callee is a method then use the old ABI
   if (applySite.getSubstCalleeType()->getLanguage() == SILFunctionLanguage::C) {
     return false;
-  }
-  auto callee = applySite.getCallee();
-  if (isa<ProjectBlockStorageInst>(callee)) {
-    return false;
-  } else if (auto *instr = dyn_cast<LoadInst>(callee)) {
-    auto loadedSrcValue = instr->getOperand();
-    if (isa<ProjectBlockStorageInst>(loadedSrcValue)) {
-      return false;
-    }
   }
   return true;
 }
@@ -1276,10 +1262,7 @@ void LoadableStorageAllocation::
       genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
     }
     SILType newSILType = getNewSILType(genEnv, storageType, pass.Mod);
-    // We only care about function signatures that are not block storage
     if (!isLargeLoadableType(genEnv, storageType, pass.Mod) &&
-        !dyn_cast<SILBlockStorageType>(
-            storageType.getSwiftRValueType().getPointer()) &&
         (newSILType != storageType)) {
       auto *castInstr = argBuilder.createUncheckedBitCast(
           RegularLocation(const_cast<ValueDecl *>(arg->getDecl())), arg,
