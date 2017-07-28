@@ -146,10 +146,6 @@ namespace {
           return;
         }
 
-        // If we're validating the protocol recursively, bail out.
-        if (!foundProto->hasValidSignature())
-          return;
-
         // Dig out the witness.
         ValueDecl *witness = nullptr;
         auto concrete = conformance->getConcrete();
