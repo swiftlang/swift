@@ -1,4 +1,7 @@
-// RUN: %target-run-stdlib-swift
+// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-run %t/a.out3
+// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
+
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -20,20 +23,35 @@ var XCTestTestSuite = TestSuite("XCTest")
 
 func execute(observers: [XCTestObservation] = [], _ run: () -> Void) {
   for observer in observers {
+#if swift(>=4.0)
+    XCTestObservationCenter.shared.addTestObserver(observer)
+#else
     XCTestObservationCenter.shared().addTestObserver(observer)
+#endif
+
   }
 
   run()
 
   for observer in observers {
+#if swift(>=4.0)
+    XCTestObservationCenter.shared.removeTestObserver(observer)
+#else
     XCTestObservationCenter.shared().removeTestObserver(observer)
+#endif
   }
 }
 
 class FailureDescriptionObserver: NSObject, XCTestObservation {
   var failureDescription: String?
 
-  func testCase(_ testCase: XCTestCase, didFailWithDescription description: String, inFile filePath: String?, atLine lineNumber: UInt) {
+#if swift(>=4.0)
+  typealias LineNumber=Int
+#else
+  typealias LineNumber=UInt
+#endif
+
+  func testCase(_ testCase: XCTestCase, didFailWithDescription description: String, inFile filePath: String?, atLine lineNumber: LineNumber) {
     failureDescription = description
   }
 }
@@ -463,11 +481,21 @@ XCTestTestSuite.test("Test methods that wind up throwing") {
 XCTestTestSuite.test("XCTContext/runActivity(named:block:)") {
   class RunActivityTestCase: XCTestCase {
 
-    dynamic func test_noThrow() {
+    dynamic func test_noThrow_void() {
       var blockCalled = false
       XCTContext.runActivity(named: "noThrow") { activity in
         blockCalled = true
       }
+      expectTrue(blockCalled)
+    }
+
+    dynamic func test_noThrow_returns_string() {
+      var blockCalled = false
+      let value = XCTContext.runActivity(named: "noThrow") { activity -> String in
+        blockCalled = true
+        return "Activities can return values now!"
+      }
+      expectEqual(value, "Activities can return values now!")
       expectTrue(blockCalled)
     }
 
@@ -488,6 +516,25 @@ XCTestTestSuite.test("XCTContext/runActivity(named:block:)") {
   }
 }
 
+#if os(macOS)
+if #available(macOS 10.11, *) {
+    XCTestTestSuite.test("XCUIElement/typeKey(_:modifierFlags:)") {
+        class TypeKeyTestCase: XCTestCase {
+            func testTypeKey() {
+                #if swift(>=4.0)
+                    XCUIApplication().typeKey("a", modifierFlags: [])
+                    XCUIApplication().typeKey(.delete, modifierFlags: [])
+                #else
+                    XCUIApplication().typeKey("a", modifierFlags: [])
+                    XCUIApplication().typeKey(XCUIKeyboardKeyDelete, modifierFlags: [])
+                #endif
+            }
+        }
+    }
+}
+#endif
+
 
 runAllTests()
+
 
