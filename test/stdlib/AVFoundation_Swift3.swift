@@ -1,6 +1,7 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-build-swift -swift-version 3 %s -o %t/a.out
 // RUN: %target-run %t/a.out
+// REQUIRES: objc_interop
 // REQUIRES: executable_test
 // CoreMedia is not present on watchOS.
 // UNSUPPORTED: OS=watchos
