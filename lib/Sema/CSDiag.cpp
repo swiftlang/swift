@@ -8529,7 +8529,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
   }
 
   if (result.UnviableCandidates.empty() && isInitializer &&
-      !baseObjTy->is<MetatypeType>()) {
+      !baseObjTy->is<AnyMetatypeType>()) {
     if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(E)) {
       // Diagnose 'super.init', which can only appear inside another
       // initializer, specially.
