@@ -107,8 +107,6 @@ static bool containsLargeLoadable(GenericEnvironment *GenericEnv,
                         Mod)) {
         return true;
       }
-    } else if (isa<SILBlockStorageType>(currCanType.getPointer())) {
-      continue;
     } else {
       switch (param.getConvention()) {
       case ParameterConvention::Indirect_In_Guaranteed:
@@ -346,9 +344,6 @@ static SILType getNewSILType(GenericEnvironment *GenericEnv,
     return newSILType;
   }
   CanType currCanType = storageType.getSwiftRValueType();
-  if (isa<SILBlockStorageType>(currCanType.getPointer())) {
-    return storageType;
-  }
   if (SILFunctionType *currSILFunctionType =
           dyn_cast<SILFunctionType>(currCanType.getPointer())) {
     if (containsLargeLoadable(GenericEnv, currSILFunctionType->getParameters(),
@@ -559,15 +554,6 @@ static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
   // If the callee is a method then use the old ABI
   if (applySite.getSubstCalleeType()->getLanguage() == SILFunctionLanguage::C) {
     return false;
-  }
-  auto callee = applySite.getCallee();
-  if (isa<ProjectBlockStorageInst>(callee)) {
-    return false;
-  } else if (auto *instr = dyn_cast<LoadInst>(callee)) {
-    auto loadedSrcValue = instr->getOperand();
-    if (isa<ProjectBlockStorageInst>(loadedSrcValue)) {
-      return false;
-    }
   }
   return true;
 }
@@ -1145,7 +1131,13 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
     genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
   }
   auto singleResult = loweredTy->getSingleResult();
-  auto resultStorageType = singleResult.getSILStorageType();
+  SILType resultStorageType = singleResult.getSILStorageType();
+  auto canType = resultStorageType.getSwiftRValueType();
+  if (canType->hasTypeParameter()) {
+    assert(genEnv && "Expected a GenericEnv");
+    canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+  }
+  resultStorageType = SILType::getPrimitiveObjectType(canType);
 
   auto &ctx = pass.F->getModule().getASTContext();
   auto var = new (ctx) ParamDecl(
@@ -1270,10 +1262,7 @@ void LoadableStorageAllocation::
       genEnv = getGenericEnvironment(pass.F->getModule(), loweredTy);
     }
     SILType newSILType = getNewSILType(genEnv, storageType, pass.Mod);
-    // We only care about function signatures that are not block storage
     if (!isLargeLoadableType(genEnv, storageType, pass.Mod) &&
-        !dyn_cast<SILBlockStorageType>(
-            storageType.getSwiftRValueType().getPointer()) &&
         (newSILType != storageType)) {
       auto *castInstr = argBuilder.createUncheckedBitCast(
           RegularLocation(const_cast<ValueDecl *>(arg->getDecl())), arg,
@@ -1323,8 +1312,15 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
         dyn_cast<SILInstruction>(pass.allocToApplyRetMap[allocInstr]);
     assert(applyInst && "Value is not an apply");
     auto II = applyInst->getIterator();
-    ++II;
     SILBuilder loadBuilder(II);
+    if (auto *tryApply = dyn_cast<TryApplyInst>(applyInst)) {
+      auto *tgtBB = tryApply->getNormalBB();
+      assert(tgtBB && "Could not find try apply's target BB");
+      loadBuilder.setInsertionPoint(tgtBB->begin());
+    } else {
+      ++II;
+      loadBuilder.setInsertionPoint(II);
+    }
     if (pass.F->hasUnqualifiedOwnership()) {
       load = loadBuilder.createLoad(applyInst->getLoc(), value,
                                     LoadOwnershipQualifier::Unqualified);
@@ -2354,6 +2350,9 @@ void LoadableByAddress::recreateConvInstrs() {
     IRGenModule *currIRMod =
         getIRGenModule()->IRGen.getGenModule(convInstr->getFunction());
     SILType currSILType = convInstr->getType();
+    if (auto *thinToPointer = dyn_cast<ThinFunctionToPointerInst>(convInstr)) {
+      currSILType = thinToPointer->getOperand()->getType();
+    }
     CanType currCanType = currSILType.getSwiftRValueType();
     SILFunctionType *currSILFunctionType =
         dyn_cast<SILFunctionType>(currCanType.getPointer());
@@ -2379,6 +2378,15 @@ void LoadableByAddress::recreateConvInstrs() {
           dyn_cast<ThinToThickFunctionInst>(convInstr);
       assert(instr && "Unexpected conversion instruction");
       newInstr = convBuilder.createThinToThickFunction(
+          instr->getLoc(), instr->getOperand(), newType);
+      break;
+    }
+    case ValueKind::ThinFunctionToPointerInst: {
+      ThinFunctionToPointerInst *instr =
+          dyn_cast<ThinFunctionToPointerInst>(convInstr);
+      assert(instr && "Unexpected conversion instruction");
+      newType = getNewSILType(genEnv, instr->getType(), *getIRGenModule());
+      newInstr = convBuilder.createThinFunctionToPointer(
           instr->getLoc(), instr->getOperand(), newType);
       break;
     }
@@ -2473,6 +2481,7 @@ void LoadableByAddress::run() {
                 }
                 break;
               }
+              case ValueKind::ThinFunctionToPointerInst:
               case ValueKind::ThinToThickFunctionInst: {
                 conversionInstrs.insert(currInstr);
                 break;

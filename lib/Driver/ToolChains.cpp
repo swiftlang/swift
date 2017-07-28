@@ -153,6 +153,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
   inputArgs.AddLastArg(arguments,
                        options::OPT_solver_shrink_unsolved_threshold);
+  inputArgs.AddLastArg(arguments, options::OPT_O_Group);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -384,9 +385,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
   }
 
-  // Pass the optimization level down to the frontend.
-  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
-
   if (context.Args.hasArg(options::OPT_parse_as_library) ||
       context.Args.hasArg(options::OPT_emit_library))
     Arguments.push_back("-parse-as-library");
@@ -502,9 +500,6 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
-
-  // Pass the optimization level down to the frontend.
-  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_sil);
 
@@ -633,9 +628,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
 
-  // Pass the optimization level down to the frontend.
-  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
-
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
@@ -663,8 +655,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   Arguments.push_back("-frontend");
 
-  // We just want to emit a module, so pass -emit-module without any other
-  // mode options.
+  Arguments.push_back("-merge-modules");
   Arguments.push_back("-emit-module");
 
   if (context.Args.hasArg(options::OPT_driver_use_filelists) ||

@@ -1988,13 +1988,14 @@ private:
     RValueStorage(ManagedValue rv) : RV(rv) {}
   };
 
-  static int getUnionIndexForValue(KindTy kind) {
-    return (kind <= LastLVKind ? 0 : 1);
+  using ValueMembers = ExternalUnionMembers<RValueStorage, LValueStorage>;
+  static ValueMembers::Index getValueMemberIndexForKind(KindTy kind) {
+    return (kind <= LastLVKind ? ValueMembers::indexOf<LValueStorage>()
+                               : ValueMembers::indexOf<RValueStorage>());
   }
 
   /// Storage for either the l-value or the r-value.
-  ExternalUnion<KindTy, getUnionIndexForValue,
-                LValueStorage, RValueStorage> Value;
+  ExternalUnion<KindTy, ValueMembers, getValueMemberIndexForKind> Value;
 
   LValueStorage &LV() { return Value.get<LValueStorage>(Kind); }
   const LValueStorage &LV() const { return Value.get<LValueStorage>(Kind); }
@@ -2007,19 +2008,22 @@ private:
 
   using PointerAccessInfo = SILGenFunction::PointerAccessInfo;
   using ArrayAccessInfo = SILGenFunction::ArrayAccessInfo;
-  static int getUnionIndexForExtra(KindTy kind) {
+
+  using ExtraMembers =
+    ExternalUnionMembers<void, ArrayAccessInfo, PointerAccessInfo>;
+  static ExtraMembers::Index getExtraMemberIndexForKind(KindTy kind) {
     switch (kind) {
     case LValueToPointer:
-      return 0;
+      return ExtraMembers::indexOf<PointerAccessInfo>();
     case LValueArrayToPointer:
     case RValueArrayToPointer:
-      return 1;
+      return ExtraMembers::indexOf<ArrayAccessInfo>();
     default:
-      return -1;
+      return ExtraMembers::indexOf<void>();
     }
   }
-  ExternalUnion<KindTy, getUnionIndexForExtra,
-                PointerAccessInfo, ArrayAccessInfo> Extra;
+
+  ExternalUnion<KindTy, ExtraMembers, getExtraMemberIndexForKind> Extra;
 
 public:
   DelayedArgument(KindTy kind, LValue &&lv, SILLocation loc)

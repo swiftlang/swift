@@ -33,29 +33,6 @@ do {
   )
 }
 
-// Test collections using a reference type as element.
-do {
-  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
-
-  CollectionTests.addRandomAccessCollectionTests(
-    makeCollection: { (elements: [LifetimeTracked]) in
-      return MinimalRandomAccessCollection(elements: elements)
-    },
-    wrapValue: { (element: OpaqueValue<Int>) in
-      LifetimeTracked(element.value, identity: element.identity)
-    },
-    extractValue: { (element: LifetimeTracked) in
-      OpaqueValue(element.value, identity: element.identity)
-    },
-    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      // FIXME: use LifetimeTracked.
-      return MinimalRandomAccessCollection(elements: elements)
-    },
-    wrapValueIntoEquatable: identityEq,
-    extractValueFromEquatable: identityEq,
-    resiliencyChecks: resiliencyChecks
-  )
-}
-
 runAllTests()
+
+

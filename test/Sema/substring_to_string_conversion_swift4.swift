@@ -86,3 +86,11 @@ func apply(_ fn: (String) -> (), _ s: String) {
   let _: String = s[s.startIndex..<s.endIndex] // expected-error{{subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result}} {{19-19=String(}} {{47-47=)}}
   _ = s[s.startIndex..<s.endIndex] as String // expected-error{{subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result}} {{7-7=String(}} {{35-35=)}}
 }
+
+// rdar://33474838
+protocol Derivable {
+  func derive() -> Substring
+}
+func foo<T: Derivable>(t: T) -> String {
+  return t.derive()  // expected-error {{cannot convert return expression of type 'Substring' to return type 'String'}} {{10-10=String(}} {{20-20=)}}
+}

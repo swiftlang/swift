@@ -587,6 +587,13 @@ static bool matchesVersion(A *versionedAttr, ImportNameVersion version) {
 const clang::SwiftNameAttr *
 importer::findSwiftNameAttr(const clang::Decl *decl,
                             ImportNameVersion version) {
+#ifndef NDEBUG
+  if (Optional<const clang::Decl *> def = getDefinitionForClangTypeDecl(decl)) {
+    assert((*def == nullptr || *def == decl) &&
+           "swift_name should only appear on the definition");
+  }
+#endif
+
   if (version == ImportNameVersion::Raw)
     return nullptr;
 

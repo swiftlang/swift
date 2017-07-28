@@ -179,6 +179,7 @@ public:
     EmitSIL, ///< Emit canonical SIL
 
     EmitModuleOnly, ///< Emit module only
+    MergeModules, ///< Merge modules only
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB, ///< Emit serialized AST + canonical SIL

@@ -671,7 +671,17 @@ public:
                           return isa<ThrowInst>(TI);
                         });
   }
-    
+
+  /// Loop over all blocks in this function and add all function exiting blocks
+  /// to output.
+  void findExitingBlocks(llvm::SmallVectorImpl<SILBasicBlock *> &output) const {
+    for (auto &Block : const_cast<SILFunction &>(*this)) {
+      if (Block.getTerminator()->isFunctionExiting()) {
+        output.emplace_back(&Block);
+      }
+    }
+  }
+
   //===--------------------------------------------------------------------===//
   // Argument Helper Methods
   //===--------------------------------------------------------------------===//

@@ -466,10 +466,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
       else
         buildFnAttr.addAttribute(Attr);
     }
-    // FIXME: getting attributes here without setting them does
-    // nothing. This cannot be fixed until the attributes are correctly specified.
-    //fn->addAttributes(llvm::AttributeList::FunctionIndex, buildFnAttr);
-    //fn->addAttributes(llvm::AttributeList::ReturnIndex, buildRetAttr);
+    fn->addAttributes(llvm::AttributeList::FunctionIndex, buildFnAttr);
+    fn->addAttributes(llvm::AttributeList::ReturnIndex, buildRetAttr);
   }
 
   return cache;

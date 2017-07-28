@@ -143,30 +143,32 @@ public:
 private:
   using ExplosionVector = SmallVector<llvm::Value *, 4>;
   using SingletonExplosion = llvm::Value*;
+
+  using Members = ExternalUnionMembers<ContainedAddress,
+                                       StackAddress,
+                                       OwnedAddress,
+                                       DynamicallyEnforcedAddress,
+                                       ExplosionVector,
+                                       SingletonExplosion,
+                                       FunctionPointer,
+                                       ObjCMethod,
+                                       void>;
   
-  static int getStorageTypeForKind(Kind kind) {
+  static Members::Index getMemberIndexForKind(Kind kind) {
     switch (kind) {
-    case Kind::ContainedAddress: return 0;
-    case Kind::StackAddress: return 1;
-    case Kind::OwnedAddress: return 2;
-    case Kind::DynamicallyEnforcedAddress: return 3;
-    case Kind::ExplosionVector: return 4;
-    case Kind::SingletonExplosion: return 5;
-    case Kind::FunctionPointer: return 6;
-    case Kind::ObjCMethod: return 7;
-    case Kind::EmptyExplosion: return -1;
+    case Kind::ContainedAddress: return Members::indexOf<ContainedAddress>();
+    case Kind::StackAddress: return Members::indexOf<StackAddress>();
+    case Kind::OwnedAddress: return Members::indexOf<OwnedAddress>();
+    case Kind::DynamicallyEnforcedAddress: return Members::indexOf<DynamicallyEnforcedAddress>();
+    case Kind::ExplosionVector: return Members::indexOf<ExplosionVector>();
+    case Kind::SingletonExplosion: return Members::indexOf<SingletonExplosion>();
+    case Kind::FunctionPointer: return Members::indexOf<FunctionPointer>();
+    case Kind::ObjCMethod: return Members::indexOf<ObjCMethod>();
+    case Kind::EmptyExplosion: return Members::indexOf<void>();
     }
     llvm_unreachable("bad kind");
   }
-  ExternalUnion<Kind, getStorageTypeForKind,
-                ContainedAddress,
-                StackAddress,
-                OwnedAddress,
-                DynamicallyEnforcedAddress,
-                ExplosionVector,
-                SingletonExplosion,
-                FunctionPointer,
-                ObjCMethod> Storage;
+  ExternalUnion<Kind, Members, getMemberIndexForKind> Storage;
 
 public:
 

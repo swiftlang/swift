@@ -1574,6 +1574,8 @@ We can summarize it as follows:
   - DI enforcement
   - `moveonly` contexts
 
+### Priorities for ABI stability
+
 The single most important goal for the upcoming releases is
 ABI stability.  The prioritization and analysis of these
 features must center around their impact on the ABI.  With

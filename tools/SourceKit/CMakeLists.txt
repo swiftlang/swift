@@ -22,7 +22,7 @@ set(SOURCEKIT_DEPLOYMENT_TARGET "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMEN
 
 swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
   set(CMAKE_OSX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
@@ -115,7 +115,8 @@ endfunction()
 #
 # Usage:
 #   add_sourcekit_library(name       # Name of the library
-#     [DEPENDS dep1 ...]             # Libraries this library depends on
+#     [DEPENDS dep1 ...]             # Libraries this library will be linked with
+#     [TARGET_DEPENDS dep1 ...]      # Targets this library depends on
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [INSTALL_IN_COMPONENT comp]    # The Swift installation component that this library belongs to.
 #     [SHARED]
@@ -124,7 +125,7 @@ macro(add_sourcekit_library name)
   cmake_parse_arguments(SOURCEKITLIB
       "SHARED"
       "INSTALL_IN_COMPONENT"
-      "DEPENDS;LLVM_COMPONENT_DEPENDS"
+      "DEPENDS;TARGET_DEPENDS;LLVM_COMPONENT_DEPENDS"
       ${ARGN})
   set(srcs ${SOURCEKITLIB_UNPARSED_ARGUMENTS})
 
@@ -168,6 +169,10 @@ macro(add_sourcekit_library name)
   if(LLVM_COMMON_DEPENDS)
     add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
   endif(LLVM_COMMON_DEPENDS)
+
+  if(SOURCEKITLIB_TARGET_DEPENDS)
+    add_dependencies(${name} ${SOURCEKITLIB_TARGET_DEPENDS})
+  endif(SOURCEKITLIB_TARGET_DEPENDS)
 
   set(prefixed_link_libraries)
   foreach(dep ${SOURCEKITLIB_DEPENDS})
