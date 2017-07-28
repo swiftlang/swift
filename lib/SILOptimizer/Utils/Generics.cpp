@@ -34,6 +34,13 @@ llvm::cl::opt<bool> SupportGenericSubstitutions(
     llvm::cl::init(false),
     llvm::cl::desc("Enable partial specialization with generic substitutions"));
 
+/// Set to true to print detected infinite generic specialization loops that
+/// were prevented.
+llvm::cl::opt<bool> PrintGenericSpecializationLoops(
+    "sil-print-generic-specialization-loops", llvm::cl::init(false),
+    llvm::cl::desc("Print detected infinite generic specialization loops that "
+                   "were prevented"));
+
 static bool OptimizeGenericSubstitutions = false;
 
 /// Max depth of a type which can be processed by the generic
@@ -164,6 +171,118 @@ static bool isTypeTooComplex(Type t) {
   unsigned TypeDepth;
   std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(t);
   return TypeWidth >= TypeWidthThreshold || TypeDepth >= TypeDepthThreshold;
+}
+
+/// Check whether the type T1 is contained in the type T2
+static bool isContainedIn(CanType T1, CanType T2) {
+  return T2.findIf(
+      [&T1](Type T) -> bool { return T->getCanonicalType() == T1; });
+}
+
+/// Checks if a second substitution list is a expanded version of
+/// the first substitution list.
+/// This is the case if at least one of the substitution type in Subs2 is
+/// "bigger" than the corresponding substitution type in Subs1.
+/// Type T2 is "smaller" than type T1 if T2 is structurally contained in T1.
+static bool growingSubstitutions(SubstitutionList Subs1,
+                                 SubstitutionList Subs2) {
+  assert(Subs1.size() == Subs2.size());
+  // Perform component-wise substitution comparisions.
+  for (unsigned idx = 0, e = Subs1.size(); idx < e; ++idx) {
+    auto Type1 = Subs1[idx].getReplacement()->getCanonicalType();
+    auto Type2 = Subs2[idx].getReplacement()->getCanonicalType();
+    // Replacement types should be concrete.
+    assert(!Type1->hasArchetype());
+    assert(!Type2->hasArchetype());
+    if (Type2 == Type1)
+      continue;
+    if (isContainedIn(Type2, Type1))
+      continue;
+    if (isContainedIn(Type1, Type2)) {
+      DEBUG(llvm::dbgs() << "Type:\n"; Type1.dump();
+            llvm::dbgs() << "is contained in type:\n"; Type2.dump());
+      DEBUG(llvm::dbgs() << "SubstitutionList[" << idx
+                         << "] has got bigger since last time.\n");
+      return true;
+    }
+    // None of the types is contained in the other type.
+    // They are not comparable in this sense.
+  }
+
+  // The substitition list is not growing.
+  return false;
+}
+
+/// Checks whether specializing a given generic apply would create an infinite
+/// cycle in the generic specializations graph. This can be the case if there is
+/// a loop in the specialization graph and generic parameters at each iteration
+/// of such a loop are getting bigger and bigger.
+/// The specialization graph is represented by means of SpecializationInformation.
+/// We use this meta-information about specializations to detect cycles in this
+/// graph.
+static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
+  if (!Apply)
+    return false;
+  auto *Callee = Apply.getCalleeFunction();
+  SILFunction *Caller = nullptr;
+  Caller = Apply.getFunction();
+
+  // Name of the function to be specialized.
+  auto GenericFunc = Callee;
+
+  DEBUG(llvm::dbgs() << "\n\n\nChecking for a specialization cycle:\n"
+                     << "Caller: " << Caller->getName() << "\n"
+                     << "Callee: " << Callee->getName() << "\n";
+        llvm::dbgs() << "Substitutions:\n";
+        for (auto Sub: Apply.getSubstitutions()) {
+          Sub.getReplacement()->dump();
+        });
+
+  auto *CurSpecializationInfo = Apply.getSpecializationInfo();
+  if (CurSpecializationInfo) {
+    DEBUG(llvm::dbgs() << "Scan call-site's history\n");
+  } else if (Caller->isSpecialization()) {
+    CurSpecializationInfo = Caller->getSpecializationInfo();
+    DEBUG(llvm::dbgs() << "Scan caller's specialization history\n");
+  }
+
+  while (CurSpecializationInfo) {
+    DEBUG(llvm::dbgs() << "Current caller is a specialization:\n"
+                       << "Caller: "
+                       << CurSpecializationInfo->getCaller()->getName() << "\n"
+                       << "Parent: "
+                       << CurSpecializationInfo->getParent()->getName() << "\n";
+          llvm::dbgs() << "Substitutions:\n";
+          for (auto Sub: CurSpecializationInfo->getSubstitutions()) {
+            Sub.getReplacement()->dump();
+          });
+
+    if (CurSpecializationInfo->getParent() == GenericFunc) {
+      DEBUG(llvm::dbgs() << "Found a call graph loop, checking substitutions\n");
+      // Consider if components of the substitution list gets bigger compared to
+      // the previously seen specialization of the same generic function.
+      if (growingSubstitutions(CurSpecializationInfo->getSubstitutions(),
+                               Apply.getSubstitutions())) {
+        DEBUG(llvm::dbgs() << "Found a generic specialization loop!\n");
+        return true;
+      }
+    }
+
+    // Get the next element of the specialization history.
+    auto *CurCaller = CurSpecializationInfo->getCaller();
+    CurSpecializationInfo = nullptr;
+    if (!CurCaller)
+      break;
+    DEBUG(llvm::dbgs() << "\nCurrent caller is: " << CurCaller->getName()
+                       << "\n");
+    if (!CurCaller->isSpecialization())
+      break;
+    CurSpecializationInfo = CurCaller->getSpecializationInfo();
+  }
+
+  assert(!CurSpecializationInfo);
+  DEBUG(llvm::dbgs() << "Stop the scan: Current caller is not a specialization\n");
+  return false;
 }
 
 // =============================================================================
@@ -300,6 +419,21 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
     // Bail if the callee should not be partially specialized.
     if (shouldNotSpecializeCallee(Callee, ParamSubs))
       return false;
+  }
+
+  // Check if specializing this call site would create in an infinite generic
+  // specialization loop.
+  if (createsInfiniteSpecializationLoop(Apply)) {
+    DEBUG(llvm::dbgs() << "    Generic specialization is not supported if "
+                          "it would result in a generic specialization of "
+                          "infinite depth.\n");
+    DEBUG(llvm::dbgs() << "Callee " << Callee->getName()
+                       << " occurs multiple times on the call chain\n");
+    if (PrintGenericSpecializationLoops)
+      llvm::errs() << "Detected and prevented an infinite "
+                      "generic specialization loop for callee: "
+                   << Callee->getName() << '\n';
+    return false;
   }
 
   return true;
@@ -1664,6 +1798,12 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   assert(SpecializedF->hasUnqualifiedOwnership());
   // Check if this specialization should be linked for prespecialization.
   linkSpecialization(M, SpecializedF);
+  // Store the meta-information about how this specialization was created.
+  auto *Caller = ReInfo.getApply() ? ReInfo.getApply().getFunction() : nullptr;
+  SubstitutionList Subs = Caller ? ReInfo.getApply().getSubstitutions()
+                                 : ReInfo.getClonerParamSubstitutions();
+  SpecializedF->setSpecializationInfo(GenericSpecializationInformation::create(
+      M.getASTContext(), Caller, GenericFunc, Subs));
   return SpecializedF;
 }
 
