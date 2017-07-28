@@ -134,16 +134,16 @@ public:
 
 /// Returns true on success.
 bool PartialApplyCombiner::allocateTemporaries() {
-  // Copy the original arguments of the partial_apply into
-  // newly created temporaries and use these temporaries instead of
-  // the original arguments afterwards.
-  // This is done to "extend" the life-time of original partial_apply
-  // arguments, as they may be destroyed/deallocated before the last
-  // use by one of the apply instructions.
-  // TODO:
-  // Copy arguments of the partial_apply into new temporaries
-  // only if the lifetime of arguments ends before their uses
-  // by apply instructions.
+  // Copy the original arguments of the partial_apply into newly created
+  // temporaries and use these temporaries instead of the original arguments
+  // afterwards.
+  //
+  // This is done to "extend" the life-time of original partial_apply arguments,
+  // as they may be destroyed/deallocated before the last use by one of the
+  // apply instructions.
+  //
+  // TODO: Copy arguments of the partial_apply into new temporaries only if the
+  // lifetime of arguments ends before their uses by apply instructions.
   bool needsReleases = false;
   CanSILFunctionType PAITy =
     PAI->getCallee()->getType().getAs<SILFunctionType>();
