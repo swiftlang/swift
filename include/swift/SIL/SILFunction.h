@@ -113,6 +113,10 @@ private:
   /// The context archetypes of the function.
   GenericEnvironment *GenericEnv;
 
+  /// The information about specialization.
+  /// Only set if this function is a specialization of another function.
+  const GenericSpecializationInformation *SpecializationInfo;
+
   /// The forwarding substitutions, lazily computed.
   Optional<SubstitutionList> ForwardingSubs;
 
@@ -186,6 +190,7 @@ private:
   /// *) It is inlined and the debug info keeps a reference to the function.
   /// *) It is a dead method of a class which has higher visibility than the
   ///    method itself. In this case we need to create a vtable stub for it.
+  /// *) It is a function referenced by the specialization information.
   bool Zombie = false;
 
   /// True if SILOwnership is enabled for this function.
@@ -565,6 +570,20 @@ public:
   }
   const clang::Decl *getClangDecl() const {
     return (ClangNodeOwner ? ClangNodeOwner->getClangDecl() : nullptr);
+  }
+
+  /// Returns whether this function is a specialization.
+  bool isSpecialization() const { return SpecializationInfo != nullptr; }
+
+  /// Return the specialization information.
+  const GenericSpecializationInformation *getSpecializationInfo() const {
+    assert(isSpecialization());
+    return SpecializationInfo;
+  }
+
+  void setSpecializationInfo(const GenericSpecializationInformation *Info) {
+    assert(!isSpecialization());
+    SpecializationInfo = Info;
   }
 
   /// Retrieve the generic environment containing the mapping from interface

@@ -983,6 +983,34 @@ public:
   }
 };
 
+/// GenericSpecializationInformation - provides information about a generic
+/// specialization. This meta-information is created for each generic
+/// specialization, which allows for tracking of dependencies between
+/// specialized generic functions and can be used to detect specialization loops
+/// during generic specialization.
+class GenericSpecializationInformation {
+  /// The caller function that triggered this specialization.
+  SILFunction *Caller;
+  /// The original function that was specialized.
+  SILFunction *Parent;
+  /// Substitutions used to produce this specialization.
+  SubstitutionList Subs;
+
+  GenericSpecializationInformation(SILFunction *Caller, SILFunction *Parent,
+                                   SubstitutionList Subs);
+
+public:
+  static const GenericSpecializationInformation *create(ASTContext &Ctx,
+                                                        SILFunction *Caller,
+                                                        SILFunction *Parent,
+                                                        SubstitutionList Subs);
+  static const GenericSpecializationInformation *create(SILInstruction *Inst,
+                                                        SILBuilder &B);
+  const SILFunction *getCaller() const { return Caller; }
+  const SILFunction *getParent() const { return Parent; }
+  SubstitutionList getSubstitutions() const { return Subs; }
+};
+
 void *allocateApplyInst(SILFunction &F, size_t size, size_t align);
 class PartialApplyInst;
 
@@ -1000,6 +1028,11 @@ class ApplyInstBase<Impl, Base, false> : public Base {
 
   /// The type of the callee with our substitutions applied.
   SILType SubstCalleeType;
+
+  /// Information about specialization and inlining of this apply.
+  /// This is only != nullptr if the apply was inlined. And in this case it
+  /// points to the specialization info of the inlined function.
+  const GenericSpecializationInformation *SpecializationInfo;
 
   /// The number of tail-allocated substitutions, allocated after the operand
   /// list's tail allocation.
@@ -1029,8 +1062,10 @@ protected:
                 SILType substCalleeType, SubstitutionList substitutions,
                 ArrayRef<SILValue> args,
                 ArrayRef<SILValue> TypeDependentOperands,
+                const GenericSpecializationInformation *SpecializationInfo,
                 As... baseArgs)
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
+        SpecializationInfo(SpecializationInfo),
         NumSubstitutions(substitutions.size()), NonThrowing(false),
         NumCallArguments(args.size()),
         Operands(this, args, TypeDependentOperands, callee) {
@@ -1160,6 +1195,10 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return Operands.getDynamicAsArray().slice(NumCallArguments);
   }
+
+  const GenericSpecializationInformation *getSpecializationInfo() const {
+    return SpecializationInfo;
+  }
 };
 
 /// Given the callee operand of an apply or try_apply instruction,
@@ -1283,14 +1322,15 @@ class ApplyInst : public ApplyInstBase<ApplyInst, SILInstruction> {
             SubstitutionList Substitutions,
             ArrayRef<SILValue> Args,
             ArrayRef<SILValue> TypeDependentOperands,
-            bool isNonThrowing);
+            bool isNonThrowing,
+            const GenericSpecializationInformation *SpecializationInfo);
 
-  static ApplyInst *create(SILDebugLocation DebugLoc, SILValue Callee,
-                           SubstitutionList Substitutions,
-                           ArrayRef<SILValue> Args, bool isNonThrowing,
-                           Optional<SILModuleConventions> ModuleConventions,
-                           SILFunction &F,
-                           SILOpenedArchetypesState &OpenedArchetypes);
+  static ApplyInst *
+  create(SILDebugLocation DebugLoc, SILValue Callee,
+         SubstitutionList Substitutions, ArrayRef<SILValue> Args,
+         bool isNonThrowing, Optional<SILModuleConventions> ModuleConventions,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         const GenericSpecializationInformation *SpecializationInfo);
 
 public:
   static bool classof(const ValueBase *V) {
@@ -1315,14 +1355,14 @@ class PartialApplyInst
                    SubstitutionList Substitutions,
                    ArrayRef<SILValue> Args,
                    ArrayRef<SILValue> TypeDependentOperands,
-                   SILType ClosureType);
+                   SILType ClosureType,
+                   const GenericSpecializationInformation *SpecializationInfo);
 
-  static PartialApplyInst *create(SILDebugLocation DebugLoc, SILValue Callee,
-                                  ArrayRef<SILValue> Args,
-                                  SubstitutionList Substitutions,
-                                  ParameterConvention CalleeConvention,
-                                  SILFunction &F,
-                                  SILOpenedArchetypesState &OpenedArchetypes);
+  static PartialApplyInst *
+  create(SILDebugLocation DebugLoc, SILValue Callee, ArrayRef<SILValue> Args,
+         SubstitutionList Substitutions, ParameterConvention CalleeConvention,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         const GenericSpecializationInformation *SpecializationInfo);
 
 public:
   /// Return the result function type of this partial apply.
@@ -6293,13 +6333,15 @@ class TryApplyInst
                SILType substCalleeType, SubstitutionList substitutions,
                ArrayRef<SILValue> args,
                ArrayRef<SILValue> TypeDependentOperands,
-               SILBasicBlock *normalBB, SILBasicBlock *errorBB);
+               SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+               const GenericSpecializationInformation *SpecializationInfo);
 
-  static TryApplyInst *create(SILDebugLocation DebugLoc, SILValue callee,
-                              SubstitutionList substitutions,
-                              ArrayRef<SILValue> args, SILBasicBlock *normalBB,
-                              SILBasicBlock *errorBB, SILFunction &F,
-                              SILOpenedArchetypesState &OpenedArchetypes);
+  static TryApplyInst *
+  create(SILDebugLocation DebugLoc, SILValue callee,
+         SubstitutionList substitutions, ArrayRef<SILValue> args,
+         SILBasicBlock *normalBB, SILBasicBlock *errorBB, SILFunction &F,
+         SILOpenedArchetypesState &OpenedArchetypes,
+         const GenericSpecializationInformation *SpecializationInfo);
 
 public:
   static bool classof(const ValueBase *V) {
@@ -6445,6 +6487,10 @@ public:
     FOREACH_IMPL_RETURN(getArgumentOperandNumber());
   }
 
+  /// Return the associated specialization information.
+  const GenericSpecializationInformation *getSpecializationInfo() const {
+    FOREACH_IMPL_RETURN(getSpecializationInfo());
+  }
 #undef FOREACH_IMPL_RETURN
 
   /// The arguments passed to this instruction, without self.
