@@ -3208,9 +3208,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
-    auto whereStatus = parseFreestandingGenericWhereClause(genericParams);
-    if (whereStatus.shouldStopParsing())
-      return whereStatus;
+    Status |= parseFreestandingGenericWhereClause(genericParams);
   }
 
   if (UnderlyingTy.isNull()) {
@@ -3223,6 +3221,9 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                           genericParams, CurDeclContext);
   TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
   TAD->getAttrs() = Attributes;
+
+  if (Status.hasCodeCompletion() && CodeCompletion)
+    CodeCompletion->setParsedDecl(TAD);
 
   // Exit the scope introduced for the generic parameters.
   GenericsScope.reset();
@@ -4771,7 +4772,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
-  bool GPHasCodeCompletion = false;
+  bool SignatureHasCodeCompletion = false;
   // If the name is an operator token that ends in '<' and the following token
   // is an identifier, split the '<' off as a separate token. This allows things
   // like 'func ==<T>(x:T, y:T) {}' to parse as '==' with generic type variable
@@ -4783,7 +4784,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     SourceLoc LAngleLoc = NameLoc.getAdvancedLoc(SimpleName.str().size());
     auto Result = parseGenericParameters(LAngleLoc);
     GenericParams = Result.getPtrOrNull();
-    GPHasCodeCompletion |= Result.hasCodeCompletion();
+    SignatureHasCodeCompletion |= Result.hasCodeCompletion();
 
     auto NameTokText = NameTok.getRawText();
     markSplitToken(tok::identifier,
@@ -4794,9 +4795,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   } else {
     auto Result = maybeParseGenericParams();
     GenericParams = Result.getPtrOrNull();
-    GPHasCodeCompletion |= Result.hasCodeCompletion();
+    SignatureHasCodeCompletion |= Result.hasCodeCompletion();
   }
-  if (GPHasCodeCompletion && !CodeCompletion)
+  if (SignatureHasCodeCompletion && !CodeCompletion)
     return makeParserCodeCompletionStatus();
 
   SmallVector<ParameterList*, 8> BodyParams;
@@ -4820,6 +4821,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
                              throwsLoc, rethrows, FuncRetTy);
 
+  SignatureHasCodeCompletion |= SignatureStatus.hasCodeCompletion();
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
     return SignatureStatus;
@@ -4830,8 +4832,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    if (whereStatus.shouldStopParsing())
+    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
       return whereStatus;
+    }
   }
   
   // Protocol method arguments may not have default values.
@@ -4866,13 +4871,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     // they are available.
     FD->getAttrs() = Attributes;
 
-    // Code completion for the generic type params.
-    if (GPHasCodeCompletion)
-      CodeCompletion->setDelayedParsedDecl(FD);
-
     // Pass the function signature to code completion.
-    if (SignatureStatus.hasCodeCompletion())
-      CodeCompletion->setDelayedParsedDecl(FD);
+    if (SignatureHasCodeCompletion)
+      CodeCompletion->setParsedDecl(FD);
 
     DefaultArgs.setFunctionContext(FD);
     for (auto PL : FD->getParameterLists())
@@ -5015,10 +5016,16 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    if (whereStatus.shouldStopParsing())
+    Status |= whereStatus;
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
       return whereStatus;
+    }
     ED->setGenericParams(GenericParams);
   }
+
+  if (Status.hasCodeCompletion() && CodeCompletion)
+    CodeCompletion->setParsedDecl(ED);
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
@@ -5272,11 +5279,16 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    if (whereStatus.shouldStopParsing())
+    Status |= whereStatus;
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
       return whereStatus;
+    }
     SD->setGenericParams(GenericParams);
   }
 
+  if (Status.hasCodeCompletion() && CodeCompletion)
+    CodeCompletion->setParsedDecl(SD);
   
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
@@ -5355,10 +5367,16 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    if (whereStatus.shouldStopParsing())
+    Status |= whereStatus;
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
       return whereStatus;
+    }
     CD->setGenericParams(GenericParams);
   }
+
+  if (Status.hasCodeCompletion() && CodeCompletion)
+    CodeCompletion->setParsedDecl(CD);
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
@@ -5502,13 +5520,13 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
-  bool GPHasCodeCompletion = false;
+  bool SignatureHasCodeCompletion = false;
 
   auto Result = maybeParseGenericParams();
   GenericParams = Result.getPtrOrNull();
-  GPHasCodeCompletion |= Result.hasCodeCompletion();
+  SignatureHasCodeCompletion |= Result.hasCodeCompletion();
 
-  if (GPHasCodeCompletion && !CodeCompletion)
+  if (SignatureHasCodeCompletion && !CodeCompletion)
     return makeParserCodeCompletionStatus();
 
   // Parse the parameter list.
@@ -5537,8 +5555,11 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    if (whereStatus.shouldStopParsing())
+    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
       return whereStatus;
+    }
   }
 
   // Build an AST for the subscript declaration.
@@ -5551,11 +5572,9 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
                                                 GenericParams);
   Subscript->getAttrs() = Attributes;
 
-  // Code completion for the generic type params.
-  //
-  // FIXME: What is this?
-  if (GPHasCodeCompletion)
-    CodeCompletion->setDelayedParsedDecl(Subscript);
+  // Pass the function signature to code completion.
+  if (SignatureHasCodeCompletion)
+    CodeCompletion->setParsedDecl(Subscript);
 
   Decls.push_back(Subscript);
 
@@ -5633,10 +5652,12 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse the parameters.
   DefaultArgumentInfo DefaultArgs(/*inTypeContext*/true);
   llvm::SmallVector<Identifier, 4> namePieces;
+  bool SignatureHasCodeCompletion = false;
   ParserResult<ParameterList> Params
     = parseSingleParameterClause(ParameterContextKind::Initializer,
                                  &namePieces, &DefaultArgs);
 
+  SignatureHasCodeCompletion |= Params.hasCodeCompletion();
   if (Params.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
     return makeParserCodeCompletionStatus();
@@ -5661,8 +5682,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    if (whereStatus.shouldStopParsing())
+    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
       return whereStatus;
+    }
   }
   
   auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
@@ -5686,8 +5710,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   DefaultArgs.setFunctionContext(CD);
 
   // Pass the function signature to code completion.
-  if (Params.hasCodeCompletion())
-    CodeCompletion->setDelayedParsedDecl(CD);
+  if (SignatureHasCodeCompletion)
+    CodeCompletion->setParsedDecl(CD);
 
   if (ConstructorsNotAllowed || Params.isParseError()) {
     // Tell the type checker not to touch this constructor.
