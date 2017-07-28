@@ -57,6 +57,8 @@ struct GoodIndexable : Indexable {
   func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
+  var isEmpty: Bool { return true }
+  var count: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
   subscript(bounds: Range<Int>) -> [Int] { return [] }
@@ -69,6 +71,8 @@ struct BadIndexable1 : Indexable {
   func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
+  var isEmpty: Bool { return true }
+  var count: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
 
@@ -80,6 +84,8 @@ struct BadIndexable1 : Indexable {
 struct BadIndexable2 : Indexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
+  var isEmpty: Bool { return true }
+  var count: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
   subscript(bounds: Range<Int>) -> [Int] { return [] }
@@ -90,6 +96,8 @@ struct BadIndexable2 : Indexable {
 struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
+  var isEmpty: Bool { return true }
+  var count: Int { return 0 }
   func index(after i: Int) -> Int { return i + 1 }
   func index(before i: Int) -> Int { return i - 1 }
 
@@ -103,6 +111,8 @@ struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
 struct BadBidirectionalIndexable : BidirectionalIndexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
+  var isEmpty: Bool { return true }
+  var count: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
   subscript(bounds: Range<Int>) -> [Int] { return [] }
@@ -121,6 +131,8 @@ struct BadBidirectionalIndexable : BidirectionalIndexable {
 struct RangeReplaceableCollection_SubSequence_IsDefaulted : RangeReplaceableCollection {
   var startIndex: Int { fatalError() }
   var endIndex: Int { fatalError() }
+  var isEmpty: Bool { return true }
+  var count: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
 

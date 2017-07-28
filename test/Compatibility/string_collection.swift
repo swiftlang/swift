@@ -6,7 +6,7 @@ extension String : Collection { // expected-warning{{conformance of 'String' to 
     set { }
   }
 
-  var isEmpty: Bool { return false } // expected-note{{var 'isEmpty' will not be used to satisfy the conformance to 'Collection'}}
+  var first: Character? { return nil } // expected-note{{var 'first' will not be used to satisfy the conformance to 'Collection'}}
 
 }
 
