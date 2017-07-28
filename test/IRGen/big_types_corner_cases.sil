@@ -94,3 +94,20 @@ bb0(%0 : $BigTempStruct<Element>):
   %ret = thin_function_to_pointer %fref : $@convention(method) <τ_0_0> (@guaranteed BigTempStruct<τ_0_0>) -> @owned Builtin.RawPointer to $Builtin.RawPointer
   return %ret : $Builtin.RawPointer
 }
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testFuncWithModBlockStorageApply({ %objc_block, %swift.function }* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) #0 {
+// CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) %1
+// CHECK: ret void
+sil @testFuncWithModBlockStorageApply : $@convention(thin) (@inout_aliasable @block_storage @callee_owned (@owned BigStruct) -> (), BigStruct) -> () {
+// %0                                             // user: %5
+// %1                                             // users: %12, %13, %7
+// %2                                             // user: %20
+// %3                                             // user: %20
+// %4                                             // user: %20
+bb0(%0 : $*@block_storage @callee_owned (@owned BigStruct) -> (), %1 : $BigStruct):
+  %proji = project_block_storage %0 : $*@block_storage @callee_owned (@owned BigStruct) -> () // user: %6
+  %ldi = load %proji : $*@callee_owned (@owned BigStruct) -> () // users: %11, %17, %20
+  %appi = apply %ldi(%1) : $@callee_owned (@owned BigStruct) -> ()
+  %ret = tuple ()                                  // user: %22
+  return %ret : $()                                // id: %22
+}
