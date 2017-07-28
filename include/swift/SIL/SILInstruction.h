@@ -3207,10 +3207,6 @@ public:
   UncheckedRefCastAddrInst(SILDebugLocation Loc, SILValue src, CanType srcType,
                            SILValue dest, CanType targetType);
 
-  CastConsumptionKind getConsumptionKind() const {
-    return CastConsumptionKind::TakeAlways;
-  }
-
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
@@ -3562,18 +3558,14 @@ class UnconditionalCheckedCastAddrInst : public SILInstruction
     Dest
   };
   FixedOperandList<2> Operands;
-  CastConsumptionKind ConsumptionKind;
   CanType SourceType;
   CanType TargetType;
 
   UnconditionalCheckedCastAddrInst(SILDebugLocation Loc,
-                                   CastConsumptionKind consumption,
                                    SILValue src, CanType sourceType,
                                    SILValue dest, CanType targetType);
 
 public:
-  CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
-
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
@@ -3598,24 +3590,16 @@ class UnconditionalCheckedCastValueInst final
           ValueKind::UnconditionalCheckedCastValueInst,
           UnconditionalCheckedCastValueInst, ConversionInst, true> {
   friend SILBuilder;
-  CastConsumptionKind ConsumptionKind;
 
-  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc,
-                                    CastConsumptionKind consumption,
-                                    SILValue Operand,
+  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                     ArrayRef<SILValue> TypeDependentOperands,
                                     SILType DestTy)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, DestTy),
-        ConsumptionKind(consumption) {}
+            DebugLoc, Operand, TypeDependentOperands, DestTy) {}
 
   static UnconditionalCheckedCastValueInst *
-  create(SILDebugLocation DebugLoc, CastConsumptionKind consumption,
-         SILValue Operand, SILType DestTy, SILFunction &F,
-         SILOpenedArchetypesState &OpenedArchetypes);
-
-public:
-  CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// StructInst - Represents a constructed loadable struct.

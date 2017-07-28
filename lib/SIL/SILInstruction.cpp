@@ -904,11 +904,9 @@ bool SILInstruction::mayRelease() const {
     assert(!SILModuleConventions(getModule()).useLoweredAddresses());
     return true;
 
-  case ValueKind::UnconditionalCheckedCastAddrInst: {
-    // Failing casts with take_always can release.
-    auto *Cast = cast<UnconditionalCheckedCastAddrInst>(this);
-    return Cast->getConsumptionKind() == CastConsumptionKind::TakeAlways;
-  }
+  case ValueKind::UnconditionalCheckedCastAddrInst:
+    return true;
+
   case ValueKind::CheckedCastAddrBranchInst: {
     // Failing casts with take_always can release.
     auto *Cast = cast<CheckedCastAddrBranchInst>(this);
