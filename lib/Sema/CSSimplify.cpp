@@ -1167,7 +1167,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
-    // Find the last path element, skipping OptioanlPayload elements
+    // Find the last path element, skipping OptionalPayload elements
     // so that we allow this exception in cases of optional injection.
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
