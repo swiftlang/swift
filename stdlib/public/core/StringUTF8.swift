@@ -16,12 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)#72 : The UTF-8 string view should conform to
-// `BidirectionalCollection`.
-
-// FIXME(ABI)#73 : The UTF-8 string view should have a custom iterator type to
-// allow performance optimizations of linear traversals.
-
 extension String {
   /// A view of a string's contents as a collection of UTF-8 code units.
   ///
@@ -98,14 +92,28 @@ extension String {
   ///     print(String(s1.utf8.prefix(15)))
   ///     // Prints "They call me 'B"
   public struct UTF8View
-    : Collection, 
+    : BidirectionalCollection,
       CustomStringConvertible, 
       CustomDebugStringConvertible {
+
+    /// Underlying UTF-16-compatible representation
     @_versioned
     internal let _core: _StringCore
 
-    init(_ _core: _StringCore) {
+    /// Distances to `(startIndex, endIndex)` from the endpoints of _core,
+    /// measured in UTF-8 code units.
+    ///
+    /// Note: this is *only* here to support legacy Swift3-style slicing where
+    /// `s.utf8[i..<j]` produces a `String.UTF8View`, and should be removed when
+    /// those semantics are no longer supported.
+    @_versioned
+    internal let _legacyOffsets: (start: Int8, end: Int8)
+
+    init(_ _core: _StringCore,
+      legacyOffsets: (Int, Int) = (0, 0)
+    ) {
       self._core = _core
+      self._legacyOffsets = (Int8(legacyOffsets.0), Int8(legacyOffsets.1))
     }
 
     public typealias Index = String.Index
@@ -116,7 +124,9 @@ extension String {
     ///
     /// If the UTF-8 view is empty, `startIndex` is equal to `endIndex`.
     public var startIndex: Index {
-      return _index(atEncodedOffset: _core.startIndex)
+      let r = _index(atEncodedOffset: _core.startIndex)
+      if _legacyOffsets.start == 0 { return r }
+      return index(r, offsetBy: numericCast(_legacyOffsets.start))
     }
 
     /// The "past the end" position---that is, the position one
@@ -124,7 +134,19 @@ extension String {
     ///
     /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
     public var endIndex: Index {
-      return Index(encodedOffset: _core.endIndex)
+      _sanityCheck(_legacyOffsets.end >= -3 && _legacyOffsets.end <= 0,
+        "out of bounds legacy end")
+
+      var r = Index(encodedOffset: _core.endIndex)
+      if _fastPath(_legacyOffsets.end == 0) {
+        return r
+      }
+      switch _legacyOffsets.end {
+      case -3: r = index(before: r); fallthrough
+      case -2: r = index(before: r); fallthrough
+      case -1: return index(before: r)
+      default: Builtin.unreachable()
+      }
     }
 
     @_versioned
@@ -163,42 +185,85 @@ extension String {
         precondition(i.encodedOffset < _core.count)
         return Index(encodedOffset: i.encodedOffset + 1)
       }
-      
+
       var j = i
-      while true {
-        if case .utf8(let buffer) = j._cache {
-          _onFastPath()
-          var scalarLength16 = 1
-          let b0 = buffer.first._unsafelyUnwrappedUnchecked
-          var nextBuffer = buffer
-          
-          let leading1s = (~b0).leadingZeroBitCount
-          if leading1s == 0 {
-            nextBuffer.removeFirst()
-          }
-          else {
-            let n8 = j._transcodedOffset + 1
-            // If we haven't reached a scalar boundary...
-            if _fastPath(n8 < leading1s) {
-              return Index(
-                encodedOffset: j.encodedOffset,
-                transcodedOffset: n8, .utf8(buffer: nextBuffer))
-            }
-            scalarLength16 = n8 >> 2 + 1
-            nextBuffer.removeFirst(n8)
-          }
-          if _fastPath(!nextBuffer.isEmpty) {
-            return Index(
-              encodedOffset: j.encodedOffset + scalarLength16,
-              .utf8(buffer: nextBuffer))
-          }
-          return _index(atEncodedOffset: j.encodedOffset + scalarLength16)
-        }
+      
+      // Ensure j's cache is utf8
+      if _slowPath(j._cache.utf8 == nil) {
         j = _index(atEncodedOffset: j.encodedOffset)
         precondition(j != endIndex, "index out of bounds")
       }
+      
+      let buffer = j._cache.utf8._unsafelyUnwrappedUnchecked
+      
+      var scalarLength16 = 1
+      let b0 = buffer.first._unsafelyUnwrappedUnchecked
+      var nextBuffer = buffer
+
+      let leading1s = (~b0).leadingZeroBitCount
+      if _fastPath(leading1s == 0) { // ASCII in buffer; just consume it
+        nextBuffer.removeFirst()
+      }
+      else {
+        // Number of bytes consumed in this scalar
+        let n8 = j._transcodedOffset + 1
+        // If we haven't reached a scalar boundary...
+        if _fastPath(n8 < leading1s) {
+          // Advance to the next position in this scalar
+          return Index(
+            encodedOffset: j.encodedOffset,
+            transcodedOffset: n8, .utf8(buffer: buffer))
+        }
+        // We reached a scalar boundary; compute the underlying utf16's width
+        // based on the number of utf8 code units
+        scalarLength16 = n8 >> 2 + 1
+        nextBuffer.removeFirst(n8)
+      }
+
+      if _fastPath(!nextBuffer.isEmpty) {        
+        return Index(
+          encodedOffset: j.encodedOffset + scalarLength16,
+          .utf8(buffer: nextBuffer))
+      }
+      // If nothing left in the buffer, refill it.
+      return _index(atEncodedOffset: j.encodedOffset + scalarLength16)
     }
 
+    public func index(before i: Index) -> Index {
+      if _fastPath(_core.isASCII) {
+        precondition(i.encodedOffset > 0)
+        return Index(encodedOffset: i.encodedOffset - 1)
+      }
+      
+      if i._transcodedOffset != 0 {
+        _sanityCheck(i._cache.utf8 != nil)
+        var r = i
+        r._compoundOffset = r._compoundOffset &- 1
+        return r
+      }
+      
+      // Handle the scalar boundary the same way as the not-a-utf8-index case.
+      
+      // Parse a single scalar
+      var p =  Unicode.UTF16.ReverseParser()
+      var s = _core[..<i.encodedOffset].reversed().makeIterator()
+      let u8: Unicode.UTF8.EncodedScalar
+      switch p.parseScalar(from: &s) {
+      case .valid(let u16):
+        u8 = Unicode.UTF8.transcode(
+          u16, from: Unicode.UTF16.self)._unsafelyUnwrappedUnchecked
+      case .error:
+        u8 = Unicode.UTF8.encodedReplacementCharacter
+      case .emptyInput:
+        _preconditionFailure("index out of bounds")
+      }
+      return Index(
+        encodedOffset: i.encodedOffset &- (u8.count < 4 ? 1 : 2),
+        transcodedOffset: u8.count &- 1,
+        .utf8(buffer: String.Index._UTF8Buffer(u8))
+      )
+    }
+    
     public func distance(from i: Index, to j: Index) -> IndexDistance {
       if _fastPath(_core.isASCII) {
         return j.encodedOffset - i.encodedOffset
@@ -312,28 +377,6 @@ extension String {
   ///
   /// If `utf8` is an ill-formed UTF-8 code sequence, the result is `nil`.
   ///
-  /// You can use this initializer to create a new string from
-  /// another string's `utf8` view.
-  ///
-  ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.utf8.index(of: 32) {
-  ///         let adjective = String(picnicGuest.utf8[..<i])
-  ///         print(adjective)
-  ///     }
-  ///     // Prints "Optional(Deserving)"
-  ///
-  /// The `adjective` constant is created by calling this initializer with a
-  /// slice of the `picnicGuest.utf8` view.
-  ///
-  /// - Parameter utf8: A UTF-8 code sequence.
-  public init(_ utf8: UTF8View) {
-    self = String(utf8._core)
-  }
-
-  /// Creates a string corresponding to the given sequence of UTF-8 code units.
-  ///
-  /// If `utf8` is an ill-formed UTF-8 code sequence, the result is `nil`.
-  ///
   /// You can use this initializer to create a new string from a slice of
   /// another string's `utf8` view.
   ///
@@ -348,14 +391,38 @@ extension String {
   /// slice of the `picnicGuest.utf8` view.
   ///
   /// - Parameter utf8: A UTF-8 code sequence.
-  public init?(_ utf8: UTF8View.SubSequence) {
-    let wholeString = String(utf8.base._core)
-    if let start = utf8.startIndex.samePosition(in: wholeString),
-       let end = utf8.endIndex.samePosition(in: wholeString) {
-      self = wholeString[start..<end]
-      return
+  @available(swift, deprecated: 3.2, obsoleted: 4.0)
+  public init?(_ utf8: UTF8View) {
+    if utf8.startIndex._transcodedOffset != 0
+    || utf8.endIndex._transcodedOffset != 0 {
+      return nil
     }
-    return nil
+    // Attempt to recover the whole string, the better to implement the actual
+    // Swift 3.1 semantics, which are not as documented above!  Full Swift 3.1
+    // semantics may be impossible to preserve in the case of string literals,
+    // since we no longer have access to the length of the original string when
+    // there is no owner and elements have been dropped from the end.
+    if let nativeBuffer = utf8._core.nativeBuffer {
+      let wholeString = String(_StringCore(nativeBuffer))
+      let offset = (utf8._core._baseAddress! - nativeBuffer.start)
+        &>> utf8._core.elementShift
+
+      if Index(
+        encodedOffset: utf8.startIndex.encodedOffset + offset
+      ).samePosition(in: wholeString) == nil
+      || Index(
+        encodedOffset: utf8.endIndex.encodedOffset + offset
+      ).samePosition(in: wholeString) == nil {
+        return nil
+      }
+    }
+    self = String(utf8._core)
+  }
+
+  /// Creates a string corresponding to the given sequence of UTF-8 code units.
+  @available(swift, introduced: 4.0)
+  public init(_ utf8: UTF8View) {
+    self = String(utf8._core)
   }
 
   /// The index type for subscripting a string's `utf8` view.
@@ -586,3 +653,45 @@ extension String.UTF8View {
     return self[i!]
   }
 }
+
+//===--- Slicing Support --------------------------------------------------===//
+/// In Swift 3.2, in the absence of type context,
+///
+///   someString.utf8[someString.utf8.startIndex..<someString.utf8.endIndex]
+///
+/// was deduced to be of type `String.UTF8View`.  Provide a more-specific
+/// Swift-3-only `subscript` overload that continues to produce
+/// `String.UTF8View`.
+extension String.UTF8View {
+  public typealias SubSequence = Substring.UTF8View
+
+  @available(swift, introduced: 4)
+  public subscript(r: Range<Index>) -> String.UTF8View.SubSequence {
+    return String.UTF8View.SubSequence(self, _bounds: r)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(r: Range<Index>) -> String.UTF8View {
+    if r.upperBound._transcodedOffset == 0 {
+      return String.UTF8View(
+        _core[r.lowerBound.encodedOffset..<r.upperBound.encodedOffset],
+        legacyOffsets: (r.lowerBound._transcodedOffset, 0))
+    }
+
+    let b0 = r.upperBound._cache.utf8!.first!
+    let scalarLength8 = (~b0).leadingZeroBitCount
+    let scalarLength16 = scalarLength8 == 4 ? 2 : 1
+    let coreEnd = r.upperBound.encodedOffset + scalarLength16
+    return String.UTF8View(
+      _core[r.lowerBound.encodedOffset..<coreEnd],
+      legacyOffsets: (
+        r.lowerBound._transcodedOffset,
+        r.upperBound._transcodedOffset - scalarLength8))
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: ClosedRange<Index>) -> String.UTF8View {
+    return self[bounds.relative(to: self)]
+  }
+}
+

@@ -59,10 +59,10 @@ StringTests.test("AssociatedTypes-UTF8View") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: View.Iterator.self,
-    subSequenceType: Slice<View>.self,
+    subSequenceType: Substring.UTF8View.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
-    indicesType: DefaultIndices<View>.self)
+    indicesType: DefaultBidirectionalIndices<View>.self)
 }
 
 StringTests.test("AssociatedTypes-UTF16View") {
@@ -70,7 +70,7 @@ StringTests.test("AssociatedTypes-UTF16View") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
+    subSequenceType: Substring.UTF16View.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: View.Indices.self)
@@ -81,7 +81,7 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: View.Iterator.self,
-    subSequenceType: View.self,
+    subSequenceType: Substring.UnicodeScalarView.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)
@@ -466,7 +466,7 @@ StringTests.test("appendToSubstringBug") {
   }
 
   do {
-    var (s, unused) = { ()->(String, Int) in
+    var (s, _) = { ()->(String, Int) in
       let (s0, unused) = stringWithUnusedCapacity()
       return (s0[s0.index(_nth: 5)..<s0.endIndex], unused)
     }()
@@ -478,7 +478,7 @@ StringTests.test("appendToSubstringBug") {
   }
 
   do {
-    var (s, unused) = { ()->(Substring, Int) in
+    var (s, _) = { ()->(Substring, Int) in
       let (s0, unused) = stringWithUnusedCapacity()
       return (s0[s0.index(_nth: 5)..<s0.endIndex], unused)
     }()
@@ -503,6 +503,7 @@ StringTests.test("appendToSubstringBug") {
     expectEqual(originalID, s.bufferID)
     s += "."
     expectNotEqual(originalID, s.bufferID)
+    unused += 0 // warning suppression
   }
 }
 
@@ -640,7 +641,7 @@ StringTests.test("COW/removeSubrange/end") {
 StringTests.test("COW/replaceSubrange/end") {
   // Check literal-to-heap reallocation.
   do {
-    var str = "12345678"
+    let str = "12345678"
     let literalIdentity = str.bufferID
 
     var slice = str[str.startIndex..<str.index(_nth: 7)]
@@ -772,7 +773,7 @@ StringTests.test("stringCoreReserve")
     }
     expectEqual(!base._core.hasCocoaBuffer, startedNative)
     
-    var originalBuffer = base.bufferID
+    let originalBuffer = base.bufferID
     let startedUnique = startedNative && base._core._owner != nil
       && isKnownUniquelyReferenced(&base._core._owner!)
     
@@ -975,10 +976,11 @@ StringTests.test("growth") {
   var s = ""
   var s2 = s
 
-  for i in 0..<20 {
+  for _ in 0..<20 {
     s += "x"
     s2 = s
   }
+  expectEqual(s2, s)
   expectLE(s.nativeCapacity, 34)
 }
 
@@ -988,20 +990,20 @@ StringTests.test("Construction") {
 
 StringTests.test("Conversions") {
   do {
-    var c: Character = "a"
+    let c: Character = "a"
     let x = String(c)
     expectTrue(x._core.isASCII)
 
-    var s: String = "a"
+    let s: String = "a"
     expectEqual(s, x)
   }
 
   do {
-    var c: Character = "\u{B977}"
+    let c: Character = "\u{B977}"
     let x = String(c)
     expectFalse(x._core.isASCII)
 
-    var s: String = "\u{B977}"
+    let s: String = "\u{B977}"
     expectEqual(s, x)
   }
 }
