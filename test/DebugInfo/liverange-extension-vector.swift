@@ -9,7 +9,7 @@ func getInt32() -> Int32 { return -1 }
 public func rangeExtension(x: Int32, y: Int32) {
   let p = int2(x, y)
   // CHECK: define {{.*}}rangeExtension
-  // CHECK: llvm.dbg.value(metadata <2 x i32> %[[P:.*]], i64 0, metadata
+  // CHECK: llvm.dbg.value(metadata <2 x i32> %[[P:.*]], metadata
   use(p)
   // CHECK: asm sideeffect "", "r"{{.*}}[[P]]
 }
