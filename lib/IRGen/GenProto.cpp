@@ -990,6 +990,9 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   if (!accessor->empty())
     return accessor;
 
+  if (IGM.IRGen.Opts.OptimizeForSize)
+    accessor->addFnAttr(llvm::Attribute::NoInline);
+
   // Okay, define the accessor.
   auto cacheVariable = cast<llvm::GlobalVariable>(
     IGM.getAddrOfWitnessTableLazyCacheVariable(conformance, conformingType,
@@ -1318,6 +1321,8 @@ getAssociatedTypeMetadataAccessFunction(AssociatedTypeDecl *requirement,
   llvm::Function *accessor =
     IGM.getAddrOfAssociatedTypeMetadataAccessFunction(&Conformance,
                                                       requirement);
+  if (IGM.IRGen.Opts.OptimizeForSize)
+    accessor->addFnAttr(llvm::Attribute::NoInline);
 
   IRGenFunction IGF(IGM, accessor);
   if (IGM.DebugInfo)
@@ -1427,6 +1432,9 @@ getAssociatedTypeWitnessTableAccessFunction(CanType depAssociatedType,
   IRGenFunction IGF(IGM, accessor);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
+
+  if (IGM.IRGen.Opts.OptimizeForSize)
+    accessor->addFnAttr(llvm::Attribute::NoInline);
 
   Explosion parameters = IGF.collectParameters();
 
