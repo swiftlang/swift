@@ -2007,13 +2007,13 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     while (InsPt != E && isa<llvm::PHINode>(&*InsPt))
       ++InsPt;
     if (InsPt != E) {
-      DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, &*InsPt);
+      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, &*InsPt);
       return;
     }
   }
 
   // Otherwise just insert it at the current insertion point.
-  DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
+  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
