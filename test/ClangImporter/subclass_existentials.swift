@@ -35,3 +35,7 @@ class OldSwiftLaundryService : NSLaundry {
     return g!
   }
 }
+
+// Make sure the method lookup is not ambiguous
+
+_ = Coat.fashionStatement.wear()
