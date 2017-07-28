@@ -488,10 +488,10 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
     lhs._storage.high <<= High(rhs._storage.low)
 
-    let t = Base.bitWidth > rhs._storage.low
+    let lowInHigh = Base.bitWidth > rhs._storage.low
       ? lhs._storage.low >> (numericCast(Base.bitWidth) - rhs._storage.low)
       : lhs._storage.low << (rhs._storage.low - numericCast(Base.bitWidth))
-    lhs._storage.high |= High(extendingOrTruncating: t)
+    lhs._storage.high |= High(extendingOrTruncating: lowInHigh)
 
     lhs._storage.low <<= rhs._storage.low
   }
@@ -502,10 +502,10 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
     lhs._storage.low >>= rhs._storage.low
 
-    let t = Base.bitWidth > rhs._storage.low
+    let highInLow = Base.bitWidth > rhs._storage.low
       ? lhs._storage.high << (numericCast(Base.bitWidth) - rhs._storage.low)
       : lhs._storage.high >> (rhs._storage.low - numericCast(Base.bitWidth))
-    lhs._storage.low |= Low(extendingOrTruncating: t)
+    lhs._storage.low |= Low(extendingOrTruncating: highInLow)
 
     lhs._storage.high >>= High(extendingOrTruncating: rhs._storage.low)
   }
