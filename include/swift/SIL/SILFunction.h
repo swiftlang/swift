@@ -200,6 +200,12 @@ private:
   /// after the pass runs, we only see a semantic-arc world.
   bool HasQualifiedOwnership = true;
 
+  /// True if this function is referenced by any kind of meta-information. This
+  /// is the case e.g. when a function is referenced by the specialization
+  /// information. Setting this flag ensures that the functions becomes a zombie
+  /// function later.
+  bool ReferencedByMetainformation = false;
+
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
@@ -291,13 +297,25 @@ public:
   /// Mark this function as removed from the module's function list, but kept
   /// as "zombie" for debug info or vtable stub generation.
   void setZombie() {
-    assert((isInlined() || isExternallyUsedSymbol())  &&
-          "Function should be deleted instead of getting a zombie");
+    assert((isInlined() || isExternallyUsedSymbol() ||
+            isReferencedByMetainformation()) &&
+           "Function should be deleted instead of getting a zombie");
     Zombie = true;
   }
   
   /// Returns true if this function is dead, but kept in the module's zombie list.
   bool isZombie() const { return Zombie; }
+
+  /// Mark this function as referenced by meta-information.
+  void setReferencedByMetainformation() {
+    ReferencedByMetainformation = true;
+  }
+
+  /// Returns true if this function is referenced by any kind of
+  /// meta-information.
+  bool isReferencedByMetainformation() const {
+    return ReferencedByMetainformation;
+  }
 
   /// Returns true if this function has qualified ownership instructions in it.
   bool hasQualifiedOwnership() const { return HasQualifiedOwnership; }
