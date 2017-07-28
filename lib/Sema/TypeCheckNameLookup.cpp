@@ -129,6 +129,12 @@ namespace {
 
       assert(isa<ProtocolDecl>(foundDC));
 
+      if (!Options.contains(NameLookupFlags::PerformConformanceCheck))
+        return;
+
+      // If we found something within the protocol itself, and our
+      // search began somewhere that is not in a protocol or extension
+      // thereof, remap this declaration to the witness.
       auto conformingType = foundInType;
 
       // When performing a lookup on a subclass existential, we might
@@ -143,50 +149,43 @@ namespace {
           conformingType = layout.superclass;
       }
 
-      // If we found something within the protocol itself, and our
-      // search began somewhere that is not in a protocol or extension
-      // thereof, remap this declaration to the witness.
-      if (Options.contains(NameLookupFlags::PerformConformanceCheck)) {
-        // Dig out the protocol conformance.
-        auto conformance = TC.conformsToProtocol(conformingType, foundProto, DC,
+      // Dig out the protocol conformance.
+      auto conformance = TC.conformsToProtocol(conformingType, foundProto, DC,
                                                  conformanceOptions);
-        if (!conformance) {
-          // If there's no conformance, we have an existential
-          // and we found a member from one of the protocols, and
-          // not a class constraint if any.
-          assert(foundInType->isExistentialType());
-          addResult(found);
-          return;
-        }
-
-        if (conformance->isAbstract()) {
-          assert(foundInType->is<ArchetypeType>() ||
-                 foundInType->isExistentialType());
-          addResult(found);
-          return;
-        }
-
-        // Dig out the witness.
-        ValueDecl *witness = nullptr;
-        auto concrete = conformance->getConcrete();
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-          witness = concrete->getTypeWitnessAndDecl(assocType, &TC)
-            .second;
-        } else if (found->isProtocolRequirement()) {
-          witness = concrete->getWitnessDecl(found, &TC);
-        }
-
-        // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
-        // default implementations in protocols.
-        //
-        // If we have an imported conformance or the witness could
-        // not be deserialized, getWitnessDecl() will just return
-        // the requirement, so just drop the lookup result here.
-        if (witness && !isa<ProtocolDecl>(witness->getDeclContext()))
-          addResult(witness);
-
+      if (!conformance) {
+        // If there's no conformance, we have an existential
+        // and we found a member from one of the protocols, and
+        // not a class constraint if any.
+        assert(foundInType->isExistentialType());
+        addResult(found);
         return;
       }
+
+      if (conformance->isAbstract()) {
+        assert(foundInType->is<ArchetypeType>() ||
+               foundInType->isExistentialType());
+        addResult(found);
+        return;
+      }
+
+      // Dig out the witness.
+      ValueDecl *witness = nullptr;
+      auto concrete = conformance->getConcrete();
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
+        witness = concrete->getTypeWitnessAndDecl(assocType, &TC)
+          .second;
+      } else if (found->isProtocolRequirement()) {
+        witness = concrete->getWitnessDecl(found, &TC);
+      }
+
+      // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
+      // default implementations in protocols.
+      //
+      // If we have an imported conformance or the witness could
+      // not be deserialized, getWitnessDecl() will just return
+      // the requirement, so just drop the lookup result here.
+      if (witness && !isa<ProtocolDecl>(witness->getDeclContext()))
+        addResult(witness);
     }
   };
 } // end anonymous namespace
