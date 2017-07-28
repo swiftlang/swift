@@ -46,10 +46,31 @@
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ OBJC_DESIGNATED_INITIALIZER SWIFT_AVAILABILITY(macos,introduced=10.10);
 // CHECK-NEXT: @end
+
+// CHECK-LABEL: {{^}}SWIFT_AVAILABILITY(macos,introduced=999){{$}}
+// CHECK-NEXT: @interface Availability (SWIFT_EXTENSION(availability))
+// CHECK-NEXT: - (void)extensionAvailability:(WholeClassAvailability * _Nonnull)_;
+// CHECK-NEXT: @end
+
 // CHECK-LABEL: @interface AvailabilitySub
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ SWIFT_UNAVAILABLE;
 // CHECK-NEXT: @end
+
+// CHECK-LABEL: SWIFT_CLASS("{{.+}}WholeClassAvailability") 
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=999)
+// CHECK-NEXT: @interface WholeClassAvailability
+// CHECK-NEXT: - (void)wholeClassAvailability:(id <WholeProtoAvailability> _Nonnull)_;
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+
+// CHECK-LABEL: SWIFT_PROTOCOL("{{.+}}WholeProtoAvailability{{.*}}") 
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=999)
+// CHECK-NEXT: @protocol WholeProtoAvailability
+// CHECK-NEXT: - (void)wholeProtoAvailability:(WholeClassAvailability * _Nonnull)_;
+// CHECK-NEXT: @end
+
+
 @objc class Availability {
     @objc func alwaysAvailable() {}
 
@@ -117,8 +138,25 @@
     @objc init(x _: Int) {}
 }
 
+// Deliberately a high number that the default deployment target will not reach.
+@available(macOS 999, *)
+extension Availability {
+  @objc func extensionAvailability(_: WholeClassAvailability) {}
+}
+
 @objc class AvailabilitySub: Availability {
     private override init() { super.init() }
     @available(macOS 10.10, *)
     private override init(x _: Int) { super.init() }
+}
+
+
+@available(macOS 999, *)
+@objc class WholeClassAvailability {
+  func wholeClassAvailability(_: WholeProtoAvailability) {}
+}
+
+@available(macOS 999, *)
+@objc protocol WholeProtoAvailability {
+  func wholeProtoAvailability(_: WholeClassAvailability)
 }

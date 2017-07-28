@@ -310,11 +310,13 @@ private:
     StringRef customName = getNameForObjC(CD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
-      os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")\n"
-         << "@interface " << CD->getName();
+      os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")";
+      printAvailability(CD);
+      os << "\n@interface " << CD->getName();
     } else {
-      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\")\n"
-         << "@interface " << customName;
+      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\")";
+      printAvailability(CD);
+      os << "\n@interface " << customName;
     }
 
     if (Type superTy = CD->getSuperclass())
@@ -350,6 +352,8 @@ private:
 
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
 
+    if (printAvailability(ED, PrintLeadingSpace::No))
+      os << "\n";
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
@@ -365,11 +369,13 @@ private:
     StringRef customName = getNameForObjC(PD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
-      os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
-         << "@protocol " << PD->getName();
+      os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")";
+      printAvailability(PD);
+      os << "\n@protocol " << PD->getName();
     } else {
-      os << "SWIFT_PROTOCOL_NAMED(\"" << PD->getName() << "\")\n"
-         << "@protocol " << customName;
+      os << "SWIFT_PROTOCOL_NAMED(\"" << PD->getName() << "\")";
+      printAvailability(PD);
+      os << "\n@protocol " << customName;
     }
 
     printProtocols(PD->getInheritedProtocols());
@@ -626,7 +632,7 @@ private:
     }
 
     if (!skipAvailability) {
-      appendAvailabilityAttribute(AFD);
+      printAvailability(AFD);
     }
 
     if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->isAccessor()) {
@@ -683,22 +689,39 @@ private:
       os << " SWIFT_WARN_UNUSED_RESULT";
     }
 
-    appendAvailabilityAttribute(FD);
+    printAvailability(FD);
     
     os << ';';
   }
 
-  void appendAvailabilityAttribute(const ValueDecl *VD) {
-    for (auto Attr : VD->getAttrs()) {
+  enum class PrintLeadingSpace : bool {
+    No = false,
+    Yes = true
+  };
+
+  /// Returns \c true if anything was printed.
+  bool printAvailability(
+      const Decl *D,
+      PrintLeadingSpace printLeadingSpace = PrintLeadingSpace::Yes) {
+    bool hasPrintedAnything = false;
+    auto maybePrintLeadingSpace = [&] {
+      if (printLeadingSpace == PrintLeadingSpace::Yes || hasPrintedAnything)
+        os << " ";
+      hasPrintedAnything = true;
+    };
+
+    for (auto Attr : D->getAttrs()) {
       if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
         if (AvAttr->isInvalid()) continue;
         if (AvAttr->Platform == PlatformKind::none) {
           if (AvAttr->PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
             // Availability for *
-            if (!AvAttr->Rename.empty()) {
+            if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
               // NB: Don't bother getting obj-c names, we can't get one for the
               // rename
-              os << " SWIFT_UNAVAILABLE_MSG(\"'" << VD->getBaseName()
+              maybePrintLeadingSpace();
+              os << "SWIFT_UNAVAILABLE_MSG(\"'"
+                 << cast<ValueDecl>(D)->getBaseName()
                  << "' has been renamed to '";
               printEncodedString(AvAttr->Rename, false);
               os << '\'';
@@ -708,17 +731,20 @@ private:
               }
               os << "\")";
             } else if (!AvAttr->Message.empty()) {
-              os << " SWIFT_UNAVAILABLE_MSG(";
+              maybePrintLeadingSpace();
+              os << "SWIFT_UNAVAILABLE_MSG(";
               printEncodedString(AvAttr->Message);
               os << ")";
             } else {
-                os << " SWIFT_UNAVAILABLE";
+              maybePrintLeadingSpace();
+              os << "SWIFT_UNAVAILABLE";
             }
             break;
           }
           if (AvAttr->isUnconditionallyDeprecated()) {
             if (!AvAttr->Rename.empty() || !AvAttr->Message.empty()) {
-              os << " SWIFT_DEPRECATED_MSG(";
+              maybePrintLeadingSpace();
+              os << "SWIFT_DEPRECATED_MSG(";
               printEncodedString(AvAttr->Message);
               if (!AvAttr->Rename.empty()) {
                 os << ", ";
@@ -726,7 +752,8 @@ private:
               }
               os << ")";
             } else {
-              os << " SWIFT_DEPRECATED";
+              maybePrintLeadingSpace();
+              os << "SWIFT_DEPRECATED";
             }
           }
           continue;
@@ -769,7 +796,8 @@ private:
           break;
         }
         if (!plat) continue;
-        os << " SWIFT_AVAILABILITY(" << plat;
+        maybePrintLeadingSpace();
+        os << "SWIFT_AVAILABILITY(" << plat;
         if (AvAttr->isUnconditionallyUnavailable()) {
           os << ",unavailable";
         } else {
@@ -790,9 +818,9 @@ private:
           if (AvAttr->Obsoleted.hasValue()) {
             os << ",obsoleted=" << AvAttr->Obsoleted.getValue().getAsString();
           }
-          if (!AvAttr->Rename.empty()) {
+          if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
             // NB: Don't bother getting obj-c names, we can't get one for the rename
-            os << ",message=\"'" << VD->getBaseName()
+            os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
                << "' has been renamed to '";
             printEncodedString(AvAttr->Rename, false);
             os << '\'';
@@ -809,6 +837,7 @@ private:
         os << ")";
       }
     }
+    return hasPrintedAnything;
   }
 
   void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
