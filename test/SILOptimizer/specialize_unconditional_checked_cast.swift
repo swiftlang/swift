@@ -61,7 +61,7 @@ ArchetypeToArchetype(t: b, t2: f)
 // CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast011ArchetypeToE0{{[_0-9a-zA-Z]*}}FAA1CC_AA1DCTg5 : $@convention(thin) (@owned C, @owned D) -> @owned D {
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $C
 // TODO: This should be optimized to an unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
-// CHECK: unconditional_checked_cast_addr take_always C in [[STACK]] : $*C to D in
+// CHECK: unconditional_checked_cast_addr C in [[STACK]] : $*C to D in
 
 // y -> x where x is a super class of y.
 // CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast011ArchetypeToE0{{[_0-9a-zA-Z]*}}FAA1DC_AA1CCTg5 : $@convention(thin) (@owned D, @owned C) -> @owned C {
@@ -168,7 +168,7 @@ ArchetypeToConcreteConvertD(t: c)
 // CHECK-DAG: store %0 to [[STACK_C]]
 // CHECK-DAG: [[STACK_D:%[0-9]+]] = alloc_stack $D
 // TODO: This should be optimized to an unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
-// CHECK-DAG: unconditional_checked_cast_addr take_always C in [[STACK_C]] : $*C to D in [[STACK_D]] : $*D
+// CHECK-DAG: unconditional_checked_cast_addr C in [[STACK_C]] : $*C to D in [[STACK_D]] : $*D
 // CHECK-DAG: [[LOAD:%[0-9]+]] = load [[STACK_D]]
 // CHECK: return [[LOAD]]
 
@@ -253,7 +253,7 @@ ConcreteToArchetypeConvertC(t: c, t2: e)
 // CHECK-DAG: store %0 to [[STACK_C]]
 // CHECK-DAG: [[STACK_D:%[0-9]+]] = alloc_stack $D
 // TODO: This should be optimized to an unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
-// CHECK-DAG: unconditional_checked_cast_addr take_always C in [[STACK_C]] : $*C to D in [[STACK_D]] : $*D
+// CHECK-DAG: unconditional_checked_cast_addr C in [[STACK_C]] : $*C to D in [[STACK_D]] : $*D
 // CHECK-DAG: strong_release %1
 // CHECK-DAG: strong_release %0
 // CHECK-DAG: [[LOAD:%[0-9]+]] = load [[STACK_D]]
@@ -304,7 +304,7 @@ SuperToArchetypeC(c: c, t: b)
 // x -> y where x is a super class of y.
 // CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast17SuperToArchetypeC{{[_0-9a-zA-Z]*}}FAA1DC_Tg5 : $@convention(thin) (@owned C, @owned D) -> @owned D {
 // CHECK: bb0
-// CHECK: unconditional_checked_cast_addr take_always C in
+// CHECK: unconditional_checked_cast_addr C in
 
 // x -> y where x is a class and y is not.
 // CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast17SuperToArchetypeC{{[_0-9a-zA-Z]*}}FAA8NotUInt8V_Tg5 : $@convention(thin) (@owned C, NotUInt8) -> NotUInt8 {
@@ -344,7 +344,7 @@ public func ExistentialToArchetype<T>(o o : AnyObject, t : T) -> T {
 
 // AnyObject -> Class.
 // CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast22ExistentialToArchetype{{[_0-9a-zA-Z]*}}FAA1CC_Tg5 : $@convention(thin) (@owned AnyObject, @owned C) -> @owned C {
-// CHECK: unconditional_checked_cast_addr take_always AnyObject in {{%.*}} : $*AnyObject to C
+// CHECK: unconditional_checked_cast_addr AnyObject in {{%.*}} : $*AnyObject to C
 
 // AnyObject -> Non Class (should always fail)
 // CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast22ExistentialToArchetype{{[_0-9a-zA-Z]*}}FAA8NotUInt8V_Tg5 : $@convention(thin) (@owned AnyObject, NotUInt8) -> NotUInt8 {
@@ -372,7 +372,7 @@ ExistentialToArchetype(o: o, t: o)
 // CHECK-DAG: [[STACK_C:%[0-9]+]] = alloc_stack $Optional<C>
 // CHECK-DAG: store %0 to [[STACK_C]]
 // TODO: This should be optimized to an unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
-// CHECK-DAG: unconditional_checked_cast_addr take_always Optional<C> in [[STACK_C]] : $*Optional<C> to D in [[STACK_D]] : $*D
+// CHECK-DAG: unconditional_checked_cast_addr Optional<C> in [[STACK_C]] : $*Optional<C> to D in [[STACK_D]] : $*D
 // CHECK-DAG: [[LOAD:%[0-9]+]] = load [[STACK_D]]
 // CHECK: return [[LOAD]]
 @inline(never)

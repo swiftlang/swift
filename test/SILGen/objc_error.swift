@@ -64,7 +64,7 @@ func test_cast_to_nserror() {
   // CHECK: function_ref @swift_convertErrorToNSError
   let nsCoerced = e as Error as NSError
 
-  // CHECK: unconditional_checked_cast_addr {{.*}} AnyObject in {{%.*}} : $*AnyObject to NSError in {{%.*}} : $*NSError
+  // CHECK: unconditional_checked_cast_addr AnyObject in {{%.*}} : $*AnyObject to NSError in {{%.*}} : $*NSError
   let nsForcedCast = (e as AnyObject) as! NSError
 
   // CHECK: checked_cast_addr_br {{.*}} Error in {{%.*}} : $*Error to NSError in {{%.*}} : $*NSError, bb3, bb4
@@ -79,7 +79,7 @@ func test_cast_to_nserror() {
 // in that case either.
 // CHECK-LABEL: sil hidden @_T010objc_error28test_cast_to_class_archetype{{[_0-9a-zA-Z]*}}F
 func test_cast_to_class_archetype<T: AnyObject>(_: T) {
-  // CHECK: unconditional_checked_cast_addr {{.*}} ErrorClass in {{%.*}} : $*ErrorClass to T in {{.*}} : $*T
+  // CHECK: unconditional_checked_cast_addr ErrorClass in {{%.*}} : $*ErrorClass to T in {{.*}} : $*T
   let e = ErrorClass()
   let forcedCast = e as! T
 }

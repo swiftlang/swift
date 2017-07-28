@@ -190,7 +190,7 @@ sil shared @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@in Ar
 bb0(%0 : $*NSObject, %1 : $*Array<String>):
   %2 = alloc_stack $Array<String>
   copy_addr %1 to [initialization] %2 : $*Array<String>
-  unconditional_checked_cast_addr take_always Array<String> in %2 : $*Array<String> to NSObject in %0 : $*NSObject
+  unconditional_checked_cast_addr Array<String> in %2 : $*Array<String> to NSObject in %0 : $*NSObject
   dealloc_stack %2 : $*Array<String>
   destroy_addr %1 : $*Array<String>
   %7 = tuple ()
