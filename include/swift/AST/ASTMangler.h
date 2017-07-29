@@ -73,7 +73,7 @@ public:
 
   std::string mangleAccessorEntity(AccessorKind kind,
                                    AddressorKind addressorKind,
-                                   const ValueDecl *decl,
+                                   const AbstractStorageDecl *decl,
                                    bool isStatic,
                                    SymbolKind SKind);
 
@@ -138,7 +138,7 @@ public:
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         AddressorKind addressorKind,
-                                        const ValueDecl *decl,
+                                        const AbstractStorageDecl *decl,
                                         StringRef USRPrefix);
 
 protected:
@@ -227,7 +227,7 @@ protected:
 
   void appendAccessorEntity(AccessorKind kind,
                             AddressorKind addressorKind,
-                            const ValueDecl *decl,
+                            const AbstractStorageDecl *decl,
                             bool isStatic);
 
   void appendEntity(const ValueDecl *decl, StringRef EntityOp, bool isStatic);

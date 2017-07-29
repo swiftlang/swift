@@ -92,7 +92,7 @@ std::string ASTMangler::mangleIVarInitDestroyEntity(const ClassDecl *decl,
 
 std::string ASTMangler::mangleAccessorEntity(AccessorKind kind,
                                              AddressorKind addressorKind,
-                                             const ValueDecl *decl,
+                                             const AbstractStorageDecl *decl,
                                              bool isStatic,
                                              SymbolKind SKind) {
   beginMangling();
@@ -419,7 +419,7 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
                                                   AddressorKind addressorKind,
-                                                  const ValueDecl *decl,
+                                                  const AbstractStorageDecl *decl,
                                                   StringRef USRPrefix) {
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
@@ -1881,7 +1881,7 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
 
 void ASTMangler::appendAccessorEntity(AccessorKind kind,
                                       AddressorKind addressorKind,
-                                      const ValueDecl *decl,
+                                      const AbstractStorageDecl *decl,
                                       bool isStatic) {
   assert(kind != AccessorKind::NotAccessor);
   appendContextOf(decl);
