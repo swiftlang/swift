@@ -171,21 +171,21 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // Check that we directly delegate buffer witnesses to a single dynamic field:
 
 //   initializeBufferWithCopyOfBuffer
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T015generic_structs13SingleDynamicVwCP([24 x i8]* %dest, [24 x i8]* %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T015generic_structs13SingleDynamicVwCP([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
 // CHECK:      %T = load %swift.type*,
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK-NEXT: %T.valueWitnesses = load i8**, i8*** [[T1]]
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** %T.valueWitnesses,
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[T1]] to %swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)*
-// CHECK-NEXT: [[T0:%.*]] = call %swift.opaque* [[FN]]([24 x i8]* %dest, [24 x i8]* %src, %swift.type* %T)
+// CHECK-NEXT: [[T0:%.*]] = call %swift.opaque* [[FN]]([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %T)
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.opaque* [[T0]] to {{.*}}
 // CHECK-NEXT: [[T2:%.*]] = bitcast {{.*}} [[T1]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T2]]
 
 
 //   initializeBufferWithTakeOfBuffer
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T015generic_structs13SingleDynamicVwTK([24 x i8]* %dest, [24 x i8]* %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T015generic_structs13SingleDynamicVwTK([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
 // CHECK:      %T = load %swift.type*,
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
@@ -193,7 +193,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.valueWitnesses, i32 6
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]],
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[T1]] to %swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)*
-// CHECK-NEXT: [[T0:%.*]] = call %swift.opaque* [[FN]]([24 x i8]* %dest, [24 x i8]* %src, %swift.type* %T)
+// CHECK-NEXT: [[T0:%.*]] = call %swift.opaque* [[FN]]([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %T)
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.opaque* [[T0]] to {{.*}}
 // CHECK-NEXT: [[T2:%.*]] = bitcast {{.*}} [[T1]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T2]]

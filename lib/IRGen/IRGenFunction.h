@@ -215,11 +215,14 @@ public:
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
   
   llvm::Value *emitValueWitnessTableRef(CanType type);
-  llvm::Value *emitValueWitnessTableRefForLayout(SILType type);
+  llvm::Value *emitValueWitnessTableRef(SILType type,
+                                        llvm::Value **metadataSlot = nullptr);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
   
-  llvm::Value *emitValueWitness(CanType type, ValueWitness index);
-  llvm::Value *emitValueWitnessForLayout(SILType type, ValueWitness index);
+  llvm::Value *emitValueWitnessValue(SILType type, ValueWitness index);
+  FunctionPointer emitValueWitnessFunctionRef(SILType type,
+                                              llvm::Value *&metadataSlot,
+                                              ValueWitness index);
 
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);

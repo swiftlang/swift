@@ -26,7 +26,7 @@ entry(%x : $*T):
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   %b = alloc_existential_box $Error, $T
   %p = project_existential_box $T in %b : $Error
-  // CHECK: call %swift.opaque* %initializeWithTake(%swift.opaque* [[ADDR]], %swift.opaque* %0, %swift.type* %T)
+  // CHECK: call %swift.opaque* %initializeWithTake(%swift.opaque* noalias [[ADDR]], %swift.opaque* noalias %0, %swift.type* %T)
   copy_addr [take] %x to [initialization] %p : $*T
   // CHECK: ret %swift.error* [[BOX]]
   return %b : $Error

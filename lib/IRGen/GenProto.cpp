@@ -1985,14 +1985,15 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
 
   // Cast the witness to the appropriate function type.
-  auto witnessTy = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionTy();
+  auto sig = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionSignature();
+  auto witnessTy = sig.getType();
   witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
 
+  FunctionPointer witnessFnPtr(witness, sig);
+
   // Call the accessor.
-  auto call = IGF.Builder.CreateCall(witness,
+  auto call = IGF.Builder.CreateCall(witnessFnPtr,
                             { associatedTypeMetadata, parentMetadata, wtable });
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.DefaultCC);
 
   return call;
 }
@@ -2831,16 +2832,20 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   return FunctionPointer(witnessFnPtr, signature);
 }
 
-llvm::FunctionType *IRGenModule::getAssociatedTypeMetadataAccessFunctionTy() {
-  if (AssociatedTypeMetadataAccessFunctionTy)
-    return AssociatedTypeMetadataAccessFunctionTy;
+Signature IRGenModule::getAssociatedTypeMetadataAccessFunctionSignature() {
+  auto &fnType = AssociatedTypeMetadataAccessFunctionTy;
+  if (!fnType) {
+    fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
+                                     { TypeMetadataPtrTy,
+                                       WitnessTablePtrTy },
+                                     /*varargs*/ false);
+  }
 
-  auto accessorTy = llvm::FunctionType::get(TypeMetadataPtrTy,
-                                            { TypeMetadataPtrTy,
-                                              WitnessTablePtrTy },
-                                            /*varargs*/ false);
-  AssociatedTypeMetadataAccessFunctionTy = accessorTy;
-  return accessorTy;
+  auto attrs = llvm::AttributeSet::get(getLLVMContext(),
+                                       llvm::AttributeSet::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+
+  return Signature(fnType, attrs, DefaultCC);
 }
 
 llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
@@ -2852,31 +2857,37 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
 
   // Cast the witness to the appropriate function type.
-  auto witnessTy = IGF.IGM.getAssociatedTypeMetadataAccessFunctionTy();
+  auto sig = IGF.IGM.getAssociatedTypeMetadataAccessFunctionSignature();
+  auto witnessTy = sig.getType();
   witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
+
+  FunctionPointer witnessFnPtr(witness, sig);
 
   // Call the accessor.
   assert((!IGF.IGM.DebugInfo || IGF.Builder.getCurrentDebugLocation()) &&
          "creating a function call without a debug location");
-  auto call = IGF.Builder.CreateCall(witness, { parentMetadata, wtable });
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.DefaultCC);
+  auto call = IGF.Builder.CreateCall(witnessFnPtr,
+                                     { parentMetadata, wtable });
 
   return call;
 }
 
-llvm::FunctionType *
-IRGenModule::getAssociatedTypeWitnessTableAccessFunctionTy() {
-  if (AssociatedTypeWitnessTableAccessFunctionTy)
-    return AssociatedTypeWitnessTableAccessFunctionTy;
+Signature
+IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
+  auto &fnType = AssociatedTypeWitnessTableAccessFunctionTy;
+  if (!fnType) {
+    // The associated type metadata is passed first so that this function is
+    // CC-compatible with a conformance's witness table access function.
+    fnType = llvm::FunctionType::get(WitnessTablePtrTy,
+                                     { TypeMetadataPtrTy,
+                                       TypeMetadataPtrTy,
+                                       WitnessTablePtrTy },
+                                     /*varargs*/ false);
+  }
 
-  // The associated type metadata is passed first so that this function is
-  // CC-compatible with a conformance's witness table access function.
-  auto accessorTy = llvm::FunctionType::get(WitnessTablePtrTy,
-                                            { TypeMetadataPtrTy,
-                                              TypeMetadataPtrTy,
-                                              WitnessTablePtrTy },
-                                            /*varargs*/ false);
-  AssociatedTypeWitnessTableAccessFunctionTy = accessorTy;
-  return accessorTy;
+  auto attrs = llvm::AttributeSet::get(getLLVMContext(),
+                                       llvm::AttributeSet::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+
+  return Signature(fnType, attrs, DefaultCC);
 }

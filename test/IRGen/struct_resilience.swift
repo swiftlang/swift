@@ -32,7 +32,7 @@ public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
 // CHECK: [[initializeWithCopy:%.*]] = bitcast i8* [[WITNESS]]
-// CHECK: [[STRUCT_LOC:%.*]] = call %swift.opaque* [[initializeWithCopy]](%swift.opaque* [[STRUCT_ADDR]], %swift.opaque* %1, %swift.type* [[METADATA]])
+// CHECK: [[STRUCT_LOC:%.*]] = call %swift.opaque* [[initializeWithCopy]](%swift.opaque* noalias [[STRUCT_ADDR]], %swift.opaque* noalias %1, %swift.type* [[METADATA]])
 
 // CHECK: [[FN:%.*]] = bitcast i8* %2 to void (%swift.opaque*, %swift.opaque*, %swift.refcounted*)*
 // CHECK: call swiftcc void [[FN]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture [[STRUCT_ADDR]], %swift.refcounted* swiftself %3)
@@ -40,7 +40,7 @@ public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 1
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
 // CHECK: [[destroy:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*)*
-// CHECK: call void [[destroy]](%swift.opaque* %1, %swift.type* [[METADATA]])
+// CHECK: call void [[destroy]](%swift.opaque* noalias %1, %swift.type* [[METADATA]])
 // CHECK: ret void
 
   return f(s)
