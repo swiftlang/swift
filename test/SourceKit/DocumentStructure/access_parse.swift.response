@@ -538,6 +538,7 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "DefAccess",
       key.offset: 1399,
       key.length: 43,
@@ -561,6 +562,7 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "PubAccess",
       key.offset: 1443,
       key.length: 43,
@@ -584,6 +586,7 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "IntAccess",
       key.offset: 1487,
       key.length: 43,
@@ -607,6 +610,7 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "PrivAccess",
       key.offset: 1531,
       key.length: 44,
@@ -630,6 +634,7 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.private,
       key.name: "PubAccess",
       key.offset: 1584,
       key.length: 47,

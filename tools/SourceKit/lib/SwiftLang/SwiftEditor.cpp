@@ -1025,6 +1025,8 @@ public:
     if (Node.Kind != SyntaxStructureKind::Parameter) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
         AccessLevel = getAccessibilityUID(inferAccessibility(VD));
+      } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
+        AccessLevel = getAccessibilityUID(inferDefaultAccessibility(ED));
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
         Optional<Accessibility> SetAccess = inferSetterAccessibility(ASD);
