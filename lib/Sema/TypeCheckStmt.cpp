@@ -377,7 +377,8 @@ public:
 
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
-    typeCheckStmt(S);
+    if (typeCheckStmt(S))
+      return true;
     setAutoClosureDiscriminators(DC, S);
     return false;
   }
@@ -1298,6 +1299,8 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       break;
 
     TC.typeCheckDecl(SubDecl, /*isFirstPass*/false);
+    if (SubDecl->isInvalid())
+      return nullptr;
   }
   
   return BS;
@@ -1627,17 +1630,19 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
   return HadError;
 }
 
-void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
+bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   BraceStmt *body = closure->getBody();
 
   Optional<FunctionBodyTimer> timer;
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(closure, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
-  StmtChecker(*this, closure).typeCheckBody(body);
-  if (body) {
-    closure->setBody(body, closure->hasSingleExpressionBody());
-  }
+  if (StmtChecker(*this, closure).typeCheckBody(body))
+    return true;
+
+  assert(body && "Expected non-null body!");
+  closure->setBody(body, closure->hasSingleExpressionBody());
+  return false;
 }
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

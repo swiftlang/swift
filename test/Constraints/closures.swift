@@ -574,3 +574,10 @@ extension A_SR_5030 {
     // expected-error@-1 {{cannot convert value of type '(idx: (Int))' to closure result type 'Int'}}
   }
 }
+
+// rdar://problem/33296619
+let u = rdar33296619().element //expected-error {{use of unresolved identifier 'rdar33296619'}}
+
+[1].forEach { _ in
+  let _ = "\(u)"
+}

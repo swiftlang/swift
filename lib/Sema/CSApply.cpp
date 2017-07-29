@@ -330,7 +330,6 @@ namespace {
     DeclContext *dc;
     const Solution &solution;
     bool SuppressDiagnostics;
-    bool SkipClosures;
 
     /// Recognize used conformances from an imported type when we must emit
     /// the witness table.
@@ -1652,10 +1651,9 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution,
-                 bool suppressDiagnostics, bool skipClosures)
+                 bool suppressDiagnostics)
       : cs(cs), dc(cs.DC), solution(solution), 
-        SuppressDiagnostics(suppressDiagnostics),
-        SkipClosures(skipClosures) { }
+        SuppressDiagnostics(suppressDiagnostics) { }
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -7256,18 +7254,6 @@ namespace {
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
-    ~ExprWalker() override {
-      // If we're re-typechecking an expression for diagnostics, don't
-      // visit closures that have non-single expression bodies.
-      if (Rewriter.SkipClosures)
-        return;
-
-      auto &cs = Rewriter.getConstraintSystem();
-      auto &tc = cs.getTypeChecker();
-      for (auto *closure : closuresToTypeCheck)
-        tc.typeCheckClosureBody(closure);
-    }
-
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
@@ -7346,6 +7332,10 @@ namespace {
 
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
+
+    ArrayRef<ClosureExpr *> getClosuresToTypeCheck() {
+      return closuresToTypeCheck;
+    }
   };
 } // end anonymous namespace
 
@@ -7582,13 +7572,24 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   for (auto &e : solution.Conformances)
     TC.markConformanceUsed(e.second, DC);
 
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics, skipClosures);
+  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
   ExprWalker walker(rewriter);
 
   // Apply the solution to the expression.
   auto result = expr->walk(walker);
   if (!result)
     return nullptr;
+
+  if (!skipClosures) {
+    bool hadError = false;
+    auto &tc = getTypeChecker();
+
+    for (auto *closure : walker.getClosuresToTypeCheck())
+      hadError |= tc.typeCheckClosureBody(closure);
+
+    if (hadError)
+      return nullptr;
+  }
 
   // If we're supposed to convert the expression to some particular type,
   // do so now.
@@ -7612,8 +7613,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
                                              Expr *expr,
                                              bool suppressDiagnostics) {
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics,
-                        /*skipClosures=*/false);
+  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
   rewriter.walkToExprPre(expr);
   Expr *result = rewriter.walkToExprPost(expr);
   if (result)
@@ -7627,8 +7627,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
                              Optional<Pattern*> typeFromPattern) const {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this,
-                        /*suppressDiagnostics=*/false,
-                        /*skipClosures=*/false);
+                        /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator, typeFromPattern);
   if (!result)
     return nullptr;
@@ -7777,8 +7776,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   Solution &solution = solutions.front();
   ExprRewriter rewriter(cs, solution,
-                        /*suppressDiagnostics=*/false,
-                        /*skipClosures=*/false);
+                        /*suppressDiagnostics=*/false);
 
   auto memberRef = rewriter.buildMemberRef(base, openedFullType,
                                            base->getStartLoc(),
