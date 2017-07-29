@@ -224,7 +224,7 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
                                  Explosion &ex) {
   // Pick a runtime entry point and target metadata based on what kind of
   // representation we're casting.
-  llvm::Value *castFn;
+  llvm::Constant *castFn;
   llvm::Value *toMetadata;
 
   switch (toMetatype->getRepresentation()) {
@@ -630,7 +630,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     
     // Pick the cast function based on the cast mode and on whether we're
     // casting a Swift metatype or ObjC object.
-    llvm::Value *castFn;
+    llvm::Constant *castFn;
     switch (mode) {
     case CheckedCastMode::Unconditional:
       castFn = objcObject

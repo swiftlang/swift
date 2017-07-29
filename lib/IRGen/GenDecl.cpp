@@ -969,7 +969,7 @@ void IRGenerator::emitEagerClassInitialization() {
                               false /* = isVarArg */);
     llvm::InlineAsm *inlineAsm =
       llvm::InlineAsm::get(asmFnTy, "", "r", true /* = SideEffects */);
-    RegisterIGF.Builder.CreateCall(inlineAsm, MetaData);
+    RegisterIGF.Builder.CreateAsmCall(inlineAsm, MetaData);
   }
   RegisterIGF.Builder.CreateRetVoid();
 
@@ -1535,17 +1535,15 @@ static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
 }
 
 /// Get or create an LLVM function with these linkage rules.
-llvm::Function *swift::irgen::createFunction(IRGenModule &IGM,
-                                             LinkInfo &linkInfo,
-                                             llvm::FunctionType *fnType,
-                                             llvm::CallingConv::ID cc,
-                                             const llvm::AttributeList &attrs,
-                                             llvm::Function *insertBefore) {
+llvm::Function *irgen::createFunction(IRGenModule &IGM,
+                                      LinkInfo &linkInfo,
+                                      const Signature &signature,
+                                      llvm::Function *insertBefore) {
   auto name = linkInfo.getName();
 
   llvm::Function *existing = IGM.Module.getFunction(name);
   if (existing) {
-    if (isPointerTo(existing->getType(), fnType))
+    if (isPointerTo(existing->getType(), signature.getType()))
       return cast<llvm::Function>(existing);
 
     IGM.error(SourceLoc(),
@@ -1557,10 +1555,10 @@ llvm::Function *swift::irgen::createFunction(IRGenModule &IGM,
   }
 
   llvm::Function *fn =
-      llvm::Function::Create(fnType, linkInfo.getLinkage(), name);
+    llvm::Function::Create(signature.getType(), linkInfo.getLinkage(), name);
   fn->setVisibility(linkInfo.getVisibility());
   fn->setDLLStorageClass(linkInfo.getDLLStorage());
-  fn->setCallingConv(cc);
+  fn->setCallingConv(signature.getCallingConv());
 
   if (insertBefore) {
     IGM.Module.getFunctionList().insert(insertBefore->getIterator(), fn);
@@ -1568,12 +1566,15 @@ llvm::Function *swift::irgen::createFunction(IRGenModule &IGM,
     IGM.Module.getFunctionList().push_back(fn);
  }
 
-  if (!attrs.isEmpty())
-    fn->setAttributes(attrs);
-  // Merge initial attributes with attrs.
-  llvm::AttrBuilder b;
-  IGM.constructInitialFnAttributes(b);
-  fn->addAttributes(llvm::AttributeList::FunctionIndex, b);
+  llvm::AttrBuilder initialAttrs;
+  IGM.constructInitialFnAttributes(initialAttrs);
+  // Merge initialAttrs with attrs.
+  auto updatedAttrs =
+    signature.getAttributes().addAttributes(IGM.getLLVMContext(),
+                                      llvm::AttributeSet::FunctionIndex,
+                                            initialAttrs);
+  if (!updatedAttrs.isEmpty())
+    fn->setAttributes(updatedAttrs);
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
@@ -1897,9 +1898,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   }
 
   Signature signature = getSignature(f->getLoweredFunctionType());
-  llvm::FunctionType *fnType = signature.getType();
-  auto cc = signature.getCallingConv();
-  auto attrs = signature.getAttributes();
+  auto &attrs = signature.getMutableAttributes();
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
@@ -1913,7 +1912,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::ReadOnly);
   }
-  fn = createFunction(*this, link, fnType, cc, attrs, insertBefore);
+  fn = createFunction(*this, link, signature, insertBefore);
 
   // If we have an order number for this function, set it up as appropriate.
   if (hasOrderNumber) {
@@ -2513,8 +2512,9 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
   }
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, false);
+  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
+  entry = createFunction(*this, link, signature);
   return entry;
 }
 
@@ -2538,8 +2538,9 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
   }
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
+  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
+  entry = createFunction(*this, link, signature);
   return entry;
 }
 
@@ -2848,13 +2849,9 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
     return entry;
   }
 
-  // Find the appropriate function type.
-  llvm::FunctionType *fnType =
-    cast<llvm::FunctionType>(
-      cast<llvm::PointerType>(getValueWitnessTy(index))
-        ->getElementType());
+  auto signature = getValueWitnessSignature(index);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
+  entry = createFunction(*this, link, signature);
   return entry;
 }
 
@@ -3330,8 +3327,9 @@ IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                           TypeMetadataPtrTy,
                                           Int8PtrPtrTy },
                                         /*varargs*/ false);
+  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
+  entry = createFunction(*this, link, signature);
   return entry;
 }
 
@@ -3378,8 +3376,9 @@ IRGenModule::getAddrOfWitnessTableAccessFunction(
     fnType = llvm::FunctionType::get(WitnessTablePtrTy, false);
   }
 
+  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
+  entry = createFunction(*this, link, signature);
   return entry;
 }
 
@@ -3400,8 +3399,9 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
   llvm::FunctionType *fnType
     = llvm::FunctionType::get(WitnessTablePtrTy, false);
 
+  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
+  entry = createFunction(*this, link, signature);
   return entry;
 }
 
@@ -3450,9 +3450,9 @@ IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
     return entry;
   }
 
-  auto fnType = getAssociatedTypeMetadataAccessFunctionTy();
+  auto signature = getAssociatedTypeMetadataAccessFunctionSignature();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
+  entry = createFunction(*this, link, signature);
   return entry;
 }
 
@@ -3473,9 +3473,9 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
     return entry;
   }
 
-  auto fnType = getAssociatedTypeWitnessTableAccessFunctionTy();
+  auto signature = getAssociatedTypeWitnessTableAccessFunctionSignature();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, fnType, DefaultCC, llvm::AttributeList());
+  entry = createFunction(*this, link, signature);
   return entry;
 }
 

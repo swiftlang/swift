@@ -623,7 +623,7 @@ public:
         // Emit an empty inline assembler expression depending on the register.
         auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
         auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
-        Builder.CreateCall(InlineAsm, Storage);
+        Builder.CreateAsmCall(InlineAsm, Storage);
         // Propagate the dbg.value intrinsics into the later basic blocks.  Note
         // that this shouldn't be necessary. LiveDebugValues should be doing
         // this but can't in general because it currently only tracks register
@@ -5012,8 +5012,8 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
       llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
     llvm::InlineAsm *inlineAsm =
       llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
-    Builder.CreateCall(inlineAsm,
-                       llvm::ConstantInt::get(asmArgTy, NumCondFails++));
+    Builder.CreateAsmCall(inlineAsm,
+                          llvm::ConstantInt::get(asmArgTy, NumCondFails++));
   }
 
   // Emit the trap instruction.

@@ -33,7 +33,6 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
-#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Module.h"
 
 #include "Address.h"
@@ -1790,8 +1789,7 @@ namespace {
 
     /// Emit the type layout by projecting it from dynamic type metadata.
     llvm::Value *emitFromTypeMetadata(CanType t) {
-      auto *vwtable = IGF.emitValueWitnessTableRefForLayout(
-                                                    IGF.IGM.getLoweredType(t));
+      auto *vwtable = IGF.emitValueWitnessTableRef(IGF.IGM.getLoweredType(t));
       return emitFromValueWitnessTablePointer(vwtable);
     }
 
@@ -4129,14 +4127,18 @@ IRGenFunction::emitValueWitnessTableRefForMetadata(llvm::Value *metadata) {
 /// Given a lowered SIL type, load a value witness table that represents its
 /// layout.
 llvm::Value *
-IRGenFunction::emitValueWitnessTableRefForLayout(SILType type) {
+IRGenFunction::emitValueWitnessTableRef(SILType type,
+                                        llvm::Value **metadataSlot) {
   // See if we have a cached projection we can use.
   if (auto cached = tryGetLocalTypeDataForLayout(type,
                                   LocalTypeDataKind::forValueWitnessTable())) {
+    if (metadataSlot)
+      *metadataSlot = emitTypeMetadataRefForLayout(type);
     return cached;
   }
   
   auto metadata = emitTypeMetadataRefForLayout(type);
+  if (metadataSlot) *metadataSlot = metadata;
   auto vwtable = emitValueWitnessTableRefForMetadata(metadata);
   setScopedLocalTypeDataForLayout(type,
                                   LocalTypeDataKind::forValueWitnessTable(),

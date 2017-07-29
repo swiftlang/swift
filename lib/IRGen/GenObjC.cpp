@@ -124,7 +124,7 @@ llvm::Value *IRGenFunction::emitObjCAutoreleaseCall(llvm::Value *val) {
   return call;
 }
 
-llvm::Value *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
+llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   // Check to see if we've already computed the market.  Note that we
   // might have cached a null marker, and that's fine.
   auto &cache = ObjCRetainAutoreleasedReturnValueMarker;
@@ -170,7 +170,7 @@ llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
                                                           llvm::Value *value) {
   // Call the inline-assembly marker if we need one.
   if (auto marker = IGF.IGM.getObjCRetainAutoreleasedReturnValueMarker()) {
-    IGF.Builder.CreateCall(marker, {});
+    IGF.Builder.CreateAsmCall(marker, {});
   }
 
   auto fn = IGF.IGM.getObjCRetainAutoreleasedReturnValueFn();

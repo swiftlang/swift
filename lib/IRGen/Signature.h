@@ -54,6 +54,11 @@ class Signature {
   llvm::CallingConv::ID CallingConv;
 
 public:
+  Signature() {}
+  Signature(llvm::FunctionType *fnType, llvm::AttributeSet attrs,
+            llvm::CallingConv::ID callingConv)
+    : Type(fnType), Attributes(attrs), CallingConv(callingConv) {}
+
   bool isValid() const {
     return Type != nullptr;
   }
@@ -97,8 +102,6 @@ public:
     assert(isValid());
     return Attributes;
   }
-
-
 };
 
 } // end namespace irgen
