@@ -964,6 +964,16 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                                    TypeAliasD->getName().getLength());
     SN.Attrs = TypeAliasD->getAttrs();
     pushStructureNode(SN, TypeAliasD);
+  } else if (auto *SubscriptD = dyn_cast<SubscriptDecl>(D)) {
+    SyntaxStructureNode SN;
+    SN.Dcl = SubscriptD;
+    SN.Kind = SyntaxStructureKind::Subscript;
+    SN.Range = charSourceRangeFromSourceRange(SM,
+                                              SubscriptD->getSourceRange());
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
+                                               SubscriptD->getBracesRange());
+    SN.Attrs = SubscriptD->getAttrs();
+    pushStructureNode(SN, SubscriptD);
   }
 
   return true;
@@ -1253,7 +1263,7 @@ bool ModelASTWalker::popStructureNode() {
 
   // VarDecls are popped before we see their TypeRepr, so if we pass the token
   // nodes now they will not change from identifier to a type-identifier.
-  if (!Node.isVariable()) {
+  if (!Node.hasSubstructure()) {
     if (!passTokenNodesUntil(Node.Range.getEnd(), IncludeNodeAtLocation))
       return false;
   }
