@@ -2067,7 +2067,12 @@ Expr *Parser::parseExprIdentifier() {
     auto refKind = DeclRefKind::Ordinary;
     E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
   } else if (auto TD = dyn_cast<TypeDecl>(D)) {
-    assert(!TD->getDeclContext()->isTypeContext());
+    // When parsing default argument expressions for generic functions,
+    // we haven't built a FuncDecl or re-parented the GenericTypeParamDecls
+    // to the FuncDecl yet. Other than that, we should only ever find
+    // global or local declarations here.
+    assert(!TD->getDeclContext()->isTypeContext() ||
+           isa<GenericTypeParamDecl>(TD));
     E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*DC*/nullptr,
                                 /*implicit*/false);
   } else {
