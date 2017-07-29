@@ -1038,7 +1038,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///
   /// - Parameter other: The value to compare with this value.
   /// - Returns: `true` if `other` has the same value as this instance;
-  ///   otherwise, `false`.
+  ///   otherwise, `false`. If either this value or `other` is NaN, the result
+  ///   of this method is `false`.
   func isEqual(to other: Self) -> Bool
 
   /// Returns a Boolean value indicating whether this instance is less than the
@@ -1068,7 +1069,9 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` is less than this value; otherwise, `false`.
+  /// - Returns: `true` if this value is less than `other`; otherwise, `false`.
+  ///   If either this value or `other` is NaN, the result of this method is
+  ///   `false`.
   func isLess(than other: Self) -> Bool
 
   /// Returns a Boolean value indicating whether this instance is less than or
@@ -1096,24 +1099,24 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` is less than this value; otherwise, `false`.
+  /// - Returns: `true` if `other` is greater than this value; otherwise,
+  ///   `false`. If either this value or `other` is NaN, the result of this
+  ///   method is `false`.
   func isLessThanOrEqualTo(_ other: Self) -> Bool
 
-  /// Returns a Boolean value indicating whether this instance should precede the
-  /// given value in an ascending sort.
+  /// Returns a Boolean value indicating whether this instance should precede
+  /// or tie positions with the given value in an ascending sort.
   ///
   /// This relation is a refinement of the less-than-or-equal-to operator
   /// (`<=`) that provides a total order on all values of the type, including
-  /// noncanonical encodings, signed zeros, and NaNs. Because it is used much
-  /// less frequently than the usual comparisons, there is no operator form of
-  /// this relation.
+  /// signed zeros and NaNs.
   ///
-  /// The following example uses `isTotallyOrdered(below:)` to sort an array of
-  /// floating-point values, including some that are NaN:
+  /// The following example uses `isTotallyOrdered(belowOrEqualTo:)` to sort an
+  /// array of floating-point values, including some that are NaN:
   ///
   ///     var numbers = [2.5, 21.25, 3.0, .nan, -9.5]
-  ///     numbers.sort { $0.isTotallyOrdered(below: $1) }
-  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, nan]
+  ///     numbers.sort { !$1.isTotallyOrdered(belowOrEqualTo: $0) }
+  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, NaN]
   ///
   /// The `isTotallyOrdered(belowOrEqualTo:)` method implements the total order
   /// relation as defined by the [IEEE 754 specification][spec].
@@ -1121,8 +1124,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter other: A floating-point value to compare to this value.
-  /// - Returns: `true` if this value is ordered below `other` in a total
-  ///   ordering of the floating-point type; otherwise, `false`.
+  /// - Returns: `true` if this value is ordered below or the same as `other`
+  ///   in a total ordering of the floating-point type; otherwise, `false`.
   func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool
 
   /// A Boolean value indicating whether this instance is normal.
@@ -2029,21 +2032,19 @@ extension BinaryFloatingPoint {
       significandBitPattern: magnitudeOf.significandBitPattern)
   }
 
-  /// Returns a Boolean value indicating whether this instance should precede the
-  /// given value in an ascending sort.
+  /// Returns a Boolean value indicating whether this instance should precede
+  /// or tie positions with the given value in an ascending sort.
   ///
   /// This relation is a refinement of the less-than-or-equal-to operator
   /// (`<=`) that provides a total order on all values of the type, including
-  /// noncanonical encodings, signed zeros, and NaNs. Because it is used much
-  /// less frequently than the usual comparisons, there is no operator form of
-  /// this relation.
+  /// signed zeros and NaNs.
   ///
-  /// The following example uses `isTotallyOrdered(below:)` to sort an array of
-  /// floating-point values, including some that are NaN:
+  /// The following example uses `isTotallyOrdered(belowOrEqualTo:)` to sort an
+  /// array of floating-point values, including some that are NaN:
   ///
   ///     var numbers = [2.5, 21.25, 3.0, .nan, -9.5]
-  ///     numbers.sort { $0.isTotallyOrdered(below: $1) }
-  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, nan]
+  ///     numbers.sort { !$1.isTotallyOrdered(belowOrEqualTo: $0) }
+  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, NaN]
   ///
   /// The `isTotallyOrdered(belowOrEqualTo:)` method implements the total order
   /// relation as defined by the [IEEE 754 specification][spec].
@@ -2051,8 +2052,8 @@ extension BinaryFloatingPoint {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter other: A floating-point value to compare to this value.
-  /// - Returns: `true` if this value is ordered below `other` in a total
-  ///   ordering of the floating-point type; otherwise, `false`.
+  /// - Returns: `true` if this value is ordered below or the same as `other`
+  ///   in a total ordering of the floating-point type; otherwise, `false`.
   public func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool {
     // Quick return when possible.
     if self < other { return true }
