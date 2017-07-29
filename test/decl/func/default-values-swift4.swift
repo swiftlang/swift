@@ -78,3 +78,8 @@ public func publicFunctionWithDefaultValue(
     }(),
     y: Int = internalIntFunction()) {}
     // expected-error@-1 {{global function 'internalIntFunction()' is internal and cannot be referenced from a default argument value}}
+
+// https://bugs.swift.org/browse/SR-5559
+public class MyClass {
+  public func method<T>(_: T.Type = T.self) -> T { }
+}
