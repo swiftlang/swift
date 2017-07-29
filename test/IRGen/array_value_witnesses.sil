@@ -50,7 +50,7 @@ struct SomeWeak {
 // CHECK:         @_T021array_value_witnesses8SomeWeakVwtT
 
 // CHECK-LABEL: define linkonce_odr hidden void @_T021array_value_witnesses8SomeWeakVwXx
-// CHECK:         (%swift.opaque* [[ARRAY_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %SomeWeak) {{.*}} {
+// CHECK:         (%swift.opaque* noalias [[ARRAY_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %SomeWeak) {{.*}} {
 // CHECK:         [[BEGIN:%.*]] = bitcast %swift.opaque* [[ARRAY_PTR]] to [[SOMEWEAK:%T21array_value_witnesses8SomeWeakV]]*
 // CHECK:         br label %iter
 // CHECK:       iter:
@@ -68,7 +68,7 @@ struct SomeWeak {
 // CHECK:         ret
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T021array_value_witnesses8SomeWeakVwCc
-// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %SomeWeak) {{.*}} {
+// CHECK:         (%swift.opaque* noalias [[DEST_PTR:%.*]], %swift.opaque* noalias [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %SomeWeak) {{.*}} {
 // CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
 // CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*
 // CHECK:         br label %iter

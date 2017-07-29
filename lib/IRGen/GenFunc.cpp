@@ -1174,23 +1174,30 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     }
   }
 
-  // Derive the callee function pointer.  If we found a function
-  // pointer statically, great.
+  // Derive the callee function pointer.
   auto fnTy = origSig.getType()->getPointerTo();
-  llvm::Value *fnPtr;
-  if (staticFnPtr) {
-    assert(staticFnPtr->getType() == fnTy && "static function type mismatch?!");
-    fnPtr = staticFnPtr;
+  FunctionPointer fnPtr = [&] {
+    // If we found a function pointer statically, great.
+    if (staticFnPtr) {
+      assert(staticFnPtr->getType() == fnTy &&
+             "static function type mismatch?!");
+      Signature sig(cast<llvm::FunctionType>(fnTy->getElementType()),
+                    staticFnPtr->getAttributes(),
+                    staticFnPtr->getCallingConv());
+      return FunctionPointer::forDirect(staticFnPtr, sig);
+    }
 
-  // Otherwise, it was the last thing we added to the layout.
-  } else {
+    // Otherwise, it was the last thing we added to the layout.
+
     // The dynamic function pointer is packed "last" into the context,
     // and we pulled it out as an argument.  Just pop it off.
-    fnPtr = args.takeLast();
+    auto fnPtr = args.takeLast();
 
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
-  }
+
+    return FunctionPointer(fnPtr, origSig);
+  }();
 
   // Derive the context argument if needed.  This is either:
   //   - the saved context argument, in which case it was the last
@@ -1246,17 +1253,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, args.claimAll());
   
-  if (staticFnPtr) {
-    // Use the attributes and calling convention from the static definition if
-    // we have it.
-    call->setAttributes(staticFnPtr->getAttributes());
-    call->setCallingConv(staticFnPtr->getCallingConv());
-  } else {
-    // Otherwise, use the default attributes for the dynamic type.
-    call->setAttributes(origSig.getAttributes());
-    // Use the calling convention of the partially applied function type.
-    call->setCallingConv(origSig.getCallingConv());
-  }
   if (addressesToDeallocate.empty() && !needsAllocas &&
       (!consumesContext || !dependsOnContextLifetime))
     call->setTailCall();

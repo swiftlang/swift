@@ -85,7 +85,7 @@ public:
   }
 
   llvm::Value *getValueWitnessTable(IRGenFunction &IGF, SILType T) const {
-    return IGF.emitValueWitnessTableRefForLayout(T);
+    return IGF.emitValueWitnessTableRef(T);
   }
 
   std::pair<llvm::Value*,llvm::Value*>

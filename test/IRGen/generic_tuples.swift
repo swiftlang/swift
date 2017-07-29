@@ -25,14 +25,14 @@ func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]], align 8
 // CHECK-NEXT: [[INITIALIZE_WITH_COPY:%.*]] = bitcast i8* [[WITNESS]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[INITIALIZE_WITH_COPY]]([[OPAQUE]]* [[X_TMP]], [[OPAQUE]]* {{.*}}, [[TYPE]]* %T)
+// CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[INITIALIZE_WITH_COPY]]([[OPAQUE]]* noalias [[X_TMP]], [[OPAQUE]]* noalias {{.*}}, [[TYPE]]* %T)
 //   Copy 'x' into the first result.
-// CHECK-NEXT: call [[OPAQUE]]* [[INITIALIZE_WITH_COPY]]([[OPAQUE]]* %0, [[OPAQUE]]* [[X_TMP]], [[TYPE]]* %T)
+// CHECK-NEXT: call [[OPAQUE]]* [[INITIALIZE_WITH_COPY]]([[OPAQUE]]* noalias %0, [[OPAQUE]]* noalias [[X_TMP]], [[TYPE]]* %T)
 //   Copy 'x' into the second element.
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]], align 8
 // CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[WITNESS]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* %1, [[OPAQUE]]* [[X_TMP]], [[TYPE]]* %T)
+// CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* noalias %1, [[OPAQUE]]* noalias [[X_TMP]], [[TYPE]]* %T)
 
 struct S {}
 

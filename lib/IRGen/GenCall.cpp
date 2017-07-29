@@ -1335,7 +1335,7 @@ llvm::CallSite CallEmission::emitCallSite() {
 
 llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
                                       ArrayRef<llvm::Value*> args) {
-  llvm::CallInst *call = CreateCall(fn.getPointer(), args);
+  llvm::CallInst *call = IRBuilderBase::CreateCall(fn.getPointer(), args);
   call->setAttributes(fn.getAttributes());
   call->setCallingConv(fn.getCallingConv());
   return call;

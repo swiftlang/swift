@@ -100,8 +100,8 @@ void IRGenFunction::emitMemCpy(Address dest, Address src, llvm::Value *size) {
 }
 
 static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
-                                       llvm::Value *fn,
-                                       std::initializer_list<llvm::Value*> args,
+                                       llvm::Constant *fn,
+                                       ArrayRef<llvm::Value*> args,
                                        const llvm::Twine &name) {
   auto allocAttrs = IGF.IGM.getAllocAttrs();
   llvm::CallInst *call =
