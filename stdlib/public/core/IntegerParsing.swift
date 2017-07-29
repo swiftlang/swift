@@ -102,7 +102,7 @@ extension FixedWidthInteger {
   ///
   /// The string passed as `text` may begin with a plus or minus sign character
   /// (`+` or `-`), followed by one or more numeric digits (`0-9`) or letters
-  /// (`a-z` or `A-Z`). The string is case insensitive.
+  /// (`a-z` or `A-Z`). Parsing of the string is case insensitive.
   ///
   ///     let x = Int("123")
   ///     // x == 123
@@ -116,7 +116,7 @@ extension FixedWidthInteger {
   ///     // z == 123
   ///
   /// If `text` is in an invalid format or contains characters that are out of
-  /// range for the given `radix`, or if the value it denotes in the given
+  /// bounds for the given `radix`, or if the value it denotes in the given
   /// `radix` is not representable, the result is `nil`. For example, the
   /// following conversions result in `nil`:
   ///
@@ -154,5 +154,29 @@ extension FixedWidthInteger {
     }
     guard _fastPath(result != nil) else { return nil }
     self = result!
+  }
+
+  /// Creates a new integer value from the given string.
+  ///
+  /// The string passed as `description` may begin with a plus or minus sign
+  /// character (`+` or `-`), followed by one or more numeric digits (`0-9`).
+  ///
+  ///     let x = Int("123")
+  ///     // x == 123
+  ///
+  /// If `description` is in an invalid format, or if the value it denotes in
+  /// base 10 is not representable, the result is `nil`. For example, the
+  /// following conversions result in `nil`:
+  ///
+  ///     Int(" 100")                       // Includes whitespace
+  ///     Int("21-50")                      // Invalid format
+  ///     Int("ff6600")                     // Characters out of bounds
+  ///     Int("10000000000000000000000000") // Out of range
+  ///
+  /// - Parameter description: The ASCII representation of a number.
+  @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inline(__always)
+  public init?(_ description: String) {
+    self.init(description, radix: 10)
   }
 }
