@@ -11,7 +11,9 @@
       key.length: 65,
       key.typename: "S",
       key.nameoffset: 148,
-      key.namelength: 5
+      key.namelength: 5,
+      key.docoffset: 0,
+      key.doclength: 142
     },
     {
       key.kind: source.lang.swift.expr.object_literal,

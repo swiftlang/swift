@@ -33,6 +33,7 @@ public:
                          SourceKit::UIdent SetterAccessLevel,
                          unsigned NameOffset, unsigned NameLength,
                          unsigned BodyOffset, unsigned BodyLength,
+                         unsigned DocOffset, unsigned DocLength,
                          llvm::StringRef DisplayName, llvm::StringRef TypeName,
                          llvm::StringRef RuntimeName,
                          llvm::StringRef SelectorName,
