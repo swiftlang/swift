@@ -855,29 +855,29 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
               return;
             }
           }
+        }
 
-          // Check the generic parameters if our context is a generic type or
-          // extension thereof.
-          GenericParamList *dcGenericParams = nullptr;
-          if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
-            dcGenericParams = nominal->getGenericParams();
-          else if (auto ext = dyn_cast<ExtensionDecl>(DC))
-            dcGenericParams = ext->getGenericParams();
-          else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
-            dcGenericParams = subscript->getGenericParams();
+        // Check the generic parameters if our context is a generic type or
+        // extension thereof.
+        GenericParamList *dcGenericParams = nullptr;
+        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
+          dcGenericParams = nominal->getGenericParams();
+        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
+          dcGenericParams = ext->getGenericParams();
+        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
+          dcGenericParams = subscript->getGenericParams();
 
-          while (dcGenericParams) {
-            namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-            localVal.checkGenericParams(dcGenericParams);
+        while (dcGenericParams) {
+          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+          localVal.checkGenericParams(dcGenericParams);
 
-            if (!Results.empty())
-              return;
+          if (!Results.empty())
+            return;
 
-            if (!isa<ExtensionDecl>(DC))
-              break;
+          if (!isa<ExtensionDecl>(DC))
+            break;
 
-            dcGenericParams = dcGenericParams->getOuterParameters();
-          }
+          dcGenericParams = dcGenericParams->getOuterParameters();
         }
 
         DC = DC->getParentForLookup();
