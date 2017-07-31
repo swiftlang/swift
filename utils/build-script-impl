@@ -2406,6 +2406,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS="-DLIBDISPATCH_SOURCE_DIR=${LIBDISPATCH_SOURCE_DIR} -DLIBDISPATCH_BUILD_DIR=${LIBDISPATCH_BUILD_DIR}"
                 fi
 
+                # Opt-in for building with icu
+                if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+                    LIBICU_BUILD_DIR=$(build_directory ${host} libicu)
+                    ICU_TMPINSTALL=$LIBICU_BUILD_DIR/tmp_install
+                    LIBICU_BUILD_ARGS="-DLIBICU_SOURCE_DIR=${LIBICU_SOURCE_DIR} -DLIBICU_BUILD_DIR=${LIBICU_BUILD_DIR} -DICU_TMPINSTALL=${ICU_TMPINSTALL}"
+                fi
+
                 if [[ "${USE_GOLD_LINKER}" ]]; then
                     SWIFT_USE_LINKER="-fuse-ld=gold"
                 fi
@@ -2430,7 +2437,7 @@ for host in "${ALL_HOSTS[@]}"; do
     
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call env SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
-                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="$(get_host_install_destdir ${host})" PREFIX="$(get_host_install_prefix ${host})" ./configure "${FOUNDATION_BUILD_TYPE}" ${FOUNDATION_BUILD_ARGS[@]} -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS
+                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="$(get_host_install_destdir ${host})" PREFIX="$(get_host_install_prefix ${host})" ./configure "${FOUNDATION_BUILD_TYPE}" ${FOUNDATION_BUILD_ARGS[@]} -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS $LIBICU_BUILD_ARGS
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call ${NINJA_BIN}
 
