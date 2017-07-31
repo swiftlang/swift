@@ -1070,6 +1070,7 @@ private:
       case SyntaxStructureKind::EnumCase: return "enum-case";
       case SyntaxStructureKind::EnumElement: return "enum-elem";
       case SyntaxStructureKind::TypeAlias: return "typealias";
+      case SyntaxStructureKind::Subscript: return "subscript";
       case SyntaxStructureKind::Parameter: return "param";
       case SyntaxStructureKind::ForEachStatement: return "foreach";
       case SyntaxStructureKind::ForStatement: return "for";

@@ -93,6 +93,7 @@ enum class SyntaxStructureKind : uint8_t {
   EnumCase,
   EnumElement,
   TypeAlias,
+  Subscript,
 
   ForEachStatement,
   ForStatement,
@@ -139,13 +140,14 @@ struct SyntaxStructureNode {
   std::vector<CharSourceRange> InheritedTypeRanges;
   std::vector<SyntaxStructureElement> Elements;
 
-  bool isVariable() const {
+  bool hasSubstructure() const {
     switch (Kind) {
     case SyntaxStructureKind::GlobalVariable:
     case SyntaxStructureKind::InstanceVariable:
     case SyntaxStructureKind::StaticVariable:
     case SyntaxStructureKind::ClassVariable:
     case SyntaxStructureKind::Parameter:
+    case SyntaxStructureKind::Subscript:
       return true;
     default:
       return false;
