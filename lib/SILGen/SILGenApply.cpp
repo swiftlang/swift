@@ -2921,9 +2921,10 @@ private:
       return;
     }
 
-    if (SGF.F.getModule().getOptions().EnableSILOwnership) {
-      if (param.isDirectGuaranteed() &&
-          value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+    if (SGF.F.getModule().getOptions().EnableSILOwnership
+        && value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+      if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses()
+                                         && param.isIndirectInGuaranteed())) {
         value = value.borrow(SGF, loc);
         Args.push_back(value);
         return;
