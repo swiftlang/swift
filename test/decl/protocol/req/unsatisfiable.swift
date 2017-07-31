@@ -40,11 +40,11 @@ protocol Base {
 // FIXME: This used to /not/ error in Swift 3. It didn't impose any statically-
 // enforced requirements, but the compiler crashed if you used anything but the
 // same type.
-protocol Sub1: Base { // expected-error {{first type 'Self.Assoc' in conformance requirement does not refer to a generic parameter or associated type}}
+protocol Sub1: Base { // expected-error {{type 'Self.SubAssoc' constrained to non-protocol, non-class type 'Self.Assoc'}}
   associatedtype SubAssoc: Assoc // expected-error {{inheritance from non-protocol, non-class type 'Self.Assoc'}}
 }
 // FIXME: This error is incorrect in what it states and should be emitted on
 // the where-clause.
-protocol Sub2: Base { // expected-error {{first type 'Self.Assoc' in conformance requirement does not refer to a generic parameter or associated type}}
+protocol Sub2: Base { // expected-error {{type 'Self.SubAssoc' constrained to non-protocol, non-class type 'Self.Assoc'}}
   associatedtype SubAssoc where SubAssoc: Assoc
 }
