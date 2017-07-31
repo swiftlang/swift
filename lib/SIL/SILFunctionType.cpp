@@ -486,6 +486,11 @@ enum class ConventionsKind : uint8_t {
       ParameterConvention convention;
       if (origType.getAs<InOutType>()) {
         convention = ParameterConvention::Indirect_Inout;
+      } else if (isa<TupleType>(substType) && !origType.isTypeParameter()) {
+        // Do not lower tuples @guaranteed.  This can create conflicts with
+        // substitutions for witness thunks e.g. we take $*(T, T)
+        // @in_guaranteed and try to substitute it for $*T.
+        return visit(origType, substType);
       } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
         if (rep == SILFunctionTypeRepresentation::WitnessMethod)
           convention = ParameterConvention::Indirect_In_Guaranteed;
@@ -586,7 +591,7 @@ enum class ConventionsKind : uint8_t {
         // materializable -- if it doesn't contain an l-value type -- then it's
         // a valid target for substitution and we should not expand it.
         if (!tty || (eltPattern.isTypeParameter() && !tty->hasInOutElement())) {
-          if (params[i].getParameterFlags().isShared()) {
+          if (params[i].isShared()) {
             visitSharedType(eltPattern, ty, extInfo.getSILRepresentation());
           } else {
             visit(eltPattern, ty);

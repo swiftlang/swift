@@ -1123,8 +1123,12 @@ CanType TypeBase::getCanonicalType() {
     auto &ctx = function->getInput()->getASTContext();
     auto &mod = *ctx.TheBuiltinModule;
     Type inputTy = function->getInput()->getCanonicalType(sig, mod);
-    if (!AnyFunctionType::isCanonicalFunctionInputType(inputTy))
-      inputTy = ParenType::get(ctx, inputTy->getInOutObjectType(), ParameterTypeFlags().withInOut(inputTy->is<InOutType>()));
+    if (!AnyFunctionType::isCanonicalFunctionInputType(inputTy)) {
+      auto flags = ParameterTypeFlags().withInOut(inputTy->is<InOutType>());
+      if (auto parenTy = dyn_cast<ParenType>(function->getInput().getPointer()))
+        flags = flags.withShared(parenTy->getParameterFlags().isShared());
+      inputTy = ParenType::get(ctx, inputTy->getInOutObjectType(), flags);
+    }
     auto resultTy = function->getResult()->getCanonicalType(sig, mod);
 
     Result = GenericFunctionType::get(sig, inputTy, resultTy,
@@ -1142,7 +1146,10 @@ CanType TypeBase::getCanonicalType() {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
     if (!AnyFunctionType::isCanonicalFunctionInputType(In)) {
-      In = ParenType::get(In->getASTContext(), In->getInOutObjectType(), ParameterTypeFlags().withInOut(In->is<InOutType>()));
+      auto flags = ParameterTypeFlags().withInOut(In->is<InOutType>());
+      if (auto parenTy = dyn_cast<ParenType>(FT->getInput().getPointer()))
+        flags = flags.withShared(parenTy->getParameterFlags().isShared());
+      In = ParenType::get(In->getASTContext(), In->getInOutObjectType(), flags);
       assert(AnyFunctionType::isCanonicalFunctionInputType(In));
     }
     Type Out = FT->getResult()->getCanonicalType();
