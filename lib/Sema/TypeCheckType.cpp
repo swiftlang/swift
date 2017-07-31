@@ -274,8 +274,13 @@ Type TypeChecker::resolveTypeInContext(
 
   assert(foundDC);
 
+  // selfType is the self type of the context, unless the
+  // context is a protocol type, in which case we might have
+  // to use the existential type or superclass bound as a
+  // parent type instead.
   Type selfType;
-  if (isa<NominalTypeDecl>(typeDecl)) {
+  if (isa<NominalTypeDecl>(typeDecl) &&
+      typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
     // When looking up a nominal type declaration inside of a
     // protocol extension, always use the nominal type and
     // not the protocol 'Self' type.
@@ -292,7 +297,8 @@ Type TypeChecker::resolveTypeInContext(
 
     if (selfType->is<GenericTypeParamType>() &&
         typeDecl->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      // We found a member of a class from a protocol extension.
+      // We found a member of a class from a protocol or protocol
+      // extension.
       //
       // Get the superclass of the 'Self' type parameter.
       auto *sig = foundDC->getGenericSignatureOfContext();
