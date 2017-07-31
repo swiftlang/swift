@@ -134,7 +134,5 @@ func owned_to_shared_conversion(_ f : (Int, ValueAggregate, RefAggregate) -> Voi
   return owned_to_shared_conversion { (trivial : __shared Int, val : __shared ValueAggregate, ref : __shared RefAggregate) in }
 }
 
-// TODO: Investigate a different lowering scheme than @owned.  Perhaps '@guaranteed $@callee_guaranteed'?
-
-// CHECK-LABEL: sil hidden @_T06shared0A17_closure_loweringyySi_AA14ValueAggregateVAA03RefE0CtcF : $@convention(thin) (@owned @callee_owned (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
+// CHECK-LABEL: sil hidden @_T06shared0A17_closure_loweringyySi_AA14ValueAggregateVAA03RefE0CtcF : $@convention(thin) (@guaranteed @callee_owned (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
 func shared_closure_lowering(_ f : __shared (Int, ValueAggregate, RefAggregate) -> Void) {}
