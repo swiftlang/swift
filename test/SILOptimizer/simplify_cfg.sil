@@ -2901,3 +2901,44 @@ bb6(%14 : $foo):
   %16 = tuple ()
   return %16 : $()
 }
+
+protocol Q {}
+
+class IsQ : Q {}
+
+// checked_cast_br take_* should be replaced by a destroy in case it ever
+// converts a managed object to an unmanaged value. Currently this doesn't
+// happen at the language level because bridge (NSNumber->Int) casts aren't
+// represented with checked_cast_br.
+// ---
+// CHECK-LABEL: sil @test_dead_checked_cast_br : $@convention(thin) (@in IsQ) -> () {
+// CHECK: bb0(%0 : $*IsQ):
+// CHECK:   [[Q:%.*]] = alloc_stack $Q
+// CHECK:   destroy_addr %0 : $*IsQ
+// CHECK:   dealloc_stack [[Q]] : $*Q
+// CHECK:   [[R:%.*]] = tuple ()
+// CHECK:   return [[R]] : $()
+// CHECK-LABEL: } // end sil function 'test_dead_checked_cast_br'
+sil @test_dead_checked_cast_br : $@convention(thin) (@in IsQ) -> () {
+bb0(%0 : $*IsQ):
+  %p = alloc_stack $Q
+  checked_cast_addr_br take_always IsQ in %0 : $*IsQ to Q in %p : $*Q, bb1, bb3
+
+bb1:
+  %m1 = integer_literal $Builtin.Int1, -1
+  br bb2(%m1 : $Builtin.Int1)
+
+bb2(%5 : $Builtin.Int1):
+  // To avoid violating ownership, Q needs to be destroyed here. However, that
+  // would create a use of the checked_cast, defeating the test. In theory, Q
+  // could be some unmananged type with no destroy, but we don't have a way to
+  // express that in the type system, and bridged casts don't yet go through
+  // this optimization path.
+  dealloc_stack %p : $*Q
+  %r = tuple ()
+  return %r : $()
+
+bb3:
+  %z = integer_literal $Builtin.Int1, 0
+  br bb2(%z : $Builtin.Int1)
+}

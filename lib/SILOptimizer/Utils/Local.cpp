@@ -1986,6 +1986,8 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
     if (ResultNotUsed) {
       EraseInstAction(Inst);
       Builder.setInsertionPoint(BB);
+      if (shouldTakeOnSuccess(Inst->getConsumptionKind()))
+        Builder.emitDestroyAddr(Loc, Src);
       auto *NewI = Builder.createBranch(Loc, SuccessBB);
       WillSucceedAction();
       return NewI;
