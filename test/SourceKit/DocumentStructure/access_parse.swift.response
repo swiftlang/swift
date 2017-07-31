@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 1758,
+  key.length: 1876,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -538,7 +538,6 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
-      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "DefAccess",
       key.offset: 1399,
       key.length: 43,
@@ -562,7 +561,6 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
-      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "PubAccess",
       key.offset: 1443,
       key.length: 43,
@@ -586,7 +584,6 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
-      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "IntAccess",
       key.offset: 1487,
       key.length: 43,
@@ -610,7 +607,6 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
-      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "PrivAccess",
       key.offset: 1531,
       key.length: 44,
@@ -657,39 +653,87 @@
       ]
     },
     {
+      key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "DefAccess",
+      key.offset: 1641,
+      key.length: 51,
+      key.nameoffset: 1651,
+      key.namelength: 9,
+      key.bodyoffset: 1662,
+      key.bodylength: 29,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "internalExtFunc()",
+          key.offset: 1665,
+          key.length: 25,
+          key.nameoffset: 1670,
+          key.namelength: 17,
+          key.bodyoffset: 1689,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "PubAccess",
+      key.offset: 1700,
+      key.length: 49,
+      key.nameoffset: 1710,
+      key.namelength: 9,
+      key.bodyoffset: 1721,
+      key.bodylength: 27,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.public,
+          key.name: "publicExtFunc()",
+          key.offset: 1724,
+          key.length: 23,
+          key.nameoffset: 1729,
+          key.namelength: 15,
+          key.bodyoffset: 1746,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
       key.kind: source.lang.swift.decl.typealias,
       key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "defAlias",
-      key.offset: 1633,
+      key.offset: 1751,
       key.length: 24,
-      key.nameoffset: 1643,
+      key.nameoffset: 1761,
       key.namelength: 8
     },
     {
       key.kind: source.lang.swift.decl.typealias,
       key.accessibility: source.lang.swift.accessibility.public,
       key.name: "pubAlias",
-      key.offset: 1665,
+      key.offset: 1783,
       key.length: 24,
-      key.nameoffset: 1675,
+      key.nameoffset: 1793,
       key.namelength: 8
     },
     {
       key.kind: source.lang.swift.decl.typealias,
       key.accessibility: source.lang.swift.accessibility.private,
       key.name: "privAlias",
-      key.offset: 1698,
+      key.offset: 1816,
       key.length: 25,
-      key.nameoffset: 1708,
+      key.nameoffset: 1826,
       key.namelength: 9
     },
     {
       key.kind: source.lang.swift.decl.typealias,
       key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "intAlias",
-      key.offset: 1733,
+      key.offset: 1851,
       key.length: 24,
-      key.nameoffset: 1743,
+      key.nameoffset: 1861,
       key.namelength: 8
     }
   ]

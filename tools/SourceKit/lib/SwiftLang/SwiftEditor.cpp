@@ -912,12 +912,21 @@ static UIdent getAccessibilityUID(Accessibility Access) {
   llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
-static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
+static Optional<Accessibility> getAccessibilityStrictly(const ExtensionDecl *ED) {
   if (ED->hasDefaultAccessibility())
     return ED->getDefaultAccessibility();
 
+  // Check if the decl has an explicit accessibility attribute.
   if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
     return AA->getAccess();
+
+  return None;
+}
+
+static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
+  auto StrictAccess = getAccessibilityStrictly(ED);
+  if (StrictAccess.hasValue())
+    return StrictAccess.getValue();
 
   // Assume "internal", which is the most common thing anyway.
   return Accessibility::Internal;
@@ -1026,7 +1035,10 @@ public:
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
         AccessLevel = getAccessibilityUID(inferAccessibility(VD));
       } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
-        AccessLevel = getAccessibilityUID(inferDefaultAccessibility(ED));
+        auto StrictAccess = getAccessibilityStrictly(ED);
+        if (StrictAccess.hasValue()) {
+          AccessLevel = getAccessibilityUID(StrictAccess.getValue());
+        }
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
         Optional<Accessibility> SetAccess = inferSetterAccessibility(ASD);
