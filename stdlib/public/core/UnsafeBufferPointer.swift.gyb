@@ -312,15 +312,23 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 %  if not Mutable:
   /// Creates a buffer over the same memory as the given buffer slice.
   ///
-  /// The new buffer will represent the same region of memory as the slice,
-  /// but it's indices will be rebased to zero. Given:
+  /// The new buffer represents the same region of memory as `slice`, but is
+  /// indexed starting at zero instead of sharing indices with the original
+  /// buffer. For example:
   ///
-  ///   let slice = buffer[n..<m]
-  ///   let rebased = UnsafeBufferPointer(rebasing: slice)
+  ///     let buffer = returnsABuffer()
+  ///     let n = 5
+  ///     let slice = buffer[n...]
+  ///     let rebased = UnsafeBufferPointer(rebasing: slice)
   ///
-  /// One may assume `rebased.startIndex == 0` and `rebased[0] == slice[n]`.
+  /// After rebasing `slice` as the `rebased` buffer, the following are true:
   ///
-  /// - Parameter slice: the raw buffer slice to rebase.
+  /// - `rebased.startIndex == 0`
+  /// - `rebased[0] == slice[n]`
+  /// - `rebased[0] == buffer[n]`
+  /// - `rebased.count == slice.count`
+  ///
+  /// - Parameter slice: The buffer slice to rebase.
   @_inlineable
   public init(rebasing slice: RandomAccessSlice<UnsafeBufferPointer<Element>>) {
     self.init(start: slice.base.baseAddress! + slice.startIndex,
@@ -330,15 +338,23 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
   /// Creates a buffer over the same memory as the given buffer slice.
   ///
-  /// The new buffer will represent the same region of memory as the slice,
-  /// but it's indices will be rebased to zero. Given:
+  /// The new buffer represents the same region of memory as `slice`, but is
+  /// indexed starting at zero instead of sharing indices with the original
+  /// buffer. For example:
   ///
-  ///   let slice = buffer[n..<m]
-  ///   let rebased = UnsafeBufferPointer(rebasing: slice)
+  ///     let buffer = returnsABuffer()
+  ///     let n = 5
+  ///     let slice = buffer[n...]
+  ///     let rebased = Unsafe${Mutable}BufferPointer(rebasing: slice)
   ///
-  /// One may assume `rebased.startIndex == 0` and `rebased[0] == slice[n]`.
+  /// After rebasing `slice` as the `rebased` buffer, the following are true:
   ///
-  /// - Parameter slice: the buffer slice to rebase.
+  /// - `rebased.startIndex == 0`
+  /// - `rebased[0] == slice[n]`
+  /// - `rebased[0] == buffer[n]`
+  /// - `rebased.count == slice.count`
+  ///
+  /// - Parameter slice: The buffer slice to rebase.
   @_inlineable
   public init(
     rebasing slice:
@@ -394,17 +410,26 @@ extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
 
 
 extension UnsafeMutableBufferPointer {
-  /// Initializes memory in the buffer with the elements of `source`.
-  /// Returns an iterator to any elements of `source` that didn't fit in the 
-  /// buffer, and an index to the point in the buffer one past the last element
-  /// written (so `startIndex` if no elements written, `endIndex` if the buffer 
-  /// was completely filled).
+  /// Initializes the buffer's memory with the given elements.
   ///
-  /// - Precondition: The memory in `self` is uninitialized. The buffer must
-  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+  /// When calling the `initialize(from:)` method on a buffer `b`, the memory
+  /// referenced by `b` must be uninitialized or the `Element` type must be a
+  /// trivial type. After the call, the memory referenced by this buffer up
+  /// to, but not including, the returned index is initialized. The buffer
+  /// must contain sufficient memory to accommodate
+  /// `source.underestimatedCount`.
   ///
-  /// - Postcondition: The `Pointee`s at `self[startIndex..<returned index]` are
-  ///   initialized.
+  /// The returned index is the position of the element in the buffer one past
+  /// the last element written. If `source` contains no elements, the returned
+  /// index is equal to the buffer's `startIndex`. If `source` contains an
+  /// equal or greater number of elements than the buffer can hold, the
+  /// returned index is equal to the buffer's `endIndex`.
+  ///
+  /// - Parameter source: A sequence of elements with which to initializer the
+  ///   buffer.
+  /// - Returns: An iterator to any elements of `source` that didn't fit in the
+  ///   buffer, and an index to the point in the buffer one past the last
+  ///   element written.
   @_inlineable
   public func initialize<S: Sequence>(from source: S) -> (S.Iterator, Index)
     where S.Element == Element {

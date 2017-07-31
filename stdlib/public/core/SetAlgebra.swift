@@ -276,15 +276,14 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   /// In the following example, the elements of the `employees` set that are
   /// also members of `neighbors` are removed from `employees`, while the
   /// elements of `neighbors` that are not members of `employees` are added to
-  /// `employees`. In particular, the names `"Alicia"`, `"Chris"`, and
-  /// `"Diana"` are removed from `employees` while the names `"Forlani"` and
-  /// `"Greta"` are added.
+  /// `employees`. In particular, the names `"Bethany"` and `"Eric"` are
+  /// removed from `employees` while the name `"Forlani"` is added.
   ///
-  ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
-  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
+  ///     var employees: Set = ["Alicia", "Bethany", "Diana", "Eric"]
+  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani"]
   ///     employees.formSymmetricDifference(neighbors)
   ///     print(employees)
-  ///     // Prints "["Diana", "Chris", "Forlani", "Alicia", "Greta"]"
+  ///     // Prints "["Diana", "Forlani", "Alicia"]"
   ///
   /// - Parameter other: A set of the same type.
   mutating func formSymmetricDifference(_ other: Self)

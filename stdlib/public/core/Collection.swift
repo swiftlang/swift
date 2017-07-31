@@ -445,18 +445,6 @@ public struct IndexingIterator<
 /// corresponding element. In the example above, `firstSpace` is used to
 /// extract the prefix that contains elements up to that index.
 ///
-/// You can pass only valid indices to collection operations. You can find a
-/// complete set of a collection's valid indices by starting with the
-/// collection's `startIndex` property and finding every successor up to, and
-/// including, the `endIndex` property. All other values of the `Index` type,
-/// such as the `startIndex` property of a different collection, are invalid
-/// indices for this collection.
-///
-/// Saved indices may become invalid as a result of mutating operations. For
-/// more information about index invalidation in mutable collections, see the
-/// reference for the `MutableCollection` and `RangeReplaceableCollection`
-/// protocols, as well as for the specific type you're using.
-///
 /// Accessing Individual Elements
 /// =============================
 ///
@@ -480,6 +468,18 @@ public struct IndexingIterator<
 ///
 ///     print(text.first)
 ///     // Prints "Optional("B")"
+///
+/// You can pass only valid indices to collection operations. You can find a
+/// complete set of a collection's valid indices by starting with the
+/// collection's `startIndex` property and finding every successor up to, and
+/// including, the `endIndex` property. All other values of the `Index` type,
+/// such as the `startIndex` property of a different collection, are invalid
+/// indices for this collection.
+///
+/// Saved indices may become invalid as a result of mutating operations. For
+/// more information about index invalidation in mutable collections, see the
+/// reference for the `MutableCollection` and `RangeReplaceableCollection`
+/// protocols, as well as for the specific type you're using.
 ///
 /// Accessing Slices of a Collection
 /// ================================

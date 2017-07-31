@@ -1334,6 +1334,9 @@ public protocol BinaryInteger :
   /// Creates an integer from the given floating-point value, rounding toward
   /// zero.
   ///
+  /// Any fractional part of the value passed as `source` is removed, rounding
+  /// the value toward zero.
+  ///
   ///     let x = Int(21.5)
   ///     // x == 21
   ///     let y = Int(-21.5)
@@ -1346,7 +1349,8 @@ public protocol BinaryInteger :
   ///     // Error: ...the result would be less than UInt.min
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
-  ///   `source` must be representable in this type after rounding toward zero.
+  ///   `source` must be representable in this type after rounding toward
+  ///   zero.
   init<T : BinaryFloatingPoint>(_ source: T)
 
   /// Creates a new instance from the given integer.
@@ -2499,7 +2503,7 @@ extension SignedInteger where Self : FixedWidthInteger {
 %   z = 's' if signed else 'z'
 
 %   Article = 'An' if bits == 8 else 'A'
-%   if bits == word_bits:
+%   if self_type.is_word:
 /// ${'A ' if signed else 'An un'}signed integer value type.
 ///
 /// On 32-bit platforms, `${Self}` is the same size as `${Self}32`, and

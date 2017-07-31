@@ -378,33 +378,31 @@ extension String.UnicodeScalarIndex {
   ///     let cafe = "Café 🍵"
   ///
   ///     let utf16Index = cafe.utf16.index(of: 32)!
-  ///     let scalarIndex = String.UnicodeScalarView.Index(utf16Index, within: cafe.unicodeScalars)!
+  ///     let scalarIndex = String.Index(utf16Index, within: cafe.unicodeScalars)!
   ///
   ///     print(String(cafe.unicodeScalars[..<scalarIndex]))
   ///     // Prints "Café"
   ///
-  /// If the position passed in `utf16Index` doesn't have an exact
+  /// If the index passed as `sourcePosition` doesn't have an exact
   /// corresponding position in `unicodeScalars`, the result of the
   /// initializer is `nil`. For example, an attempt to convert the position of
-  /// the trailing surrogate of a UTF-16 surrogate pair fails.
+  /// the trailing surrogate of a UTF-16 surrogate pair results in `nil`.
   ///
   /// - Parameters:
-  ///   - utf16Index: A position in the `utf16` view of a string. `utf16Index`
+  ///   - sourcePosition: A position in the `utf16` view of a string. `utf16Index`
   ///     must be an element of `String(unicodeScalars).utf16.indices`.
   ///   - unicodeScalars: The `UnicodeScalarView` in which to find the new
   ///     position.
   public init?(
-    _ utf16Index: String.UTF16Index,
+    _ sourcePosition: String.UTF16Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
-    if !unicodeScalars._isOnUnicodeScalarBoundary(utf16Index) { return nil }
-    self = utf16Index
+    if !unicodeScalars._isOnUnicodeScalarBoundary(sourcePosition) { return nil }
+    self = sourcePosition
   }
 
   /// Returns the position in the given string that corresponds exactly to this
   /// index.
-  ///
-  /// This index must be a valid index of `characters.unicodeScalars`.
   ///
   /// This example first finds the position of a space (UTF-8 code point `32`)
   /// in a string's `utf8` view and then uses this method find the same position
@@ -417,6 +415,7 @@ extension String.UnicodeScalarIndex {
   ///     // Prints "🍵"
   ///
   /// - Parameter characters: The string to use for the index conversion.
+  ///   This index must be a valid index of at least one view of `characters`.
   /// - Returns: The position in `characters` that corresponds exactly to
   ///   this index. If this index does not have an exact corresponding
   ///   position in `characters`, this method returns `nil`. For example,
