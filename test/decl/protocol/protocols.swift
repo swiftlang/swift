@@ -40,7 +40,7 @@ func test1() {
 
 protocol Bogus : Int {}
 // expected-error@-1{{inheritance from non-protocol type 'Int'}}
-// expected-error@-2{{type 'Self' constrained to non-protocol type 'Int'}}
+// expected-error@-2{{type 'Self' constrained to non-protocol, non-class type 'Int'}}
 
 // Explicit conformance checks (successful).
 
