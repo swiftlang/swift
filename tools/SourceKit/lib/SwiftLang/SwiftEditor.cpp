@@ -924,8 +924,7 @@ static Optional<Accessibility> getAccessibilityStrictly(const ExtensionDecl *ED)
 }
 
 static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
-  auto StrictAccess = getAccessibilityStrictly(ED);
-  if (StrictAccess.hasValue())
+  if (auto StrictAccess = getAccessibilityStrictly(ED))
     return StrictAccess.getValue();
 
   // Assume "internal", which is the most common thing anyway.
@@ -1035,10 +1034,8 @@ public:
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
         AccessLevel = getAccessibilityUID(inferAccessibility(VD));
       } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
-        auto StrictAccess = getAccessibilityStrictly(ED);
-        if (StrictAccess.hasValue()) {
+        if (auto StrictAccess = getAccessibilityStrictly(ED))
           AccessLevel = getAccessibilityUID(StrictAccess.getValue());
-        }
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
         Optional<Accessibility> SetAccess = inferSetterAccessibility(ASD);
