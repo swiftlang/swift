@@ -19,6 +19,9 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Pattern.h"
 
+#include <llvm/ADT/APInt.h>
+#include <llvm/ADT/APFloat.h>
+
 #include <numeric>
 #include <forward_list>
 
@@ -27,11 +30,42 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckSwitchStmt"
 
 namespace {
+  struct DenseMapAPIntKeyInfo {
+    static inline APInt getEmptyKey() { return APInt(); }
+
+    static inline APInt getTombstoneKey() {
+      return APInt::getAllOnesValue(/*bitwidth*/1);
+    }
+
+    static unsigned getHashValue(const APInt &Key) {
+      return static_cast<unsigned>(hash_value(Key));
+    }
+
+    static bool isEqual(const APInt &LHS, const APInt &RHS) {
+      return LHS.getBitWidth() == RHS.getBitWidth() && LHS == RHS;
+    }
+  };
+
+  struct DenseMapAPFloatKeyInfo {
+    static inline APFloat getEmptyKey() { return APFloat(APFloat::Bogus(), 1); }
+    static inline APFloat getTombstoneKey() { return APFloat(APFloat::Bogus(), 2); }
+    
+    static unsigned getHashValue(const APFloat &Key) {
+      return static_cast<unsigned>(hash_value(Key));
+    }
+    
+    static bool isEqual(const APFloat &LHS, const APFloat &RHS) {
+      return LHS.bitwiseIsEqual(RHS);
+    }
+  };
+}
+
+namespace {
 
   /// The SpaceEngine encapsulates an algorithm for computing the exhaustiveness
   /// of a switch statement using an algebra of spaces described by Fengyun Liu
   /// and an algorithm for computing warnings for pattern matching by
-  //  Luc Maranget.
+  /// Luc Maranget.
   ///
   /// The main algorithm centers around the computation of the difference and
   /// the intersection of the "Spaces" given in each case, which reduces the
@@ -914,9 +948,62 @@ namespace {
 
     TypeChecker &TC;
     SwitchStmt *Switch;
-
+    llvm::DenseMap<APInt, Expr *, ::DenseMapAPIntKeyInfo> IntLiteralCache;
+    llvm::DenseMap<APFloat, Expr *, ::DenseMapAPFloatKeyInfo> FloatLiteralCache;
+    llvm::DenseMap<StringRef, Expr *> StringLiteralCache;
+    
     SpaceEngine(TypeChecker &C, SwitchStmt *SS) : TC(C), Switch(SS) {}
 
+    bool checkRedundantLiteral(const Pattern *Pat, Expr *&PrevPattern) {
+      if (Pat->getKind() != PatternKind::Expr) {
+          return false;
+      }
+      auto *ExprPat = cast<ExprPattern>(Pat);
+      auto *MatchExpr = ExprPat->getSubExpr();
+      if (!MatchExpr || !isa<LiteralExpr>(MatchExpr)) {
+          return false;
+      }
+      auto *EL = cast<LiteralExpr>(MatchExpr);
+      switch (EL->getKind()) {
+      case ExprKind::StringLiteral: {
+        auto *SLE = cast<StringLiteralExpr>(EL);
+        auto cacheVal =
+            StringLiteralCache.insert({SLE->getValue(), SLE});
+        PrevPattern = (cacheVal.first != StringLiteralCache.end())
+                    ? cacheVal.first->getSecond()
+                    : nullptr;
+        return !cacheVal.second;
+      }
+      case ExprKind::IntegerLiteral: {
+        // FIXME: The magic number 128 is bad and we should actually figure out
+        // the bitwidth.  But it's too early in Sema to get it.
+        auto *ILE = cast<IntegerLiteralExpr>(EL);
+        auto cacheVal =
+            IntLiteralCache.insert(
+                {ILE->getValue(ILE->getDigitsText(), 128), ILE});
+        PrevPattern = (cacheVal.first != IntLiteralCache.end())
+                    ? cacheVal.first->getSecond()
+                    : nullptr;
+        return !cacheVal.second;
+      }
+      case ExprKind::FloatLiteral: {
+        // FIXME: Pessimistically using IEEEquad here is bad and we should
+        // actually figure out the bitwidth.  But it's too early in Sema.
+        auto *FLE = cast<FloatLiteralExpr>(EL);
+        auto cacheVal =
+            FloatLiteralCache.insert(
+                   {FLE->getValue(FLE->getDigitsText(),
+                                  APFloat::IEEEquad()), FLE});
+        PrevPattern = (cacheVal.first != FloatLiteralCache.end())
+                    ? cacheVal.first->getSecond()
+                    : nullptr;
+        return !cacheVal.second;
+      }
+      default:
+        return false;
+      }
+    }
+    
     void checkExhaustiveness(bool limitedChecking) {
       // If the type of the scrutinee is uninhabited, we're already dead.
       // Allow any well-typed patterns through.
@@ -958,6 +1045,17 @@ namespace {
             TC.diagnose(caseItem.getStartLoc(),
                           diag::redundant_particular_case)
               .highlight(caseItem.getSourceRange());
+          } else {
+            Expr *cachedExpr = nullptr;
+            if (checkRedundantLiteral(caseItem.getPattern(), cachedExpr)) {
+              assert(cachedExpr && "Cache found hit but no expr?");
+              TC.diagnose(caseItem.getStartLoc(),
+                          diag::redundant_particular_literal_case)
+                .highlight(caseItem.getSourceRange());
+              TC.diagnose(cachedExpr->getLoc(),
+                          diag::redundant_particular_literal_case_here)
+                .highlight(cachedExpr->getSourceRange());
+            }
           }
           spaces.push_back(projection);
         }
