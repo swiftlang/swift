@@ -168,16 +168,15 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
   llvm_unreachable("bad value witness!");
 }
 
-static llvm::AttributeSet getValueWitnessAttrs(IRGenModule &IGM,
-                                               ValueWitness index) {
+static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
+                                                ValueWitness index) {
   assert(isValueWitnessFunction(index));
 
   auto &ctx = IGM.getLLVMContext();
 
   // All value witnesses are nounwind.
-  auto attrs = llvm::AttributeSet::get(ctx,
-                                       llvm::AttributeSet::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
+  auto attrs = llvm::AttributeList::get(ctx, llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
 
   switch (index) {
   // These have two arguments, but they can alias.

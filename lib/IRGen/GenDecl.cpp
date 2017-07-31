@@ -1571,7 +1571,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
   // Merge initialAttrs with attrs.
   auto updatedAttrs =
     signature.getAttributes().addAttributes(IGM.getLLVMContext(),
-                                      llvm::AttributeSet::FunctionIndex,
+                                      llvm::AttributeList::FunctionIndex,
                                             initialAttrs);
   if (!updatedAttrs.isEmpty())
     fn->setAttributes(updatedAttrs);
@@ -1903,12 +1903,12 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   if (f->getInlineStrategy() == NoInline) {
-    attrs = attrs.addAttribute(fnType->getContext(),
+    attrs = attrs.addAttribute(signature.getType()->getContext(),
                                llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::NoInline);
   }
   if (isReadOnlyFunction(f)) {
-    attrs = attrs.addAttribute(fnType->getContext(),
+    attrs = attrs.addAttribute(signature.getType()->getContext(),
                                llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::ReadOnly);
   }
@@ -2512,7 +2512,7 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
   }
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, false);
-  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
+  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
@@ -2538,7 +2538,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
   }
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
-  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
+  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
@@ -3327,7 +3327,7 @@ IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                           TypeMetadataPtrTy,
                                           Int8PtrPtrTy },
                                         /*varargs*/ false);
-  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
+  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
@@ -3376,7 +3376,7 @@ IRGenModule::getAddrOfWitnessTableAccessFunction(
     fnType = llvm::FunctionType::get(WitnessTablePtrTy, false);
   }
 
-  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
+  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
@@ -3399,7 +3399,7 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
   llvm::FunctionType *fnType
     = llvm::FunctionType::get(WitnessTablePtrTy, false);
 
-  Signature signature(fnType, llvm::AttributeSet(), DefaultCC);
+  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
