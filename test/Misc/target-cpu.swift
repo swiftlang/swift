@@ -20,7 +20,7 @@
 // TARGETCPU2: "-target-cpu" "swift"
 
 // RUN: not %swift -typecheck -target armv7-apple-ios7 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=TARGETCPU3 %s
-// TARGETCPU3: "-target-cpu" "cortex-a8"
+// TARGETCPU3: "-target-cpu" "generic"
 
 // RUN: not %swift -typecheck -target i386-apple-ios7 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=SIMULATOR_CPU %s
 // SIMULATOR_CPU: "-target-cpu" "yonah"
