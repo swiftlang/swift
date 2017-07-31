@@ -55,7 +55,7 @@ class Signature {
 
 public:
   Signature() {}
-  Signature(llvm::FunctionType *fnType, llvm::AttributeSet attrs,
+  Signature(llvm::FunctionType *fnType, llvm::AttributeList attrs,
             llvm::CallingConv::ID callingConv)
     : Type(fnType), Attributes(attrs), CallingConv(callingConv) {}
 

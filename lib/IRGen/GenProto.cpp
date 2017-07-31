@@ -2841,9 +2841,9 @@ Signature IRGenModule::getAssociatedTypeMetadataAccessFunctionSignature() {
                                      /*varargs*/ false);
   }
 
-  auto attrs = llvm::AttributeSet::get(getLLVMContext(),
-                                       llvm::AttributeSet::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
+  auto attrs = llvm::AttributeList::get(getLLVMContext(),
+                                        llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
 
   return Signature(fnType, attrs, DefaultCC);
 }
@@ -2885,8 +2885,8 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
                                      /*varargs*/ false);
   }
 
-  auto attrs = llvm::AttributeSet::get(getLLVMContext(),
-                                       llvm::AttributeSet::FunctionIndex,
+  auto attrs = llvm::AttributeList::get(getLLVMContext(),
+                                       llvm::AttributeList::FunctionIndex,
                                        llvm::Attribute::NoUnwind);
 
   return Signature(fnType, attrs, DefaultCC);
