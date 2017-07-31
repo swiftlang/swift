@@ -1381,9 +1381,9 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   }
 
   /// \returns true on success, false on failure.
-  bool typecheckDelayedParsedDecl() {
-    assert(DelayedParsedDecl && "should have a delayed parsed decl");
-    return typeCheckCompletionDecl(DelayedParsedDecl);
+  bool typecheckParsedDecl() {
+    assert(ParsedDecl && "should have a parsed decl");
+    return typeCheckCompletionDecl(ParsedDecl);
   }
 
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
@@ -5117,11 +5117,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (!typecheckContext())
     return;
 
-  if (DelayedParsedDecl && !typecheckDelayedParsedDecl())
+  if (ParsedDecl && !typecheckParsedDecl())
     return;
 
-  if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(DelayedParsedDecl))
-    CurDeclContext = AFD;
+  if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl))
+    CurDeclContext = DC;
 
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;

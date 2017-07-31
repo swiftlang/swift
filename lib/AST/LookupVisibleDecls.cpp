@@ -885,7 +885,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleScopeContext()) {
     const ValueDecl *BaseDecl = nullptr;
-    GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     auto LS = LookupState::makeUnqualified();
 
@@ -894,6 +893,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       DC = DC->getParent();
       LS = LS.withOnMetatype();
     }
+
+    GenericParamList *GenericParams = DC->getGenericParamsOfContext();
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
@@ -922,9 +923,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
           if (FD->isStatic())
             ExtendedType = MetatypeType::get(ExtendedType);
       }
-
-      // Look in the generic parameters after checking our local declaration.
-      GenericParams = AFD->getGenericParams();
     } else if (auto CE = dyn_cast<ClosureExpr>(DC)) {
       if (Loc.isValid()) {
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
