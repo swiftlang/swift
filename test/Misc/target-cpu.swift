@@ -8,7 +8,7 @@
 // APPLETVTARGETCPU2: "-target-cpu" "swift"
 
 // RUN: not %swift -typecheck -target armv7-apple-tvos9 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=APPLETVTARGETCPU3 %s
-// APPLETVTARGETCPU3: "-target-cpu" "cortex-a8"
+// APPLETVTARGETCPU3: "-target-cpu" "generic"
 
 // RUN: not %swift -typecheck -target armv7k-apple-watchos2 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=WATCHTARGETCPU1 %s
 // WATCHTARGETCPU1: "-target-cpu" "cortex-a7"
