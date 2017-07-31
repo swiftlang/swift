@@ -198,3 +198,30 @@ entry(%c : $Gizmo):
   %g = partial_apply %f(%c) : $@convention(thin) Gizmo -> ()
   return %g : $@callee_owned () -> ()
 }
+
+// CHECK: define internal swiftcc void @_T0Ta.17(i64, i64, i64, %swift.refcounted* swiftself)
+// CHECK: [[TMPCOERCE:%.*]] = alloca { i64, i64, i64 }
+// CHECK: [[INDIRECTTEMP:%.*]] = alloca %TSC3FobV
+// CHECK: [[ADDR:%.*]] = getelementptr inbounds { i64, i64, i64 }, { i64, i64, i64 }* [[TMPCOERCE]], i32 0, i32 0
+// CHECK:  store i64 %0, i64* [[ADDR]]
+// CHECK:  [[ADDR:%.]] = getelementptr inbounds { i64, i64, i64 }, { i64, i64, i64 }* [[TMPCOERCE]], i32 0, i32 1
+// CHECK:  store i64 %1, i64* [[ADDR]]
+// CHECK:  [[ADDR:%.*]] = getelementptr inbounds { i64, i64, i64 }, { i64, i64, i64 }* [[TMPCOERCE]], i32 0, i32 2
+// CHECK:  store i64 %2, i64* [[ADDR]]
+// CHECK:  load i64
+// CHECK:  load i32
+// CHECK:  load i32
+// CHECK:  load i64
+// CHECK:  store i64
+// CHECK:  store i32
+// CHECK:  store i32
+// CHECK:  store i64
+// CHECK:  objc_msgSend
+// CHECK:  ret void
+
+sil @objc_partial_apply_2 : $@convention(thin) Gizmo -> @callee_owned (Fob) -> () {
+entry(%c : $Gizmo):
+  %m = class_method [volatile] %c : $Gizmo, #Gizmo.test!1.foreign : (Gizmo) -> (Fob) -> (), $@convention(objc_method) (Fob,  Gizmo) -> ()
+  %p = partial_apply %m(%c) : $@convention(objc_method) (Fob,  Gizmo) -> ()
+  return %p : $@callee_owned (Fob) -> ()
+}
