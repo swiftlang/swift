@@ -1860,6 +1860,7 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
 /// archetype that has argument type errors, diagnose that error and
 /// return true.
 bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
+  TypeChecker &TC = CS.TC;
   Type argType = CS.getType(badArgExpr);
 
   // FIXME: For protocol argument types, could add specific error
@@ -1876,23 +1877,70 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
                                 argType, archetypesMap))
     return false;
 
+  auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
+    auto *env = archetype->getGenericEnvironment();
+    auto paramType = env->mapTypeOutOfContext(archetype);
+
+    if (auto *GTPT = paramType->getAs<GenericTypeParamType>())
+      return GTPT->getDecl();
+
+    if (auto *DMT = paramType->getAs<DependentMemberType>())
+      return DMT->getAssocType();
+
+    return nullptr;
+  };
+
+  auto describeGenericType = [&](ValueDecl *genericParam,
+                                 bool includeName = false) -> std::string {
+    if (!genericParam)
+      return "";
+
+    Decl *parent = nullptr;
+    if (auto *AT = dyn_cast<AssociatedTypeDecl>(genericParam)) {
+      parent = AT->getProtocol();
+    } else {
+      auto *dc = genericParam->getDeclContext();
+      parent = dc->getInnermostDeclarationDeclContext();
+    }
+
+    if (!parent)
+      return "";
+
+    llvm::SmallString<64> result;
+    llvm::raw_svector_ostream OS(result);
+
+    OS << Decl::getDescriptiveKindName(genericParam->getDescriptiveKind());
+
+    if (includeName && genericParam->hasName())
+      OS << " '" << genericParam->getBaseName() << "'";
+
+    OS << " of ";
+    OS << Decl::getDescriptiveKindName(parent->getDescriptiveKind());
+    if (auto *decl = dyn_cast<ValueDecl>(parent)) {
+      if (decl->hasName())
+        OS << " '" << decl->getFullName() << "'";
+    }
+
+    return OS.str();
+  };
+
   for (auto pair : archetypesMap) {
-    auto archetype = pair.first->castTo<ArchetypeType>();
+    auto paramArchetype = pair.first->castTo<ArchetypeType>();
     auto substitution = pair.second;
     
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
 
     // Check for optional near miss.
     if (auto argOptType = substitution->getOptionalObjectType()) {
-      if (CS.TC.isSubstitutableFor(argOptType, archetype, CS.DC)) {
+      if (CS.TC.isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
         CS.TC.diagnose(badArgExpr->getLoc(), diag::missing_unwrap_optional,
                        argType);
         foundFailure = true;
-        continue;
+        break;
       }
     }
-    
-    for (auto proto : archetype->getConformsTo()) {
+
+    for (auto proto : paramArchetype->getConformsTo()) {
       if (!CS.TC.conformsToProtocol(substitution, proto, CS.DC,
                                     ConformanceCheckFlags::InExpression)) {
         if (substitution->isEqual(argType)) {
@@ -1905,9 +1953,38 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
                          argType, substitution, proto->getDeclaredType());
         }
         foundFailure = true;
+        break;
       }
     }
+
+    if (auto *argArchetype = substitution->getAs<ArchetypeType>()) {
+      // Produce this diagnostic only if the names
+      // of the generic parameters are the same.
+      if (argArchetype->getName() != paramArchetype->getName())
+        continue;
+
+      auto *paramDecl = getGenericTypeDecl(paramArchetype);
+      auto *argDecl = getGenericTypeDecl(argArchetype);
+
+      if (!paramDecl || !argDecl)
+        continue;
+
+      TC.diagnose(badArgExpr->getLoc(),
+                  diag::cannot_convert_argument_value_generic, argArchetype,
+                  describeGenericType(argDecl), paramArchetype,
+                  describeGenericType(paramDecl));
+
+      TC.diagnose(paramDecl, diag::descriptive_generic_type_declared_here,
+                  describeGenericType(paramDecl, true));
+
+      TC.diagnose(argDecl, diag::descriptive_generic_type_declared_here,
+                  describeGenericType(argDecl, true));
+
+      foundFailure = true;
+      break;
+    }
   }
+
   return foundFailure;
 }
 
