@@ -2439,6 +2439,8 @@ namespace {
         ProtocolDecl *protocols[]
           = {cxt.getProtocol(KnownProtocolKind::RawRepresentable),
              cxt.getProtocol(KnownProtocolKind::Equatable)};
+        if (!protocols[0] || !protocols[1])
+          return nullptr;
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;

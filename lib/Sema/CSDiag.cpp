@@ -3792,11 +3792,14 @@ static bool trySequenceSubsequenceConversionFixIts(InFlightDiagnostic &diag,
                                                    ConstraintSystem &CS,
                                                    Type fromType, Type toType,
                                                    Expr *expr) {
-  if (CS.TC.Context.getStdlibModule() == nullptr) {
+  if (CS.TC.Context.getStdlibModule() == nullptr)
     return false;
-  }
+
   auto String = CS.TC.getStringType(CS.DC);
   auto Substring = CS.TC.getSubstringType(CS.DC);
+
+  if (!String || !Substring)
+    return false;
 
   /// FIXME: Remove this flag when void subscripts are implemented.
   /// Make this unconditional and remove the if statement.

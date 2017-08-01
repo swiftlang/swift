@@ -5608,6 +5608,8 @@ bool TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
               auto keyType = args[0];
               auto *hashableProto =
                 TC.Context.getProtocol(KnownProtocolKind::Hashable);
+              if (!hashableProto)
+                return Action::Stop;
 
               auto result = TC.conformsToProtocol(
                   keyType, hashableProto, DC, options,
