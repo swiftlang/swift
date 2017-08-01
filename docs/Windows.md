@@ -40,7 +40,7 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 ## MSVC
 - Windows doesn't currently have a build script. You'll need to run commands manually to build Swift on Windows.
 - Release/RelWithDebInfo modes have not been tested and may not be supported.
-- Windows support for Swift is very much a WIP, and may not work on your system.
+- Windows support for Swift is very much a work in progress and may not work on your system.
 - Using the latest Visual Studio version is recommended. Swift may fail to build with older C++ compilers.
 
 ### 1. Install dependencies
@@ -49,7 +49,7 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 2. Latest version (3.7.0-rc3 tested) of [CMake](https://cmake.org/download/)
 3. Latest version (1.7.1 tested) of [Ninja](https://github.com/ninja-build/ninja/releases/latest)
 4. Latest version (2015 Update 3 tested) of [Visual Studio](https://www.visualstudio.com/downloads/)
-- Make sure to include `Programming Languages|Visual C++`, and `Windows and Web Development|Universal Windows App Development|Windows SDK` in your installation.
+- Make sure to include `Programming Languages|Visual C++` and `Windows and Web Development|Universal Windows App Development|Windows SDK` in your installation.
 - Windows SDK 10.0.10240 was tested. Some later versions (e.g. 10.0.14393) are known not to work, as they are not supported by `compiler-rt`.
 
 ### 2. Clone the repositories
@@ -58,7 +58,7 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 3. `apple/swift-clang` into a folder named `clang`
 5. `apple/swift-llvm` into a folder named `llvm`
 5. `apple/swift` into a folder named `swift`
-- Currently, other repositories in the Swift project have not been tested, and may not be supported.
+- Currently, other repositories in the Swift project have not been tested and may not be supported.
 
 ### 3. Build ICU
 1. Download and extract the [ICU source code](http://site.icu-project.org/download) to a folder named `icu` in the same directory as the other Swift project repositories.
@@ -72,13 +72,13 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 ```
 VsDevCmd -arch=amd64
 ```
-- Then adapt the following command, and run it.
+- Then adapt the following command and run it.
 ```
 set swift_source_dir=path-to-directory-containing-all-cloned-repositories
 ```
 
 ### 5. Build CMark
-- This must be done from within a developer command prompt. CMark is a fairly small project, and it should only take a few minutes to build.
+- This must be done from within a developer command prompt. CMark is a fairly small project and should only take a few minutes to build.
 ```
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
@@ -109,7 +109,7 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 ```
 
 ### 7. Build Swift
-- This must be done from within a developer command prompt, and could take up to two hours depending on your system.
+- This must be done from within a developer command prompt and could take up to two hours depending on your system.
 - You may need to adjust the SWIFT_WINDOWS_LIB_DIRECTORY parameter depending on your target platform or Windows SDK version.
 - While the commands here use MSVC to build, using clang-cl is recommended (see the **Clang-cl** section below).
 ```
