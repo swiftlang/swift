@@ -1409,7 +1409,7 @@ static void VisitNodeSetterGetter(
           identifier_func = subscript_decl->getGetter();
           break;
         case Demangle::Node::Kind::Setter:
-          identifier_func = subscript_decl->getGetter();
+          identifier_func = subscript_decl->getSetter();
           break;
         case Demangle::Node::Kind::DidSet:
           identifier_func = subscript_decl->getDidSetFunc();
