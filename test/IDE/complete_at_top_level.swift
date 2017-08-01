@@ -344,7 +344,7 @@ func resyncParserB5() {}
 for var i = 0; ; {
   #^TOP_LEVEL_STMT_5^#
 // TOP_LEVEL_STMT_5: Begin completions
-// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#Int#]{{; name=.+$}}
+// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
 // TOP_LEVEL_STMT_5: End completions
 }
 

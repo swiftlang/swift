@@ -496,6 +496,14 @@ void Parser::skipUntilDeclStmtRBrace(tok T1) {
   }
 }
 
+void Parser::skipUntilDeclStmtRBrace(tok T1, tok T2) {
+  while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
+                   tok::code_complete) &&
+         !isStartOfStmt() && !isStartOfDecl()) {
+    skipSingle();
+  }
+}
+
 void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif) &&
          !isStartOfDecl()) {

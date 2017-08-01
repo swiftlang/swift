@@ -18,7 +18,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_DO_WHILE_1 | %FileCheck %s -check-prefix=COND-WITH-RELATION
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_DO_WHILE_2 | %FileCheck %s -check-prefix=COND-WITH-RELATION1
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_1 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_1 | %FileCheck %s -check-prefix=COND_NONE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_2 | %FileCheck %s -check-prefix=COND_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_3 | %FileCheck %s -check-prefix=COND_COMMON
 
@@ -26,54 +26,26 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_2 | %FileCheck %s -check-prefix=COND_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_3 | %FileCheck %s -check-prefix=COND_COMMON
 
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_1 > %t.cond.txt
-// RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.cond.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.cond.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_2 > %t.cond.txt
-// RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.cond.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_ERROR_LOCAL < %t.cond.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_E_1 > %t.cond.txt
-// RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.cond.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_E_LOCAL < %t.cond.txt
-
-
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_1 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_2 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_COND_I_E_1 | %FileCheck %s -check-prefix=COND_COMMON
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_1 | %FileCheck %s -check-prefix=COND_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_2 | %FileCheck %s -check-prefix=COND_COMMON
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_1 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_2 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_3 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_4 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_E_1 | %FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_1 > %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.incr.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_2 > %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.incr.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_3 > %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.incr.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_4 > %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_ERROR_LOCAL < %t.incr.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INCR_I_E_1 > %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.incr.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_E_LOCAL < %t.incr.txt
-
-
-// FIXME: should have 'i' in these results.
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_1 > %t.body.txt
 // RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
-// FIXME: %FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.body.txt
+// RUN: %FileCheck %s -check-prefix=WITH_I_ERROR_LOCAL < %t.body.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_2 > %t.body.txt
 // RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.body.txt
+// RUN: %FileCheck %s -check-prefix=WITH_I_ERROR_LOCAL < %t.body.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_3 > %t.body.txt
 // RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
@@ -81,16 +53,15 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_4 > %t.body.txt
 // RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.body.txt
+// RUN: %FileCheck %s -check-prefix=WITH_I_ERROR_LOCAL < %t.body.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_5 > %t.body.txt
 // RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.body.txt
+// RUN: %FileCheck %s -check-prefix=WITH_I_ERROR_LOCAL < %t.body.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_BODY_I_6 > %t.body.txt
 // RUN: %FileCheck %s -check-prefix=COND_COMMON < %t.body.txt
-// RUN: %FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.body.txt
-
+// RUN: %FileCheck %s -check-prefix=WITH_I_ERROR_LOCAL < %t.body.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_EACH_EXPR_1 | %FileCheck %s -check-prefix=COND_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_EACH_EXPR_2 | %FileCheck %s -check-prefix=COND_COMMON
@@ -517,10 +488,6 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 // WITH_I_ERROR_LOCAL: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
 
 // WITH_J_INT: Decl[LocalVar]/Local: j[#Int#]{{; name=.+$}}
-
-// WITH_I_E_LOCAL: Decl[LocalVar]/Local:        i[#Int#]{{; name=.+$}}
-// WITH_I_E_LOCAL: Decl[LocalVar]/Local:        e[#Int#]{{; name=.+$}}
-
 
 enum A { case aaa }
 enum B { case bbb }

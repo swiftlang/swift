@@ -992,30 +992,16 @@ ERROR(docatch_not_trycatch,PointsToFirstBadToken,
       "the 'do' keyword is used to specify a 'catch' region",
       ())
 
-
-
 // C-Style For Stmt
-ERROR(expected_init_for_stmt,PointsToFirstBadToken,
-      "expected initialization in a 'for' statement", ())
-ERROR(missing_init_for_stmt,none,
-      "missing initialization in a 'for' statement", ())
-ERROR(expected_semi_for_stmt,PointsToFirstBadToken,
-      "expected ';' in 'for' statement", ())
-ERROR(expected_cond_for_stmt,none,
-      "expected condition in 'for' statement", ())
-ERROR(expected_rparen_for_stmt,none,
-      "expected ')' in 'for' statement", ())
-ERROR(expected_lbrace_after_for,none,
-      "expected '{' in 'for' statement", ())
-ERROR(expected_var_decl_for_stmt,PointsToFirstBadToken,
-      "expected var declaration in a 'for' statement", ())
+ERROR(c_style_for_stmt_removed,none,
+      "C-style for statement has been removed in Swift 3", ())
 
 // For-each Stmt
-ERROR(expected_foreach_in,none,
+ERROR(expected_foreach_in,PointsToFirstBadToken,
       "expected 'in' after for-each pattern", ())
-ERROR(expected_foreach_container,none,
+ERROR(expected_foreach_container,PointsToFirstBadToken,
       "expected Sequence expression for for-each loop", ())
-ERROR(expected_foreach_lbrace,none,
+ERROR(expected_foreach_lbrace,PointsToFirstBadToken,
       "expected '{' to start the body of for-each loop", ())
 ERROR(expected_foreach_where_expr,PointsToFirstBadToken,
       "expected expression in 'where' guard of 'for/in'", ())

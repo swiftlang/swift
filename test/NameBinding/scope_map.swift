@@ -319,8 +319,8 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [94:5 - 94:10] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-CaseStmt {{.*}} [97:5 - 97:10] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [97:5 - 97:10] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                          `-ForStmt {{.*}} [99:3 - 99:38] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                            `-ForStmtInitializer {{.*}} [99:17 - 99:38] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          `-ForEachStmt {{.*}} [99:3 - 99:38] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            `-ForEachPattern {{.*}} [99:36 - 99:38] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [99:36 - 99:38] expanded
 
 // CHECK-EXPANDED:        TypeDecl {{.*}} StructContainsAbstractStorageDecls [114:1 - 130:1] expanded
