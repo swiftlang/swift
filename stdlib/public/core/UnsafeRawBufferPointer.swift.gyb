@@ -507,8 +507,8 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// Initializes the buffer's memory with the given elements, binding the
   /// initialized memory to the elements' type.
   ///
-  /// When calling the `initialize(as:from:)` method on a buffer `b`, the
-  /// memory referenced by `b` must be uninitialized or initialized to a
+  /// When calling the `initializeMemory(as:from:)` method on a buffer `b`,
+  /// the memory referenced by `b` must be uninitialized or initialized to a
   /// trivial type, and must be properly aligned for accessing `S.Element`.
   /// The buffer must contain sufficient memory to accommodate
   /// `source.underestimatedCount`.
