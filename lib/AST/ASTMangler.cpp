@@ -548,6 +548,8 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     case DeclBaseName::Kind::Subscript:
       appendIdentifier("subscript");
       break;
+    case DeclBaseName::Kind::Destructor:
+      llvm_unreachable("Destructors are not mangled using appendDeclName");
     }
   } else {
     assert(AllowNamelessEntities && "attempt to mangle unnamed decl");

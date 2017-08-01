@@ -214,7 +214,8 @@ class DeclBaseName {
 public:
   enum class Kind: uint8_t {
     Normal,
-    Subscript
+    Subscript,
+    Destructor
   };
   
 private:
@@ -223,6 +224,8 @@ private:
   /// This is an implementation detail that should never leak outside of
   /// DeclName.
   static void *SubscriptIdentifierData;
+  /// As above, for special destructor DeclNames.
+  static void *DestructorIdentifierData;
 
   Identifier Ident;
 
@@ -235,9 +238,15 @@ public:
     return DeclBaseName(Identifier((const char *)SubscriptIdentifierData));
   }
 
+  static DeclBaseName createDestructor() {
+    return DeclBaseName(Identifier((const char *)DestructorIdentifierData));
+  }
+
   Kind getKind() const {
     if (Ident.get() == SubscriptIdentifierData) {
       return Kind::Subscript;
+    } else if (Ident.get() == DestructorIdentifierData) {
+        return Kind::Destructor;
     } else {
       return Kind::Normal;
     }
@@ -273,6 +282,8 @@ public:
       return getIdentifier().str();
     case Kind::Subscript:
       return "subscript";
+    case Kind::Destructor:
+      return "deinit";
     }
   }
 

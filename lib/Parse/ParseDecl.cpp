@@ -5792,8 +5792,8 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   auto *SelfDecl = ParamDecl::createUnboundSelf(DestructorLoc, CurDeclContext);
 
   Scope S(this, ScopeKind::DestructorBody);
-  auto *DD = new (Context) DestructorDecl(Context.Id_deinit, DestructorLoc,
-                                          SelfDecl, CurDeclContext);
+  auto *DD = new (Context) DestructorDecl(DestructorLoc, SelfDecl,
+                                          CurDeclContext);
 
   // Parse the body.
   if (Tok.is(tok::l_brace)) {
