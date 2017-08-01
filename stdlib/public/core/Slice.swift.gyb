@@ -16,7 +16,8 @@ from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
     sliceTypeName,
-    protocolsForCollectionFeatures
+    protocolsForCollectionFeatures,
+    defaultIndicesForTraversal
 )
 
 def get_slice_doc_comment(Self):
@@ -119,6 +120,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 
   public typealias Index = Base.Index
   public typealias IndexDistance = Base.IndexDistance
+  public typealias Indices = ${defaultIndicesForTraversal(Traversal)}<${Self}>
 
   public var _startIndex: Index
   public var _endIndex: Index
