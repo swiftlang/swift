@@ -310,8 +310,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::EmitPCH;
     } else if (Opt.matches(OPT_emit_imported_modules)) {
       Action = FrontendOptions::EmitImportedModules;
-    } else if (Opt.matches(OPT_emit_tbd)) {
-      Action = FrontendOptions::EmitTBD;
     } else if (Opt.matches(OPT_parse)) {
       Action = FrontendOptions::Parse;
     } else if (Opt.matches(OPT_typecheck)) {
@@ -603,13 +601,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       else
         Suffix = "importedmodules";
       break;
-
-    case FrontendOptions::EmitTBD:
-      if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
-      else
-        Suffix = "tbd";
-      break;
     }
 
     if (!Suffix.empty()) {
@@ -719,6 +710,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                           OPT_emit_loaded_module_trace_path,
                           "trace.json", false);
 
+  determineOutputFilename(Opts.TBDPath, OPT_emit_tbd, OPT_emit_tbd_path, "tbd",
+                          false);
+
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
     Opts.FixitsOutputPath = A->getValue();
   }
@@ -773,7 +767,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
-    case FrontendOptions::EmitTBD:
       break;
     }
   }
@@ -806,7 +799,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
-    case FrontendOptions::EmitTBD:
       break;
     }
   }
@@ -840,7 +832,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
-    case FrontendOptions::EmitTBD:
       break;
     }
   }
@@ -877,7 +868,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
-    case FrontendOptions::EmitTBD:
       break;
     }
   }
