@@ -425,7 +425,7 @@ extension String {
     self = String(utf8._core)
   }
 
-  /// The index type for subscripting a string's `utf8` view.
+  /// The index type for subscripting a string.
   public typealias UTF8Index = UTF8View.Index
 }
 

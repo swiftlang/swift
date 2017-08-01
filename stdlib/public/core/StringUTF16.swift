@@ -89,25 +89,13 @@ extension String {
   /// Although the Swift overlay updates many Objective-C methods to return
   /// native Swift indices and index ranges, some still return instances of
   /// `NSRange`. To convert an `NSRange` instance to a range of
-  /// `String.UTF16View.Index`, follow these steps:
-  ///
-  /// 1. Use the `NSRange` type's `toRange` method to convert the instance to
-  ///    an optional range of `Int` values.
-  /// 2. Use your string's `utf16` view's index manipulation methods to convert
-  ///    the integer bounds to `String.UTF16View.Index` values.
-  /// 3. Create a new `Range` instance from the new index values.
-  ///
-  /// Here's an implementation of those steps, showing how to retrieve a
-  /// substring described by an `NSRange` instance from the middle of a
-  /// string.
+  /// `String.Index`, use the `Range(_:in:)` initializer, which takes an
+  /// `NSRange` and a string as arguments.
   ///
   ///     let snowy = "❄️ Let it snow! ☃️"
   ///     let nsrange = NSRange(location: 3, length: 12)
-  ///     if let r = nsrange.toRange() {
-  ///         let start = snowy.utf16.index(snowy.utf16.startIndex, offsetBy: r.lowerBound)
-  ///         let end = snowy.utf16.index(snowy.utf16.startIndex, offsetBy: r.upperBound)
-  ///         let substringRange = start..<end
-  ///         print(snowy.utf16[substringRange])
+  ///     if let range = Range(nsrange, in: snowy) {
+  ///         print(snowy[range])
   ///     }
   ///     // Prints "Let it snow!"
   public struct UTF16View
@@ -326,7 +314,7 @@ extension String {
     self = String(utf16._core)
   }
 
-  /// The index type for subscripting a string's `utf16` view.
+  /// The index type for subscripting a string.
   public typealias UTF16Index = UTF16View.Index
 }
 

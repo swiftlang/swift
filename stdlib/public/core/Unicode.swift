@@ -281,8 +281,8 @@ extension Unicode.UTF8 : UnicodeCodec {
   /// byte is a continuation byte.
   ///
   ///     let eAcute = "é"
-  ///     for codePoint in eAcute.utf8 {
-  ///         print(codePoint, UTF8.isContinuation(codePoint))
+  ///     for codeUnit in eAcute.utf8 {
+  ///         print(codeUnit, UTF8.isContinuation(codeUnit))
   ///     }
   ///     // Prints "195 false"
   ///     // Prints "169 true"

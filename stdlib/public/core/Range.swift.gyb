@@ -10,11 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type which can be used to slice a collection. A `RangeExpression` can
-/// convert itself to a `Range<Bound>` of indices within a given collection;
-/// the collection can then slice itself with that `Range`.
+/// A type that can be used to slice a collection.
+///
+/// A type that conforms to `RangeExpression` can convert itself to a
+/// `Range<Bound>` of indices within a given collection.
 public protocol RangeExpression {
+  /// The type that an expression describes a range of.
   associatedtype Bound: Comparable
+
   /// Returns the range of indices within the given collection described by
   /// this range expression.
   ///
@@ -61,6 +64,12 @@ public protocol RangeExpression {
     to collection: C
   ) -> Range<Bound> where C.Index == Bound
   
+  /// Returns a Boolean value indicating whether the given element is contained
+  /// within the range expression.
+  ///
+  /// - Parameter element: The element to check for containment.
+  /// - Returns: `true` if `element` is contained in the range expression;
+  ///   otherwise, `false`.
   func contains(_ element: Bound) -> Bool
 }
 

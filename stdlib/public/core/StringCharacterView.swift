@@ -29,10 +29,10 @@ extension String {
   ///
   /// In Swift, every string provides a view of its contents as characters. In
   /// this view, many individual characters---for example, "é", "김", and
-  /// "🇮🇳"---can be made up of multiple Unicode code points. These code points
-  /// are combined by Unicode's boundary algorithms into *extended grapheme
-  /// clusters*, represented by the `Character` type. Each element of a
-  /// `CharacterView` collection is a `Character` instance.
+  /// "🇮🇳"---can be made up of multiple Unicode scalar values. These scalar
+  /// values are combined by Unicode's boundary algorithms into *extended
+  /// grapheme clusters*, represented by the `Character` type. Each element of
+  /// a `CharacterView` collection is a `Character` instance.
   ///
   ///     let flowers = "Flowers 💐"
   ///     for c in flowers.characters {
