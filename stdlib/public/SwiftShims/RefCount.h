@@ -564,10 +564,12 @@ class RefCountBitsT {
     else
       return doDecrementStrongExtraRefCount<DontClearPinnedFlag>(dec);
   }
-
+  // Returns the old reference count before the increment.
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void incrementUnownedRefCount(uint32_t inc) {
-    setUnownedRefCount(getUnownedRefCount() + inc);
+  uint32_t incrementUnownedRefCount(uint32_t inc) {
+    uint32_t old = getUnownedRefCount();
+    setUnownedRefCount(old + inc);
+    return old;
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -756,6 +758,9 @@ class RefCounts {
 
   LLVM_ATTRIBUTE_NOINLINE
   bool tryIncrementNonAtomicSlow(RefCountBits oldbits);
+
+  LLVM_ATTRIBUTE_NOINLINE
+  void incrementUnownedSlow(uint32_t inc);
 
   public:
   enum Initialized_t { Initialized };
@@ -1139,8 +1144,12 @@ class RefCounts {
 
       newbits = oldbits;
       assert(newbits.getUnownedRefCount() != 0);
-      newbits.incrementUnownedRefCount(inc);
-      // FIXME: overflow check?
+      uint32_t oldValue = newbits.incrementUnownedRefCount(inc);
+
+      // Check overflow and use the side table on overflow.
+      if (newbits.getUnownedRefCount() != oldValue + inc)
+        return incrementUnownedSlow(inc);
+
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
   }
@@ -1152,8 +1161,12 @@ class RefCounts {
 
     auto newbits = oldbits;
     assert(newbits.getUnownedRefCount() != 0);
-    newbits.incrementUnownedRefCount(inc);
-    // FIXME: overflow check?
+    uint32_t oldValue = newbits.incrementUnownedRefCount(inc);
+
+    // Check overflow and use the side table on overflow.
+    if (newbits.getUnownedRefCount() != oldValue + inc)
+      return incrementUnownedSlow(inc);
+
     refCounts.store(newbits, std::memory_order_relaxed);
   }
 
