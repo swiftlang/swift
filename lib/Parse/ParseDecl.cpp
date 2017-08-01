@@ -2526,7 +2526,15 @@ void Parser::parseDeclDelayed() {
   Scope S(this, DelayedState->takeScope());
   ContextChange CC(*this, DelayedState->ParentContext);
 
-  parseDecl(ParseDeclOptions(DelayedState->Flags), [](Decl *D) { });
+  parseDecl(ParseDeclOptions(DelayedState->Flags), [&](Decl *D) {
+    if (auto *parent = DelayedState->ParentContext) {
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(parent)) {
+        NTD->addMember(D);
+      } else if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
+        ED->addMember(D);
+      }
+    }
+  });
 }
 
 /// \brief Parse an 'import' declaration, doing no token skipping on error.
@@ -3296,8 +3304,11 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
         TrailingWhere, /*isProtocol=*/false);
-    if (whereStatus.shouldStopParsing())
+    Status |= whereStatus;
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
       return whereStatus;
+    }
   }
 
   if (!Flags.contains(PD_InProtocol)) {
