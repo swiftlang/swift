@@ -140,18 +140,6 @@ func missingWhileInRepeat() {
 func acceptsClosure<T>(t: T) -> Bool { return true }
 
 func missingControllingExprInFor() {
-  for // expected-error {{expected initialization in a 'for' statement}}
-
-  for { // expected-error {{missing initialization in a 'for' statement}}
-  }
-
-  for // expected-error {{missing initialization in a 'for' statement}}
-  {
-  }
-
-  for var i { // expected-error 2{{expected ';' in 'for' statement}} expected-error {{type annotation missing in pattern}}
-  }
-
   for ; { // expected-error {{expected ';' in 'for' statement}}
   }
 
@@ -164,40 +152,70 @@ func missingControllingExprInFor() {
   }
 
   for var i = 0; true { // expected-error {{expected ';' in 'for' statement}}
+    i += 1
   }
-
- 
-// The #if block is used to provide a scope for the for stmt to force it to end
-// where necessary to provoke the crash.
-#if true  // <rdar://problem/21679557> compiler crashes on "for{{"
-  // expected-error @+2 {{missing initialization in a 'for' statement}}
-  // expected-note @+1 2 {{to match this opening '{'}}
-for{{ // expected-error {{expression resolves to an unused function}}
-#endif  // expected-error 2 {{expected '}' at end of closure}}
-  
-#if true
-  // expected-error @+1 {{missing initialization in a 'for' statement}}
-  for{
-    var x = 42
-  }
-#endif
-
 }
 
 func missingControllingExprInForEach() {
-  for in { // expected-error {{expected pattern}} expected-error {{expected Sequence expression for for-each loop}}
-  }
+  // expected-error @+3 {{expected pattern}}
+  // expected-error @+2 {{expected Sequence expression for for-each loop}}
+  // expected-error @+1 {{expected '{' to start the body of for-each loop}}
+  for
 
-
-  // expected-error @+4 {{expected 'in' after for-each pattern}}
-  // expected-error @+3 {{expected '{' to start the body of for-each loop}}
   // expected-error @+2 {{expected pattern}}
   // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  for {
+  }
+
+  // expected-error @+2 {{expected pattern}}
+  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  for
+  {
+  }
+
+  // expected-error @+2 {{expected 'in' after for-each pattern}}
+  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  for i {
+  }
+
+  // expected-error @+2 {{expected 'in' after for-each pattern}}
+  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  for var i {
+  }
+
+  // expected-error @+2 {{expected pattern}}
+  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  for in {
+  }
+
+  // expected-error @+1 {{expected pattern}}
+  for 0..<12 {
+  }
+
+  // expected-error @+3 {{expected pattern}}
+  // expected-error @+2 {{expected Sequence expression for for-each loop}}
+  // expected-error @+1 {{expected '{' to start the body of for-each loop}}
   for for in { // expected-error {{expected pattern}} expected-error {{expected Sequence expression for for-each loop}}
   }
 
   for i in { // expected-error {{expected Sequence expression for for-each loop}}
   }
+
+// The #if block is used to provide a scope for the for stmt to force it to end
+// where necessary to provoke the crash.
+#if true  // <rdar://problem/21679557> compiler crashes on "for{{"
+  // expected-error @+2 {{expected pattern}}
+  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  for{{ // expected-note 2 {{to match this opening '{'}}
+#endif  // expected-error {{expected '}' at end of closure}} expected-error {{expected '}' at end of brace statement}}
+
+#if true
+  // expected-error @+2 {{expected pattern}}
+  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  for{
+    var x = 42
+  }
+#endif
 }
 
 func missingControllingExprInSwitch() {
