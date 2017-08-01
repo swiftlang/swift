@@ -403,6 +403,7 @@ public:
   ModuleDecl *getSwiftModule() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
+  const IRGenOptions &getOptions() const { return IRGen.Opts; }
   SILModuleConventions silConv;
 
   llvm::SmallString<128> OutputFilename;

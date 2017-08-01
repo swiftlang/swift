@@ -72,6 +72,10 @@ Lowering::TypeConverter &IRGenFunction::getSILTypes() const {
   return IGM.getSILTypes();
 }
 
+const IRGenOptions &IRGenFunction::getOptions() const {
+  return IGM.getOptions();
+}
+
 // Returns the default atomicity of the module.
 Atomicity IRGenFunction::getDefaultAtomicity() {
   return getSILModule().isDefaultAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
