@@ -2883,6 +2883,24 @@ private:
                   SILParameterInfo param) {
     ManagedValue value;
     auto loc = arg.getLocation();
+
+    auto convertOwnershipConvention = [&](ManagedValue value) {
+      if (param.isConsumed() &&
+          value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+        return value.copyUnmanaged(SGF, loc);
+      }
+
+      if (SGF.F.getModule().getOptions().EnableSILOwnership &&
+          value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+        if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses() &&
+                                           param.isIndirectInGuaranteed())) {
+          return value.borrow(SGF, loc);
+        }
+      }
+
+      return value;
+    };
+
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
     if (contexts.RequiresReabstraction) {
       auto conversion = [&] {
@@ -2899,9 +2917,12 @@ private:
       }();
       value = emitConvertedArgument(std::move(arg), conversion,
                                     contexts.FinalContext);
+      Args.push_back(convertOwnershipConvention(value));
+      return;
+    }
 
     // Peephole certain argument emissions.
-    } else if (arg.isExpr()) {
+    if (arg.isExpr()) {
       auto expr = std::move(arg).asKnownExpr();
 
       // Try the peepholes.
@@ -2910,28 +2931,12 @@ private:
 
       // Otherwise, just use the default logic.
       value = SGF.emitRValueAsSingleValue(expr, contexts.FinalContext);
-    } else {
-      value = std::move(arg).getAsSingleValue(SGF, contexts.FinalContext);
-    }
-
-    if (param.isConsumed() &&
-        value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-      value = value.copyUnmanaged(SGF, loc);
-      Args.push_back(value);
+      Args.push_back(convertOwnershipConvention(value));
       return;
     }
 
-    if (SGF.F.getModule().getOptions().EnableSILOwnership
-        && value.getOwnershipKind() == ValueOwnershipKind::Owned) {
-      if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses()
-                                         && param.isIndirectInGuaranteed())) {
-        value = value.borrow(SGF, loc);
-        Args.push_back(value);
-        return;
-      }
-    }
-
-    Args.push_back(value);
+    value = std::move(arg).getAsSingleValue(SGF, contexts.FinalContext);
+    Args.push_back(convertOwnershipConvention(value));
   }
 
   bool maybeEmitDelayed(Expr *expr, OriginalArgument original) {
