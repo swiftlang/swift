@@ -256,6 +256,11 @@ endmacro()
 # Common cmake project config for additional warnings.
 #
 macro(swift_common_cxx_warnings)
+  # Make unhandled switch cases be an error in assert builds
+  if(DEFINED LLVM_ENABLE_ASSERTIONS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=switch")
+  endif()
+
   check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLAG)
   append_if(CXX_SUPPORTS_DOCUMENTATION_FLAG "-Wdocumentation" CMAKE_CXX_FLAGS)
 
