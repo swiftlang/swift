@@ -26,6 +26,8 @@ namespace llvm {
 namespace swift {
 namespace irgen {
 
+class Address;
+class Explosion;
 class LoadableTypeInfo;
 struct WitnessMetadata;
 
