@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_SIGNATURE_H
 
 #include "llvm/IR/Attributes.h"
+#include "llvm/IR/CallingConv.h"
 #include "swift/AST/Types.h"
 
 namespace llvm {
@@ -37,6 +38,8 @@ namespace swift {
   class SILType;
 
 namespace irgen {
+
+class IRGenModule;
 
 /// An encapsulation of different foreign calling-convention lowering
 /// information we might have.  Should be interpreted according to the

@@ -37,24 +37,10 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
-  class AssociatedTypeDecl;
-  class ClassDecl;
-  class ConstructorDecl;
-  class Decl;
-  class ExtensionDecl;
-  class FuncDecl;
-  class EnumElementDecl;
-  class EnumType;
-  class Pattern;
-  class PatternBindingDecl;
+  class IRGenOptions;
   class SILDebugScope;
   class SILType;
-  class KeyPathInst;
   class SourceLoc;
-  class StructType;
-  class Substitution;
-  class ValueDecl;
-  class VarDecl;
 
 namespace Lowering {
   class TypeConverter;
@@ -84,6 +70,7 @@ public:
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
   Lowering::TypeConverter &getSILTypes() const;
+  const IRGenOptions &getOptions() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
                 const SILDebugScope *DbgScope = nullptr,

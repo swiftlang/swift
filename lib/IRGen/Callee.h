@@ -21,13 +21,8 @@
 #include <type_traits>
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/SIL/SILType.h"
-#include "Explosion.h"
 #include "IRGen.h"
 #include "Signature.h"
-
-namespace llvm {
-  class PointerType;
-}
 
 namespace swift {
   class Substitution;
