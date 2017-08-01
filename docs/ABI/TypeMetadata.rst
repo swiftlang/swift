@@ -402,8 +402,8 @@ Objective-C ``Protocol`` objects. The layout is as follows:
     only be conformed to by classes.)
   * **Bit 2** is the **witness table bit**. It is set if dispatch to the
     protocol's methods is done through a witness table, which is either passed
-    as an extra parameter to generic functions or included in the `existential
-    container layout`_ of protocol types. It is unset if dispatch is done
+    as an extra parameter to generic functions or included in the existential
+    container layout of protocol types. It is unset if dispatch is done
     through ``objc_msgSend`` and requires no additional information to accompany
     a value of conforming type.
   * **Bit 31** is set by the Objective-C runtime when it has done its
