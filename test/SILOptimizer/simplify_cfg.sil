@@ -2914,7 +2914,8 @@ class IsQ : Q {}
 // CHECK-LABEL: sil @test_dead_checked_cast_br : $@convention(thin) (@in IsQ) -> () {
 // CHECK: bb0(%0 : $*IsQ):
 // CHECK:   [[Q:%.*]] = alloc_stack $Q
-// CHECK:   destroy_addr %0 : $*IsQ
+// CHECK:   [[LD:%.*]] = load %0 : $*IsQ
+// CHECK:   strong_release [[LD]] : $IsQ
 // CHECK:   dealloc_stack [[Q]] : $*Q
 // CHECK:   [[R:%.*]] = tuple ()
 // CHECK:   return [[R]] : $()

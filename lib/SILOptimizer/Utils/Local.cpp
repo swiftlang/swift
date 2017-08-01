@@ -1984,10 +1984,12 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
     // The unconditional_addr_cast can be skipped, if the result of a cast
     // is not used afterwards.
     if (ResultNotUsed) {
+      if (shouldTakeOnSuccess(Inst->getConsumptionKind())) {
+        auto &srcTL = Builder.getModule().getTypeLowering(Src->getType());
+        srcTL.emitDestroyAddress(Builder, Loc, Src);
+      }
       EraseInstAction(Inst);
       Builder.setInsertionPoint(BB);
-      if (shouldTakeOnSuccess(Inst->getConsumptionKind()))
-        Builder.emitDestroyAddr(Loc, Src);
       auto *NewI = Builder.createBranch(Loc, SuccessBB);
       WillSucceedAction();
       return NewI;
