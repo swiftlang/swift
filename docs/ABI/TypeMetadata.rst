@@ -147,7 +147,7 @@ In addition to the `common metadata layout`_ fields, protocol metadata records
 contain the following fields:
 
 - A **layout flags** word is stored at **offset 1**. The bits of this word
-  describe the `existential container layout`_ used to represent
+  describe the existential container layout used to represent
   values of the type. The word is laid out as follows:
 
   * The **number of witness tables** is stored in the least significant 31 bits.
