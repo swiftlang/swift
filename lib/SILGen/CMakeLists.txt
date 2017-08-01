@@ -31,6 +31,8 @@ add_swift_library(swiftSILGen STATIC
   SILGenStmt.cpp
   SILGenThunk.cpp
   SILGenType.cpp
+  DEPENDS
+    swift-syntax-generated-headers
   LINK_LIBRARIES
     swiftSIL
 )

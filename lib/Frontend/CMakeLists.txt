@@ -12,7 +12,9 @@ add_swift_library(swiftFrontend STATIC
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp
   ${AppleHostVersionDetection}
-  DEPENDS SwiftOptions
+  DEPENDS
+    SwiftOptions
+    swift-syntax-generated-headers
   LINK_LIBRARIES
     swiftSIL
     swiftMigrator
