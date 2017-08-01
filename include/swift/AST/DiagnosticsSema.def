@@ -1659,11 +1659,12 @@ ERROR(protocol_composition_one_class,none,
       "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
-      "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))
+      "type %0 constrained to non-protocol, non-class type %1",
+      (TypeLoc, TypeLoc))
 ERROR(requires_not_suitable_archetype,none,
-      "%select{|first |second }0type %1 in %select{conformance|same-type}2 "
-      "requirement does not refer to a generic parameter or associated type",
-      (int, TypeLoc, int))
+      "type %0 in conformance requirement does not refer to a "
+      "generic parameter or associated type",
+      (TypeLoc))
 ERROR(requires_no_same_type_archetype,none,
       "neither type in same-type refers to a generic parameter or "
       "associated type",

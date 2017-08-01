@@ -2952,7 +2952,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
     // complain.
     if (source.isExplicit() && source.getLoc().isValid()) {
       Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                     0, TypeLoc::withoutLoc(resolvedSubject->getType()), 0);
+                     TypeLoc::withoutLoc(resolvedSubject->getType()));
       return ConstraintResult::Concrete;
     }
 
@@ -3078,20 +3078,14 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   }
 
   // The right-hand side needs to be concrete.
+  Type constraintType;
   if (auto constraintPA = resolvedConstraint->getPotentialArchetype()) {
-    // The constraint type isn't a statically-known constraint.
-    if (source.getLoc().isValid()) {
-      auto constraintType = constraintPA->getDependentType(Impl->GenericParams);
-      Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                     1, TypeLoc::withoutLoc(constraintType), 0);
-    }
-
-    return ConstraintResult::Concrete;
+    constraintType = constraintPA->getDependentType(Impl->GenericParams);
+  } else {
+    constraintType = resolvedConstraint->getType();
   }
 
   // Check whether we have a reasonable constraint type at all.
-  auto constraintType = resolvedConstraint->getType();
-  assert(constraintType && "Missing constraint type?");
   if (!constraintType->isExistentialType() &&
       !constraintType->getClassOrBoundGenericClass()) {
     if (source.getLoc().isValid() && !constraintType->hasError()) {
@@ -3129,7 +3123,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     if (source.isExplicit()) {
       if (source.getLoc().isValid()) {
         Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                       0, TypeLoc::withoutLoc(resolvedSubject->getType()), 0);
+                       TypeLoc::withoutLoc(resolvedSubject->getType()));
       }
 
       return ConstraintResult::Concrete;
