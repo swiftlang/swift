@@ -1027,10 +1027,8 @@ namespace {
       auto intType = getDiscriminatorType();
 
       APInt intValue = IntegerLiteralExpr::getValue(intExpr->getDigitsText(),
-                                                    intType->getBitWidth());
-
-      if (intExpr->isNegative())
-        intValue = -intValue;
+                                                    intType->getBitWidth(),
+                                                    intExpr->isNegative());
 
       return intValue.getZExtValue();
     }

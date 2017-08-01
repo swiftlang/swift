@@ -559,8 +559,7 @@ func infinitelySized() -> Bool {
   }
 }
 
-// Literal Duplicate checks
-func checkLiterals() {
+func diagnoseDuplicateLiterals() {
   let str = "def"
   let int = 2
   let dbl = 2.5
@@ -614,6 +613,9 @@ func checkLiterals() {
 
   // No Diagnostics
   switch int {
+  case -2: break
+  case -1: break
+  case 0: break
   case 1: break
   case 2: break
   case 3: break
@@ -621,6 +623,8 @@ func checkLiterals() {
   }
 
   switch int {
+  case -2: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case -2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
   case 1: break
   case 2: break // expected-note {{first occurrence of identical literal pattern is here}}
   case 2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
@@ -629,6 +633,7 @@ func checkLiterals() {
   }
     
   switch int {
+  case -2, -2: break // expected-note {{first occurrence of identical literal pattern is here}} expected-warning {{literal value is already handled by previous pattern; consider removing it}}
   case 1, 2: break // expected-note 3 {{first occurrence of identical literal pattern is here}}
   case 2, 3: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
   case 1, 2: break // expected-warning 2 {{literal value is already handled by previous pattern; consider removing it}}
@@ -655,10 +660,12 @@ func checkLiterals() {
   switch int {
   case 10: break
   case 0b10: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case -0b10: break // expected-note {{first occurrence of identical literal pattern is here}}
   case 3000: break
   case 0x12: break // expected-note {{first occurrence of identical literal pattern is here}}
   case 400: break
   case 2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case -2: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
   case 18: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
   default: break
   }
@@ -681,6 +688,9 @@ func checkLiterals() {
 
   // No Diagnostics
   switch dbl {
+  case -3.5: break
+  case -2.5: break
+  case -1.5: break
   case 1.5: break
   case 2.5: break
   case 3.5: break
@@ -688,6 +698,10 @@ func checkLiterals() {
   }
   
   switch dbl {
+  case -3.5: break
+  case -2.5: break // expected-note {{first occurrence of identical literal pattern is here}}
+  case -2.5: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
+  case -1.5: break
   case 1.5: break
   case 2.5: break // expected-note {{first occurrence of identical literal pattern is here}}
   case 2.5: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
