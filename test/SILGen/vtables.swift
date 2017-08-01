@@ -183,3 +183,12 @@ class SubscriptAsFunction {
 // CHECK-LABEL: sil_vtable SubscriptAsFunction {
 // CHECK-NOT:     #SubscriptAsFunction.subscript
 // CHECK:         #SubscriptAsFunction.`subscript`!1
+
+
+class DeinitAsFunction {
+  func `deinit`() {}
+}
+
+// CHECK-LABEL: sil_vtable DeinitAsFunction {
+// CHECK:         #DeinitAsFunction.`deinit`!1
+// CHECK:         #DeinitAsFunction.deinit!deallocator

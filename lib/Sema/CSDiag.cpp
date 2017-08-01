@@ -2532,6 +2532,9 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     if (memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
         .highlight(baseRange);
+    } else if (memberName.getBaseName() == "deinit") {
+      // Specialised diagnostic if trying to access deinitialisers
+      diagnose(loc, diag::destructor_not_accessible).highlight(baseRange);
     } else if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
       auto instanceTy = metatypeTy->getInstanceType();
       tryTypoCorrection();
@@ -2689,10 +2692,6 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       for (auto cand : result.UnviableCandidates)
         diagnose(cand.first, diag::decl_declared_here, memberName);
         
-      return;
-    }
-    case MemberLookupResult::UR_DestructorInaccessible: {
-      diagnose(nameLoc, diag::destructor_not_accessible);
       return;
     }
     }

@@ -4866,8 +4866,6 @@ protected:
   }
 
 public:
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
-
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
@@ -5199,6 +5197,8 @@ public:
                           ArrayRef<ParameterList *> ParameterLists,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
+
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
   bool isStatic() const {
     return FuncDeclBits.IsStatic;
@@ -5648,6 +5648,8 @@ public:
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
 
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
   void setParameterLists(ParamDecl *selfParam, ParameterList *bodyParams);
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
@@ -5839,8 +5841,8 @@ public:
 class DestructorDecl : public AbstractFunctionDecl {
   ParameterList *SelfParameter;
 public:
-  DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
-                 ParamDecl *selfDecl, DeclContext *Parent);
+  DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
+                 DeclContext *Parent);
   
   void setSelfDecl(ParamDecl *selfDecl);
 

@@ -1626,6 +1626,8 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
           return getSelectorFamily(declName.getIdentifier());
         case DeclBaseName::Kind::Subscript:
           return SelectorFamily::None;
+        case DeclBaseName::Kind::Destructor:
+          return SelectorFamily::None;
         }
       }
       return SelectorFamily::None;

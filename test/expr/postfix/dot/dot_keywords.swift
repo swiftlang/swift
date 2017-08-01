@@ -54,3 +54,26 @@ let sr3043 = SR3043Derived()
 sr3043.deinit() // expected-error {{deinitializers cannot be accessed}}
 sr3043.deinit // expected-error {{deinitializers cannot be accessed}}
 SR3043Derived.deinit() // expected-error {{deinitializers cannot be accessed}}
+
+// Allow deinit functions in classes
+
+class ClassWithDeinitFunc {
+  func `deinit`() {
+  }
+
+  func `deinit`(a: SR3043Base) {
+  }
+}
+
+let instanceWithDeinitFunc = ClassWithDeinitFunc()
+instanceWithDeinitFunc.deinit()
+_ = instanceWithDeinitFunc.deinit(a:)
+_ = instanceWithDeinitFunc.deinit as () -> Void
+SR3043Derived.deinit() // expected-error {{deinitializers cannot be accessed}}
+
+class ClassWithDeinitMember {
+  var `deinit`: SR3043Base?
+}
+
+let instanceWithDeinitMember = ClassWithDeinitMember()
+_ = instanceWithDeinitMember.deinit

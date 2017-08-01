@@ -141,6 +141,8 @@ DeclBaseName SerializedSwiftName::toDeclBaseName(ASTContext &Context) const {
     return Context.getIdentifier(Name);
   case DeclBaseName::Kind::Subscript:
     return DeclBaseName::createSubscript();
+  case DeclBaseName::Kind::Destructor:
+    return DeclBaseName::createDestructor();
   }
 }
 
@@ -819,6 +821,9 @@ void SwiftLookupTable::dump() const {
       break;
     case DeclBaseName::Kind::Subscript:
       llvm::errs() << "  subscript:\n";
+      break;
+    case DeclBaseName::Kind::Destructor:
+      llvm::errs() << "  deinit:\n";
       break;
     }
     const auto &entries = LookupTable.find(baseName)->second;
