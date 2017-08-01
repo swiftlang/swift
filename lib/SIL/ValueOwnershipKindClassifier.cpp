@@ -45,7 +45,6 @@ CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
 CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
-CONSTANT_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -132,6 +131,7 @@ CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 // These are instructions that do not have any result, so we should never reach

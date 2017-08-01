@@ -202,7 +202,6 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
-  case ValueKind::UnconditionalCheckedCastValueInst:
   case ValueKind::TupleExtractInst:
   case ValueKind::StructExtractInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -529,6 +528,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, DeallocValueBuffer)
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastValueBranch)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, UnconditionalCheckedCastValue)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialValue)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, DeinitExistentialValue)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
@@ -658,7 +658,6 @@ FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
-FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCastValue)
 FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 #undef FORWARD_ANY_OWNERSHIP_INST
