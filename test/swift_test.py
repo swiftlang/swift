@@ -32,13 +32,15 @@ class SwiftTest(lit.formats.ShTest, object):
 
     def before_test(self, test, litConfig):
         _, tmp_base = lit.TestRunner.getTempPaths(test)
-        
-        # Apparently despite the docs, tmpDir is not actually unique for each test, but
-        # tmpBase is.  Remove it here and add a tmpBase substitution in before_test.
-        # Speculative fix for rdar://32928464.
+
+        # Apparently despite the docs, tmpDir is not actually unique for each
+        # test, but tmpBase is. Remove it here and add a tmpBase substitution
+        # in before_test. Speculative fix for rdar://32928464.
         try:
-            percentT_index = [x[0] for x in test.config.substitutions].index('%T')
-        except ValueError: pass
+            percentT_index = \
+                [x[0] for x in test.config.substitutions].index('%T')
+        except ValueError:
+            pass
         else:
             test.config.substitutions.pop(percentT_index)
 
