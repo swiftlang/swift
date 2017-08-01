@@ -1096,9 +1096,12 @@ static StringRef getEscapedName(DeclBaseName name) {
   switch (name.getKind()) {
   case DeclBaseName::Kind::Subscript:
     return "subscript";
+  case DeclBaseName::Kind::Destructor:
+    return "deinit";
   case DeclBaseName::Kind::Normal:
     return llvm::StringSwitch<StringRef>(name.getIdentifier().str())
         .Case("subscript", "`subscript`")
+        .Case("deinit", "`deinit`")
         .Default(name.getIdentifier().str());
   }
 }
