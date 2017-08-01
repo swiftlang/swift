@@ -109,8 +109,12 @@ protocol P2 {
 
 // P2: Begin completions
 // P2-DAG: Decl[GenericTypeParam]/CurrNominal: Self[#Self#];
-// FIXME: Should complete T.
+// P2-DAG: Decl[AssociatedType]/CurrNominal:   T;
+// P2-DAG: Decl[AssociatedType]/CurrNominal:   U;
 // P2: End completions
 
+// U_DOT: Begin completions
 // FIXME: Should complete Q from Assoc.
-// U_DOT-NOT: Begin completions
+// U_DOT-DAG: Keyword/None:                       Type[#Self.U.Type#];
+// U_DOT-DAG: Keyword/CurrNominal:                self[#Self.U#];
+// U_DOT: End completions
