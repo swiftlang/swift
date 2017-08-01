@@ -980,7 +980,7 @@ namespace {
         auto *ILE = cast<IntegerLiteralExpr>(EL);
         auto cacheVal =
             IntLiteralCache.insert(
-                {ILE->getValue(ILE->getDigitsText(), 128), ILE});
+                {ILE->getValue(ILE->getDigitsText(), 128, ILE->isNegative()), ILE});
         PrevPattern = (cacheVal.first != IntLiteralCache.end())
                     ? cacheVal.first->getSecond()
                     : nullptr;
@@ -993,7 +993,7 @@ namespace {
         auto cacheVal =
             FloatLiteralCache.insert(
                    {FLE->getValue(FLE->getDigitsText(),
-                                  APFloat::IEEEquad()), FLE});
+                                  APFloat::IEEEquad(), FLE->isNegative()), FLE});
         PrevPattern = (cacheVal.first != FloatLiteralCache.end())
                     ? cacheVal.first->getSecond()
                     : nullptr;
