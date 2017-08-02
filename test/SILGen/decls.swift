@@ -167,3 +167,25 @@ struct StructWithStaticVar {
   init() {
   }
 }
+
+// Make sure unbound method references on class hierarchies are
+// properly represented in the AST
+
+class Base {
+  func method1() -> Self { return self }
+  func method2() -> Self { return self }
+}
+
+class Derived : Base {
+  override func method2() -> Self { return self }
+}
+
+func generic<T>(arg: T) { }
+
+func unboundMethodReferences() {
+  generic(arg: Derived.method1)
+  generic(arg: Derived.method2)
+
+  _ = type(of: Derived.method1)
+  _ = type(of: Derived.method2)
+}
