@@ -6178,6 +6178,7 @@ public:
 
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(ObjCRuntimeName)
+    UNINTERESTING_ATTR(RestatedObjCConformance)
     UNINTERESTING_ATTR(Implements)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
     UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
@@ -8504,7 +8505,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     auto argumentName = argumentNames.front();
     if (baseName.getIdentifier() == Context.Id_init &&
         argumentName == Context.Id_from) {
-      // init(from:) may be synthesized as part of derived confromance to the
+      // init(from:) may be synthesized as part of derived conformance to the
       // Decodable protocol.
       // If the target should conform to the Decodable protocol, check the
       // conformance here to attempt synthesis.
@@ -8512,7 +8513,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       (void)evaluateTargetConformanceTo(decodableProto);
     } else if (baseName.getIdentifier() == Context.Id_encode &&
                argumentName == Context.Id_to) {
-      // encode(to:) may be synthesized as part of derived confromance to the
+      // encode(to:) may be synthesized as part of derived conformance to the
       // Encodable protocol.
       // If the target should conform to the Encodable protocol, check the
       // conformance here to attempt synthesis.

@@ -172,6 +172,47 @@ bb0:
   return %4 : $()
 }
 
+// We should be able to remove the local store into alloc_ref [stack] locations
+// that is not read.
+//
+// CHECK-LABEL: trivial_local_dead_store_into_alloc_ref
+// CHECK: bb0
+// CHECK-NOT: {{ store}}
+// CHECK: tuple
+// CHECK: return
+sil hidden @trivial_local_dead_store_into_alloc_ref_stack : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] $foo
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int (%1 : $Builtin.Int64)
+  %3 = ref_element_addr %0 : $foo, #foo.a
+  store %2 to %3 : $*Int
+  %4 = tuple ()
+  dealloc_ref [stack] %0 : $foo
+  return %4 : $()
+}
+
+// We cannot remove the local store that is potentially read by the deinit of foo.
+//
+// CHECK-LABEL: sil hidden @blocking_read_on_local_store_into_alloc_ref_stack
+// CHECK: bb0
+// CHECK: alloc_ref
+// CHECK: store
+// CHECK: dealloc_ref
+// CHECK: return
+sil hidden @blocking_read_on_local_store_into_alloc_ref_stack : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] $foo
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int (%1 : $Builtin.Int64)
+  %3 = ref_element_addr %0 : $foo, #foo.a
+  store %2 to %3 : $*Int
+  %4 = tuple ()
+  strong_release %0 : $foo
+  dealloc_ref [stack] %0 : $foo
+  return %4 : $()
+}
+
 // We cannot remove the local store that is read.
 //
 // CHECK-LABEL: blocking_read_on_local_store

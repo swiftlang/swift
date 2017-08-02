@@ -1,4 +1,3 @@
-#include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"

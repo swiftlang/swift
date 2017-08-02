@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Callee.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
@@ -72,7 +73,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   if (requirements.empty()) {
     return accessorFn;
   }
-  
+
   auto accessorFnTy = accessorFn->getType()->getPointerElementType();
   
   // Otherwise, we need a thunk to unmarshal the generic environment from the
@@ -142,9 +143,9 @@ getAccessorForComputedComponent(IRGenModule &IGM,
                              forwardingSubs,
                              &witnessMetadata,
                              forwardedArgs);
-    auto call = IGF.Builder.CreateCall(accessorFn, forwardedArgs.claimAll());
-    if (whichAccessor == Getter)
-      call->addAttribute(1, llvm::Attribute::StructRet);
+    auto fnPtr = FunctionPointer::forDirect(IGM, accessorFn,
+                                          accessor->getLoweredFunctionType());
+    IGF.Builder.CreateCall(fnPtr, forwardedArgs.claimAll());
     
     IGF.Builder.CreateRetVoid();
   }

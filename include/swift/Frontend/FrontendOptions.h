@@ -119,6 +119,9 @@ public:
   /// The path to which we should output a loaded module trace file.
   std::string LoadedModuleTracePath;
 
+  /// The path to which we should output a TBD file.
+  std::string TBDPath;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
@@ -171,7 +174,6 @@ public:
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
 
-    EmitTBD, ///< Emit a TBD file for this module
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH, ///< Emit PCH of imported bridging header
 
@@ -179,6 +181,7 @@ public:
     EmitSIL, ///< Emit canonical SIL
 
     EmitModuleOnly, ///< Emit module only
+    MergeModules, ///< Merge modules only
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB, ///< Emit serialized AST + canonical SIL

@@ -7,7 +7,7 @@ sil_stage canonical
 // CHECK: define hidden swiftcc void @f010_irgen_identity(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK: entry:
 // CHECK-NOT: call
-// CHECK: %{{.*}} = call %swift.opaque* %initializeWithTake(%swift.opaque* %0, %swift.opaque* %1, %swift.type* %T)
+// CHECK: %{{.*}} = call %swift.opaque* %initializeWithTake(%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T)
 // CHECK-NOT: call
 // CHECK: ret void
 sil hidden @f010_irgen_identity : $@convention(thin) <T> (@in T) -> @out T {

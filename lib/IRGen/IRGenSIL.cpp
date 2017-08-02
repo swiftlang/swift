@@ -143,30 +143,32 @@ public:
 private:
   using ExplosionVector = SmallVector<llvm::Value *, 4>;
   using SingletonExplosion = llvm::Value*;
+
+  using Members = ExternalUnionMembers<ContainedAddress,
+                                       StackAddress,
+                                       OwnedAddress,
+                                       DynamicallyEnforcedAddress,
+                                       ExplosionVector,
+                                       SingletonExplosion,
+                                       FunctionPointer,
+                                       ObjCMethod,
+                                       void>;
   
-  static int getStorageTypeForKind(Kind kind) {
+  static Members::Index getMemberIndexForKind(Kind kind) {
     switch (kind) {
-    case Kind::ContainedAddress: return 0;
-    case Kind::StackAddress: return 1;
-    case Kind::OwnedAddress: return 2;
-    case Kind::DynamicallyEnforcedAddress: return 3;
-    case Kind::ExplosionVector: return 4;
-    case Kind::SingletonExplosion: return 5;
-    case Kind::FunctionPointer: return 6;
-    case Kind::ObjCMethod: return 7;
-    case Kind::EmptyExplosion: return -1;
+    case Kind::ContainedAddress: return Members::indexOf<ContainedAddress>();
+    case Kind::StackAddress: return Members::indexOf<StackAddress>();
+    case Kind::OwnedAddress: return Members::indexOf<OwnedAddress>();
+    case Kind::DynamicallyEnforcedAddress: return Members::indexOf<DynamicallyEnforcedAddress>();
+    case Kind::ExplosionVector: return Members::indexOf<ExplosionVector>();
+    case Kind::SingletonExplosion: return Members::indexOf<SingletonExplosion>();
+    case Kind::FunctionPointer: return Members::indexOf<FunctionPointer>();
+    case Kind::ObjCMethod: return Members::indexOf<ObjCMethod>();
+    case Kind::EmptyExplosion: return Members::indexOf<void>();
     }
     llvm_unreachable("bad kind");
   }
-  ExternalUnion<Kind, getStorageTypeForKind,
-                ContainedAddress,
-                StackAddress,
-                OwnedAddress,
-                DynamicallyEnforcedAddress,
-                ExplosionVector,
-                SingletonExplosion,
-                FunctionPointer,
-                ObjCMethod> Storage;
+  ExternalUnion<Kind, Members, getMemberIndexForKind> Storage;
 
 public:
 
@@ -621,7 +623,7 @@ public:
         // Emit an empty inline assembler expression depending on the register.
         auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
         auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
-        Builder.CreateCall(InlineAsm, Storage);
+        Builder.CreateAsmCall(InlineAsm, Storage);
         // Propagate the dbg.value intrinsics into the later basic blocks.  Note
         // that this shouldn't be necessary. LiveDebugValues should be doing
         // this but can't in general because it currently only tracks register
@@ -5009,8 +5011,8 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
       llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
     llvm::InlineAsm *inlineAsm =
       llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
-    Builder.CreateCall(inlineAsm,
-                       llvm::ConstantInt::get(asmArgTy, NumCondFails++));
+    Builder.CreateAsmCall(inlineAsm,
+                          llvm::ConstantInt::get(asmArgTy, NumCondFails++));
   }
 
   // Emit the trap instruction.

@@ -797,8 +797,16 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // @NSManaged property, then it won't be in the vtable.
     if (overridden.getDecl()->hasClangNode())
       return SILDeclRef();
-    if (overridden.getDecl()->isDynamic())
+
+    // If we overrode a non-required initializer, there won't be a vtable
+    // slot for the allocator.
+    if (overridden.kind == SILDeclRef::Kind::Allocator) {
+      if (!cast<ConstructorDecl>(overridden.getDecl())->isRequired())
+        return SILDeclRef();
+    } else if (overridden.getDecl()->isDynamic()) {
       return SILDeclRef();
+    }
+    
     if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
       if (auto *asd = ovFD->getAccessorStorageDecl()) {
         if (asd->hasClangNode())
@@ -811,13 +819,6 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // either. This can occur for extensions to ObjC classes.
     if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
       return SILDeclRef();
-
-    // If we overrode a non-required initializer, there won't be a vtable
-    // slot for the allocator.
-    if (overridden.kind == SILDeclRef::Kind::Allocator &&
-        !cast<ConstructorDecl>(overridden.getDecl())->isRequired()) {
-      return SILDeclRef();
-    }
 
     return overridden;
   }

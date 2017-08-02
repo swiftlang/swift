@@ -668,6 +668,8 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::Layout:
+      // FIXME: Second type of a superclass requirement may contain
+      // generic parameters.
       continue;
     case RequirementKind::SameType: {
       // Check if this requirement contains more than one generic param.
@@ -712,6 +714,10 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature *Sig,
     case RequirementKind::Layout:
       // If it is a generic param or something derived from it, add this
       // requirement.
+
+      // FIXME: Second type of a superclass requirement may contain
+      // generic parameters.
+
       if (Req.getFirstType()->getCanonicalType()->getRootGenericParam() ==
           CurrentGP)
         CollectedReqs.push_back(Req);

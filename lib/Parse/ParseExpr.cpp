@@ -2067,7 +2067,12 @@ Expr *Parser::parseExprIdentifier() {
     auto refKind = DeclRefKind::Ordinary;
     E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
   } else if (auto TD = dyn_cast<TypeDecl>(D)) {
-    assert(!TD->getDeclContext()->isTypeContext());
+    // When parsing default argument expressions for generic functions,
+    // we haven't built a FuncDecl or re-parented the GenericTypeParamDecls
+    // to the FuncDecl yet. Other than that, we should only ever find
+    // global or local declarations here.
+    assert(!TD->getDeclContext()->isTypeContext() ||
+           isa<GenericTypeParamDecl>(TD));
     E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*DC*/nullptr,
                                 /*implicit*/false);
   } else {
@@ -2274,7 +2279,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
           if (!consumeIf(tok::r_paren))
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
-      } else if (Tok.is(tok::identifier) &&
+      } else if (Tok.isAny(tok::identifier, tok::kw_self) &&
                  peekToken().isAny(tok::equal, tok::comma, tok::r_square)) {
         // "x = 42", "x," and "x]" are all strong captures of x.
         loc = Tok.getLoc();

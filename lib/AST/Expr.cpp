@@ -1005,8 +1005,8 @@ static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
   return Value;
 }
 
-APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth) {
-  return getIntegerLiteralValue(/*IsNegative=*/false, Text, BitWidth);
+APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth, bool Negative) {
+  return getIntegerLiteralValue(Negative, Text, BitWidth);
 }
 
 APInt IntegerLiteralExpr::getValue() const {
@@ -1035,8 +1035,9 @@ static APFloat getFloatLiteralValue(bool IsNegative, StringRef Text,
 }
 
 APFloat FloatLiteralExpr::getValue(StringRef Text,
-                                   const llvm::fltSemantics &Semantics) {
-  return getFloatLiteralValue(/*IsNegative*/false, Text, Semantics);
+                                   const llvm::fltSemantics &Semantics,
+                                   bool Negative) {
+  return getFloatLiteralValue(Negative, Text, Semantics);
 }
 
 llvm::APFloat FloatLiteralExpr::getValue() const {

@@ -248,10 +248,12 @@ struct S27515965 : P27515965 {
 
 struct V27515965 {
   init<T : P27515965>(_ tp: T) where T.R == Float {}
+  // expected-note@-1 {{candidate requires that the types 'Any' and 'Float' be equivalent (requirement specified as 'T.R' == 'Float' [with T = S27515965])}}
 }
 
 func test(x: S27515965) -> V27515965 {
-  return V27515965(x) // expected-error {{generic parameter 'T' could not be inferred}}
+  return V27515965(x)
+  // expected-error@-1 {{cannot invoke initializer for type 'init(_:)' with an argument list of type '(S27515965)'}}
 }
 
 protocol BaseProto {}
@@ -477,4 +479,20 @@ public struct S5 {
         f(models: arr)
         g(models: arr)
     }
+}
+
+// rdar://problem/24329052 - QoI: call argument archetypes not lining up leads to ambiguity errors
+
+struct S_24329052<T> { // expected-note {{generic parameter 'T' of generic struct 'S_24329052' declared here}}
+  var foo: (T) -> Void
+  // expected-note@+1 {{generic parameter 'T' of instance method 'bar(_:)' declared here}}
+  func bar<T>(_ v: T) { foo(v) }
+  // expected-error@-1 {{cannot convert value of type 'T' (generic parameter of instance method 'bar(_:)') to expected argument type 'T' (generic parameter of generic struct 'S_24329052')}}
+}
+
+extension Sequence {
+  var rdar24329052: (Element) -> Void { fatalError() }
+  // expected-note@+1 {{generic parameter 'Element' of instance method 'foo24329052(_:)' declared here}}
+  func foo24329052<Element>(_ v: Element) { rdar24329052(v) }
+  // expected-error@-1 {{cannot convert value of type 'Element' (generic parameter of instance method 'foo24329052(_:)') to expected argument type 'Self.Element' (associated type of protocol 'Sequence')}}
 }

@@ -22,6 +22,8 @@ using namespace swift;
 
 void *DeclBaseName::SubscriptIdentifierData =
     &DeclBaseName::SubscriptIdentifierData;
+void *DeclBaseName::DestructorIdentifierData =
+    &DeclBaseName::DestructorIdentifierData;
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, Identifier I) {
   if (I.get() == nullptr)

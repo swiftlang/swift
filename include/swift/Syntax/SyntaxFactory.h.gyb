@@ -1,0 +1,137 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From SyntaxFactory.h.gyb.
+//// Do Not Edit Directly!
+//===------------- SyntaxFactory.h - Syntax Factory definition ------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the SyntaxFactory, one of the most important client-facing
+// types in lib/Syntax and likely to be very commonly used.
+//
+// Effectively a namespace, SyntaxFactory is never instantiated, but is *the*
+// one-stop shop for making new Syntax nodes. Putting all of these into a
+// collection of static methods provides a single point of API lookup for
+// clients' convenience and also allows the library to hide all of the
+// constructors for all Syntax nodes, as the SyntaxFactory is friend to all.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_SYNTAX_FACTORY_H
+#define SWIFT_SYNTAX_FACTORY_H
+
+#include "swift/Syntax/SyntaxNodes.h"
+#include "swift/Syntax/Trivia.h"
+#include "llvm/ADT/ArrayRef.h"
+
+#include <vector>
+
+namespace swift {
+namespace syntax {
+
+/// The Syntax factory - the one-stop shop for making new Syntax nodes.
+struct SyntaxFactory {
+  /// Make any kind of token.
+  static TokenSyntax
+  makeToken(tok Kind, OwnedString Text, SourcePresence Presence,
+            const Trivia &LeadingTrivia, const Trivia &TrailingTrivia);
+
+  /// Collect a list of tokens into a piece of "unknown" syntax.
+  static UnknownSyntax
+  makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens);
+
+% for node in SYNTAX_NODES:
+%   if node.children:
+%     child_params = []
+%     for child in node.children:
+%         param_type = child.type_name
+%         if child.is_optional:
+%            param_type = "llvm::Optional<%s>" % param_type
+%         end
+%         child_params.append("%s %s" % (param_type, child.name))
+%     end
+%     child_params = ', '.join(child_params)
+  static ${node.name} make${node.syntax_kind}(${child_params});
+%   elif node.is_syntax_collection():
+  static ${node.name} make${node.syntax_kind}(
+    const std::vector<${node.collection_element_type}> &elts);
+%   end
+
+  static ${node.name} makeBlank${node.syntax_kind}();
+% end
+
+% for token in SYNTAX_TOKENS:
+%   if token.is_keyword:
+  static TokenSyntax make${token.name}Keyword(const Trivia &LeadingTrivia,
+                                              const Trivia &TrailingTrivia);
+%   elif token.text:
+  static TokenSyntax make${token.name}Token(const Trivia &LeadingTrivia,
+                                            const Trivia &TrailingTrivia);
+%   else:
+  static TokenSyntax make${token.name}(OwnedString Text,
+                                       const Trivia &LeadingTrivia,
+                                       const Trivia &TrailingTrivia);
+%   end
+% end
+
+#pragma mark - Convenience APIs
+
+  static TupleTypeSyntax makeVoidTupleType();
+
+  /// Creates an labelled TupleTypeElementSyntax with the provided label,
+  /// colon, type and optional trailing comma.
+  static TupleTypeElementSyntax makeTupleTypeElement(
+    llvm::Optional<TokenSyntax> Label,
+    llvm::Optional<TokenSyntax> Colon, TypeSyntax Type,
+    llvm::Optional<TokenSyntax> TrailingComma = llvm::None);
+
+  /// Creates an unlabelled TupleTypeElementSyntax with the provided type and
+  /// optional trailing comma.
+  static TupleTypeElementSyntax makeTupleTypeElement(TypeSyntax Type,
+    llvm::Optional<TokenSyntax> TrailingComma = llvm::None);
+
+  /// Creates a TypeIdentifierSyntax with the provided name and leading/trailing
+  /// trivia. 
+  static TypeIdentifierSyntax makeTypeIdentifier(OwnedString TypeName,
+    const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
+
+  /// Creates a GenericParameterSyntax with no inheritance clause and an
+  /// optional trailing comma.
+  static GenericParameterSyntax makeGenericParameter(TypeIdentifierSyntax Type,
+    llvm::Optional<TokenSyntax> TrailingComma);
+
+  /// Creates a TypeIdentifierSyntax for the `Any` type.
+  static TypeIdentifierSyntax makeAnyTypeIdentifier(
+    const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
+  
+  /// Creates a TypeIdentifierSyntax for the `Self` type.
+  static TypeIdentifierSyntax makeSelfTypeIdentifier(
+    const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
+
+  /// Creates a TokenSyntax for the `Type` identifier.
+  static TokenSyntax makeTypeToken(
+    const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
+
+  /// Creates a TokenSyntax for the `Protocol` identifier.
+  static TokenSyntax makeProtocolToken(
+    const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
+
+  /// Creates an `==` operator token.
+  static TokenSyntax makeEqualityOperator(
+    const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
+};
+}
+}
+
+#endif // SWIFT_SYNTAX_FACTORY_H

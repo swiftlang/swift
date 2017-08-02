@@ -56,7 +56,7 @@ class SyntaxCollection : public Syntax {
 
 private:
   static RC<SyntaxData>
-  makeData(std::vector<Element> &Elements) {
+  makeData(std::initializer_list<Element> &Elements) {
     RawSyntax::LayoutList List;
     for (auto &Elt : Elements) {
       List.push_back(Elt.getRaw());
@@ -65,16 +65,15 @@ private:
                                SourcePresence::Present);
     return SyntaxData::make(Raw);
   }
+  SyntaxCollection(const RC<SyntaxData> Root): Syntax(Root, Root.get()) {}
 
 public:
 
-  static SyntaxCollection<CollectionKind, Element> makeBlank() {
-    auto Raw = RawSyntax::make(CollectionKind, {}, SourcePresence::Present);
-    return make<SyntaxCollection<CollectionKind, Element>>(Raw);
-  }
-
   SyntaxCollection(const RC<SyntaxData> Root, const SyntaxData *Data)
   : Syntax(Root, Data) {}
+
+  SyntaxCollection(std::initializer_list<Element> list):
+    SyntaxCollection(SyntaxCollection::makeData(list)) {}
 
   /// Returns true if the collection is empty.
   bool empty() const {
@@ -190,12 +189,6 @@ public:
     return S->getKind() == CollectionKind;
   }
 };
-
-#define SYNTAX(Id, Super)
-#define SYNTAX_COLLECTION(Id, Element) \
-class Element;                         \
-using Id##Syntax = SyntaxCollection<SyntaxKind::Id, Element>;
-#include "swift/Syntax/SyntaxKinds.def"
 
 } // end namespace syntax
 } // end namespace swift

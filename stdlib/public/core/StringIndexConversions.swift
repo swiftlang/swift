@@ -12,7 +12,13 @@
 
 extension String.Index {
   /// Creates an index in the given string that corresponds exactly to the
-  /// specified `UnicodeScalarView` position.
+  /// specified position.
+  ///
+  /// If the index passed as `sourcePosition` represents the start of an
+  /// extended grapheme cluster---the element type of a string---then the
+  /// initializer succeeds. If the index instead represents the position of a
+  /// Unicode scalar within an extended grapheme cluster or the position of an
+  /// encoded Unicode scalar value, the result is `nil`.
   ///
   /// The following example converts the position of the Unicode scalar `"e"`
   /// into its corresponding position in the string. The character at that
@@ -28,21 +34,23 @@ extension String.Index {
   ///     print(cafe[...stringIndex])
   ///     // Prints "Café"
   ///
-  /// If the position passed in `unicodeScalarIndex` doesn't have an exact
-  /// corresponding position in `other`, the result of the initializer is
+  /// If the index passed as `sourcePosition` doesn't have an exact
+  /// corresponding position in `target`, the result of the initializer is
   /// `nil`. For example, an attempt to convert the position of the combining
   /// acute accent (`"\u{0301}"`) fails. Combining Unicode scalars do not have
   /// their own position in a string.
   ///
-  ///     let nextIndex = String.Index(cafe.unicodeScalars.index(after: scalarsIndex),
-  ///                                  within: cafe)
+  ///     let nextScalarsIndex = cafe.unicodeScalars.index(after: scalarsIndex)
+  ///     let nextStringIndex = String.Index(nextScalarsIndex, within: cafe)
+  ///
   ///     print(nextIndex)
   ///     // Prints "nil"
   ///
   /// - Parameters:
-  ///   - sourcePosition: A position in (a view of) the `other` parameter.
-  ///   - target: The string referenced by both `unicodeScalarIndex` and the
-  ///     resulting index.
+  ///   - sourcePosition: A position in a view of the `target` parameter.
+  ///     `sourcePosition` must be a valid index of at least one of the views
+  ///     of `target`.
+  ///   - target: The string referenced by the resulting index.
   public init?(
     _ sourcePosition: String.Index,
     within target: String
@@ -57,20 +65,23 @@ extension String.Index {
   /// Returns the position in the given UTF-8 view that corresponds exactly to
   /// this index.
   ///
-  /// The index must be a valid index of `String(utf8)`.
-  ///
-  /// This example first finds the position of the character `"é"` and then uses
-  /// this method find the same position in the string's `utf8` view.
+  /// This example first finds the position of the character `"é"`, and then
+  /// uses this method find the same position in the string's `utf8` view.
   ///
   ///     let cafe = "Café"
   ///     if let i = cafe.index(of: "é") {
-  ///         let j = i.samePosition(in: cafe.utf8)
+  ///         let j = i.samePosition(in: cafe.utf8)!
   ///         print(Array(cafe.utf8[j...]))
   ///     }
   ///     // Prints "[195, 169]"
   ///
-  /// - Parameter utf8: The view to use for the index conversion.
+  /// - Parameter utf8: The view to use for the index conversion. This index
+  ///   must be a valid index of at least one view of the string shared by
+  ///   `utf8`.
   /// - Returns: The position in `utf8` that corresponds exactly to this index.
+  ///   If this index does not have an exact corresponding position in `utf8`,
+  ///   this method returns `nil`. For example, an attempt to convert the
+  ///   position of a UTF-16 trailing surrogate returns `nil`.
   public func samePosition(
     in utf8: String.UTF8View
   ) -> String.UTF8View.Index? {
@@ -82,18 +93,23 @@ extension String.Index {
   ///
   /// The index must be a valid index of `String(utf16)`.
   ///
-  /// This example first finds the position of the character `"é"` and then uses
-  /// this method find the same position in the string's `utf16` view.
+  /// This example first finds the position of the character `"é"` and then
+  /// uses this method find the same position in the string's `utf16` view.
   ///
   ///     let cafe = "Café"
   ///     if let i = cafe.index(of: "é") {
-  ///         let j = i.samePosition(in: cafe.utf16)
+  ///         let j = i.samePosition(in: cafe.utf16)!
   ///         print(cafe.utf16[j])
   ///     }
   ///     // Prints "233"
   ///
-  /// - Parameter utf16: The view to use for the index conversion.
-  /// - Returns: The position in `utf16` that corresponds exactly to this index.
+  /// - Parameter utf16: The view to use for the index conversion. This index
+  ///   must be a valid index of at least one view of the string shared by
+  ///   `utf16`.
+  /// - Returns: The position in `utf16` that corresponds exactly to this
+  ///   index. If this index does not have an exact corresponding position in
+  ///   `utf16`, this method returns `nil`. For example, an attempt to convert
+  ///   the position of a UTF-8 continuation byte returns `nil`.
   public func samePosition(
     in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {

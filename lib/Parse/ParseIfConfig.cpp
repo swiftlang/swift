@@ -583,7 +583,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
         isActive = false;
         isVersionCondition = false;
       } else if (!foundActive) {
-        // Evaludate the condition only if we haven't found any active one.
+        // Evaluate the condition only if we haven't found any active one.
         isActive = evaluateIfConfigCondition(Condition, Context);
         isVersionCondition = isVersionIfConfigCondition(Condition);
       }

@@ -1167,7 +1167,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
-    // Find the last path element, skipping OptioanlPayload elements
+    // Find the last path element, skipping OptionalPayload elements
     // so that we allow this exception in cases of optional injection.
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
@@ -1208,15 +1208,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
-                                       ConstraintKind kind,
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   auto classDecl2 = type2->getClassOrBoundGenericClass();
-  bool done = false;
   for (auto super1 = TC.getSuperClassOf(type1);
-       !done && super1;
+       super1;
        super1 = TC.getSuperClassOf(super1)) {
     if (super1->getClassOrBoundGenericClass() != classDecl2)
       continue;
@@ -3094,11 +3092,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (includeInaccessibleMembers)
       lookupOptions |= NameLookupFlags::IgnoreAccessibility;
 
-    // If a constructor is only visible as a witness for a protocol
-    // requirement, it must be an invalid override. Also, protocol
-    // extensions cannot yet define designated initializers.
-    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-
     LookupResult ctors = TC.lookupConstructors(DC, instanceTy, lookupOptions);
     if (!ctors)
       return result;    // No result.
@@ -3213,11 +3206,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // reasonable choice.
   auto addChoice = [&](ValueDecl *cand, bool isBridged,
                        bool isUnwrappedOptional) {
-    // Destructors cannot be referenced manually
-    if (isa<DestructorDecl>(cand)) {
-      result.addUnviable(cand, MemberLookupResult::UR_DestructorInaccessible);
-      return;
-    }
     // If the result is invalid, skip it.
     TC.validateDecl(cand);
     if (cand->isInvalid()) {
@@ -4417,7 +4405,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   case ConversionRestrictionKind::Superclass:
     addContextualScore();
-    return matchSuperclassTypes(type1, type2, matchKind, subflags, locator);
+    return matchSuperclassTypes(type1, type2, subflags, locator);
 
   case ConversionRestrictionKind::LValueToRValue:
     return matchTypes(type1->getRValueType(), type2,

@@ -686,6 +686,10 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back("-march=z196");
   }
 
+  if (!importerOpts.Optimization.empty()) {
+    invocationArgStrs.push_back(importerOpts.Optimization);
+  }
+
   const std::string &overrideResourceDir = importerOpts.OverrideResourceDir;
   if (overrideResourceDir.empty()) {
     llvm::SmallString<128> resourceDir(searchPathOpts.RuntimeResourcePath);
@@ -725,7 +729,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // FIXME: The following attempts to do an initial ReadAST invocation to verify
   // the PCH, without affecting the existing CompilerInstance.
   // Look into combining creating the ASTReader along with verification + update
-  // if necesary, so that we can create and use one ASTReader in the common case
+  // if necessary, so that we can create and use one ASTReader in the common case
   // when there is no need for update.
 
   CompilerInstance &CI = *Impl.Instance;
@@ -868,6 +872,7 @@ ClangImporter::create(ASTContext &ctx,
   }
 
   std::vector<const char *> invocationArgs;
+  invocationArgs.reserve(invocationArgStrs.size());
   for (auto &argStr : invocationArgStrs)
     invocationArgs.push_back(argStr.c_str());
 

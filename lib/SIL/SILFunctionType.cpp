@@ -477,8 +477,8 @@ enum class ConventionsKind : uint8_t {
       }
     }
 
-    void visitSelfType(AbstractionPattern origType, CanType substType,
-                       SILFunctionTypeRepresentation rep) {
+    void visitSharedType(AbstractionPattern origType, CanType substType,
+                         SILFunctionTypeRepresentation rep) {
       NextOrigParamIndex++;
 
       auto &substTL =
@@ -486,6 +486,11 @@ enum class ConventionsKind : uint8_t {
       ParameterConvention convention;
       if (origType.getAs<InOutType>()) {
         convention = ParameterConvention::Indirect_Inout;
+      } else if (isa<TupleType>(substType) && !origType.isTypeParameter()) {
+        // Do not lower tuples @guaranteed.  This can create conflicts with
+        // substitutions for witness thunks e.g. we take $*(T, T)
+        // @in_guaranteed and try to substitute it for $*T.
+        return visit(origType, substType);
       } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
         if (rep == SILFunctionTypeRepresentation::WitnessMethod)
           convention = ParameterConvention::Indirect_In_Guaranteed;
@@ -548,16 +553,29 @@ enum class ConventionsKind : uint8_t {
                                                    /*canonicalVararg*/true)
                         ->getCanonicalType();
         CanTupleType tty = dyn_cast<TupleType>(ty);
-        if (!tty || (origType.isTypeParameter() && !tty->hasInOutElement())) {
-          visit(origType, ty);
-          return;
-        }
-        
         // If the abstraction pattern is opaque, and the tuple type is
         // materializable -- if it doesn't contain an l-value type -- then it's
         // a valid target for substitution and we should not expand it.
+        if (!tty || (origType.isTypeParameter() && !tty->hasInOutElement())) {
+          auto flags = (params.size() == 1)
+                     ? params.front().getParameterFlags()
+                     : ParameterTypeFlags();
+          if (flags.isShared()) {
+            visitSharedType(origType, ty, extInfo.getSILRepresentation());
+          } else {
+            visit(origType, ty);
+          }
+          return;
+        }
+
         for (auto i : indices(tty.getElementTypes())) {
-          visit(origType.getTupleElementType(i), tty.getElementType(i));
+          if (tty->getElement(i).getParameterFlags().isShared()) {
+            visitSharedType(origType.getTupleElementType(i),
+                            tty.getElementType(i),
+                            extInfo.getSILRepresentation());
+          } else {
+            visit(origType.getTupleElementType(i), tty.getElementType(i));
+          }
         }
         return;
       }
@@ -569,15 +587,19 @@ enum class ConventionsKind : uint8_t {
         CanType ty =  params[i].getType();
         CanTupleType tty = dyn_cast<TupleType>(ty);
         AbstractionPattern eltPattern = origType.getTupleElementType(i);
+        // If the abstraction pattern is opaque, and the tuple type is
+        // materializable -- if it doesn't contain an l-value type -- then it's
+        // a valid target for substitution and we should not expand it.
         if (!tty || (eltPattern.isTypeParameter() && !tty->hasInOutElement())) {
-          visit(eltPattern, ty);
+          if (params[i].isShared()) {
+            visitSharedType(eltPattern, ty, extInfo.getSILRepresentation());
+          } else {
+            visit(eltPattern, ty);
+          }
           continue;
         }
         
         assert(eltPattern.isTuple());
-        // If the abstraction pattern is opaque, and the tuple type is
-        // materializable -- if it doesn't contain an l-value type -- then it's
-        // a valid target for substitution and we should not expand it.
         for (unsigned j = 0; j < eltPattern.getNumTupleElements(); ++j) {
           visit(eltPattern.getTupleElementType(j), tty.getElementType(j));
         }
@@ -586,9 +608,9 @@ enum class ConventionsKind : uint8_t {
       // Process the self parameter.  Note that we implicitly drop self
       // if this is a static foreign-self import.
       if (!Foreign.Self.isImportAsMember()) {
-        visitSelfType(origType.getTupleElementType(numNonSelfParams),
-                      params[numNonSelfParams].getType(),
-                      extInfo.getSILRepresentation());
+        visitSharedType(origType.getTupleElementType(numNonSelfParams),
+                        params[numNonSelfParams].getType(),
+                        extInfo.getSILRepresentation());
       }
 
       // Clear the foreign-self handler for safety.
@@ -1604,6 +1626,8 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
           return getSelectorFamily(declName.getIdentifier());
         case DeclBaseName::Kind::Subscript:
           return SelectorFamily::None;
+        case DeclBaseName::Kind::Destructor:
+          return SelectorFamily::None;
         }
       }
       return SelectorFamily::None;
@@ -1949,8 +1973,11 @@ static bool requiresNewVTableEntry(SILDeclRef method) {
     return true;
   if (method.kind == SILDeclRef::Kind::Allocator) {
     auto *ctor = cast<ConstructorDecl>(method.getDecl());
-    if (ctor->isRequired() && !ctor->getOverriddenDecl()->isRequired())
-      return true;
+    if (ctor->isRequired()) {
+      if (!ctor->getOverriddenDecl()->isRequired()
+          || ctor->getOverriddenDecl()->hasClangNode())
+        return true;
+    }
   }
   return false;
 }

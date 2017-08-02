@@ -3446,6 +3446,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
       switch (reqt.getKind()) {
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
+        // FIXME: This is the wrong check
         if (selfTy->isEqual(reqt.getFirstType())
             && !TC.isSubtypeOf(Conformance->getType(),reqt.getSecondType(), DC))
           return false;
@@ -4058,7 +4059,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
     if (!t2)
       return true;
     
-    return TC.isSubtypeOf(t1, t2, DC);
+    return TC.isSubclassOf(t1, t2, DC);
   };
   
   bool protos1AreSubsetOf2 = protos1.empty();
@@ -4968,12 +4969,10 @@ static void recordConformanceDependency(DeclContext *DC,
       Conformance->getDeclContext()->getParentModule())
     return;
 
-  auto &Context = DC->getASTContext();
-
   // FIXME: 'deinit' is being used as a dummy identifier here. Really we
   // don't care about /any/ of the type's members, only that it conforms to
   // the protocol.
-  tracker->addUsedMember({Adoptee, Context.Id_deinit},
+  tracker->addUsedMember({Adoptee, DeclBaseName::createDestructor()},
                          DC->isCascadingContextForLookup(InExpression));
 }
 

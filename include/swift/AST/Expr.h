@@ -893,7 +893,7 @@ public:
   {}
 
   APInt getValue() const;
-  static APInt getValue(StringRef Text, unsigned BitWidth);
+  static APInt getValue(StringRef Text, unsigned BitWidth, bool Negative);
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::IntegerLiteral;
@@ -910,7 +910,8 @@ public:
   {}
   
   APFloat getValue() const;
-  static APFloat getValue(StringRef Text, const llvm::fltSemantics &Semantics);
+  static APFloat getValue(StringRef Text, const llvm::fltSemantics &Semantics,
+                          bool Negative);
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FloatLiteral;

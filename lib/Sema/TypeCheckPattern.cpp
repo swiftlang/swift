@@ -74,7 +74,7 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
 /// an arbitrary property to an enum element using extractEnumElement.
 static EnumElementDecl *
 filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
-                     LookupResult foundElements) {
+                     bool unqualifiedLookup, LookupResult foundElements) {
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
 
@@ -85,9 +85,11 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
       continue;
     }
     // Skip if the enum element was referenced as an instance member
-    if (!result.getBaseDecl() ||
-        !result.getBaseDecl()->getInterfaceType()->is<MetatypeType>()) {
-      continue;
+    if (unqualifiedLookup) {
+      if (!result.getBaseDecl() ||
+          !result.getBaseDecl()->getInterfaceType()->is<MetatypeType>()) {
+        continue;
+      }
     }
 
     if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
@@ -116,20 +118,24 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
-  return filterForEnumElement(TC, DC, UseLoc, lookup);
+  return filterForEnumElement(TC, DC, UseLoc,
+                              /*unqualifiedLookup=*/true, lookup);
 }
 
 /// Find an enum element in an enum type.
 static EnumElementDecl *
 lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
                         Identifier name, SourceLoc UseLoc) {
-  assert(ty->getAnyNominal());
+  if (!ty->mayHaveMembers())
+    return nullptr;
+
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
   NameLookupOptions lookupOptions
     = defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
   LookupResult foundElements = TC.lookupMember(DC, ty, name, lookupOptions);
-  return filterForEnumElement(TC, DC, UseLoc, foundElements);
+  return filterForEnumElement(TC, DC, UseLoc,
+                              /*unqualifiedLookup=*/false, foundElements);
 }
 
 namespace {
@@ -1311,10 +1317,8 @@ recur:
     
     Type enumTy;
     if (!elt) {
-      if (type->getAnyNominal()) {
-        elt = lookupEnumMemberElement(*this, dc, type, EEP->getName(),
-                                      EEP->getLoc());
-      }
+      elt = lookupEnumMemberElement(*this, dc, type, EEP->getName(),
+                                    EEP->getLoc());
       if (!elt) {
         if (!type->hasError()) {
           // Lowercasing of Swift.Optional's cases is handled in the

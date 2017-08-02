@@ -170,25 +170,6 @@ extension String {
       }
     }
 
-    /// Accesses the Unicode scalar values in the given range.
-    ///
-    /// The example below uses this subscript to access the scalar values up
-    /// to, but not including, the first comma (`","`) in the string.
-    ///
-    ///     let str = "All this happened, more or less."
-    ///     let i = str.unicodeScalars.index(of: ",")!
-    ///     let substring = str.unicodeScalars[str.unicodeScalars.startIndex ..< i]
-    ///     print(String(substring))
-    ///     // Prints "All this happened"
-    ///
-    /// - Complexity: O(*n*) if the underlying string is bridged from
-    ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-    public subscript(r: Range<Index>) -> UnicodeScalarView {
-      let rawSubRange = _toCoreIndex(r.lowerBound)..<_toCoreIndex(r.upperBound)
-      return UnicodeScalarView(_core[rawSubRange],
-        coreOffset: r.lowerBound.encodedOffset)
-    }
-
     /// An iterator over the Unicode scalars that make up a `UnicodeScalarView`
     /// collection.
     public struct Iterator : IteratorProtocol {
@@ -397,33 +378,31 @@ extension String.UnicodeScalarIndex {
   ///     let cafe = "Café 🍵"
   ///
   ///     let utf16Index = cafe.utf16.index(of: 32)!
-  ///     let scalarIndex = String.UnicodeScalarView.Index(utf16Index, within: cafe.unicodeScalars)!
+  ///     let scalarIndex = String.Index(utf16Index, within: cafe.unicodeScalars)!
   ///
   ///     print(String(cafe.unicodeScalars[..<scalarIndex]))
   ///     // Prints "Café"
   ///
-  /// If the position passed in `utf16Index` doesn't have an exact
+  /// If the index passed as `sourcePosition` doesn't have an exact
   /// corresponding position in `unicodeScalars`, the result of the
   /// initializer is `nil`. For example, an attempt to convert the position of
-  /// the trailing surrogate of a UTF-16 surrogate pair fails.
+  /// the trailing surrogate of a UTF-16 surrogate pair results in `nil`.
   ///
   /// - Parameters:
-  ///   - utf16Index: A position in the `utf16` view of a string. `utf16Index`
+  ///   - sourcePosition: A position in the `utf16` view of a string. `utf16Index`
   ///     must be an element of `String(unicodeScalars).utf16.indices`.
   ///   - unicodeScalars: The `UnicodeScalarView` in which to find the new
   ///     position.
   public init?(
-    _ utf16Index: String.UTF16Index,
+    _ sourcePosition: String.UTF16Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
-    if !unicodeScalars._isOnUnicodeScalarBoundary(utf16Index) { return nil }
-    self = utf16Index
+    if !unicodeScalars._isOnUnicodeScalarBoundary(sourcePosition) { return nil }
+    self = sourcePosition
   }
 
   /// Returns the position in the given string that corresponds exactly to this
   /// index.
-  ///
-  /// This index must be a valid index of `characters.unicodeScalars`.
   ///
   /// This example first finds the position of a space (UTF-8 code point `32`)
   /// in a string's `utf8` view and then uses this method find the same position
@@ -436,6 +415,7 @@ extension String.UnicodeScalarIndex {
   ///     // Prints "🍵"
   ///
   /// - Parameter characters: The string to use for the index conversion.
+  ///   This index must be a valid index of at least one view of `characters`.
   /// - Returns: The position in `characters` that corresponds exactly to
   ///   this index. If this index does not have an exact corresponding
   ///   position in `characters`, this method returns `nil`. For example,
@@ -461,10 +441,10 @@ extension String.UnicodeScalarView {
   // NOTE: Don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
-    if !_isOnUnicodeScalarBoundary(i) { return false }
     if i == startIndex || i == endIndex {
       return true
     }
+    if !_isOnUnicodeScalarBoundary(i) { return false }
     let precedingScalar = self[index(before: i)]
 
     let graphemeClusterBreakProperty =
@@ -523,5 +503,49 @@ extension String.UnicodeScalarView {
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public subscript(i: Index?) -> Unicode.Scalar {
     return self[i!]
+  }
+}
+
+//===--- Slicing Support --------------------------------------------------===//
+/// In Swift 3.2, in the absence of type context,
+///
+///   someString.unicodeScalars[
+///     someString.unicodeScalars.startIndex
+///     ..< someString.unicodeScalars.endIndex]
+///
+/// was deduced to be of type `String.UnicodeScalarView`.  Provide a
+/// more-specific Swift-3-only `subscript` overload that continues to produce
+/// `String.UnicodeScalarView`.
+extension String.UnicodeScalarView {
+  public typealias SubSequence = Substring.UnicodeScalarView
+
+  @available(swift, introduced: 4)
+  public subscript(r: Range<Index>) -> String.UnicodeScalarView.SubSequence {
+    return String.UnicodeScalarView.SubSequence(self, _bounds: r)
+  }
+
+  /// Accesses the Unicode scalar values in the given range.
+  ///
+  /// The example below uses this subscript to access the scalar values up
+  /// to, but not including, the first comma (`","`) in the string.
+  ///
+  ///     let str = "All this happened, more or less."
+  ///     let i = str.unicodeScalars.index(of: ",")!
+  ///     let substring = str.unicodeScalars[str.unicodeScalars.startIndex ..< i]
+  ///     print(String(substring))
+  ///     // Prints "All this happened"
+  ///
+  /// - Complexity: O(*n*) if the underlying string is bridged from
+  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
+  @available(swift, obsoleted: 4)
+  public subscript(r: Range<Index>) -> String.UnicodeScalarView {
+    let rawSubRange = _toCoreIndex(r.lowerBound)..<_toCoreIndex(r.upperBound)
+    return String.UnicodeScalarView(
+      _core[rawSubRange], coreOffset: r.lowerBound.encodedOffset)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: ClosedRange<Index>) -> String.UnicodeScalarView {
+    return self[bounds.relative(to: self)]
   }
 }

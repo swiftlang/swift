@@ -36,18 +36,6 @@ struct ScalarEnumerationTraits<syntax::SourcePresence> {
   }
 };
 
-/// Serialization traits for SyntaxKind.
-template <>
-struct ScalarEnumerationTraits<syntax::SyntaxKind> {
-  static void enumeration(Output &out, syntax::SyntaxKind &value) {
-#define DEFINE_MAP(Id) \
-    out.enumCase(value, #Id, syntax::SyntaxKind::Id);
-#define SYNTAX(Id, Parent) DEFINE_MAP(Id)
-#define SYNTAX_COLLECTION(Id, Element) DEFINE_MAP(Id)
-#include "swift/Syntax/SyntaxKinds.def"
-  }
-};
-
 /// Serialization traits for swift::tok.
 template <>
 struct ScalarEnumerationTraits<tok> {

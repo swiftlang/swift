@@ -3,7 +3,6 @@
 // A class with no initializers (which has non-initialized properties so a
 // default constructor can be synthesized) should produce an error.
 class NoInitializers { // expected-error {{class 'NoInitializers' has no initializers}}
-// expected-note@-1 {{did you mean 'deinit'?}}
   var x: Double // expected-note {{stored property 'x' without initial value prevents synthesized initializers}}
 
   func foo() {

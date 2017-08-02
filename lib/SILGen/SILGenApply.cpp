@@ -1988,13 +1988,14 @@ private:
     RValueStorage(ManagedValue rv) : RV(rv) {}
   };
 
-  static int getUnionIndexForValue(KindTy kind) {
-    return (kind <= LastLVKind ? 0 : 1);
+  using ValueMembers = ExternalUnionMembers<RValueStorage, LValueStorage>;
+  static ValueMembers::Index getValueMemberIndexForKind(KindTy kind) {
+    return (kind <= LastLVKind ? ValueMembers::indexOf<LValueStorage>()
+                               : ValueMembers::indexOf<RValueStorage>());
   }
 
   /// Storage for either the l-value or the r-value.
-  ExternalUnion<KindTy, getUnionIndexForValue,
-                LValueStorage, RValueStorage> Value;
+  ExternalUnion<KindTy, ValueMembers, getValueMemberIndexForKind> Value;
 
   LValueStorage &LV() { return Value.get<LValueStorage>(Kind); }
   const LValueStorage &LV() const { return Value.get<LValueStorage>(Kind); }
@@ -2007,19 +2008,22 @@ private:
 
   using PointerAccessInfo = SILGenFunction::PointerAccessInfo;
   using ArrayAccessInfo = SILGenFunction::ArrayAccessInfo;
-  static int getUnionIndexForExtra(KindTy kind) {
+
+  using ExtraMembers =
+    ExternalUnionMembers<void, ArrayAccessInfo, PointerAccessInfo>;
+  static ExtraMembers::Index getExtraMemberIndexForKind(KindTy kind) {
     switch (kind) {
     case LValueToPointer:
-      return 0;
+      return ExtraMembers::indexOf<PointerAccessInfo>();
     case LValueArrayToPointer:
     case RValueArrayToPointer:
-      return 1;
+      return ExtraMembers::indexOf<ArrayAccessInfo>();
     default:
-      return -1;
+      return ExtraMembers::indexOf<void>();
     }
   }
-  ExternalUnion<KindTy, getUnionIndexForExtra,
-                PointerAccessInfo, ArrayAccessInfo> Extra;
+
+  ExternalUnion<KindTy, ExtraMembers, getExtraMemberIndexForKind> Extra;
 
 public:
   DelayedArgument(KindTy kind, LValue &&lv, SILLocation loc)
@@ -2879,6 +2883,24 @@ private:
                   SILParameterInfo param) {
     ManagedValue value;
     auto loc = arg.getLocation();
+
+    auto convertOwnershipConvention = [&](ManagedValue value) {
+      if (param.isConsumed() &&
+          value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+        return value.copyUnmanaged(SGF, loc);
+      }
+
+      if (SGF.F.getModule().getOptions().EnableSILOwnership &&
+          value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+        if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses() &&
+                                           param.isIndirectInGuaranteed())) {
+          return value.borrow(SGF, loc);
+        }
+      }
+
+      return value;
+    };
+
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
     if (contexts.RequiresReabstraction) {
       auto conversion = [&] {
@@ -2895,9 +2917,12 @@ private:
       }();
       value = emitConvertedArgument(std::move(arg), conversion,
                                     contexts.FinalContext);
+      Args.push_back(convertOwnershipConvention(value));
+      return;
+    }
 
     // Peephole certain argument emissions.
-    } else if (arg.isExpr()) {
+    if (arg.isExpr()) {
       auto expr = std::move(arg).asKnownExpr();
 
       // Try the peepholes.
@@ -2906,27 +2931,12 @@ private:
 
       // Otherwise, just use the default logic.
       value = SGF.emitRValueAsSingleValue(expr, contexts.FinalContext);
-    } else {
-      value = std::move(arg).getAsSingleValue(SGF, contexts.FinalContext);
-    }
-
-    if (param.isConsumed() &&
-        value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-      value = value.copyUnmanaged(SGF, loc);
-      Args.push_back(value);
+      Args.push_back(convertOwnershipConvention(value));
       return;
     }
 
-    if (SGF.F.getModule().getOptions().EnableSILOwnership) {
-      if (param.isDirectGuaranteed() &&
-          value.getOwnershipKind() == ValueOwnershipKind::Owned) {
-        value = value.borrow(SGF, loc);
-        Args.push_back(value);
-        return;
-      }
-    }
-
-    Args.push_back(value);
+    value = std::move(arg).getAsSingleValue(SGF, contexts.FinalContext);
+    Args.push_back(convertOwnershipConvention(value));
   }
 
   bool maybeEmitDelayed(Expr *expr, OriginalArgument original) {

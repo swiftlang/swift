@@ -59,7 +59,7 @@ extension String {
       compare = 0 
     }
     else {
-      compare = Int(extendingOrTruncating: _swift_stdlib_memcmp(
+      compare = Int(truncatingIfNeeded: _swift_stdlib_memcmp(
         self._core.startASCII, rhs._core.startASCII,
         Swift.min(self._core.count, rhs._core.count)))      
     }

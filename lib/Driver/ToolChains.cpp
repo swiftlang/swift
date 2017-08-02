@@ -153,6 +153,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
   inputArgs.AddLastArg(arguments,
                        options::OPT_solver_shrink_unsolved_threshold);
+  inputArgs.AddLastArg(arguments, options::OPT_O_Group);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -231,9 +232,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_ImportedModules:
       FrontendModeOption = "-emit-imported-modules";
       break;
-    case types::TY_TBD:
-      FrontendModeOption = "-emit-tbd";
-      break;
 
     // BEGIN APPLE-ONLY OUTPUT TYPES
     case types::TY_IndexData:
@@ -263,6 +261,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_Image:
     case types::TY_SwiftDeps:
     case types::TY_ModuleTrace:
+    case types::TY_TBD:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -384,9 +383,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
   }
 
-  // Pass the optimization level down to the frontend.
-  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
-
   if (context.Args.hasArg(options::OPT_parse_as_library) ||
       context.Args.hasArg(options::OPT_emit_library))
     Arguments.push_back("-parse-as-library");
@@ -433,6 +429,13 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (!LoadedModuleTracePath.empty()) {
     Arguments.push_back("-emit-loaded-module-trace-path");
     Arguments.push_back(LoadedModuleTracePath.c_str());
+  }
+
+  const std::string &TBDPath =
+      context.Output.getAdditionalOutputForType(types::TY_TBD);
+  if (!TBDPath.empty()) {
+    Arguments.push_back("-emit-tbd-path");
+    Arguments.push_back(TBDPath.c_str());
   }
 
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
@@ -502,9 +505,6 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         Arguments);
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
-
-  // Pass the optimization level down to the frontend.
-  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_sil);
 
@@ -633,9 +633,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
 
-  // Pass the optimization level down to the frontend.
-  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
-
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
@@ -663,8 +660,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   Arguments.push_back("-frontend");
 
-  // We just want to emit a module, so pass -emit-module without any other
-  // mode options.
+  Arguments.push_back("-merge-modules");
   Arguments.push_back("-emit-module");
 
   if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
@@ -1560,6 +1556,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     // Look for binutils in the toolchain folder.
     Arguments.push_back("-B");
     Arguments.push_back(context.Args.MakeArgString(A->getValue()));
+  }
+
+  if (getTriple().getOS() == llvm::Triple::Linux) {
+    Arguments.push_back("-pie");
   }
 
   std::string Target = getTargetForLinker();

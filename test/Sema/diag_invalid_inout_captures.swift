@@ -7,7 +7,14 @@ struct you_cry_in_your_tea {
   mutating func which_you_hurl_in_the_sea_when_you_see_me_go_by() {
     no_escape { _ = self } // OK
     do_escape { _ = self } // expected-error {{closure cannot implicitly capture a mutating self parameter}}
+    do_escape {
+      [self] in
+      _ = self // OK
+      self.other_mutator() // expected-error {{cannot use mutating member on immutable value: 'self' is an immutable capture}}
+    }
   }
+
+  mutating func other_mutator() {}
 }
 
 func why_so_sad(line: inout String) {

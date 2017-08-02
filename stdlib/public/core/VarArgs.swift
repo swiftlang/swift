@@ -126,7 +126,7 @@ internal func _withVaList<R>(
 /// uses, such as in a `class` initializer, you may find that the language
 /// rules do not allow you to use `withVaList(_:_:)` as intended.
 ///
-/// - Parameters args: An array of arguments to convert to a C `va_list`
+/// - Parameter args: An array of arguments to convert to a C `va_list`
 ///   pointer.
 /// - Returns: A pointer that can be used with C functions that take a
 ///   `va_list` argument.

@@ -742,12 +742,12 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
-  if (Action == FrontendOptions::EmitTBD) {
+  if (!opts.TBDPath.empty()) {
     const auto &silOpts = Invocation.getSILOptions();
     auto hasMultipleIRGenThreads = silOpts.NumThreads > 1;
-    return writeTBD(Instance.getMainModule(), hasMultipleIRGenThreads,
-                    silOpts.SILSerializeWitnessTables,
-                    opts.getSingleOutputFilename());
+    if (writeTBD(Instance.getMainModule(), hasMultipleIRGenThreads,
+                 silOpts.SILSerializeWitnessTables, opts.TBDPath))
+      return true;
   }
 
   assert(Action >= FrontendOptions::EmitSILGen &&
@@ -816,7 +816,9 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   // Perform "stable" optimizations that are invariant across compiler versions.
-  if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
+  if (Action == FrontendOptions::MergeModules) {
+    // Don't run diagnostic passes at all.
+  } else if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
     if (runSILDiagnosticPasses(*SM))
       return true;
 
@@ -846,8 +848,9 @@ static bool performCompile(CompilerInstance &Instance,
   // These may change across compiler versions.
   {
     SharedTimer timer("SIL optimization");
-    if (Invocation.getSILOptions().Optimization >
-        SILOptions::SILOptMode::None) {
+    if (Action != FrontendOptions::MergeModules &&
+        Invocation.getSILOptions().Optimization >
+          SILOptions::SILOptMode::None) {
 
       runSILOptPreparePasses(*SM);
 
@@ -936,7 +939,8 @@ static bool performCompile(CompilerInstance &Instance,
       serialize(DC, serializationOpts, SM.get());
     }
 
-    if (Action == FrontendOptions::EmitModuleOnly) {
+    if (Action == FrontendOptions::MergeModules ||
+        Action == FrontendOptions::EmitModuleOnly) {
       if (shouldIndex) {
         if (emitIndexData(PrimarySourceFile, Invocation, Instance))
           return true;

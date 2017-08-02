@@ -806,7 +806,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     break;
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    OS << " name=" << AFD->getName();
+    OS << " name=" << AFD->getFullName();
     if (AFD->hasInterfaceType())
       OS << " : " << AFD->getInterfaceType();
     else
