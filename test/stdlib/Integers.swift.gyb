@@ -761,22 +761,30 @@ dwTests.test("TwoWords") {
 }
 
 dwTests.test("Bitshifts") {
-  typealias DWU16 = DoubleWidth<UInt8>
-  typealias DWU32 = DoubleWidth<DWU16>
-  typealias DWU64 = DoubleWidth<DWU32>
+  typealias DWU64 = DoubleWidth<DoubleWidth<DoubleWidth<UInt8>>>
+  typealias DWI64 = DoubleWidth<DoubleWidth<DoubleWidth<Int8>>>
 
-  func f(_ x: UInt64) {
-    let y = DWU64(x)
-    for i in -65...65 {
+  func f<T: FixedWidthInteger, U: FixedWidthInteger>(_ x: T, type: U.Type) {
+    let y = U(x)
+    expectEqual(T.bitWidth, U.bitWidth)
+    for i in -(T.bitWidth + 1)...(T.bitWidth + 1) {
       expectTrue(x << i == y << i)
       expectTrue(x >> i == y >> i)
+
+      expectTrue(x &<< i == y &<< i)
+      expectTrue(x &>> i == y &>> i)
     }
   }
 
-  f(1)
-  f(~(~0 >> 1))
-  f(.max)
-  f(0b11110000_10100101_11110000_10100101_11110000_10100101_11110000_10100101)
+  f(1 as UInt64, type: DWU64.self)
+  f(~(~0 as UInt64 >> 1), type: DWU64.self)
+  f(UInt64.max, type: DWU64.self)
+  f(0b11110000_10100101_11110000_10100101_11110000_10100101_11110000_10100101 as UInt64, type: DWU64.self)
+
+  f(1 as Int64, type: DWI64.self)
+  f(Int64.min, type: DWI64.self)
+  f(Int64.max, type: DWI64.self)
+  f(0b01010101_10100101_11110000_10100101_11110000_10100101_11110000_10100101 as Int64, type: DWI64.self)
 }
 
 dwTests.test("Remainder/DividingBy0") {

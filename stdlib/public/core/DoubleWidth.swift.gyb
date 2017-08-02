@@ -314,8 +314,8 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let initialOffset = q.leadingZeroBitCount +
       (DoubleWidth.bitWidth - rhs.leadingZeroBitCount) - 1
 
-    // TODO(performance): Use &>> instead here?
     // Start with remainder capturing the high bits of q.
+    // (These need to be smart shifts, as initialOffset can be > q.bitWidth)
     var r = q >> Magnitude(DoubleWidth.bitWidth - initialOffset)
     q <<= Magnitude(initialOffset)
 
@@ -396,8 +396,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let mid2 = sum(b.carry, c.carry, d.partial)
         
     let low = DoubleWidth<Low>((mid1.partial, a.partial))
-    let high = DoubleWidth(
-      (High(mid2.carry + d.carry), mid1.carry + mid2.partial))
+    let high = DoubleWidth((
+      High(mid2.carry + d.carry), mid1.carry + mid2.partial
+    ))
         
     if isNegative {
       let (lowComplement, overflow) = (~low).addingReportingOverflow(1)
@@ -433,6 +434,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       return
     }
     
+    // Shift is larger than this type's bit width.
     if rhs._storage.high != (0 as High) ||
       rhs._storage.low >= DoubleWidth.bitWidth
     {
@@ -476,32 +478,30 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   }
   
   public static func &<<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    // Need to use smart shifts here, since rhs can be > Base.bitWidth
     let rhs = rhs & DoubleWidth(DoubleWidth.bitWidth - 1)
 
     lhs._storage.high <<= High(rhs._storage.low)
-    if Base.bitWidth > rhs._storage.low {
-      lhs._storage.high |= High(truncatingIfNeeded: lhs._storage.low >>
-        (numericCast(Base.bitWidth) - rhs._storage.low))
-    } else {
-      lhs._storage.high |= High(truncatingIfNeeded: lhs._storage.low <<
-        (rhs._storage.low - numericCast(Base.bitWidth)))
-    }
+
+    let lowInHigh = Base.bitWidth > rhs._storage.low
+      ? lhs._storage.low >> (numericCast(Base.bitWidth) - rhs._storage.low)
+      : lhs._storage.low << (rhs._storage.low - numericCast(Base.bitWidth))
+    lhs._storage.high |= High(truncatingIfNeeded: lowInHigh)
+
     lhs._storage.low <<= rhs._storage.low
   }
   
   public static func &>>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    // Need to use smart shifts here, since rhs can be > Base.bitWidth
     let rhs = rhs & DoubleWidth(DoubleWidth.bitWidth - 1)
 
     lhs._storage.low >>= rhs._storage.low
-    if Base.bitWidth > rhs._storage.low {
-      lhs._storage.low |= Low(
-        truncatingIfNeeded:
-        lhs._storage.high << (numericCast(Base.bitWidth) - rhs._storage.low))
-    } else {
-      lhs._storage.low |= Low(
-        truncatingIfNeeded: lhs._storage.high >>
-        (rhs._storage.low - numericCast(Base.bitWidth)))
-    }
+
+    let highInLow = Base.bitWidth > rhs._storage.low
+      ? lhs._storage.high << (numericCast(Base.bitWidth) - rhs._storage.low)
+      : lhs._storage.high >> (rhs._storage.low - numericCast(Base.bitWidth))
+    lhs._storage.low |= Low(truncatingIfNeeded: highInLow)
+
     lhs._storage.high >>= High(truncatingIfNeeded: rhs._storage.low)
   }
   
@@ -573,8 +573,10 @@ binaryOperators = [
 
   @_transparent
   public var byteSwapped: DoubleWidth {
-    return DoubleWidth((High(truncatingIfNeeded: low.byteSwapped),
-      Low(truncatingIfNeeded: high.byteSwapped)))
+    return DoubleWidth((
+      High(truncatingIfNeeded: low.byteSwapped),
+      Low(truncatingIfNeeded: high.byteSwapped)
+    ))
   }
 }
 

@@ -211,6 +211,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_tbd_install_name)) {
+    Opts.TBDInstallName = A->getValue();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_warn_long_function_bodies)) {
     unsigned attempt;
     if (StringRef(A->getValue()).getAsInteger(10, attempt)) {

@@ -16,9 +16,7 @@ extension String.Index {
   ///
   /// If the index passed as `sourcePosition` represents the start of an
   /// extended grapheme cluster---the element type of a string---then the
-  /// initializer succeeds. If the index instead represents the position of a
-  /// Unicode scalar within an extended grapheme cluster or the position of an
-  /// encoded Unicode scalar value, the result is `nil`.
+  /// initializer succeeds.
   ///
   /// The following example converts the position of the Unicode scalar `"e"`
   /// into its corresponding position in the string. The character at that
@@ -43,7 +41,7 @@ extension String.Index {
   ///     let nextScalarsIndex = cafe.unicodeScalars.index(after: scalarsIndex)
   ///     let nextStringIndex = String.Index(nextScalarsIndex, within: cafe)
   ///
-  ///     print(nextIndex)
+  ///     print(nextStringIndex)
   ///     // Prints "nil"
   ///
   /// - Parameters:
