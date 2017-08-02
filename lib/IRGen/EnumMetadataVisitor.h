@@ -1,4 +1,4 @@
-//===--- EnumMetadataLayout.h - CRTP for enum metadata ----------*- C++ -*-===//
+//===--- EnumMetadataVisitor.h - CRTP for enum metadata ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A CRTP class useful for laying out enum metadata.
+// A CRTP class useful for visiting all of the fields in an
+// enum metadata object.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_ENUMMETADATALAYOUT_H
-#define SWIFT_IRGEN_ENUMMETADATALAYOUT_H
+#ifndef SWIFT_IRGEN_ENUMMETADATAVISITOR_H
+#define SWIFT_IRGEN_ENUMMETADATAVISITOR_H
 
-#include "MetadataLayout.h"
+#include "NominalMetadataVisitor.h"
 
 namespace swift {
 namespace irgen {
@@ -26,8 +27,9 @@ namespace irgen {
 ///
 /// This produces an object corresponding to the EnumMetadata type.
 /// It does not itself doing anything special for metadata templates.
-template <class Impl> class EnumMetadataLayout : public MetadataLayout<Impl> {
-  typedef MetadataLayout<Impl> super;
+template <class Impl> class EnumMetadataVisitor
+       : public NominalMetadataVisitor<Impl> {
+  using super = NominalMetadataVisitor<Impl>;
 
 protected:
   using super::IGM;
@@ -36,7 +38,7 @@ protected:
   /// The Enum.
   EnumDecl *const Target;
 
-  EnumMetadataLayout(IRGenModule &IGM, EnumDecl *target)
+  EnumMetadataVisitor(IRGenModule &IGM, EnumDecl *target)
     : super(IGM), Target(target) {}
 
 public:
@@ -64,12 +66,12 @@ public:
   }
 };
 
-/// An "implementation" of EnumMetadataLayout that just scans through
+/// An "implementation" of EnumMetadataVisitor that just scans through
 /// the metadata layout, maintaining the next index: the offset (in
 /// pointer-sized chunks) into the metadata for the next field.
 template <class Impl>
-class EnumMetadataScanner : public EnumMetadataLayout<Impl> {
-  typedef EnumMetadataLayout<Impl> super;
+class EnumMetadataScanner : public EnumMetadataVisitor<Impl> {
+  typedef EnumMetadataVisitor<Impl> super;
 protected:
   Size NextOffset = Size(0);
 

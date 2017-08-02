@@ -1,4 +1,4 @@
-//===--- MetadataLayout.h - CRTP for metadata layout ------------*- C++ -*-===//
+//===--- NominalMetadataVisitor.h - CRTP for metadata layout ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A CRTP helper class for laying out type metadata.
+// A CRTP helper class for visiting all of the fields in a nominal type
+// metadata object.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_METADATALAYOUT_H
-#define SWIFT_IRGEN_METADATALAYOUT_H
+#ifndef SWIFT_IRGEN_NOMINALMETADATAVISITOR_H
+#define SWIFT_IRGEN_NOMINALMETADATAVISITOR_H
 
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Decl.h"
@@ -29,14 +30,14 @@ namespace irgen {
 
 /// A CRTP class for laying out type metadata.  Note that this does
 /// *not* handle the metadata template stuff.
-template <class Impl> class MetadataLayout {
+template <class Impl> class NominalMetadataVisitor {
 protected:
   Impl &asImpl() { return *static_cast<Impl*>(this); }
 
 protected:
   IRGenModule &IGM;
 
-  MetadataLayout(IRGenModule &IGM) : IGM(IGM) {}
+  NominalMetadataVisitor(IRGenModule &IGM) : IGM(IGM) {}
 
 public:
   void layout() {

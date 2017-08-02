@@ -39,7 +39,7 @@
 #include "MemberAccessStrategy.h"
 #include "NonFixedTypeInfo.h"
 #include "ResilientTypeInfo.h"
-#include "StructMetadataLayout.h"
+#include "StructMetadataVisitor.h"
 
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
 

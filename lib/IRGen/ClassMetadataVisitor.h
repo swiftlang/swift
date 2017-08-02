@@ -1,4 +1,4 @@
-//===--- ClassMetadataLayout.h - CRTP for class metadata --------*- C++ -*-===//
+//===--- ClassMetadataVisitor.h - CRTP for class metadata -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,17 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A CRTP helper class for class metadata.
+// A CRTP helper class for visiting all of the known fields in a class
+// metadata object.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_CLASSMETADATALAYOUT_H
-#define SWIFT_IRGEN_CLASSMETADATALAYOUT_H
+#ifndef SWIFT_IRGEN_CLASSMETADATAVISITOR_H
+#define SWIFT_IRGEN_CLASSMETADATAVISITOR_H
 
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "IRGen.h"
-#include "MetadataLayout.h"
+#include "NominalMetadataVisitor.h"
 
 namespace swift {
 namespace irgen {
@@ -29,10 +30,10 @@ class IRGenModule;
 
 /// A CRTP class for laying out class metadata.  Note that this does
 /// *not* handle the metadata template stuff.
-template <class Impl> class ClassMetadataLayout
-    : public MetadataLayout<Impl>,
+template <class Impl> class ClassMetadataVisitor
+    : public NominalMetadataVisitor<Impl>,
       public SILVTableVisitor<Impl> {
-  typedef MetadataLayout<Impl> super;
+  typedef NominalMetadataVisitor<Impl> super;
 
 protected:
   using super::IGM;
@@ -41,7 +42,7 @@ protected:
   /// The most-derived class.
   ClassDecl *const Target;
 
-  ClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
+  ClassMetadataVisitor(IRGenModule &IGM, ClassDecl *target)
     : super(IGM), SILVTableVisitor<Impl>(IGM.getSILTypes()), Target(target) {}
 
 public:
@@ -141,11 +142,11 @@ private:
   }
 };
 
-/// An "implementation" of ClassMetadataLayout that just scans through
+/// An "implementation" of ClassMetadataVisitor that just scans through
 /// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
-class ClassMetadataScanner : public ClassMetadataLayout<Impl> {
-  typedef ClassMetadataLayout<Impl> super;
+class ClassMetadataScanner : public ClassMetadataVisitor<Impl> {
+  typedef ClassMetadataVisitor<Impl> super;
 protected:
   Size NextOffset = Size(0);
 

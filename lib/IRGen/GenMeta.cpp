@@ -37,9 +37,9 @@
 
 #include "Address.h"
 #include "Callee.h"
-#include "ClassMetadataLayout.h"
+#include "ClassMetadataVisitor.h"
 #include "ConstantBuilder.h"
-#include "EnumMetadataLayout.h"
+#include "EnumMetadataVisitor.h"
 #include "FixedTypeInfo.h"
 #include "GenArchetype.h"
 #include "GenClass.h"
@@ -53,7 +53,7 @@
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
-#include "StructMetadataLayout.h"
+#include "StructMetadataVisitor.h"
 
 #include "GenMeta.h"
 
@@ -2156,7 +2156,7 @@ namespace {
       B.addInt32(asImpl().getGenericParamsOffset() / IGM.getPointerSize());
 
       // The archetype order here needs to be consistent with
-      // MetadataLayout::addGenericFields.
+      // MetadataVisitor::addGenericFields.
       
       GenericTypeRequirements requirements(IGM, ntd);
       
@@ -3230,8 +3230,8 @@ static llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 namespace {
   /// An adapter for laying out class metadata.
   template <class Impl>
-  class ClassMetadataBuilderBase : public ClassMetadataLayout<Impl> {
-    using super = ClassMetadataLayout<Impl>;
+  class ClassMetadataBuilderBase : public ClassMetadataVisitor<Impl> {
+    using super = ClassMetadataVisitor<Impl>;
 
     Optional<MetadataSize> ClassObjectExtents;
 
@@ -4796,8 +4796,8 @@ namespace {
   /// An adapter for laying out struct metadata.
   template <class Impl>
   class StructMetadataBuilderBase
-         : public ValueTypeMetadataBuilderBase<Impl,StructMetadataLayout<Impl>>{
-    using super = ValueTypeMetadataBuilderBase<Impl,StructMetadataLayout<Impl>>;
+         : public ValueTypeMetadataBuilderBase<Impl,StructMetadataVisitor<Impl>>{
+    using super = ValueTypeMetadataBuilderBase<Impl,StructMetadataVisitor<Impl>>;
 
   protected:
     using super::IGM;
@@ -4992,8 +4992,8 @@ namespace {
 
 template<class Impl>
 class EnumMetadataBuilderBase
-       : public ValueTypeMetadataBuilderBase<Impl, EnumMetadataLayout<Impl>> {
-  using super = ValueTypeMetadataBuilderBase<Impl, EnumMetadataLayout<Impl>>;
+       : public ValueTypeMetadataBuilderBase<Impl, EnumMetadataVisitor<Impl>> {
+  using super = ValueTypeMetadataBuilderBase<Impl, EnumMetadataVisitor<Impl>>;
 
 protected:
   using super::IGM;
@@ -5187,14 +5187,14 @@ llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
 namespace {
   /// A CRTP layout class for foreign class metadata.
   template <class Impl>
-  class ForeignClassMetadataLayout
-         : public MetadataLayout<Impl> {
-    using super = MetadataLayout<Impl>;
+  class ForeignClassMetadataVisitor
+         : public NominalMetadataVisitor<Impl> {
+    using super = NominalMetadataVisitor<Impl>;
   protected:
     ClassDecl *Target;
     using super::asImpl;
   public:
-    ForeignClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
+    ForeignClassMetadataVisitor(IRGenModule &IGM, ClassDecl *target)
       : super(IGM), Target(target) {}
 
     void layout() {
@@ -5299,13 +5299,13 @@ namespace {
 
   class ForeignClassMetadataBuilder;
   class ForeignClassMetadataBuilderBase :
-      public ForeignClassMetadataLayout<ForeignClassMetadataBuilder> {
+      public ForeignClassMetadataVisitor<ForeignClassMetadataBuilder> {
   protected:
     ConstantStructBuilder &B;
 
     ForeignClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *target,
                                     ConstantStructBuilder &B)
-      : ForeignClassMetadataLayout(IGM, target), B(B) {}
+      : ForeignClassMetadataVisitor(IGM, target), B(B) {}
   };
 
   /// A builder for ForeignClassMetadata.
