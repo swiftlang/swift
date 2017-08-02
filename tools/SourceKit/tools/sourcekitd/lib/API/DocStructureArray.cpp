@@ -34,6 +34,8 @@ struct Node {
   unsigned NameLength;
   unsigned BodyOffset;
   unsigned BodyLength;
+  unsigned DocOffset;
+  unsigned DocLength;
   std::string DisplayName;
   std::string TypeName;
   std::string RuntimeName;
@@ -72,6 +74,8 @@ struct DocStructureArrayBuilder::Implementation {
                       unsigned,            // NameLength
                       unsigned,            // BodyOffset
                       unsigned,            // BodyLength
+                      unsigned,            // DocOffset
+                      unsigned,            // DocLength
                       Optional<StringRef>, // DisplayName
                       Optional<StringRef>, // TypeName
                       Optional<StringRef>, // RuntimeName
@@ -167,7 +171,8 @@ void DocStructureArrayBuilder::beginSubStructure(
     unsigned Offset, unsigned Length, SourceKit::UIdent Kind,
     SourceKit::UIdent AccessLevel, SourceKit::UIdent SetterAccessLevel,
     unsigned NameOffset, unsigned NameLength, unsigned BodyOffset,
-    unsigned BodyLength, StringRef DisplayName, StringRef TypeName,
+    unsigned BodyLength, unsigned DocOffset, unsigned DocLength,
+    StringRef DisplayName, StringRef TypeName,
     StringRef RuntimeName, StringRef SelectorName,
     ArrayRef<StringRef> InheritedTypes, ArrayRef<UIdent> Attrs) {
 
@@ -181,6 +186,8 @@ void DocStructureArrayBuilder::beginSubStructure(
       NameLength,
       BodyOffset,
       BodyLength,
+      DocOffset,
+      DocLength,
       DisplayName,
       TypeName,
       RuntimeName,
@@ -216,10 +223,10 @@ void DocStructureArrayBuilder::endSubStructure() {
   impl.structureBuilder.addEntry(
       node.Offset, node.Length, node.Kind, node.AccessLevel,
       node.SetterAccessLevel, node.NameOffset, node.NameLength, node.BodyOffset,
-      node.BodyLength, str(node.DisplayName), str(node.TypeName),
-      str(node.RuntimeName), str(node.SelectorName), node.InheritedTypesOffset,
-      node.AttrsOffset, impl.addElements(node.elements),
-      impl.addChildren(node.childIndices));
+      node.BodyLength, node.DocOffset, node.DocLength, str(node.DisplayName),
+      str(node.TypeName), str(node.RuntimeName), str(node.SelectorName),
+      node.InheritedTypesOffset, node.AttrsOffset,
+      impl.addElements(node.elements), impl.addChildren(node.childIndices));
 }
 
 std::unique_ptr<llvm::MemoryBuffer> DocStructureArrayBuilder::createBuffer() {
@@ -280,6 +287,8 @@ struct OutNode {
   unsigned NameLength;
   unsigned BodyOffset;
   unsigned BodyLength;
+  unsigned DocOffset;
+  unsigned DocLength;
   const char *DisplayName;
   const char *TypeName;
   const char *RuntimeName;
@@ -331,6 +340,8 @@ private:
                              unsigned,         // NameLength
                              unsigned,         // BodyOffset
                              unsigned,         // BodyLength
+                             unsigned,         // DocOffset
+                             unsigned,         // DocLength
                              const char *,     // DisplayName
                              const char *,     // TypeName
                              const char *,     // RuntimeName
@@ -353,8 +364,9 @@ OutNode DocStructureArrayReader::readStructure(size_t index) {
   reader.readEntries(
       index, result.Offset, result.Length, result.Kind, result.AccessLevel,
       result.SetterAccessLevel, result.NameOffset, result.NameLength,
-      result.BodyOffset, result.BodyLength, result.DisplayName, result.TypeName,
-      result.RuntimeName, result.SelectorName, result.InheritedTypesOffset,
+      result.BodyOffset, result.BodyLength, result.DocOffset, result.DocLength,
+      result.DisplayName, result.TypeName, result.RuntimeName,
+      result.SelectorName, result.InheritedTypesOffset,
       result.AttrsOffset, result.ElementsOffset, result.ChildIndicesOffset);
   return result;
 }
@@ -460,6 +472,10 @@ struct DocStructureReader {
     if (node.BodyOffset || node.BodyLength) {
       APPLY(KeyBodyOffset, Int, node.BodyOffset);
       APPLY(KeyBodyLength, Int, node.BodyLength);
+    }
+    if (node.DocOffset || node.DocLength) {
+      APPLY(KeyDocOffset, Int, node.DocOffset);
+      APPLY(KeyDocLength, Int, node.DocLength);
     }
     if (node.DisplayName)
       APPLY(KeyName, String, node.DisplayName);
