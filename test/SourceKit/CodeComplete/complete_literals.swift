@@ -45,10 +45,16 @@ func foo(_ x: Int) {
 
 // RUN: %complete-test -tok=EXPR1 %s -raw | %FileCheck %s -check-prefix=LITERALS
 // RUN: %complete-test -tok=EXPR2 %s -raw | %FileCheck %s -check-prefix=LITERALS
-// RUN: %complete-test -tok=EXPR3 %s -raw | %FileCheck %s -check-prefix=LITERALS
 let x1 = #^EXPR1^#
 x1 + #^EXPR2^#
+
+// RUN: %complete-test -tok=EXPR3 %s -raw | %FileCheck %s -check-prefix=LITERAL_BOOL
 if #^EXPR3^# { }
+// LITERAL_BOOL-NOT: source.lang.swift.literal
+// LITERAL_BOOL: key.kind: source.lang.swift.literal.boolean
+// LITERAL_BOOL-NOT: source.lang.swift.literal
+// LITERAL_BOOL: key.kind: source.lang.swift.literal.boolean
+// LITERAL_BOOL-NOT: source.lang.swift.literal
 
 // RUN: %complete-test -tok=EXPR4 %s -raw | %FileCheck %s -check-prefix=LITERAL_INT
 foo(#^EXPR4^#)
