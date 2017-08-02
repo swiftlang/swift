@@ -1955,7 +1955,7 @@ iterations with -O",
     llvm_group.add_argument(
         '--llvm-targets-to-build',
         help='LLVM target generators to build',
-        default="X86;ARM;AArch64;PowerPC;SystemZ")
+        default="X86;ARM;AArch64;PowerPC;SystemZ;Mips")
 
     android_group = parser.add_argument_group(
         title="Build settings for Android")
