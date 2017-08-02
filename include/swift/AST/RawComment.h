@@ -68,7 +68,7 @@ struct RawComment {
     return Comments.empty();
   }
 
-  CharSourceRange getCharSourceRange(const SourceManager &SM);
+  CharSourceRange getCharSourceRange();
 };
 
 struct CommentInfo {

@@ -248,12 +248,17 @@ StringRef Decl::getBriefComment() const {
   return Result;
 }
 
-CharSourceRange RawComment::getCharSourceRange(const SourceManager &SM) {
+CharSourceRange RawComment::getCharSourceRange() {
   if (this->isEmpty()) {
     return CharSourceRange();
   }
 
   auto Start = this->Comments.front().Range.getStart();
+  if (Start.isInvalid()) {
+    return CharSourceRange();
+  }
   auto End = this->Comments.back().Range.getEnd();
-  return CharSourceRange(SM, Start, End);
+  auto Length = (char *)End.getOpaquePointerValue() -
+                (char* )Start.getOpaquePointerValue();
+  return CharSourceRange(Start, Length);
 }
