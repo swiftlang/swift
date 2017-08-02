@@ -1558,6 +1558,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(A->getValue()));
   }
 
+  if (getTriple().getOS() == llvm::Triple::Linux) {
+    Arguments.push_back("-pie");
+  }
+
   std::string Target = getTargetForLinker();
   if (!Target.empty()) {
     Arguments.push_back("-target");
