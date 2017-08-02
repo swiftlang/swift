@@ -102,6 +102,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::RTEMS:
   case llvm::Triple::NaCl:
   case llvm::Triple::CNK:
+  case llvm::Triple::Bitrig:
   case llvm::Triple::AIX:
   case llvm::Triple::CUDA:
   case llvm::Triple::NVCL:
