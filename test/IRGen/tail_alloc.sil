@@ -22,7 +22,7 @@ sil_vtable TestClass {}
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C:.*TestClass.*]]*
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to i8*
-// CHECK-NEXT: call void @llvm.lifetime.end(i64 -1, i8* [[O2]])
+// CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[O2]])
 // CHECK-NEXT: ret void
 sil @alloc_on_stack : $@convention(thin) () -> () {
 bb0:

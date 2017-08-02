@@ -758,8 +758,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
  
   assert(resultType->getRepresentation()
            == SILFunctionType::Representation::Thick);
- 
-  llvm::AttributeSet attrs;
+
+  llvm::AttributeList attrs;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType, attrs);
   // FIXME: Give the thunk a real name.
   // FIXME: Maybe cache the thunk by function and closure types?
@@ -770,11 +770,11 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setCallingConv(
       expandCallingConv(IGM, SILFunctionTypeRepresentation::Thick));
 
-  auto initialAttrs = IGM.constructInitialAttributes();
-  // Merge initialAttrs with attrs.
-  auto updatedAttrs = attrs.addAttributes(IGM.getLLVMContext(),
-                        llvm::AttributeSet::FunctionIndex, initialAttrs);
-  fwd->setAttributes(updatedAttrs);
+  fwd->setAttributes(attrs);
+  // Merge initial attributes with attrs.
+  llvm::AttrBuilder b;
+  IGM.constructInitialFnAttributes(b);
+  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
   
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)

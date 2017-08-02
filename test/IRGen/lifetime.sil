@@ -26,7 +26,7 @@ bb0(%x : $*T):
 // CHECK-NEXT: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
 // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
 // CHECK-NEXT: [[Y_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
-// CHECK-NEXT: call void @llvm.lifetime.start({{(i32|i64)}} -1, i8* [[Y_ALLOCA]])
+// CHECK-NEXT: call void @llvm.lifetime.start.p0i8({{(i32|i64)}} -1, i8* [[Y_ALLOCA]])
 // CHECK-NEXT: [[Y_TMP:%.*]] = bitcast i8* [[Y_ALLOCA]] to %swift.opaque*
 //   Copy 'x' into 'y'.
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
@@ -41,7 +41,7 @@ bb0(%x : $*T):
 //   Destroy 'x'.
 // CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* noalias [[X]], [[TYPE]]* %T)
 // CHECK-NEXT: [[YBUFLIFE:%.*]] = bitcast [[OPAQUE]]* [[Y_TMP]] to i8*
-// CHECK-NEXT: call void @llvm.lifetime.end({{(i32|i64)}} -1, i8* [[YBUFLIFE]])
+// CHECK-NEXT: call void @llvm.lifetime.end.p0i8({{(i32|i64)}} -1, i8* [[YBUFLIFE]])
 //   Return.
 // CHECK-NEXT: ret void
 
@@ -65,7 +65,7 @@ bb0(%x : $*T):
 // CHECK-NEXT: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
 // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
 // CHECK-NEXT: [[Y_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
-// CHECK-NEXT: call void @llvm.lifetime.start({{(i32|i64)}} -1, i8* [[Y_ALLOCA]])
+// CHECK-NEXT: call void @llvm.lifetime.start.p0i8({{(i32|i64)}} -1, i8* [[Y_ALLOCA]])
 // CHECK-NEXT: [[Y_TMP:%.*]] = bitcast i8* [[Y_ALLOCA]] to %swift.opaque*
 //   Copy 'x' into 'y'.
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
@@ -85,7 +85,7 @@ bb0(%x : $*T):
 //   Destroy 'y'.
 // CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* noalias [[Y_TMP]], [[TYPE]]* %T)
 // CHECK-NEXT: [[YBUFLIFE:%.*]] = bitcast [[OPAQUE]]* [[Y_TMP]] to i8*
-// CHECK-NEXT: call void @llvm.lifetime.end({{(i32|i64)}} -1, i8* [[YBUFLIFE]])
+// CHECK-NEXT: call void @llvm.lifetime.end.p0i8({{(i32|i64)}} -1, i8* [[YBUFLIFE]])
 //   Return.
 // CHECK-NEXT: ret void
 
@@ -102,9 +102,9 @@ bb0(%x : $*Builtin.Int64):
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @fixed_size(i64* noalias nocapture dereferenceable(8))
 // CHECK:         [[XBUF:%.*]] = alloca i64
 // CHECK-NEXT:    [[XBUFLIFE:%.*]] = bitcast i64* [[XBUF]] to i8*
-// CHECK-NEXT:    call void @llvm.lifetime.start({{(i32|i64)}} 8, i8* [[XBUFLIFE]])
+// CHECK-NEXT:    call void @llvm.lifetime.start.p0i8({{(i32|i64)}} 8, i8* [[XBUFLIFE]])
 // CHECK-NEXT:    load
 // CHECK-NEXT:    store
 // CHECK-NEXT:    [[XBUFLIFE:%.*]] = bitcast i64* [[XBUF]] to i8*
-// CHECK-NEXT:    call void @llvm.lifetime.end({{(i32|i64)}} 8, i8* [[XBUFLIFE]])
+// CHECK-NEXT:    call void @llvm.lifetime.end.p0i8({{(i32|i64)}} 8, i8* [[XBUFLIFE]])
 

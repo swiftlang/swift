@@ -637,7 +637,7 @@ public:
             auto *DVI = dyn_cast<llvm::DbgValueInst>(I);
             if (DVI && DVI->getValue() == Value)
               IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
-                  DVI->getValue(), 0, DVI->getVariable(), DVI->getExpression(),
+                  DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
                   DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
             else
               // Found all dbg.value intrinsics describing this location.
@@ -2063,8 +2063,9 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
 
   CallEmission callEmission(IGF, std::move(callee));
   if (IGF.CurSILFn->isThunk())
-    callEmission.addAttribute(llvm::AttributeSet::FunctionIndex,
+    callEmission.addAttribute(llvm::AttributeList::FunctionIndex,
                               llvm::Attribute::NoInline);
+
   return callEmission;
 }
 

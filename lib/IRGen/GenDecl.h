@@ -22,7 +22,7 @@
 #include "IRGen.h"
 
 namespace llvm {
-  class AttributeSet;
+  class AttributeList;
   class Function;
   class FunctionType;
 }

@@ -23,7 +23,7 @@ bb0(%0 : $A):
   %3 = ref_element_addr %0 : $A, #A.x
 
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH0]] to i8*
-  // CHECK: call void @llvm.lifetime.start(i64 -1, i8* [[T0]])
+  // CHECK: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[T0]])
   // CHECK: [[T0:%.*]] = bitcast [[INT:%TSi]]* [[PROP]] to i8*
   // CHECK-SWIFT3: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 16, i8* null)
   // CHECK-SWIFT4: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 0, i8* null)
@@ -35,7 +35,7 @@ bb0(%0 : $A):
 
   // CHECK: call void @swift_endAccess([[BUFFER_T]]* [[SCRATCH0]])
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH0]] to i8*
-  // CHECK: call void @llvm.lifetime.end(i64 -1, i8* [[T0]])
+  // CHECK: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[T0]])
   end_access %4 : $*Int
 
   %9 = function_ref @changeInt : $@convention(thin) (@inout Int) -> ()
@@ -44,7 +44,7 @@ bb0(%0 : $A):
   %11 = ref_element_addr %0 : $A, #A.x
 
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH1]] to i8*
-  // CHECK: call void @llvm.lifetime.start(i64 -1, i8* [[T0]])
+  // CHECK: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[T0]])
   // CHECK: [[T0:%.*]] = bitcast [[INT:%TSi]]* [[PROP]] to i8*
   // CHECK-SWIFT3: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH1]], [[SIZE_T:i32|i64]] 17, i8* null)
   // CHECK-SWIFT4: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH1]], [[SIZE_T:i32|i64]] 1, i8* null)
@@ -55,7 +55,7 @@ bb0(%0 : $A):
 
   // CHECK: call void @swift_endAccess([[BUFFER_T]]* [[SCRATCH1]])
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH1]] to i8*
-  // CHECK: call void @llvm.lifetime.end(i64 -1, i8* [[T0]])
+  // CHECK: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[T0]])
   end_access %12 : $*Int
   destroy_value %0 : $A
   return %5 : $Int

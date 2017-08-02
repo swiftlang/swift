@@ -173,8 +173,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
                      diag::verify_debug_info_requires_debug_option);
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(options::OPT_D),
-                                 Args.filtered_end())) {
+  for (const Arg *A : Args.filtered(options::OPT_D)) {
     StringRef name = A->getValue();
     if (name.find('=') != StringRef::npos)
       diags.diagnose(SourceLoc(),
@@ -853,8 +852,7 @@ Driver::parseArgStrings(ArrayRef<const char *> Args) {
   }
 
   // Check for unknown arguments.
-  for (const Arg *A : make_range(ArgList->filtered_begin(options::OPT_UNKNOWN),
-       ArgList->filtered_end())) {
+  for (const Arg *A :  ArgList->filtered(options::OPT_UNKNOWN)) {
     Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
                    A->getAsString(*ArgList));
   }

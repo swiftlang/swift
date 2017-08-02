@@ -52,13 +52,13 @@ public:
 /// A signature represents something which can actually be called.
 class Signature {
   llvm::FunctionType *Type = nullptr;
-  llvm::AttributeSet Attributes;
+  llvm::AttributeList Attributes;
   ForeignFunctionInfo ForeignInfo;
   llvm::CallingConv::ID CallingConv;
 
 public:
   Signature() {}
-  Signature(llvm::FunctionType *fnType, llvm::AttributeSet attrs,
+  Signature(llvm::FunctionType *fnType, llvm::AttributeList attrs,
             llvm::CallingConv::ID callingConv)
     : Type(fnType), Attributes(attrs), CallingConv(callingConv) {}
 
@@ -84,7 +84,7 @@ public:
     return CallingConv;
   }
 
-  llvm::AttributeSet getAttributes() const {
+  llvm::AttributeList getAttributes() const {
     assert(isValid());
     return Attributes;
   }
@@ -101,7 +101,7 @@ public:
     Type = type;
   }
 
-  llvm::AttributeSet &getMutableAttributes() & {
+  llvm::AttributeList &getMutableAttributes() & {
     assert(isValid());
     return Attributes;
   }

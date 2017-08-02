@@ -63,16 +63,6 @@ static void append(xpc_object_t Contents, const StringPairs &Files) {
                 });
 }
 
-template <typename U>
-struct llvm::yaml::SequenceTraits<std::vector<U>> {
-  static size_t size(IO &Io, std::vector<U> &Vector) {
-    return Vector.size();
-  }
-  static U &element(IO &Io, std::vector<U> &Vector, size_t Index) {
-    return Vector[Index];
-  }
-};
-
 template <>
 struct llvm::yaml::MappingTraits<SwiftArguments> {
   static void mapping(IO &Io, SwiftArguments &Args) {

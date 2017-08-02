@@ -61,6 +61,12 @@ STATISTIC(NumLazyGenericEnvironments,
 STATISTIC(NumLazyGenericEnvironmentsLoaded,
           "# of lazily-deserialized generic environments loaded");
 
+const clang::MacroInfo *ClangNode::getAsMacro() const {
+  if (auto MM = getAsModuleMacro())
+    return MM->getMacroInfo();
+  return getAsMacroInfo();
+}
+
 clang::SourceLocation ClangNode::getLocation() const {
   if (auto D = getAsDecl())
     return D->getLocation();

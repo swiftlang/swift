@@ -625,7 +625,7 @@ IRGenModule::getSignature(CanSILFunctionType type) {
 
 llvm::FunctionType *
 IRGenModule::getFunctionType(CanSILFunctionType type,
-                             llvm::AttributeSet &attrs,
+                             llvm::AttributeList &attrs,
                              ForeignFunctionInfo *foreignInfo) {
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
   Signature sig = sigInfo.getSignature(*this);
@@ -756,7 +756,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    HeapLayout const *layout,
                                    ArrayRef<ParameterConvention> conventions) {
   auto outSig = IGM.getSignature(outType);
-  llvm::AttributeSet outAttrs = outSig.getAttributes();
+  llvm::AttributeList outAttrs = outSig.getAttributes();
   llvm::FunctionType *fwdTy = outSig.getType();
   SILFunctionConventions outConv(outType, IGM.getSILModule());
 
@@ -773,11 +773,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                            llvm::StringRef(thunkName), &IGM.Module);
   fwd->setCallingConv(outSig.getCallingConv());
 
-  auto initialAttrs = IGM.constructInitialAttributes();
-  // Merge initialAttrs with outAttrs.
-  auto updatedAttrs = outAttrs.addAttributes(IGM.getLLVMContext(),
-                        llvm::AttributeSet::FunctionIndex, initialAttrs);
-  fwd->setAttributes(updatedAttrs);
+  fwd->setAttributes(outAttrs);
+  // Merge initial attributes with outAttrs.
+  llvm::AttrBuilder b;
+  IGM.constructInitialFnAttributes(b);
+  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)

@@ -19,15 +19,20 @@
 
 using namespace swift;
 
-template class llvm::DominatorTreeBase<SILBasicBlock>;
-template class llvm::DominatorBase<SILBasicBlock>;
+template class llvm::DominatorTreeBase<SILBasicBlock, false>;
+template class llvm::DominatorTreeBase<SILBasicBlock, true>;
 template class llvm::DomTreeNodeBase<SILBasicBlock>;
+using SILDomTree = llvm::DomTreeBase<SILBasicBlock>;
+using SILPostDomTree = llvm::PostDomTreeBase<SILBasicBlock>;
+template void llvm::DomTreeBuilder::Calculate<SILDomTree>(SILDomTree &DT);
+template void
+llvm::DomTreeBuilder::Calculate<SILPostDomTree>(SILPostDomTree &DT);
 
 /// Compute the immediate-dominators map.
 DominanceInfo::DominanceInfo(SILFunction *F)
-    : DominatorTreeBase(/*isPostDom*/ false) {
-      assert(!F->isExternalDeclaration() &&
-             "Make sure the function is a definition and not a declaration.");
+    : DominatorTreeBase() {
+  assert(!F->isExternalDeclaration() &&
+         "Make sure the function is a definition and not a declaration.");
   recalculate(*F);
 }
 
@@ -81,7 +86,7 @@ void DominanceInfo::verify() const {
 
 /// Compute the immediate-post-dominators map.
 PostDominanceInfo::PostDominanceInfo(SILFunction *F)
-  : DominatorTreeBase(/*isPostDom*/ true) {
+   : PostDominatorTreeBase() {
   assert(!F->isExternalDeclaration() &&
          "Cannot construct a post dominator tree for a declaration");
   recalculate(*F);

@@ -392,7 +392,7 @@ makeFilterRange(Range range, Predicate pred) {
   return FilterRange<Range, Predicate>(range, pred);
 }
 
-/// An iterator that transforms the result of an underlying forward
+/// An iterator that transforms the result of an underlying bidirectional
 /// iterator with a given operation.
 ///
 /// \tparam Iterator the underlying iterator.
@@ -411,7 +411,7 @@ class TransformIterator {
   using OpTraits = function_traits<Operation>;
 
 public:
-  using iterator_category = std::forward_iterator_tag;
+  using iterator_category = std::bidirectional_iterator_tag;
   using value_type = typename OpTraits::result_type;
   using reference = value_type;
   using pointer = void; // FIXME: Should provide a pointer proxy.
@@ -435,6 +435,17 @@ public:
   TransformIterator operator++(int) {
     TransformIterator old = *this;
     ++*this;
+    return old;
+  }
+
+  TransformIterator &operator--() {
+    --Current;
+    return *this;
+  }
+
+  TransformIterator operator--(int) {
+    TransformIterator old = *this;
+    --*this;
     return old;
   }
 

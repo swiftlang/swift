@@ -22,7 +22,8 @@
 // CHECK-SAME:                              {{..}}-DFOO=foo{{..}}
 // CHECK-SAME:                              {{..}}-UBAR{{..}}
 
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]], line: [[@LINE+1]])
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]], file:
+// CHECK-SAME:              line: [[@LINE+1]])
 import ClangModule.SubModule
 // CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]],
 // CHECK-SAME:              line: [[@LINE+1]])
@@ -32,10 +33,10 @@ import OtherClangModule.SubModule
 // submodule's top-level-module, even if we didn't ask for it.
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]]
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[CLANGMODULE]])
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[CLANGMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]]
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERCLANGMODULE]])
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERCLANGMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
 // CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]]
 

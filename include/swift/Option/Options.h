@@ -38,8 +38,9 @@ namespace options {
 
   enum ID {
     OPT_INVALID = 0, // This is not an option ID.
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, \
-               HELPTEXT, METAVAR) OPT_##ID,
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  OPT_##ID,
 #include "swift/Option/Options.inc"
     LastOption
 #undef OPTION

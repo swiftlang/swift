@@ -160,8 +160,7 @@ namespace {
     CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
       return llvm::make_unique<HeaderParsingASTConsumer>(Impl);
     }
-    bool BeginSourceFileAction(clang::CompilerInstance &CI,
-                               StringRef Filename) override {
+    bool BeginSourceFileAction(clang::CompilerInstance &CI) override {
       // Prefer frameworks over plain headers.
       // We add search paths here instead of when building the initial invocation
       // so that (a) we use the same code as search paths for imported modules,
@@ -753,7 +752,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
                         PP.getBuiltinInfo());
 
   std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
-      PP, ctx, CI.getPCHContainerReader(),
+      PP, &ctx, CI.getPCHContainerReader(),
       CI.getFrontendOpts().ModuleFileExtensions,
       CI.getHeaderSearchOpts().Sysroot,
       /*DisableValidation*/ false,
@@ -919,7 +918,8 @@ ClangImporter::create(ASTContext &ctx,
   clangDiags->setSeverity(clang::diag::err_module_not_built,
                           clang::diag::Severity::Error,
                           clang::SourceLocation());
-  clangDiags->setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
+  clangDiags->setSuppressAfterFatalError(
+                          !ctx.Diags.getShowDiagnosticsAfterFatalError());
 
   // Create an almost-empty memory buffer.
   auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
@@ -1273,7 +1273,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   invocation->getFrontendOpts().DisableFree = false;
   invocation->getFrontendOpts().Inputs.clear();
   invocation->getFrontendOpts().Inputs.push_back(
-      clang::FrontendInputFile(headerPath, clang::IK_ObjC));
+      clang::FrontendInputFile(headerPath, clang::InputKind::ObjC));
 
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
@@ -1319,7 +1319,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().DisableFree = false;
   invocation->getFrontendOpts().Inputs.clear();
   invocation->getFrontendOpts().Inputs.push_back(
-      clang::FrontendInputFile(headerPath, clang::IK_ObjC));
+      clang::FrontendInputFile(headerPath, clang::InputKind::ObjC));
   invocation->getFrontendOpts().OutputFile = outputPCHPath;
   invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
   invocation->getPreprocessorOpts().resetNonModularOptions();
@@ -1919,15 +1919,21 @@ static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
   return ModuleFilter == ContainingUnit;
 }
 
-static const clang::Module *getClangOwningModule(ClangNode Node,
-                                            const clang::ASTContext &ClangCtx) {
-  auto ExtSource = ClangCtx.getExternalSource();
-  assert(ExtSource);
-  if (const clang::Decl *D = Node.getAsDecl())
-    return ExtSource->getModule(D->getOwningModuleID());
-  if (const clang::MacroInfo *MI = Node.getAsMacro())
-    return ExtSource->getModule(MI->getOwningModuleID());
+static const clang::Module *
+getClangOwningModule(ClangNode Node, const clang::ASTContext &ClangCtx) {
+  assert(!Node.getAsModule() && "not implemented for modules");
 
+  if (const clang::Decl *D = Node.getAsDecl()) {
+    auto ExtSource = ClangCtx.getExternalSource();
+    assert(ExtSource);
+    return ExtSource->getModule(D->getOwningModuleID());
+  }
+
+  if (const clang::ModuleMacro *M = Node.getAsModuleMacro())
+    return M->getOwningModule();
+
+  // A locally-defined MacroInfo does not have an owning module.
+  assert(Node.getAsMacroInfo());
   return nullptr;
 }
 
@@ -2118,6 +2124,17 @@ public:
 
 } // unnamed namespace
 
+/// Translate a MacroDefinition to a ClangNode, either a ModuleMacro for
+/// a definition imported from a module or a MacroInfo for a macro defined
+/// locally.
+ClangNode getClangNodeForMacroDefinition(clang::MacroDefinition &M) {
+  if (!M.getModuleMacros().empty())
+    return ClangNode(M.getModuleMacros().back()->getMacroInfo());
+  if (auto *MD = M.getLocalDirective())
+    return ClangNode(MD->getMacroInfo());
+  return ClangNode();
+}
+
 void ClangImporter::lookupBridgingHeaderDecls(
                               llvm::function_ref<bool(ClangNode)> filter,
                               llvm::function_ref<void(Decl*)> receiver) const {
@@ -2137,10 +2154,12 @@ void ClangImporter::lookupBridgingHeaderDecls(
 
   auto &ClangPP = Impl.getClangPreprocessor();
   for (clang::IdentifierInfo *II : Impl.BridgeHeaderMacros) {
-    if (auto *MI = ClangPP.getMacroInfo(II)) {
-      if (filter(MI)) {
+    auto MD = ClangPP.getMacroDefinition(II);
+    if (auto macroNode = getClangNodeForMacroDefinition(MD)) {
+      if (filter(macroNode)) {
+        auto MI = macroNode.getAsMacro();
         Identifier Name = Impl.getNameImporter().importMacroName(II, MI);
-        if (Decl *imported = Impl.importMacro(Name, MI))
+        if (Decl *imported = Impl.importMacro(Name, macroNode))
           receiver(imported);
       }
     }
@@ -2212,12 +2231,14 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
         clang::PreprocessedEntity *PPE = *I;
         if (!PPE)
           continue;
-        if (auto *MD = dyn_cast<clang::MacroDefinitionRecord>(PPE)) {
-          auto *II = const_cast<clang::IdentifierInfo*>(MD->getName());
-          if (auto *MI = ClangPP.getMacroInfo(II)) {
-            if (filter(MI)) {
+        if (auto *MDR = dyn_cast<clang::MacroDefinitionRecord>(PPE)) {
+          auto *II = const_cast<clang::IdentifierInfo*>(MDR->getName());
+          auto MD = ClangPP.getMacroDefinition(II);
+          if (auto macroNode = getClangNodeForMacroDefinition(MD)) {
+            if (filter(macroNode)) {
+              auto MI = macroNode.getAsMacro();
               Identifier Name = Impl.getNameImporter().importMacroName(II, MI);
-              if (Decl *imported = Impl.importMacro(Name, MI))
+              if (Decl *imported = Impl.importMacro(Name, macroNode))
                 receiver(imported);
             }
           }
@@ -2427,11 +2448,10 @@ static bool isVisibleClangEntry(clang::ASTContext &ctx,
     return false;
   }
 
-  // Check whether the macro is defined.
-  auto clangMacro = entry.get<clang::MacroInfo *>();
-  if (auto moduleID = clangMacro->getOwningModuleID()) {
-    if (auto module = ctx.getExternalSource()->getModule(moduleID))
-      return module->NameVisibility == clang::Module::AllVisible;
+  // If it's a macro from a module, check whether the module has been imported.
+  if (auto moduleMacro = entry.dyn_cast<clang::ModuleMacro *>()) {
+    clang::Module *module = moduleMacro->getOwningModule();
+    return module->NameVisibility == clang::Module::AllVisible;
   }
 
   return true;
@@ -2751,6 +2771,11 @@ const clang::CompilerInstance &ClangImporter::getClangInstance() const {
 }
 
 const clang::Module *ClangImporter::getClangOwningModule(ClangNode Node) const {
+  return Impl.getClangOwningModule(Node);
+}
+
+const clang::Module *
+ClangImporter::Implementation::getClangOwningModule(ClangNode Node) const {
   return ::getClangOwningModule(Node, getClangASTContext());
 }
 
@@ -3078,8 +3103,12 @@ void ClangImporter::Implementation::lookupValue(
       if (!decl) continue;
     } else if (!name.isSpecial()) {
       // Try to import a macro.
-      auto clangMacro = entry.get<clang::MacroInfo *>();
-      decl = importMacro(name.getBaseIdentifier(), clangMacro);
+      if (auto modMacro = entry.dyn_cast<clang::ModuleMacro *>())
+        decl = importMacro(name.getBaseIdentifier(), modMacro);
+      else if (auto clangMacro = entry.dyn_cast<clang::MacroInfo *>())
+        decl = importMacro(name.getBaseIdentifier(), clangMacro);
+      else
+        llvm_unreachable("new kind of lookup table entry");
       if (!decl) continue;
     } else {
       continue;

@@ -73,6 +73,7 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   if ("${LLVM_TABLEGEN_EXE}" STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
     message(FATAL_ERROR "Failed to find tablegen in ${${product}_NATIVE_LLVM_TOOLS_PATH}")
   endif()
+  set(SWIFT_TABLEGEN_TARGET "${SWIFT_TABLEGEN_EXE}")
 
   include(AddLLVM)
   include(AddSwiftTableGen) # This imports TableGen from LLVM.

@@ -104,10 +104,10 @@ namespace irgen {
       return Sig.getCallingConv();
     }
 
-    llvm::AttributeSet getAttributes() const {
+    llvm::AttributeList getAttributes() const {
       return Sig.getAttributes();
     }
-    llvm::AttributeSet &getMutableAttributes() & {
+    llvm::AttributeList &getMutableAttributes() & {
       return Sig.getMutableAttributes();
     }
 
@@ -162,10 +162,10 @@ namespace irgen {
       return Fn.getFunctionType();
     }
 
-    llvm::AttributeSet getAttributes() const {
+    llvm::AttributeList getAttributes() const {
       return Fn.getAttributes();
     }
-    llvm::AttributeSet &getMutableAttributes() & {
+    llvm::AttributeList &getMutableAttributes() & {
       return Fn.getMutableAttributes();
     }
 
