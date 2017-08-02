@@ -4002,16 +4002,17 @@ fileprivate func assertTypeIsDecodable<T>(_ type: T.Type, in wrappingType: Any.T
 
 // FIXME: Remove when conditional conformance is available.
 extension Encodable {
-    fileprivate func encode(to container: inout SingleValueEncodingContainer) throws { try container.encode(self) }
-    fileprivate func encode(to container: inout UnkeyedEncodingContainer)     throws { try container.encode(self) }
-    fileprivate func encode<Key : CodingKey>(to container: inout KeyedEncodingContainer<Key>, forKey key: Key) throws { try container.encode(self, forKey: key) }
+    fileprivate func __encode(to container: inout SingleValueEncodingContainer) throws { try container.encode(self) }
+    fileprivate func __encode(to container: inout UnkeyedEncodingContainer)     throws { try container.encode(self) }
+    fileprivate func __encode<Key>(to container: inout KeyedEncodingContainer<Key>, forKey key: Key) throws { try container.encode(self, forKey: key) }
 }
 
 // FIXME: Remove when conditional conformance is available.
 extension Decodable {
-    fileprivate init(from container: SingleValueDecodingContainer)   throws { self = try container.decode(Self.self) }
-    fileprivate init(from container: inout UnkeyedDecodingContainer) throws { self = try container.decode(Self.self) }
-    fileprivate init<Key : CodingKey>(from container: KeyedDecodingContainer<Key>, forKey key: Key) throws { self = try container.decode(Self.self, forKey: key) }
+    // Since we cannot call these __init, we'll give the parameter a '__'.
+    fileprivate init(__from container: SingleValueDecodingContainer)   throws { self = try container.decode(Self.self) }
+    fileprivate init(__from container: inout UnkeyedDecodingContainer) throws { self = try container.decode(Self.self) }
+    fileprivate init<Key>(__from container: KeyedDecodingContainer<Key>, forKey key: Key) throws { self = try container.decode(Self.self, forKey: key) }
 }
 
 // FIXME: Uncomment when conditional conformance is available.
@@ -4022,7 +4023,7 @@ extension Optional : Encodable /* where Wrapped : Encodable */ {
         var container = encoder.singleValueContainer()
         switch self {
         case .none: try container.encodeNil()
-        case .some(let wrapped): try (wrapped as! Encodable).encode(to: &container)
+        case .some(let wrapped): try (wrapped as! Encodable).__encode(to: &container)
         }
     }
 }
@@ -4036,7 +4037,7 @@ extension Optional : Decodable /* where Wrapped : Decodable */ {
         let container = try decoder.singleValueContainer()
         if !container.decodeNil() {
             let metaType = (Wrapped.self as! Decodable.Type)
-            let element = try metaType.init(from: container)
+            let element = try metaType.init(__from: container)
             self = .some(element as! Wrapped)
         }
     }
@@ -4049,7 +4050,7 @@ extension Array : Encodable /* where Element : Encodable */ {
 
         var container = encoder.unkeyedContainer()
         for element in self {
-            try (element as! Encodable).encode(to: &container)
+            try (element as! Encodable).__encode(to: &container)
         }
     }
 }
@@ -4063,7 +4064,7 @@ extension Array : Decodable /* where Element : Decodable */ {
         let metaType = (Element.self as! Decodable.Type)
         var container = try decoder.unkeyedContainer()
         while !container.isAtEnd {
-            let element = try metaType.init(from: &container)
+            let element = try metaType.init(__from: &container)
             self.append(element as! Element)
         }
     }
@@ -4075,7 +4076,7 @@ extension Set : Encodable /* where Element : Encodable */ {
 
         var container = encoder.unkeyedContainer()
         for element in self {
-            try (element as! Encodable).encode(to: &container)
+            try (element as! Encodable).__encode(to: &container)
         }
     }
 }
@@ -4089,7 +4090,7 @@ extension Set : Decodable /* where Element : Decodable */ {
         let metaType = (Element.self as! Decodable.Type)
         var container = try decoder.unkeyedContainer()
         while !container.isAtEnd {
-            let element = try metaType.init(from: &container)
+            let element = try metaType.init(__from: &container)
             self.insert(element as! Element)
         }
     }
@@ -4121,22 +4122,22 @@ extension Dictionary : Encodable /* where Key : Encodable, Value : Encodable */ 
             var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
             for (key, value) in self {
                 let codingKey = _DictionaryCodingKey(stringValue: key as! String)!
-                try (value as! Encodable).encode(to: &container, forKey: codingKey)
+                try (value as! Encodable).__encode(to: &container, forKey: codingKey)
             }
         } else if Key.self == Int.self {
             // Since the keys are already Ints, we can use them as keys directly.
             var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
             for (key, value) in self {
                 let codingKey = _DictionaryCodingKey(intValue: key as! Int)!
-                try (value as! Encodable).encode(to: &container, forKey: codingKey)
+                try (value as! Encodable).__encode(to: &container, forKey: codingKey)
             }
         } else {
             // Keys are Encodable but not Strings or Ints, so we cannot arbitrarily convert to keys.
             // We can encode as an array of alternating key-value pairs, though.
             var container = encoder.unkeyedContainer()
             for (key, value) in self {
-                try (key as! Encodable).encode(to: &container)
-                try (value as! Encodable).encode(to: &container)
+                try (key as! Encodable).__encode(to: &container)
+                try (value as! Encodable).__encode(to: &container)
             }
         }
     }
@@ -4154,7 +4155,7 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
             let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
             let valueMetaType = Value.self as! Decodable.Type
             for key in container.allKeys {
-                let value = try valueMetaType.init(from: container, forKey: key)
+                let value = try valueMetaType.init(__from: container, forKey: key)
                 self[key.stringValue as! Key] = (value as! Value)
             }
         } else if Key.self == Int.self {
@@ -4173,7 +4174,7 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
                                                                            debugDescription: "Expected Int key but found String key instead."))
                 }
 
-                let value = try valueMetaType.init(from: container, forKey: key)
+                let value = try valueMetaType.init(__from: container, forKey: key)
                 self[key.intValue! as! Key] = (value as! Value)
             }
         } else {
@@ -4191,14 +4192,14 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
             let keyMetaType = (Key.self as! Decodable.Type)
             let valueMetaType = (Value.self as! Decodable.Type)
             while !container.isAtEnd {
-                let key = try keyMetaType.init(from: &container)
+                let key = try keyMetaType.init(__from: &container)
 
                 guard !container.isAtEnd else {
                     throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath,
                                                                                  debugDescription: "Unkeyed container reached end before value in key-value pair."))
                 }
 
-                let value = try valueMetaType.init(from: &container)
+                let value = try valueMetaType.init(__from: &container)
                 self[key as! Key] = (value as! Value)
             }
         }
