@@ -871,8 +871,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     // Otherwise, we have a loadable type that can either be passed directly or
     // indirectly.
     assert(info.getSILStorageType().isObject());
-    auto &ti =
-        cast<LoadableTypeInfo>(IGM.getTypeInfo(info.getSILStorageType()));
+    auto curSILType = info.getSILStorageType();
+    auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(curSILType));
 
     // Load the indirectly passed parameter.
     auto &nativeSchema = ti.nativeParameterValueSchema(IGM);
@@ -881,8 +881,16 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
       ti.loadAsTake(subIGF, paramAddr, translatedParams);
       continue;
     }
+    // Map from the native calling convention into the explosion schema.
+    auto &nativeParamSchema = ti.nativeParameterValueSchema(IGM);
+    Explosion nativeParam;
+    params.transferInto(nativeParam, nativeParamSchema.size());
+    Explosion nonNativeParam = nativeParamSchema.mapFromNative(
+        subIGF.IGM, subIGF, nativeParam, curSILType);
+    assert(nativeParam.empty());
+
     // Pass along the value.
-    ti.reexplode(subIGF, params, translatedParams);
+    ti.reexplode(subIGF, nonNativeParam, translatedParams);
   }
 
   // Prepare the call to the underlying method.
