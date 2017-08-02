@@ -137,6 +137,7 @@ struct SyntaxStructureNode {
   CharSourceRange BodyRange;
   CharSourceRange NameRange;
   CharSourceRange TypeRange;
+  CharSourceRange DocRange;
   std::vector<CharSourceRange> InheritedTypeRanges;
   std::vector<SyntaxStructureElement> Elements;
 

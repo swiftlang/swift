@@ -1027,6 +1027,15 @@ public:
       BodyOffset = BodyEnd = 0;
     }
 
+    unsigned DocOffset = 0;
+    unsigned DocEnd = 0;
+    if (Node.DocRange.isValid()) {
+      DocOffset = SrcManager.getLocOffsetInBuffer(Node.DocRange.getStart(),
+                                                  BufferID);
+      DocEnd = SrcManager.getLocOffsetInBuffer(Node.DocRange.getEnd(),
+                                               BufferID);
+    }
+
     UIdent Kind = SwiftLangSupport::getUIDForSyntaxStructureKind(Node.Kind);
     UIdent AccessLevel;
     UIdent SetterAccessLevel;
@@ -1080,6 +1089,7 @@ public:
                                        Kind, AccessLevel, SetterAccessLevel,
                                        NameStart, NameEnd - NameStart,
                                        BodyOffset, BodyEnd - BodyOffset,
+                                       DocOffset, DocEnd - DocOffset,
                                        DisplayName,
                                        TypeName, RuntimeName,
                                        SelectorName,
@@ -1144,7 +1154,7 @@ public:
     UIdent Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Node.Kind);
     Consumer.beginDocumentSubStructure(StartOffset, EndOffset - StartOffset,
                                        Kind, UIdent(), UIdent(), 0, 0,
-                                       0, 0,
+                                       0, 0, 0, 0,
                                        StringRef(),
                                        StringRef(), StringRef(),
                                        StringRef(),
