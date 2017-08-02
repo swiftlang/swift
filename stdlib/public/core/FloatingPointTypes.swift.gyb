@@ -1414,8 +1414,9 @@ extension ${Self} {
   public init?(exactly value: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
 
-%   if srcBits < SignificandBitCount:
-    if ${That}(self) != value {
+%   if srcBits >= SignificandBitCount:
+    guard let roundTrip = ${That}(exactly: self),
+      roundTrip == value else {
       return nil
     }
 %   end
