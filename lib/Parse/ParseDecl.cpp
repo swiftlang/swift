@@ -3214,24 +3214,26 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
       return Status;
   }
 
+  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
+                                          /*genericParams*/nullptr,
+                                          CurDeclContext);
+  TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
+  TAD->getAttrs() = Attributes;
+
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
+    ContextChange CC(*this, TAD);
     Status |= parseFreestandingGenericWhereClause(genericParams);
   }
+
+  // Set after parsing the where clause, which might create genericParams.
+  TAD->setGenericParams(genericParams);
 
   if (UnderlyingTy.isNull()) {
     diagnose(Tok, diag::expected_equal_in_typealias);
     Status.setIsParseError();
     return Status;
   }
-
-  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
-                                          genericParams, CurDeclContext);
-  TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
-  TAD->getAttrs() = Attributes;
-
-  if (Status.hasCodeCompletion() && CodeCompletion)
-    CodeCompletion->setParsedDecl(TAD);
 
   // Exit the scope introduced for the generic parameters.
   GenericsScope.reset();
@@ -5014,9 +5016,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
 
+  ContextChange CC(*this, ED);
+
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
-    ContextChange CC(*this, ED);
     SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     ED->setInherited(Context.AllocateCopy(Inherited));
@@ -5035,16 +5038,12 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     ED->setGenericParams(GenericParams);
   }
 
-  if (Status.hasCodeCompletion() && CodeCompletion)
-    CodeCompletion->setParsedDecl(ED);
-
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
     LBLoc = PreviousLoc;
     RBLoc = LBLoc;
     Status.setIsParseError();
   } else {
-    ContextChange CC(*this, ED);
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
     if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_enum,
@@ -5277,9 +5276,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
 
+  ContextChange CC(*this, SD);
+
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
-    ContextChange CC(*this, SD);
     SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     SD->setInherited(Context.AllocateCopy(Inherited));
@@ -5297,9 +5297,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     }
     SD->setGenericParams(GenericParams);
   }
-
-  if (Status.hasCodeCompletion() && CodeCompletion)
-    CodeCompletion->setParsedDecl(SD);
   
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
@@ -5308,7 +5305,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     Status.setIsParseError();
   } else {
     // Parse the body.
-    ContextChange CC(*this, SD);
     Scope S(this, ScopeKind::StructBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
     if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
@@ -5365,9 +5361,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   // Attach attributes.
   CD->getAttrs() = Attributes;
 
+  ContextChange CC(*this, CD);
+
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
-    ContextChange CC(*this, CD);
     SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     CD->setInherited(Context.AllocateCopy(Inherited));
@@ -5386,9 +5383,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     CD->setGenericParams(GenericParams);
   }
 
-  if (Status.hasCodeCompletion() && CodeCompletion)
-    CodeCompletion->setParsedDecl(CD);
-
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
     LBLoc = PreviousLoc;
@@ -5396,7 +5390,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     Status.setIsParseError();
   } else {
     // Parse the body.
-    ContextChange CC(*this, CD);
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
                              PD_InClass);
