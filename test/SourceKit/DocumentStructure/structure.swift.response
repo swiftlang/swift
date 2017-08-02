@@ -397,8 +397,6 @@
       key.namelength: 11,
       key.bodyoffset: 703,
       key.bodylength: 186,
-      key.docoffset: 663,
-      key.doclength: 19,
       key.substructure: [
         {
           key.kind: source.lang.swift.syntaxtype.comment.mark,
@@ -417,8 +415,6 @@
           key.namelength: 16,
           key.bodyoffset: 762,
           key.bodylength: 125,
-          key.docoffset: 708,
-          key.doclength: 19,
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.var.parameter,
@@ -561,9 +557,7 @@
       key.offset: 1079,
       key.length: 15,
       key.nameoffset: 1089,
-      key.namelength: 4,
-      key.docoffset: 1059,
-      key.doclength: 18
+      key.namelength: 4
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -898,8 +892,6 @@
       key.namelength: 13,
       key.bodyoffset: 1444,
       key.bodylength: 27,
-      key.docoffset: 1387,
-      key.doclength: 18,
       key.inheritedtypes: [
         {
           key.name: "NSObject"

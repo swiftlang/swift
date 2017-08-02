@@ -418,19 +418,10 @@ CharSourceRange parameterNameRangeOfCallArg(const TupleExpr *TE,
   return CharSourceRange();
 }
 
-static CharSourceRange findDocCommentRange(DeclAttributes Attrs) {
-  for (auto Attr : Attrs) {
-    if (auto DocAttr = dyn_cast_or_null<RawDocCommentAttr>(Attr)) {
-      return DocAttr->getCommentRange();
-    }
-  }
-  return CharSourceRange();
-}
-
-static void setDecl(SyntaxStructureNode &N, Decl *D) {
+static void setDecl(SyntaxStructureNode &N, Decl *D, const SourceManager &SM) {
   N.Dcl = D;
   N.Attrs = D->getAttrs();
-  N.DocRange = findDocCommentRange(D->getAttrs());
+  N.DocRange = D->getRawComment().getCharSourceRange(SM);
 }
 
 } // anonymous namespace
@@ -768,7 +759,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     } else {
       // Pass Function / Method structure node.
       SyntaxStructureNode SN;
-      setDecl(SN, D);
+      setDecl(SN, D, SM);
       const DeclContext *DC = AFD->getDeclContext();
       if (DC->isTypeContext()) {
         if (FD && FD->isStatic()) {
@@ -791,7 +782,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     }
   } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     SyntaxStructureNode SN;
-    setDecl(SN, D);
+    setDecl(SN, D, SM);
     SN.Kind = syntaxStructureKindFromNominalTypeDecl(NTD);
     SN.Range = charSourceRangeFromSourceRange(SM, NTD->getSourceRange());
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, NTD->getBraces());
@@ -810,7 +801,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     SyntaxStructureNode SN;
-    setDecl(SN, D);
+    setDecl(SN, D, SM);
     SN.Kind = SyntaxStructureKind::Extension;
     SN.Range = charSourceRangeFromSourceRange(SM, ED->getSourceRange());
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, ED->getBraces());
@@ -844,7 +835,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     const DeclContext *DC = VD->getDeclContext();
     if (DC->isTypeContext() || DC->isModuleScopeContext()) {
       SyntaxStructureNode SN;
-      setDecl(SN, D);
+      setDecl(SN, D, SM);
       SourceRange SR;
       if (auto *PBD = VD->getParentPatternBinding())
         SR = PBD->getSourceRange();
@@ -926,7 +917,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
   } else if (auto *EnumCaseD = dyn_cast<EnumCaseDecl>(D)) {
     SyntaxStructureNode SN;
-    setDecl(SN, D);
+    setDecl(SN, D, SM);
     SN.Kind = SyntaxStructureKind::EnumCase;
     SN.Range = charSourceRangeFromSourceRange(SM, D->getSourceRange());
 
@@ -950,7 +941,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         if (EnumElemD->getName().empty())
           continue;
         SyntaxStructureNode SN;
-        setDecl(SN, EnumElemD);
+        setDecl(SN, EnumElemD, SM);
         SN.Kind = SyntaxStructureKind::EnumElement;
         SN.Range = charSourceRangeFromSourceRange(SM,
                                                   EnumElemD->getSourceRange());
@@ -967,7 +958,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     }
   } else if (auto *TypeAliasD = dyn_cast<TypeAliasDecl>(D)) {
     SyntaxStructureNode SN;
-    setDecl(SN, D);
+    setDecl(SN, D, SM);
     SN.Kind = SyntaxStructureKind::TypeAlias;
     SN.Range = charSourceRangeFromSourceRange(SM,
                                               TypeAliasD->getSourceRange());
@@ -976,7 +967,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     pushStructureNode(SN, TypeAliasD);
   } else if (auto *SubscriptD = dyn_cast<SubscriptDecl>(D)) {
     SyntaxStructureNode SN;
-    setDecl(SN, D);
+    setDecl(SN, D, SM);
     SN.Kind = SyntaxStructureKind::Subscript;
     SN.Range = charSourceRangeFromSourceRange(SM,
                                               SubscriptD->getSourceRange());

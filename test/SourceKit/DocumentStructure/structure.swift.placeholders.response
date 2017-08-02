@@ -77,9 +77,7 @@
       key.offset: 225,
       key.length: 36,
       key.nameoffset: 229,
-      key.namelength: 7,
-      key.docoffset: 91,
-      key.doclength: 133
+      key.namelength: 7
     },
     {
       key.kind: source.lang.swift.expr.array,

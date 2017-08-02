@@ -391,7 +391,7 @@ internal enum Colors {
     key.bodyoffset: 200,
     key.bodylength: 51,
     key.docoffset: 139,
-    key.doclength: 26,
+    key.doclength: 27,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -502,7 +502,7 @@ internal enum Colors {
         key.nameoffset: 512,
         key.namelength: 4,
         key.docoffset: 473,
-        key.doclength: 21
+        key.doclength: 22
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -515,7 +515,7 @@ internal enum Colors {
         key.nameoffset: 564,
         key.namelength: 2,
         key.docoffset: 527,
-        key.doclength: 18
+        key.doclength: 19
       }
     ]
   },

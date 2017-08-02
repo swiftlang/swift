@@ -224,7 +224,7 @@ public protocol SameNameProtocol {
     key.bodyoffset: 189,
     key.bodylength: 1,
     key.docoffset: 106,
-    key.doclength: 61
+    key.doclength: 62
   },
   {
     key.kind: source.lang.swift.decl.protocol,
@@ -236,8 +236,6 @@ public protocol SameNameProtocol {
     key.nameoffset: 229,
     key.namelength: 16,
     key.bodyoffset: 247,
-    key.bodylength: 1,
-    key.docoffset: 193,
-    key.doclength: 18
+    key.bodylength: 1
   }
 ]
