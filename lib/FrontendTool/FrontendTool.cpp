@@ -684,8 +684,12 @@ static bool performCompile(CompilerInstance &Instance,
   if (!opts.TBDPath.empty()) {
     const auto &silOpts = Invocation.getSILOptions();
     auto hasMultipleIRGenThreads = silOpts.NumThreads > 1;
+    auto installName = opts.TBDInstallName.empty()
+                           ? "lib" + Invocation.getModuleName().str() + ".dylib"
+                           : opts.TBDInstallName;
+
     if (writeTBD(Instance.getMainModule(), hasMultipleIRGenThreads,
-                 silOpts.SILSerializeWitnessTables, opts.TBDPath))
+                 silOpts.SILSerializeWitnessTables, opts.TBDPath, installName))
       return true;
   }
 

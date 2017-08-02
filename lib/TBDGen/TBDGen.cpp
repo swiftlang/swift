@@ -326,23 +326,70 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 #endif
 }
 
+static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
+                                           StringSet &symbols,
+                                           bool hasMultipleIRGenThreads,
+                                           bool silSerializeWitnessTables,
+                                           llvm::raw_ostream *os,
+                                           StringRef installName) {
+  auto isWholeModule = singleFile == nullptr;
+  const auto &target = M->getASTContext().LangOpts.Target;
+  UniversalLinkageInfo linkInfo(target, hasMultipleIRGenThreads, isWholeModule);
+
+  TBDGenVisitor visitor(symbols, target, linkInfo, M, silSerializeWitnessTables,
+                        installName);
+
+  auto visitFile = [&](FileUnit *file) {
+    SmallVector<Decl *, 16> decls;
+    file->getTopLevelDecls(decls);
+
+    visitor.setFileHasEntryPoint(file->hasEntryPoint());
+
+    for (auto d : decls)
+      visitor.visit(d);
+  };
+
+  if (singleFile) {
+    assert(M == singleFile->getParentModule() && "mismatched file and module");
+    visitFile(singleFile);
+  } else {
+    for (auto *file : M->getFiles()) {
+      visitFile(file);
+    }
+  }
+
+  if (os) {
+    // The correct TBD formatting code is temporarily non-open source, so this
+    // is just a list of the symbols.
+    std::vector<StringRef> sorted;
+    for (auto &symbol : symbols)
+      sorted.push_back(symbol.getKey());
+    std::sort(sorted.begin(), sorted.end());
+    for (const auto &symbol : sorted) {
+      *os << symbol << "\n";
+    }
+  }
+}
+
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
                                    bool hasMultipleIRGenThreads,
-                                   bool isWholeModule,
                                    bool silSerializeWitnessTables) {
-  UniversalLinkageInfo linkInfo(file->getASTContext().LangOpts.Target,
-                                hasMultipleIRGenThreads, isWholeModule);
-
-  SmallVector<Decl *, 16> decls;
-  file->getTopLevelDecls(decls);
-
-  auto hasEntryPoint = file->hasEntryPoint();
-
-  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule(),
-                        hasEntryPoint, silSerializeWitnessTables);
-  for (auto d : decls)
-    visitor.visit(d);
-
-  if (hasEntryPoint)
-    symbols.insert("main");
+  enumeratePublicSymbolsAndWrite(
+      file->getParentModule(), file, symbols, hasMultipleIRGenThreads,
+      silSerializeWitnessTables, nullptr, StringRef());
+}
+void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
+                                   bool hasMultipleIRGenThreads,
+                                   bool silSerializeWitnessTables) {
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIRGenThreads,
+                                 silSerializeWitnessTables, nullptr,
+                                 StringRef());
+}
+void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
+                         bool hasMultipleIRGenThreads,
+                         bool silSerializeWitnessTables,
+                         StringRef installName) {
+  StringSet symbols;
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIRGenThreads,
+                                 silSerializeWitnessTables, &os, installName);
 }
