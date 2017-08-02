@@ -1050,9 +1050,14 @@ public:
       for_each(exprTy->getElements().begin(), exprTy->getElements().end(),
                E->getElements().begin(),
                [this](const TupleTypeElt &field, const Expr *elt) {
-        checkTrivialSubtype(field.getType()->getUnlabeledType(Ctx),
-                            elt->getType()->getUnlabeledType(Ctx),
-                            "tuple and element");
+        if (!field.getType()->isEqual(elt->getType())) {
+          Out << "tuple_expr element type mismatch:\n";
+          Out << "  field: ";
+          Out << field.getType() << "\n";
+          Out << "  element: ";
+          Out << elt->getType() << "\n";
+          abort();
+        }
       });
       // FIXME: Check all the variadic elements.
       verifyCheckedBase(E);
