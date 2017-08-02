@@ -4967,6 +4967,9 @@ public:
         case StmtKind::Return:
         case StmtKind::ForEach:
         case StmtKind::RepeatWhile:
+        case StmtKind::If:
+        case StmtKind::While:
+        case StmtKind::Guard:
           return true;
         default:
           return false;
@@ -5014,35 +5017,51 @@ public:
     }
   }
 
-   void analyzeStmt(Stmt *Parent, llvm::function_ref<void(Type)> Callback) {
-     switch (Parent->getKind()) {
-       case StmtKind::Return: {
-         Callback(getReturnTypeFromContext(DC));
-         break;
-       }
-       case StmtKind::ForEach: {
-         auto FES = cast<ForEachStmt>(Parent);
-         if (auto SEQ = FES->getSequence()) {
-           if (SM.rangeContains(SEQ->getSourceRange(),
-                                ParsedExpr->getSourceRange())) {
-             Callback(Context.getSequenceDecl()->getDeclaredInterfaceType());
-           }
-         }
-         break;
-       }
-       case StmtKind::RepeatWhile: {
-         auto Cond = cast<RepeatWhileStmt>(Parent)->getCond();
-         if (Cond &&
-             SM.rangeContains(Cond->getSourceRange(),
-                              ParsedExpr->getSourceRange())) {
-           Callback(Context.getBoolDecl()->getDeclaredType());
-         }
-         break;
-       }
-       default:
-         llvm_unreachable("Unhandled statement kinds.");
-     }
-   }
+  void analyzeStmt(Stmt *Parent, llvm::function_ref<void(Type)> Callback) {
+    switch (Parent->getKind()) {
+    case StmtKind::Return:
+      Callback(getReturnTypeFromContext(DC));
+      break;
+    case StmtKind::ForEach:
+      if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
+        if (containsTarget(SEQ)) {
+          Callback(Context.getSequenceDecl()->getDeclaredInterfaceType());
+        }
+      }
+      break;
+    case StmtKind::RepeatWhile:
+    case StmtKind::If:
+    case StmtKind::While:
+    case StmtKind::Guard:
+      if (isBoolConditionOf(Parent)) {
+        Callback(Context.getBoolDecl()->getDeclaredInterfaceType());
+      }
+      break;
+    default:
+      llvm_unreachable("Unhandled statement kinds.");
+    }
+  }
+
+  bool isBoolConditionOf(Stmt *parent) {
+    if (auto *repeat = dyn_cast<RepeatWhileStmt>(parent)) {
+      return repeat->getCond() && containsTarget(repeat->getCond());
+    }
+    if (auto *conditional = dyn_cast<LabeledConditionalStmt>(parent)) {
+      for (StmtConditionElement cond : conditional->getCond()) {
+        if (auto *E = cond.getBooleanOrNull()) {
+          if (containsTarget(E)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  bool containsTarget(Expr *E) {
+    assert(E && "expected parent expression");
+    return SM.rangeContains(E->getSourceRange(), ParsedExpr->getSourceRange());
+  }
 
   void analyzeDecl(Decl *D, llvm::function_ref<void(Type)> Callback) {
     switch (D->getKind()) {
@@ -5050,7 +5069,7 @@ public:
         auto PBD = cast<PatternBindingDecl>(D);
         for (unsigned I = 0; I < PBD->getNumPatternEntries(); ++ I) {
           if (auto Init = PBD->getInit(I)) {
-            if (SM.rangeContains(Init->getSourceRange(), ParsedExpr->getLoc())) {
+            if (containsTarget(Init)) {
               if (PBD->getPattern(I)->hasType()) {
                 Callback(PBD->getPattern(I)->getType());
                 break;
