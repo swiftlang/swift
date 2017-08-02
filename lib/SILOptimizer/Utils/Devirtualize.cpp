@@ -17,6 +17,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -551,6 +552,44 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   return true;
 }
 
+// Remove any code that follows a I and set the block's
+// terminator to unreachable.
+static bool insertUnreachable(SILInstruction *I, SILBuilder &B) {
+  assert(I);
+  auto NextI = std::next(SILBasicBlock::iterator(I));
+  // Nothing more to do here.
+  if (NextI != I->getParent()->end() && isa<UnreachableInst>(NextI))
+    return false;
+
+  // Collect together all the instructions after this point.
+  llvm::SmallVector<SILInstruction *, 32> ToRemove;
+  for (auto Inst = I->getParent()->rbegin(); &*Inst != I; ++Inst)
+    ToRemove.push_back(&*Inst);
+
+  SILBasicBlock::iterator EndI;
+  for (auto *Inst : ToRemove) {
+    // Replace any still-remaining uses with undef and erase.
+    Inst->replaceAllUsesWithUndef();
+    assert(onlyHaveDebugUses(Inst) && "Cannot erase instruction that is used!");
+    eraseFromParentWithDebugInsts(Inst, EndI);
+  }
+
+  // Add an `unreachable` to be the new terminator for this block.
+  B.setInsertionPoint(I->getParent());
+  B.createUnreachable(ArtificialUnreachableLocation());
+  return true;
+}
+
+/// If this is a call of a NoReturn function and it is not a terminator
+/// instruction, it should be followed by an unreachable instruction.
+static void handleNoReturnFunction(FullApplySite AI, SILBuilder &B) {
+  if (!AI.getSubstCalleeType()->isNoReturnFunction())
+    return;
+  if (!AI.getInstruction() || isa<TermInst>(AI.getInstruction()))
+    return;
+  insertUnreachable(AI.getInstruction(), B);
+}
+
 /// \brief Devirtualize an apply of a class method.
 ///
 /// \p AI is the apply to devirtualize.
@@ -694,9 +733,17 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
         Use->set(ResultValue);
       }
     }
+    // Insert unreachable after the old apply instruction if required.
+    // Do not remove the old instruction yet, because it is done later
+    // elsewhere.
+    handleNoReturnFunction(AI, B);
     return std::make_pair(NewAI.getInstruction(), NewAI);
   }
 
+  // Insert unreachable after the old apply instruction if required.
+  // Do not remove the old instruction yet, because it is done later
+  // elsewhere.
+  handleNoReturnFunction(AI, B);
   // We need to return a pair of values here:
   // - the first one is the actual result of the devirtualized call, possibly
   //   casted into an appropriate type. This SILValue may be a BB arg, if it
