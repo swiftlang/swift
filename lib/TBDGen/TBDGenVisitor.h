@@ -41,6 +41,7 @@ public:
   const llvm::Triple &Triple;
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
+  StringRef InstallName;
 
 private:
   bool FileHasEntryPoint = false;
@@ -73,9 +74,10 @@ private:
 public:
   TBDGenVisitor(StringSet &symbols, const llvm::Triple &triple,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, bool silSerializeWitnessTables)
+                ModuleDecl *swiftModule, bool silSerializeWitnessTables,
+                StringRef installName)
       : Symbols(symbols), Triple(triple), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule),
+        SwiftModule(swiftModule), InstallName(installName),
         SILSerializeWitnessTables(silSerializeWitnessTables) {}
 
   void setFileHasEntryPoint(bool hasEntryPoint) {
