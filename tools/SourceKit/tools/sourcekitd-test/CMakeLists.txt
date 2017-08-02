@@ -3,19 +3,19 @@ swift_tablegen(Options.inc -gen-opt-parser-defs)
 swift_add_public_tablegen_target(sourcekitdTestOptionsTableGen)
 
 if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
-  set(SOURCEKITD_TEST_DEPEND sourcekitdInProc)
+  set(SOURCEKITD_TEST_LINK_LIBS sourcekitdInProc)
 else()
-  set(SOURCEKITD_TEST_DEPEND sourcekitd)
+  set(SOURCEKITD_TEST_LINK_LIBS sourcekitd)
 endif()
 
 if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
-  set(SOURCEKITD_TEST_DEPEND ${SOURCEKITD_TEST_DEPEND} dispatch swiftCore)
+  set(SOURCEKITD_TEST_LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} dispatch swiftCore)
 endif()
 
 add_sourcekit_executable(sourcekitd-test
   sourcekitd-test.cpp
   TestOptions.cpp
-  DEPENDS ${SOURCEKITD_TEST_DEPEND} SourceKitSupport
+  LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} SourceKitSupport
     clangRewrite clangLex clangBasic
   LLVM_COMPONENT_DEPENDS core support option coverage lto
 )
