@@ -1403,8 +1403,8 @@ extension ${Self} {
   
   /// Creates a value that exactly represents the given integer.
   ///
-  /// If the given integer is outside the representable range of this type, the
-  /// result is `nil`.
+  /// If the given integer is outside the representable range of this type or
+  /// can't be represented exactly, the result is `nil`.
   ///
   /// - Parameter value: The integer to represent as a floating-point value.
 %   if srcBits < SignificandBitCount:
