@@ -30,7 +30,6 @@ public func run_StringWithCString(_ N: Int) {
 
 @inline(never)
 public func run_CStringLongAscii(_ N: Int) {
-  let refResult = 517492
   var res: UInt = 0
   for _ in 1...N*500 {
     // static string to c -> from c to String -> implicit conversion
@@ -41,7 +40,6 @@ public func run_CStringLongAscii(_ N: Int) {
 
 @inline(never)
 public func run_CStringLongNonAscii(_ N: Int) {
-  let refResult = 517492
   var res: UInt = 0
   for _ in 1...N*500 {
     res &= strlen(japanese.withCString(String.init(cString:)))

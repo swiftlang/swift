@@ -1167,7 +1167,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
-    // Find the last path element, skipping OptioanlPayload elements
+    // Find the last path element, skipping OptionalPayload elements
     // so that we allow this exception in cases of optional injection.
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
@@ -3092,11 +3092,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (includeInaccessibleMembers)
       lookupOptions |= NameLookupFlags::IgnoreAccessibility;
 
-    // If a constructor is only visible as a witness for a protocol
-    // requirement, it must be an invalid override. Also, protocol
-    // extensions cannot yet define designated initializers.
-    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-
     LookupResult ctors = TC.lookupConstructors(DC, instanceTy, lookupOptions);
     if (!ctors)
       return result;    // No result.
@@ -3211,11 +3206,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // reasonable choice.
   auto addChoice = [&](ValueDecl *cand, bool isBridged,
                        bool isUnwrappedOptional) {
-    // Destructors cannot be referenced manually
-    if (isa<DestructorDecl>(cand)) {
-      result.addUnviable(cand, MemberLookupResult::UR_DestructorInaccessible);
-      return;
-    }
     // If the result is invalid, skip it.
     TC.validateDecl(cand);
     if (cand->isInvalid()) {

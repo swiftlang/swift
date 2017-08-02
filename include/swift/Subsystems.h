@@ -20,7 +20,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Version.h"
-#include "swift/Syntax/TokenSyntax.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
@@ -131,16 +130,6 @@ namespace swift {
                               bool KeepComments = true,
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
-
-  /// \brief Lex and return a vector of `TokenSyntax` tokens, which include
-  /// leading and trailing trivia.
-  std::vector<std::pair<RC<syntax::RawTokenSyntax>,
-                                   syntax::AbsolutePosition>>
-  tokenizeWithTrivia(const LangOptions &LangOpts,
-                     const SourceManager &SM,
-                     unsigned BufferID,
-                     unsigned Offset = 0,
-                     unsigned EndOffset = 0);
 
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.

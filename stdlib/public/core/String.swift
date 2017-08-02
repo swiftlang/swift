@@ -13,6 +13,9 @@
 import SwiftShims
 
 /// A type that can represent a string as a collection of characters.
+///
+/// Do not declare new conformances to `StringProtocol`. Only the `String` and
+/// `Substring` types in the standard library are valid conforming types.
 public protocol StringProtocol
   : BidirectionalCollection,
   TextOutputStream, TextOutputStreamable,
@@ -147,13 +150,6 @@ extension StringProtocol {
   var _ephemeralString : String {
     if _fastPath(self is _SwiftStringView) {
       return (self as! _SwiftStringView)._ephemeralContent
-    }
-    return String(String.CharacterView(self))
-  }
-
-  internal var _persistentString : String {
-    if _fastPath(self is _SwiftStringView) {
-      return (self as! _SwiftStringView)._persistentContent
     }
     return String(String.CharacterView(self))
   }
@@ -430,7 +426,7 @@ extension String {
 /// storage. Substrings present the same interface as strings.
 ///
 ///     print("\(name)'s first name has \(firstName.count) letters.")
-///     // Prints "Marie Curie's name has 5 letters."
+///     // Prints "Marie Curie's first name has 5 letters."
 ///
 /// Accessing a String's Unicode Representation
 /// ===========================================
@@ -543,10 +539,10 @@ extension String {
 ///     // Prints "1"
 ///
 /// On the other hand, an emoji flag character is constructed from a pair of
-/// Unicode scalar values, like `"\u{1F1F5}"` and `"\u{1F1F7}"`. Each of
-/// these scalar values, in turn, is too large to fit into a single UTF-16 or
-/// UTF-8 code unit. As a result, each view of the string `"🇵🇷"` reports a
-/// different length.
+/// Unicode scalar values, like `"\u{1F1F5}"` and `"\u{1F1F7}"`. Each of these
+/// scalar values, in turn, is too large to fit into a single UTF-16 or UTF-8
+/// code unit. As a result, each view of the string `"🇵🇷"` reports a different
+/// length.
 ///
 ///     let flag = "🇵🇷"
 ///     print(flag.count)
@@ -568,8 +564,8 @@ extension String {
 ///
 /// To find individual elements of a string, use the appropriate view for your
 /// task. For example, to retrieve the first word of a longer string, you can
-/// search the `characters` view for a space and then create a new string from
-/// a prefix of the `characters` view up to that point.
+/// search the string for a space and then create a new string from a prefix
+/// of the string up to that point.
 ///
 ///     let name = "Marie Curie"
 ///     let firstSpace = name.index(of: " ") ?? name.endIndex
@@ -577,12 +573,44 @@ extension String {
 ///     print(firstName)
 ///     // Prints "Marie"
 ///
-/// You can convert an index into one of a string's views to an index into
-/// another view.
+/// Strings and their views share indices, so you can access the UTF-8 view of
+/// the `name` string using the same `firstSpace` index.
 ///
-///     let firstSpaceUTF8 = firstSpace.samePosition(in: name.utf8)
-///     print(Array(name.utf8[..<firstSpaceUTF8]))
+///     print(Array(name.utf8[..<firstSpace]))
 ///     // Prints "[77, 97, 114, 105, 101]"
+///
+/// Note that an index into one view may not have an exact corresponding
+/// position in another view. For example, the `flag` string declared above
+/// comprises a single character, but is composed of eight code units when
+/// encoded as UTF-8. The following code creates constants for the first and
+/// second positions in the `flag.utf8` view. Accessing the `utf8` view with
+/// these indices yields the first and second code UTF-8 units.
+///
+///     let firstCodeUnit = flag.startIndex
+///     let secondCodeUnit = flag.utf8.index(after: firstCodeUnit)
+///     // flag.utf8[firstCodeUnit] == 240
+///     // flag.utf8[secondCodeUnit] == 159
+///
+/// When used to access the elements of the `flag` string itself, however, the
+/// `secondCodeUnit` index does not correspond to the position of a specific
+/// character. Instead of only accessing the specific UTF-8 code unit, that
+/// index is treated as the position of the character at the index's encoded
+/// offset. In the case of `secondCodeUnit`, that character is still the flag
+/// itself.
+///
+///     // flag[firstCodeUnit] == "🇵🇷"
+///     // flag[secondCodeUnit] == "🇵🇷"
+///
+/// If you need to validate that an index from one string's view corresponds
+/// with an exact position in another view, use the index's
+/// `samePosition(in:)` method or the `init(_:within:)` initializer.
+///
+///     if let exactIndex = secondCodeUnit.samePosition(in: flag) {
+///         print(flag[exactIndex])
+///     } else {
+///         print("No exact match for this position.")
+///     }
+///     // Prints "No exact match for this position."
 ///
 /// Performance Optimizations
 /// =========================
@@ -880,7 +908,7 @@ extension String {
   }
 }
 
-extension Sequence where Element == String {
+extension Sequence where Element: StringProtocol {
 
   /// Returns a new string by concatenating the elements of the sequence,
   /// adding the given separator between each element.
@@ -914,7 +942,7 @@ extension Sequence where Element == String {
       for chunk in self {
         // FIXME(performance): this code assumes UTF-16 in-memory representation.
         // It should be switched to low-level APIs.
-        r += separatorSize + chunk.utf16.count
+        r += separatorSize + chunk._ephemeralString.utf16.count
       }
       return r - separatorSize
     }
@@ -925,17 +953,17 @@ extension Sequence where Element == String {
 
     if separatorSize == 0 {
       for x in self {
-        result.append(x)
+        result.append(x._ephemeralString)
       }
       return result
     }
 
     var iter = makeIterator()
     if let first = iter.next() {
-      result.append(first)
+      result.append(first._ephemeralString)
       while let next = iter.next() {
         result.append(separator)
-        result.append(next)
+        result.append(next._ephemeralString)
       }
     }
 
@@ -1091,7 +1119,7 @@ extension String {
         // Since we are left with either 0x0 or 0x20, we can safely truncate to
         // a UInt8 and add to our ASCII value (this will not overflow numbers in
         // the ASCII range).
-        dest.storeBytes(of: value &+ UInt8(extendingOrTruncating: add),
+        dest.storeBytes(of: value &+ UInt8(truncatingIfNeeded: add),
           toByteOffset: i, as: UInt8.self)
       }
       return String(_storage: buffer)
@@ -1130,7 +1158,7 @@ extension String {
           _asciiLowerCaseTable &>>
           UInt64(((value &- 1) & 0b0111_1111) &>> 1)
         let add = (isLower & 0x1) &<< 5
-        dest.storeBytes(of: value &- UInt8(extendingOrTruncating: add),
+        dest.storeBytes(of: value &- UInt8(truncatingIfNeeded: add),
           toByteOffset: i, as: UInt8.self)
       }
       return String(_storage: buffer)

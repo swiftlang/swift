@@ -37,24 +37,10 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
-  class AssociatedTypeDecl;
-  class ClassDecl;
-  class ConstructorDecl;
-  class Decl;
-  class ExtensionDecl;
-  class FuncDecl;
-  class EnumElementDecl;
-  class EnumType;
-  class Pattern;
-  class PatternBindingDecl;
+  class IRGenOptions;
   class SILDebugScope;
   class SILType;
-  class KeyPathInst;
   class SourceLoc;
-  class StructType;
-  class Substitution;
-  class ValueDecl;
-  class VarDecl;
 
 namespace Lowering {
   class TypeConverter;
@@ -84,6 +70,7 @@ public:
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
   Lowering::TypeConverter &getSILTypes() const;
+  const IRGenOptions &getOptions() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
                 const SILDebugScope *DbgScope = nullptr,
@@ -215,11 +202,14 @@ public:
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
   
   llvm::Value *emitValueWitnessTableRef(CanType type);
-  llvm::Value *emitValueWitnessTableRefForLayout(SILType type);
+  llvm::Value *emitValueWitnessTableRef(SILType type,
+                                        llvm::Value **metadataSlot = nullptr);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
   
-  llvm::Value *emitValueWitness(CanType type, ValueWitness index);
-  llvm::Value *emitValueWitnessForLayout(SILType type, ValueWitness index);
+  llvm::Value *emitValueWitnessValue(SILType type, ValueWitness index);
+  FunctionPointer emitValueWitnessFunctionRef(SILType type,
+                                              llvm::Value *&metadataSlot,
+                                              ValueWitness index);
 
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);

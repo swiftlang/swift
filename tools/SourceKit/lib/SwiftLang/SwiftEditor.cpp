@@ -912,12 +912,20 @@ static UIdent getAccessibilityUID(Accessibility Access) {
   llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
-static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
+static Optional<Accessibility> getAccessibilityStrictly(const ExtensionDecl *ED) {
   if (ED->hasDefaultAccessibility())
     return ED->getDefaultAccessibility();
 
+  // Check if the decl has an explicit accessibility attribute.
   if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
     return AA->getAccess();
+
+  return None;
+}
+
+static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
+  if (auto StrictAccess = getAccessibilityStrictly(ED))
+    return StrictAccess.getValue();
 
   // Assume "internal", which is the most common thing anyway.
   return Accessibility::Internal;
@@ -1019,12 +1027,24 @@ public:
       BodyOffset = BodyEnd = 0;
     }
 
+    unsigned DocOffset = 0;
+    unsigned DocEnd = 0;
+    if (Node.DocRange.isValid()) {
+      DocOffset = SrcManager.getLocOffsetInBuffer(Node.DocRange.getStart(),
+                                                  BufferID);
+      DocEnd = SrcManager.getLocOffsetInBuffer(Node.DocRange.getEnd(),
+                                               BufferID);
+    }
+
     UIdent Kind = SwiftLangSupport::getUIDForSyntaxStructureKind(Node.Kind);
     UIdent AccessLevel;
     UIdent SetterAccessLevel;
     if (Node.Kind != SyntaxStructureKind::Parameter) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
         AccessLevel = getAccessibilityUID(inferAccessibility(VD));
+      } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
+        if (auto StrictAccess = getAccessibilityStrictly(ED))
+          AccessLevel = getAccessibilityUID(StrictAccess.getValue());
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
         Optional<Accessibility> SetAccess = inferSetterAccessibility(ASD);
@@ -1069,6 +1089,7 @@ public:
                                        Kind, AccessLevel, SetterAccessLevel,
                                        NameStart, NameEnd - NameStart,
                                        BodyOffset, BodyEnd - BodyOffset,
+                                       DocOffset, DocEnd - DocOffset,
                                        DisplayName,
                                        TypeName, RuntimeName,
                                        SelectorName,
@@ -1133,7 +1154,7 @@ public:
     UIdent Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Node.Kind);
     Consumer.beginDocumentSubStructure(StartOffset, EndOffset - StartOffset,
                                        Kind, UIdent(), UIdent(), 0, 0,
-                                       0, 0,
+                                       0, 0, 0, 0,
                                        StringRef(),
                                        StringRef(), StringRef(),
                                        StringRef(),

@@ -11,11 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/LegacyASTTransformer.h"
-#include "swift/Syntax/DeclSyntax.h"
-#include "swift/Syntax/ExprSyntax.h"
-#include "swift/Syntax/GenericSyntax.h"
 #include "swift/Syntax/References.h"
-#include "swift/Syntax/StmtSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/UnknownSyntax.h"
@@ -141,16 +137,15 @@ SourceLoc LegacyASTTransformer::getEndLocForExpr(const Expr *E) const {
   : E->getEndLoc();
 }
 
-RC<SyntaxData> LegacyASTTransformer::getUnknownSyntax(SourceRange SR) {
+RC<SyntaxData>
+LegacyASTTransformer::getUnknownSyntax(SourceRange SR, SyntaxKind Kind) {
   auto ComprisingTokens = getRawTokenSyntaxesInRange(SR, SourceMgr,
                                                  BufferID, Tokens);
   RawSyntax::LayoutList Layout;
   std::copy(ComprisingTokens.begin(),
             ComprisingTokens.end(),
             std::back_inserter(Layout));
-  auto Raw = RawSyntax::make(SyntaxKind::Unknown,
-                             Layout,
-                             SourcePresence::Present);
+  auto Raw = RawSyntax::make(Kind, Layout, SourcePresence::Present);
   return SyntaxData::make(Raw);
 }
 
@@ -216,16 +211,7 @@ RC<SyntaxData>
 LegacyASTTransformer::visitPatternBindingDecl(PatternBindingDecl *PBD,
                                               const SyntaxData *Parent,
                                               const CursorIndex IndexInParent) {
-  auto StartLoc = getStartLocForDecl(PBD);
-
-  for (auto Entry : PBD->getPatternList()) {
-    auto Loc = getStartLocForDecl(Entry.getAnchoringVarDecl());
-    if (StartLoc.isInvalid() || SourceMgr.isBeforeInBuffer(Loc, StartLoc)) {
-      StartLoc = Loc;
-    }
-  }
-  auto EndLoc = getEndLocForDecl(PBD);
-  return getUnknownSyntax({StartLoc, EndLoc});
+  return getUnknownDecl(PBD);
 }
 
 RC<SyntaxData>
@@ -452,11 +438,23 @@ LegacyASTTransformer::visitBraceStmt(BraceStmt *S,
                     BufferID, Tokens)
     : TokenSyntax::missingToken(tok::l_brace, "{");
 
+  /// Because this syntax comes from an ASTNode, we need to handle Decl/Expr
+  /// and convert them into implicit DeclStmtSyntax and ExprStmtSyntaxes.
+  auto getStmtSyntax = [](Syntax Node) -> StmtSyntax {
+    if (Node.isDecl())
+      return SyntaxFactory::makeDeclarationStmt(Node.castTo<DeclSyntax>(),
+                                                None);
+    if (Node.isExpr())
+      return SyntaxFactory::makeExpressionStmt(Node.castTo<ExprSyntax>(),
+                                               None);
+    return Node.castTo<StmtSyntax>();
+  };
+
   std::vector<StmtSyntax> Stmts;
   for (auto Node : S->getElements()) {
     auto Transformed = transformAST(Node, ASTMap, SourceMgr, BufferID, Tokens);
     if (Transformed.hasValue()) {
-      Stmts.push_back(Transformed.getValue().castTo<StmtSyntax>());
+      Stmts.push_back(getStmtSyntax(*Transformed));
     }
   }
 
@@ -476,6 +474,8 @@ LegacyASTTransformer::visitReturnStmt(ReturnStmt *S,
                                       const CursorIndex IndexInParent) {
   auto ReturnKW = findTokenSyntax(tok::kw_return, "return", SourceMgr,
                                   S->getReturnLoc(), BufferID, Tokens);
+  auto Semicolon = findTokenSyntax(tok::semi, ";", SourceMgr,
+                                   S->getEndLoc(), BufferID, Tokens);
   auto Result = transformAST(S->getResult(), ASTMap, SourceMgr, BufferID,
                              Tokens);
 
@@ -484,7 +484,7 @@ LegacyASTTransformer::visitReturnStmt(ReturnStmt *S,
   }
 
   return SyntaxFactory::makeReturnStmt(ReturnKW,
-    Result.getValue().castTo<ExprSyntax>()).Root;
+    Result.getValue().castTo<ExprSyntax>(), Semicolon).Root;
 }
 
 RC<SyntaxData>
@@ -596,7 +596,9 @@ LegacyASTTransformer::visitFallthroughStmt(FallthroughStmt *S,
   auto FallthroughToken = findTokenSyntax(tok::kw_fallthrough, "fallthrough",
                                           SourceMgr, S->getLoc(),
                                           BufferID, Tokens);
-  return SyntaxFactory::makeFallthroughStmt(FallthroughToken).Root;
+  auto Semicolon = SyntaxFactory::makeToken(tok::semi, ";", SourcePresence::Missing,
+                                            {}, {});
+  return SyntaxFactory::makeFallthroughStmt(FallthroughToken, Semicolon).Root;
 }
 
 RC<SyntaxData>

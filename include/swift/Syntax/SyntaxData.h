@@ -58,10 +58,6 @@ namespace syntax {
 /// reference to the parent, and, in subclasses, lazily created strong
 /// references to non-terminal child nodes.
 class SyntaxData final : public llvm::ThreadSafeRefCountedBase<SyntaxData> {
-  friend struct SyntaxFactory;
-#define SYNTAX(Id, Parent) friend class Id##Syntax;
-#include "swift/Syntax/SyntaxKinds.def"
-
   using RootDataPair = std::pair<RC<SyntaxData>, RC<SyntaxData>>;
 
   llvm::SmallVector<AtomicCache<SyntaxData>, 10> Children;

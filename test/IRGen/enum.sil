@@ -2728,7 +2728,7 @@ entry(%x : $*MyOptional):
 // CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_DynamicSinglePayload(%swift.type_pattern*, i8**) {{.*}} {
 // CHECK:   call void @swift_initEnumValueWitnessTableSinglePayload
 
-// CHECK-64-LABEL: define linkonce_odr hidden void @_T04enum17StructWithWeakVarVwxs(%swift.opaque* %dest, i32 %index, %swift.type* %StructWithWeakVar)
+// CHECK-64-LABEL: define linkonce_odr hidden void @_T04enum17StructWithWeakVarVwxs(%swift.opaque* noalias %dest, i32 %index, %swift.type* %StructWithWeakVar)
 // -- TODO: some pointless masking here.
 // -- TODO: should use EnumPayload word-chunking.
 // CHECK-64:         %1 = zext i32 %index to i128
@@ -2741,7 +2741,7 @@ entry(%x : $*MyOptional):
 // --                             0x1__0000_0000_0000_0000
 // CHECK-64:         %6 = or i128 %5, 18446744073709551616
 
-// CHECK-LABEL: define linkonce_odr hidden i32 @_T04enum40MultiPayloadLessThan32BitsWithEmptyCasesOwug(%swift.opaque* %value
+// CHECK-LABEL: define linkonce_odr hidden i32 @_T04enum40MultiPayloadLessThan32BitsWithEmptyCasesOwug(%swift.opaque* noalias %value
 // CHECK:  [[VAL00:%.*]] = bitcast %swift.opaque* %value to %T4enum40MultiPayloadLessThan32BitsWithEmptyCasesO*
 // CHECK:  [[VAL01:%.*]] = bitcast %T4enum40MultiPayloadLessThan32BitsWithEmptyCasesO* [[VAL00]] to i8*
 // CHECK:  [[VAL02:%.*]] = load {{.*}} [[VAL01]]
@@ -2756,7 +2756,7 @@ entry(%x : $*MyOptional):
 // CHECK:  [[VAL11:%.*]] = select i1 [[VAL10]], i32 [[VAL09]], i32 [[VAL07]]
 // CHECK:  ret i32 [[VAL11]]
 
-// CHECK-LABEL: define linkonce_odr hidden void @_T04enum40MultiPayloadLessThan32BitsWithEmptyCasesOwui(%swift.opaque* %value, i32 %tag
+// CHECK-LABEL: define linkonce_odr hidden void @_T04enum40MultiPayloadLessThan32BitsWithEmptyCasesOwui(%swift.opaque* noalias %value, i32 %tag
 // CHECK: entry:
 // CHECK:  [[VAL00:%.*]] = bitcast %swift.opaque* %value
 // CHECK:  [[VAL01:%.*]] = icmp sge i32 %tag, 0

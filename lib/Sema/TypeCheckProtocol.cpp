@@ -4969,12 +4969,10 @@ static void recordConformanceDependency(DeclContext *DC,
       Conformance->getDeclContext()->getParentModule())
     return;
 
-  auto &Context = DC->getASTContext();
-
   // FIXME: 'deinit' is being used as a dummy identifier here. Really we
   // don't care about /any/ of the type's members, only that it conforms to
   // the protocol.
-  tracker->addUsedMember({Adoptee, Context.Id_deinit},
+  tracker->addUsedMember({Adoptee, DeclBaseName::createDestructor()},
                          DC->isCascadingContextForLookup(InExpression));
 }
 

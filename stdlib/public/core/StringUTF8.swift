@@ -134,15 +134,19 @@ extension String {
     ///
     /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
     public var endIndex: Index {
+      _sanityCheck(_legacyOffsets.end >= -3 && _legacyOffsets.end <= 0,
+        "out of bounds legacy end")
+
       var r = Index(encodedOffset: _core.endIndex)
+      if _fastPath(_legacyOffsets.end == 0) {
+        return r
+      }
       switch _legacyOffsets.end {
-      case 0: return r
       case -3: r = index(before: r); fallthrough
       case -2: r = index(before: r); fallthrough
-      case -1: r = index(before: r); fallthrough
-      default: break
+      case -1: return index(before: r)
+      default: Builtin.unreachable()
       }
-      return r
     }
 
     @_versioned
@@ -373,28 +377,6 @@ extension String {
   ///
   /// If `utf8` is an ill-formed UTF-8 code sequence, the result is `nil`.
   ///
-  /// You can use this initializer to create a new string from
-  /// another string's `utf8` view.
-  ///
-  ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.utf8.index(of: 32) {
-  ///         let adjective = String(picnicGuest.utf8[..<i])
-  ///         print(adjective)
-  ///     }
-  ///     // Prints "Optional(Deserving)"
-  ///
-  /// The `adjective` constant is created by calling this initializer with a
-  /// slice of the `picnicGuest.utf8` view.
-  ///
-  /// - Parameter utf8: A UTF-8 code sequence.
-  public init(_ utf8: UTF8View) {
-    self = String(utf8._core)
-  }
-
-  /// Creates a string corresponding to the given sequence of UTF-8 code units.
-  ///
-  /// If `utf8` is an ill-formed UTF-8 code sequence, the result is `nil`.
-  ///
   /// You can use this initializer to create a new string from a slice of
   /// another string's `utf8` view.
   ///
@@ -409,14 +391,38 @@ extension String {
   /// slice of the `picnicGuest.utf8` view.
   ///
   /// - Parameter utf8: A UTF-8 code sequence.
-  public init?(_ utf8: UTF8View.SubSequence) {
-    let wholeString = String(utf8.base._core)
-    if let start = utf8.startIndex.samePosition(in: wholeString),
-       let end = utf8.endIndex.samePosition(in: wholeString) {
-      self = String(wholeString[start..<end])
-      return
+  @available(swift, deprecated: 3.2, obsoleted: 4.0)
+  public init?(_ utf8: UTF8View) {
+    if utf8.startIndex._transcodedOffset != 0
+    || utf8.endIndex._transcodedOffset != 0 {
+      return nil
     }
-    return nil
+    // Attempt to recover the whole string, the better to implement the actual
+    // Swift 3.1 semantics, which are not as documented above!  Full Swift 3.1
+    // semantics may be impossible to preserve in the case of string literals,
+    // since we no longer have access to the length of the original string when
+    // there is no owner and elements have been dropped from the end.
+    if let nativeBuffer = utf8._core.nativeBuffer {
+      let wholeString = String(_StringCore(nativeBuffer))
+      let offset = (utf8._core._baseAddress! - nativeBuffer.start)
+        &>> utf8._core.elementShift
+
+      if Index(
+        encodedOffset: utf8.startIndex.encodedOffset + offset
+      ).samePosition(in: wholeString) == nil
+      || Index(
+        encodedOffset: utf8.endIndex.encodedOffset + offset
+      ).samePosition(in: wholeString) == nil {
+        return nil
+      }
+    }
+    self = String(utf8._core)
+  }
+
+  /// Creates a string corresponding to the given sequence of UTF-8 code units.
+  @available(swift, introduced: 4.0)
+  public init(_ utf8: UTF8View) {
+    self = String(utf8._core)
   }
 
   /// The index type for subscripting a string's `utf8` view.
@@ -448,7 +454,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
   
   public mutating func next() -> Unicode.UTF8.CodeUnit? {
     if _fastPath(_buffer != 0) {
-      let r = UInt8(extendingOrTruncating: _buffer) &- 1
+      let r = UInt8(truncatingIfNeeded: _buffer) &- 1
       _buffer >>= 8
       return r
     }
@@ -488,7 +494,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
     while _sourceIndex != _source.endIndex && shift < _OutputBuffer.bitWidth {
       let u = _source[_sourceIndex]
       if u >= 0x80 { break }
-      _buffer |= _OutputBuffer(UInt8(extendingOrTruncating: u &+ 1)) &<< shift
+      _buffer |= _OutputBuffer(UInt8(truncatingIfNeeded: u &+ 1)) &<< shift
       _sourceIndex += 1
       shift = shift &+ 8
     }
@@ -516,7 +522,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
       _sourceIndex = i._position &- parser._buffer.count
     }
     guard _fastPath(_buffer != 0) else { return nil }
-    let result = UInt8(extendingOrTruncating: _buffer) &- 1
+    let result = UInt8(truncatingIfNeeded: _buffer) &- 1
     _buffer >>= 8
     return result
   }
@@ -651,17 +657,17 @@ extension String.UTF8View {
 //===--- Slicing Support --------------------------------------------------===//
 /// In Swift 3.2, in the absence of type context,
 ///
-///     someString.utf8[someString.startIndex..<someString.endIndex]
+///   someString.utf8[someString.utf8.startIndex..<someString.utf8.endIndex]
 ///
 /// was deduced to be of type `String.UTF8View`.  Provide a more-specific
 /// Swift-3-only `subscript` overload that continues to produce
 /// `String.UTF8View`.
 extension String.UTF8View {
-  public typealias SubSequence = BidirectionalSlice<String.UTF8View>
+  public typealias SubSequence = Substring.UTF8View
   
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> String.UTF8View.SubSequence {
-    return String.UTF8View.SubSequence(base: self, bounds: r)
+    return String.UTF8View.SubSequence(self, _bounds: r)
   }
 
   @available(swift, obsoleted: 4)

@@ -123,7 +123,7 @@ extension ${Self} : LosslessStringConvertible {
   /// - Parameter text: The input string to convert to a `${Self}` instance. If
   ///   `text` has invalid characters or is in an invalid format, the result
   ///   is `nil`.
-  public init?(_ text: String) {
+  public init?<S: StringProtocol>(_ text: S) {
     let u16 = text.utf16
     func parseNTBS(_ chars: UnsafePointer<CChar>) -> (${Self}, Int) {
       var result: ${Self} = 0
@@ -133,7 +133,7 @@ extension ${Self} : LosslessStringConvertible {
       return (result, endPtr == nil ? 0 : endPtr! - chars)
     }
 
-    let (result, n) = text.withCString(parseNTBS)
+    let (result, n) = text._ephemeralString.withCString(parseNTBS)
 
     if n == 0 || n != u16.count
     || u16.contains(where: { $0 > 127 || _isspace_clocale($0) }) {

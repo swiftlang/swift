@@ -123,7 +123,12 @@ void SILOpenedArchetypesTracker::unregisterOpenedArchetypes(
   assert(I->getFunction() == &F &&
          "Instruction does not belong to a proper SILFunction");
   auto Archetype = getOpenedArchetypeOf(I);
-  if (Archetype)
+  // Remove the archetype definition if it was registered before.
+  // It may happen that this archetype was not registered in the
+  // SILOpenedArchetypesTracker, because the tracker was created
+  // without scanning the whole function and thus may not aware
+  // of all opened archetypes of the function.
+  if (Archetype && getOpenedArchetypeDef(Archetype))
     removeOpenedArchetypeDef(Archetype, I);
 }
 

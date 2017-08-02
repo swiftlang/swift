@@ -48,6 +48,7 @@ namespace llvm {
   class Function;
   class FunctionType;
   class GlobalVariable;
+  class InlineAsm;
   class IntegerType;
   class LLVMContext;
   class MDNode;
@@ -402,6 +403,7 @@ public:
   ModuleDecl *getSwiftModule() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
+  const IRGenOptions &getOptions() const { return IRGen.Opts; }
   SILModuleConventions silConv;
 
   llvm::SmallString<128> OutputFilename;
@@ -507,8 +509,8 @@ public:
   llvm::CallingConv::ID SwiftCC;     /// swift calling convention
   bool UseSwiftCC;
 
-  llvm::FunctionType *getAssociatedTypeMetadataAccessFunctionTy();
-  llvm::FunctionType *getAssociatedTypeWitnessTableAccessFunctionTy();
+  Signature getAssociatedTypeMetadataAccessFunctionSignature();
+  Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
   llvm::StructType *getGenericWitnessTableCacheTy();
 
   /// Get the bit width of an integer type for the target platform.
@@ -571,6 +573,7 @@ public:
 
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);
+  Signature getValueWitnessSignature(ValueWitness index);
 
   void unimplemented(SourceLoc, StringRef Message);
   LLVM_ATTRIBUTE_NORETURN
@@ -867,7 +870,7 @@ public:
   llvm::Constant *getEmptyTupleMetadata();
   llvm::Constant *getObjCEmptyCachePtr();
   llvm::Constant *getObjCEmptyVTablePtr();
-  llvm::Value *getObjCRetainAutoreleasedReturnValueMarker();
+  llvm::InlineAsm *getObjCRetainAutoreleasedReturnValueMarker();
   ClassDecl *getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass);
   ClassDecl *getObjCRuntimeBaseClass(Identifier name, Identifier objcName);
   llvm::Module *getModule() const;
@@ -879,7 +882,7 @@ private:
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
   llvm::Constant *ObjCISAMaskPtr = nullptr;
-  Optional<llvm::Value*> ObjCRetainAutoreleasedReturnValueMarker;
+  Optional<llvm::InlineAsm*> ObjCRetainAutoreleasedReturnValueMarker;
   llvm::DenseMap<Identifier, ClassDecl*> SwiftRootClasses;
   llvm::AttributeSet AllocAttrs;
 

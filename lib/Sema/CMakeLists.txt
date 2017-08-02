@@ -53,6 +53,8 @@ add_swift_library(swiftSema STATIC
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
   TypeChecker.cpp
+  DEPENDS
+    swift-syntax-generated-headers
   LINK_LIBRARIES
     swiftParse
     swiftAST

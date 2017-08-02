@@ -101,3 +101,12 @@ protocol P1 {
   associatedtype C where ThisTypeDoesNotExist == ThisTypeDoesNotExist
   // expected-error@-1 2{{use of undeclared type 'ThisTypeDoesNotExist'}}
 }
+
+// Diagnostic referred to the wrong type - <rdar://problem/33604221>
+
+protocol E { associatedtype XYZ }
+
+class P<N> {
+  func q<A>(b:A) where A:E, N : A.XYZ { return }
+  // expected-error@-1 {{type 'N' constrained to non-protocol, non-class type 'A.XYZ'}}
+}

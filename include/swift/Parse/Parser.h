@@ -1398,6 +1398,16 @@ DeclName parseDeclName(ASTContext &ctx, StringRef name);
 /// Whether a given token can be the start of a decl.
 bool isKeywordPossibleDeclStart(const Token &Tok);
 
+/// \brief Lex and return a vector of `TokenSyntax` tokens, which include
+/// leading and trailing trivia.
+std::vector<std::pair<RC<syntax::RawTokenSyntax>,
+                                 syntax::AbsolutePosition>>
+tokenizeWithTrivia(const LangOptions &LangOpts,
+                   const SourceManager &SM,
+                   unsigned BufferID,
+                   unsigned Offset = 0,
+                   unsigned EndOffset = 0);
+
 } // end namespace swift
 
 #endif

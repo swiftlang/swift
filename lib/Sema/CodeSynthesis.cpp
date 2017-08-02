@@ -2185,8 +2185,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
 
   auto *selfDecl = ParamDecl::createSelf(CD->getLoc(), CD);
 
-  auto *DD = new (Context) DestructorDecl(Context.Id_deinit, CD->getLoc(),
-                                          selfDecl, CD);
+  auto *DD = new (Context) DestructorDecl(CD->getLoc(), selfDecl, CD);
 
   DD->setImplicit();
 

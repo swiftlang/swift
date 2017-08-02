@@ -45,7 +45,7 @@ var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undecl
 
 // FIXME: The first error is redundant, isn't correct in what it states, and
 // also should be emitted on the inheritance clause.
-protocol AProtocol { // expected-error {{first type 'Self.e' in conformance requirement does not refer to a generic parameter or associated type}}
+protocol AProtocol { // expected-error {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}}
   associatedtype e : e // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
 }
 

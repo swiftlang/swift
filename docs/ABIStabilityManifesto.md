@@ -8,10 +8,13 @@
 
 One of the top priorities for Swift right now is compatibility across future Swift versions. Compatibility aims at accomplishing two goals:
 
-1. *Source compatibility* means that newer compilers can compile code written in an older version of Swift. This aims to reduce the migration pain that Swift developers face when migrating to a newer Swift version. Without source compatibility, projects face version-lock where all source code in a project and its packages must be written in the same version of Swift. With source compatibility, package authors will be able to maintain a single code base across multiple Swift versions while allowing their users to use a newer version of Swift.
-2. *Binary framework & runtime compatibility* enables the distribution of frameworks in a binary form that works across multiple Swift versions. Binary frameworks include both a *Swift module file*, which communicates source-level information of the framework's API, and a *shared library*, which provides the compiled implementation that is loaded at runtime. Thus, there are two necessary goals for binary framework compatibility:
-    * *Module format stability* stabilizes the module file, which is the compiler's representation of the public interfaces of a framework. This includes API declarations and inlineable code. The module file is used by the compiler for necessary tasks such as type checking and code generation when compiling client code using a framework.
-    * *ABI stability* enables binary compatibility between applications and libraries compiled with different Swift versions. It is the focus of the rest of this document.
+1. **Source compatibility** means that newer compilers can compile code written in an older version of Swift. This aims to reduce the migration pain that Swift developers face when migrating to a newer Swift version. Without source compatibility, projects face version-lock where all source code in a project and its packages must be written in the same version of Swift. With source compatibility, package authors will be able to maintain a single code base across multiple Swift versions while allowing their users to use a newer version of Swift.
+
+2. **Binary framework & runtime compatibility** enables the distribution of frameworks in a binary form that works across multiple Swift versions. Binary frameworks include both a *Swift module file*, which communicates source-level information of the framework's API, and a *shared library*, which provides the compiled implementation that is loaded at runtime. Thus, there are two necessary goals for binary framework compatibility:
+
+    * **Module format stability** stabilizes the module file, which is the compiler's representation of the public interfaces of a framework. This includes API declarations and inlineable code. The module file is used by the compiler for necessary tasks such as type checking and code generation when compiling client code using a framework.
+
+    * **ABI stability** enables binary compatibility between applications and libraries compiled with different Swift versions. It is the focus of the rest of this document.
 
 This document is an exploration and explanation of Swift's ABI alongside the goals and investigations needed before declaring Swift's ABI stable. It is meant to be a resource to the community as well as a declaration of the direction of Swift's ABI.
 

@@ -90,8 +90,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 /// - Value conversion from one integer type to another. Use the destination
 ///   type's initializer or the `numericCast(_:)` function.
 /// - Bitwise conversion from one integer type to another. Use the destination
-///   type's `init(extendingOrTruncating:)` or `init(bitPattern:)`
-///   initializer.
+///   type's `init(truncatingIfNeeded:)` or `init(bitPattern:)` initializer.
 /// - Conversion from a pointer to an integer value with the bit pattern of the
 ///   pointer's address in memory, or vice versa. Use the `init(bitPattern:)`
 ///   initializer for the destination type.
@@ -247,18 +246,26 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
   return Builtin.castReference(x)
 }
 
-/// - returns: `x as T`.
+/// Returns the given instance cast unconditionally to the specified type.
 ///
-/// - Precondition: `x is T`.  In particular, in -O builds, no test is
-///   performed to ensure that `x` actually has dynamic type `T`.
+/// The instance passed as `x` must be an instance of type `T`.
 ///
-/// - Warning: Trades safety for performance.  Use `unsafeDowncast`
-///   only when `x as! T` has proven to be a performance problem and you
-///   are confident that, always, `x is T`.  It is better than an
-///   `unsafeBitCast` because it's more restrictive, and because
-///   checking is still performed in debug builds.
+/// Use this function instead of `unsafeBitcast(_:to:)` because this function
+/// is more restrictive and still performs a check in debug builds. In -O
+/// builds, no test is performed to ensure that `x` actually has the dynamic
+/// type `T`.
+///
+/// - Warning: This function trades safety for performance. Use
+///   `unsafeDowncast(_:to:)` only when you are confident that `x is T` always
+///   evaluates to `true`, and only after `x as! T` has proven to be a
+///   performance problem.
+///
+/// - Parameters:
+///   - x: An instance to cast to type `T`.
+///   - type: The type `T` to which `x` is cast.
+/// - Returns: The instance `x`, cast to type `T`.
 @_transparent
-public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to: T.Type) -> T {
+public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
@@ -338,7 +345,6 @@ func swift_class_getInstanceExtents(_ theClass: AnyClass)
 func swift_objc_class_unknownGetInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
-/// - Returns: 
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)

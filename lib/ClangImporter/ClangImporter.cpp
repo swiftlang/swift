@@ -686,6 +686,10 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back("-march=z196");
   }
 
+  if (!importerOpts.Optimization.empty()) {
+    invocationArgStrs.push_back(importerOpts.Optimization);
+  }
+
   const std::string &overrideResourceDir = importerOpts.OverrideResourceDir;
   if (overrideResourceDir.empty()) {
     llvm::SmallString<128> resourceDir(searchPathOpts.RuntimeResourcePath);
@@ -868,6 +872,7 @@ ClangImporter::create(ASTContext &ctx,
   }
 
   std::vector<const char *> invocationArgs;
+  invocationArgs.reserve(invocationArgStrs.size());
   for (auto &argStr : invocationArgStrs)
     invocationArgs.push_back(argStr.c_str());
 

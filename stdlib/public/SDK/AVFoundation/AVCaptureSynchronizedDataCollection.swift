@@ -30,7 +30,7 @@ extension AVCaptureSynchronizedDataCollection : Sequence {
 
     public mutating func next() -> AVCaptureSynchronizedData? {
       guard let nextAny = fastIterator.next() else { return nil }
-      return nextAny as! AVCaptureSynchronizedData
+      return (nextAny as! AVCaptureSynchronizedData)
     }
   }
 }

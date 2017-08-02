@@ -21,6 +21,7 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
 
@@ -429,6 +430,7 @@ RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
     return;
   }
 
+  verifyConsistentOwnership();
 }
 
 RValue RValue::withPreExplodedElements(ArrayRef<ManagedValue> values,
@@ -450,6 +452,7 @@ RValue::RValue(SILGenFunction &SGF, SILLocation l, CanType formalType,
 
   ExplodeTupleValue(values, SGF, l).visit(formalType, v);
   assert(values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
@@ -464,6 +467,7 @@ RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
   assert(v && "creating r-value with consumed value");
   ExplodeTupleValue(values, SGF, expr).visit(type, v);
   assert(values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 RValue::RValue(CanType type)
@@ -485,6 +489,7 @@ void RValue::addElement(RValue &&element) & {
   element.makeUsed();
 
   assert(!isComplete() || values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
@@ -498,6 +503,7 @@ void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
   ExplodeTupleValue(values, SGF, l).visit(formalType, element);
 
   assert(!isComplete() || values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 SILValue RValue::forwardAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
@@ -672,16 +678,26 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   makeUsed();
 }
 
-RValue::RValue(const RValue &copied, SILGenFunction &SGF, SILLocation l)
-  : type(copied.type),
-    elementsToBeAdded(copied.elementsToBeAdded)
-{
-  assert((copied.isComplete() || copied.isInSpecialState())
-         && "can't copy incomplete rvalue");
-  values.reserve(copied.values.size());
-  for (ManagedValue value : copied.values) {
-    values.push_back(value.copy(SGF, l));
+RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't copy an incomplete rvalue");
+  std::vector<ManagedValue> copiedValues;
+  copiedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    copiedValues.emplace_back(v.copy(SGF, loc));
   }
+  return RValue(std::move(copiedValues), type, elementsToBeAdded);
+}
+
+RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't borrow incomplete rvalue");
+  std::vector<ManagedValue> borrowedValues;
+  borrowedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    borrowedValues.emplace_back(v.borrow(SGF, loc));
+  }
+  return RValue(std::move(borrowedValues), type, elementsToBeAdded);
 }
 
 ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
@@ -731,6 +747,7 @@ bool RValue::areObviouslySameValue(SILValue lhs, SILValue rhs) {
 void RValue::dump() const {
   dump(llvm::errs());
 }
+
 void RValue::dump(raw_ostream &OS, unsigned indent) const {
   if (isInContext()) {
     OS.indent(indent) << "InContext\n";
@@ -741,4 +758,47 @@ void RValue::dump(raw_ostream &OS, unsigned indent) const {
   for (auto &value : values) {
     value.dump(OS, indent + 2);
   }
+}
+
+void RValue::verifyConsistentOwnership() const {
+// This is a no-op in non-assert builds.
+#ifndef NDEBUG
+  auto result = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
+  Optional<bool> sameHaveCleanups;
+  for (ManagedValue v : values) {
+    ValueOwnershipKind kind = v.getOwnershipKind();
+    if (kind == ValueOwnershipKind::Trivial)
+      continue;
+
+    // Merge together whether or not the RValue has cleanups.
+    if (!sameHaveCleanups.hasValue()) {
+      sameHaveCleanups = v.hasCleanup();
+    } else {
+      assert(*sameHaveCleanups == v.hasCleanup());
+    }
+
+    // This variable is here so that if the assert below fires, the current
+    // reduction value is still available.
+    auto newResult = result.getValue().merge(kind);
+    assert(newResult.hasValue());
+    result = newResult;
+  }
+#endif
+}
+
+bool RValue::isPlusOne(SILGenFunction &SGF) const & {
+  return llvm::all_of(values, [&SGF](ManagedValue mv) -> bool {
+    // Ignore trivial values and objects with trivial value ownership kind.
+    if (mv.getType().isTrivial(SGF.F.getModule()) ||
+        (mv.getType().isObject() &&
+         mv.getOwnershipKind() == ValueOwnershipKind::Trivial))
+      return true;
+    return mv.hasCleanup();
+  });
+}
+
+bool RValue::isPlusZero(SILGenFunction &SGF) const & {
+  return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
+    return mv.hasCleanup();
+  });
 }

@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
+import StdlibUnittest
+
 // CHECK-NOT: Reallocations exceeded 30
 func testReallocation() {
   var x = "The quick brown fox jumped over the lazy dog\n"._split(separator: " ")

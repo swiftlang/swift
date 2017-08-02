@@ -123,9 +123,15 @@ extension INSetProfileInCarIntent {
         }
     }
 
-    @available(iOS 11.0, *)
-    public final var isDefaultProfile: Bool? {
+    @available(iOS 10.0, *)
+    public var isDefaultProfile: Bool? {
         return __defaultProfile?.boolValue
+    }
+
+    @available(swift, deprecated: 3.2, obsoleted: 4.0,
+      message: "Please use isDefaultProfile instead")
+    public var defaultProfile: Int? {
+      return __defaultProfile?.intValue
     }
 
     @available(iOS 10.0, *)

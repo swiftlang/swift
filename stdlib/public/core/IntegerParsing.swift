@@ -18,14 +18,14 @@ internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
   let lower = _ascii16("a")..._ascii16("z")
   let upper = _ascii16("A")..._ascii16("Z")
 
-  let u = UInt16(extendingOrTruncating: u_)
+  let u = UInt16(truncatingIfNeeded: u_)
   let d: UInt16
   if _fastPath(digit ~= u) { d = u &- digit.lowerBound }
   else if _fastPath(upper ~= u) { d = u &- upper.lowerBound &+ 10 }
   else if _fastPath(lower ~= u) { d = u &- lower.lowerBound &+ 10 }
   else { return nil }
   guard _fastPath(d < radix) else { return nil }
-  return Result(extendingOrTruncating: d)
+  return Result(truncatingIfNeeded: d)
 }
 
 @inline(__always)
@@ -40,7 +40,7 @@ where Rest.Element : UnsignedInteger {
   if !positive {
     let (result0, overflow0)
       = (0 as Result).subtractingReportingOverflow(result)
-    guard _fastPath(overflow0 == .none) else { return nil }
+    guard _fastPath(!overflow0) else { return nil }
     result = result0
   }
   
@@ -51,7 +51,7 @@ where Rest.Element : UnsignedInteger {
     let (result2, overflow2) = positive
       ? result1.addingReportingOverflow(d)
       : result1.subtractingReportingOverflow(d)
-    guard _fastPath(overflow1 == .none && overflow2 == .none)
+    guard _fastPath(!overflow1 && !overflow2)
     else { return nil }
     result = result2
   }
@@ -102,7 +102,7 @@ extension FixedWidthInteger {
   ///
   /// The string passed as `text` may begin with a plus or minus sign character
   /// (`+` or `-`), followed by one or more numeric digits (`0-9`) or letters
-  /// (`a-z` or `A-Z`). The string is case insensitive.
+  /// (`a-z` or `A-Z`). Parsing of the string is case insensitive.
   ///
   ///     let x = Int("123")
   ///     // x == 123
@@ -116,7 +116,7 @@ extension FixedWidthInteger {
   ///     // z == 123
   ///
   /// If `text` is in an invalid format or contains characters that are out of
-  /// range for the given `radix`, or if the value it denotes in the given
+  /// bounds for the given `radix`, or if the value it denotes in the given
   /// `radix` is not representable, the result is `nil`. For example, the
   /// following conversions result in `nil`:
   ///
@@ -131,10 +131,10 @@ extension FixedWidthInteger {
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  public init?/*<S : StringProtocol>*/(_ text: String, radix: Int = 10) {
+  public init?<S : StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     let r = Self(radix)
-    let s = text// ._ephemeralString
+    let s = text._ephemeralString
     defer { _fixLifetime(s) }
     
     let c = s._core
@@ -154,5 +154,29 @@ extension FixedWidthInteger {
     }
     guard _fastPath(result != nil) else { return nil }
     self = result!
+  }
+
+  /// Creates a new integer value from the given string.
+  ///
+  /// The string passed as `description` may begin with a plus or minus sign
+  /// character (`+` or `-`), followed by one or more numeric digits (`0-9`).
+  ///
+  ///     let x = Int("123")
+  ///     // x == 123
+  ///
+  /// If `description` is in an invalid format, or if the value it denotes in
+  /// base 10 is not representable, the result is `nil`. For example, the
+  /// following conversions result in `nil`:
+  ///
+  ///     Int(" 100")                       // Includes whitespace
+  ///     Int("21-50")                      // Invalid format
+  ///     Int("ff6600")                     // Characters out of bounds
+  ///     Int("10000000000000000000000000") // Out of range
+  ///
+  /// - Parameter description: The ASCII representation of a number.
+  @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inline(__always)
+  public init?(_ description: String) {
+    self.init(description, radix: 10)
   }
 }

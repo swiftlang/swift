@@ -15,13 +15,15 @@
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Basic/Defer.h"
@@ -1621,6 +1623,8 @@ DeclBaseName ModuleFile::getDeclBaseName(IdentifierID IID) {
         llvm_unreachable("Cannot get DeclBaseName of special module id");
     case SUBSCRIPT_ID:
       return DeclBaseName::createSubscript();
+    case serialization::DESTRUCTOR_ID:
+      return DeclBaseName::createDestructor();
     case NUM_SPECIAL_IDS:
       llvm_unreachable("implementation detail only");
     }
@@ -1803,6 +1807,7 @@ ModuleDecl *ModuleFile::getModule(ModuleID MID) {
       return clangImporter->getImportedHeaderModule();
     }
     case SUBSCRIPT_ID:
+    case DESTRUCTOR_ID:
       llvm_unreachable("Modules cannot be named with special names");
     case NUM_SPECIAL_IDS:
       llvm_unreachable("implementation detail only");
@@ -3548,8 +3553,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto dtor = createDecl<DestructorDecl>(ctx.Id_deinit, SourceLoc(),
-                                           /*selfpat*/nullptr, DC);
+    auto dtor = createDecl<DestructorDecl>(SourceLoc(), /*selfpat*/nullptr, DC);
     declOrOffset = dtor;
 
     configureGenericEnvironment(dtor, genericEnvID);

@@ -1894,6 +1894,8 @@ public:
                                  unsigned NameLength,
                                  unsigned BodyOffset,
                                  unsigned BodyLength,
+                                 unsigned DocOffset,
+                                 unsigned DocLength,
                                  StringRef DisplayName,
                                  StringRef TypeName,
                                  StringRef RuntimeName,
@@ -2119,6 +2121,8 @@ SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
                                             unsigned NameLength,
                                             unsigned BodyOffset,
                                             unsigned BodyLength,
+                                            unsigned DocOffset,
+                                            unsigned DocLength,
                                             StringRef DisplayName,
                                             StringRef TypeName,
                                             StringRef RuntimeName,
@@ -2128,8 +2132,8 @@ SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
   if (EnableStructure) {
     DocStructure.beginSubStructure(
         Offset, Length, Kind, AccessLevel, SetterAccessLevel, NameOffset,
-        NameLength, BodyOffset, BodyLength, DisplayName, TypeName, RuntimeName,
-        SelectorName, InheritedTypes, Attrs);
+        NameLength, BodyOffset, BodyLength, DocOffset, DocLength, DisplayName,
+        TypeName, RuntimeName, SelectorName, InheritedTypes, Attrs);
   }
   return true;
 }

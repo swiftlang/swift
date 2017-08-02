@@ -57,9 +57,6 @@ class Syntax {
   friend class LegacyASTTransformer;
   friend class swift::SyntaxASTMap;
 
-#define SYNTAX(Id, Parent) friend class Id##Syntax;
-#include "swift/Syntax/SyntaxKinds.def"
-
 protected:
   /// A strong reference to the root node of the tree in which this piece of
   /// syntax resides.
@@ -71,14 +68,9 @@ protected:
   /// lazily created.
   mutable const SyntaxData *Data;
 
-  /// Subclasses override this to ensure their structure matches expectations.
-  virtual void validate() const {};
-
 public:
   Syntax(const RC<SyntaxData> Root, const SyntaxData *Data)
-  : Root(Root), Data(Data) {
-    this->validate();
-  }
+  : Root(Root), Data(Data) {}
 
   virtual ~Syntax() {}
 
@@ -87,6 +79,13 @@ public:
 
   /// Get the shared raw syntax.
   RC<RawSyntax> getRaw() const;
+
+  /// Get the number of child nodes in this piece of syntax, not including
+  /// tokens.
+  size_t getNumChildren() const;
+
+  /// Get the Nth child of this piece of syntax.
+  Syntax getChild(const size_t N) const;
 
   /// Returns true if the syntax node is of the given type.
   template <typename T>
@@ -137,11 +136,21 @@ public:
   /// Returns true if this syntax node represents an expression.
   bool isExpr() const;
 
+  /// Returns true if this syntax node represents a pattern.
+  bool isPattern() const;
+
   /// Returns true if this syntax node represents a type.
   bool isType() const;
 
   /// Returns true if this syntax is of some "unknown" kind.
   bool isUnknown() const;
+
+  /// Returns true if the node is "missing" in the source (i.e. it was
+  /// expected (or optional) but not written.
+  bool isMissing() const;
+
+  /// Returns true if the node is "present" in the source.
+  bool isPresent() const;
 
   /// Print the syntax node with full fidelity to the given output stream.
   void print(llvm::raw_ostream &OS) const;

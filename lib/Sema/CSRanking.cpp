@@ -155,57 +155,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 
-/// Compare two declarations to determine whether one is a witness of the other.
-static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
-                                               ValueDecl *decl1,
-                                               ValueDecl *decl2) {
-  // We only have a witness/requirement pair if exactly one of the declarations
-  // comes from a protocol.
-  auto proto1 = dyn_cast<ProtocolDecl>(decl1->getDeclContext());
-  auto proto2 = dyn_cast<ProtocolDecl>(decl2->getDeclContext());
-  if ((bool)proto1 == (bool)proto2)
-    return Comparison::Unordered;
-
-  // Figure out the protocol, requirement, and potential witness.
-  ProtocolDecl *proto;
-  ValueDecl *req;
-  ValueDecl *potentialWitness;
-  if (proto1) {
-    proto = proto1;
-    req = decl1;
-    potentialWitness = decl2;
-  } else {
-    proto = proto2;
-    req = decl2;
-    potentialWitness = decl1;
-  }
-
-  // Cannot compare type declarations this way.
-  // FIXME: Use the same type-substitution approach as lookupMemberType.
-  if (isa<TypeDecl>(req))
-    return Comparison::Unordered;
-
-  if (!potentialWitness->getDeclContext()->isTypeContext())
-    return Comparison::Unordered;
-
-  // Determine whether the type of the witness's context conforms to the
-  // protocol.
-  auto owningType
-    = potentialWitness->getDeclContext()->getDeclaredInterfaceType();
-  auto conformance = tc.conformsToProtocol(owningType, proto, dc,
-                                           ConformanceCheckFlags::InExpression);
-  if (!conformance || conformance->isAbstract())
-    return Comparison::Unordered;
-
-  // If the witness and the potential witness are not the same, there's no
-  // ordering here.
-  if (conformance->getConcrete()->getWitnessDecl(req, &tc) != potentialWitness)
-    return Comparison::Unordered;
-
-  // We have a requirement/witness match.
-  return proto1? Comparison::Worse : Comparison::Better;
-}
-
 namespace {
   /// Describes the relationship between the context types for two declarations.
   enum class SelfTypeRelationship {
@@ -502,18 +451,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         auto subscript2 = cast<SubscriptDecl>(decl2);
         if (subscript1->isGeneric() != subscript2->isGeneric())
           return subscript2->isGeneric();
-      }
-
-      // A witness is always more specialized than the requirement it satisfies.
-      switch (compareWitnessAndRequirement(tc, dc, decl1, decl2)) {
-      case Comparison::Unordered:
-        break;
-
-      case Comparison::Better:
-        return true;
-
-      case Comparison::Worse:
-        return false;
       }
 
       // Members of protocol extensions have special overloading rules.

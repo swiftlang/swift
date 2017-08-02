@@ -705,6 +705,41 @@ static CanType getArgumentLoweringType(CanType type,
   }
 }
 
+static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
+                                                IRGenFunction &IGF,
+                                                CanSILFunctionType substType,
+                                                unsigned paramIdx) {
+  auto param = substType->getParameters()[paramIdx];
+  SILType argType = IGM.silConv.getSILType(param);
+  auto argLoweringTy =
+    getArgumentLoweringType(argType.getSwiftRValueType(), param);
+  auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+  // Empty values don't matter.
+  return ti.getSchema().size() == 0 && !param.isFormalIndirect();
+}
+
+/// Find the parameter index for the one (assuming there was only one) partially
+/// applied argument ignoring empty types that are not passed as part of the
+/// ABI.
+static unsigned findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
+    IRGenFunction &IGF, CanSILFunctionType substType,
+    CanSILFunctionType outType) {
+  auto substParameters = substType->getParameters();
+  auto outParamters = outType->getParameters();
+  unsigned firstNonEmpty = -1U;
+  for (unsigned paramIdx = outParamters.size() ; paramIdx != substParameters.size(); ++paramIdx) {
+    bool isEmpty =
+        isABIIgnoredParameterWithoutStorage(IGF.IGM, IGF, substType, paramIdx);
+    assert((isEmpty || firstNonEmpty == -1U) && "Expect at most one partially "
+                                                "applied that is passed as an "
+                                                "ABI argument");
+    if (!isEmpty)
+      firstNonEmpty = paramIdx;
+  }
+  assert(firstNonEmpty != -1U);
+  return firstNonEmpty;
+}
+
 /// Emit the forwarding stub function for a partial application.
 ///
 /// If 'layout' is null, there is a single captured value of
@@ -924,11 +959,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // care for the former for the purpose of reconstructing polymorphic
     // parameters from regular arguments.
     if (!calleeHasContext) {
-      unsigned paramI = substType->getParameters().size() - 1;
-      assert(substType->getParameters().size() -
-                     outType->getParameters().size() ==
-                 1 &&
-             "Expect one partially applied argument");
+      unsigned paramI =
+          findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
+              subIGF, substType, outType);
       auto paramInfo = substType->getParameters()[paramI];
       auto &ti = IGM.getTypeInfoForLowered(paramInfo.getType());
       Explosion param;
@@ -1097,13 +1130,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
       // Skip empty parameters.
       while (origParamI < origType->getParameters().size()) {
-        auto param = substType->getParameters()[origParamI];
-        SILType argType = IGM.silConv.getSILType(param);
-        auto argLoweringTy =
-            getArgumentLoweringType(argType.getSwiftRValueType(), param);
-        auto &ti = subIGF.getTypeInfoForLowered(argLoweringTy);
-        // Empty values don't matter.
-        if (ti.getSchema().size() != 0 || param.isFormalIndirect())
+        if (!isABIIgnoredParameterWithoutStorage(IGM, subIGF, substType,
+                                                 origParamI))
           break;
         origParamI++;
       }
@@ -1146,23 +1174,30 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     }
   }
 
-  // Derive the callee function pointer.  If we found a function
-  // pointer statically, great.
+  // Derive the callee function pointer.
   auto fnTy = origSig.getType()->getPointerTo();
-  llvm::Value *fnPtr;
-  if (staticFnPtr) {
-    assert(staticFnPtr->getType() == fnTy && "static function type mismatch?!");
-    fnPtr = staticFnPtr;
+  FunctionPointer fnPtr = [&] {
+    // If we found a function pointer statically, great.
+    if (staticFnPtr) {
+      assert(staticFnPtr->getType() == fnTy &&
+             "static function type mismatch?!");
+      Signature sig(cast<llvm::FunctionType>(fnTy->getElementType()),
+                    staticFnPtr->getAttributes(),
+                    staticFnPtr->getCallingConv());
+      return FunctionPointer::forDirect(staticFnPtr, sig);
+    }
 
-  // Otherwise, it was the last thing we added to the layout.
-  } else {
+    // Otherwise, it was the last thing we added to the layout.
+
     // The dynamic function pointer is packed "last" into the context,
     // and we pulled it out as an argument.  Just pop it off.
-    fnPtr = args.takeLast();
+    auto fnPtr = args.takeLast();
 
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
-  }
+
+    return FunctionPointer(fnPtr, origSig);
+  }();
 
   // Derive the context argument if needed.  This is either:
   //   - the saved context argument, in which case it was the last
@@ -1218,17 +1253,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, args.claimAll());
   
-  if (staticFnPtr) {
-    // Use the attributes and calling convention from the static definition if
-    // we have it.
-    call->setAttributes(staticFnPtr->getAttributes());
-    call->setCallingConv(staticFnPtr->getCallingConv());
-  } else {
-    // Otherwise, use the default attributes for the dynamic type.
-    call->setAttributes(origSig.getAttributes());
-    // Use the calling convention of the partially applied function type.
-    call->setCallingConv(origSig.getCallingConv());
-  }
   if (addressesToDeallocate.empty() && !needsAllocas &&
       (!consumesContext || !dependsOnContextLifetime))
     call->setTailCall();

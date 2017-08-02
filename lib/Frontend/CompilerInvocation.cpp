@@ -211,6 +211,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_tbd_install_name)) {
+    Opts.TBDInstallName = A->getValue();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_warn_long_function_bodies)) {
     unsigned attempt;
     if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
@@ -310,8 +314,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::EmitPCH;
     } else if (Opt.matches(OPT_emit_imported_modules)) {
       Action = FrontendOptions::EmitImportedModules;
-    } else if (Opt.matches(OPT_emit_tbd)) {
-      Action = FrontendOptions::EmitTBD;
     } else if (Opt.matches(OPT_parse)) {
       Action = FrontendOptions::Parse;
     } else if (Opt.matches(OPT_typecheck)) {
@@ -322,6 +324,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::DumpAST;
     } else if (Opt.matches(OPT_emit_syntax)) {
       Action = FrontendOptions::EmitSyntax;
+    } else if (Opt.matches(OPT_merge_modules)) {
+      Action = FrontendOptions::MergeModules;
     } else if (Opt.matches(OPT_dump_scope_maps)) {
       Action = FrontendOptions::DumpScopeMaps;
 
@@ -559,6 +563,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Suffix = SIB_EXTENSION;
       break;
 
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
       Suffix = SERIALIZED_MODULE_EXTENSION;
       break;
@@ -599,13 +604,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Opts.setSingleOutputFilename("-");
       else
         Suffix = "importedmodules";
-      break;
-
-    case FrontendOptions::EmitTBD:
-      if (Opts.OutputFilenames.empty())
-        Opts.setSingleOutputFilename("-");
-      else
-        Suffix = "tbd";
       break;
     }
 
@@ -716,6 +714,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                           OPT_emit_loaded_module_trace_path,
                           "trace.json", false);
 
+  determineOutputFilename(Opts.TBDPath, OPT_emit_tbd, OPT_emit_tbd_path, "tbd",
+                          false);
+
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
     Opts.FixitsOutputPath = A->getValue();
   }
@@ -724,7 +725,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.RequestedAction == FrontendOptions::EmitSIB ||
     Opts.RequestedAction == FrontendOptions::EmitSIBGen;
   bool canUseMainOutputForModule =
-    Opts.RequestedAction == FrontendOptions::EmitModuleOnly || IsSIB;
+    Opts.RequestedAction == FrontendOptions::MergeModules ||
+    Opts.RequestedAction == FrontendOptions::EmitModuleOnly ||
+    IsSIB;
   auto ext = IsSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
   auto sibOpt = Opts.RequestedAction == FrontendOptions::EmitSIB ?
     OPT_emit_sib : OPT_emit_sibgen;
@@ -756,6 +759,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       return true;
     case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitPCH:
     case FrontendOptions::EmitSILGen:
@@ -767,7 +771,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
-    case FrontendOptions::EmitTBD:
       break;
     }
   }
@@ -789,6 +792,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       return true;
     case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
@@ -799,7 +803,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
-    case FrontendOptions::EmitTBD:
       break;
     }
   }
@@ -821,6 +824,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                      diag::error_mode_cannot_emit_loaded_module_trace);
       return true;
     case FrontendOptions::Typecheck:
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitPCH:
     case FrontendOptions::EmitSILGen:
@@ -832,7 +836,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
-    case FrontendOptions::EmitTBD:
       break;
     }
   }
@@ -859,6 +862,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       else
         Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
       return true;
+    case FrontendOptions::MergeModules:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSIL:
     case FrontendOptions::EmitSIBGen:
@@ -868,7 +872,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
-    case FrontendOptions::EmitTBD:
       break;
     }
   }
@@ -1014,8 +1017,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
-  Opts.EnableRecursiveConstraints |=
-    Args.hasArg(OPT_enable_recursive_constraints);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.EnableConstraintPropagation |= Args.hasArg(OPT_propagate_constraints);
   Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
@@ -1352,7 +1353,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          IRGenOptions &IRGenOpts,
                          FrontendOptions &FEOpts,
                          DiagnosticEngine &Diags,
-                         const llvm::Triple &Triple) {
+                         const llvm::Triple &Triple,
+                         ClangImporterOptions &ClangOpts) {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_sil_inline_threshold)) {
@@ -1407,6 +1409,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       assert(A->getOption().matches(OPT_O));
       IRGenOpts.Optimize = true;
       Opts.Optimization = SILOptions::SILOptMode::Optimize;
+    }
+
+    if (IRGenOpts.Optimize) {
+      ClangOpts.Optimization = "-Os";
     }
   }
 
@@ -1799,7 +1805,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags,
-                   LangOpts.Target)) {
+                   LangOpts.Target, ClangImporterOpts)) {
     return true;
   }
 

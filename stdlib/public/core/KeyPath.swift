@@ -1347,20 +1347,101 @@ func _projectKeyPathReferenceWritable<Root, Value>(
 // constrained by being overrides, and so that we can use exact-type constraints
 // on `Self` to prevent dynamically-typed methods from being inherited by
 // statically-typed key paths.
+
+/// This protocol is an implementation detail of key path expressions; do not
+/// use it directly.
+@_show_in_interface
 public protocol _AppendKeyPath {}
 
 extension _AppendKeyPath where Self == AnyKeyPath {
+  /// Returns a new key path created by appending the given key path to this
+  /// one.
+  ///
+  /// Use this method to extend this key path to the value type of another key
+  /// path. Appending the key path passed as `path` is successful only if the
+  /// root type for `path` matches this key path's value type. This example
+  /// creates key paths from `Array<Int>` to `String` and from `String` to
+  /// `Int`, and then tries appending each to the other:
+  ///
+  ///     let arrayDescription: AnyKeyPath = \Array<Int>.description
+  ///     let stringLength: AnyKeyPath = \String.count
+  ///
+  ///     // Creates a key path from `Array<Int>` to `Int`
+  ///     let arrayDescriptionLength = arrayDescription.appending(path: stringLength)
+  ///
+  ///     let invalidKeyPath = stringLength.appending(path: arrayDescription)
+  ///     // invalidKeyPath == nil
+  ///
+  /// The second call to `appending(path:)` returns `nil`
+  /// because the root type of `arrayDescription`, `Array<Int>`, does not
+  /// match the value type of `stringLength`, `Int`.
+  ///
+  /// - Parameter path: The key path to append.
+  /// - Returns: A key path from the root of this key path and the value type
+  ///   of `path`, if `path` can be appended. If `path` can't be appended,
+  ///   returns `nil`.
   public func appending(path: AnyKeyPath) -> AnyKeyPath? {
     return _tryToAppendKeyPaths(root: self, leaf: path)
   }
 }
 
 extension _AppendKeyPath /* where Self == PartialKeyPath<T> */ {
+  /// Returns a new key path created by appending the given key path to this
+  /// one.
+  ///
+  /// Use this method to extend this key path to the value type of another key
+  /// path. Appending the key path passed as `path` is successful only if the
+  /// root type for `path` matches this key path's value type. This example
+  /// creates key paths from `Array<Int>` to `String` and from `String` to
+  /// `Int`, and then tries appending each to the other:
+  ///
+  ///     let arrayDescription: PartialKeyPath<Array<Int>> = \.description
+  ///     let stringLength: PartialKeyPath<String> = \.count
+  ///
+  ///     // Creates a key path from `Array<Int>` to `Int`
+  ///     let arrayDescriptionLength = arrayDescription.appending(path: stringLength)
+  ///
+  ///     let invalidKeyPath = stringLength.appending(path: arrayDescription)
+  ///     // invalidKeyPath == nil
+  ///
+  /// The second call to `appending(path:)` returns `nil`
+  /// because the root type of `arrayDescription`, `Array<Int>`, does not
+  /// match the value type of `stringLength`, `Int`.
+  ///
+  /// - Parameter path: The key path to append.
+  /// - Returns: A key path from the root of this key path and the value type
+  ///   of `path`, if `path` can be appended. If `path` can't be appended,
+  ///   returns `nil`.
   public func appending<Root>(path: AnyKeyPath) -> PartialKeyPath<Root>?
   where Self == PartialKeyPath<Root> {
     return _tryToAppendKeyPaths(root: self, leaf: path)
   }
   
+  /// Returns a new key path created by appending the given key path to this
+  /// one.
+  ///
+  /// Use this method to extend this key path to the value type of another key
+  /// path. Appending the key path passed as `path` is successful only if the
+  /// root type for `path` matches this key path's value type. This example
+  /// creates a key path from `Array<Int>` to `String`, and then tries
+  /// appending compatible and incompatible key paths:
+  ///
+  ///     let arrayDescription: PartialKeyPath<Array<Int>> = \.description
+  ///
+  ///     // Creates a key path from `Array<Int>` to `Int`
+  ///     let arrayDescriptionLength = arrayDescription.appending(path: \String.count)
+  ///
+  ///     let invalidKeyPath = arrayDescription.appending(path: \Double.isZero)
+  ///     // invalidKeyPath == nil
+  ///
+  /// The second call to `appending(path:)` returns `nil` because the root type
+  /// of the `path` parameter, `Double`, does not match the value type of
+  /// `arrayDescription`, `String`.
+  ///
+  /// - Parameter path: The key path to append.
+  /// - Returns: A key path from the root of this key path to the the value type
+  ///   of `path`, if `path` can be appended. If `path` can't be appended,
+  ///   returns `nil`.
   public func appending<Root, AppendedRoot, AppendedValue>(
     path: KeyPath<AppendedRoot, AppendedValue>
   ) -> KeyPath<Root, AppendedValue>?
@@ -1368,6 +1449,17 @@ extension _AppendKeyPath /* where Self == PartialKeyPath<T> */ {
     return _tryToAppendKeyPaths(root: self, leaf: path)
   }
   
+  /// Returns a new key path created by appending the given key path to this
+  /// one.
+  ///
+  /// Use this method to extend this key path to the value type of another key
+  /// path. Appending the key path passed as `path` is successful only if the
+  /// root type for `path` matches this key path's value type.
+  ///
+  /// - Parameter path: The reference writeable key path to append.
+  /// - Returns: A key path from the root of this key path to the the value type
+  ///   of `path`, if `path` can be appended. If `path` can't be appended,
+  ///   returns `nil`.
   public func appending<Root, AppendedRoot, AppendedValue>(
     path: ReferenceWritableKeyPath<AppendedRoot, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue>?
@@ -1377,6 +1469,22 @@ extension _AppendKeyPath /* where Self == PartialKeyPath<T> */ {
 }
 
 extension _AppendKeyPath /* where Self == KeyPath<T,U> */ {
+  /// Returns a new key path created by appending the given key path to this
+  /// one.
+  ///
+  /// Use this method to extend this key path to the value type of another key
+  /// path. Calling `appending(path:)` results in the same key path as if the
+  /// given key path had been specified using dot notation. In the following
+  /// example, `keyPath1` and `keyPath2` are equivalent:
+  ///
+  ///     let arrayDescription = \Array<Int>.description
+  ///     let keyPath1 = arrayDescription.appending(path: \String.count)
+  ///
+  ///     let keyPath2 = \Array<Int>.description.count
+  ///
+  /// - Parameter path: The key path to append.
+  /// - Returns: A key path from the root of this key path to the value type of
+  ///   `path`.
   public func appending<Root, Value, AppendedValue>(
     path: KeyPath<Value, AppendedValue>
   ) -> KeyPath<Root, AppendedValue>
@@ -1395,6 +1503,16 @@ extension _AppendKeyPath /* where Self == KeyPath<T,U> */ {
   }
    */
 
+  /// Returns a new key path created by appending the given key path to this
+  /// one.
+  ///
+  /// Use this method to extend this key path to the value type of another key
+  /// path. Calling `appending(path:)` results in the same key path as if the
+  /// given key path had been specified using dot notation.
+  ///
+  /// - Parameter path: The key path to append.
+  /// - Returns: A key path from the root of this key path to the value type of
+  ///   `path`.
   public func appending<Root, Value, AppendedValue>(
     path: ReferenceWritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue>
@@ -1404,6 +1522,16 @@ extension _AppendKeyPath /* where Self == KeyPath<T,U> */ {
 }
 
 extension _AppendKeyPath /* where Self == WritableKeyPath<T,U> */ {
+  /// Returns a new key path created by appending the given key path to this
+  /// one.
+  ///
+  /// Use this method to extend this key path to the value type of another key
+  /// path. Calling `appending(path:)` results in the same key path as if the
+  /// given key path had been specified using dot notation.
+  ///
+  /// - Parameter path: The key path to append.
+  /// - Returns: A key path from the root of this key path to the value type of
+  ///   `path`.
   public func appending<Root, Value, AppendedValue>(
     path: WritableKeyPath<Value, AppendedValue>
   ) -> WritableKeyPath<Root, AppendedValue>
@@ -1411,6 +1539,16 @@ extension _AppendKeyPath /* where Self == WritableKeyPath<T,U> */ {
     return _appendingKeyPaths(root: self, leaf: path)
   }
 
+  /// Returns a new key path created by appending the given key path to this
+  /// one.
+  ///
+  /// Use this method to extend this key path to the value type of another key
+  /// path. Calling `appending(path:)` results in the same key path as if the
+  /// given key path had been specified using dot notation.
+  ///
+  /// - Parameter path: The key path to append.
+  /// - Returns: A key path from the root of this key path to the value type of
+  ///   `path`.
   public func appending<Root, Value, AppendedValue>(
     path: ReferenceWritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue>
@@ -1420,6 +1558,16 @@ extension _AppendKeyPath /* where Self == WritableKeyPath<T,U> */ {
 }
 
 extension _AppendKeyPath /* where Self == ReferenceWritableKeyPath<T,U> */ {
+  /// Returns a new key path created by appending the given key path to this
+  /// one.
+  ///
+  /// Use this method to extend this key path to the value type of another key
+  /// path. Calling `appending(path:)` results in the same key path as if the
+  /// given key path had been specified using dot notation.
+  ///
+  /// - Parameter path: The key path to append.
+  /// - Returns: A key path from the root of this key path to the value type of
+  ///   `path`.
   public func appending<Root, Value, AppendedValue>(
     path: WritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue>

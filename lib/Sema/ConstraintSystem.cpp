@@ -1279,16 +1279,11 @@ ConstraintSystem::getTypeOfMemberReference(
     // For a static member referenced through a metatype or an instance
     // member referenced through an instance, strip off the 'self'.
     type = openedFnType->getResult();
-  } else if (isDynamicResult && isa<AbstractFunctionDecl>(value)) {
-    // For a dynamic result referring to an instance function through
-    // an object of metatype type, replace the 'Self' parameter with
-    // a AnyObject member.
-    auto anyObjectTy = TC.Context.getAnyObjectType();
-    type = openedFnType->replaceSelfParameterType(anyObjectTy);
   } else {
     // For an unbound instance method reference, replace the 'Self'
     // parameter with the base type.
-    type = openedFnType->replaceSelfParameterType(baseObjTy);
+    openedType = openedFnType->replaceSelfParameterType(baseObjTy);
+    type = openedType;
   }
 
   // When accessing protocol members with an existential base, replace
