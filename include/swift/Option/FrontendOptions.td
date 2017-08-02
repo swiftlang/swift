@@ -62,6 +62,13 @@ def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
 
+def tbd_install_name
+  : Separate<["-"], "tbd-install_name">, MetaVarName<"<path>">,
+    HelpText<"The install_name to use in an emitted TBD file">;
+
+def tbd_install_name_EQ : Joined<["-"], "tbd-install_name=">,
+  Alias<tbd_install_name>;
+
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
