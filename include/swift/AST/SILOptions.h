@@ -143,7 +143,7 @@ public:
   bool EnableMandatorySemanticARCOpts = false;
 
   /// \brief Enable large loadable types IRGen pass.
-  bool EnableLargeLoadableTypes = false;
+  bool EnableLargeLoadableTypes = true;
 
   /// Enables the "fully fragile" resilience strategy.
   ///
