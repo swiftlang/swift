@@ -685,3 +685,38 @@ bb0(%0 : $*S<T>):
   %7 = tuple ()
   return %7 : $()
 }
+
+struct GS<Base> {
+  var _base: Base
+  var _value: Builtin.Int64
+}
+
+// Test temp RValue elimination/
+// ---
+// CHECK-LABEL: sil @rvalue : $@convention(thin) <B> (@in GS<B>, @inout GS<B>) -> () {
+// CHECK: bb0(%0 : $*GS<B>, %1 : $*GS<B>):
+// CHECK:   [[A1:%.*]] = struct_element_addr %0 : $*GS<B>, #GS._value
+// CHECK:   [[V1:%.*]] = load [[A1]] : $*Builtin.Int64
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: copy_addr
+// CHECK:   [[A2:%.*]] = struct_element_addr %1 : $*GS<B>, #GS._value
+// CHECK:   [[V2:%.*]] = load [[A2]] : $*Builtin.Int64
+// CHECK:   %{{.*}} = builtin "cmp_slt_Int64"([[V1]] : $Builtin.Int64, [[V2]] : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NOT: destroy_addr
+// CHECK-NOT: dealloc_stack
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'rvalue'
+sil @rvalue : $@convention(thin) <B> (@in GS<B>, @inout GS<B>) -> () {
+bb0(%0 : $*GS<B>, %1 : $*GS<B>):
+  %2 = struct_element_addr %0 : $*GS<B>, #GS._value
+  %3 = load %2 : $*Builtin.Int64
+  %4 = alloc_stack $GS<B>
+  copy_addr %1 to [initialization] %4 : $*GS<B>
+  %6 = struct_element_addr %4 : $*GS<B>, #GS._value
+  %7 = load %6 : $*Builtin.Int64
+  %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  destroy_addr %4 : $*GS<B>
+  dealloc_stack %4 : $*GS<B>
+  %9999 = tuple()
+  return %9999 : $()
+}
