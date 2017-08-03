@@ -221,10 +221,6 @@ sil @singleton_switch_arg : $(Singleton) -> () {
 // CHECK-32: entry:
 entry(%u : $Singleton):
 // CHECK-32:  [[CAST:%.*]] = bitcast %T4enum9SingletonO* %0 to <{ i64, i64 }>*
-// CHECK-32:  [[GEP1:%.*]] = getelementptr inbounds <{ i64, i64 }>, <{ i64, i64 }>* [[CAST]], i32 0, i32 0
-// CHECK-32:  [[ELT1:%.*]] = load i64, i64* [[GEP1]]
-// CHECK-32:  [[GEP2:%.*]] = getelementptr inbounds <{ i64, i64 }>, <{ i64, i64 }>* [[CAST]], i32 0, i32 1
-// CHECK-32:  [[ELT2:%.*]] = load i64, i64* [[GEP2]]
 // CHECK-64:   br label %[[PREDEST:[0-9]+]]
 // CHECK-32:   br label %[[PREDEST:[0-9]+]]
   switch_enum %u : $Singleton, case #Singleton.value!enumelt.1: dest
@@ -232,16 +228,10 @@ entry(%u : $Singleton):
 // CHECK-64: ; <label>:[[PREDEST]]
 // CHECK-64:   br label %[[DEST:[0-9]+]]
 // CHECK-64: ; <label>:[[DEST]]
-// CHECK-32: ; <label>:[[PREDEST]]
-// CHECK-32:   br label %[[DEST:[0-9]+]]
-// CHECK-32: ; <label>:[[DEST]]
 dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
 // CHECK-64:   {{%.*}} = phi i64 [ %0, %[[PREDEST]] ]
 // CHECK-64:   {{%.*}} = phi i64 [ %1, %[[PREDEST]] ]
 // CHECK-64:   ret void
-// CHECK-32:   {{%.*}} = phi i64 [ [[ELT1]], %[[PREDEST]] ]
-// CHECK-32:   {{%.*}} = phi i64 [ [[ELT2]], %[[PREDEST]] ]
-// CHECK-32:   ret void
   %x = tuple ()
   return %x : $()
 }
@@ -746,19 +736,7 @@ enum AggregateSinglePayload2 {
 // CHECK-32: define{{( protected)?}}  swiftcc void @aggregate_single_payload_unpack_2(%T4enum23AggregateSinglePayload2O* noalias nocapture dereferenceable(16)) {{.*}} {
 sil @aggregate_single_payload_unpack_2 : $@convention(thin) (AggregateSinglePayload2) -> () {
 entry(%u : $AggregateSinglePayload2):
-// CHECK-32:  [[CAST:%.*]] = bitcast %T4enum23AggregateSinglePayload2O* %0 to { i32, i32, i32, i32 }*
-// CHECK-32:  [[GEP:%.*]] = getelementptr inbounds {{.*}} [[CAST]], i32 0, i32 0
-// CHECK-32:  [[LOAD1:%.*]] = load i32, i32* [[GEP]]
-// CHECK-32:  [[LOAD2:%.*]] = load i32, i32* {{.*}}
-// CHECK-32:  [[LOAD3:%.*]] = load i32, i32* {{.*}}
-// CHECK-32:  [[LOAD4:%.*]] = load i32, i32* {{.*}}
   switch_enum %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!enumelt.1: x_dest, default end
-
-// CHECK-32:   [[TRUNC:%.*]] = trunc [[WORD]] [[LOAD1]] to i21
-// CHECK-32:   phi i21 [ [[TRUNC]]
-// CHECK-32:   phi [[WORD]] [ [[LOAD2]]
-// CHECK-32:   phi [[WORD]] [ [[LOAD3]]
-// CHECK-32:   phi [[WORD]] [ [[LOAD4]]
 
 // CHECK-64:   [[TRUNC:%.*]] = trunc [[WORD]] %0 to i21
 // CHECK-64:   phi i21 [ [[TRUNC]]

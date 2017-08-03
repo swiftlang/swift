@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s --check-prefix=CHECK2
+
+// UNSUPPORTED: OS=watchos
+
 func use<T>(_ t: T) {}
 
 public func f(_ i : Int?)

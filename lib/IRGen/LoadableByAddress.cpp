@@ -1997,7 +1997,22 @@ static void rewriteFunction(StructLoweringState &pass,
     auto retOp = instr->getOperand();
     auto storageType = retOp->getType();
     if (storageType.isAddress()) {
-      createOutlinedCopyCall(retBuilder, retOp, retArg, pass, &regLoc);
+      // There *might* be a dealloc_stack that already released this value
+      // we should create the copy *before* the epilogue's deallocations
+      auto IIR = instr->getReverseIterator();
+      for (++IIR; IIR != instr->getParent()->rend(); ++IIR) {
+        auto *currIIInstr = &(*IIR);
+        if (currIIInstr->getKind() != ValueKind::DeallocStackInst) {
+          // got the right location - stop.
+          --IIR;
+          break;
+        }
+      }
+      auto II = (IIR != instr->getParent()->rend())
+                    ? IIR->getIterator()
+                    : instr->getParent()->begin();
+      SILBuilder retCopyBuilder(II);
+      createOutlinedCopyCall(retCopyBuilder, retOp, retArg, pass, &regLoc);
     } else {
       if (pass.F->hasQualifiedOwnership()) {
         retBuilder.createStore(regLoc, retOp, retArg,
