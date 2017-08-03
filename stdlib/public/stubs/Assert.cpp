@@ -21,7 +21,7 @@
 
 using namespace swift;
 
-bool swift::_swift_reportFatalErrorsToDebugger = false;
+bool swift::_swift_reportFatalErrorsToDebugger = true;
 
 static int swift_asprintf(char **strp, const char *fmt, ...) {
   va_list args;
