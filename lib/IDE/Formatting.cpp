@@ -113,7 +113,7 @@ public:
     // Calculating space length
     for (auto C: Range.str()) {
       if (C == '\t')
-        TabLength += FmtOptions.TabWidth;
+        SpaceLength += FmtOptions.TabWidth;
       else
         SpaceLength += 1;
     }
