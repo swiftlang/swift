@@ -348,7 +348,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK-objc:   store i64 [[T2]], i64* [[T1]], align 8
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-// CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 23
+// CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i64 23
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %B to i8***
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[T1]], align 8

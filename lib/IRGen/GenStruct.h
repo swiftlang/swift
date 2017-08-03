@@ -49,13 +49,6 @@ namespace irgen {
                                                       SILType baseType,
                                                       VarDecl *field);
 
-  /// Return the constant offset within the struct's metadata object where the
-  /// offset of that field is stored, or null if the field is not in the
-  /// struct's field offset vector.
-  llvm::Constant *emitPhysicalStructMemberOffsetOfFieldOffset(IRGenModule &IGM,
-                                                              SILType baseType,
-                                                              VarDecl *field);
-
   /// Return a strategy for accessing the given stored struct property.
   ///
   /// This API is used by RemoteAST.

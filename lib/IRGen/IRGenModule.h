@@ -78,21 +78,12 @@ namespace swift {
   class ASTContext;
   class BraceStmt;
   class CanType;
-  class ClassDecl;
-  class ConstructorDecl;
-  class Decl;
-  class DestructorDecl;
-  class ExtensionDecl;
-  class FuncDecl;
   class LinkLibrary;
   class SILFunction;
-  class EnumElementDecl;
-  class EnumDecl;
   class IRGenOptions;
   class NormalProtocolConformance;
   class ProtocolConformance;
   class ProtocolCompositionType;
-  class ProtocolDecl;
   struct SILDeclRef;
   class SILGlobalVariable;
   class SILModule;
@@ -100,12 +91,7 @@ namespace swift {
   class SILWitnessTable;
   class SourceLoc;
   class SourceFile;
-  class StructDecl;
   class Type;
-  class TypeAliasDecl;
-  class TypeDecl;
-  class ValueDecl;
-  class VarDecl;
 
 namespace Lowering {
   class TypeConverter;
@@ -114,8 +100,10 @@ namespace Lowering {
 namespace irgen {
   class Address;
   class ClangTypeConverter;
+  class ClassMetadataLayout;
   class DebugTypeInfo;
   class EnumImplStrategy;
+  class EnumMetadataLayout;
   class ExplosionSchema;
   class FixedTypeInfo;
   class ForeignFunctionInfo;
@@ -125,9 +113,12 @@ namespace irgen {
   class IRGenFunction;
   class LinkEntity;
   class LoadableTypeInfo;
+  class MetadataLayout;
   class NecessaryBindings;
+  class NominalMetadataLayout;
   class ProtocolInfo;
   class Signature;
+  class StructMetadataLayout;
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
@@ -652,7 +643,12 @@ public:
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
-  
+
+  NominalMetadataLayout &getMetadataLayout(NominalTypeDecl *decl);
+  StructMetadataLayout &getMetadataLayout(StructDecl *decl);
+  ClassMetadataLayout &getMetadataLayout(ClassDecl *decl);
+  EnumMetadataLayout &getMetadataLayout(EnumDecl *decl);
+
 private:
   TypeConverter &Types;
   friend class TypeConverter;
@@ -661,6 +657,9 @@ private:
   ClangTypeConverter *ClangTypes;
   void initClangTypeConverter();
   void destroyClangTypeConverter();
+
+  llvm::DenseMap<Decl*, MetadataLayout*> MetadataLayouts;
+  void destroyMetadataLayoutMap();
 
   friend class GenericContextScope;
   
