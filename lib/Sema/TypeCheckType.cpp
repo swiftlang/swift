@@ -481,6 +481,28 @@ Type TypeChecker::applyUnboundGenericArguments(
   // type.
   if (auto parentType = unboundType->getParent()) {
     if (parentType->hasUnboundGenericType()) {
+      // If we're working with a nominal type declaration, just construct
+      // a bound generic type without checking the generic arguments.
+      if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl)) {
+        SmallVector<Type, 2> args;
+        for (auto &genericArg : genericArgs) {
+          // Propagate failure.
+          if (validateType(genericArg, dc, options, resolver,
+                           unsatisfiedDependency))
+            return ErrorType::get(Context);
+
+          auto substTy = genericArg.getType();
+
+          // Unsatisfied dependency case.
+          if (!substTy)
+            return nullptr;
+
+          args.push_back(substTy);
+        }
+
+        return BoundGenericType::get(nominalDecl, parentType, args);
+      }
+
       assert(!resultType->hasTypeParameter());
       return resultType;
     }
