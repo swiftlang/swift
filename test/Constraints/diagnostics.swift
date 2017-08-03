@@ -281,7 +281,7 @@ func r18800223(_ i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{type of expression is ambiguous without more context}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
@@ -1090,4 +1090,15 @@ func sr5081() {
   var a = ["1", "2", "3", "4", "5"]
   var b = [String]()
   b = a[2...4] // expected-error {{cannot assign value of type 'ArraySlice<String>' to type '[String]'}}
+}
+
+func rdar17170728() {
+  var i: Int? = 1
+  var j: Int?
+  var k: Int? = 2
+
+  let _ = [i, j, k].reduce(0 as Int?) {
+    $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
+    // expected-error@-1 {{type of expression is ambiguous without more context}}
+  }
 }

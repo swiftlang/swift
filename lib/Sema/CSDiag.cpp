@@ -7172,13 +7172,18 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
 }
 
 bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
+  auto typeCheckClauseExpr = [&](Expr *clause) -> Expr * {
+    return typeCheckChildIndependently(clause, Type(), CTP_Unused, TCCOptions(),
+                                       nullptr, false);
+  };
+
   // Check all of the subexpressions independently.
-  auto condExpr = typeCheckChildIndependently(IE->getCondExpr());
+  auto condExpr = typeCheckClauseExpr(IE->getCondExpr());
   if (!condExpr) return true;
-  auto trueExpr = typeCheckChildIndependently(IE->getThenExpr());
+  auto trueExpr = typeCheckClauseExpr(IE->getThenExpr());
   if (!trueExpr) return true;
 
-  auto falseExpr = typeCheckChildIndependently(IE->getElseExpr());
+  auto falseExpr = typeCheckClauseExpr(IE->getElseExpr());
   if (!falseExpr) return true;
 
   // If the true/false values already match, it must be a contextual problem.
