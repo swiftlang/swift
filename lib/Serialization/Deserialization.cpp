@@ -124,6 +124,8 @@ const char OverrideError::ID = '\0';
 void OverrideError::anchor() {}
 const char TypeError::ID = '\0';
 void TypeError::anchor() {}
+const char ExtensionError::ID = '\0';
+void ExtensionError::anchor() {}
 
 LLVM_NODISCARD
 static std::unique_ptr<llvm::ErrorInfoBase> takeErrorInfo(llvm::Error error) {
@@ -3472,14 +3474,24 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     bool isImplicit;
     GenericEnvironmentID genericEnvID;
-    unsigned numConformances;
-    ArrayRef<uint64_t> rawInheritedIDs;
+    unsigned numConformances, numInherited;
+    ArrayRef<uint64_t> inheritedAndDependencyIDs;
 
     decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
                                              isImplicit, genericEnvID,
-                                             numConformances, rawInheritedIDs);
+                                             numConformances, numInherited,
+                                             inheritedAndDependencyIDs);
 
     auto DC = getDeclContext(contextID);
+
+    for (TypeID dependencyID : inheritedAndDependencyIDs.slice(numInherited)) {
+      auto dependency = getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<ExtensionError>(
+            takeErrorInfo(dependency.takeError()));
+      }
+    }
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3505,8 +3517,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       extension->setImplicit();
 
-    auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
-    for_each(inheritedTypes, rawInheritedIDs,
+    auto inheritedTypes = ctx.Allocate<TypeLoc>(numInherited);
+    for_each(inheritedTypes, inheritedAndDependencyIDs.slice(0, numInherited),
              [this](TypeLoc &tl, uint64_t rawID) {
       tl = TypeLoc::withoutLoc(getType(rawID));
     });

@@ -1564,15 +1564,27 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   if (nominal->getParent()->isModuleScopeContext()) {
     Identifier moduleName = nominal->getParentModule()->getName();
     for (auto item : *iter) {
-      if (item.first == moduleName.str())
-        (void)getDecl(item.second);
+      if (item.first != moduleName.str())
+        continue;
+      Expected<Decl *> declOrError = getDeclChecked(item.second);
+      if (!declOrError) {
+        if (!getContext().LangOpts.EnableDeserializationRecovery)
+          fatal(declOrError.takeError());
+        llvm::consumeError(declOrError.takeError());
+      }
     }
   } else {
     std::string mangledName =
         Mangle::ASTMangler().mangleNominalType(nominal);
     for (auto item : *iter) {
-      if (item.first == mangledName)
-        (void)getDecl(item.second);
+      if (item.first != mangledName)
+        continue;
+      Expected<Decl *> declOrError = getDeclChecked(item.second);
+      if (!declOrError) {
+        if (!getContext().LangOpts.EnableDeserializationRecovery)
+          fatal(declOrError.takeError());
+        llvm::consumeError(declOrError.takeError());
+      }
     }
   }
 }
@@ -1751,8 +1763,16 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
 
   if (ExtensionDecls) {
     for (auto entry : ExtensionDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+      for (auto item : entry) {
+        Expected<Decl *> declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          llvm::consumeError(declOrError.takeError());
+          continue;
+        }
+        results.push_back(declOrError.get());
+      }
     }
   }
 }

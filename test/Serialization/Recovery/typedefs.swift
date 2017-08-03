@@ -52,6 +52,17 @@ let _ = unwrapped // okay
 _ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
 _ = usesUnwrapped(nil) // expected-error {{nil is not compatible with expected argument type 'Int32'}}
 
+func testExtensions(wrapped: WrappedInt, unwrapped: UnwrappedInt) {
+  wrapped.wrappedMethod() // expected-error {{value of type 'WrappedInt' (aka 'Int32') has no member 'wrappedMethod'}}
+  unwrapped.unwrappedMethod() // expected-error {{value of type 'UnwrappedInt' has no member 'unwrappedMethod'}}
+
+  ***wrapped // This one works because of the UnwrappedInt extension.
+  ***unwrapped // expected-error {{cannot convert value of type 'UnwrappedInt' to expected argument type 'Int32'}}
+
+  let _: WrappedProto = wrapped // expected-error {{value of type 'WrappedInt' (aka 'Int32') does not conform to specified type 'WrappedProto'}}
+  let _: UnwrappedProto = unwrapped // expected-error {{value of type 'UnwrappedInt' does not conform to specified type 'UnwrappedProto'}}
+}
+
 public class UserDynamicSub: UserDynamic {
   override init() {}
 }
@@ -71,6 +82,31 @@ public class UserSub : User {} // expected-error {{cannot inherit from class 'Us
 #else // TEST
 
 import Typedefs
+
+prefix operator ***
+
+// CHECK-LABEL: extension WrappedInt : WrappedProto {
+// CHECK-NEXT: func wrappedMethod()
+// CHECK-NEXT: prefix static func ***(x: WrappedInt)
+// CHECK-NEXT: }
+// CHECK-RECOVERY-NEGATIVE-NOT: extension WrappedInt
+extension WrappedInt: WrappedProto {
+  public func wrappedMethod() {}
+  public static prefix func ***(x: WrappedInt) {}
+}
+// CHECK-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-NEXT: func unwrappedMethod()
+// CHECK-NEXT: prefix static func ***(x: UnwrappedInt)
+// CHECK-NEXT: }
+// CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-RECOVERY-NEXT: func unwrappedMethod()
+// CHECK-RECOVERY-NEXT: prefix static func ***(x: Int32)
+// CHECK-RECOVERY-NEXT: }
+// CHECK-RECOVERY-NEGATIVE-NOT: extension UnwrappedInt
+extension UnwrappedInt: UnwrappedProto {
+  public func unwrappedMethod() {}
+  public static prefix func ***(x: UnwrappedInt) {}
+}
 
 // CHECK-LABEL: class User {
 // CHECK-RECOVERY-LABEL: class User {
@@ -304,5 +340,8 @@ public func returnsWrapped() -> WrappedInt { fatalError() }
 // CHECK-DAG: func returnsWrappedGeneric<T>(_: T.Type) -> WrappedInt
 // CHECK-RECOVERY-NEGATIVE-NOT: func returnsWrappedGeneric<
 public func returnsWrappedGeneric<T>(_: T.Type) -> WrappedInt { fatalError() }
+
+public protocol WrappedProto {}
+public protocol UnwrappedProto {}
 
 #endif // TEST
