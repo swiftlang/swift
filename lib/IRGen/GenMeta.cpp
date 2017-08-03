@@ -51,6 +51,7 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
+#include "MetadataLayout.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "StructMetadataVisitor.h"
@@ -68,23 +69,9 @@ static Address emitAddressOfMetadataSlotAtIndex(IRGenFunction &IGF,
   // metadata pointer.
   assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
 
-  // We require objectType to be a pointer type so that the GEP will
-  // scale by the right amount.  We could load an arbitrary type using
-  // some extra bitcasting.
-  assert(IGF.IGM.DataLayout.getTypeStoreSize(objectTy) ==
-         IGF.IGM.DataLayout.getTypeStoreSize(IGF.IGM.SizeTy));
-
-  // Cast to T*.
-  auto objectPtrTy = objectTy->getPointerTo();
-  auto metadataWords = IGF.Builder.CreateBitCast(metadata, objectPtrTy);
-
-  auto indexV = llvm::ConstantInt::getSigned(IGF.IGM.SizeTy, index);
-
-  // GEP to the slot.
-  Address slot(IGF.Builder.CreateInBoundsGEP(metadataWords, indexV),
-               IGF.IGM.getPointerAlignment());
-
-  return slot;
+  return IGF.emitAddressAtOffset(metadata,
+                                 Offset(index * IGF.IGM.getPointerSize()),
+                                 objectTy, IGF.IGM.getPointerAlignment());
 }
 
 /// Emit a load from the given metadata at a constant index.
@@ -99,8 +86,6 @@ static llvm::LoadInst *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
   // Load.
   return IGF.Builder.CreateLoad(slot, metadata->getName() + suffix);
 }
-
-static int getClassParentIndex(IRGenModule &IGM, ClassDecl *classDecl);
 
 static Address createPointerSizedGEP(IRGenFunction &IGF,
                                      Address base,
@@ -2240,69 +2225,6 @@ namespace {
     }
   };
 
-  // A bunch of ugly macros to make it easy to declare certain
-  // common kinds of searcher.
-#define BEGIN_METADATA_SEARCHER_0(SEARCHER, DECLKIND)                   \
-  struct SEARCHER                                                       \
-    : MetadataSearcher<DECLKIND##MetadataScanner<SEARCHER>> {           \
-    using super = MetadataSearcher;                                     \
-    SEARCHER(IRGenModule &IGM, DECLKIND##Decl *target)                  \
-      : super(IGM, target) {}
-#define BEGIN_METADATA_SEARCHER_1(SEARCHER, DECLKIND, TYPE_1, NAME_1)   \
-  struct SEARCHER                                                       \
-      : MetadataSearcher<DECLKIND##MetadataScanner<SEARCHER>> {         \
-    using super = MetadataSearcher;                                     \
-    TYPE_1 NAME_1;                                                      \
-    SEARCHER(IRGenModule &IGM, DECLKIND##Decl *target, TYPE_1 NAME_1)   \
-      : super(IGM, target), NAME_1(NAME_1) {}
-#define BEGIN_METADATA_SEARCHER_2(SEARCHER, DECLKIND, TYPE_1, NAME_1,   \
-                                  TYPE_2, NAME_2)                       \
-  struct SEARCHER                                                       \
-      : MetadataSearcher<DECLKIND##MetadataScanner<SEARCHER>> {         \
-    using super = MetadataSearcher;                                     \
-    TYPE_1 NAME_1;                                                      \
-    TYPE_2 NAME_2;                                                      \
-    SEARCHER(IRGenModule &IGM, DECLKIND##Decl *target, TYPE_1 NAME_1,   \
-             TYPE_2 NAME_2)                                             \
-      : super(IGM, target), NAME_1(NAME_1), NAME_2(NAME_2) {}
-#define END_METADATA_SEARCHER()                                         \
-  };
-
-#define BEGIN_GENERIC_METADATA_SEARCHER_0(SEARCHER)                     \
-  template <template <class Impl> class Scanner>                        \
-  struct SEARCHER : MetadataSearcher<Scanner<SEARCHER<Scanner>>> {      \
-    using super = MetadataSearcher<Scanner<SEARCHER<Scanner>>>;         \
-    using super::Target;                                                \
-    using TargetType = decltype(Target);                                \
-    SEARCHER(IRGenModule &IGM, TargetType target)                       \
-      : super(IGM, target) {}
-#define BEGIN_GENERIC_METADATA_SEARCHER_1(SEARCHER, TYPE_1, NAME_1)     \
-  template <template <class Impl> class Scanner>                        \
-  struct SEARCHER : MetadataSearcher<Scanner<SEARCHER<Scanner>>> {      \
-    using super = MetadataSearcher<Scanner<SEARCHER<Scanner>>>;         \
-    using super::Target;                                                \
-    using TargetType = decltype(Target);                                \
-    TYPE_1 NAME_1;                                                      \
-    SEARCHER(IRGenModule &IGM, TargetType target, TYPE_1 NAME_1)        \
-      : super(IGM, target), NAME_1(NAME_1) {}
-#define BEGIN_GENERIC_METADATA_SEARCHER_2(SEARCHER, TYPE_1, NAME_1,     \
-                                          TYPE_2, NAME_2)               \
-  template <template <class Impl> class Scanner>                        \
-  struct SEARCHER : MetadataSearcher<Scanner<SEARCHER<Scanner>>> {      \
-    using super = MetadataSearcher<Scanner<SEARCHER<Scanner>>>;         \
-    using super::Target;                                                \
-    using TargetType = decltype(Target);                                \
-    TYPE_1 NAME_1;                                                      \
-    TYPE_2 NAME_2;                                                      \
-    SEARCHER(IRGenModule &IGM, TargetType target,                       \
-             TYPE_1 NAME_1, TYPE_2 NAME_2)                              \
-      : super(IGM, target), NAME_1(NAME_1), NAME_2(NAME_2) {}
-#define END_GENERIC_METADATA_SEARCHER(SOUGHT)                           \
-  };                                                                    \
-  using FindClass##SOUGHT = FindType##SOUGHT<ClassMetadataScanner>;     \
-  using FindStruct##SOUGHT = FindType##SOUGHT<StructMetadataScanner>;   \
-  using FindEnum##SOUGHT = FindType##SOUGHT<EnumMetadataScanner>;
-
   /// The total size and address point of a metadata object.
   struct MetadataSize {
     Size FullSize;
@@ -3145,32 +3067,11 @@ namespace {
 
 // Classes
 
-static Address
-emitAddressOfFieldOffsetVectorInClassMetadata(IRGenFunction &IGF,
-                                              ClassDecl *theClass,
-                                              llvm::Value *metadata) {
-  BEGIN_METADATA_SEARCHER_0(GetOffsetToFieldOffsetVector, Class)
-    void noteStartOfFieldOffsets(ClassDecl *whichClass) {
-      if (whichClass == Target)
-        setTargetOffset();
-    }
-  END_METADATA_SEARCHER()
-
-  auto offset =
-    GetOffsetToFieldOffsetVector(IGF.IGM, theClass).getTargetOffset();
-  
-  Address addr(metadata, IGF.IGM.getPointerAlignment());
-  addr = IGF.Builder.CreateBitCast(addr,
-                                   IGF.IGM.SizeTy->getPointerTo());
-  return createPointerSizedGEP(IGF, addr, offset);
-}
-
 static llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
                                                     ClassDecl *target,
                                                     llvm::Value *metadata) {
   llvm::Value *fieldVector
-    = emitAddressOfFieldOffsetVectorInClassMetadata(IGF, target, metadata)
-        .getAddress();
+    = emitAddressOfFieldOffsetVector(IGF, metadata, target).getAddress();
   
   // Collect the stored properties of the type.
   llvm::SmallVector<VarDecl*, 4> storedProperties;
@@ -3488,7 +3389,7 @@ namespace {
                                                      ForDefinition);
           auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
           offsetVar->setConstant(false);
-          auto offset = getClassFieldOffset(IGM, Target, var).getValue();
+          auto offset = getClassFieldOffsetOffset(IGM, Target, var).getValue();
           auto offsetVal = llvm::ConstantInt::get(IGM.IntPtrTy, offset);
           offsetVar->setInitializer(offsetVal);
 
@@ -3605,10 +3506,9 @@ namespace {
           // We can't use emitClassFieldOffset() here because that creates
           // an invariant load, which could be hoisted above the point
           // where the metadata becomes fully initialized
-          Size offset = getClassFieldOffset(IGF.IGM, Target, prop);
-          int index = IGF.IGM.getOffsetInWords(offset);
-          auto offsetVal = emitLoadFromMetadataAtIndex(IGF, metadata, index,
-                                                       IGF.IGM.SizeTy);
+          auto slot =
+            emitAddressOfClassFieldOffset(IGF, metadata, Target, prop);
+          auto offsetVal = IGF.emitInvariantLoad(slot);
           IGF.Builder.CreateStore(offsetVal, offsetA);
         }
 
@@ -3733,10 +3633,9 @@ namespace {
         assert(parentType);
         llvm::Value *parentMetadata = IGF.emitTypeMetadataRef(parentType);
 
-        int index = getClassParentIndex(IGF.IGM, Target);
-        Address slot = emitAddressOfMetadataSlotAtIndex(IGF, metadata, index,
-                                                    IGF.IGM.TypeMetadataPtrTy);
-        IGF.Builder.CreateStore(parentMetadata, slot);
+        auto parentSlot =
+          emitAddressOfParentMetadataSlot(IGF, metadata, type->getDecl());
+        IGF.Builder.CreateStore(parentMetadata, parentSlot);
       }
 
       metadata = emitFinishInitializationOfClassMetadata(IGF, metadata);
@@ -4062,6 +3961,13 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   }
 }
 
+llvm::Value *IRGenFunction::emitInvariantLoad(Address address,
+                                              const llvm::Twine &name) {
+  auto load = Builder.CreateLoad(address, name);
+  setInvariantLoad(load);
+  return load;
+}
+
 void IRGenFunction::setInvariantLoad(llvm::LoadInst *load) {
   load->setMetadata(IGM.InvariantMetadataID, IGM.InvariantNode);
 }
@@ -4144,176 +4050,6 @@ IRGenFunction::emitValueWitnessTableRef(SILType type,
                                   LocalTypeDataKind::forValueWitnessTable(),
                                   vwtable);
   return vwtable;
-}
-
-/// Load the metadata reference at the given index.
-static llvm::Value *emitLoadOfMetadataRefAtIndex(IRGenFunction &IGF,
-                                                 llvm::Value *metadata,
-                                                 int index) {
-  return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index,
-                                              IGF.IGM.TypeMetadataPtrTy);
-}
-
-/// Load the protocol witness table reference at the given index.
-static llvm::Value *emitLoadOfWitnessTableRefAtIndex(IRGenFunction &IGF,
-                                                     llvm::Value *metadata,
-                                                     int index) {
-  return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index,
-                                              IGF.IGM.WitnessTablePtrTy);
-}
-
-namespace {
-  /// A class for finding the 'parent' index in a class metadata object.
-  BEGIN_METADATA_SEARCHER_0(FindClassParentIndex, Class)
-    void addParentMetadataRef(ClassDecl *forClass, Type classType) {
-      if (forClass == Target) setTargetOffset();
-      super::addParentMetadataRef(forClass, classType);
-    }
-  END_METADATA_SEARCHER()
-} // end anonymous namespace
-
-/// Return the index of the parent metadata pointer for the given class.
-static int getClassParentIndex(IRGenModule &IGM, ClassDecl *classDecl) {
-  assert(classDecl->getDeclContext()->isTypeContext());
-  return FindClassParentIndex(IGM, classDecl).getTargetIndex();
-}
-
-/// In both enums and structs, the parent index is at index 2.
-static constexpr int ValueTypeParentIndex = 2;
-
-/// Given a reference to some metadata, derive a reference to the
-/// type's parent type.
-llvm::Value *irgen::emitParentMetadataRef(IRGenFunction &IGF,
-                                          NominalTypeDecl *decl,
-                                          llvm::Value *metadata) {
-  assert(decl->getDeclContext()->isTypeContext());
-
-  switch (decl->getKind()) {
-#define NOMINAL_TYPE_DECL(id, parent)
-#define DECL(id, parent) \
-  case DeclKind::id:
-#include "swift/AST/DeclNodes.def"
-    llvm_unreachable("not a nominal type");
-
-  case DeclKind::Protocol:
-    llvm_unreachable("protocols never have parent types!");
-
-  case DeclKind::Class: {
-    int index = getClassParentIndex(IGF.IGM, cast<ClassDecl>(decl));
-    return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
-  }
-
-  case DeclKind::Enum:
-  case DeclKind::Struct:
-    return emitLoadOfMetadataRefAtIndex(IGF, metadata, ValueTypeParentIndex);
-  }
-  llvm_unreachable("bad decl kind!");
-}
-
-namespace {
-  /// A class for finding the start of the generic requirements section
-  /// in a type metadata object.
-  BEGIN_GENERIC_METADATA_SEARCHER_0(FindTypeGenericRequirements)
-    template <class... T>
-    void noteStartOfGenericRequirements() {
-      this->setTargetOffset();
-    }
-
-    template <class... T>
-    void noteStartOfGenericRequirements(ClassDecl *forClass) {
-      if (forClass == Target)
-        this->setTargetOffset();
-    }
-  END_GENERIC_METADATA_SEARCHER(GenericRequirements)
-} // end anonymous namespace
-
-static int getIndexOfGenericRequirement(IRGenModule &IGM,
-                                        NominalTypeDecl *decl,
-                                        unsigned reqtIndex) {
-  switch (decl->getKind()) {
-#define NOMINAL_TYPE_DECL(id, parent)
-#define DECL(id, parent) \
-  case DeclKind::id:
-#include "swift/AST/DeclNodes.def"
-    llvm_unreachable("not a nominal type");
-
-  case DeclKind::Protocol:
-    llvm_unreachable("protocols are never generic!");
-
-  case DeclKind::Class: {
-    int index = FindClassGenericRequirements(IGM, cast<ClassDecl>(decl))
-                  .getTargetIndex() + (int) reqtIndex;
-    return index;
-  }
-
-  case DeclKind::Enum: {
-    int index = FindEnumGenericRequirements(IGM, cast<EnumDecl>(decl))
-                  .getTargetIndex() + (int) reqtIndex;
-    return index;
-  }
-        
-  case DeclKind::Struct: {
-    int index = FindStructGenericRequirements(IGM, cast<StructDecl>(decl))
-                  .getTargetIndex() + (int) reqtIndex;
-    return index;
-  }
-  }
-  llvm_unreachable("bad decl kind!");
-}
-
-/// Given a reference to nominal type metadata of the given type,
-/// derive a reference to the nth argument metadata.  The type must
-/// have generic arguments.
-llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
-                                            NominalTypeDecl *decl,
-                                      const GenericTypeRequirements &reqts,
-                                            unsigned reqtIndex,
-                                            llvm::Value *metadata) {
-  assert(reqts.getRequirements()[reqtIndex].Protocol == nullptr);
-  int index = getIndexOfGenericRequirement(IGF.IGM, decl, reqtIndex);
-  return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
-}
-
-/// Given a reference to nominal type metadata of the given type,
-/// derive a reference to a protocol witness table for the nth
-/// argument metadata.  The type must have generic arguments.
-llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
-                                                NominalTypeDecl *decl,
-                                          const GenericTypeRequirements &reqts,
-                                                unsigned reqtIndex,
-                                                llvm::Value *metadata) {
-  assert(reqts.getRequirements()[reqtIndex].Protocol != nullptr);
-  int index = getIndexOfGenericRequirement(IGF.IGM, decl, reqtIndex);
-  return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
-}
-
-irgen::Size irgen::getClassFieldOffset(IRGenModule &IGM,
-                                       ClassDecl *theClass,
-                                       VarDecl *field) {
-  /// A class for finding a field offset in a class metadata object.
-  BEGIN_METADATA_SEARCHER_1(FindClassFieldOffset, Class,
-                            VarDecl *, TargetField)
-    void addFieldOffset(VarDecl *field) {
-      if (field == TargetField)
-        setTargetOffset();
-      super::addFieldOffset(field);
-    }
-  END_METADATA_SEARCHER()
-
-  return FindClassFieldOffset(IGM, theClass, field).getTargetOffset();
-}
-
-/// Given a reference to class metadata of the given type,
-/// derive a reference to the field offset for a stored property.
-/// The type must have dependent generic layout.
-llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
-                                         ClassDecl *theClass,
-                                         VarDecl *field,
-                                         llvm::Value *metadata) {
-  irgen::Size offset = getClassFieldOffset(IGF.IGM, theClass, field);
-  int index = IGF.IGM.getOffsetInWords(offset);
-  return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index,
-                                              IGF.IGM.SizeTy);
 }
 
 /// Given a reference to class metadata of the given type,
@@ -4599,19 +4335,6 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   return phi;
 }
 
-namespace {
-  /// A class for finding a vtable entry offset for a method argument
-  /// in a class metadata object.
-  BEGIN_METADATA_SEARCHER_1(FindClassMethodIndex, Class,
-                            SILDeclRef, TargetMethod)
-    void addMethod(SILDeclRef fn) {
-      if (TargetMethod == fn)
-        setTargetOffset();
-      super::addMethod(fn);
-    }
-  END_METADATA_SEARCHER()
-} // end anonymous namespace
-
 /// Load the correct virtual function for the given class method.
 FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                               llvm::Value *base,
@@ -4666,21 +4389,17 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   auto sig = IGF.IGM.getSignature(methodType);
 
   auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
-  auto index = FindClassMethodIndex(IGF.IGM, declaringClass, overridden)
-                 .getTargetIndex();
 
-  auto fnPtr = emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index,
-                                             sig.getType()->getPointerTo());
+  auto methodInfo =
+    IGF.IGM.getMetadataLayout(declaringClass).getMethodInfo(IGF, overridden);
+  auto offset = methodInfo.getOffset();
+
+  auto slot = IGF.emitAddressAtOffset(metadata, offset,
+                                      sig.getType()->getPointerTo(),
+                                      IGF.IGM.getPointerAlignment());
+  auto fnPtr = IGF.emitInvariantLoad(slot);
 
   return FunctionPointer(fnPtr, sig);
-}
-
-unsigned irgen::getVirtualMethodIndex(IRGenModule &IGM,
-                                      SILDeclRef method) {
-  SILDeclRef overridden = IGM.getSILTypes().getOverriddenVTableEntry(method);
-  auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
-  return FindClassMethodIndex(IGM, declaringClass, overridden)
-   .getTargetIndex();;
 }
 
 //===----------------------------------------------------------------------===//
@@ -4748,8 +4467,7 @@ emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
     // indirectable pointer.
     llvm::Value *parentMetadata = IGF.emitTypeMetadataRef(parentType);
     Address addr =
-      emitAddressOfMetadataSlotAtIndex(IGF, metadata, ValueTypeParentIndex,
-                                       IGF.IGM.TypeMetadataPtrTy);
+      emitAddressOfParentMetadataSlot(IGF, metadata, type->getDecl());
     IGF.Builder.CreateStore(parentMetadata, addr);
   }
 
@@ -5373,9 +5091,8 @@ namespace {
         auto parentType = getTargetType().getNominalParent();
         auto parentMetadata = IGF.emitTypeMetadataRef(parentType);
 
-        int index = ValueTypeParentIndex;
-        Address slot = emitAddressOfMetadataSlotAtIndex(IGF, metadata, index,
-                                                    IGF.IGM.TypeMetadataPtrTy);
+        Address slot =
+          emitAddressOfParentMetadataSlot(IGF, metadata, this->Target);
         IGF.Builder.CreateStore(parentMetadata, slot);
       }
     }
@@ -5419,9 +5136,8 @@ namespace {
         auto parentType = getTargetType().getNominalParent();
         auto parentMetadata = IGF.emitTypeMetadataRef(parentType);
 
-        int index = ValueTypeParentIndex;
-        Address slot = emitAddressOfMetadataSlotAtIndex(IGF, metadata, index,
-                                                    IGF.IGM.TypeMetadataPtrTy);
+        Address slot =
+          emitAddressOfParentMetadataSlot(IGF, metadata, this->Target);
         IGF.Builder.CreateStore(parentMetadata, slot);
       }
     }

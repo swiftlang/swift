@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_ENUMMETADATAVISITOR_H
 
 #include "NominalMetadataVisitor.h"
+#include "GenEnum.h"
 
 namespace swift {
 namespace irgen {

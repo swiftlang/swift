@@ -372,3 +372,48 @@ void Explosion::print(llvm::raw_ostream &OS) {
 void Explosion::dump() {
   print(llvm::errs());
 }
+
+llvm::Value *Offset::getAsValue(IRGenFunction &IGF) const {
+  if (isStatic()) {
+    return IGF.IGM.getSize(getStatic());
+  } else {
+    return getDynamic();
+  }
+}
+
+Offset Offset::offsetBy(IRGenFunction &IGF, Offset other) const {
+  if (isStatic() && other.isStatic()) {
+    return Offset(getStatic() + other.getStatic());
+  }
+  return Offset(IGF.Builder.CreateAdd(getDynamic(), other.getDynamic()));
+}
+
+Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
+                                           llvm::Type *objectTy,
+                                           Alignment objectAlignment,
+                                           const llvm::Twine &name) {
+  // Use a slightly more obvious IR pattern if it's a multiple of the type
+  // size.  I'll confess that this is partly just to avoid updating tests.
+  if (offset.isStatic()) {
+    auto byteOffset = offset.getStatic();
+    Size objectSize(IGM.DataLayout.getTypeAllocSize(objectTy));
+    if (byteOffset.isMultipleOf(objectSize)) {
+      // Cast to T*.
+      auto objectPtrTy = objectTy->getPointerTo();
+      base = Builder.CreateBitCast(base, objectPtrTy);
+
+      // GEP to the slot, computing the index as a signed number.
+      auto scaledIndex =
+        int64_t(byteOffset.getValue()) / int64_t(objectSize.getValue());
+      auto indexValue = IGM.getSize(Size(scaledIndex));
+      auto slotPtr = Builder.CreateInBoundsGEP(base, indexValue);
+
+      return Address(slotPtr, objectAlignment);
+    }
+  }
+
+  // GEP to the slot.
+  auto offsetValue = offset.getAsValue(*this);
+  auto slotPtr = emitByteOffsetGEP(base, offsetValue, objectTy);
+  return Address(slotPtr, objectAlignment);
+}

@@ -18,6 +18,8 @@
 #ifndef SWIFT_IRGEN_CLASSMETADATAVISITOR_H
 #define SWIFT_IRGEN_CLASSMETADATAVISITOR_H
 
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "IRGen.h"
@@ -77,6 +79,14 @@ public:
     addClassMembers(Target, Target->getDeclaredTypeInContext());
   }
 
+  /// Notes the beginning of the field offset vector for a particular ancestor
+  /// of a generic-layout class.
+  void noteStartOfFieldOffsets(ClassDecl *whichClass) {}
+
+  /// Notes the end of the field offset vector for a particular ancestor
+  /// of a generic-layout class.
+  void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
+
 private:
   /// Add fields associated with the given class and its bases.
   void addClassMembers(ClassDecl *theClass, Type type) {
@@ -128,14 +138,6 @@ private:
     asImpl().noteEndOfFieldOffsets(theClass);
   }
   
-  /// Notes the beginning of the field offset vector for a particular ancestor
-  /// of a generic-layout class.
-  void noteStartOfFieldOffsets(ClassDecl *whichClass) {}
-
-  /// Notes the end of the field offset vector for a particular ancestor
-  /// of a generic-layout class.
-  void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
-
 private:
   void addFieldEntries(VarDecl *field) {
     asImpl().addFieldOffset(field);
