@@ -3987,6 +3987,34 @@ fileprivate func assertTypeIsDecodable<T>(_ type: T.Type, in wrappingType: Any.T
     }
 }
 
+// Temporary resolution for SR-5206.
+// 
+// The following two extension on Encodable and Decodable are used below to provide static type information where we don't have any yet.
+// The wrapped contents of the below generic types have to expose their Encodable/Decodable conformance via an existential cast/their metatype.
+// Since those are dynamic types without static type guarantees, we cannot call generic methods taking those arguments, e.g.
+// 
+//   try container.encode((someElement as! Encodable))
+// 
+// One way around this is to get elements to encode into `superEncoder`s and decode from `superDecoder`s because those interfaces are available via the existentials/metatypes.
+// However, this direct encoding/decoding never gives containers a chance to intercept and do something custom on types.
+// 
+// If we instead expose this custom private functionality of writing to/reading from containers directly, the containers do get this chance.
+
+// FIXME: Remove when conditional conformance is available.
+extension Encodable {
+    fileprivate func __encode(to container: inout SingleValueEncodingContainer) throws { try container.encode(self) }
+    fileprivate func __encode(to container: inout UnkeyedEncodingContainer)     throws { try container.encode(self) }
+    fileprivate func __encode<Key>(to container: inout KeyedEncodingContainer<Key>, forKey key: Key) throws { try container.encode(self, forKey: key) }
+}
+
+// FIXME: Remove when conditional conformance is available.
+extension Decodable {
+    // Since we cannot call these __init, we'll give the parameter a '__'.
+    fileprivate init(__from container: SingleValueDecodingContainer)   throws { self = try container.decode(Self.self) }
+    fileprivate init(__from container: inout UnkeyedDecodingContainer) throws { self = try container.decode(Self.self) }
+    fileprivate init<Key>(__from container: KeyedDecodingContainer<Key>, forKey key: Key) throws { self = try container.decode(Self.self, forKey: key) }
+}
+
 // FIXME: Uncomment when conditional conformance is available.
 extension Optional : Encodable /* where Wrapped : Encodable */ {
     public func encode(to encoder: Encoder) throws {
@@ -3995,7 +4023,7 @@ extension Optional : Encodable /* where Wrapped : Encodable */ {
         var container = encoder.singleValueContainer()
         switch self {
         case .none: try container.encodeNil()
-        case .some(let wrapped): try (wrapped as! Encodable).encode(to: encoder)
+        case .some(let wrapped): try (wrapped as! Encodable).__encode(to: &container)
         }
     }
 }
@@ -4009,7 +4037,7 @@ extension Optional : Decodable /* where Wrapped : Decodable */ {
         let container = try decoder.singleValueContainer()
         if !container.decodeNil() {
             let metaType = (Wrapped.self as! Decodable.Type)
-            let element = try metaType.init(from: decoder)
+            let element = try metaType.init(__from: container)
             self = .some(element as! Wrapped)
         }
     }
@@ -4022,10 +4050,7 @@ extension Array : Encodable /* where Element : Encodable */ {
 
         var container = encoder.unkeyedContainer()
         for element in self {
-            // superEncoder appends an empty element and wraps an Encoder around it.
-            // This is normally appropriate for encoding super, but this is really what we want to do.
-            let subencoder = container.superEncoder()
-            try (element as! Encodable).encode(to: subencoder)
+            try (element as! Encodable).__encode(to: &container)
         }
     }
 }
@@ -4039,10 +4064,7 @@ extension Array : Decodable /* where Element : Decodable */ {
         let metaType = (Element.self as! Decodable.Type)
         var container = try decoder.unkeyedContainer()
         while !container.isAtEnd {
-            // superDecoder fetches the next element as a container and wraps a Decoder around it.
-            // This is normally appropriate for decoding super, but this is really what we want to do.
-            let subdecoder = try container.superDecoder()
-            let element = try metaType.init(from: subdecoder)
+            let element = try metaType.init(__from: &container)
             self.append(element as! Element)
         }
     }
@@ -4054,10 +4076,7 @@ extension Set : Encodable /* where Element : Encodable */ {
 
         var container = encoder.unkeyedContainer()
         for element in self {
-            // superEncoder appends an empty element and wraps an Encoder around it.
-            // This is normally appropriate for encoding super, but this is really what we want to do.
-            let subencoder = container.superEncoder()
-            try (element as! Encodable).encode(to: subencoder)
+            try (element as! Encodable).__encode(to: &container)
         }
     }
 }
@@ -4071,10 +4090,7 @@ extension Set : Decodable /* where Element : Decodable */ {
         let metaType = (Element.self as! Decodable.Type)
         var container = try decoder.unkeyedContainer()
         while !container.isAtEnd {
-            // superDecoder fetches the next element as a container and wraps a Decoder around it.
-            // This is normally appropriate for decoding super, but this is really what we want to do.
-            let subdecoder = try container.superDecoder()
-            let element = try metaType.init(from: subdecoder)
+            let element = try metaType.init(__from: &container)
             self.insert(element as! Element)
         }
     }
@@ -4106,29 +4122,22 @@ extension Dictionary : Encodable /* where Key : Encodable, Value : Encodable */ 
             var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
             for (key, value) in self {
                 let codingKey = _DictionaryCodingKey(stringValue: key as! String)!
-                let valueEncoder = container.superEncoder(forKey: codingKey)
-                try (value as! Encodable).encode(to: valueEncoder)
+                try (value as! Encodable).__encode(to: &container, forKey: codingKey)
             }
         } else if Key.self == Int.self {
             // Since the keys are already Ints, we can use them as keys directly.
             var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
             for (key, value) in self {
                 let codingKey = _DictionaryCodingKey(intValue: key as! Int)!
-                let valueEncoder = container.superEncoder(forKey: codingKey)
-                try (value as! Encodable).encode(to: valueEncoder)
+                try (value as! Encodable).__encode(to: &container, forKey: codingKey)
             }
         } else {
             // Keys are Encodable but not Strings or Ints, so we cannot arbitrarily convert to keys.
             // We can encode as an array of alternating key-value pairs, though.
             var container = encoder.unkeyedContainer()
             for (key, value) in self {
-                // superEncoder appends an empty element and wraps an Encoder around it.
-                // This is normally appropriate for encoding super, but this is really what we want to do.
-                let keyEncoder = container.superEncoder()
-                try (key as! Encodable).encode(to: keyEncoder)
-
-                let valueEncoder = container.superEncoder()
-                try (value as! Encodable).encode(to: valueEncoder)
+                try (key as! Encodable).__encode(to: &container)
+                try (value as! Encodable).__encode(to: &container)
             }
         }
     }
@@ -4146,8 +4155,7 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
             let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
             let valueMetaType = Value.self as! Decodable.Type
             for key in container.allKeys {
-                let valueDecoder = try container.superDecoder(forKey: key)
-                let value = try valueMetaType.init(from: valueDecoder)
+                let value = try valueMetaType.init(__from: container, forKey: key)
                 self[key.stringValue as! Key] = (value as! Value)
             }
         } else if Key.self == Int.self {
@@ -4166,8 +4174,7 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
                                                                            debugDescription: "Expected Int key but found String key instead."))
                 }
 
-                let valueDecoder = try container.superDecoder(forKey: key)
-                let value = try valueMetaType.init(from: valueDecoder)
+                let value = try valueMetaType.init(__from: container, forKey: key)
                 self[key.intValue! as! Key] = (value as! Value)
             }
         } else {
@@ -4185,19 +4192,14 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
             let keyMetaType = (Key.self as! Decodable.Type)
             let valueMetaType = (Value.self as! Decodable.Type)
             while !container.isAtEnd {
-                // superDecoder fetches the next element as a container and wraps a Decoder around it.
-                // This is normally appropriate for decoding super, but this is really what we want to do.
-                let keyDecoder = try container.superDecoder()
-                let key = try keyMetaType.init(from: keyDecoder)
+                let key = try keyMetaType.init(__from: &container)
 
                 guard !container.isAtEnd else {
                     throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath,
                                                                                  debugDescription: "Unkeyed container reached end before value in key-value pair."))
                 }
 
-                let valueDecoder = try container.superDecoder()
-                let value = try valueMetaType.init(from: valueDecoder)
-
+                let value = try valueMetaType.init(__from: &container)
                 self[key as! Key] = (value as! Value)
             }
         }
