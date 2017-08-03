@@ -50,6 +50,7 @@
 #include "GenHeap.h"
 #include "HeapTypeInfo.h"
 #include "MemberAccessStrategy.h"
+#include "MetadataLayout.h"
 
 
 using namespace swift;
@@ -607,7 +608,7 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
   }
 
   case FieldAccess::ConstantIndirect: {
-    Size indirectOffset = getClassFieldOffset(IGM, baseClass, field);
+    Size indirectOffset = getClassFieldOffsetOffset(IGM, baseClass, field);
     return MemberAccessStrategy::getIndirectFixed(indirectOffset,
                                  MemberAccessStrategy::OffsetKind::Bytes_Word);
   }

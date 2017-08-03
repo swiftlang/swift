@@ -1,4 +1,4 @@
-//===--- StructMetadataLayout.h - CRTP for struct metadata ------*- C++ -*-===//
+//===--- StructMetadataVisitor.h - CRTP for struct metadata ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,7 +17,7 @@
 #ifndef SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 #define SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 
-#include "MetadataLayout.h"
+#include "NominalMetadataVisitor.h"
 
 namespace swift {
 namespace irgen {
@@ -26,8 +26,9 @@ namespace irgen {
 ///
 /// This produces an object corresponding to the StructMetadata type.
 /// It does not itself doing anything special for metadata templates.
-template <class Impl> class StructMetadataLayout : public MetadataLayout<Impl> {
-  typedef MetadataLayout<Impl> super;
+template <class Impl> class StructMetadataVisitor
+       : public NominalMetadataVisitor<Impl> {
+  using super = NominalMetadataVisitor<Impl>;
 
 protected:
   using super::IGM;
@@ -36,7 +37,7 @@ protected:
   /// The struct.
   StructDecl *const Target;
 
-  StructMetadataLayout(IRGenModule &IGM, StructDecl *target)
+  StructMetadataVisitor(IRGenModule &IGM, StructDecl *target)
     : super(IGM), Target(target) {}
 
 public:
@@ -64,11 +65,11 @@ public:
   void noteStartOfFieldOffsets() {}
 };
 
-/// An "implementation" of StructMetadataLayout that just scans through
+/// An "implementation" of StructMetadataVisitor that just scans through
 /// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
-class StructMetadataScanner : public StructMetadataLayout<Impl> {
-  typedef StructMetadataLayout<Impl> super;
+class StructMetadataScanner : public StructMetadataVisitor<Impl> {
+  typedef StructMetadataVisitor<Impl> super;
 protected:
   Size NextOffset = Size(0);
 

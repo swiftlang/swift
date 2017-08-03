@@ -137,6 +137,13 @@ public:
   Address emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
                             const TypeInfo &type,
                             const llvm::Twine &name = "");
+  Address emitAddressAtOffset(llvm::Value *base, Offset offset,
+                              llvm::Type *objectType,
+                              Alignment objectAlignment,
+                              const llvm::Twine &name = "");
+
+  llvm::Value *emitInvariantLoad(Address address,
+                                 const llvm::Twine &name = "");
 
   void emitStoreOfRelativeIndirectablePointer(llvm::Value *value,
                                               Address addr,
