@@ -311,6 +311,10 @@ public:
     return compatibleOwnershipKinds(getOwnershipKind(), Kind);
   }
 
+  bool hasExactOwnership(ValueOwnershipKind Kind) const {
+    return getOwnershipKind() == Kind;
+  }
+
   bool isAddressOrTrivialType() const {
     if (getType().isAddress())
       return true;
@@ -561,9 +565,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
     if (getType().is<AnyMetatypeType>()) {                                     \
       return {true, false};                                                    \
     }                                                                          \
-    assert(!isAddressOrTrivialType() &&                                        \
-           "Shouldn't have an address or a non trivial type");                 \
-    bool compatible = getOwnershipKind() == ValueOwnershipKind::Any ||         \
+    bool compatible = hasExactOwnership(ValueOwnershipKind::Any) ||            \
                       !compatibleWithOwnership(ValueOwnershipKind::Trivial);   \
     return {compatible, SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                 \
   }
@@ -576,9 +578,7 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(false, ClassMethod)
   OwnershipUseCheckerResult                                                    \
       OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
     assert(I->getNumOperands() && "Expected to have non-zero operands");       \
-    assert(!isAddressOrTrivialType() &&                                        \
-           "Shouldn't have an address or a non trivial type");                 \
-    bool compatible = getOwnershipKind() == ValueOwnershipKind::Any ||         \
+    bool compatible = hasExactOwnership(ValueOwnershipKind::Any) ||            \
                       !compatibleWithOwnership(ValueOwnershipKind::Trivial);   \
     return {compatible, SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                 \
   }
@@ -639,7 +639,7 @@ OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I, ArrayRe
 
   // We only need to treat a forwarded instruction as a lifetime ending use of
   // it is owned.
-  return {true, compatibleWithOwnership(ValueOwnershipKind::Owned)};
+  return {true, hasExactOwnership(ValueOwnershipKind::Owned)};
 }
 
 #define FORWARD_ANY_OWNERSHIP_INST(INST)                                       \
@@ -671,7 +671,7 @@ FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
     assert(isOwnershipForwardingInst(I) &&                                     \
            "Expected an ownership forwarding inst");                           \
     if (ValueOwnershipKind::OWNERSHIP != ValueOwnershipKind::Trivial &&        \
-        getOwnershipKind() == ValueOwnershipKind::Trivial) {                   \
+        hasExactOwnership(ValueOwnershipKind::Trivial)) {                      \
       assert(isAddressOrTrivialType() &&                                       \
              "Trivial ownership requires a trivial type or an address");       \
       return {true, false};                                                    \
@@ -707,7 +707,7 @@ OwnershipCompatibilityUseChecker::visitEndBorrowArgumentInst(
     return {true, false};
 
   // Otherwise, we must be checking an actual argument. Make sure it is guaranteed!
-  return {true, compatibleWithOwnership(ValueOwnershipKind::Guaranteed)};
+  return {true, hasExactOwnership(ValueOwnershipKind::Guaranteed)};
 }
 
 OwnershipUseCheckerResult
@@ -745,7 +745,7 @@ OwnershipCompatibilityUseChecker::checkTerminatorArgumentMatchesDestBB(
   EnumDecl *E = getType().getEnumOrBoundGenericEnum();
   if (!E) {
     return {compatibleWithOwnership(DestBlockArgOwnershipKind),
-            getOwnershipKind() == ValueOwnershipKind::Owned};
+            hasExactOwnership(ValueOwnershipKind::Owned)};
   }
 
   return visitNonTrivialEnum(E, DestBlockArgOwnershipKind);
@@ -829,7 +829,7 @@ OwnershipCompatibilityUseChecker::visitTransformingTerminatorInst(
 
   // Finally, if everything lines up, emit that we match and are a lifetime
   // ending point if we are owned.
-  return {true, compatibleWithOwnership(ValueOwnershipKind::Owned)};
+  return {true, hasExactOwnership(ValueOwnershipKind::Owned)};
 }
 
 OwnershipUseCheckerResult
@@ -983,7 +983,7 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitNonTrivialEnum(
   // And finally finish by making sure that if we have a non-trivial ownership
   // kind that it matches the argument's convention.
   return {compatibleWithOwnership(RequiredKind),
-          compatibleWithOwnership(ValueOwnershipKind::Owned)};
+          hasExactOwnership(ValueOwnershipKind::Owned)};
 }
 
 // We allow for trivial cases of enums with non-trivial cases to be passed in
