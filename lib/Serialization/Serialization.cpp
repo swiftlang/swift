@@ -2482,9 +2482,17 @@ void Serializer::writeDecl(const Decl *D) {
                           ConformanceLookupKind::All,
                           nullptr, /*sorted=*/true);
 
-    SmallVector<TypeID, 8> inheritedTypes;
+    SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited())
-      inheritedTypes.push_back(addTypeRef(inherited.getType()));
+      inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
+    size_t numInherited = inheritedAndDependencyTypes.size();
+
+    // FIXME: Figure out what to do with requirements and such, which the
+    // extension also depends on. Right now just do what is safe to drop, which
+    // is the base declaration.
+    auto dependencies = collectDependenciesFromType(baseTy);
+    for (auto dependencyTy : dependencies)
+      inheritedAndDependencyTypes.push_back(addTypeRef(dependencyTy));
 
     unsigned abbrCode = DeclTypeAbbrCodes[ExtensionLayout::Code];
     ExtensionLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2494,7 +2502,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 addGenericEnvironmentRef(
                                            extension->getGenericEnvironment()),
                                 conformances.size(),
-                                inheritedTypes);
+                                numInherited,
+                                inheritedAndDependencyTypes);
 
     bool isClassExtension = false;
     if (baseNominal) {

@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 354; // Last change: special destructor names
+const uint16_t VERSION_MINOR = 355; // Last change: extension dependencies
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1038,7 +1038,8 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     GenericEnvironmentIDField,  // generic environment
     BCVBR<4>,    // # of protocol conformances
-    BCArray<TypeIDField> // inherited types
+    BCVBR<4>,    // number of inherited types
+    BCArray<TypeIDField> // inherited types, followed by TypeID dependencies
     // Trailed by the generic parameter lists, members record, and then
     // conformance info (if any).
   >;
