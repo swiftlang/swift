@@ -287,7 +287,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     // accross the cast (which reads the type metadata). With Semantic SIL we
     // should be able to move this back to None - it should model the scoping
     // and forbid the compiler from moving the ultimate retain.
-    INST(UnconditionalCheckedCastValueInst, ConversionInst, unconditional_checked_cast_value, MayRead, DoesNotRelease)
+    INST(UnconditionalCheckedCastValueInst, ConversionInst, unconditional_checked_cast_value, MayRead, MayRelease)
     INST(UnconditionalCheckedCastInst, ConversionInst, unconditional_checked_cast, MayRead, DoesNotRelease)
     VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
   INST(IsNonnullInst, SILInstruction, is_nonnull, None, DoesNotRelease)
