@@ -765,6 +765,12 @@ public:
     /// This is a root requirement source.
     NestedTypeNameMatch,
 
+    /// The requirement is the implicit binding of a potential archetype to
+    /// the interface type of the concrete type declaration it represents.
+    ///
+    /// This is a root requirement source.
+    ConcreteTypeBinding,
+
     /// The requirement is a protocol requirement.
     ///
     /// This stores the protocol that introduced the requirement as well as the
@@ -853,6 +859,7 @@ private:
     case Inferred:
     case QuietlyInferred:
     case NestedTypeNameMatch:
+    case ConcreteTypeBinding:
     case Superclass:
     case Parent:
     case Concrete:
@@ -893,6 +900,7 @@ private:
     case QuietlyInferred:
     case RequirementSignatureSelf:
     case NestedTypeNameMatch:
+    case ConcreteTypeBinding:
       return true;
 
     case ProtocolRequirement:
@@ -1009,6 +1017,11 @@ public:
 
   /// Retrieve a requirement source for nested type name matches.
   static const RequirementSource *forNestedTypeNameMatch(
+                                     PotentialArchetype *root);
+
+  /// Retrieve a requirement source describing when a concrete type
+  /// declaration is used to define a potential archetype.
+  static const RequirementSource *forConcreteTypeBinding(
                                      PotentialArchetype *root);
 
 private:

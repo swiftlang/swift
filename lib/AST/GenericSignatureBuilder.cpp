@@ -128,6 +128,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
   case QuietlyInferred:
   case RequirementSignatureSelf:
   case NestedTypeNameMatch:
+  case ConcreteTypeBinding:
     switch (storageKind) {
     case StorageKind::RootArchetype:
       return true;
@@ -242,6 +243,9 @@ bool RequirementSource::isInferredRequirement(bool includeQuietInferred) const {
     case QuietlyInferred:
       return includeQuietInferred;
 
+    case ConcreteTypeBinding:
+      return false;
+
     case Concrete:
     case Explicit:
     case NestedTypeNameMatch:
@@ -271,6 +275,7 @@ bool RequirementSource::isDerivedRequirement() const {
     return false;
 
   case NestedTypeNameMatch:
+  case ConcreteTypeBinding:
   case Parent:
   case Superclass:
   case Concrete:
@@ -328,6 +333,7 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
       return addConstraint(currentPA, source->getProtocolDecl());
 
     case RequirementSource::NestedTypeNameMatch:
+    case RequirementSource::ConcreteTypeBinding:
     case RequirementSource::Concrete:
     case RequirementSource::Superclass:
     case RequirementSource::Derived:
@@ -453,6 +459,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     case Inferred:
     case QuietlyInferred:
     case NestedTypeNameMatch:
+    case ConcreteTypeBinding:
     case RequirementSignatureSelf:
       rootPA = parentPA;
       return false;
@@ -550,6 +557,17 @@ const RequirementSource *RequirementSource::forNestedTypeNameMatch(
                         (nodeID, NestedTypeNameMatch, nullptr, root,
                          nullptr, nullptr),
                         (NestedTypeNameMatch, root, nullptr,
+                         WrittenRequirementLoc()),
+                        0, WrittenRequirementLoc());
+}
+
+const RequirementSource *RequirementSource::forConcreteTypeBinding(
+                                                   PotentialArchetype *root) {
+  auto &builder = *root->getBuilder();
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, ConcreteTypeBinding, nullptr, root,
+                         nullptr, nullptr),
+                                  (ConcreteTypeBinding, root, nullptr,
                          WrittenRequirementLoc()),
                         0, WrittenRequirementLoc());
 }
@@ -652,6 +670,7 @@ RequirementSource::visitPotentialArchetypesAlongPath(
   }
 
   case RequirementSource::NestedTypeNameMatch:
+  case RequirementSource::ConcreteTypeBinding:
   case RequirementSource::Explicit:
   case RequirementSource::Inferred:
   case RequirementSource::QuietlyInferred:
@@ -763,31 +782,7 @@ static unsigned sourcePathLength(const RequirementSource *source) {
   return count;
 }
 
-/// Check whether we have a NestedTypeNameMatch/ProtocolRequirement requirement
-/// pair, in which case we prefer the RequirementSignature.
-///
-/// This is part of staging out NestedTypeNameMatch requirement sources in
-/// favor of something more principled.
-static int isNestedTypeNameMatchAndRequirementSignaturePair(
-                                              const RequirementSource *lhs,
-                                              const RequirementSource *rhs) {
-  if (lhs->getRoot()->kind == RequirementSource::NestedTypeNameMatch &&
-      rhs->isProtocolRequirement())
-    return +1;
-
-  if (rhs->getRoot()->kind == RequirementSource::NestedTypeNameMatch &&
-      lhs->isProtocolRequirement())
-    return -1;
-
-  return 0;
-}
-
 int RequirementSource::compare(const RequirementSource *other) const {
-  // FIXME: Egregious hack while we phase out NestedTypeNameMatch
-  if (int compare =
-        isNestedTypeNameMatchAndRequirementSignaturePair(this, other))
-    return compare;
-
   // Prefer the derived option, if there is one.
   bool thisIsDerived = this->isDerivedRequirement();
   bool otherIsDerived = other->isDerivedRequirement();
@@ -851,6 +846,10 @@ void RequirementSource::print(llvm::raw_ostream &out,
 
   case NestedTypeNameMatch:
     out << "Nested type match";
+    break;
+
+  case RequirementSource::ConcreteTypeBinding:
+    out << "Concrete type binding";
     break;
 
   case Parent:
@@ -1030,6 +1029,7 @@ bool FloatingRequirementSource::isExplicit() const {
     case RequirementSource::Inferred:
     case RequirementSource::QuietlyInferred:
     case RequirementSource::NestedTypeNameMatch:
+    case RequirementSource::ConcreteTypeBinding:
     case RequirementSource::Parent:
     case RequirementSource::ProtocolRequirement:
     case RequirementSource::InferredProtocolRequirement:
@@ -1053,6 +1053,7 @@ bool FloatingRequirementSource::isExplicit() const {
     case RequirementSource::RequirementSignatureSelf:
     case RequirementSource::Concrete:
     case RequirementSource::NestedTypeNameMatch:
+    case RequirementSource::ConcreteTypeBinding:
     case RequirementSource::Parent:
     case RequirementSource::Superclass:
     case RequirementSource::Derived:
@@ -2072,7 +2073,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
         builder.addSameTypeRequirement(
                          UnresolvedType(resultPA),
                          UnresolvedType(type),
-                         RequirementSource::forNestedTypeNameMatch(resultPA),
+                         RequirementSource::forConcreteTypeBinding(resultPA),
                          UnresolvedHandlingKind::GenerateConstraints);
       }
     }
