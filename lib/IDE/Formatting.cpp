@@ -102,13 +102,30 @@ public:
       LineText.startswith("return") || LineText.startswith("fallthrough");
   }
 
-  void padToSiblingColumn(StringBuilder &Builder) {
+  void padToSiblingColumn(StringBuilder &Builder,
+                          const CodeFormatOptions &FmtOptions) {
     assert(SiblingInfo.Loc.isValid() && "No sibling to align with.");
     CharSourceRange Range(SM, Lexer::getLocForStartOfLine(SM, SiblingInfo.Loc),
                           SiblingInfo.Loc);
-    for (auto C : Range.str()) {
-      Builder.append(1, C == '\t' ? C : ' ');
+    unsigned SpaceLength = 0;
+    unsigned TabLength = 0;
+
+    // Calculating space length
+    for (auto C: Range.str()) {
+      if (C == '\t')
+        TabLength += FmtOptions.TabWidth;
+      else
+        SpaceLength += 1;
     }
+
+    // If we are using tabs, calculating the number of tabs and spaces we need
+    // to insert.
+    if (FmtOptions.UseTabs) {
+      TabLength = SpaceLength / FmtOptions.TabWidth;
+      SpaceLength = SpaceLength % FmtOptions.TabWidth;
+    }
+    Builder.append(TabLength, '\t');
+    Builder.append(SpaceLength, ' ');
   }
 
   bool HasSibling() {
@@ -801,7 +818,7 @@ public:
     if (FC.HasSibling()) {
       StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
       StringBuilder Builder;
-      FC.padToSiblingColumn(Builder);
+      FC.padToSiblingColumn(Builder, FmtOptions);
       if (FC.needExtraIndentationForSibling()) {
         if (FmtOptions.UseTabs)
           Builder.append(1, '\t');
