@@ -387,7 +387,7 @@ func pets<T>(fur: T) -> Claws<Kitten>.Fangs<T> {
   return Claws<Kitten>.Fangs<T>()
 }
 
-func something<T>() -> T { // expected-note {{in call to function 'something()'}}
+func something<T>() -> T { // expected-note {{in call to function 'something'}}
   while true {}
 }
 
