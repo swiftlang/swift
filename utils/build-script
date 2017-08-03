@@ -1803,7 +1803,7 @@ iterations with -O",
         "--skip-test-ios-32bit-simulator",
         help="skip testing iOS 32 bit simulator targets",
         action=arguments.action.optional_bool,
-        default=True)
+        default=False)
     skip_test_group.add_argument(
         "--skip-test-ios-host",
         help="skip testing iOS device targets on the host machine (the phone "
