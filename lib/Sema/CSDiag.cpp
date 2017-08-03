@@ -2134,7 +2134,8 @@ public:
 
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
-  bool diagnoseContextualConversionError(Expr *expr, Type contextualType);
+  bool diagnoseContextualConversionError(Expr *expr, Type contextualType,
+                                         ContextualTypePurpose CTP);
 
   /// For an expression being type checked with a CTP_CalleeResult contextual
   /// type, try to diagnose a problem.
@@ -2143,7 +2144,8 @@ public:
   /// Attempt to produce a diagnostic for a mismatch between a call's
   /// type and its assumed contextual type.
   bool diagnoseCallContextualConversionErrors(ApplyExpr *callEpxr,
-                                              Type contextualType);
+                                              Type contextualType,
+                                              ContextualTypePurpose CTP);
 
 private:
   /// Validate potential contextual type for type-checking one of the
@@ -3899,9 +3901,9 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
 /// of function type, giving more specific and simpler diagnostics, attaching
 /// notes on the parameter, and offering fixits to insert @escaping. Returns
 /// true if it detects and issues an error, false if it does nothing.
-static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
-                                                      Type dstType,
-                                                      ConstraintSystem &CS) {
+static bool tryDiagnoseNonEscapingParameterToEscaping(
+    Expr *expr, Type srcType, Type dstType, ContextualTypePurpose dstPurpose,
+    ConstraintSystem &CS) {
   assert(expr);
   // Need to be referencing a parameter of function type
   auto declRef = dyn_cast<DeclRefExpr>(expr);
@@ -3921,7 +3923,7 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
 
   // Pick a specific diagnostic for the specific use
   auto paramDecl = cast<ParamDecl>(declRef->getDecl());
-  switch (CS.getContextualTypePurpose()) {
+  switch (dstPurpose) {
   case CTP_CallArgument:
     CS.TC.diagnose(declRef->getLoc(), diag::passing_noescape_to_escaping,
                    paramDecl->getName());
@@ -3949,13 +3951,13 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
   return true;
 }
 
-bool FailureDiagnosis::diagnoseContextualConversionError(Expr *expr,
-                                                         Type contextualType) {
+bool FailureDiagnosis::diagnoseContextualConversionError(
+    Expr *expr, Type contextualType, ContextualTypePurpose CTP) {
   // If the constraint system has a contextual type, then we can test to see if
   // this is the problem that prevents us from solving the system.
   if (!contextualType) {
     // This contextual conversion constraint doesn't install an actual type.
-    if (CS.getContextualTypePurpose() == CTP_CalleeResult)
+    if (CTP == CTP_CalleeResult)
       return diagnoseCalleeResultContextualConversionError();
  
     return false;
@@ -3995,7 +3997,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Expr *expr,
   // If this is conversion failure due to a return statement with an argument
   // that cannot be coerced to the result type of the function, emit a
   // specific error.
-  switch (CS.getContextualTypePurpose()) {
+  switch (CTP) {
   case CTP_Unused:
   case CTP_CannotFail:
     llvm_unreachable("These contextual type purposes cannot fail with a "
@@ -4156,8 +4158,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Expr *expr,
 
   // If this is a conversion from T to () in a call argument context, it is
   // almost certainly an extra argument being passed in.
-  if (CS.getContextualTypePurpose() == CTP_CallArgument &&
-      contextualType->isVoid()) {
+  if (CTP == CTP_CallArgument && contextualType->isVoid()) {
     diagnose(expr->getLoc(), diag::extra_argument_to_nullary_call)
       .highlight(expr->getSourceRange());
     return true;
@@ -4212,7 +4213,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Expr *expr,
 
   // Try for better/more specific diagnostics for non-escaping to @escaping
   if (tryDiagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
-                                                CS))
+                                                CTP, CS))
     return true;
 
   // Don't attempt fixits if we have an unsolved type variable, since
@@ -4261,7 +4262,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Expr *expr,
   }
 
   // Attempt to add a fixit for the error.
-  switch (CS.getContextualTypePurpose()) {
+  switch (CTP) {
   case CTP_CallArgument:
   case CTP_ArrayElement:
   case CTP_DictionaryKey:
@@ -6303,7 +6304,8 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
     // related to function type, let's try to diagnose it.
     if (possibleTypes.empty() && contextualType &&
         !contextualType->hasUnresolvedType())
-      return diagnoseContextualConversionError(callExpr, contextualType);
+      return diagnoseContextualConversionError(callExpr, contextualType,
+                                               CS.getContextualTypePurpose());
   } else {
     possibleTypes.push_back(currentType);
   }
@@ -6404,7 +6406,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
 /// Check if there failure associated with expression is related
 /// to given contextual type.
 bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
-    ApplyExpr *callExpr, Type contextualType) {
+    ApplyExpr *callExpr, Type contextualType, ContextualTypePurpose CTP) {
   if (!contextualType || contextualType->hasUnresolvedType())
     return false;
 
@@ -6436,7 +6438,7 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   // If type-checking with contextual type didn't produce any results
   // it means that we have a contextual mismatch.
   if (withContextual.empty())
-    return diagnoseContextualConversionError(callExpr, contextualType);
+    return diagnoseContextualConversionError(callExpr, contextualType, CTP);
 
   // If call produces a single type when type-checked with contextual
   // expression, it means that the problem is elsewhere, any other
@@ -6482,7 +6484,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (diagnoseTrailingClosureErrors(callExpr))
     return true;
 
-  if (diagnoseCallContextualConversionErrors(callExpr, CS.getContextualType()))
+  if (diagnoseCallContextualConversionErrors(callExpr, CS.getContextualType(),
+                                             CS.getContextualTypePurpose()))
     return true;
 
   auto *fnExpr = callExpr->getFn();
@@ -7004,11 +7007,31 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
     return true;
   }
 
-  // If the source type is already an error type, we've already posted an error.
-  auto srcExpr = typeCheckChildIndependently(assignExpr->getSrc(),
-                                             destType->getRValueType(),
-                                             CTP_AssignSource);
-  if (!srcExpr) return true;
+  auto *srcExpr = assignExpr->getSrc();
+  auto contextualType = destType->getRValueType();
+
+  // Let's try to type-check assignment source expression without using
+  // destination as a contextual type, that allows us to diagnose
+  // contextual problems related to source much easier.
+  //
+  // If source expression requires contextual type to be present,
+  // let's avoid this step because it's always going to fail.
+  {
+    auto *srcExpr = assignExpr->getSrc();
+    ExprTypeSaverAndEraser eraser(srcExpr);
+
+    ConcreteDeclRef ref = nullptr;
+    auto type = CS.TC.getTypeOfExpressionWithoutApplying(srcExpr, CS.DC, ref);
+
+    if (type && !type->isEqual(contextualType))
+      return diagnoseContextualConversionError(
+          assignExpr->getSrc(), contextualType, CTP_AssignSource);
+  }
+
+  srcExpr = typeCheckChildIndependently(assignExpr->getSrc(), contextualType,
+                                        CTP_AssignSource);
+  if (!srcExpr)
+    return true;
 
   // If we are assigning to _ and have unresolved types on the RHS, then we have
   // an ambiguity problem.
@@ -8860,7 +8883,8 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
     return;
 
   // If this is a contextual conversion problem, dig out some information.
-  if (diagnosis.diagnoseContextualConversionError(expr, getContextualType()))
+  if (diagnosis.diagnoseContextualConversionError(expr, getContextualType(),
+                                                  getContextualTypePurpose()))
     return;
 
   // If we can diagnose a problem based on the constraints left laying around in

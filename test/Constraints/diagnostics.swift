@@ -1085,3 +1085,9 @@ fun_31849281(a: { !$0 }, c: [nil, 42], b: { "\($0)" })
 
 func f_31849281(x: Int, y: Int, z: Int) {}
 f_31849281(42, y: 10, x: 20) // expected-error {{argument 'x' must precede unnamed argument #1}} {{12-12=x: 20, }} {{21-28=}}
+
+func sr5081() {
+  var a = ["1", "2", "3", "4", "5"]
+  var b = [String]()
+  b = a[2...4] // expected-error {{cannot assign value of type 'ArraySlice<String>' to type '[String]'}}
+}

@@ -429,7 +429,7 @@ class GenericClass<A> {}
 func genericFunc<T>(t: T) {
   _ = [T: GenericClass] // expected-error {{generic parameter 'A' could not be inferred}}
   // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
-  // expected-error@-2 2 {{type 'T' does not conform to protocol 'Hashable'}}
+  // expected-error@-2 3 {{type 'T' does not conform to protocol 'Hashable'}}
 }
 
 struct SR_3525<T> {}
