@@ -121,9 +121,9 @@ SubstringTests.test("CharacterView") {
   
   t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
   u.replaceSubrange(u.startIndex...u.startIndex, with: ["E"])
-  expectEqual(String(u), "Efg")
-  expectEqual(String(t), "Cdefg")
-  expectEqual(s, "abcdefg")
+  expectEqual("Efg", String(u))
+  expectEqual("Cdefg", String(t))
+  expectEqual("abcdefg", s)
 }
 
 SubstringTests.test("UnicodeScalars") {

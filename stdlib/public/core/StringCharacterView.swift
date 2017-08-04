@@ -726,6 +726,8 @@ extension String.CharacterView : RangeReplaceableCollection {
 
 // Algorithms
 extension String.CharacterView {
+  public typealias SubSequence = Substring.CharacterView
+
   /// Accesses the characters in the given range.
   ///
   /// The example below uses this subscript to access the characters up to, but
@@ -739,6 +741,12 @@ extension String.CharacterView {
   ///
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
+  @available(swift, introduced: 4.0)
+  public subscript(bounds: Range<Index>) -> Substring.CharacterView {
+    return String(self)[bounds].characters
+  }
+
+  @available(swift, obsoleted: 4.0)
   public subscript(bounds: Range<Index>) -> String.CharacterView {
     return String.CharacterView(
       unicodeScalars[bounds]._core,

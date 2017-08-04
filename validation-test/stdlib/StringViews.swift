@@ -482,15 +482,15 @@ tests.test("index-mapping/unicode-scalar-to-character/\(id)") {
     "❄️", err("\u{FE0F}"),
     replacementCharacter, "\u{20}", replacementCharacter, replacementCharacter
   ]
+
+  let mappedChars = winter.unicodeScalars.indices.map {
+    i in mapIndex(i, winter).map {
+      winter[$0]
+    }
+  }
   
   expectEqualSequence(
-    winterUnicodeScalarCharacters,
-    
-    winter.unicodeScalars.indices.map {
-      i in mapIndex(i, winter).map {
-        winter[$0]
-      }
-    }, sameValue: ==)
+    winterUnicodeScalarCharacters, mappedChars, sameValue: ==)
 
   expectEqual(winter.endIndex, mapIndex(winter.unicodeScalars.endIndex, winter)!)
   
