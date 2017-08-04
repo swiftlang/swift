@@ -24,12 +24,9 @@ template class llvm::DominatorTreeBase<SILBasicBlock, true>;
 template class llvm::DomTreeNodeBase<SILBasicBlock>;
 using SILDomTree = llvm::DomTreeBase<SILBasicBlock>;
 using SILPostDomTree = llvm::PostDomTreeBase<SILBasicBlock>;
+template void llvm::DomTreeBuilder::Calculate<SILDomTree>(SILDomTree &DT);
 template void
-llvm::DomTreeBuilder::Calculate<SILDomTree, swift::SILFunction>(
-    SILDomTree &DT, swift::SILFunction &F);
-template void
-llvm::DomTreeBuilder::Calculate<SILPostDomTree, swift::SILFunction>(
-    SILPostDomTree &DT, swift::SILFunction &F);
+llvm::DomTreeBuilder::Calculate<SILPostDomTree>(SILPostDomTree &DT);
 
 /// Compute the immediate-dominators map.
 DominanceInfo::DominanceInfo(SILFunction *F)
