@@ -306,6 +306,9 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addDeadFunctionElimination();
   // Start by cloning functions from stdlib.
   P.addSILLinker();
+
+  // Cleanup after SILGen: remove trivial copies to temporaries.
+  P.addTempRValueOpt();
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
