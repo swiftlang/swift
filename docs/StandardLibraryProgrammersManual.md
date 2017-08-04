@@ -73,6 +73,19 @@ These three functions are assertions that will trigger a run time trap if violat
 * `_debugPrecondition` will execute when **user code** is built with assertions enabled. Use this for invariant enforcement that's useful while debugging, but might be prohibitively expensive when user code is configured without assertions.
 * `_sanityCheck` will execute when **standard library code** is built with assertions enabled. Use this for internal only invariant checks that useful for debugging the standard library itself.
 
+#### `_fixLifetime`
+
+A call to `_fixLifetime` is considered a use of its argument, meaning that the argument is guaranteed live at least up until the call. It is otherwise a nop. This is useful for guaranteeing the lifetime of a value while inspecting its physical layout. Without a call to `_fixLifetime`, the last formal use may occur while the value's bits are still being munged.
+
+*Example:*
+
+```swift
+var x = ...
+defer { _fixLifetime(x) } // Guarentee at least lexical lifetime for x
+let theBits = unsafeBitCast(&x, ...)
+... // use of theBits in ways that may outlive x if it weren't for the _fixLifetime call
+```
+
 
 ### Annotations
 
