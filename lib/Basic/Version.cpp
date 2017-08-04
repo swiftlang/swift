@@ -75,10 +75,10 @@ static void printFullRevisionString(raw_ostream &out) {
 #endif
 }
 
-void splitVersionComponents(
+static void splitVersionComponents(
   SmallVectorImpl<std::pair<StringRef, SourceRange>> &SplitComponents,
                             StringRef &VersionString, SourceLoc Loc,
-                            DiagnosticEngine *Diags, bool skipQuote = false) {
+                            bool skipQuote = false) {
   SourceLoc Start = (Loc.isValid() && skipQuote) ? Loc.getAdvancedLoc(1) : Loc;
   SourceLoc End = Start;
 
@@ -99,13 +99,19 @@ void splitVersionComponents(
   }
 }
 
-Version Version::parseCompilerVersionString(
+Optional<Version> Version::parseCompilerVersionString(
   StringRef VersionString, SourceLoc Loc, DiagnosticEngine *Diags) {
 
   Version CV;
   SmallString<16> digits;
   llvm::raw_svector_ostream OS(digits);
   SmallVector<std::pair<StringRef, SourceRange>, 5> SplitComponents;
+
+  splitVersionComponents(SplitComponents, VersionString, Loc,
+                         /*skipQuote=*/true);
+
+  uint64_t ComponentNumber;
+  bool isValidVersion = true;
 
   auto checkVersionComponent = [&](unsigned Component, SourceRange Range) {
     unsigned limit = CV.Components.size() == 0 ? 9223371 : 999;
@@ -114,15 +120,9 @@ Version Version::parseCompilerVersionString(
       if (Diags)
         Diags->diagnose(Range.Start,
                         diag::compiler_version_component_out_of_range, limit);
-      else
-        llvm_unreachable("Compiler version component out of range");
+      isValidVersion = false;
     }
   };
-
-  splitVersionComponents(SplitComponents, VersionString, Loc, Diags,
-                         /*skipQuote=*/true);
-
-  uint64_t ComponentNumber;
 
   for (size_t i = 0; i < SplitComponents.size(); ++i) {
     StringRef SplitComponent;
@@ -133,20 +133,16 @@ Version Version::parseCompilerVersionString(
     if (SplitComponent.empty()) {
       if (Diags)
         Diags->diagnose(Range.Start, diag::empty_version_component);
-      else
-        llvm_unreachable("Found empty compiler version component");
+      isValidVersion = false;
       continue;
     }
 
     // The second version component isn't used for comparison.
     if (i == 1) {
       if (!SplitComponent.equals("*")) {
-        if (Diags) {
+        if (Diags)
           Diags->diagnose(Range.Start, diag::unused_compiler_version_component)
           .fixItReplaceChars(Range.Start, Range.End, "*");
-        } else {
-          llvm_unreachable("Expected * for second compiler version component");
-        }
       }
 
       CV.Components.push_back(0);
@@ -158,23 +154,20 @@ Version Version::parseCompilerVersionString(
       checkVersionComponent(ComponentNumber, Range);
       CV.Components.push_back(ComponentNumber);
       continue;
-    } else if (Diags) {
-      Diags->diagnose(Range.Start,
-                      diag::version_component_not_number);
     } else {
-      llvm_unreachable("Invalid character in _compiler_version condition");
+      if (Diags)
+        Diags->diagnose(Range.Start, diag::version_component_not_number);
+      isValidVersion = false;
     }
   }
 
   if (CV.Components.size() > 5) {
-    if (Diags) {
+    if (Diags)
       Diags->diagnose(Loc, diag::compiler_version_too_many_components);
-    } else {
-      llvm_unreachable("Compiler version must not have more than 5 components");
-    }
+    isValidVersion = false;
   }
 
-  return CV;
+  return isValidVersion ? Optional<Version>(CV) : None;
 }
 
 Optional<Version> Version::parseVersionString(StringRef VersionString,
@@ -226,6 +219,11 @@ Optional<Version> Version::parseVersionString(StringRef VersionString,
   return isValidVersion ? Optional<Version>(TheVersion) : None;
 }
 
+Version::Version(StringRef VersionString,
+                 SourceLoc Loc,
+                 DiagnosticEngine *Diags)
+  : Version(*parseVersionString(VersionString, Loc, Diags))
+{}
 
 Version Version::getCurrentCompilerVersion() {
 #ifdef SWIFT_COMPILER_VERSION
@@ -312,19 +310,23 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
     return None;
   }
 
-  // FIXME: When we switch to Swift 4 by default, the "3" case should return
-  // a version newer than any released 3.x compiler (probably "3.2"), and the
-  // "4" case should start returning getCurrentLanguageVersion. We should
+  // FIXME: When we switch to Swift 5 by default, the "4" case should return
+  // a version newer than any released 4.x compiler, and the
+  // "5" case should start returning getCurrentLanguageVersion. We should
   // also check for the presence of SWIFT_VERSION_PATCHLEVEL, and if that's
   // set apply it to the "3" case, so that Swift 4.0.1 will automatically
   // have a compatibility mode of 3.2.1.
   switch (Components[0]) {
   case 3:
-    static_assert(SWIFT_VERSION_MAJOR == 3,
+#ifdef SWIFT_VERSION_PATCHLEVEL
+    return Version{3, 2, SWIFT_VERSION_PATCHLEVEL};
+#else
+    return Version{3, 2};
+#endif
+  case 4:
+    static_assert(SWIFT_VERSION_MAJOR == 4,
                   "getCurrentLanguageVersion is no longer correct here");
     return Version::getCurrentLanguageVersion();
-  case 4:
-    return Version{4, 0};
   default:
     return None;
   }

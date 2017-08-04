@@ -110,9 +110,23 @@ static llvm::SmallVector<SILInstruction *, 1>
 findDeallocStackInst(AllocStackInst *ASI) {
   llvm::SmallVector<SILInstruction *, 1> DSIs;
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
-    if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
+    if (auto *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
       DSIs.push_back(D);
     }   
+  }
+  return DSIs;
+}
+
+/// Return the deallocate ref instructions corresponding to the given
+/// AllocRefInst.
+static llvm::SmallVector<SILInstruction *, 1>
+findDeallocRefInst(AllocRefInst *ARI) {
+  llvm::SmallVector<SILInstruction *, 1> DSIs;
+  for (auto UI = ARI->use_begin(), E = ARI->use_end(); UI != E; ++UI) {
+    if (auto *D = dyn_cast<DeallocRefInst>(UI->getUser())) {
+      if (D->isDeallocatingStack())
+        DSIs.push_back(D);
+    }
   }
   return DSIs;
 }
@@ -138,6 +152,7 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case ValueKind::UnownedRetainInst:
   case ValueKind::RetainValueInst:
   case ValueKind::DeallocStackInst:
+  case ValueKind::DeallocRefInst:
   case ValueKind::CondFailInst:
   case ValueKind::FixLifetimeInst:
     return true;
@@ -647,6 +662,16 @@ void BlockState::initStoreSetAtEndOfBlock(DSEContext &Ctx) {
     // Turn on the store bit at the block which the stack slot is deallocated.
     if (auto *ASI = dyn_cast<AllocStackInst>(LocationVault[i].getBase())) {
       for (auto X : findDeallocStackInst(ASI)) {
+        SILBasicBlock *DSIBB = X->getParent();
+        if (DSIBB != BB)
+          continue;
+        startTrackingLocation(BBDeallocateLocation, i);
+      }
+    }
+    if (auto *ARI = dyn_cast<AllocRefInst>(LocationVault[i].getBase())) {
+      if (!ARI->isAllocatingStack())
+        continue;
+      for (auto X : findDeallocRefInst(ARI)) {
         SILBasicBlock *DSIBB = X->getParent();
         if (DSIBB != BB)
           continue;

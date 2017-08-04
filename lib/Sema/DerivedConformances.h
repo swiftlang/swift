@@ -96,6 +96,30 @@ ValueDecl *deriveBridgedNSError(TypeChecker &tc,
                                 NominalTypeDecl *type,
                                 ValueDecl *requirement);
 
+/// Derive a CodingKey requirement for an enum type.
+///
+/// \returns the derived member, which will also be added to the type.
+ValueDecl *deriveCodingKey(TypeChecker &tc,
+                           Decl *parentDecl,
+                           NominalTypeDecl *type,
+                           ValueDecl *requirement);
+
+/// Derive an Encodable requirement for a struct type.
+///
+/// \returns the derived member, which will also be added to the type.
+ValueDecl *deriveEncodable(TypeChecker &tc,
+                           Decl *parentDecl,
+                           NominalTypeDecl *type,
+                           ValueDecl *requirement);
+
+/// Derive a Decodable requirement for a struct type.
+///
+/// \returns the derived member, which will also be added to the type.
+ValueDecl *deriveDecodable(TypeChecker &tc,
+                           Decl *parentDecl,
+                           NominalTypeDecl *type,
+                           ValueDecl *requirement);
+
 /// Declare a getter for a derived property.
 FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
                                        Decl *parentDecl,

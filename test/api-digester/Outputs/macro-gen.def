@@ -1,0 +1,22 @@
+
+#ifndef SDK_CHANGE
+#define SDK_CHANGE(NODE_KIND, DIFF_KIND, CHILD_INDEX, LEFT_USR, RIGHT_USR, LEFT_COMMENT, RIGHT_COMMENT, MODULENAME)
+#endif
+SDK_CHANGE(Function, TypeRewritten, "0", "s:12macrogenleft2C1C4foo2SSSi_SitF", "", "String", "Int", "macrogenleft")
+SDK_CHANGE(Function, TypeRewritten, "1", "s:12macrogenleft2C1C4foo2SSSi_SitF", "", "Int", "() -> ()", "macrogenleft")
+SDK_CHANGE(Function, TypeRewritten, "2", "s:12macrogenleft2C1C4foo2SSSi_SitF", "", "Int", "String", "macrogenleft")
+SDK_CHANGE(Function, Rename, "0", "s:12macrogenleft2S1V4foo5ySi1x_Si1ytF", "", "foo5(x:y:)", "foo5(x:y:z:)", "macrogenleft")
+SDK_CHANGE(Function, WrapOptional, "0", "s:12macrogenleft2S1V4foo6S2i1x_Si1ytF", "", "", "", "macrogenleft")
+SDK_CHANGE(Function, WrapOptional, "2", "s:12macrogenleft2S1V4foo6S2i1x_Si1ytF", "", "", "", "macrogenleft")
+SDK_CHANGE(Function, UnwrapOptional, "0", "s:12macrogenleft2S1V4foo7SiSgSi1x_AE1ytF", "", "", "", "macrogenleft")
+SDK_CHANGE(Function, UnwrapOptional, "2", "s:12macrogenleft2S1V4foo7SiSgSi1x_AE1ytF", "", "", "", "macrogenleft")
+SDK_CHANGE(Function, ImplicitOptionalToOptional, "0", "s:12macrogenleft2S1V4foo8SQySiGSi1x_AE1ytF", "", "", "", "macrogenleft")
+SDK_CHANGE(Function, ImplicitOptionalToOptional, "2", "s:12macrogenleft2S1V4foo8SQySiGSi1x_AE1ytF", "", "", "", "macrogenleft")
+SDK_CHANGE(Function, WrapOptional, "2:0", "s:12macrogenleft2S1V4foo9ySays10DictionaryVySiSSSgGG1x_SaySiG1ytF", "", "", "", "macrogenleft")
+SDK_CHANGE(Function, UnwrapOptional, "1:0:1", "s:12macrogenleft2S1V4foo9ySays10DictionaryVySiSSSgGG1x_SaySiG1ytF", "", "", "", "macrogenleft")
+SDK_CHANGE(Function, WrapOptional, "1:1:1:1:1:0", "s:12macrogenleft2S1V5foo10ySSSi_s10DictionaryVySiAFySSSaySiGGGtc1x_tF", "", "", "", "macrogenleft")
+SDK_CHANGE(Function, TypeRewritten, "1:1:1:1", "s:12macrogenleft2S1V5foo11ySSSi_s10DictionaryVySiAFySSSaySiGGGtc1x_tF", "", "[String : [Int]]", "Int", "macrogenleft")
+SDK_CHANGE(Function, TypeRewritten, "1:1:1:1:1:0:0:0:0", "s:12macrogenleft2S1V5foo12ySSSi_s10DictionaryVySiAFySSSaySiGGGtc1x_tF", "", "Int", "String", "macrogenleft")
+SDK_CHANGE(Constructor, TypeRewritten, "1", "s:12macrogenleft2S1VACSicfc", "", "Int", "Double", "macrogenleft")
+#undef SDK_CHANGE
+

@@ -88,13 +88,24 @@ end:
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @checked_cast_to_anyobject_type
-// CHECK:         [[METATYPE:%.*]] = call %swift.type* @_T014metatype_casts9SomeClassCMa()
-// CHECK:         [[T0:%.*]] = bitcast %swift.type* [[METATYPE]] to i8*
-// CHECK:         [[CAST:%.*]] = call { i8* } @dynamic_cast_existential_0_class_unconditional(i8* [[T0]], %swift.type* [[METATYPE]])
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* %0 to i8*
+// CHECK:         [[CAST:%.*]] = call { i8* } @dynamic_cast_existential_0_class_unconditional(i8* [[T0]], %swift.type* %0)
 // CHECK:         [[RESULT0:%.*]] = extractvalue { i8* } [[CAST]], 0
 // CHECK:         [[RESULT:%.*]] = bitcast i8* [[RESULT0]] to %swift.type*
 // CHECK:         ret %swift.type* [[RESULT]]
-sil @checked_cast_to_anyobject_type : $@convention(thin) () -> @thick AnyObject.Type {
+sil @checked_cast_to_anyobject_type : $@convention(thin) (@thick Any.Type) -> @thick AnyObject.Type {
+entry(%0 : $@thick Any.Type):
+  %2 = unconditional_checked_cast %0 : $@thick Any.Type to $@thick AnyObject.Type
+  return %2 : $@thick AnyObject.Type
+}
+
+// Trivial case -- we know the source is a class metatype, so there's nothing
+// to check.
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @checked_cast_class_to_anyobject_type
+// CHECK:         [[METATYPE:%.*]] = call %swift.type* @_T014metatype_casts9SomeClassCMa()
+// CHECK:         ret %swift.type* [[METATYPE]]
+sil @checked_cast_class_to_anyobject_type : $@convention(thin) () -> @thick AnyObject.Type {
 entry:
   %1 = metatype $@thick SomeClass.Type
   %2 = unconditional_checked_cast %1 : $@thick SomeClass.Type to $@thick AnyObject.Type

@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t && mkdir -p %t && %gyb -DunicodeGraphemeBreakPropertyFile=%utils/UnicodeData/GraphemeBreakProperty.txt -DunicodeGraphemeBreakTestFile=%utils/UnicodeData/GraphemeBreakTest.txt %s -o %t/UnicodeTrie.swift
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DunicodeGraphemeBreakPropertyFile=%utils/UnicodeData/GraphemeBreakProperty.txt -DunicodeGraphemeBreakTestFile=%utils/UnicodeData/GraphemeBreakTest.txt %s -o %t/UnicodeTrie.swift
 // RUN: %line-directive %t/UnicodeTrie.swift -- %target-build-swift %t/UnicodeTrie.swift -o %t/a.out -g -Xfrontend -disable-access-control
 // RUN: %line-directive %t/UnicodeTrie.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
@@ -85,6 +86,10 @@ class NonContiguousNSString : NSString {
 
   required init(coder aDecoder: NSCoder) {
     fatalError("don't call this initializer")
+  }
+
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")    
   }
 
   @nonobjc

@@ -41,7 +41,7 @@ namespace irgen {
   void emitBlockHeader(IRGenFunction &IGF,
                        Address storage,
                        CanSILBlockStorageType blockTy,
-                       llvm::Function *invokeFunction,
+                       llvm::Constant *invokeFunction,
                        CanSILFunctionType invokeTy,
                        ForeignFunctionInfo foreignInfo);
 
@@ -49,7 +49,7 @@ namespace irgen {
   /// partial set of argument values.
   void emitFunctionPartialApplication(IRGenFunction &IGF,
                                       SILFunction &SILFn,
-                                      llvm::Value *fnPtr,
+                                      const FunctionPointer &fnPtr,
                                       llvm::Value *fnContext,
                                       Explosion &args,
                                       ArrayRef<SILParameterInfo> argTypes,

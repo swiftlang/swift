@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen %s | %FileCheck %s
@@ -61,7 +61,7 @@ class ErrorClass: Error {
 func test_cast_to_nserror() {
   let e = ErrorClass()
 
-  // CHECK: function_ref @swift_bridgeErrorToNSError
+  // CHECK: function_ref @swift_convertErrorToNSError
   let nsCoerced = e as Error as NSError
 
   // CHECK: unconditional_checked_cast_addr {{.*}} AnyObject in {{%.*}} : $*AnyObject to NSError in {{%.*}} : $*NSError

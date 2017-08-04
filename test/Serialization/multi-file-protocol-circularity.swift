@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-module -module-name Multi -o %t/a.swiftmodule -primary-file %S/Inputs/circular-protocols/a.swift %S/Inputs/circular-protocols/b.swift %S/Inputs/circular-protocols/c.swift
 // RUN: %target-swift-frontend -emit-module -module-name Multi -o %t/b.swiftmodule -primary-file %S/Inputs/circular-protocols/b.swift %S/Inputs/circular-protocols/a.swift %S/Inputs/circular-protocols/c.swift

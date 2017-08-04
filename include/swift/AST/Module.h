@@ -209,9 +209,6 @@ private:
     unsigned ResilienceStrategy : 2;
   } Flags;
 
-  /// The magic __dso_handle variable.
-  VarDecl *DSOHandle;
-
   ModuleDecl(Identifier name, ASTContext &ctx);
 
 public:
@@ -555,6 +552,18 @@ public:
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const {
+    return nullptr;
+  }
+
+  /// Directly look for a nested type declared within this module inside the
+  /// given nominal type (including any extensions).
+  ///
+  /// This is a fast-path hack to avoid circular dependencies in deserialization
+  /// and the Clang importer.
+  ///
+  /// Private and fileprivate types should not be returned by this lookup.
+  virtual TypeDecl *lookupNestedType(Identifier name,
+                                     const NominalTypeDecl *parent) const {
     return nullptr;
   }
 

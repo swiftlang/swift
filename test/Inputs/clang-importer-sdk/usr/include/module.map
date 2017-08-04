@@ -98,6 +98,10 @@ module objc_structs {
   export *
 }
 
+module enums_using_attributes {
+  header "enums_using_attributes.h"
+}
+
 module errors {
   header "errors.h"
   export *
@@ -115,5 +119,10 @@ module objc_generics {
 
 module CoreMedia {
   header "CoreMedia.h"
+  export *
+}
+
+module OtherSubscripts {
+  header "OtherSubscripts.h"
   export *
 }

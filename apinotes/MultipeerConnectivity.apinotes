@@ -1,5 +1,0 @@
----
-Name: MultipeerConnectivity
-Tags:
-- Name: MCErrorCode
-  NSErrorDomain: MCErrorDomain

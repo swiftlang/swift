@@ -23,6 +23,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -119,7 +120,8 @@ static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
       BuilderWrapper.IRGOpts.SanitizeCoverage));
 }
 
-std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
+std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
+           std::string>
 swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
   //   - relocation model
@@ -133,7 +135,7 @@ swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
-  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features);
+  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }
 
 void setModuleFlags(IRGenModule &IGM) {
@@ -148,13 +150,12 @@ void setModuleFlags(IRGenModule &IGM) {
 
 void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine) {
-  SharedTimer timer("LLVM optimization");
-
   // Set up a pipeline.
   PassManagerBuilderWrapper PMBuilder(Opts);
 
   if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
-    PMBuilder.OptLevel = 3;
+    PMBuilder.OptLevel = 2; // -Os
+    PMBuilder.SizeLevel = 1; // -Os
     PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
     PMBuilder.SLPVectorize = true;
     PMBuilder.LoopVectorize = true;
@@ -361,7 +362,8 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
                         const version::Version &effectiveLanguageVersion,
-                        StringRef OutputFilename) {
+                        StringRef OutputFilename,
+                        UnifiedStatsReporter *Stats) {
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
@@ -463,32 +465,31 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
   }
   }
 
-  {
-    SharedTimer timer("LLVM output");
-    EmitPasses.run(*Module);
+  EmitPasses.run(*Module);
+
+  if (Stats && RawOS.hasValue()) {
+    if (DiagMutex)
+      DiagMutex->lock();
+    Stats->getFrontendCounters().NumLLVMBytesOutput += RawOS->tell();
+    if (DiagMutex)
+      DiagMutex->unlock();
   }
   return false;
 }
 
 std::unique_ptr<llvm::TargetMachine>
 swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
-  const llvm::Triple &Triple = Ctx.LangOpts.Target;
-  std::string Error;
-  const Target *Target = TargetRegistry::lookupTarget(Triple.str(), Error);
-  if (!Target) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, Triple.str(), Error);
-    return nullptr;
-  }
-
-  CodeGenOpt::Level OptLevel = Opts.Optimize ? CodeGenOpt::Aggressive
+  CodeGenOpt::Level OptLevel = Opts.Optimize ? CodeGenOpt::Default // -Os
                                              : CodeGenOpt::None;
 
   // Set up TargetOptions and create the target features string.
   TargetOptions TargetOpts;
   std::string CPU;
+  std::string EffectiveClangTriple;
   std::vector<std::string> targetFeaturesArray;
-  std::tie(TargetOpts, CPU, targetFeaturesArray)
+  std::tie(TargetOpts, CPU, targetFeaturesArray, EffectiveClangTriple)
     = getIRTargetOptions(Opts, Ctx);
+  const llvm::Triple &EffectiveTriple = llvm::Triple(EffectiveClangTriple);
   std::string targetFeatures;
   if (!targetFeaturesArray.empty()) {
     llvm::SubtargetFeatures features;
@@ -497,21 +498,31 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
     targetFeatures = features.getString();
   }
 
+  std::string Error;
+  const Target *Target =
+      TargetRegistry::lookupTarget(EffectiveTriple.str(), Error);
+  if (!Target) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, EffectiveTriple.str(),
+                       Error);
+    return nullptr;
+  }
+
+
   // Create a target machine.
   auto cmodel = CodeModel::Default;
 
   // On Windows 64 bit, dlls are loaded above the max address for 32 bits.
   // This means that a default CodeModel causes generated code to segfault
   // when run.
-  if (Triple.isArch64Bit() && Triple.isOSWindows())
+  if (EffectiveTriple.isArch64Bit() && EffectiveTriple.isOSWindows())
     cmodel = CodeModel::Large;
 
   llvm::TargetMachine *TargetMachine =
-      Target->createTargetMachine(Triple.str(), CPU, targetFeatures, TargetOpts,
-                                  Reloc::PIC_, cmodel, OptLevel);
+      Target->createTargetMachine(EffectiveTriple.str(), CPU, targetFeatures,
+                                  TargetOpts, Reloc::PIC_, cmodel, OptLevel);
   if (!TargetMachine) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
-                       Triple.str(), "no LLVM target machine");
+                       EffectiveTriple.str(), "no LLVM target machine");
     return nullptr;
   }
   return std::unique_ptr<llvm::TargetMachine>(TargetMachine);
@@ -645,12 +656,19 @@ void swift::irgen::deleteIRGenModule(
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
   SILPassManager PM(&Module, &IRModule);
+  bool largeLoadable = Module.getOptions().EnableLargeLoadableTypes;
 #define PASS(ID, Tag, Name)
 #define IRGEN_PASS(ID, Tag, Name)                                              \
-  PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());
+  if (swift::PassKind::ID == swift::PassKind::LoadableByAddress) {             \
+    if (largeLoadable) {                                                       \
+      PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());          \
+    }                                                                          \
+  } else {                                                                     \
+    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());            \
+  }
 #include "swift/SILOptimizer/PassManager/Passes.def"
   PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getIRGenPreparePassPipeline());
+      SILPassPipelinePlan::getIRGenPreparePassPipeline(Module.getOptions()));
 }
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
@@ -714,6 +732,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       IGM.emitTypeMetadataRecords();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
+      irgen.emitEagerClassInitialization();
     }
 
     // Emit symbols for eliminated dead methods.
@@ -765,6 +784,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   if (outModuleHash) {
     *outModuleHash = IGM.ModuleHash;
   } else {
+    SharedTimer timer("LLVM pipeline");
+
     // Since no out module hash was set, we need to performLLVM.
     if (performLLVM(Opts, &IGM.Context.Diags, nullptr, IGM.ModuleHash,
                     IGM.getModule(), IGM.TargetMachine.get(),
@@ -875,7 +896,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   irgen.emitGlobalTopLevel();
   
   for (auto *File : M->getFiles()) {
-    if (SourceFile *SF = dyn_cast<SourceFile>(File)) {
+    if (auto *SF = dyn_cast<SourceFile>(File)) {
       IRGenModule *IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF, 0);
     } else {
@@ -891,6 +912,8 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   irgen.emitProtocolConformances();
 
   irgen.emitReflectionMetadataVersion();
+
+  irgen.emitEagerClassInitialization();
 
   // Emit reflection metadata for builtin and imported types.
   irgen.emitBuiltinReflectionMetadata();
@@ -982,6 +1005,8 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
   // Bail out if there are any errors.
   if (Ctx.hadError()) return;
+
+  SharedTimer timer("LLVM pipeline");
 
   std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;
@@ -1085,7 +1110,8 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
 }
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
-                        llvm::Module *Module) {
+                        llvm::Module *Module,
+                        UnifiedStatsReporter *Stats) {
   // Build TargetMachine.
   auto TargetMachine = createTargetMachine(Opts, Ctx);
   if (!TargetMachine)
@@ -1095,7 +1121,7 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
   if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
                     TargetMachine.get(),
                     Ctx.LangOpts.EffectiveLanguageVersion,
-                    Opts.getSingleOutputFilename()))
+                    Opts.getSingleOutputFilename(), Stats))
     return true;
   return false;
 }

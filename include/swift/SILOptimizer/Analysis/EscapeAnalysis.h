@@ -377,6 +377,9 @@ public:
     /// NodeType::Return.
     CGNode *ReturnNode = nullptr;
 
+    /// The list of use points.
+    llvm::SmallVector<ValueBase *, 16> UsePointTable;
+
     /// Mapping of use points to bit indices in CGNode::UsePoints.
     llvm::DenseMap<ValueBase *, int> UsePoints;
 
@@ -490,6 +493,8 @@ public:
       int Idx = (int)UsePoints.size();
       assert(UsePoints.count(V) == 0 && "value is already a use-point");
       UsePoints[V] = Idx;
+      UsePointTable.push_back(V);
+      assert(UsePoints.size() == UsePointTable.size());
       Node->setUsePointBit(Idx);
       return Idx;
     }
@@ -567,6 +572,10 @@ public:
     /// Use-points are only values which are relevant for lifeness computation,
     /// e.g. release or apply instructions.
     bool isUsePoint(ValueBase *V, CGNode *Node);
+
+    /// Returns all use points of \p Node in \p UsePoints.
+    void getUsePoints(CGNode *Node,
+                      llvm::SmallVectorImpl<ValueBase *> &UsePoints);
 
     /// Computes the use point information.
     void computeUsePoints();

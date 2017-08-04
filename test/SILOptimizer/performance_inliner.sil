@@ -786,7 +786,7 @@ bb2:                                              // Preds: bb0 bb1
   return %16 : $()                                // id: %17
 }
 
-sil [transparent] @slowHelper : $@convention(thin) () -> () {
+sil @slowHelper : $@convention(thin) () -> () {
 bb0:
   // make it a non-trivial function
   %f = function_ref @unknown_function : $@convention(thin) () -> ()

@@ -69,8 +69,9 @@ struct S {
 
 }
 
-/// Ensure 'variariable used within its own initial value' not to be emitted.
+/// Ensure 'variable used within its own initial value' not to be emitted.
 let BAR = { () -> Void in
 #if BAR
 #endif
 }
+

@@ -72,13 +72,13 @@ public struct LazyDropWhileSequence<Base : Sequence> : LazySequenceProtocol {
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  internal init(_base: Base, predicate: @escaping (Base.Iterator.Element) -> Bool) {
+  internal init(_base: Base, predicate: @escaping (Base.Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
 
   internal var _base: Base
-  internal let _predicate: (Base.Iterator.Element) -> Bool
+  internal let _predicate: (Base.Element) -> Bool
 }
 
 extension LazySequenceProtocol {
@@ -90,7 +90,7 @@ extension LazySequenceProtocol {
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   public func drop(
-    while predicate: @escaping (Elements.Iterator.Element) -> Bool
+    while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyDropWhileSequence<Self.Elements> {
     return LazyDropWhileSequence(_base: self.elements, predicate: predicate)
   }
@@ -103,20 +103,18 @@ extension LazySequenceProtocol {
 public struct LazyDropWhileIndex<Base : Collection> : Comparable {
   /// The position corresponding to `self` in the underlying collection.
   public let base: Base.Index
-}
 
-public func == <Base>(
-  lhs: LazyDropWhileIndex<Base>,
-  rhs: LazyDropWhileIndex<Base>
-) -> Bool {
-  return lhs.base == rhs.base
-}
+  public static func == (
+    lhs: LazyDropWhileIndex, rhs: LazyDropWhileIndex
+  ) -> Bool {
+    return lhs.base == rhs.base
+  }
 
-public func < <Base>(
-  lhs: LazyDropWhileIndex<Base>,
-  rhs: LazyDropWhileIndex<Base>
-) -> Bool {
-  return lhs.base < rhs.base
+  public static func < (
+    lhs: LazyDropWhileIndex, rhs: LazyDropWhileIndex
+  ) -> Bool {
+    return lhs.base < rhs.base
+  }
 }
 
 % for Traversal in ['Forward', 'Bidirectional']:
@@ -166,7 +164,7 @@ public struct ${Self}<
 
 %   end
 
-  public subscript(position: Index) -> Base.Iterator.Element {
+  public subscript(position: Index) -> Base.Element {
     return _base[position.base]
   }
 
@@ -175,13 +173,13 @@ public struct ${Self}<
       _base: _base.makeIterator(), predicate: _predicate)
   }
 
-  internal init(_base: Base, predicate: @escaping (Base.Iterator.Element) -> Bool) {
+  internal init(_base: Base, predicate: @escaping (Base.Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
 
   internal var _base: Base
-  internal let _predicate: (Base.Iterator.Element) -> Bool
+  internal let _predicate: (Base.Element) -> Bool
 }
 
 extension LazyCollectionProtocol
@@ -199,7 +197,7 @@ Elements : ${Collection}
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   public func drop(
-    while predicate: @escaping (Elements.Iterator.Element) -> Bool
+    while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyDropWhile${Collection}<Self.Elements> {
     return LazyDropWhile${Collection}(
       _base: self.elements, predicate: predicate)

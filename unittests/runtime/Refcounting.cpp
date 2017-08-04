@@ -153,6 +153,24 @@ TEST(RefcountingTest, unowned_retain_release_n) {
   EXPECT_EQ(1u, value);
 }
 
+TEST(RefcountingTest, unowned_retain_release_n_overflow) {
+  // This test would test overflow on 32bit platforms.
+  // These platforms have 7 unowned reference count bits.
+  size_t value = 0;
+  auto object = allocTestObject(&value, 1);
+  EXPECT_EQ(0u, value);
+  swift_unownedRetain_n(object, 128);
+  EXPECT_EQ(129u, swift_unownedRetainCount(object));
+  swift_unownedRetain(object);
+  EXPECT_EQ(130u, swift_unownedRetainCount(object));
+  swift_unownedRelease_n(object, 128);
+  EXPECT_EQ(2u, swift_unownedRetainCount(object));
+  swift_unownedRelease(object);
+  EXPECT_EQ(1u, swift_unownedRetainCount(object));
+  swift_release(object);
+  EXPECT_EQ(1u, value);
+}
+
 TEST(RefcountingTest, isUniquelyReferenced) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);

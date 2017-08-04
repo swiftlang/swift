@@ -69,6 +69,20 @@ enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS,
 };
 
+enum class KeyPathComponentKindEncoding : uint8_t {
+  StoredProperty,
+  GettableProperty,
+  SettableProperty,
+  OptionalChain,
+  OptionalForce,
+  OptionalWrap,
+};
+enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
+  Property,
+  Function,
+  DeclRef,
+};
+
 // Constants for packing an encoded CheckedCastKind and
 // CastConsumptionKind together.
 enum {
@@ -357,7 +371,7 @@ namespace sil_block {
   using SILOneOperandLayout = BCRecordLayout<
     SIL_ONE_OPERAND,
     SILInstOpCodeField,
-    BCFixed<3>,          // Optional attributes
+    BCFixed<4>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField
@@ -367,7 +381,7 @@ namespace sil_block {
   using SILTwoOperandsLayout = BCRecordLayout<
     SIL_TWO_OPERANDS,
     SILInstOpCodeField,
-    BCFixed<2>,          // Optional attributes
+    BCFixed<4>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,

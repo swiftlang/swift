@@ -180,6 +180,8 @@ public:
   /// Instruction visitors.
   SILInstruction *visitReleaseValueInst(ReleaseValueInst *DI);
   SILInstruction *visitRetainValueInst(RetainValueInst *CI);
+  SILInstruction *visitReleaseValueAddrInst(ReleaseValueAddrInst *DI);
+  SILInstruction *visitRetainValueAddrInst(RetainValueAddrInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitTryApplyInst(TryApplyInst *AI);

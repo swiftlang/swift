@@ -1,0 +1,182 @@
+// RUN: %target-sil-opt -access-enforcement-selection -enforce-exclusivity=checked %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil_stage raw
+
+// Test undef begin_access operands.
+// CHECK-LABEL: sil hidden @undefStack : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK: bb0(%0 : $Builtin.Int64):
+// CHECK: unreachable
+// CHECK: bb1:
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [static] undef : $*Builtin.Int64
+// CHECK: store %{{.*}} to [trivial] [[WRITE]] : $*Builtin.Int64
+// CHECK: end_access [[WRITE]] : $*Builtin.Int64
+// CHECK: br
+// CHECK: bb2:
+// CHECK: [[READ:%.*]] = begin_access [read] [static] undef : $*Builtin.Int64
+// CHECK: %{{.*}} = load [trivial] [[READ]] : $*Builtin.Int64
+// CHECK: end_access [[READ]] : $*Builtin.Int64
+// CHECK-LABEL: } // end sil function 'undefStack'
+sil hidden @undefStack : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  unreachable
+
+bb1:
+  %23 = integer_literal $Builtin.Int64, 42
+  %25 = begin_access [modify] [unknown] undef : $*Builtin.Int64
+  store %23 to [trivial] %25 : $*Builtin.Int64
+  end_access %25 : $*Builtin.Int64
+  br bb2
+
+bb2:
+  %29 = begin_access [read] [unknown] undef : $*Builtin.Int64
+  %30 = load [trivial] %29 : $*Builtin.Int64
+  end_access %29 : $*Builtin.Int64
+  dealloc_stack undef : $*Builtin.Int64
+  return %30 : $Builtin.Int64
+}
+
+// Test static enforcement selection in the presence of mark_function_escape.
+// This really isn't really a special case, but depends on pass pipeline.
+//
+// CHECK-LABEL: sil hidden @markFuncEscape : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:  [[BOX:%.*]] = alloc_box ${ var Builtin.Int64 }, var, name "x"
+// CHECK:  [[ADR:%.*]] = project_box [[BOX]] : ${ var Builtin.Int64 }, 0
+// CHECK:  mark_function_escape [[ADR]] : $*Builtin.Int64
+// CHECK:  [[READ:%.*]] = begin_access [read] [static] [[ADR]] : $*Builtin.Int64
+// CHECK:  %{{.*}} = load [trivial] [[READ]] : $*Builtin.Int64
+// CHECK:  end_access [[READ]] : $*Builtin.Int64
+// CHECK:  destroy_value [[BOX]] : ${ var Builtin.Int64 }
+// CHECK:  return %{{.*}} : $()
+// CHECK-LABEL:} // end sil function 'markFuncEscape'
+sil hidden @markFuncEscape : $@convention(thin) () -> () {
+  %2 = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %3 = project_box %2 : ${ var Builtin.Int64 }, 0
+  mark_function_escape %3 : $*Builtin.Int64
+  %39 = begin_access [read] [unknown] %3 : $*Builtin.Int64
+  %40 = load [trivial] %39 : $*Builtin.Int64
+  end_access %39 : $*Builtin.Int64
+  destroy_value %2 : ${ var Builtin.Int64 }
+  %98 = tuple ()
+  %99 = return %98 : $()
+}
+
+
+sil @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+sil @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+
+// Test static enforcement of box addresses that escape via closure
+// partial_applys.
+// application.
+// CHECK-LABEL: sil hidden @escapeAsArgumentToPartialApply : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:  [[BOX:%.*]] = alloc_box ${ var Builtin.Int64 }, var, name "x"
+// CHECK:  [[ADR:%.*]] = project_box [[BOX]] : ${ var Builtin.Int64 }, 0
+// CHECK:  [[FUNC:%.*]] = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+// CHECK:  [[CLOSURE:%.*]] = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+// CHECK:  [[PA:%.*]] = partial_apply [[CLOSURE]]([[ADR]]) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+// CHECK:  [[MODIFY:%.*]] = begin_access [modify] [static] [[ADR]] : $*Builtin.Int64
+// CHECK:  %{{.*}} = apply [[FUNC]]([[MODIFY]], [[PA]]) : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+// CHECK:  end_access [[MODIFY]] : $*Builtin.Int64
+// CHECK:  destroy_value [[BOX]] : ${ var Builtin.Int64 }
+// CHECK:  return %{{.*}} : $()
+// CHECK-LABEL:} // end sil function 'escapeAsArgumentToPartialApply'
+sil hidden @escapeAsArgumentToPartialApply : $@convention(thin) () -> () {
+  %2 = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %3 = project_box %2 : ${ var Builtin.Int64 }, 0
+  %4 = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+  %5 = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %6 = partial_apply %5(%3) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %7 = begin_access [modify] [unknown] %3 : $*Builtin.Int64
+  %8 = apply %4(%7, %6) : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+  end_access %7 : $*Builtin.Int64
+  destroy_value %2 : ${ var Builtin.Int64 }
+  %9 = tuple ()
+  %10 = return %9 : $()
+}
+
+
+// Test static enforcement of copied boxes.
+// FIXME: Oops... We make this dynamic.
+//
+// CHECK-LABEL: sil hidden @copyBox : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:  [[BOX:%.*]] = alloc_box ${ var Builtin.Int64 }, var, name "x"
+// CHECK:  [[ADR1:%.*]] = project_box [[BOX]] : ${ var Builtin.Int64 }, 0
+// CHECK:  [[CPY:%.*]] = copy_value [[BOX]] : ${ var Builtin.Int64 }
+// CHECK:  [[ADR2:%.*]] = project_box [[CPY]] : ${ var Builtin.Int64 }, 0
+// CHECK:  [[READ:%.*]] = begin_access [read] [dynamic] [[ADR2]] : $*Builtin.Int64
+// CHECK:  %{{.*}} = load [trivial] [[READ]] : $*Builtin.Int64
+// CHECK:  end_access [[READ]] : $*Builtin.Int64
+// CHECK:  [[READ:%.*]] = begin_access [read] [dynamic] [[ADR1]] : $*Builtin.Int64
+// CHECK:  %{{.*}} = load [trivial] [[READ]] : $*Builtin.Int64
+// CHECK:  end_access [[READ]] : $*Builtin.Int64
+// CHECK:  destroy_value [[CPY]] : ${ var Builtin.Int64 }
+// CHECK:  destroy_value [[BOX]] : ${ var Builtin.Int64 }
+// CHECK:  return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'copyBox'
+sil hidden @copyBox : $@convention(thin) () -> () {
+  %2 = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %3 = project_box %2 : ${ var Builtin.Int64 }, 0
+  %16 = copy_value %2 : ${ var Builtin.Int64 }
+  %17 = project_box %16 : ${ var Builtin.Int64 }, 0
+  %18 = begin_access [read] [unknown] %17 : $*Builtin.Int64
+  %19 = load [trivial] %18 : $*Builtin.Int64
+  end_access %18 : $*Builtin.Int64
+  %39 = begin_access [read] [unknown] %3 : $*Builtin.Int64
+  %40 = load [trivial] %39 : $*Builtin.Int64
+  end_access %39 : $*Builtin.Int64
+  destroy_value %16 : ${ var Builtin.Int64 }
+  destroy_value %2 : ${ var Builtin.Int64 }
+  %98 = tuple ()
+  %99 = return %98 : $()
+}
+
+sil @closure : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+bb0(%0 : ${var Builtin.Int64}):
+  %empty = tuple ()
+  return %empty : $()
+}
+
+// An access that escapes on an unreachable path must be dynamic.
+//
+// CHECK-LABEL: sil @partialUnreachable : $@convention(thin) () -> () {
+// CHECK: %[[ACCESS:.*]] = begin_access [modify] [dynamic] %{{.*}} : $*Builtin.Int64
+// CHECK: bb1:
+// CHECK: end_access %[[ACCESS]] : $*Builtin.Int64
+// CHECK: return
+// CHECK: bb2:
+// CHECK: partial_apply
+// CHECK: unreachable
+sil @partialUnreachable : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %addr = project_box %box : ${ var Builtin.Int64 }, 0
+  %write = begin_access [modify] [unknown] %addr : $*Builtin.Int64
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_access %write : $*Builtin.Int64
+  %empty = tuple ()
+  return %empty : $()
+
+bb2:
+  %f = function_ref @closure : $@convention(thin) (@owned { var Builtin.Int64 }) -> ()
+  %closure = partial_apply %f(%box) : $@convention(thin) (@owned { var Builtin.Int64 }) -> ()
+  unreachable
+}
+
+// An access that refers to mark_uninitialized.
+//
+// CHECK-LABEL: sil @markUninitSource : $@convention(thin) () -> () {
+sil @markUninitSource : $@convention(thin) () -> () {
+bb0:
+  %stk = alloc_stack $Builtin.Int64, let, name "x"
+  %var = mark_uninitialized [var] %stk : $*Builtin.Int64
+  %f = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %closure = partial_apply %f(%var) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  unreachable
+}

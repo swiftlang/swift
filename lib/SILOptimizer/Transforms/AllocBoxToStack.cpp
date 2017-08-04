@@ -109,12 +109,13 @@ static bool addLastRelease(SILValue V, SILBasicBlock *BB,
 // Find the final releases of the alloc_box along any given path.
 // These can include paths from a release back to the alloc_box in a
 // loop.
-static bool getFinalReleases(AllocBoxInst *ABI,
-                             llvm::SmallVectorImpl<SILInstruction*> &Releases) {
+static bool
+getFinalReleases(SILValue Box,
+                 llvm::SmallVectorImpl<SILInstruction *> &Releases) {
   llvm::SmallPtrSet<SILBasicBlock*, 16> LiveIn;
   llvm::SmallPtrSet<SILBasicBlock*, 16> UseBlocks;
 
-  auto *DefBB = ABI->getParent();
+  auto *DefBB = Box->getParentBlock();
 
   auto seenRelease = false;
   SILInstruction *OneRelease = nullptr;
@@ -122,7 +123,7 @@ static bool getFinalReleases(AllocBoxInst *ABI,
   // We'll treat this like a liveness problem where the alloc_box is
   // the def. Each block that has a use of the owning pointer has the
   // value live-in unless it is the block with the alloc_box.
-  llvm::SmallVector<Operand *, 32> Worklist(ABI->use_begin(), ABI->use_end());
+  llvm::SmallVector<Operand *, 32> Worklist(Box->use_begin(), Box->use_end());
   while (!Worklist.empty()) {
     auto *Op = Worklist.pop_back_val();
     auto *User = Op->getUser();
@@ -137,12 +138,10 @@ static bool getFinalReleases(AllocBoxInst *ABI,
     // Also keep track of the blocks with uses.
     UseBlocks.insert(BB);
 
-    // If we have a copy value, add its uses to the work list and continue.
-    //
-    // We are actually performing multiple operations here. We are eliminating
-    // copies of the box and the box itself.
-    if (auto *CVI = dyn_cast<CopyValueInst>(User)) {
-      std::copy(CVI->use_begin(), CVI->use_end(), std::back_inserter(Worklist));
+    // If we have a copy value or a mark_uninitialized, add its uses to the work
+    // list and continue.
+    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
+      copy(User->getUses(), std::back_inserter(Worklist));
       continue;
     }
 
@@ -171,7 +170,7 @@ static bool getFinalReleases(AllocBoxInst *ABI,
   // release/dealloc.
   for (auto *BB : UseBlocks)
     if (!successorHasLiveIn(BB, LiveIn))
-      if (!addLastRelease(ABI, BB, Releases))
+      if (!addLastRelease(Box, BB, Releases))
         return false;
 
   return true;
@@ -213,9 +212,8 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
     // If we have a copy_value, the copy value does not cause an escape, but its
     // uses might do so... so add the copy_value's uses to the worklist and
     // continue.
-    if (auto *Copy = dyn_cast<CopyValueInst>(User)) {
-      std::copy(Copy->use_begin(), Copy->use_end(),
-                std::back_inserter(Worklist));
+    if (isa<CopyValueInst>(User)) {
+      copy(User->getUses(), std::back_inserter(Worklist));
       continue;
     }
 
@@ -353,11 +351,9 @@ static bool checkPartialApplyBody(Operand *O) {
                                PromotedOperands);
 }
 
-
-/// findUnexpectedBoxUse - Validate that the uses of a pointer to a
-/// box do not eliminate it from consideration for promotion to a
-/// stack element. Optionally examine the body of partial_apply
-/// to see if there is an unexpected use inside.  Return the
+/// Validate that the uses of a pointer to a box do not eliminate it from
+/// consideration for promotion to a stack element. Optionally examine the body
+/// of partial_apply to see if there is an unexpected use inside.  Return the
 /// instruction with the unexpected use if we find one.
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply,
@@ -386,9 +382,10 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
         (!inAppliedFunction && isa<DeallocBoxInst>(User)))
       continue;
 
-    // If we have a copy_value, visit the users of the copy_value.
-    if (auto *CVI = dyn_cast<CopyValueInst>(User)) {
-      std::copy(CVI->use_begin(), CVI->use_end(), std::back_inserter(Worklist));
+    // If our user instruction is a copy_value or a marked_uninitialized, visit
+    // the users recursively.
+    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
+      copy(User->getUses(), std::back_inserter(Worklist));
       continue;
     }
 
@@ -432,19 +429,21 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
   return true;
 }
 
-static void replaceProjectBoxUsers(AllocBoxInst *ABI, AllocStackInst *ASI) {
-  llvm::SmallVector<Operand *, 8> Worklist(ABI->use_begin(), ABI->use_end());
+static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
+  llvm::SmallVector<Operand *, 8> Worklist(HeapBox->use_begin(),
+                                           HeapBox->use_end());
   while (!Worklist.empty()) {
     auto *Op = Worklist.pop_back_val();
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
-      PBI->replaceAllUsesWith(ASI);
+      // This may result in an alloc_stack being used by begin_access [dynamic].
+      PBI->replaceAllUsesWith(StackBox);
       continue;
     }
 
     auto *CVI = dyn_cast<CopyValueInst>(Op->getUser());
     if (!CVI)
       continue;
-    std::copy(CVI->use_begin(), CVI->use_end(), std::back_inserter(Worklist));
+    copy(CVI->getUses(), std::back_inserter(Worklist));
   }
 }
 
@@ -453,36 +452,40 @@ static void replaceProjectBoxUsers(AllocBoxInst *ABI, AllocStackInst *ASI) {
 static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
+  SILValue HeapBox = ABI;
+  Optional<MarkUninitializedInst::Kind> Kind;
+  if (HeapBox->hasOneUse()) {
+    auto *User = HeapBox->getSingleUse()->getUser();
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(User)) {
+      HeapBox = MUI;
+      Kind = MUI->getKind();
+    }
+  }
+
   llvm::SmallVector<SILInstruction *, 4> FinalReleases;
-  if (!getFinalReleases(ABI, FinalReleases))
+  if (!getFinalReleases(HeapBox, FinalReleases))
     return false;
 
   // Promote this alloc_box to an alloc_stack. Insert the alloc_stack
   // at the beginning of the function.
-  SILBuilder BuildAlloc(ABI);
-  BuildAlloc.setCurrentDebugScope(ABI->getDebugScope());
+  SILBuilder Builder(ABI);
+  Builder.setCurrentDebugScope(ABI->getDebugScope());
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
-  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(),
-                          ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
-                          ABI->getVarInfo());
+  auto *ASI = Builder.createAllocStack(
+      ABI->getLoc(), ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
+      ABI->getVarInfo());
+
+  // Transfer a mark_uninitialized if we have one.
+  SILValue StackBox = ASI;
+  if (Kind) {
+    StackBox =
+        Builder.createMarkUninitialized(ASI->getLoc(), ASI, Kind.getValue());
+  }
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
-  replaceProjectBoxUsers(ABI, ASI);
-
-  // Check to see if the alloc_box was used by a mark_uninitialized instruction.
-  // If so, any uses of the pointer result need to keep using the MUI, not the
-  // alloc_stack directly.  If we don't do this, DI will miss the uses.
-  SILValue PointerResult = ASI;
-  for (auto UI : ASI->getUses()) {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(UI->getUser())) {
-      assert(ASI->hasOneUse() &&
-             "alloc_stack used by mark_uninitialized, but not exclusively!");
-      PointerResult = MUI;
-      break;
-    }
-  }
+  replaceProjectBoxUsers(HeapBox, StackBox);
 
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
@@ -495,7 +498,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     if (!isa<DeallocBoxInst>(LastRelease)&& !Lowering.isTrivial()) {
       // For non-trivial types, insert destroys for each final release-like
       // instruction we found that isn't an explicit dealloc_box.
-      Builder.emitDestroyAddrAndFold(Loc, PointerResult);
+      Builder.emitDestroyAddrAndFold(Loc, StackBox);
     }
     Builder.createDeallocStack(Loc, ASI);
   }
@@ -509,10 +512,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   while (!Worklist.empty()) {
     auto *User = Worklist.pop_back_val();
 
-    if (isa<CopyValueInst>(User)) {
-      std::transform(
-          User->use_begin(), User->use_end(), std::back_inserter(Worklist),
-          [](Operand *Op) -> SILInstruction * { return Op->getUser(); });
+    // Look through any mark_uninitialized, copy_values.
+    if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
+      transform(User->getUses(), std::back_inserter(Worklist),
+                [](Operand *Op) -> SILInstruction * { return Op->getUser(); });
       User->replaceAllUsesWith(
           SILUndef::get(User->getType(), User->getModule()));
       User->eraseFromParent();
@@ -636,7 +639,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   auto *Fn = M.createFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
-      Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
+      Orig->isThunk(), Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
@@ -835,13 +838,10 @@ specializePartialApply(PartialApplyInst *PartialApply,
   // Build the function_ref and partial_apply.
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
                                                    ClonedFn);
-  CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
-  auto const &Subs = PartialApply->getSubstitutions();
-  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M, Subs);
-  return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
-                                 SILType::getPrimitiveObjectType(SubstCalleeTy),
-                                    PartialApply->getSubstitutions(), Args,
-                                    PartialApply->getType());
+  return Builder.createPartialApply(
+      PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutions(),
+      Args,
+      PartialApply->getType().getAs<SILFunctionType>()->getCalleeConvention());
 }
 
 static void

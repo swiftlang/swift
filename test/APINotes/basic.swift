@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -swift-version 4
 import APINotesTest
 import APINotesFrameworkTest
 
@@ -7,8 +7,18 @@ extension A {
   func implicitlyObjC() { }
 }
 
+extension C {
+  func alsoImplicitlyObjC() { }
+}
+
+class D : C {
+  func yetAnotherImplicitlyObjC() { }
+}
+
 func testSelectors(a: AnyObject) {
   a.implicitlyObjC?()  // okay: would complain without SwiftObjCMembers
+  a.alsoImplicitlyObjC?()  // okay: would complain without SwiftObjCMembers
+  a.yetAnotherImplicitlyObjC?()  // okay: would complain without SwiftObjCMembers
 }
 #endif
 

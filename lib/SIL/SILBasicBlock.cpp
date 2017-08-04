@@ -90,13 +90,14 @@ void SILBasicBlock::remove(SILInstruction *I) {
   InstList.remove(I);
 }
 
+/// Returns the iterator following the erased instruction.
 SILBasicBlock::iterator SILBasicBlock::erase(SILInstruction *I) {
   // Notify the delete handlers that this instruction is going away.
   getModule().notifyDeleteHandlers(&*I);
   auto *F = getParent();
-  auto II = InstList.erase(I);
+  auto nextIter = InstList.erase(I);
   F->getModule().deallocateInst(I);
-  return II;
+  return nextIter;
 }
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.
@@ -353,4 +354,8 @@ bool SILBasicBlock::isTrampoline() const {
   if (!Branch)
     return false;
   return begin() == Branch->getIterator();
+}
+
+bool SILBasicBlock::isLegalToHoistInto() const {
+  return true;
 }

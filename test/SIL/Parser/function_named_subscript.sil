@@ -1,0 +1,23 @@
+// RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
+
+// Make sure that we can parse escaped subscripts (representing functions named "subscript") in vtables
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+class SubscriptAsFunction {
+  func `subscript`()
+}
+
+sil hidden @_T04test19SubscriptAsFunctionC9subscriptyyF : $@convention(method) (@guaranteed SubscriptAsFunction) -> () {
+bb0(%0 : $SubscriptAsFunction):
+  return undef : $()
+}
+
+sil_vtable SubscriptAsFunction {
+  // CHECK: #SubscriptAsFunction.`subscript`!1: (SubscriptAsFunction) -> () -> () : _T04test19SubscriptAsFunctionC9subscriptyyF
+  #SubscriptAsFunction.`subscript`!1: (SubscriptAsFunction) -> () -> () : _T04test19SubscriptAsFunctionC9subscriptyyF
+}

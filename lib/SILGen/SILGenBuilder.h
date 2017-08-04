@@ -89,8 +89,8 @@ public:
                             SILType loweredConcreteType,
                             ArrayRef<ProtocolConformanceRef> conformances);
 
-  InitExistentialOpaqueInst *
-  createInitExistentialOpaque(SILLocation Loc, SILType ExistentialType,
+  InitExistentialValueInst *
+  createInitExistentialValue(SILLocation Loc, SILType ExistentialType,
                               CanType FormalConcreteType, SILValue Concrete,
                               ArrayRef<ProtocolConformanceRef> Conformances);
 
@@ -153,6 +153,7 @@ public:
   ManagedValue createUnsafeCopyUnownedValue(SILLocation loc,
                                             ManagedValue originalValue);
   ManagedValue createOwnedPHIArgument(SILType type);
+  ManagedValue createGuaranteedPHIArgument(SILType type);
 
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
@@ -259,6 +260,15 @@ public:
   using SILBuilder::createOptionalSome;
   ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);
   ManagedValue createManagedOptionalNone(SILLocation Loc, SILType Type);
+
+  /// Forward \p value into \p address.
+  ///
+  /// This will forward value's cleanup (if it has one) into the equivalent
+  /// cleanup on address. In practice this means if the value is non-trivial,
+  /// the memory location will at end of scope have a destroy_addr applied to
+  /// it.
+  ManagedValue createStore(SILLocation loc, ManagedValue value,
+                           SILValue address, StoreOwnershipQualifier qualifier);
 };
 
 class SwitchCaseFullExpr;

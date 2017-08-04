@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 3 -warn-swift3-objc-inference
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 3 -warn-swift3-objc-inference-complete
 // REQUIRES: objc_interop
 
 import Foundation
@@ -17,6 +17,21 @@ class DynamicMembers {
   dynamic func foo() { } // expected-warning{{inference of '@objc' for 'dynamic' members is deprecated}}{{3-3=@objc }}
   
   dynamic var bar: NSObject? = nil // expected-warning{{inference of '@objc' for 'dynamic' members is deprecated}}{{3-3=@objc }}
+}
+
+class GenericClass<T>: NSObject {}
+
+class SubclassOfGeneric: GenericClass<Int> {
+  func foo() { } // expected-warning{{inference of '@objc' for members of Objective-C-derived classes is deprecated}}
+    // expected-note@-1{{add `@objc` to continue exposing an Objective-C entry point (Swift 3 behavior)}}{{3-3=@objc }}
+    // expected-note@-2{{add `@nonobjc` to suppress the Objective-C entry point (Swift 4 behavior)}}{{3-3=@nonobjc }}
+}
+
+@objc(SubclassOfGenericCustom)
+class SubclassOfGenericCustomName: GenericClass<Int> {
+  func foo() { } // expected-warning{{inference of '@objc' for members of Objective-C-derived classes is deprecated}}
+    // expected-note@-1{{add `@objc` to continue exposing an Objective-C entry point (Swift 3 behavior)}}{{3-3=@objc }}
+    // expected-note@-2{{add `@nonobjc` to suppress the Objective-C entry point (Swift 4 behavior)}}{{3-3=@nonobjc }}
 }
 
 // Suppress diagnostices about references to inferred @objc declarations

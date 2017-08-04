@@ -124,6 +124,19 @@ public:
   virtual bool visitCallArgName(Identifier Name, CharSourceRange Range,
                                 ValueDecl *D);
 
+  /// This method is called for each external argument name in function-like
+  /// declarations like constructor, function and subscript. The function is
+  /// called only when an external argument label is specifically specified,
+  /// like func foo(External Internal: Int) {}.
+  /// If it returns false, the remaining traversal is terminated and returns
+  /// failure.
+  ///
+  /// \param Name the argument name.
+  /// \param StartLoc the source loc of the argument name start.
+  /// \param D the function-like decl.
+  virtual bool visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc,
+                                            ValueDecl *D);
+
   /// This method is called when a Module is referenced in source.
   virtual bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range);
 

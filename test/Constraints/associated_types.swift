@@ -62,8 +62,8 @@ protocol XReqt {}
 protocol YReqt {}
 
 protocol SameTypedDefaultWithReqts {
-    associatedtype X: XReqt // expected-note{{}}
-    associatedtype Y: YReqt // expected-note{{}}
+    associatedtype X: XReqt
+    associatedtype Y: YReqt
     static var x: X { get }
     static var y: Y { get }
 }
@@ -86,7 +86,7 @@ struct UsesSameTypedDefaultWithoutSatisfyingReqts: SameTypedDefaultWithReqts {
 }
 
 protocol SameTypedDefaultBaseWithReqts {
-    associatedtype X: XReqt // expected-note{{}}
+    associatedtype X: XReqt
     static var x: X { get }
 }
 protocol SameTypedDefaultDerivedWithReqts: SameTypedDefaultBaseWithReqts {

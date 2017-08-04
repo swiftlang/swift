@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h
-// RUN: %target-sil-func-extractor %t/Test.swiftmodule -func=_T04Test16testPartialApplyySoAA_pF -o - | %FileCheck %s
+// RUN: %target-sil-func-extractor %t/Test.swiftmodule -sil-print-debuginfo  -func=_T04Test16testPartialApplyySoAA_pF -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -13,7 +13,7 @@ public func testPartialApply(_ obj: Test) {
     // CHECK: [[CURRIED1_FALSE]]:
     // CHECK: [[CURRIED1_TRUE]]([[CURRIED1_METHOD:%.+]] : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject):
     // CHECK: [[CURRIED1_PARTIAL:%.+]] = partial_apply [[CURRIED1_METHOD]]([[CURRIED1_OBJ]]) : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject
-    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @_T0s9AnyObject_pIxo_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> @owned AnyObject) -> @out Any
+    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @_T0yXlIxo_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> @owned AnyObject) -> @out Any
     // CHECK: = partial_apply [[CURRIED1_THUNK]]([[CURRIED1_PARTIAL]])
     curried1()
   }

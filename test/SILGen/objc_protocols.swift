@@ -271,7 +271,8 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
   // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[I]], [[I2_COPY]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
   // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
   // CHECK:   store [[I2_EXIST_CONTAINER]] to [init] [[PB]] : $*Initializable
-  // CHECK:   [[I2:%[0-9]+]] = load [copy] [[PB]] : $*Initializable
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Initializable
+  // CHECK:   [[I2:%[0-9]+]] = load [copy] [[READ]] : $*Initializable
   // CHECK:   destroy_value [[I2_BOX]] : ${ var Initializable }
   // CHECK:   return [[I2]] : $Initializable
   var i2 = im.init(int: i)

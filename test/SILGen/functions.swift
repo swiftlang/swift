@@ -110,8 +110,10 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[KADDR:%.*]] = project_box [[KBOX]]
 
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
   // CHECK: apply [[FUNC]]([[I]], [[J]])
   standalone_function(i, j)
 
@@ -120,8 +122,10 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[ST_ADDR:%.*]] = alloc_box ${ var SomeStruct }
   // CHECK: [[CTOR:%.*]] = function_ref @_T09functions10SomeStructV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   // CHECK: [[METATYPE:%.*]] = metatype $@thin SomeStruct.Type
-  // CHECK: [[I:%.*]] = load [trivial] [[IADDR]]
-  // CHECK: [[J:%.*]] = load [trivial] [[JADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%.*]] = load [trivial] [[READI]]
+  // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
+  // CHECK: [[J:%.*]] = load [trivial] [[READJ]]
   // CHECK: apply [[CTOR]]([[I]], [[J]], [[METATYPE]]) : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   var st = SomeStruct(x: i, y: j)
 
@@ -138,14 +142,18 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[CADDR:%.*]] = project_box [[CBOX]]
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T09functions9SomeClassC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeClass.Type
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
   // CHECK: [[C:%[0-9]+]] = apply [[FUNC]]([[I]], [[J]], [[META]])
   var c = SomeClass(x: i, y: j)
 
-  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
+  // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: apply [[METHOD]]([[I]], [[C]])
   // CHECK: destroy_value [[C]]
   c.method(i)
@@ -156,50 +164,64 @@ func calls(_ i:Int, j:Int, k:Int) {
   var cm1 = SomeClass.method(c)
   cm1(i)
 
-  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
+  // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: apply [[METHOD]]([[I]], [[C]])
   // CHECK: destroy_value [[C]]
   SomeClass.method(c)(i)
 
   // -- Curry the Type onto static method argument lists.
   
-  // CHECK: [[C:%[0-9]+]] = load_borrow [[CADDR]]
+  // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[META:%.*]] = value_metatype $@thick SomeClass.Type, [[C]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[META]] : {{.*}}, #SomeClass.static_method!1
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: apply [[METHOD]]([[I]], [[META]])
   type(of: c).static_method(i)
 
   // -- Curry property accesses.
 
   // -- FIXME: class_method-ify class getters.
-  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
+  // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[GETTER:%[0-9]+]] = class_method {{.*}} : $SomeClass, #SomeClass.someProperty!getter.1
   // CHECK: apply [[GETTER]]([[C]])
   // CHECK: destroy_value [[C]]
   i = c.someProperty
 
-  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.someProperty!setter.1 : (SomeClass) -> (Builtin.Int64) -> ()
   // CHECK: apply [[SETTER]]([[I]], [[C]])
   // CHECK: destroy_value [[C]]
   c.someProperty = i
 
-  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
-  // CHECK: [[K:%[0-9]+]] = load [trivial] [[KADDR]]
+  // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
+  // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
+  // CHECK: [[READK:%.*]] = begin_access [read] [unknown] [[KADDR]]
+  // CHECK: [[K:%[0-9]+]] = load [trivial] [[READK]]
   // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64, $@convention(method) (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> Builtin.Int64
   // CHECK: apply [[GETTER]]([[J]], [[K]], [[C]])
   // CHECK: destroy_value [[C]]
   i = c[j, k]
 
-  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
-  // CHECK: [[K:%[0-9]+]] = load [trivial] [[KADDR]]
+  // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
+  // CHECK: [[READK:%.*]] = begin_access [read] [unknown] [[KADDR]]
+  // CHECK: [[K:%[0-9]+]] = load [trivial] [[READK]]
   // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> (), $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
   // CHECK: destroy_value [[C]]
@@ -212,11 +234,13 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[PADDR:%.*]] = project_box [[PBOX]]
   var p : SomeProtocol = ConformsToSomeProtocol()
 
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PADDR]]
   // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
-  // CHECK: copy_addr [[PADDR]] to [initialization] [[TEMP]]
+  // CHECK: copy_addr [[READ]] to [initialization] [[TEMP]]
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   // CHECK: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
@@ -224,7 +248,8 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   var sp : SomeProtocol = ConformsToSomeProtocol()
   sp.method(i)
@@ -244,7 +269,8 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
   var g = SomeGeneric<Builtin.Int64>()
 
-  // CHECK: [[G:%[0-9]+]] = load [copy] [[GADDR]]
+  // CHECK: [[READG:%.*]] = begin_access [read] [unknown] [[GADDR]]
+  // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.method!1
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPI:%.*]] = alloc_stack $Builtin.Int64
@@ -252,7 +278,8 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: destroy_value [[G]]
   g.method(i)
 
-  // CHECK: [[G:%[0-9]+]] = load [copy] [[GADDR]]
+  // CHECK: [[READG:%.*]] = begin_access [read] [unknown] [[GADDR]]
+  // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.generic!1
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPJ:%.*]] = alloc_stack $Builtin.Int64
@@ -260,7 +287,8 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: destroy_value [[G]]
   g.generic(j)
 
-  // CHECK: [[C:%[0-9]+]] = load [copy] [[CADDR]]
+  // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
+  // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.generic!1
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPK:%.*]] = alloc_stack $Builtin.Int64
@@ -287,25 +315,32 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: store [[FUNC_THICK]] to [init] [[FADDR]]
   var f = standalone_function
-  // CHECK: [[F:%[0-9]+]] = load [copy] [[FADDR]]
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
+  // CHECK: [[READF:%.*]] = begin_access [read] [unknown] [[FADDR]]
+  // CHECK: [[F:%[0-9]+]] = load [copy] [[READF]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
   // CHECK: apply [[F]]([[I]], [[J]])
   f(i, j)
 
   // CHECK: [[HOF:%[0-9]+]] = function_ref @_T09functions21higher_order_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) {{.*}}
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
   // CHECK: apply [[HOF]]([[FUNC_THICK]], [[I]], [[J]])
   higher_order_function(standalone_function, i, j)
 
   // CHECK: [[HOF2:%[0-9]+]] = function_ref @_T09functions22higher_order_function2{{[_0-9a-zA-Z]*}}F : $@convention(thin) {{.*}}
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%.*]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
-  // CHECK: [[J:%[0-9]+]] = load [trivial] [[JADDR]]
+  // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
+  // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
+  // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
   // CHECK: apply [[HOF2]]([[FUNC_THICK]], [[I]], [[J]])
   higher_order_function2(standalone_function, i, j)
 }
@@ -413,7 +448,7 @@ final class r17828355Class {
 // The curry thunk for the method should not include a class_method instruction.
 // CHECK-LABEL: sil shared [thunk] @_T09functions14r17828355ClassC6method
 // CHECK: bb0(%0 : $r17828355Class):
-// CHECK-NEXT: // function_ref functions.r17828355Class.method (Builtin.Int64) -> ()
+// CHECK-NEXT: // function_ref functions.r17828355Class.method(Builtin.Int64) -> ()
 // CHECK-NEXT:  %1 = function_ref @_T09functions14r17828355ClassC6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  partial_apply %1(%0) : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  return
@@ -434,14 +469,14 @@ func testNoescape() {
   markUsed(a)
 }
 
-// CHECK-LABEL: functions.testNoescape () -> ()
+// CHECK-LABEL: functions.testNoescape() -> ()
 // CHECK-NEXT: sil hidden @_T09functions12testNoescapeyyF : $@convention(thin) () -> ()
-// CHECK: function_ref functions.(testNoescape () -> ()).(closure #1)
+// CHECK: function_ref closure #1 () -> () in functions.testNoescape() -> ()
 // CHECK-NEXT: function_ref @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@owned { var Int }) -> ()
 
 // Despite being a noescape closure, this needs to capture 'a' by-box so it can
 // be passed to the capturing closure.closure
-// CHECK: functions.(testNoescape () -> ()).(closure #1)
+// CHECK: closure #1 () -> () in functions.testNoescape() -> ()
 // CHECK-NEXT: sil private @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
 
 
@@ -461,10 +496,10 @@ func testNoescape2() {
 
 // CHECK-LABEL: sil hidden @_T09functions13testNoescape2yyF : $@convention(thin) () -> () {
 
-// CHECK: // functions.(testNoescape2 () -> ()).(closure #1)
+// CHECK: // closure #1 () -> () in functions.testNoescape2() -> ()
 // CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
 
-// CHECK: // functions.(testNoescape2 () -> ()).(closure #1).(closure #1)
+// CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
 // CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_yycfU_ : $@convention(thin) (@owned { var Int }) -> () {
 
 enum PartialApplyEnumPayload<T, U> {

@@ -68,6 +68,7 @@ func testUnreachableCase1(a : Tree) {
     _ = Leaf
     return
   case .Branch(_):  // expected-warning {{case will never be executed}}
+  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
     return
   }
 }
@@ -77,7 +78,7 @@ func testUnreachableCase2(a : Tree) {
   case let Leaf:
     _ = Leaf
     fallthrough
-  case .Branch(_):
+  case .Branch(_): // expected-warning {{case is already handled by previous patterns; consider removing it}}
     return
   }
 }
@@ -87,6 +88,7 @@ func testUnreachableCase3(a : Tree) {
   case _:
     break
   case .Branch(_):  // expected-warning {{case will never be executed}}
+  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
     return
   }
 }

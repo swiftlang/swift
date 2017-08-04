@@ -618,13 +618,16 @@ public:
   }
 
   /// constructor.
-  ReleaseBlockState(bool IsExit, unsigned size, bool MultiIteration) {
+  ///
+  /// If \p InitOptimistic is true, the block in-bits are initialized to 1
+  /// which enables optimistic data flow evaluation.
+  ReleaseBlockState(bool InitOptimistic, unsigned size) {
     // backward data flow.
     // Initialize to true if we are running optimistic data flow, i.e.
     // MultiIteration is true.
-    BBSetIn.resize(size, MultiIteration);
+    BBSetIn.resize(size, InitOptimistic);
     BBSetOut.resize(size, false);
-    BBMaxSet.resize(size, !IsExit && MultiIteration);
+    BBMaxSet.resize(size, InitOptimistic);
   
     // Genset and Killset are initially empty.
     BBGenSet.resize(size, false);
@@ -735,6 +738,17 @@ bool ReleaseCodeMotionContext::requireIteration() {
 }
 
 void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
+  // All blocks which are initialized with 1-bits. These are all blocks which
+  // eventually reach the function exit (return, throw), excluding the
+  // function exit blocks themselves.
+  // Optimistic initialization enables moving releases across loops. On the
+  // other hand, blocks, which never reach the function exit, e.g. infinite
+  // loop blocks, must be excluded. Otherwise we would end up inserting
+  // completely unrelated release instructions in such blocks.
+  llvm::SmallPtrSet<SILBasicBlock *, 32> BlocksInitOptimistically;
+
+  llvm::SmallVector<SILBasicBlock *, 32> Worklist;
+  
   // Find all the RC roots in the function.
   for (auto &BB : *F) {
     for (auto &II : BB) {
@@ -750,13 +764,25 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
       RCRootIndex[Root] = RCRootVault.size();
       RCRootVault.insert(Root);
     }
+    if (MultiIteration && BB.getTerminator()->isFunctionExiting())
+      Worklist.push_back(&BB);
+  }
+
+  // Find all blocks from which there is a path to the function exit.
+  // Note: the Worklist is empty if we are not in MultiIteration mode.
+  while (!Worklist.empty()) {
+    SILBasicBlock *BB = Worklist.pop_back_val();
+    for (SILBasicBlock *Pred : BB->getPredecessorBlocks()) {
+      if (BlocksInitOptimistically.insert(Pred).second)
+        Worklist.push_back(Pred);
+    }
   }
 
   // Initialize all the data flow bit vector for all basic blocks.
   for (auto &BB : *F) {
     BlockStates[&BB] = new (BPA.Allocate())
-            ReleaseBlockState(BB.getTerminator()->isFunctionExiting(),
-                              RCRootVault.size(), MultiIteration);
+            ReleaseBlockState(BlocksInitOptimistically.count(&BB) != 0,
+                              RCRootVault.size());
   }
 }
 
@@ -819,7 +845,7 @@ void ReleaseCodeMotionContext::computeCodeMotionGenKillSet() {
 
     // Handle SILArgument, SILArgument can invalidate.
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {
-      SILArgument *A = dyn_cast<SILArgument>(RCRootVault[i]);
+      auto *A = dyn_cast<SILArgument>(RCRootVault[i]);
       if (!A || A->getParent() != BB)
         continue;
       InterestBlock = true;
@@ -986,7 +1012,7 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {
       if (!S->BBSetOut[i]) 
         continue;
-      SILArgument *A = dyn_cast<SILArgument>(RCRootVault[i]);
+      auto *A = dyn_cast<SILArgument>(RCRootVault[i]);
       if (!A || A->getParent() != BB)
         continue;
       InsertPoints[RCRootVault[i]].push_back(&*BB->begin());
@@ -1038,17 +1064,22 @@ public:
       return;
 
     DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName() << " ***\n");
+
+    PostOrderAnalysis *POA = PM->getAnalysis<PostOrderAnalysis>();
+
     // Split all critical edges.
     //
     // TODO: maybe we can do this lazily or maybe we should disallow SIL passes
     // to create critical edges.
     bool EdgeChanged = splitAllCriticalEdges(*F, false, nullptr, nullptr);
+    if (EdgeChanged)
+      POA->invalidateFunction(F);
 
-    llvm::SpecificBumpPtrAllocator<BlockState> BPA;
-    auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
+    auto *PO = POA->get(F);
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
 
+    llvm::SpecificBumpPtrAllocator<BlockState> BPA;
     bool InstChanged = false;
     if (Kind == Release) {
       // TODO: we should consider Throw block as well, or better we should

@@ -64,7 +64,6 @@ void takeGenericClass(__nullable GenericClass<NSString *> *thing);
 
 - (Animal *_Nonnull)objectAtIndexedSubscript:(NSInteger)i;
 - (void)setObject:(Animal *_Nonnull)x atIndexedSubscript:(NSInteger)i;
-
 @end
 
 @interface PettableOverextendedMetaphor: NSObject <Pettable>
@@ -85,9 +84,31 @@ void takeGenericClass(__nullable GenericClass<NSString *> *thing);
 @interface PettableAnimalContainer<T: Animal<Pettable> *> : NSObject
 @end
 
+@interface FungibleAnimalContainer<T: Animal<Fungible> *> : NSObject
+@end
+
 @interface TestConstrainedTypeParam<T> : NSObject
 - (void)doThing:(__nonnull T<Pettable>)thing;
 @end
 
 typedef id <Fungible> FungibleObject;
 
+@interface Panda
+
+// Unqualified reference to generic type
+
++ (AnimalContainer *)getContainer;
++ (FungibleAnimalContainer *)getFungibleContainer;
+
+@end
+
+@interface First<__covariant T> : NSObject
+@end
+
+@interface Second<__covariant T> : First<T>
+@end
+
+@class Third;
+
+@interface Third : Second<Third *>
+@end

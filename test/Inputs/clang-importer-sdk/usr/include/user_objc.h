@@ -29,6 +29,12 @@ typedef NS_ENUM(NSInteger, EnumWithAwkwardDeprecations) {
   EnumWithAwkward2BitProblems __attribute__((deprecated)) = EnumWithAwkwardNormalCase1,
 };
 
+enum __attribute__((enum_extensibility(open))) EnumViaAttribute {
+  EnumViaAttributeFirst = 1,
+  EnumViaAttributeSecond = 2
+};
+
+
 // From <AudioUnit/AudioComponent.h>
 // The interesting feature of this enum is that the common prefix before
 // taking the enum name itself into account extends past the underscore.
@@ -67,4 +73,9 @@ typedef CF_OPTIONS(UInt32, EmptySet2) {
 };
 typedef CF_OPTIONS(UInt32, EmptySet3) {
   kEmptySet3None __attribute__((swift_name("None")))
+};
+
+enum __attribute__((flag_enum)) OptionsViaAttribute {
+  OptionsViaAttributeFirst = 1,
+  OptionsViaAttributeSecond = 2
 };

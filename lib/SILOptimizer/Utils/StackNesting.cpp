@@ -191,7 +191,7 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
   bool CFGChanged = false;
   BitVector Bits(StackLocs.size());
 
-  // Visit all blocks. Actuallly the order doesn't matter, but let's to it in
+  // Visit all blocks. Actually the order doesn't matter, but let's to it in
   // the same order as in solve().
   for (const BlockInfo &BI : reversed(BlockInfos)) {
     // Collect the alive-bits (at the block exit) from the successor blocks.
@@ -226,7 +226,7 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
       if (SuccBI->AliveStackLocsAtEntry == Bits)
         continue;
 
-      // Insert dellocations for all locations which are alive at the end of
+      // Insert deallocations for all locations which are alive at the end of
       // the current block, but not at the begin of the successor block.
       SILBasicBlock *InsertionBlock = SuccBI->Block;
       if (!InsertionBlock->getSinglePredecessorBlock()) {

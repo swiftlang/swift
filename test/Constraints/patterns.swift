@@ -16,6 +16,8 @@ case (0..<10, _, _),
      (0...9, _, _),
      (0...9, 2.5, "three"):
   ()
+default:
+  ()
 }
 
 switch (1, 2) {
@@ -55,6 +57,8 @@ case is B,
   ()
 case is E:
   ()
+default:
+  ()
 }
 
 switch bp {
@@ -67,6 +71,8 @@ case let s as S:
   s.s()
 case let e as E:
   e.e()
+default:
+  ()
 }
 
 // Super-to-subclass.
@@ -75,6 +81,8 @@ switch db {
 case is D:
   ()
 case is E: // expected-warning {{always fails}}
+  ()
+default:
   ()
 }
 
@@ -150,14 +158,14 @@ case let x???: print(x, terminator: "")
 case let x??: print(x as Any, terminator: "")
 case let x?: print(x as Any, terminator: "")
 case 4???: break
-case nil??: break
-case nil?: break
+case nil??: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+case nil?: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
 default: break
 }
 
 // <rdar://problem/21995744> QoI: Binary operator '~=' cannot be applied to operands of type 'String' and 'String?'
 switch ("foo" as String?) {
-case "what": break // expected-error{{expression pattern of type 'String' cannot match values of type 'String?'}}
+case "what": break // expected-error{{expression pattern of type 'String' cannot match values of type 'String?'}} {{12-12=?}}
 default: break
 }
 
@@ -175,6 +183,7 @@ func ~= <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
 
 switch 4 as Int? {
 case x?.method(): break // match value
+default: break
 }
 
 switch 4 {
@@ -305,3 +314,25 @@ switch staticMembers {
 }
 
 _ = 0
+
+// rdar://problem/32241441 - Add fix-it for cases in switch with optional chaining
+
+struct S_32241441 {
+  enum E_32241441 {
+    case foo
+    case bar
+  }
+
+  var type: E_32241441 = E_32241441.foo
+}
+
+func rdar32241441() {
+  let s: S_32241441? = S_32241441()
+
+  switch s?.type {
+  case .foo: // expected-error {{enum case 'foo' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+    break;
+  case .bar: // expected-error {{enum case 'bar' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+    break;
+  }
+}

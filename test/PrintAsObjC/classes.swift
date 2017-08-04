@@ -2,8 +2,7 @@
 
 // REQUIRES: objc_interop
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
@@ -19,7 +18,7 @@
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/classes.h
 // RUN: not %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h
-// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h -include SingleGenericClass.h
+// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h -include SingleGenericClass.h -include CompatibilityAlias.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
@@ -28,6 +27,7 @@
 // CHECK-NEXT: @import CoreGraphics;
 // CHECK-NEXT: @import CoreFoundation;
 // CHECK-NEXT: @import objc_generics;
+// CHECK-NEXT: @import CompatibilityAlias;
 // CHECK-NEXT: @import SingleGenericClass;
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Swift;
@@ -35,6 +35,7 @@ import Foundation
 import objc_generics
 import AppKit // only used in implementations
 import CoreFoundation
+import CompatibilityAlias
 import SingleGenericClass
 
 // CHECK-LABEL: @interface A1{{$}}
@@ -724,6 +725,15 @@ public class NonObjCClass { }
 
 @objc class Spoon: Fungible {}
 
+// CHECK-LABEL: @interface UsesCompatibilityAlias
+@objc class UsesCompatibilityAlias : NSObject {
+  // CHECK-NEXT: - (StringCheese * _Nullable)foo SWIFT_WARN_UNUSED_RESULT;
+  @objc func foo() -> StringCheese? { return nil }
+
+  // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+}
+// CHECK-NEXT: @end
+
 // CHECK-LABEL: @interface UsesImportedGenerics
 @objc class UsesImportedGenerics {
   // CHECK: - (GenericClass<id> * _Nonnull)takeAndReturnGenericClass:(GenericClass<NSString *> * _Nullable)x SWIFT_WARN_UNUSED_RESULT;
@@ -739,4 +749,3 @@ public class NonObjCClass { }
   @objc func referenceSingleGenericClass(_: SingleImportedObjCGeneric<AnyObject>?) {}
 }
 // CHECK: @end
-

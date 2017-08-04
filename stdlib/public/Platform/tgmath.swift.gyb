@@ -12,8 +12,9 @@
 
 // Generic functions implementable directly on FloatingPoint.
 @_transparent
-public func fabs<T: FloatingPoint>(_ x: T) -> T {
-  return abs(x)
+public func fabs<T: FloatingPoint>(_ x: T) -> T
+  where T.Magnitude == T {
+  return x.magnitude
 }
 
 @_transparent
@@ -215,13 +216,13 @@ public func fpclassify(_ value: ${T}) -> Int {
 %if T == 'Double':
 #if os(Linux)
   return Int(__fpclassify(CDouble(value)))
-#elseif os(Windows) && !CYGWIN
+#elseif os(Windows) 
   return Int(_dclass(CDouble(value)))
 #else
   return Int(__fpclassifyd(CDouble(value)))
 #endif
 %else:
-#if os(Windows) && !CYGWIN
+#if os(Windows) 
   return Int(_${f}dclass(${CT}(value)))
 #else
   return Int(__fpclassify${f}(${CT}(value)))
@@ -297,7 +298,7 @@ public func scalbn(_ x: ${T}, _ n: Int) -> ${T} {
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
   var sign = Int32(0)
@@ -305,16 +306,7 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
   return (${T}(value), Int(sign))
 }
 #elseif os(Windows)
-#if CYGWIN
-@_transparent
-public func lgamma(_ x: ${T}) -> (${T}, Int) {
-  var sign = Int32(0)
-  let value = lgamma${f}_r(${CT}(x), &sign)
-  return (${T}(value), Int(sign))
-}
-#else
 // TODO(compnerd): implement
-#endif
 #else
 % # On Darwin platform,
 % # The real lgamma_r is not imported because it hides behind macro _REENTRANT.
@@ -359,11 +351,7 @@ public func nan(_ tag: String) -> ${T} {
 @_transparent
 public func jn(_ n: Int, _ x: Double) -> Double {
 #if os(Windows)
-#if CYGWIN
-  return jn(Int32(n), x)
-#else
   return _jn(Int32(n), x)
-#endif
 #else
   return jn(Int32(n), x)
 #endif
@@ -372,11 +360,7 @@ public func jn(_ n: Int, _ x: Double) -> Double {
 @_transparent
 public func yn(_ n: Int, _ x: Double) -> Double {
 #if os(Windows)
-#if CYGWIN
-  return yn(Int32(n), x)
-#else
   return _yn(Int32(n), x)
-#endif
 #else
   return yn(Int32(n), x)
 #endif

@@ -46,6 +46,9 @@ class Token {
   /// \brief Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
   
+  /// Modifiers for string literals
+  unsigned MultilineString : 1;
+
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
 
@@ -60,7 +63,7 @@ public:
             EscapedIdentifier(false) {}
   Token(tok Kind, StringRef Text)
     : Kind(Kind), AtStartOfLine(false), CommentLength(0),
-      EscapedIdentifier(false),
+      EscapedIdentifier(false), MultilineString(false),
       Text(Text) {}
   
   tok getKind() const { return Kind; }
@@ -175,8 +178,11 @@ public:
     if (is(tok::identifier) || isEscapedIdentifier() || is(tok::kw__))
       return true;
 
-    // 'let', 'var', and 'inout' cannot be argument labels.
-    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout)) return false;
+    // 'let', 'var', 'inout', '__shared', and '__owned'
+    // cannot be argument labels.
+    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout,
+              tok::kw___owned, tok::kw___shared))
+      return false;
 
     // All other keywords can be argument labels.
     return isKeyword();
@@ -273,11 +279,17 @@ public:
   void setText(StringRef T) { Text = T; }
 
   /// \brief Set the token to the specified kind and source range.
-  void setToken(tok K, StringRef T, unsigned CommentLength = 0) {
+  void setToken(tok K, StringRef T, unsigned CommentLength = 0,
+                bool MultilineString = false) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
+    this->MultilineString = MultilineString;
+  }
+
+  bool IsMultilineString() const {
+    return MultilineString;
   }
 };
   

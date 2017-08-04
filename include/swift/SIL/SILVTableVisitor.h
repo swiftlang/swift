@@ -1,4 +1,4 @@
-//===--- SILVTableVisitor.h - Class vtable visitor -------------*- C++ -*-===//
+//===--- SILVTableVisitor.h - Class vtable visitor --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -43,38 +43,33 @@ template <class T> class SILVTableVisitor {
   void maybeAddMethod(FuncDecl *fd) {
     assert(!fd->hasClangNode());
 
-    // Observing accessors and addressors don't get vtable entries.
-    if (fd->isObservingAccessor() ||
-        fd->getAddressorKind() != AddressorKind::NotAddressor)
-      return;
-
-    maybeAddEntry(SILDeclRef(fd, SILDeclRef::Kind::Func));
+    maybeAddEntry(SILDeclRef(fd, SILDeclRef::Kind::Func),
+                  fd->needsNewVTableEntry());
   }
 
   void maybeAddConstructor(ConstructorDecl *cd) {
     assert(!cd->hasClangNode());
 
-    SILDeclRef initRef(cd, SILDeclRef::Kind::Initializer);
-
-    // Stub constructors don't get a vtable entry unless they were synthesized
-    // to override a base class initializer.
-    if (cd->hasStubImplementation() &&
-        !initRef.getNextOverriddenVTableEntry())
-      return;
-
     // Required constructors (or overrides thereof) have their allocating entry
     // point in the vtable.
-    if (cd->isRequired())
-      maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+    if (cd->isRequired()) {
+      bool needsAllocatingEntry = cd->needsNewVTableEntry();
+      if (!needsAllocatingEntry)
+        if (auto *baseCD = cd->getOverriddenDecl())
+          needsAllocatingEntry = !baseCD->isRequired() || baseCD->hasClangNode();
+      maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator),
+                    needsAllocatingEntry);
+    }
 
     // All constructors have their initializing constructor in the
     // vtable, which can be used by a convenience initializer.
-    maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Initializer));
+    maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Initializer),
+                  cd->needsNewVTableEntry());
   }
 
-  void maybeAddEntry(SILDeclRef declRef) {
+  void maybeAddEntry(SILDeclRef declRef, bool needsNewEntry) {
     // Introduce a new entry if required.
-    if (Types.requiresNewVTableEntry(declRef))
+    if (needsNewEntry)
       asDerived().addMethod(declRef);
 
     // Update any existing entries that it overrides.
@@ -99,6 +94,8 @@ protected:
         maybeAddMethod(fd);
       else if (auto *cd = dyn_cast<ConstructorDecl>(member))
         maybeAddConstructor(cd);
+      else if (auto *placeholder = dyn_cast<MissingMemberDecl>(member))
+        asDerived().addPlaceholder(placeholder);
     }
   }
 };

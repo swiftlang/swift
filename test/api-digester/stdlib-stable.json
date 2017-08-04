@@ -28409,6 +28409,7 @@
           "usr": "s:FEsPs8Sequence6sortedFT2byFTWx8Iterator7Element_WxS0_S1___Sb_GSaWxS0_S1___",
           "location": "",
           "moduleName": "Swift",
+          "throwing": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -51407,6 +51408,7 @@
           "usr": "s:FEsPs17MutableCollection6sortedFT2byFTWx8Iterator7Element_WxS0_S1___Sb_GSaWxS0_S1___",
           "location": "",
           "moduleName": "Swift",
+          "throwing": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -51479,6 +51481,7 @@
           "usr": "s:FesRxs17MutableCollectionxs22RandomAccessCollectionrS_4sortFT2byFTWxPs10Collection8Iterator7Element_WxS2_S3___Sb_T_",
           "location": "",
           "moduleName": "Swift",
+          "throwing": true,
           "mutating": true,
           "children": [
             {

@@ -18,10 +18,10 @@
 #ifndef SWIFT_FRONTEND_H
 #define SWIFT_FRONTEND_H
 
-#include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
@@ -33,6 +33,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Migrator/MigratorOptions.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/SIL/SILModule.h"
@@ -62,6 +63,7 @@ class CompilerInvocation {
   ClangImporterOptions ClangImporterOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
+  MigratorOptions MigratorOpts;
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
 
@@ -202,6 +204,10 @@ public:
     return DiagnosticOpts;
   }
 
+  const MigratorOptions &getMigratorOptions() const {
+    return MigratorOpts;
+  }
+
   SILOptions &getSILOptions() { return SILOpts; }
   const SILOptions &getSILOptions() const { return SILOpts; }
 
@@ -265,7 +271,8 @@ public:
     CodeCompletionBuffer = Buf;
     CodeCompletionOffset = Offset;
     // We don't need typo-correction for code-completion.
-    LangOpts.DisableTypoCorrection = true;
+    // FIXME: This isn't really true, but is a performance issue.
+    LangOpts.TypoCorrectionLimit = 0;
   }
 
   std::pair<llvm::MemoryBuffer *, unsigned> getCodeCompletionPoint() const {
@@ -420,6 +427,10 @@ public:
   /// Parses the input file but does no type-checking or module imports.
   /// Note that this only supports parsing an invocation with a single file.
   void performParseOnly();
+
+  /// Frees up the ASTContext and SILModule objects that this instance is
+  /// holding on.
+  void freeContextAndSIL();
 };
 
 } // namespace swift

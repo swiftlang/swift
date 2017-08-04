@@ -8,8 +8,9 @@ public func returnGlobalVar() -> Double {
 }
 // SIL-LABEL: sil {{.*}}returnGlobalVar{{.*}} () -> Double {
 // SIL:   %0 = global_addr @IAMStruct1GlobalVar : $*Double
-// SIL:   %2 = load [trivial] %0 : $*Double
-// SIL:   return %2 : $Double
+// SIL:   [[READ:%.*]] = begin_access [read] [dynamic] %0 : $*Double
+// SIL:   [[VAL:%.*]] = load [trivial] [[READ]] : $*Double
+// SIL:   return [[VAL]] : $Double
 // SIL-NEXT: }
 
 // SIL-LABEL: sil {{.*}}anchor{{.*}} () -> () {

@@ -39,7 +39,7 @@
 #include "MemberAccessStrategy.h"
 #include "NonFixedTypeInfo.h"
 #include "ResilientTypeInfo.h"
-#include "StructMetadataLayout.h"
+#include "StructMetadataVisitor.h"
 
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
 
@@ -414,6 +414,8 @@ namespace {
     }
     
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
+      // TODO: do this with StructMetadataLayout::getFieldOffset
+
       // Get the field offset vector from the struct metadata.
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       Address fieldVector = emitAddressOfFieldOffsetVector(IGF,

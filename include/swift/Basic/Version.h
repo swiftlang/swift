@@ -114,9 +114,9 @@ public:
   Version asMajorVersion() const;
 
   /// Parse a version in the form used by the _compiler_version \#if condition.
-  static Version parseCompilerVersionString(StringRef VersionString,
-                                            SourceLoc Loc,
-                                            DiagnosticEngine *Diags);
+  static Optional<Version> parseCompilerVersionString(StringRef VersionString,
+                                                      SourceLoc Loc,
+                                                      DiagnosticEngine *Diags);
 
   /// Parse a generic version string of the format [0-9]+(.[0-9]+)*
   ///
@@ -144,6 +144,9 @@ public:
 
 bool operator>=(const Version &lhs, const Version &rhs);
 bool operator==(const Version &lhs, const Version &rhs);
+inline bool operator!=(const Version &lhs, const Version &rhs) {
+  return !(lhs == rhs);
+}
 
 raw_ostream &operator<<(raw_ostream &os, const Version &version);
 

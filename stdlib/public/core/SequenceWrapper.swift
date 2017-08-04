@@ -45,37 +45,37 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
   
   @discardableResult
   public func _copyContents(
-    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> (Iterator, UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     return _base._copyContents(initializing: buf)
   }
 }
 
-extension _SequenceWrapper where Iterator.Element == Base.Iterator.Element {
+extension _SequenceWrapper where Element == Base.Element {
   public func map<T>(
-    _ transform: (Iterator.Element) throws -> T
+    _ transform: (Element) throws -> T
 ) rethrows -> [T] {
     return try _base.map(transform)
   }
   
   public func filter(
-    _ isIncluded: (Iterator.Element) throws -> Bool
-  ) rethrows -> [Iterator.Element] {
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> [Element] {
     return try _base.filter(isIncluded)
   }
 
-  public func forEach(_ body: (Iterator.Element) throws -> Void) rethrows {
+  public func forEach(_ body: (Element) throws -> Void) rethrows {
     return try _base.forEach(body)
   }
   
   public func _customContainsEquatableElement(
-    _ element: Iterator.Element
+    _ element: Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
   
   public func _copyToContiguousArray()
-    -> ContiguousArray<Iterator.Element> {
+    -> ContiguousArray<Element> {
     return _base._copyToContiguousArray()
   }
 }
@@ -96,16 +96,16 @@ extension _SequenceWrapper where SubSequence == Base.SubSequence {
 }
 
 extension _SequenceWrapper
-  where SubSequence == Base.SubSequence, Iterator.Element == Base.Iterator.Element {
+  where SubSequence == Base.SubSequence, Element == Base.Element {
 
   public func drop(
-    while predicate: (Iterator.Element) throws -> Bool
+    while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     return try _base.drop(while: predicate)
   }
 
   public func prefix(
-    while predicate: (Iterator.Element) throws -> Bool
+    while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     return try _base.prefix(while: predicate)
   }
@@ -116,7 +116,7 @@ extension _SequenceWrapper
 
   public func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     return try _base.split(
       maxSplits: maxSplits,

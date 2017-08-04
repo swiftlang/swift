@@ -2,6 +2,9 @@
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 > %t.simple.txt
+// RUN: %FileCheck -check-prefix SIMPLE_STATIC -implicit-check-not -rpath %s < %t.simple.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt
 
@@ -40,7 +43,7 @@
 // RUN: %FileCheck %s < %t.simple-macosx10.10.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple-macosx10.10.txt
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-use-filelists -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
@@ -67,6 +70,23 @@
 // SIMPLE-DAG: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
 // SIMPLE-NOT: -syslibroot
 // SIMPLE: -o linker
+
+
+// SIMPLE_STATIC: swift
+// SIMPLE_STATIC: -o [[OBJECTFILE:.*]]
+
+// SIMPLE_STATIC-NEXT: bin/ld{{"? }}
+// SIMPLE_STATIC: [[OBJECTFILE]]
+// SIMPLE_STATIC: -lobjc
+// SIMPLE_STATIC: -lSystem
+// SIMPLE_STATIC: -arch x86_64
+// SIMPLE_STATIC: -L [[STDLIB_PATH:[^ ]+/lib/swift_static/macosx]]
+// SIMPLE_STATIC: -lc++
+// SIMPLE_STATIC: -framework Foundation
+// SIMPLE_STATIC: -force_load_swift_libs
+// SIMPLE_STATIC: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
+// SIMPLE_STATIC: -no_objc_category_merging
+// SIMPLE_STATIC: -o linker
 
 
 // IOS_SIMPLE: swift
@@ -250,7 +270,7 @@
 // the Swift driver really thinks it's been moved.
 
 // RUN: rm -rf %t
-// RUN: mkdir -p %t/DISTINCTIVE-PATH/usr/bin/
+// RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/bin)
 // RUN: touch %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: chmod +x %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/DISTINCTIVE-PATH/usr/bin/swiftc)
@@ -263,8 +283,8 @@
 // Also test arclite detection. This uses xcrun to find arclite when it's not
 // next to Swift.
 
-// RUN: mkdir -p %t/ANOTHER-DISTINCTIVE-PATH/usr/bin
-// RUN: mkdir -p %t/ANOTHER-DISTINCTIVE-PATH/usr/lib/arc
+// RUN: %empty-directory(%t/ANOTHER-DISTINCTIVE-PATH/usr/bin)
+// RUN: %empty-directory(%t/ANOTHER-DISTINCTIVE-PATH/usr/lib/arc)
 // RUN: cp %S/Inputs/xcrun-return-self.sh %t/ANOTHER-DISTINCTIVE-PATH/usr/bin/xcrun
 
 // RUN: env PATH=%t/ANOTHER-DISTINCTIVE-PATH/usr/bin %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | %FileCheck -check-prefix=XCRUN_ARCLITE %s
@@ -273,7 +293,7 @@
 // XCRUN_ARCLITE: /ANOTHER-DISTINCTIVE-PATH/usr/lib/arc/libarclite_macosx.a
 // XCRUN_ARCLITE: -o {{[^ ]+}}
 
-// RUN: mkdir -p %t/DISTINCTIVE-PATH/usr/lib/arc
+// RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/lib/arc)
 
 // RUN: env PATH=%t/ANOTHER-DISTINCTIVE-PATH/usr/bin %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | %FileCheck -check-prefix=RELATIVE_ARCLITE %s
 

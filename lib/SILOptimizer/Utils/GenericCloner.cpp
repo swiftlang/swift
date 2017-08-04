@@ -42,7 +42,7 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
-      Serialized, Orig->isThunk(), Orig->getClassVisibility(),
+      Serialized, Orig->isThunk(), Orig->getClassSubclassScope(),
       Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
       Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {

@@ -19,7 +19,12 @@
 #include "swift/Basic/Platform.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/Triple.h"
+
 using namespace swift;
 
 static StringRef toStringRef(const SanitizerKind kind) {
@@ -95,9 +100,17 @@ llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
   return opts;
 }
 
+static bool isTSanSupported(
+    const llvm::Triple &Triple,
+    llvm::function_ref<bool(llvm::StringRef)> sanitizerRuntimeLibExists) {
+
+  return Triple.isArch64Bit() && sanitizerRuntimeLibExists("tsan");
+}
+
 SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
-                                      const llvm::Triple &Triple,
-                                      DiagnosticEngine &Diags) {
+    const llvm::Triple &Triple,
+    DiagnosticEngine &Diags,
+    llvm::function_ref<bool(llvm::StringRef)> sanitizerRuntimeLibExists) {
   SanitizerKind kind = SanitizerKind::None;
 
   // Find the sanitizer kind.
@@ -130,18 +143,14 @@ SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
     return kind;
 
   // Check if the target is supported for this sanitizer.
-  // None of the sanitizers work on Linux right now.
-  if (!Triple.isOSDarwin()) {
+  if (!(Triple.isOSDarwin() || Triple.isOSLinux())) {
     SmallString<128> b;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
       (A->getOption().getPrefixedName() + toStringRef(kind)).toStringRef(b),
       Triple.getTriple());
   }
-  // Thread Sanitizer only works on OS X and the simulators. It's only supported
-  // on 64 bit architectures.
-  if (kind == SanitizerKind::Thread &&
-      (!(Triple.isMacOSX() || tripleIsAnySimulator(Triple)) ||
-       !Triple.isArch64Bit())) {
+  if (kind == SanitizerKind::Thread
+      && !isTSanSupported(Triple, sanitizerRuntimeLibExists)) {
     SmallString<128> b;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
       (A->getOption().getPrefixedName() + toStringRef(kind)).toStringRef(b),

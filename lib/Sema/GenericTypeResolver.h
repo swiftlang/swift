@@ -36,16 +36,8 @@ class GenericTypeResolver {
 public:
   virtual ~GenericTypeResolver();
 
-  /// Resolve the given generic type parameter to its type.
-  ///
-  /// This routine is used whenever type checking encounters a reference to a
-  /// generic parameter. It can replace the generic parameter with (for example)
-  /// a concrete type or an archetype, depending on context.
-  ///
-  /// \param gp The generic parameter to resolve.
-  ///
-  /// \returns The resolved generic type parameter type, which may be \c gp.
-  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp) = 0;
+  /// Resolve the given interface type to a contextual type if necessary.
+  virtual Type mapTypeIntoContext(Type type) = 0;
 
   /// Resolve a qualified reference to a type member within a dependent type.
   ///
@@ -60,33 +52,6 @@ public:
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref) = 0;
 
-  /// Resolve an unqualified reference to an associated type of the 'Self' type
-  /// of a protocol.
-  ///
-  /// \param selfTy The base of the member access.
-  /// \param assocType The associated type.
-  ///
-  /// \returns A type that refers to the dependent member type, or an error
-  /// type if such a reference is ill-formed.
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType) = 0;
-
-  /// Resolve the self type within the given context.
-  ///
-  /// \param dc A context in which type checking occurs, which must be a type
-  /// context (i.e., nominal type or extension thereof).
-  ///
-  /// \returns the type of context.
-  virtual Type resolveTypeOfContext(DeclContext *dc) = 0;
-
-  /// Retrieve the type when referring to the given type declaration within
-  /// its context.
-  ///
-  /// \param decl A type declaration.
-  ///
-  /// \returns the type of the declaration in context..
-  virtual Type resolveTypeOfDecl(TypeDecl *decl) = 0;
-
   /// Determine whether the given types are equivalent within the generic
   /// context.
   virtual bool areSameType(Type type1, Type type2) = 0;
@@ -100,27 +65,13 @@ public:
 /// This generic type resolver leaves generic type parameter types alone
 /// and only trivially resolves dependent member types.
 class DependentGenericTypeResolver : public GenericTypeResolver {
-  GenericSignatureBuilder &Builder;
-  ArrayRef<GenericTypeParamType *> GenericParams;
-
 public:
-  DependentGenericTypeResolver(GenericSignatureBuilder &builder,
-                               ArrayRef<GenericTypeParamType *> genericParams)
-    : Builder(builder), GenericParams(genericParams) { }
-
-  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
+  virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy,
                                           DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
-
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType);
-
-  virtual Type resolveTypeOfContext(DeclContext *dc);
-
-  virtual Type resolveTypeOfDecl(TypeDecl *decl);
 
   virtual bool areSameType(Type type1, Type type2);
 
@@ -142,18 +93,11 @@ public:
   explicit GenericTypeToArchetypeResolver(DeclContext *dc)
       : GenericEnv(dc->getGenericEnvironmentOfContext()) { }
 
-  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
+  virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
-
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType);
-
-  virtual Type resolveTypeOfContext(DeclContext *dc);
-
-  virtual Type resolveTypeOfDecl(TypeDecl *decl);
 
   virtual bool areSameType(Type type1, Type type2);
 
@@ -166,24 +110,12 @@ public:
 /// This should only be used when resolving/validating where clauses in
 /// protocols.
 class ProtocolRequirementTypeResolver : public GenericTypeResolver {
-  ProtocolDecl *Proto;
-
 public:
-  explicit ProtocolRequirementTypeResolver(ProtocolDecl *proto)
-      : Proto(proto) {}
-
-  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
+  virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
-
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType);
-
-  virtual Type resolveTypeOfContext(DeclContext *dc);
-
-  virtual Type resolveTypeOfDecl(TypeDecl *decl);
 
   virtual bool areSameType(Type type1, Type type2);
 
@@ -207,19 +139,12 @@ public:
                               ArrayRef<GenericTypeParamType *> genericParams)
     : TC(tc), Builder(builder), GenericParams(genericParams) { }
 
-  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
+  virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy,
                                           DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
-
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType);
-
-  virtual Type resolveTypeOfContext(DeclContext *dc);
-
-  virtual Type resolveTypeOfDecl(TypeDecl *decl);
 
   virtual bool areSameType(Type type1, Type type2);
 

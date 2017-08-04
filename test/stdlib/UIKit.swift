@@ -107,4 +107,80 @@ UIKitTests.test("NSValue bridging") {
                         equal: (==))
 }
 
+#if os(iOS) || os(tvOS)
+UIKitTests.test("UIContentSizeCategory comparison") {
+    if #available(iOS 11.0, tvOS 11.0, *) {
+        expectTrue(UIContentSizeCategory.large < UIContentSizeCategory.extraLarge)
+        expectTrue(UIContentSizeCategory.large <= UIContentSizeCategory.extraLarge)
+        expectFalse(UIContentSizeCategory.large >= UIContentSizeCategory.extraLarge)
+        expectFalse(UIContentSizeCategory.large > UIContentSizeCategory.extraLarge)
+        expectFalse(UIContentSizeCategory.large == UIContentSizeCategory.extraLarge)
+        
+        expectTrue(UIContentSizeCategory.extraLarge > UIContentSizeCategory.large)
+        expectTrue(UIContentSizeCategory.extraLarge >= UIContentSizeCategory.large)
+        expectFalse(UIContentSizeCategory.extraLarge < UIContentSizeCategory.large)
+        expectFalse(UIContentSizeCategory.extraLarge <= UIContentSizeCategory.large)
+        expectFalse(UIContentSizeCategory.extraLarge == UIContentSizeCategory.large)
+        
+        expectTrue(UIContentSizeCategory.large == UIContentSizeCategory.large)
+        expectTrue(UIContentSizeCategory.large >= UIContentSizeCategory.large)
+        expectTrue(UIContentSizeCategory.large <= UIContentSizeCategory.large)
+        expectFalse(UIContentSizeCategory.large > UIContentSizeCategory.large)
+        expectFalse(UIContentSizeCategory.large < UIContentSizeCategory.large)
+        
+        expectTrue(UIContentSizeCategory.accessibilityExtraExtraExtraLarge.isAccessibilityCategory)
+        expectFalse(UIContentSizeCategory.extraSmall.isAccessibilityCategory)
+    }
+}
+#endif
+
+#if os(iOS) || os(watchOS) || os(tvOS)
+UIKitTests.test("UIFontMetrics scaling") {
+    if #available(iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+        let metrics = UIFontTextStyle.headline.metrics
+        expectTrue(metrics != nil)
+    }
+}
+#endif
+
+#if os(iOS) || os(tvOS)
+UIKitTests.test("UIFocusEnvironment") {
+  if #available(iOS 11.0, tvOS 11.0, *) {
+    let item1 = UIView()
+    let item2 = UIView()
+    _ = item1.contains(item2)
+    _ = item1.isFocused
+  }
+}
+#endif
+
+#if os(iOS)
+
+UIKitTests.test("NSItemProviderReadingWriting support") {
+  if #available(iOS 11.0, *) {
+    func f<T : UIDragDropSession>(session: T) {
+      _ = session.canLoadObjects(ofClass: String.self)
+      _ = session.canLoadObjects(ofClass: URL.self)
+    }
+    func g<T : UIDropSession>(session: T) {
+      _ = session.loadObjects(ofClass: String.self) { _ in ()}
+      _ = session.loadObjects(ofClass: URL.self) { _ in () }
+    }
+
+    let pc0 = UIPasteConfiguration(forAccepting: String.self)
+    let pc1 = UIPasteConfiguration(forAccepting: URL.self)
+    pc0.addTypeIdentifiers(forAccepting: URL.self)
+    pc1.addTypeIdentifiers(forAccepting: String.self)
+
+    var pb = UIPasteboard.general
+    pb.setObjects(["Hello"])
+    pb.setObjects([URL(string: "https://www.apple.com")!])
+    pb.setObjects(["Hello"], localOnly: true, expirationDate: nil)
+    pb.setObjects([URL(string: "https://www.apple.com")!], localOnly: true, expirationDate: nil)
+  }
+}
+
+#endif
+
+
 runAllTests()

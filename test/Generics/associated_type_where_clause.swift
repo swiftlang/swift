@@ -138,16 +138,16 @@ protocol P {
 
 // Lookup of same-named associated types aren't ambiguous in this context.
 protocol P1 {
-  associatedtype A
+  associatedtype A // expected-note 2{{declared here}}
 }
 
 protocol P2: P1 {
-  associatedtype A
+  associatedtype A // expected-warning{{redeclaration of associated type}}
   associatedtype B where A == B
 }
 
 protocol P3: P1 {
-  associatedtype A
+  associatedtype A // expected-warning{{redeclaration of associated type}}
 }
 
 protocol P4 {
@@ -156,4 +156,49 @@ protocol P4 {
 
 protocol P5: P3, P4 {
   associatedtype B where B == A?
+}
+
+// Associated type inference should account for where clauses.
+protocol P6 {
+  associatedtype A
+}
+
+struct X1 { }
+
+struct X2 { }
+
+struct Y1 : P6 {
+  typealias A = X1
+}
+
+struct Y2 : P6 {
+  typealias A = X2
+}
+
+protocol P7 {
+  associatedtype B: P6 // expected-note{{ambiguous inference of associated type 'B': 'Y1' vs. 'Y2'}}
+  associatedtype C: P6 where B.A == C.A
+
+  func getB() -> B
+  func getC() -> C
+}
+
+struct Z1 : P7 {
+  func getB() -> Y1 { return Y1() }
+  func getB() -> Y2 { return Y2() }
+
+  func getC() -> Y1 { return Y1() }
+}
+
+func testZ1(z1: Z1) {
+  let _: Z1.C = Y1()
+}
+
+
+struct Z2 : P7 { // expected-error{{type 'Z2' does not conform to protocol 'P7'}}
+  func getB() -> Y1 { return Y1() } // expected-note{{matching requirement 'getB()' to this declaration inferred associated type to 'Y1'}}
+  func getB() -> Y2 { return Y2() } // expected-note{{matching requirement 'getB()' to this declaration inferred associated type to 'Y2'}}
+
+  func getC() -> Y1 { return Y1() }
+  func getC() -> Y2 { return Y2() }
 }

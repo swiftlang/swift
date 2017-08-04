@@ -53,8 +53,10 @@ struct FailableStruct {
 // CHECK:       bb0(%0 : $@thin FailableStruct.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
 // CHECK:         [[CANARY:%.*]] = apply
-// CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableStruct
+// CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
 // CHECK-NEXT:    store [[CANARY]] to [[X_ADDR]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*FailableStruct
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
@@ -73,11 +75,15 @@ struct FailableStruct {
 // CHECK:       bb0
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
 // CHECK:         [[CANARY1:%.*]] = apply
-// CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableStruct
+// CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
 // CHECK-NEXT:    store [[CANARY1]] to [[X_ADDR]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*FailableStruct
 // CHECK:         [[CANARY2:%.*]] = apply
-// CHECK-NEXT:    [[Y_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableStruct
+// CHECK-NEXT:    [[Y_ADDR:%.*]] = struct_element_addr [[WRITE]]
 // CHECK-NEXT:    store [[CANARY2]] to [[Y_ADDR]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*FailableStruct
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
 // CHECK-NEXT:    [[SELF:%.*]] = struct $FailableStruct ([[CANARY1]] : $Canary, [[CANARY2]] : $Canary)
@@ -97,7 +103,9 @@ struct FailableStruct {
 // CHECK:       bb0
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
 // CHECK:         [[CANARY]] = apply
-// CHECK-NEXT:    store [[CANARY]] to [[SELF_BOX]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableStruct
+// CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*FailableStruct
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
 // CHECK-NEXT:    release_value [[CANARY]]
@@ -221,8 +229,10 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-NEXT:    [[X_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
-// CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
+// CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
 // CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [initialization] [[X_ADDR]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    dealloc_stack [[X_BOX]]
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
@@ -245,15 +255,19 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-NEXT:    [[X_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
-// CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
+// CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
 // CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [initialization] [[X_ADDR]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    dealloc_stack [[X_BOX]]
 // CHECK-NEXT:    [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
 // CHECK-NEXT:    [[Y_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[Y_BOX]], [[T_TYPE]])
-// CHECK-NEXT:    [[Y_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
+// CHECK-NEXT:    [[Y_ADDR:%.*]] = struct_element_addr [[WRITE]]
 // CHECK-NEXT:    copy_addr [take] [[Y_BOX]] to [initialization] [[Y_ADDR]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    dealloc_stack [[Y_BOX]]
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
@@ -578,7 +592,9 @@ struct ThrowStruct {
 // CHECK-NEXT:    [[SELF_TYPE:%.*]] = metatype $@thin ThrowStruct.Type
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[SELF_TYPE]])
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowStruct):
-// CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*ThrowStruct
+// CHECK-NEXT:    store [[NEW_SELF]] to [[WRITE]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*ThrowStruct
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
 // CHECK:       bb2([[ERROR:%.*]] : $Error):
@@ -594,7 +610,9 @@ struct ThrowStruct {
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers11ThrowStructVACyt6noFail_tcfC
 // CHECK-NEXT:    [[SELF_TYPE:%.*]] = metatype $@thin ThrowStruct.Type
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]]([[SELF_TYPE]])
-// CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*ThrowStruct
+// CHECK-NEXT:    store [[NEW_SELF]] to [[WRITE]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*ThrowStruct
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
@@ -727,7 +745,9 @@ class FailableBaseClass {
 // CHECK:       bb0(%0 : $FailableBaseClass):
 // CHECK:         [[CANARY:%.*]] = apply
 // CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr %0
-// CHECK-NEXT:    store [[CANARY]] to [[MEMBER_ADDR]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [dynamic] [[MEMBER_ADDR]] : $*Canary
+// CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*Canary
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
 // CHECK-NEXT:    strong_release %0
@@ -858,7 +878,9 @@ class FailableDerivedClass : FailableBaseClass {
 // CHECK:         store %0 to [[SELF_BOX]]
 // CHECK:         [[CANARY:%.*]] = apply
 // CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr %0
-// CHECK-NEXT:    store [[CANARY]] to [[MEMBER_ADDR]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [dynamic] [[MEMBER_ADDR]] : $*Canary
+// CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*Canary
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %0
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers17FailableBaseClassCACSgyt28failBeforeFullInitialization_tcfc
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = apply [[INIT_FN]]([[BASE_SELF]])

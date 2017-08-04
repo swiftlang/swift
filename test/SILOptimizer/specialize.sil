@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -7,7 +7,7 @@ import Swift
 
 // CHECK-LABEL: sil @exp1 : $@convention(thin) () -> () {
 // CHECK-NOT: apply
-// Call of specialized intializer: <Int32>
+// Call of specialized initializer: <Int32>
 // CHECK: [[CTOR:%[0-9]+]] = function_ref @_T08XXX_inits5Int32V_Tg5
 // CHECK: apply [[CTOR]]
 // CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @acceptsInt
@@ -527,3 +527,118 @@ bb0(%0 : $Builtin.RawPointer):
   %5 = tuple ()
   return %5 : $()
 }
+
+// invokeGenericClosure<A>(todo:)
+sil [noinline] @invokeGenericClosure : $@convention(thin) <R> (@owned @callee_owned () -> (@out R, @error Error)) -> (@out R, @error Error) {
+bb0(%0 : $*R, %1 : $@callee_owned () -> (@out R, @error Error)):
+  debug_value %1 : $@callee_owned () -> (@out R, @error Error), let, name "todo", argno 1 // id: %2
+  debug_value undef : $Error, var, name "$error", argno 2 // id: %3
+  strong_retain %1 : $@callee_owned () -> (@out R, @error Error) // id: %4
+  try_apply %1(%0) : $@callee_owned () -> (@out R, @error Error), normal bb1, error bb2 // id: %5
+
+bb1(%6 : $()):                                    // Preds: bb0
+  strong_release %1 : $@callee_owned () -> (@out R, @error Error) // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+
+// %10                                            // user: %12
+bb2(%10 : $Error):                                // Preds: bb0
+  strong_release %1 : $@callee_owned () -> (@out R, @error Error) // id: %11
+  throw %10 : $Error                              // id: %12
+} // end sil function 'invokeGenericClosure'
+
+sil public_external @error : $@convention(thin) () -> Never
+
+// action()
+sil @action : $@convention(thin) () -> Never
+
+// thunk for @callee_owned () -> (@unowned Never, @error @owned Error)
+sil @action_thunk : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
+
+// Check that in a case where a generic specialization is a non-return function,
+// the return value is not stored after the call and an unreachable instruction
+// is inserted as a terminator of a basic block.
+//
+// CHECK-LABEL: sil @testGenericClosureSpecialization
+// Call of the generic specialization of invokeGenericClosure<Never>
+// CHECK: function_ref @_T020invokeGenericClosures5NeverO_Tg5 : $@convention(thin) (@owned @callee_owned () -> (@out Never, @error Error)) -> (Never, @error Error)
+// CHECK: apply [nothrow]
+// CHECK: unreachable
+// CHECK: end sil function 'testGenericClosureSpecialization'
+sil @testGenericClosureSpecialization : $@convention(thin) () -> @error Error {
+bb0:
+  // function_ref invokeGenericClosure<A>(todo:)
+  %1 = function_ref @invokeGenericClosure : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+  %2 = alloc_stack $Never
+  // function_ref action()
+  %3 = function_ref @action : $@convention(thin) () -> Never
+  %4 = thin_to_thick_function %3 : $@convention(thin) () -> Never to $@callee_owned () -> Never
+  %5 = convert_function %4 : $@callee_owned () -> Never to $@callee_owned () -> (Never, @error Error)
+  // function_ref thunk for @callee_owned () -> (@unowned Never, @error @owned Error)
+  %6 = function_ref @action_thunk : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
+  %7 = partial_apply %6(%5) : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
+  %8 = apply [nothrow] %1<Never>(%2, %7) : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+  dealloc_stack %2 : $*Never
+  %12 = tuple ()
+  return %12 : $()
+} // end sil function 'testGenericClosureSpecialization'
+
+// Test a specialization of a self-recursive generic closure.
+
+// CHECK-LABEL: sil shared @_T027selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lItnny_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @_T027selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lItnny_Tp5
+// CHECK: partial_apply [[SPECIALIZED_FN]]{{.*}}({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
+
+// CHECK-LABEL: sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> ()
+// Refer to the specialized version of the function
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @_T027selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lItnny_Tp5
+// CHECK: partial_apply [[SPECIALIZED_FN]]<R>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
+sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> () {
+bb0(%0 : $*R, %1 : $*S, %2 : $Builtin.Int64):
+  %4 = integer_literal $Builtin.Int64, 100
+  %5 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %5, bb2, bb1
+
+bb1:
+  %val_storage = alloc_stack $Builtin.Int64
+  %val = integer_literal $Builtin.Int64, 4
+  store %val to %val_storage : $*Builtin.Int64
+  %fn = function_ref @selfReferringGenericClosure : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, Builtin.Int64) -> () 
+  %7 = partial_apply %fn<R, Builtin.Int64>(%0, %val_storage, %4) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, Builtin.Int64) -> ()
+  dealloc_stack %val_storage : $*Builtin.Int64
+  br bb3
+bb2:
+  br bb3
+
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+}
+
+struct YYY<T> {
+}
+
+enum MyOptional<T> {
+  case none
+  case some(T)
+}
+
+// Check that a specialization of a self-recursive function is produced
+// and it is not crashing the compiler.
+// CHECK-LABEL: sil shared @_T025testSelfRecursiveFunction4main10MyOptionalOyAB3YYYVyypGG_Tg5 : $@convention(thin) (MyOptional<YYY<Any>>) -> ()
+sil @testSelfRecursiveFunction : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  %2 = function_ref @testSelfRecursiveFunction : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  %3 = alloc_stack $MyOptional<YYY<Any>>
+  inject_enum_addr %3 : $*MyOptional<YYY<Any>>, #MyOptional.none!enumelt
+  %5 = tuple ()
+  %6 = load %3 : $*MyOptional<YYY<Any>>
+  %7 = alloc_stack $MyOptional<YYY<Any>>
+  store %6 to %7 : $*MyOptional<YYY<Any>>
+  %9 = apply %2<MyOptional<YYY<Any>>>(%7) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %7 : $*MyOptional<YYY<Any>>
+  dealloc_stack %3 : $*MyOptional<YYY<Any>>
+  destroy_addr %0 : $*T
+  %13 = tuple ()
+  return %13 : $()
+} // end sil function 'testSelfRecursiveFunction'

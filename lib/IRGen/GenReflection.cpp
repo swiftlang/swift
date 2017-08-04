@@ -283,7 +283,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   void layout() override {
     // If the conforming type is generic, we just want to emit the
     // unbound generic type here.
-    auto *Nominal = Conformance->getInterfaceType()->getAnyNominal();
+    auto *Nominal = Conformance->getType()->getAnyNominal();
     assert(Nominal && "Structural conformance?");
 
     PrettyStackTraceDecl DebugStack("emitting associated type metadata",
@@ -321,45 +321,6 @@ public:
   }
 };
 
-class SuperclassMetadataBuilder : public ReflectionMetadataBuilder {
-  static const uint32_t AssociatedTypeRecordSize = 8;
-
-  const ClassDecl *Class;
-  CanType Superclass;
-
-  void layout() override {
-    PrettyStackTraceDecl DebugStack("emitting superclass metadata",
-                                    Class);
-
-    auto *M = IGM.getSILModule().getSwiftModule();
-
-    addTypeRef(M, Class->getDeclaredType()->getCanonicalType());
-
-    auto anyObjectDecl = IGM.Context.getProtocol(KnownProtocolKind::AnyObject);
-    addTypeRef(M, anyObjectDecl->getDeclaredType()->getCanonicalType());
-
-    B.addInt32(1);
-    B.addInt32(AssociatedTypeRecordSize);
-
-    auto NameGlobal = IGM.getAddrOfStringForTypeRef("super");
-    B.addRelativeAddress(NameGlobal);
-    addTypeRef(M, Superclass);
-  }
-
-public:
-  SuperclassMetadataBuilder(IRGenModule &IGM,
-                            const ClassDecl *Class,
-                            CanType Superclass)
-    : ReflectionMetadataBuilder(IGM), Class(Class),
-      Superclass(Superclass) {}
-
-  llvm::GlobalVariable *emit() {
-    auto entity = LinkEntity::forReflectionSuperclassDescriptor(Class);
-    auto section = IGM.getAssociatedTypeMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(entity, section);
-  }
-};
-
 class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   const uint32_t fieldRecordSize = 12;
   const NominalTypeDecl *NTD;
@@ -379,7 +340,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
-      auto fieldName = IGM.getAddrOfFieldName(value->getNameStr());
+      auto name = value->getBaseName().getIdentifier().str();
+      auto fieldName = IGM.getAddrOfFieldName(name);
       B.addRelativeAddress(fieldName);
     } else {
       B.addInt32(0);
@@ -390,7 +352,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto kind = FieldDescriptorKind::Struct;
 
     if (auto CD = dyn_cast<ClassDecl>(NTD)) {
-      auto RC = getReferenceCountingForClass(IGM, const_cast<ClassDecl *>(CD));
+      auto type = CD->getDeclaredType()->getCanonicalType();
+      auto RC = getReferenceCountingForType(IGM, type);
       if (RC == ReferenceCounting::ObjC)
         kind = FieldDescriptorKind::ObjCClass;
       else
@@ -466,14 +429,22 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layout() override {
-    PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
-    auto type = NTD->getDeclaredType()->getCanonicalType();
-    addTypeRef(NTD->getModuleContext(), type);
-
     if (NTD->hasClangNode() &&
         !isa<ClassDecl>(NTD) &&
         !isa<ProtocolDecl>(NTD))
       return;
+
+    PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
+    auto type = NTD->getDeclaredType()->getCanonicalType();
+    addTypeRef(NTD->getModuleContext(), type);
+
+    auto *CD = dyn_cast<ClassDecl>(NTD);
+    if (CD && CD->getSuperclass()) {
+      addTypeRef(NTD->getModuleContext(),
+                 CD->getSuperclass()->getCanonicalType());
+    } else {
+      B.addInt32(0);
+    }
 
     switch (NTD->getKind()) {
     case DeclKind::Class:
@@ -602,6 +573,7 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   CanSILFunctionType SubstCalleeType;
   SubstitutionList Subs;
   const HeapLayout &Layout;
+
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
                            SILFunction &Caller,
@@ -629,6 +601,35 @@ public:
       auto EncodedSource = IGM.getAddrOfStringForTypeRef(OS.str());
       B.addRelativeAddress(EncodedSource);
     }
+  }
+
+  /// Give up if we captured an opened existential type. Eventually we
+  /// should figure out how to represent this.
+  static bool hasOpenedExistential(CanSILFunctionType OrigCalleeType,
+                                   const HeapLayout &Layout) {
+    if (!OrigCalleeType->isPolymorphic() ||
+        OrigCalleeType->isPseudogeneric())
+      return false;
+
+    auto &Bindings = Layout.getBindings();
+    for (unsigned i = 0; i < Bindings.size(); ++i) {
+      // Skip protocol requirements (FIXME: for now?)
+      if (Bindings[i].Protocol != nullptr)
+        continue;
+
+      if (Bindings[i].TypeParameter->hasOpenedExistential())
+        return true;
+    }
+
+    auto ElementTypes = Layout.getElementTypes().slice(
+        Layout.hasBindings() ? 1 : 0);
+    for (auto ElementType : ElementTypes) {
+      auto SwiftType = ElementType.getSwiftRValueType();
+      if (SwiftType->hasOpenedExistential())
+        return true;
+    }
+
+    return false;
   }
 
   /// Slice off the NecessaryBindings struct at the beginning, if it's there.
@@ -661,8 +662,9 @@ public:
         continue;
 
       auto Source = SourceBuilder.createClosureBinding(i);
-      auto BindingType = Caller.mapTypeOutOfContext(Bindings[i].TypeParameter);
-      SourceMap.push_back({BindingType->getCanonicalType(), Source});
+      auto BindingType = Bindings[i].TypeParameter;
+      auto InterfaceType = Caller.mapTypeOutOfContext(BindingType);
+      SourceMap.push_back({InterfaceType->getCanonicalType(), Source});
     }
 
     // Check if any requirements were fulfilled by metadata stored inside a
@@ -702,10 +704,9 @@ public:
       // parameters.
       auto Src = Path.getMetadataSource(SourceBuilder, Root);
 
-      auto SubstType =
-        Caller.mapTypeOutOfContext(
-            GenericParam.subst(SubstMap, None));
-      SourceMap.push_back({SubstType->getCanonicalType(), Src});
+      auto SubstType = GenericParam.subst(SubstMap);
+      auto InterfaceType = Caller.mapTypeOutOfContext(SubstType);
+      SourceMap.push_back({InterfaceType->getCanonicalType(), Src});
     });
 
     return SourceMap;
@@ -724,8 +725,7 @@ public:
         SwiftType = SwiftType.transform([&](Type t) -> Type {
           if (auto *archetype = t->getAs<ArchetypeType>()) {
             assert(archetype->requiresClass() && "don't know what to do");
-            return IGM.Context.getProtocol(KnownProtocolKind::AnyObject)
-                ->getDeclaredType();
+            return IGM.Context.getAnyObjectType();
           }
           return t;
         })->getCanonicalType();
@@ -874,11 +874,13 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
+  if (CaptureDescriptorBuilder::hasOpenedExistential(OrigCalleeType, Layout))
+    return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
+
   CaptureDescriptorBuilder builder(*this, Caller,
                                    OrigCalleeType, SubstCalleeType, Subs,
                                    Layout);
   auto var = builder.emit();
-
   return llvm::ConstantExpr::getBitCast(var, CaptureDescriptorPtrTy);
 }
 
@@ -926,14 +928,13 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     // extra inhabitants as these. But maybe it's best not to codify
     // that in the ABI anyway.
     CanType thinFunction = CanFunctionType::get(
-      TupleType::getEmpty(Context),
-      TupleType::getEmpty(Context),
+      AnyFunctionType::CanParamArrayRef({}), Context.TheEmptyTupleType,
       AnyFunctionType::ExtInfo().withRepresentation(
           FunctionTypeRepresentation::Thin));
     BuiltinTypes.insert(thinFunction);
 
     CanType anyMetatype = CanExistentialMetatypeType::get(
-      ProtocolCompositionType::get(Context, {})->getCanonicalType());
+      Context.TheAnyType);
     BuiltinTypes.insert(anyMetatype);
   }
 
@@ -962,21 +963,6 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
 
   FieldTypeMetadataBuilder builder(*this, Decl);
   builder.emit();
-
-  // So that -parse-stdlib tests don't need to define an AnyObject
-  // protocol (which will go away one day anyway).
-  if (!Context.getProtocol(KnownProtocolKind::AnyObject))
-    return;
-
-  // If this is a class declaration with a superclass, record the
-  // superclass as a special associated type named 'super' on the
-  // 'AnyObject' protocol.
-  if (auto Superclass = Decl->getDeclaredInterfaceType()
-                            ->getSuperclass(nullptr)) {
-    SuperclassMetadataBuilder builder(*this, cast<ClassDecl>(Decl),
-                                      Superclass->getCanonicalType());
-    builder.emit();
-  }
 }
 
 void IRGenModule::emitReflectionMetadataVersion() {

@@ -109,7 +109,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   // If we're inlining into a normal apply and the callee's entry
   // block ends in a return, then we can avoid a split.
   if (auto nonTryAI = dyn_cast<ApplyInst>(AI)) {
-    if (ReturnInst *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
+    if (auto *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
       // Replace all uses of the apply instruction with the operands of the
       // return instruction, appropriately mapped.
       nonTryAI->replaceAllUsesWith(remapValue(RI->getOperand()));
@@ -149,7 +149,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
 
     // Modify return terminators to branch to the return-to BB, rather than
     // trying to clone the ReturnInst.
-    if (ReturnInst *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
+    if (auto *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
       auto thrownValue = remapValue(RI->getOperand());
       getBuilder().createBranch(Loc.getValue(), ReturnToBB,
                                 thrownValue);
@@ -158,7 +158,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
 
     // Modify throw terminators to branch to the error-return BB, rather than
     // trying to clone the ThrowInst.
-    if (ThrowInst *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
+    if (auto *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
       if (auto *A = dyn_cast<ApplyInst>(AI)) {
         (void)A;
         assert(A->isNonThrowing() &&
@@ -218,8 +218,8 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
 //                                 Cost Model
 //===----------------------------------------------------------------------===//
 
-static InlineCost getEnforcementCost(BeginAccessInst &I) {
-  switch (I.getEnforcement()) {
+static InlineCost getEnforcementCost(SILAccessEnforcement enforcement) {
+  switch (enforcement) {
   case SILAccessEnforcement::Unknown:
     llvm_unreachable("evaluating cost of access with unknown enforcement?");
   case SILAccessEnforcement::Dynamic:
@@ -240,6 +240,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DebugValueInst:
     case ValueKind::DebugValueAddrInst:
     case ValueKind::StringLiteralInst:
+    case ValueKind::ConstStringLiteralInst:
     case ValueKind::FixLifetimeInst:
     case ValueKind::EndBorrowInst:
     case ValueKind::EndBorrowArgumentInst:
@@ -290,9 +291,16 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
     // Access instructions are free unless we're dynamically enforcing them.
     case ValueKind::BeginAccessInst:
-      return getEnforcementCost(cast<BeginAccessInst>(I));
+      return getEnforcementCost(cast<BeginAccessInst>(I).getEnforcement());
     case ValueKind::EndAccessInst:
-      return getEnforcementCost(*cast<EndAccessInst>(I).getBeginAccess());
+      return getEnforcementCost(cast<EndAccessInst>(I).getBeginAccess()
+                                                     ->getEnforcement());
+    case ValueKind::BeginUnpairedAccessInst:
+      return getEnforcementCost(cast<BeginUnpairedAccessInst>(I)
+                                  .getEnforcement());
+    case ValueKind::EndUnpairedAccessInst:
+      return getEnforcementCost(cast<EndUnpairedAccessInst>(I)
+                                  .getEnforcement());
 
     // TODO: These are free if the metatype is for a Swift class.
     case ValueKind::ThickToObjCMetatypeInst:
@@ -351,6 +359,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::CopyBlockInst:
     case ValueKind::CopyAddrInst:
     case ValueKind::RetainValueInst:
+    case ValueKind::RetainValueAddrInst:
     case ValueKind::UnmanagedRetainValueInst:
     case ValueKind::CopyValueInst:
     case ValueKind::CopyUnownedValueInst:
@@ -361,12 +370,13 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DeallocStackInst:
     case ValueKind::DeallocValueBufferInst:
     case ValueKind::DeinitExistentialAddrInst:
-    case ValueKind::DeinitExistentialOpaqueInst:
+    case ValueKind::DeinitExistentialValueInst:
     case ValueKind::DestroyAddrInst:
     case ValueKind::ProjectValueBufferInst:
     case ValueKind::ProjectBoxInst:
     case ValueKind::ProjectExistentialBoxInst:
     case ValueKind::ReleaseValueInst:
+    case ValueKind::ReleaseValueAddrInst:
     case ValueKind::UnmanagedReleaseValueInst:
     case ValueKind::DestroyValueInst:
     case ValueKind::AutoreleaseValueInst:
@@ -379,7 +389,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::IndexRawPointerInst:
     case ValueKind::InitEnumDataAddrInst:
     case ValueKind::InitExistentialAddrInst:
-    case ValueKind::InitExistentialOpaqueInst:
+    case ValueKind::InitExistentialValueInst:
     case ValueKind::InitExistentialMetatypeInst:
     case ValueKind::InitExistentialRefInst:
     case ValueKind::InjectEnumAddrInst:
@@ -390,9 +400,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialAddrInst:
     case ValueKind::OpenExistentialBoxInst:
+    case ValueKind::OpenExistentialBoxValueInst:
     case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::OpenExistentialRefInst:
-    case ValueKind::OpenExistentialOpaqueInst:
+    case ValueKind::OpenExistentialValueInst:
     case ValueKind::PartialApplyInst:
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::RefElementAddrInst:
@@ -428,6 +439,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::SelectEnumAddrInst:
     case ValueKind::SelectEnumInst:
     case ValueKind::SelectValueInst:
+    case ValueKind::KeyPathInst:
       return InlineCost::Expensive;
 
     case ValueKind::BuiltinInst: {

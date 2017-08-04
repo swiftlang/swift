@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the SyntaxData interface, the base type for the instance
+// This file defines the SyntaxData interface, the type for the instance
 // data for Syntax nodes.
 //
 // Effectively, these provide two main things to a Syntax node - parental
@@ -26,7 +26,7 @@
 // Conceptually, SyntaxData add the characteristic of specific identity in a
 // piece of Swift source code. While the RawSyntax for the integer literal
 // token '1' can be reused anywhere a '1' occurs and has identical formatting,
-// a SyntaxData reprsents *a* specific '1' at a particular location in
+// a SyntaxData represents *a* specific '1' at a particular location in
 // Swift source.
 //
 // These are effectively internal implementation. For all public APIs, look
@@ -39,9 +39,9 @@
 #ifndef SWIFT_SYNTAX_SYNTAXDATA_H
 #define SWIFT_SYNTAX_SYNTAXDATA_H
 
+#include "swift/Syntax/AtomicCache.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/References.h"
-#include "swift/Syntax/Syntax.h"
 #include "llvm/ADT/DenseMap.h"
 
 #include <atomic>
@@ -49,20 +49,19 @@
 namespace swift {
 namespace syntax {
 
-class Syntax;
-
-/// The base class for holding parented syntax.
+/// The class for holding parented syntax.
 ///
-/// This structure and subclasses thereof should not contain significant public
+/// This structure should not contain significant public
 /// API or internal modification API.
 ///
 /// This is only for holding a strong reference to the RawSyntax, a weak
 /// reference to the parent, and, in subclasses, lazily created strong
 /// references to non-terminal child nodes.
-class SyntaxData : public llvm::ThreadSafeRefCountedBase<SyntaxData> {
-  friend struct SyntaxFactory;
-#define SYNTAX(Id, Parent) friend class Id##Syntax;
-#include "swift/Syntax/SyntaxKinds.def"
+class SyntaxData final : public llvm::ThreadSafeRefCountedBase<SyntaxData> {
+  using RootDataPair = std::pair<RC<SyntaxData>, RC<SyntaxData>>;
+
+  llvm::SmallVector<AtomicCache<SyntaxData>, 10> Children;
+
 public:
   /// The shared raw syntax representing this syntax data node.
   const RC<RawSyntax> Raw;
@@ -80,122 +79,72 @@ public:
 
   SyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
              CursorIndex IndexInParent = 0)
-    : Raw(Raw), Parent(Parent), IndexInParent(IndexInParent) {}
+    : Raw(Raw), Parent(Parent), IndexInParent(IndexInParent) {
+      if (Raw) {
+        for (size_t I = 0; I < Raw->Layout.size(); ++I) {
+          Children.push_back(AtomicCache<SyntaxData>());
+        }
+      }
+    }
+
+  /// Constructs a SyntaxNode by replacing `self` and recursively building
+  /// the parent chain up to the root.
+  template <typename SyntaxNode>
+  SyntaxNode replaceSelf(const RC<RawSyntax> NewRaw) const {
+    auto NewRootAndData = replaceSelf(NewRaw);
+    return { NewRootAndData.first, NewRootAndData.second.get() };
+  }
 
   /// With a new RawSyntax node, create a new node from this one and
   /// recursively rebuild the parental chain up to the root.
   ///
   /// DO NOT expose this as public API.
-  template <typename SyntaxNode>
-  SyntaxNode replaceSelf(RC<RawSyntax> NewRaw) const {
-    auto NewMe = SyntaxNode::DataType::make(NewRaw, nullptr, IndexInParent);
+  RootDataPair replaceSelf(const RC<RawSyntax> NewRaw) const {
     if (hasParent()) {
-      auto NewRootAndParent = getParent().getValue()
-        ->replaceChild<Syntax>(NewRaw, IndexInParent);
-      NewMe->Parent = NewRootAndParent.Data;
-      return SyntaxNode {
-        NewRootAndParent.Root,
-        cast<typename SyntaxNode::DataType>(NewMe.get())
-      };
+      auto NewRootAndParent =
+        getParent().getValue()->replaceChild(NewRaw, IndexInParent);
+      auto NewMe = NewRootAndParent.second->getChild(IndexInParent);
+      return { NewRootAndParent.first, NewMe.get() };
     } else {
-      return SyntaxNode {
-        NewMe,
-        cast<typename SyntaxNode::DataType>(NewMe.get())
-      };
+      auto NewMe = make(NewRaw, nullptr, IndexInParent);
+      return { NewMe, NewMe.get() };
     }
   }
 
-  /// Unsafely instantiate a child within another node.
-  ///
-  /// DANGER!
-  ///
-  /// Scary thread-safe code here. This should only be used for internally
-  /// mutating cached children!
-  ///
-  /// Why do we need this?
-  /// - ___SyntaxData nodes should have pointer identity.
-  /// - We only want to construct parented, realized child nodes as
-  /// ___SyntaxData when asked.
-  ///
-  /// For example, if we have a ReturnStmtSyntax, and ask for its returned
-  /// expression for the first time with getExpression(), two nodes can race
-  /// to create and set the cached expression.
-  ///
-  ///
-  /// Looking at an example - say we have a ReturnStmtSyntaxData.
-  ///
-  /// ReturnStmtSyntaxData = {
-  ///   RC<RawSyntax> Raw = {
-  ///     RC<TokenSyntax { SyntaxKind::Token, tok::return_kw, "return" },
-  ///     RC<RawSyntax> { SyntaxKind::SomeExpression, ... }
-  ///   }
-  ///   RC<ExprSyntaxData> CachedExpression = { 0 };
-  /// }
-  ///
-  /// We pretend that `CachedExpression` is a std::atomic<uintptr_t> &, so that
-  /// we can safely instantiate that field using the RawSyntax for the
-  /// expression, i.e. getRaw()->getChild(ReturnStmtSyntax::Cursor::Expression))
-  template <typename SyntaxNode>
-  static
-  void realizeSyntaxNode(std::atomic<uintptr_t> &Child,
-                         RC<RawSyntax> RawChild,
-                         const SyntaxData *Parent,
-                         CursorIndex IndexInParent) {
-    // We rely on the fact that an RC<___SyntaxData> is pointer-sized, which
-    // means we can atomically compare-exchange the child field.
-    // If we can't do that, we can't pretend it's a uintptr_t and use its
-    // compare_exchange_strong.
-    static_assert(
-      sizeof(uintptr_t) == sizeof(RC<typename SyntaxNode::DataType>),
-      "Can't safely atomically replace a child SyntaxData node "
-      "for caching! This is the end of the world!");
-
-    if (Child == 0) {
-      // We expect the uncached value to wrap a nullptr. If another thread
-      // beats us to caching the child, it'll be non-null, so we would
-      // leave it alone.
-      uintptr_t Expected = 0;
-
-      // Make a RC<SyntaxNode::DataType> at RefCount == 1, which we'll try to
-      // atomically swap in.
-      RC<typename SyntaxNode::DataType> Data =
-        cast<typename SyntaxNode::DataType>(
-          SyntaxData::makeDataFromRaw(RawChild, Parent, IndexInParent));
-
-      // Try to swap in raw pointer value.
-      auto SuccessfullySwapped =
-        Child.compare_exchange_strong(Expected,
-                                      reinterpret_cast<uintptr_t>(Data.get()));
-
-      // If we won, then leave the RefCount == 1.
-      if (SuccessfullySwapped) {
-        Data.resetWithoutRelease();
-      }
-
-      // Otherwise, the Data we just made is unfortunately useless.
-      // Let it die on this scope exit after its terminal release.
-    }
+  /// Create the data for a child node with the raw syntax in our layout
+  /// at the provided index.
+  /// DO NOT expose this as public API.
+  RC<SyntaxData> realizeSyntaxNode(CursorIndex Index) const {
+    auto RawChild = Raw->Layout.at(Index);
+    return SyntaxData::make(RawChild, this, Index);
   }
 
   /// Replace a child in the raw syntax and recursively rebuild the
-  /// parental chain up to the rooet.
-  ///
-  /// This is the effective private implementation of all setters in
-  /// subclasses of `SyntaxData`.
+  /// parental chain up to the root.
   ///
   /// DO NOT expose this as public API.
   template <typename SyntaxNode, typename CursorType>
-  SyntaxNode replaceChild(RC<RawSyntax> RawChild,
+  SyntaxNode replaceChild(const RC<RawSyntax> RawChild,
                           CursorType ChildCursor) const {
+    auto NewRootAndParent = replaceChild(RawChild, ChildCursor);
+    return SyntaxNode {
+      NewRootAndParent.first,
+      NewRootAndParent.second.get()
+    };
+  }
+
+  /// Replace a child in the raw syntax and recursively rebuild the
+  /// parental chain up to the root.
+  ///
+  /// DO NOT expose this as public API.
+  template <typename CursorType>
+  RootDataPair replaceChild(const RC<RawSyntax> RawChild,
+                            CursorType ChildCursor) const {
     auto NewRaw = Raw->replaceChild(ChildCursor, RawChild);
-    return replaceSelf<SyntaxNode>(NewRaw);
+    return replaceSelf(NewRaw);
   }
 
 public:
-
-  static RC<SyntaxData> makeDataFromRaw(RC<RawSyntax> Raw,
-                                        const SyntaxData *Parent,
-                                        CursorIndex IndexInParent);
 
   static RC<SyntaxData> make(RC<RawSyntax> Raw,
                              const SyntaxData *Parent = nullptr,
@@ -216,7 +165,7 @@ public:
     if (Parent != nullptr) {
       return Parent;
     }
-    return NoParent;
+    return llvm::None;
   }
 
   /// Returns true if this syntax node has a parent.
@@ -230,6 +179,51 @@ public:
     return IndexInParent;
   }
 
+  /// Returns the number of children this SyntaxData represents.
+  size_t getNumChildren() const {
+    return Raw->Layout.size();
+  }
+
+  /// Gets the child at the index specified by the provided cursor,
+  /// lazily creating it if necessary.
+  template <typename CursorType>
+  RC<SyntaxData> getChild(CursorType Cursor) const {
+    return getChild((size_t)cursorIndex(Cursor));
+  }
+
+  /// Gets the child at the specified index in this data's children array.
+  /// Why do we need this?
+  /// - SyntaxData nodes should have pointer identity.
+  /// - We only want to construct parented, realized child nodes as
+  ///   SyntaxData when asked.
+  ///
+  /// For example, if we have a ReturnStmtSyntax, and ask for its returned
+  /// expression for the first time with getExpression(), two nodes can race
+  /// to create and set the cached expression.
+  ///
+  /// Looking at an example - say we have a SyntaxData.
+  ///
+  /// SyntaxData = {
+  ///   RC<RawSyntax> Raw = {
+  ///     RC<RawTokenSyntax> { SyntaxKind::Token, tok::return_kw, "return" },
+  ///     RC<RawSyntax> { SyntaxKind::SomeExpression, ... }
+  ///   }
+  ///   llvm::SmallVector<AtomicCache<SyntaxData>, 10> Children {
+  ///     AtomicCache<SyntaxData> { RC<SyntaxData> = nullptr; },
+  ///     AtomicCache<SyntaxData> { RC<SyntaxData> = nullptr; },
+  ///   }
+  /// }
+  ///
+  /// If we wanted to safely create the 0th child, an instance of TokenSyntax,
+  /// then we ask the AtomicCache in that position to realize its value and
+  /// cache it. This is safe because AtomicCache only ever mutates its cache
+  /// one time -- the first initialization that wins a compare_exchange_strong.
+  RC<SyntaxData> getChild(size_t Index) const {
+    return Children[Index].getOrCreate([&]() {
+      return realizeSyntaxNode(Index);
+    });
+  }
+
   /// Returns true if the data node represents type syntax.
   bool isType() const;
 
@@ -241,6 +235,9 @@ public:
 
   /// Returns true if the data node represents expression syntax.
   bool isExpr() const;
+
+  /// Returns true if the data node represents pattern syntax.
+  bool isPattern() const;
 
   /// Returns true if this syntax is of some "unknown" kind.
   bool isUnknown() const;
@@ -256,7 +253,7 @@ public:
 // DenseMapInfo for RC<SyntaxData>, used for a Syntax Node -> lib/AST mapping.
 namespace llvm {
   using SD = swift::syntax::SyntaxData;
-  using RCSD = swift::syntax::RC<SD>;
+  using RCSD = swift::RC<SD>;
   template <> struct llvm::DenseMapInfo<RCSD> {
     static inline RCSD getEmptyKey() {
       return SD::make(nullptr, nullptr, 0);

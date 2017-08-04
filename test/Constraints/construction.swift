@@ -139,3 +139,33 @@ Int(i32 - 2 + 1) // expected-warning{{unused}}
 let xx: UInt64 = 100
 let yy = ((xx + 10) - 5) / 5
 let zy = (xx + (10 - 5)) / 5
+
+// rdar://problem/30588177
+struct S3 {
+  init() { }
+}
+
+let s3a = S3()
+
+extension S3 {
+  init?(maybe: S3) { return nil }
+}
+
+let s3b = S3(maybe: s3a)
+
+// SR-5245 - Erroneous diagnostic - Type of expression is ambiguous without more context
+class SR_5245 {
+    struct S {
+        enum E {
+            case e1
+            case e2
+        }
+
+        let e: [E]
+    }
+
+    init(s: S) {}
+}
+
+SR_5245(s: SR_5245.S(f: [.e1, .e2]))
+// expected-error@-1 {{incorrect argument label in call (have 'f:', expected 'e:')}} {{22-23=e}}

@@ -37,7 +37,7 @@ public:
   RedundantOverflowCheckRemovalPass() {}
 
   /// This enum represents a relationship between two operands.
-  /// The relationship represented by arithmetic operators represent the
+  /// The relationship represented by arithmetic operators represents the
   /// information that the operation did not trap.
   ///
   /// The following code translate (with the correct signedness prefix):
@@ -57,9 +57,11 @@ public:
   /// the function.
   struct Constraint {
     Constraint(SILBasicBlock *BB, SILValue L, SILValue R, ValueRelation Rel) :
-      DominatingBlock(BB), Left(L), Right(R), Relationship(Rel) {}
+      DominatingBlock(BB), Left(L), Right(R), Relationship(Rel) {
+      DEBUG(dump());
+    }
 
-    /// The constraint is valid blocks dominated by this block.
+    /// The constraint is valid in blocks dominated by this block.
     SILBasicBlock *DominatingBlock;
     /// The first operand.
     SILValue Left;
@@ -207,8 +209,8 @@ public:
       return true;
 
     // Evaluate literal integers.
-    IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
-    IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+    auto *AI = dyn_cast<IntegerLiteralInst>(A);
+    auto *BI = dyn_cast<IntegerLiteralInst>(B);
     if (AI && BI) {
       APInt Ap = AI->getValue();
       APInt Bp = BI->getValue();
@@ -230,7 +232,7 @@ public:
 
   /// Return True if we can deduct that \p N is always positive (N > 0).
   static bool isKnownPositive(SILValue N) {
-    if (IntegerLiteralInst *NI = dyn_cast<IntegerLiteralInst>(N))
+    if (auto *NI = dyn_cast<IntegerLiteralInst>(N))
       return NI->getValue().isStrictlyPositive();
     return false;
   }
@@ -239,8 +241,8 @@ public:
   /// absolute value of \p B. In other words, check if \p A known to be closer
   /// to zero.
   static bool isKnownAbsLess(SILValue A, SILValue B) {
-    IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
-    IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+    auto *AI = dyn_cast<IntegerLiteralInst>(A);
+    auto *BI = dyn_cast<IntegerLiteralInst>(B);
 
     if (AI && BI)
       return AI->getValue().abs().ult(BI->getValue().abs());
@@ -293,8 +295,8 @@ public:
         if (F.Relationship == ValueRelation::SLT) {
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
-          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          auto *AI = dyn_cast<IntegerLiteralInst>(A);
+          auto *BI = dyn_cast<IntegerLiteralInst>(B);
           if (L == A && BI && BI->getValue().getSExtValue() == 1)
             return true;
           if (L == B && AI && AI->getValue().getSExtValue() == 1)
@@ -322,8 +324,8 @@ public:
         if (F.Relationship == ValueRelation::ULT) {
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
-          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          auto *AI = dyn_cast<IntegerLiteralInst>(A);
+          auto *BI = dyn_cast<IntegerLiteralInst>(B);
           if (L == A && BI && BI->getValue().getZExtValue() == 1)
             return true;
           if (L == B && AI && AI->getValue().getZExtValue() == 1)
@@ -428,7 +430,7 @@ public:
         if (F.Relationship == ValueRelation::ULT) {
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          auto *BI = dyn_cast<IntegerLiteralInst>(B);
           if (R == A && BI && BI->getValue().getZExtValue() == 1)
             return true;
         }
@@ -486,7 +488,7 @@ public:
         if (F.Relationship == ValueRelation::SLT) {
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          auto *BI = dyn_cast<IntegerLiteralInst>(B);
           if (R == A && BI && BI->getValue().getSExtValue() == 1)
             return true;
         }
@@ -515,44 +517,150 @@ public:
     return false;
   }
 
-  void registerCondFailFormula(CondFailInst *CFI) {
-    // Extract the arithmetic operation from the condfail.
-    auto *TEI = dyn_cast<TupleExtractInst>(CFI->getOperand());
-    if (!TEI) return;
-    auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand());
-    if (!BI) return;
-
-    // The relationship expressed in the builtin.
+  Optional<ValueRelation> getArithOpRelation(BuiltinInst *BI) {
     ValueRelation Rel;
     switch (BI->getBuiltinInfo().ID) {
-      default: return;
-      case BuiltinValueKind::SAddOver:
-        Rel = ValueRelation::SAdd;
-        break;
-      case BuiltinValueKind::UAddOver:
-        Rel = ValueRelation::UAdd;
-        break;
-      case BuiltinValueKind::SSubOver:
-        Rel = ValueRelation::SSub;
-        break;
-      case BuiltinValueKind::USubOver:
-        Rel = ValueRelation::USub;
-        break;
-      case BuiltinValueKind::SMulOver:
-        Rel = ValueRelation::SMul;
-        break;
-      case BuiltinValueKind::UMulOver:
-        Rel = ValueRelation::UMul;
-        break;
+    default:
+      return None;
+    case BuiltinValueKind::SAddOver:
+      Rel = ValueRelation::SAdd;
+      break;
+    case BuiltinValueKind::UAddOver:
+      Rel = ValueRelation::UAdd;
+      break;
+    case BuiltinValueKind::SSubOver:
+      Rel = ValueRelation::SSub;
+      break;
+    case BuiltinValueKind::USubOver:
+      Rel = ValueRelation::USub;
+      break;
+    case BuiltinValueKind::SMulOver:
+      Rel = ValueRelation::SMul;
+      break;
+    case BuiltinValueKind::UMulOver:
+      Rel = ValueRelation::UMul;
+      break;
+    }
+    return Rel;
+  }
+
+  void addComparisonRelation(BuiltinInst *CMP, SILBasicBlock *TrueBB,
+                             SILBasicBlock *FalseBB) {
+    // The relationship expressed in the builtin.
+    ValueRelation TrueRel;
+    ValueRelation FalseRel;
+    bool Swap = false;
+
+    switch (CMP->getBuiltinInfo().ID) {
+    default:
+      return;
+    case BuiltinValueKind::ICMP_NE: {
+      SILValue Left = CMP->getOperand(0);
+      SILValue Right = CMP->getOperand(1);
+      if (FalseBB)
+        Constraints.push_back(
+            Constraint(FalseBB, Left, Right, ValueRelation::EQ));
+      return;
+    }
+    case BuiltinValueKind::ICMP_EQ: {
+      SILValue Left = CMP->getOperand(0);
+      SILValue Right = CMP->getOperand(1);
+      if (TrueBB)
+        Constraints.push_back(
+            Constraint(TrueBB, Left, Right, ValueRelation::EQ));
+      return;
+    }
+    case BuiltinValueKind::ICMP_SLE:
+      TrueRel = ValueRelation::SLE;
+      FalseRel = ValueRelation::SLT;
+      break;
+    case BuiltinValueKind::ICMP_SLT:
+      TrueRel = ValueRelation::SLT;
+      FalseRel = ValueRelation::SLE;
+      break;
+    case BuiltinValueKind::ICMP_SGE:
+      TrueRel = ValueRelation::SLT;
+      FalseRel = ValueRelation::SLE;
+      Swap = true;
+      break;
+    case BuiltinValueKind::ICMP_SGT:
+      TrueRel = ValueRelation::SLE;
+      FalseRel = ValueRelation::SLT;
+      Swap = true;
+      break;
+    case BuiltinValueKind::ICMP_ULE:
+      TrueRel = ValueRelation::ULE;
+      FalseRel = ValueRelation::ULT;
+      break;
+    case BuiltinValueKind::ICMP_ULT:
+      TrueRel = ValueRelation::ULT;
+      FalseRel = ValueRelation::ULE;
+      break;
+    case BuiltinValueKind::ICMP_UGT:
+      TrueRel = ValueRelation::ULE;
+      FalseRel = ValueRelation::ULT;
+      Swap = true;
+      break;
+    case BuiltinValueKind::ICMP_UGE:
+      TrueRel = ValueRelation::ULT;
+      FalseRel = ValueRelation::ULE;
+      Swap = true;
+      break;
     }
 
-    // Construct and register the constraint.
-    SILBasicBlock *Dom = CFI->getParent();
-    SILValue Left = BI->getOperand(0);
-    SILValue Right = BI->getOperand(1);
-    Constraint F = Constraint(Dom, Left, Right, Rel);
-    Constraints.push_back(F);
+    SILValue Left = CMP->getOperand(0);
+    SILValue Right = CMP->getOperand(1);
+
+    if (Swap)
+      std::swap(Left, Right);
+
+    // Set the constraints for both side of the conditional branch, if
+    // that the condition is dominating the dest block (see comment above).
+    if (TrueBB)  Constraints.push_back(Constraint(TrueBB,  Left, Right, TrueRel));
+    if (FalseBB) Constraints.push_back(Constraint(FalseBB, Right, Left, FalseRel));
   }
+
+  void registerCondFailFormula(CondFailInst *CFI) {
+    // Extract the arithmetic operation from the condfail.
+    if (auto *TEI = dyn_cast<TupleExtractInst>(CFI->getOperand())) {
+      auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand());
+      if (!BI)
+        return;
+
+      // The relationship expressed in the builtin.
+      Optional<ValueRelation> Rel = getArithOpRelation(BI);
+      if (!Rel.hasValue())
+        return;
+
+      // Construct and register the constraint.
+      SILBasicBlock *Dom = CFI->getParent();
+      SILValue Left = BI->getOperand(0);
+      SILValue Right = BI->getOperand(1);
+      Constraint F = Constraint(Dom, Left, Right, *Rel);
+      Constraints.push_back(F);
+    }
+
+    //  Handle patterns like this:
+    //  %cmp_result = builtin "cmp_ult_Int64"
+    //    (%x : $Builtin.Int64, %y : $Builtin.Int64) : $Builtin.Int1
+    //  This cond_fail formula should be registered!
+    //  cond_fail %cmp_result : $Builtin.Int1
+    //  %check_underflow = integer_literal $Builtin.Int1, -1
+    //  At this point we know that x >= y
+    //  %usub_result = builtin "usub_with_overflow_Int64"
+    //    (%x : $Builtin.Int64, %y : $Builtin.Int64, %check_underflow : $Builtin.Int1):
+    //       $(Builtin.Int64, Builtin.Int1)
+    //  %usub_val = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 0
+    //  We can figure out that x - y will not underflow because of x >= y
+    //  %usub_underflow = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 1
+    //  cond_fail %usub_underflow : $Builtin.Int1
+    if (auto *CMP = dyn_cast<BuiltinInst>(CFI->getOperand())) {
+      SILBasicBlock *TrueBB = nullptr;
+      SILBasicBlock *FalseBB = CMP->getParent();
+      addComparisonRelation(CMP, TrueBB, FalseBB);
+    }
+  }
+
 
   void registerBranchFormula(CondBranchInst *BI) {
     // Extract the arithmetic operation from the Branch.
@@ -583,68 +691,7 @@ public:
     if (!FalseBB->getSinglePredecessorBlock())
       FalseBB = nullptr;
 
-    // The relationship expressed in the builtin.
-    ValueRelation Rel;
-    bool Swap = false;
-
-    switch (CMP->getBuiltinInfo().ID) {
-      default: return;
-      case BuiltinValueKind::ICMP_NE: {
-        SILValue Left = CMP->getOperand(0);
-        SILValue Right = CMP->getOperand(1);
-        if (FalseBB)
-          Constraints.push_back(Constraint(FalseBB, Left, Right,
-                                     ValueRelation::EQ));
-        return;
-      }
-      case BuiltinValueKind::ICMP_EQ: {
-        SILValue Left = CMP->getOperand(0);
-        SILValue Right = CMP->getOperand(1);
-        if (TrueBB)
-          Constraints.push_back(Constraint(TrueBB, Left, Right,
-                                     ValueRelation::EQ));
-        return;
-      }
-      case BuiltinValueKind::ICMP_SLE:
-        Rel = ValueRelation::SLE;
-        break;
-      case BuiltinValueKind::ICMP_SLT:
-        Rel = ValueRelation::SLT;
-        break;
-      case BuiltinValueKind::ICMP_SGE:
-        Rel = ValueRelation::SLT;
-        Swap = true;
-        break;
-      case BuiltinValueKind::ICMP_SGT:
-        Rel = ValueRelation::SLE;
-        Swap = true;
-        break;
-      case BuiltinValueKind::ICMP_ULE:
-        Rel = ValueRelation::ULE;
-        break;
-      case BuiltinValueKind::ICMP_ULT:
-        Rel = ValueRelation::ULT;
-        break;
-      case BuiltinValueKind::ICMP_UGT:
-        Rel = ValueRelation::ULE;
-        Swap = true;
-        break;
-      case BuiltinValueKind::ICMP_UGE:
-        Rel = ValueRelation::ULT;
-        Swap = true;
-        break;
-    }
-
-    SILValue Left = CMP->getOperand(0);
-    SILValue Right = CMP->getOperand(1);
-
-    if (Swap)
-      std::swap(Left, Right);
-
-    // Set the constraints for both side of the conditional branch, if
-    // that the condition is dominating the dest block (see comment above).
-    if (TrueBB)  Constraints.push_back(Constraint(TrueBB,  Left, Right, Rel));
-    if (FalseBB) Constraints.push_back(Constraint(FalseBB, Right, Left, Rel));
+    addComparisonRelation(CMP, TrueBB, FalseBB );
   }
 
 };

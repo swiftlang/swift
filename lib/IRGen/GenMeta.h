@@ -42,6 +42,7 @@ namespace irgen {
   class ConstantReference;
   class Explosion;
   class FieldTypeInfo;
+  class FunctionPointer;
   class GenericTypeRequirements;
   class IRGenFunction;
   class IRGenModule;
@@ -134,7 +135,7 @@ namespace irgen {
   int32_t getIndexOfGenericArgument(IRGenModule &IGM,
                                     NominalTypeDecl *decl,
                                     ArchetypeType *archetype);
-  
+
   /// Given a reference to nominal type metadata of the given type,
   /// derive a reference to the parent type metadata.  There must be a
   /// parent type.
@@ -159,11 +160,6 @@ namespace irgen {
                                            const GenericTypeRequirements &reqts,
                                            unsigned reqtIndex,
                                            llvm::Value *metadata);
-
-  /// Get the offset of a field in the class type metadata.
-  Size getClassFieldOffset(IRGenModule &IGM,
-                           ClassDecl *theClass,
-                           VarDecl *field);
 
   /// Given a reference to class type metadata of the given type,
   /// decide the offset to the given field.  This assumes that the
@@ -204,6 +200,10 @@ namespace irgen {
                                            SILType objectType,
                                            bool suppressCast = false);
 
+  /// Given a non-tagged object pointer, load a pointer to its class object.
+  llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
+                                             llvm::Value *object);
+
   /// Given a heap-object instance, with some heap-object type, produce a
   /// reference to its heap metadata by dynamically asking the runtime for it.
   llvm::Value *emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
@@ -225,12 +225,12 @@ namespace irgen {
 
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.
-  llvm::Value *emitVirtualMethodValue(IRGenFunction &IGF,
-                                      llvm::Value *base,
-                                      SILType baseType,
-                                      SILDeclRef method,
-                                      CanSILFunctionType methodType,
-                                      bool useSuperVTable);
+  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,
+                                         llvm::Value *base,
+                                         SILType baseType,
+                                         SILDeclRef method,
+                                         CanSILFunctionType methodType,
+                                         bool useSuperVTable);
 
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///

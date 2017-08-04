@@ -1,0 +1,7 @@
+{
+  ".\/no_duplicate_aarch64_use_tbi.swift": {
+    "object": ".\/no_duplicate_aarch64_use_tbi.o",
+    "swiftmodule": ".\/no_duplicate_aarch64_use_tbi.swiftmodule",
+    "remap": ".\/no_duplicate_aarch64_use_tbi.remap"
+  }
+}

@@ -57,7 +57,7 @@ ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
     llvm::report_fatal_error("unable to create temporary file for filelist");
   }
 
-  C.addTemporaryFile(buffer.str());
+  C.addTemporaryFile(buffer.str(), PreserveOnSignal::Yes);
   // We can't just reference the data in the TemporaryFiles vector because
   // that could theoretically get copied to a new address.
   return C.getArgs().MakeArgString(buffer.str());
@@ -148,4 +148,12 @@ ToolChain::findProgramRelativeToSwiftImpl(StringRef executableName) const {
 
 types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
   return types::lookupTypeForExtension(Ext);
+}
+
+bool
+ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
+                                     StringRef sanitizerName) const {
+  // Assume no sanitizers are supported by default.
+  // This method should be overriden by a platform-specific subclass.
+  return false;
 }

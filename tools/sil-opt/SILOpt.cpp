@@ -90,12 +90,12 @@ enum EnforceExclusivityMode {
   DynamicOnly,
   None
 };
-}
+} // end anonymous namespace
 
 static cl::opt<EnforceExclusivityMode> EnforceExclusivity(
   "enforce-exclusivity", cl::desc("Enforce law of exclusivity "
                                   "(and support memory access markers)."),
-    cl::init(EnforceExclusivityMode::None),
+    cl::init(EnforceExclusivityMode::Checked),
     cl::values(clEnumValN(EnforceExclusivityMode::Unchecked, "unchecked",
                           "Static checking only."),
                clEnumValN(EnforceExclusivityMode::Checked, "checked",
@@ -289,28 +289,30 @@ int main(int argc, char **argv) {
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
 
-  switch (EnforceExclusivity) {
-  case EnforceExclusivityMode::Unchecked:
-    // This option is analogous to the -Ounchecked optimization setting.
-    // It will disable dynamic checking but still diagnose statically.
-    SILOpts.EnforceExclusivityStatic = true;
-    SILOpts.EnforceExclusivityDynamic = false;
-    break;
-  case EnforceExclusivityMode::Checked:
-    SILOpts.EnforceExclusivityStatic = true;
-    SILOpts.EnforceExclusivityDynamic = true;
-    break;
-  case EnforceExclusivityMode::DynamicOnly:
-    // This option is intended for staging purposes. The intent is that
-    // it will eventually be removed.
-    SILOpts.EnforceExclusivityStatic = false;
-    SILOpts.EnforceExclusivityDynamic = true;
-    break;
-  case EnforceExclusivityMode::None:
-    // This option is for staging purposes.
-    SILOpts.EnforceExclusivityStatic = false;
-    SILOpts.EnforceExclusivityDynamic = false;
-    break;
+  if (EnforceExclusivity.getNumOccurrences() != 0) {
+    switch (EnforceExclusivity) {
+    case EnforceExclusivityMode::Unchecked:
+      // This option is analogous to the -Ounchecked optimization setting.
+      // It will disable dynamic checking but still diagnose statically.
+      SILOpts.EnforceExclusivityStatic = true;
+      SILOpts.EnforceExclusivityDynamic = false;
+      break;
+    case EnforceExclusivityMode::Checked:
+      SILOpts.EnforceExclusivityStatic = true;
+      SILOpts.EnforceExclusivityDynamic = true;
+      break;
+    case EnforceExclusivityMode::DynamicOnly:
+      // This option is intended for staging purposes. The intent is that
+      // it will eventually be removed.
+      SILOpts.EnforceExclusivityStatic = false;
+      SILOpts.EnforceExclusivityDynamic = true;
+      break;
+    case EnforceExclusivityMode::None:
+      // This option is for staging purposes.
+      SILOpts.EnforceExclusivityStatic = false;
+      SILOpts.EnforceExclusivityDynamic = false;
+      break;
+    }
   }
 
   // Load the input file.
@@ -390,6 +392,7 @@ int main(int argc, char **argv) {
   if (OptimizationGroup == OptGroup::Diagnostics) {
     runSILDiagnosticPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Performance) {
+    runSILOptPreparePasses(*CI.getSILModule());
     runSILOptimizationPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Lowering) {
     runSILLoweringPasses(*CI.getSILModule());

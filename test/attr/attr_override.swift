@@ -423,11 +423,11 @@ protocol SI {}
 protocol CI {}
 
 protocol Sequence {
-  associatedtype I : SI
+  associatedtype I : SI // expected-note{{declared here}}
 }
 
 protocol Collection : Sequence {
-  associatedtype I : CI
+  associatedtype I : CI // expected-warning{{redeclaration of associated type 'I'}}
 }
 
 class Index<F, T> {

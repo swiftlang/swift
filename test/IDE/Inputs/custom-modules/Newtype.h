@@ -102,3 +102,29 @@ __attribute((swift_name("NSSomeContext.Name")));
 
 extern const NSSomeContextName NSMyContextName;
 
+typedef struct T *TRef __attribute((swift_newtype(struct)));
+typedef const struct T *ConstTRef __attribute((swift_newtype(struct)));
+extern _Nonnull TRef create_T(void);
+extern _Nonnull ConstTRef create_ConstT(void);
+extern void destroy_T(TRef);
+extern void destroy_ConstT(ConstTRef);
+
+extern void mutate_TRef_Pointee(TRef) __attribute((swift_name("TRef.mutatePointee(self:)")));
+extern void mutate_TRef(TRef *) __attribute((swift_name("TRef.mutate(self:)")));
+extern void use_ConstT(ConstTRef)
+    __attribute((swift_name("ConstTRef.use(self:)")));
+
+
+typedef struct T *__nonnull *TRefRef __attribute((swift_newtype(struct)));
+typedef struct T *__nonnull const *ConstTRefRef __attribute((swift_newtype(struct)));
+extern _Nonnull TRefRef create_TRef(void);
+extern _Nonnull ConstTRefRef create_ConstTRef(void);
+extern void destroy_TRef(TRefRef);
+extern void destroy_ConstTRef(ConstTRefRef);
+
+extern void mutate_TRefRef_Pointee(TRefRef)
+    __attribute((swift_name("TRefRef.mutatePointee(self:)")));
+extern void mutate_TRefRef(TRefRef*)
+    __attribute((swift_name("TRefRef.mutate(self:)")));
+extern void use_ConstTRef(ConstTRefRef)
+    __attribute((swift_name("ConstTRefRef.use(self:)")));

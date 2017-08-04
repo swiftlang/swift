@@ -50,6 +50,7 @@ TYPE_ATTR(in)
 TYPE_ATTR(inout)
 TYPE_ATTR(inout_aliasable)
 TYPE_ATTR(in_guaranteed)
+TYPE_ATTR(in_constant)
 TYPE_ATTR(owned)
 TYPE_ATTR(unowned_inner_pointer)
 TYPE_ATTR(guaranteed)
@@ -154,8 +155,6 @@ SIMPLE_DECL_ATTR(_transparent, Transparent,
                  OnFunc|OnConstructor|OnVar|UserInaccessible, 26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
-DECL_ATTR(autoclosure, AutoClosure, OnParam, 28)
-SIMPLE_DECL_ATTR(noescape, NoEscape, OnParam, 29)
 
 SIMPLE_DECL_ATTR(nonobjc, NonObjC,
                  OnExtension | OnFunc | OnVar | OnSubscript | OnConstructor, 30)
@@ -266,6 +265,30 @@ SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
                  OnFunc | OnConstructor | LongAttribute, 65)
 
 SIMPLE_DECL_ATTR(GKInspectable, GKInspectable, OnVar, 66)
+
+DECL_ATTR(_implements, Implements,
+          OnFunc | OnVar | OnSubscript | OnTypeAlias
+          | NotSerialized | UserInaccessible,
+          /* Not serialized */ 67)
+
+DECL_ATTR(_objcRuntimeName, ObjCRuntimeName,
+          OnClass | NotSerialized | UserInaccessible | RejectByParser,
+          /*Not serialized */ 68)
+
+SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
+                 OnClass | NotSerialized | LongAttribute | RejectByParser,
+                 /*Not serialized */ 69)
+
+DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
+          OnProtocol | NotSerialized | LongAttribute | RejectByParser,
+         /*Not serialized */ 70)
+
+// 70 is available; it was not a serialized attribute.
+
+// HACK: Attribute needed to preserve source compatibility by downgrading errors
+// due to an SDK change in Dispatch
+SIMPLE_DECL_ATTR(_downgrade_exhaustivity_check, DowngradeExhaustivityCheck,
+                 OnEnumElement | LongAttribute | UserInaccessible, 71)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

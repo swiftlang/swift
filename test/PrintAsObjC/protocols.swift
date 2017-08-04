@@ -1,7 +1,6 @@
 // Please keep this file in alphabetical order!
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
@@ -18,6 +17,7 @@
 // REQUIRES: objc_interop
 
 import Foundation
+import objc_generics
 
 // CHECK-LABEL: @protocol A{{$}}
 // CHECK-NEXT: @end
@@ -52,6 +52,17 @@ protocol CustomNameType2 {}
   init(object any: AnyObject)
 }
 
+// CHECK-LABEL: @interface MyObject : NSObject <NSCoding, Fungible>
+// CHECK-NEXT: initWithCoder
+// CHECK-NEXT: init SWIFT_UNAVAILABLE
+// CHECK-NEXT: @end
+// NEGATIVE-NOT: @protocol NSCoding
+class MyObject : NSObject, NSCoding, Fungible {
+  required init(coder aCoder: NSCoder) {
+    super.init()
+  }
+}
+
 // CHECK-LABEL: @protocol Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
@@ -59,6 +70,8 @@ protocol CustomNameType2 {}
 // CHECK-NEXT: - (void)testSingleProtocolTypes:(id <A> _Nonnull)a aAgain:(id <A> _Nonnull)a2 b:(id <B> _Nonnull)b bAgain:(id <B> _Nonnull)b2 both:(id <B> _Nonnull)both;
 // CHECK-NEXT: - (void)testSingleProtocolClassTypes:(Class <A> _Nonnull)a aAgain:(Class <A> _Nonnull)a2 b:(Class <B> _Nonnull)b bAgain:(Class <B> _Nonnull)b2 both:(Class <B> _Nonnull)both;
 // CHECK-NEXT: - (void)testComposition:(id <A, ZZZ> _Nonnull)x meta:(Class <A, ZZZ> _Nonnull)xClass;
+// CHECK-NEXT: - (void)testSubclassComposition:(MyObject <ZZZ> * _Nonnull)x meta:(SWIFT_METATYPE(MyObject) <ZZZ> _Nonnull)xClass;
+// CHECK-NEXT: - (void)testGenericSubclassComposition:(FungibleContainer<MyObject *> <ZZZ> * _Nonnull)x meta:(SWIFT_METATYPE(FungibleContainer) <ZZZ> _Nonnull)xClass;
 // CHECK-NEXT: - (void)testOptional:(id <A> _Nullable)opt meta:(Class <A> _Nullable)m;
 // CHECK-NEXT: @end
 @objc protocol Methods {
@@ -70,19 +83,10 @@ protocol CustomNameType2 {}
   func testSingleProtocolTypes(_ a : A, aAgain a2: A, b: B, bAgain b2: B, both: A & B)
   func testSingleProtocolClassTypes(_ a : A.Type, aAgain a2: A.Type, b: B.Type, bAgain b2: B.Type, both: (A & B).Type)
   func testComposition(_ x: A & ZZZ, meta xClass: (A & ZZZ).Type)
+  func testSubclassComposition(_ x: MyObject & ZZZ, meta xClass: (MyObject & ZZZ).Type)
+  func testGenericSubclassComposition(_ x: FungibleContainer<MyObject> & ZZZ, meta xClass: (FungibleContainer<MyObject> & ZZZ).Type)
 
   func testOptional(_ opt: A?, meta m: A.Type?)
-}
-
-// CHECK-LABEL: @interface MyObject : NSObject <NSCoding>
-// CHECK-NEXT: initWithCoder
-// CHECK-NEXT: init SWIFT_UNAVAILABLE
-// CHECK-NEXT: @end
-// NEGATIVE-NOT: @protocol NSCoding
-class MyObject : NSObject, NSCoding {
-  required init(coder aCoder: NSCoder) {
-    super.init()
-  }
 }
 
 // NEGATIVE-NOT: NotObjC
@@ -144,6 +148,25 @@ extension NSString : A, ZZZ {}
 }
 
 
+// Forward declaration of class referenced from subclass existential.
+
+// CHECK-LABEL: @class ReferencesSomeClass2;
+
+// CHECK-LABEL: @protocol ReferencesSomeClass1
+// CHECK-NEXT: - (void)referencesWithSomeClassAndZZZ:(ReferencesSomeClass2 <ZZZ> * _Nonnull)someClassAndZZZ;
+// CHECK-NEXT: @end
+
+// CHECK-LABEL: @interface ReferencesSomeClass2
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+
+@objc protocol ReferencesSomeClass1 {
+  @objc func references(someClassAndZZZ: ReferencesSomeClass2 & ZZZ)
+}
+
+@objc class ReferencesSomeClass2 {}
+
+
 // CHECK-LABEL: @protocol ReversedOrder2{{$}}
 // CHECK-NEXT: @end
 // CHECK: SWIFT_PROTOCOL
@@ -155,8 +178,7 @@ extension NSString : A, ZZZ {}
 
 // CHECK-LABEL: @interface RootClass1{{$}}
 // CHECK: @interface RootClass2 <A>{{$}}
-// FIXME: Would prefer not to print A below.
-// CHECK: @interface RootClass3 <B, A>{{$}}
+// CHECK: @interface RootClass3 <B>{{$}}
 @objc class RootClass1 : NotObjC {}
 @objc class RootClass2 : A, NotObjC {}
 @objc class RootClass3 : NotObjC, B {}

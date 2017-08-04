@@ -21,7 +21,6 @@
 
 #define DEBUG_TYPE "sil-optimizer"
 
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILModule.h"
@@ -82,6 +81,13 @@ bool swift::runSILOwnershipEliminatorPass(SILModule &Module) {
       SILPassPipelinePlan::getOwnershipEliminatorPassPipeline());
 
   return Ctx.hadError();
+}
+
+// Prepare SIL for the -O pipeline.
+void swift::runSILOptPreparePasses(SILModule &Module) {
+  SILPassManager PM(&Module);
+  PM.executePassPipelinePlan(
+      SILPassPipelinePlan::getSILOptPreparePassPipeline(Module.getOptions()));
 }
 
 void swift::runSILOptimizationPasses(SILModule &Module) {
@@ -161,7 +167,7 @@ StringRef swift::PassKindTag(PassKind Kind) {
   switch (Kind) {
 #define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID:                                                           \
-    return #TAG;
+    return TAG;
 #include "swift/SILOptimizer/PassManager/Passes.def"
   case PassKind::invalidPassKind:
     llvm_unreachable("Invalid pass kind?!");
@@ -176,7 +182,7 @@ StringRef swift::PassKindName(PassKind Kind) {
   switch (Kind) {
 #define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID:                                                           \
-    return #NAME;
+    return NAME;
 #include "swift/SILOptimizer/PassManager/Passes.def"
   case PassKind::invalidPassKind:
     llvm_unreachable("Invalid pass kind?!");

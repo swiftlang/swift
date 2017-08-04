@@ -126,10 +126,23 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   IntegerLiteralInst *End;
   SILValue RecNext;
 
+  unsigned Adjust = 0;
+
   if (!match(CondBr->getCondition(),
              m_BuiltinInst(BuiltinValueKind::ICMP_EQ, m_SILValue(RecNext),
-                           m_IntegerLiteralInst(End))))
-    return None;
+                           m_IntegerLiteralInst(End))) &&
+      !match(CondBr->getCondition(),
+             m_BuiltinInst(BuiltinValueKind::ICMP_SGE, m_SILValue(RecNext),
+                           m_IntegerLiteralInst(End)))) {
+    if (!match(CondBr->getCondition(),
+               m_BuiltinInst(BuiltinValueKind::ICMP_SGT, m_SILValue(RecNext),
+                             m_IntegerLiteralInst(End))))
+      return None;
+    // Otherwise, we have a greater than comparison.
+    else
+      Adjust = 1;
+  }
+
   if (!match(RecNext,
              m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
                                             m_SILPHIArgument(RecArg), m_One()),
@@ -159,7 +172,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   if (Dist == 0)
     return None;
 
-  return Dist.getZExtValue();
+  return Dist.getZExtValue() + Adjust;
 }
 
 /// Check whether we can duplicate the instructions in the loop and use a

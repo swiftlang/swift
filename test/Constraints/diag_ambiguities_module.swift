@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_ambiguities.swift
 // RUN: not %target-swift-frontend -typecheck %s -I %t 2>&1 | %FileCheck %s
 

@@ -42,9 +42,13 @@ private:
   std::unique_ptr<ParserUnit> Parser;
   class FormatterDiagConsumer : public swift::DiagnosticConsumer {
     void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                          StringRef Text,
+                          StringRef FormatString,
+                          ArrayRef<DiagnosticArgument> FormatArgs,
                           const swift::DiagnosticInfo &Info) override {
-      llvm::errs() << "Parse error: " << Text << "\n";
+      llvm::errs() << "Parse error: ";
+      DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
+                                             FormatArgs);
+      llvm::errs() << "\n";
     }
   } DiagConsumer;
 
@@ -133,13 +137,11 @@ public:
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        A->getAsString(ParsedArgs), A->getValue());
 
-    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_line_range),
-                                   ParsedArgs.filtered_end()))
+    for (const Arg *A : ParsedArgs.filtered(OPT_line_range))
       LineRanges.push_back(A->getValue());
 
     if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
-      for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_UNKNOWN),
-                                     ParsedArgs.filtered_end())) {
+      for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
         Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
                        A->getAsString(ParsedArgs));
       }
@@ -153,14 +155,8 @@ public:
       return 1;
     }
 
-    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_INPUT),
-                                   ParsedArgs.filtered_end())) {
+    for (const Arg *A : ParsedArgs.filtered(OPT_INPUT)) {
       InputFilenames.push_back(A->getValue());
-    }
-
-    if (InputFilenames.empty()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
-      return 1;
     }
 
     if (const Arg *A = ParsedArgs.getLastArg(OPT_o)) {
@@ -250,7 +246,7 @@ int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
 
   DiagnosticEngine &Diags = Instance.getDiags();
   if (Invocation.parseArgs(Args, Diags) != 0)
-    return 1;
+    return EXIT_FAILURE;
 
   std::vector<std::string> InputFiles = Invocation.getInputFilenames();
   unsigned NumInputFiles = InputFiles.size();
@@ -264,10 +260,11 @@ int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
       // We don't support formatting file ranges for multiple files.
       Instance.getDiags().diagnose(SourceLoc(),
                                    diag::error_formatting_multiple_file_ranges);
-      return 1;
+      return EXIT_FAILURE;
     }
     for (unsigned i = 0; i < NumInputFiles; ++i)
       Invocation.format(InputFiles[i], Diags);
   }
-  return 0;
+
+  return EXIT_SUCCESS;
 }

@@ -73,10 +73,10 @@ public func test_compose_closure(_ x: Int) -> Int32 {
 let insult = curry(+)("I'm with stupid ☞ ")
 print(insult("😡")) // CHECK: I'm with stupid ☞ 😡
 
-let plus1 = curry(+)(1)
+let plus1 = curry({ $0 + $1 })(1)
 print(plus1(5)) // CHECK-NEXT: 6
 
-let plus5 = curry(+)(5)
+let plus5 = curry({ $0 + $1 })(5)
 print(plus5(5)) // CHECK-NEXT: 10
 
 print(insult("😰")) // CHECK-NEXT: I'm with stupid ☞ 😰

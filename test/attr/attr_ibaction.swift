@@ -71,10 +71,10 @@ protocol CP2 : class { }
   // Protocol types
   @IBAction func action7(_: P1) {} // expected-error{{argument to @IBAction method cannot have non-object type 'P1'}}
   // expected-error@-1{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2{{protocol 'P1' is not '@objc'}}
+  // expected-note@-2{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
   @IBAction func action8(_: CP1) {} // expected-error{{argument to @IBAction method cannot have non-object type 'CP1'}}
   // expected-error@-1{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2{{protocol 'CP1' is not '@objc'}}
+  // expected-note@-2{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
   @IBAction func action9(_: OP1) {}
   @IBAction func action10(_: P1?) {} // expected-error{{argument to @IBAction method cannot have non-object type}}
   // expected-error@-1{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}

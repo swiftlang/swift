@@ -12,12 +12,13 @@
 
 namespace swift {
 
-class SILFunctionTransform;
+class SILTransform;
 
 namespace irgen {
 
 /// Create a pass to hoist alloc_stack instructions with non-fixed size.
-SILFunctionTransform *createAllocStackHoisting();
+SILTransform *createAllocStackHoisting();
+SILTransform *createLoadableByAddress();
 
 } // end namespace irgen
 } // end namespace swift

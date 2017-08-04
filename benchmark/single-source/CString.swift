@@ -1,4 +1,4 @@
-//===--- CString.swift -------------------------------------------------===//
+//===--- CString.swift ----------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -30,23 +30,21 @@ public func run_StringWithCString(_ N: Int) {
 
 @inline(never)
 public func run_CStringLongAscii(_ N: Int) {
-  let refResult = 517492
   var res: UInt = 0
   for _ in 1...N*500 {
     // static string to c -> from c to String -> implicit conversion
     res &= strlen(ascii.withCString(String.init(cString:)))
   }
-  CheckResults(res == 0, "IncorrectResults in run_CStringLongAscii: \(res) != \(refResult)")
+  CheckResults(res == 0)
 }
 
 @inline(never)
 public func run_CStringLongNonAscii(_ N: Int) {
-  let refResult = 517492
   var res: UInt = 0
   for _ in 1...N*500 {
     res &= strlen(japanese.withCString(String.init(cString:)))
   }
-  CheckResults(res == 0, "IncorrectResults in run_CStringLongAscii: \(res) != \(refResult)")
+  CheckResults(res == 0)
 }
 
 
@@ -65,7 +63,7 @@ let reference = 517492
 
 @inline(never)
 public func run_CStringShortAscii(_ N: Int) {
-  
+
   func DoOneIter(_ arr: [String]) -> Int {
     var r = 0
     for n in arr {
@@ -79,11 +77,10 @@ public func run_CStringShortAscii(_ N: Int) {
 
   var res = Int.max
   for _ in 1...100*N {
-    let strings = input.map { 
+    let strings = input.map {
       $0.withCString(String.init(cString:))
     }
     res = res & DoOneIter(strings)
   }
-  assert(res == reference, "IncorrectResults in StrToInt: \(res) != \(reference)")
+  CheckResults(res == reference)
 }
-

@@ -19,7 +19,7 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
   // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
   Bound : _Strideable & Comparable,
-  Bound.Stride : Integer {
+  Bound.Stride : BinaryInteger {
   case pastEnd
   case inRange(Bound)
 }
@@ -174,8 +174,6 @@ public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
 /// bound by floating-point values, see the `ClosedRange` type. If you need to
 /// iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
-///
-/// - SeeAlso: `CountableRange`, `ClosedRange`, `Range`
 @_fixed_layout
 public struct CountableClosedRange<Bound> : RandomAccessCollection
   where
@@ -373,8 +371,6 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
 ///     let lowercaseA = "a"..."a"
 ///     print(lowercaseA.isEmpty)
 ///     // Prints "false"
-///
-/// - SeeAlso: `CountableRange`, `Range`, `CountableClosedRange`
 @_fixed_layout
 public struct ClosedRange<
   Bound : Comparable

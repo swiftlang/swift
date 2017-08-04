@@ -100,5 +100,29 @@ func test_varArgs4() {
 }
 test_varArgs4()
 
+func test_varArgs5() {
+  var args = [CVarArg]()
+
+  // Confirm the absence of a bug (on x86-64) wherein floats were stored in
+  // the GP register-save area after the SSE register-save area was
+  // exhausted, rather than spilling into the overflow argument area.
+  //
+  // This is not caught by test_varArgs1 above, because it exhauses the
+  // GP register-save area before the SSE area.
+
+  var format = "rdar-32547102: "
+  for i in 0..<12 {
+    args.append(Float(i))
+    format += "%.1f "
+  }
+
+  // CHECK: rdar-32547102: 0.0 1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 11.0
+  withVaList(args) {
+    vprintf(format + "\n", $0)
+  }
+}
+test_varArgs5()
+
+
 // CHECK: done.
 print("done.")

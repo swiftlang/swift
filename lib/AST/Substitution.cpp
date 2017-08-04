@@ -42,3 +42,13 @@ Substitution::Substitution(Type Replacement,
   assert(Replacement->isMaterializable()
          && "cannot substitute with a non-materializable type");
 }
+
+bool Substitution::isCanonical() const {
+  if (!getReplacement()->isCanonical())
+    return false;
+  for (auto conf : getConformances()) {
+    if (!conf.isCanonical())
+      return false;
+  }
+  return true;
+}

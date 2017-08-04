@@ -1,0 +1,16 @@
+---
+Name: NonNilTest
+Classes:
+- Name: NonNilTest
+  Methods:
+  - Selector: nonNilObject
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: nonNilObject
+    MethodKind: Class
+    NullabilityOfRet: N
+  Properties:
+  - Name: nonNilObjectProperty
+    Nullability: N
+  - Name: unownedNonNilObjectProperty
+    Nullability: N

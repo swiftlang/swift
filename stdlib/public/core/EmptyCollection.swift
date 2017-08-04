@@ -18,8 +18,6 @@
 //===----------------------------------------------------------------------===//
 
 /// An iterator that never produces an element.
-///
-/// - SeeAlso: `EmptyCollection<Element>`.
 public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
   /// Creates an instance.
   public init() {}

@@ -4,6 +4,7 @@ set(sources
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h
+  KeyPath.h
   LibcShims.h
   RefCount.h
   RuntimeShims.h
@@ -15,9 +16,10 @@ set(sources
   Visibility.h
 
   DispatchOverlayShims.h
-  ObjectiveCOverlayShims.h
   OSOverlayShims.h
+  ObjectiveCOverlayShims.h
   SafariServicesOverlayShims.h
+  UIKitOverlayShims.h
   XCTestOverlayShims.h
   XPCOverlayShims.h
 
@@ -28,11 +30,13 @@ set(sources
   FoundationOverlayShims.h
   FoundationShimSupport.h
   NSCalendarShims.h
+  NSCharacterSetShims.h
   NSCoderShims.h
   NSDataShims.h
   NSDictionaryShims.h
   NSErrorShims.h
   NSFileManagerShims.h
+  NSIndexPathShims.h
   NSIndexSetShims.h
   NSKeyedArchiverShims.h
   NSLocaleShims.h

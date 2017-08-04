@@ -351,6 +351,13 @@ bool RequestDict::getInt64(SourceKit::UIdent Key, int64_t &Val,
   return false;
 }
 
+Optional<int64_t> RequestDict::getOptionalInt64(SourceKit::UIdent Key) {
+  xpc_object_t xobj = xpc_dictionary_get_value(Dict, Key.c_str());
+  if (!xobj)
+    return None;
+  return xpc_int64_get_value(xobj);
+}
+
 sourcekitd_response_t
 sourcekitd::createErrorRequestInvalid(const char *Description) {
   return CustomXPCData::createErrorRequestInvalid(Description).getXObj();

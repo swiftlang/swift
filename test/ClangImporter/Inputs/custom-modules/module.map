@@ -12,6 +12,11 @@ module CFAndObjC {
   export *
 }
 
+module CInsideObjC {
+  header "CInsideObjC.h"
+  export *
+}
+
 module ClangModuleUser {
   header "ClangModuleUser.h"
   export *
@@ -77,6 +82,14 @@ module Newtype {
   header "Newtype.h"
 }
 
+module ImportAsMember {
+  export *
+
+  module A {
+    header "ImportAsMember.h"
+  }
+}
+
 module ObjCIRExtras {
   header "ObjCIRExtras.h"
   export *
@@ -138,6 +151,10 @@ module TypeAndValue {
   export *
 }
 
+module UnimportableMembers {
+  header "UnimportableMembers.h"
+}
+
 module UsesSubmodule {
   header "UsesSubmodule.h"
   export *
@@ -162,4 +179,8 @@ module MacrosRedefB {
 
 module IndirectFields {
   header "IndirectFields.h"
+}
+
+module ObjCBridgeNonconforming {
+  header "ObjCBridgeNonconforming.h"
 }

@@ -173,7 +173,7 @@ static clang::Module *getSubmodule(const clang::NamedDecl *decl, clang::Sema &cl
     return m;
   if (auto m = clangSema.getPreprocessor().getCurrentModule())
     return m;
-  if (auto m = clangSema.getPreprocessor().getCurrentSubmodule())
+  if (auto m = clangSema.getPreprocessor().getCurrentLexerSubmodule())
     return m;
 
   return nullptr;

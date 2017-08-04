@@ -8,16 +8,16 @@ var x: Int
 
 // Just check a small part, mainly to make sure we can print the interface of the stdlib.
 // CHECK-STDLIB-NOT: extension _SwiftNSOperatingSystemVersion
-// CHECK-STDLIB: struct Int : SignedInteger, Comparable, Equatable {
-// CHECK-STDLIB:   static var max: Int { get }
-// CHECK-STDLIB:   static var min: Int { get }
+// CHECK-STDLIB: struct Int : FixedWidthInteger, SignedInteger {
+// CHECK-STDLIB:   static var bitWidth: Int { get }
+// CHECK-STDLIB:   var nonzeroBitCount: Int { get }
 // CHECK-STDLIB: }
 
 // Check that extensions of nested decls are showing up.
-// CHECK-STDLIB-LABEL: extension String.UTF16View.Index {
+// CHECK-STDLIB-LABEL: extension String.Index {
 // CHECK-STDLIB: func samePosition(in utf8: String.UTF8View) -> String.UTF8View.Index?
-// CHECK-STDLIB: func samePosition(in unicodeScalars: String.UnicodeScalarView) -> String.UnicodeScalarIndex?
 // CHECK-STDLIB: func samePosition(in characters: String) -> String.Index?
+// CHECK-STDLIB: func samePosition(in unicodeScalars: String.UnicodeScalarView) -> String.UnicodeScalarIndex?
 // CHECK-STDLIB-NEXT: }
 
 // CHECK-MUTATING-ATTR: mutating func
@@ -38,7 +38,7 @@ var x: Int
 // CHECK1-NEXT: <Group>Math/Integers</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
-// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:s13SignedIntegerP">SignedInteger</Type>{{.*}}{{.*}}<Type usr="s:s10ComparableP">Comparable</Type>{{.*}}<Type usr="s:s9EquatableP">Equatable</Type>{{.*}}</Declaration>
+// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:s17FixedWidthIntegerP">FixedWidthInteger</Type>{{.*}}<Type usr="s:s13SignedIntegerP">SignedInteger</Type>{{.*}}</Declaration>
 
 // RUN: %sourcekitd-test -req=module-groups -module Swift | %FileCheck -check-prefix=GROUP1 %s
 // GROUP1: <GROUPS>

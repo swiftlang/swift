@@ -34,7 +34,7 @@
 #include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/TransitivelyUnreachableBlocks.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -174,9 +174,19 @@ static bool compatibleOwnershipKinds(ValueOwnershipKind K1,
   return K1.merge(K2).hasValue();
 }
 
+/// Returns true if \p Kind is trivial or if \p Kind is compatible with \p
+/// ComparisonKind.
+static bool
+trivialOrCompatibleOwnershipKinds(ValueOwnershipKind Kind,
+                                  ValueOwnershipKind ComparisonKind) {
+  return compatibleOwnershipKinds(Kind, ValueOwnershipKind::Trivial) ||
+         compatibleOwnershipKinds(Kind, ComparisonKind);
+}
+
 static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
   return V->getType().isAddress() ||
-         V.getOwnershipKind() == ValueOwnershipKind::Trivial;
+         V.getOwnershipKind() == ValueOwnershipKind::Trivial ||
+         V.getOwnershipKind() == ValueOwnershipKind::Any;
 }
 
 static bool isOwnershipForwardingValueKind(ValueKind K) {
@@ -185,18 +195,20 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::StructInst:
   case ValueKind::EnumInst:
   case ValueKind::OpenExistentialRefInst:
+  case ValueKind::OpenExistentialValueInst:
   case ValueKind::UpcastInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::ConvertFunctionInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
-  case ValueKind::UnconditionalCheckedCastValueInst:
   case ValueKind::TupleExtractInst:
   case ValueKind::StructExtractInst:
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::MarkUninitializedInst:
   case ValueKind::SelectEnumInst:
+  case ValueKind::SwitchEnumInst:
+  case ValueKind::CheckedCastBranchInst:
     return true;
   default:
     return false;
@@ -302,7 +314,8 @@ public:
   bool isAddressOrTrivialType() const {
     if (getType().isAddress())
       return true;
-    return getOwnershipKind() == ValueOwnershipKind::Trivial;
+    return getOwnershipKind() == ValueOwnershipKind::Trivial ||
+      getOwnershipKind() == ValueOwnershipKind::Any;
   }
 
   /// Depending on our initialization, either return false or call Func and
@@ -325,10 +338,18 @@ public:
   OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I) {
     return visitForwardingInst(I, I->getAllOperands());
   }
-  OwnershipUseCheckerResult
-  visitApplyArgument(ValueOwnershipKind RequiredConvention, bool ShouldCheck);
+
+  /// Visit a terminator instance that performs a transform like
+  /// operation. E.x.: switch_enum, checked_cast_br. This does not include br or
+  /// cond_br.
+  OwnershipUseCheckerResult visitTransformingTerminatorInst(TermInst *TI);
+
   OwnershipUseCheckerResult
   visitNonTrivialEnum(EnumDecl *E, ValueOwnershipKind RequiredConvention);
+  OwnershipUseCheckerResult
+  visitApplyParameter(ValueOwnershipKind RequiredConvention, bool ShouldCheck);
+  OwnershipUseCheckerResult
+  visitFullApply(FullApplySite apply);
 
   /// Check if \p User as compatible ownership with the SILValue that we are
   /// checking.
@@ -393,11 +414,15 @@ NO_OPERAND_INST(IntegerLiteral)
 NO_OPERAND_INST(Metatype)
 NO_OPERAND_INST(ObjCProtocol)
 NO_OPERAND_INST(RetainValue)
+NO_OPERAND_INST(RetainValueAddr)
 NO_OPERAND_INST(StringLiteral)
+NO_OPERAND_INST(ConstStringLiteral)
 NO_OPERAND_INST(StrongRetain)
 NO_OPERAND_INST(StrongRetainUnowned)
 NO_OPERAND_INST(UnownedRetain)
 NO_OPERAND_INST(Unreachable)
+// TODO: Some key path components will have operands
+NO_OPERAND_INST(KeyPath)
 #undef NO_OPERAND_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -414,23 +439,22 @@ NO_OPERAND_INST(Unreachable)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, true, EndBorrowArgument)
 CONSTANT_OWNERSHIP_INST(Guaranteed, false, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Owned, true, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocExistentialBox)
-CONSTANT_OWNERSHIP_INST(Owned, true, DeallocPartialRef)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, true, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, ReleaseValue)
+CONSTANT_OWNERSHIP_INST(Owned, true, ReleaseValueAddr)
 CONSTANT_OWNERSHIP_INST(Owned, true, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, StrongUnpin)
 CONSTANT_OWNERSHIP_INST(Owned, true, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, InitExistentialRef)
-CONSTANT_OWNERSHIP_INST(Owned, true, OpenExistentialOpaque)
 CONSTANT_OWNERSHIP_INST(Owned, true, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Trivial, false, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, false, BeginAccess)
+CONSTANT_OWNERSHIP_INST(Trivial, false, BeginUnpairedAccess)
 CONSTANT_OWNERSHIP_INST(Trivial, false, BindMemory)
 CONSTANT_OWNERSHIP_INST(Trivial, false, CheckedCastAddrBranch)
 CONSTANT_OWNERSHIP_INST(Trivial, false, CondFail)
@@ -440,6 +464,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, DebugValueAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, DeinitExistentialAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, DestroyAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, EndAccess)
+CONSTANT_OWNERSHIP_INST(Trivial, false, EndUnpairedAccess)
 CONSTANT_OWNERSHIP_INST(Trivial, false, IndexAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, IndexRawPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, false, InitBlockStorageHeader)
@@ -502,11 +527,10 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, DeallocValueBuffer)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastBranch)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastValueBranch)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, SwitchEnum)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialOpaque)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, DeinitExistentialOpaque)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, UnconditionalCheckedCastValue)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialValue)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, DeinitExistentialValue)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
@@ -529,6 +553,24 @@ ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
+#define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(                          \
+    SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS, INST)                                \
+  OwnershipUseCheckerResult                                                    \
+      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+    assert(I->getNumOperands() && "Expected to have non-zero operands");       \
+    if (getType().is<AnyMetatypeType>()) {                                     \
+      return {true, false};                                                    \
+    }                                                                          \
+    assert(!isAddressOrTrivialType() &&                                        \
+           "Shouldn't have an address or a non trivial type");                 \
+    bool compatible = getOwnershipKind() == ValueOwnershipKind::Any ||         \
+                      !compatibleWithOwnership(ValueOwnershipKind::Trivial);   \
+    return {compatible, SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                 \
+  }
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(false, ClassMethod)
+#undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE
+
+// Trivial if trivial typed, otherwise must accept owned?
 #define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS, \
                                          INST)                                 \
   OwnershipUseCheckerResult                                                    \
@@ -542,10 +584,10 @@ ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
   }
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, SuperMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, BridgeObjectToWord)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBoxValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefTailAddr)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToRawPointer)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToUnmanaged)
@@ -609,13 +651,13 @@ FORWARD_ANY_OWNERSHIP_INST(Tuple)
 FORWARD_ANY_OWNERSHIP_INST(Struct)
 FORWARD_ANY_OWNERSHIP_INST(Enum)
 FORWARD_ANY_OWNERSHIP_INST(OpenExistentialRef)
+FORWARD_ANY_OWNERSHIP_INST(OpenExistentialValue)
 FORWARD_ANY_OWNERSHIP_INST(Upcast)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedRefCast)
 FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
-FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCastValue)
 FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 #undef FORWARD_ANY_OWNERSHIP_INST
@@ -645,6 +687,28 @@ FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, TupleExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitDeallocPartialRefInst(
+    DeallocPartialRefInst *I) {
+  if (getValue() == I->getInstance()) {
+    return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
+  }
+
+  return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitEndBorrowArgumentInst(
+    EndBorrowArgumentInst *I) {
+  // If we are currently checking an end_borrow_argument as a subobject, then we
+  // treat this as just a use.
+  if (isCheckingSubObject())
+    return {true, false};
+
+  // Otherwise, we must be checking an actual argument. Make sure it is guaranteed!
+  return {true, compatibleWithOwnership(ValueOwnershipKind::Guaranteed)};
+}
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitSelectEnumInst(SelectEnumInst *I) {
@@ -716,6 +780,59 @@ OwnershipCompatibilityUseChecker::visitCondBranchInst(CondBranchInst *CBI) {
 }
 
 OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitSwitchEnumInst(SwitchEnumInst *SEI) {
+  return visitTransformingTerminatorInst(SEI);
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitCheckedCastBranchInst(
+    CheckedCastBranchInst *SEI) {
+  return visitTransformingTerminatorInst(SEI);
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitTransformingTerminatorInst(
+    TermInst *TI) {
+  // If our operand was trivial, return early.
+  if (compatibleWithOwnership(ValueOwnershipKind::Trivial))
+    return {true, false};
+
+  // Then we need to go through all of our destinations and make sure that if
+  // they have a payload, the payload's convention matches our
+  // convention.
+  //
+  // *NOTE* we assume that all of our types line up and are checked by the
+  // normal verifier.
+  for (auto *Succ : TI->getParent()->getSuccessorBlocks()) {
+    // This must be a no-payload case... continue.
+    if (Succ->args_size() == 0)
+      continue;
+
+    // If we have a trivial value or a value with ownership kind that matches
+    // the switch_enum, then continue.
+    auto OwnershipKind = Succ->getArgument(0)->getOwnershipKind();
+    if (OwnershipKind == ValueOwnershipKind::Trivial ||
+        compatibleWithOwnership(OwnershipKind))
+      continue;
+
+    // Otherwise, emit an error.
+    handleError([&]() {
+      llvm::errs()
+          << "Function: '" << Succ->getParent()->getName() << "'\n"
+          << "Error! Argument ownership kind does not match terminator!\n"
+          << "Terminator: " << *TI << "Argument: " << *Succ->getArgument(0)
+          << "Expected convention: " << getOwnershipKind() << ".\n"
+          << "Actual convention:   " << OwnershipKind << '\n'
+          << '\n';
+    });
+  }
+
+  // Finally, if everything lines up, emit that we match and are a lifetime
+  // ending point if we are owned.
+  return {true, compatibleWithOwnership(ValueOwnershipKind::Owned)};
+}
+
+OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
   SILModule &M = RI->getModule();
   bool IsTrivial = RI->getOperand()->getType().isTrivial(M);
@@ -758,6 +875,10 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
     Base = MergedValue.getValue();
   }
 
+  if (auto *E = getType().getEnumOrBoundGenericEnum()) {
+    return visitNonTrivialEnum(E, Base);
+  }
+
   return {compatibleWithOwnership(Base), true};
 }
 
@@ -785,8 +906,10 @@ OwnershipCompatibilityUseChecker::visitStoreUnownedInst(StoreUnownedInst *I) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitStoreWeakInst(StoreWeakInst *I) {
+  // A store_weak instruction implies that the value to be stored to be live,
+  // but it does not touch the strong reference count of the value.
   if (getValue() == I->getSrc())
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
+    return {true, false};
   return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
 }
 
@@ -803,6 +926,7 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
   ParameterConvention Conv = SubstCalleeType->getCalleeConvention();
   switch (Conv) {
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
     assert(!SILModuleConventions(Mod).isSILIndirect(
         SILParameterInfo(SubstCalleeType, Conv)));
     return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
@@ -814,7 +938,10 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Illegal convention for callee");
   case ParameterConvention::Direct_Unowned:
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+    if (isAddressOrTrivialType())
+      return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+    // We accept unowned, owned, and guaranteed in unowned positions.
+    return {true, false};
   case ParameterConvention::Direct_Owned:
     return {compatibleWithOwnership(ValueOwnershipKind::Owned), true};
   case ParameterConvention::Direct_Guaranteed:
@@ -836,7 +963,7 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitNonTrivialEnum(
   // Check if this enum has at least one case that is non-trivially typed.
   bool HasNonTrivialCase =
       llvm::any_of(E->getAllElements(), [this](EnumElementDecl *E) -> bool {
-        if (!E->getArgumentInterfaceType())
+        if (!E->hasAssociatedValues())
           return false;
         SILType EnumEltType = getType().getEnumElementType(E, Mod);
         return !EnumEltType.isTrivial(Mod);
@@ -863,8 +990,8 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitNonTrivialEnum(
 // non-trivial argument positions. This fits with modeling of a
 // SILFunctionArgument as a phi in a global program graph.
 OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitApplyArgument(ValueOwnershipKind Kind,
-                                                     bool ShouldCheck) {
+OwnershipCompatibilityUseChecker::visitApplyParameter(ValueOwnershipKind Kind,
+                                                      bool ShouldCheck) {
   // Check if we have an enum. If not, then we just check against the passed in
   // convention.
   EnumDecl *E = getType().getEnumOrBoundGenericEnum();
@@ -874,62 +1001,47 @@ OwnershipCompatibilityUseChecker::visitApplyArgument(ValueOwnershipKind Kind,
   return visitNonTrivialEnum(E, Kind);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
+// Handle Apply and TryApply.
+OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::
+visitFullApply(FullApplySite apply) {
   // If we are visiting the callee, handle it specially.
   if (getOperandIndex() == 0)
-    return visitCallee(I->getSubstCalleeType());
+    return visitCallee(apply.getSubstCalleeType());
 
-  switch (I->getArgumentConvention(getOperandIndex() - 1)) {
-  case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Guaranteed:
-  case SILArgumentConvention::Indirect_Inout:
-  case SILArgumentConvention::Indirect_InoutAliasable:
-  case SILArgumentConvention::Indirect_Out:
+  // Indirect return arguments are address types.
+  if (isAddressOrTrivialType())
     return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
-  case SILArgumentConvention::Direct_Owned:
-    return visitApplyArgument(ValueOwnershipKind::Owned, true);
-  case SILArgumentConvention::Direct_Unowned:
-    if (isAddressOrTrivialType())
-      return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
+
+  unsigned argIndex = apply.getCalleeArgIndex(Op);
+  SILParameterInfo paramInfo =
+    apply.getSubstCalleeConv().getParamInfoForSILArg(argIndex);
+
+  switch (paramInfo.getConvention()) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Direct_Owned:
+    return visitApplyParameter(ValueOwnershipKind::Owned, true);
+  case ParameterConvention::Indirect_In_Constant:
+  case ParameterConvention::Direct_Unowned:
     // We accept unowned, owned, and guaranteed in unowned positions.
     return {true, false};
-  case SILArgumentConvention::Direct_Guaranteed:
-    return visitApplyArgument(ValueOwnershipKind::Guaranteed, false);
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("No ownership associated with deallocating");
+  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Direct_Guaranteed:
+    return visitApplyParameter(ValueOwnershipKind::Guaranteed, false);
+  // The following conventions should take address types.
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
+}
 
-  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
+  return visitFullApply(I);
 }
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitTryApplyInst(TryApplyInst *I) {
-  // If we are visiting the callee, handle it specially.
-  if (getOperandIndex() == 0)
-    return visitCallee(I->getSubstCalleeType());
-
-  switch (I->getArgumentConvention(getOperandIndex() - 1)) {
-  case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Guaranteed:
-  case SILArgumentConvention::Indirect_Inout:
-  case SILArgumentConvention::Indirect_InoutAliasable:
-  case SILArgumentConvention::Indirect_Out:
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
-  case SILArgumentConvention::Direct_Owned:
-    return visitApplyArgument(ValueOwnershipKind::Owned, true);
-  case SILArgumentConvention::Direct_Unowned:
-    if (isAddressOrTrivialType())
-      return {compatibleWithOwnership(ValueOwnershipKind::Trivial), false};
-    // We accept unowned, owned, and guaranteed in unowned positions.
-    return {true, false};
-  case SILArgumentConvention::Direct_Guaranteed:
-    return visitApplyArgument(ValueOwnershipKind::Guaranteed, false);
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("No ownership associated with deallocating");
-  }
-
-  llvm_unreachable("Unhandled SILArgumentConvention in switch.");
+  return visitFullApply(I);
 }
 
 OwnershipUseCheckerResult
@@ -1023,7 +1135,7 @@ public:
 
 } // end anonymous namespace
 
-// This is correct today since we do not ahve any builtins which return
+// This is correct today since we do not have any builtins which return
 // @guaranteed parameters. This means that we can only have a lifetime ending
 // use with our builtins if it is owned.
 #define CONSTANT_OWNERSHIP_BUILTIN(OWNERSHIP, LIFETIME_ENDING_USE, ID)         \
@@ -1098,10 +1210,12 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, IntToFPWithOverflow)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, IntToPtr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, IsOptionalType)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, IsPOD)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, IsSameMetatype)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, LShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Mul)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, OnFastPath)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Once)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, OnceWithContext)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Or)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, PtrToInt)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SAddOver)
@@ -1212,9 +1326,9 @@ class SILValueOwnershipChecker {
   /// The module that we are in.
   SILModule &Mod;
 
-  /// A cache of unreachable function blocks that we use to determine if we can
+  /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
-  const TransitivelyUnreachableBlocksInfo &TUB;
+  DeadEndBlocks &DEBlocks;
 
   /// The value whose ownership we will check.
   SILValue Value;
@@ -1250,10 +1364,11 @@ class SILValueOwnershipChecker {
 
 public:
   SILValueOwnershipChecker(
-      SILModule &M, const TransitivelyUnreachableBlocksInfo &TUB, SILValue V,
+      SILModule &M, DeadEndBlocks &DEBlocks, SILValue V,
       ErrorBehaviorKind ErrorBehavior,
       llvm::SmallPtrSet<SILBasicBlock *, 32> &VisitedBlocks)
-      : Result(), Mod(M), TUB(TUB), Value(V), ErrorBehavior(ErrorBehavior),
+      : Result(), Mod(M), DEBlocks(DEBlocks), Value(V),
+        ErrorBehavior(ErrorBehavior),
         VisitedBlocks(VisitedBlocks) {
     assert(Value && "Can not initialize a checker with an empty SILValue");
   }
@@ -1437,8 +1552,8 @@ void SILValueOwnershipChecker::gatherUsers(
   // we need to look through subobject uses for more uses. Otherwise, if we are
   // forwarding, we do not create any lifetime ending users/non lifetime ending
   // users since we verify against our base.
-  bool IsGuaranteed =
-      Value.getOwnershipKind() == ValueOwnershipKind::Guaranteed;
+  auto OwnershipKind = Value.getOwnershipKind();
+  bool IsGuaranteed = OwnershipKind == ValueOwnershipKind::Guaranteed;
 
   if (IsGuaranteed && isOwnershipForwardingValue(Value))
     return;
@@ -1495,19 +1610,63 @@ void SILValueOwnershipChecker::gatherUsers(
 
     // At this point, we know that we must have a forwarded subobject. Since the
     // base type is guaranteed, we know that the subobject is either guaranteed
-    // or trivial. The trivial case is not interesting for ARC verification, so
-    // if the user has a trivial ownership kind, continue.
-    if (SILValue(User).getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    // or trivial. We now split into two cases, if the user is a terminator or
+    // not. If we do not have a terminator, then just add User->getUses() to the
+    // worklist.
+    auto *TI = dyn_cast<TermInst>(User);
+    if (!TI) {
+      if (SILValue(User).getOwnershipKind() == ValueOwnershipKind::Trivial) {
+        continue;
+      }
+
+      // Now, we /must/ have a guaranteed subobject, so lets assert that the
+      // user
+      // is actually guaranteed and add the subobject's users to our worklist.
+      assert(SILValue(User).getOwnershipKind() ==
+                 ValueOwnershipKind::Guaranteed &&
+             "Our value is guaranteed and this is a forwarding instruction. "
+             "Should have guaranteed ownership as well.");
+      std::copy(User->use_begin(), User->use_end(), std::back_inserter(Users));
       continue;
     }
 
-    // Now, we /must/ have a guaranteed subobject, so lets assert that the user
-    // is actually guaranteed and add the subobject's users to our worklist.
-    assert(SILValue(User).getOwnershipKind() ==
-               ValueOwnershipKind::Guaranteed &&
-           "Our value is guaranteed and this is a forwarding instruction. "
-           "Should have guaranteed ownership as well.");
-    std::copy(User->use_begin(), User->use_end(), std::back_inserter(Users));
+    // Otherwise if we have a terminator, add any as uses any
+    // end_borrow_argument to ensure that the subscope is completely enclsed
+    // within the super scope. all of the arguments to the work list. We require
+    // all of our arguments to be either trivial or guaranteed.
+    for (auto &Succ : TI->getSuccessors()) {
+      auto *BB = Succ.getBB();
+
+      // If we do not have any arguments, then continue.
+      if (BB->args_empty())
+        continue;
+
+      // Otherwise, make sure that all arguments are trivial or guaranteed. If
+      // we fail, emit an error.
+      //
+      // TODO: We could ignore this error and emit a more specific error on the
+      // actual terminator.
+      for (auto *BBArg : BB->getArguments()) {
+        // *NOTE* We do not emit an error here since we want to allow for more
+        // specific errors to be found during use_verification.
+        //
+        // TODO: Add a flag that associates the terminator instruction with
+        // needing to be verified. If it isn't verified appropriately, assert
+        // when the verifier is destroyed.
+        if (!trivialOrCompatibleOwnershipKinds(BBArg->getOwnershipKind(),
+                                               OwnershipKind)) {
+          // This is where the error would go.
+          continue;
+        }
+
+        // If we have a trivial value, just continue.
+        if (BBArg->getOwnershipKind() == ValueOwnershipKind::Trivial)
+          continue;
+
+        // Otherwise, 
+        std::copy(BBArg->use_begin(), BBArg->use_end(), std::back_inserter(Users));
+      }
+    }
   }
 }
 
@@ -1568,7 +1727,7 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
     break;
   }
 
-  if (TUB.isUnreachable(Arg->getParent()))
+  if (DEBlocks.isDeadEnd(Arg->getParent()))
     return true;
 
   return !handleError([&] {
@@ -1598,7 +1757,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
     return true;
 
   if (auto *ParentBlock = Value->getParentBlock()) {
-    if (TUB.isUnreachable(ParentBlock)) {
+    if (DEBlocks.isDeadEnd(ParentBlock)) {
       DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
                          << "without users!\n"
                          << "    Function: '" << Value->getFunction()->getName()
@@ -1818,7 +1977,7 @@ bool SILValueOwnershipChecker::checkDataflow() {
 
       // Then check if the successor is a transitively unreachable block. In
       // such a case, we ignore it since we are going to leak along that path.
-      if (TUB.isUnreachable(SuccBlock))
+      if (DEBlocks.isDeadEnd(SuccBlock))
         continue;
 
       // Otherwise, add the successor to our SuccessorBlocksThatMustBeVisited
@@ -1870,21 +2029,29 @@ bool SILValueOwnershipChecker::checkDataflow() {
     });
   }
 
-  // Make sure that we do not have any lifetime ending uses left to visit. If we
-  // do, then these non lifetime ending uses must be outside of our "alive"
-  // blocks implying a use-after free.
+  // Make sure that we do not have any lifetime ending uses left to visit that
+  // are not transitively unreachable blocks. If we do, then these non lifetime
+  // ending uses must be outside of our "alive" blocks implying a use-after
+  // free.
   if (!BlocksWithNonLifetimeEndingUses.empty()) {
-    return handleError([&] {
-      llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
-                   << "Found use after free due to unvisited non lifetime "
-                      "ending uses?!\n"
-                   << "Value: " << *Value << "    Remaining Users:\n";
-      for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
-        llvm::errs() << "User:" << *Pair.second << "Block: bb"
-                     << Pair.first->getDebugID() << "\n";
+    for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
+      if (DEBlocks.isDeadEnd(Pair.first)) {
+        continue;
       }
-      llvm::errs() << "\n";
-    });
+
+      return handleError([&] {
+        llvm::errs() << "Function: '" << Value->getFunction()->getName()
+                     << "'\n"
+                     << "Found use after free due to unvisited non lifetime "
+                        "ending uses?!\n"
+                     << "Value: " << *Value << "    Remaining Users:\n";
+        for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
+          llvm::errs() << "User:" << *Pair.second << "Block: bb"
+                       << Pair.first->getDebugID() << "\n";
+        }
+        llvm::errs() << "\n";
+      });
+    }
   }
 
   return true;
@@ -1900,9 +2067,10 @@ void SILInstruction::verifyOperandOwnership() const {
   if (!getModule().getOptions().EnableSILOwnership)
     return;
 
-  // If the given function has unqualified ownership, there is nothing to
-  // verify.
-  if (getFunction()->hasUnqualifiedOwnership())
+  // If the given function has unqualified ownership or we have been asked by
+  // the user not to verify this function, there is nothing to verify.
+  if (getFunction()->hasUnqualifiedOwnership() ||
+      !getFunction()->shouldVerifyOwnership())
     return;
 
   // If we are testing the verifier, bail so we only print errors once when
@@ -1926,14 +2094,16 @@ void SILInstruction::verifyOperandOwnership() const {
   for (const Operand &Op : getAllOperands()) {
     if (isTypeDependentOperand(Op))
       continue;
+    // Skip any SILUndef that we see.
+    if (isa<SILUndef>(Op.get()))
+      continue;
     OwnershipCompatibilityUseChecker(getModule(), Op, Op.get(), ErrorBehavior)
         .check(Self);
   }
 #endif
 }
 
-void SILValue::verifyOwnership(SILModule &Mod,
-                               TransitivelyUnreachableBlocksInfo *TUB) const {
+void SILValue::verifyOwnership(SILModule &Mod, DeadEndBlocks *DEBlocks) const {
 #ifndef NDEBUG
   // If we are SILUndef, just bail. SILUndef can pair with anything. Any uses of
   // the SILUndef will make sure that the matching checks out.
@@ -1945,9 +2115,9 @@ void SILValue::verifyOwnership(SILModule &Mod,
   SILFunction *F = (*this)->getFunction();
   assert(F && "Instructions and arguments should have a function");
 
-  // If the given function has unqualified ownership, there is nothing further
-  // to verify.
-  if (F->hasUnqualifiedOwnership())
+  // If the given function has unqualified ownership or we have been asked by
+  // the user not to verify this function, there is nothing to verify.
+  if (F->hasUnqualifiedOwnership() || !F->shouldVerifyOwnership())
     return;
 
   ErrorBehaviorKind ErrorBehavior;
@@ -1957,13 +2127,12 @@ void SILValue::verifyOwnership(SILModule &Mod,
     ErrorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
   }
   llvm::SmallPtrSet<SILBasicBlock *, 32> LiveBlocks;
-  if (TUB) {
-    SILValueOwnershipChecker(Mod, *TUB, *this, ErrorBehavior, LiveBlocks)
+  if (DEBlocks) {
+    SILValueOwnershipChecker(Mod, *DEBlocks, *this, ErrorBehavior, LiveBlocks)
         .check();
   } else {
-    PostOrderFunctionInfo NewPOFI((*this)->getFunction());
-    TransitivelyUnreachableBlocksInfo TUB(NewPOFI);
-    SILValueOwnershipChecker(Mod, TUB, *this, ErrorBehavior, LiveBlocks)
+    DeadEndBlocks DEBlocks((*this)->getFunction());
+    SILValueOwnershipChecker(Mod, DEBlocks, *this, ErrorBehavior, LiveBlocks)
         .check();
   }
 #endif
@@ -1990,7 +2159,8 @@ bool OwnershipChecker::checkValue(SILValue Value) {
     return false;
 
   ErrorBehaviorKind ErrorBehavior(ErrorBehaviorKind::ReturnFalse);
-  SILValueOwnershipChecker Checker(Mod, TUB, Value, ErrorBehavior, LiveBlocks);
+  SILValueOwnershipChecker Checker(Mod, DEBlocks, Value, ErrorBehavior,
+                                   LiveBlocks);
   if (!Checker.check()) {
     return false;
   }

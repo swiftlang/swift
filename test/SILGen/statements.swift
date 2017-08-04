@@ -166,6 +166,7 @@ func for_loops2() {
   // rdar://problem/19316670
   // CHECK: [[NEXT:%[0-9]+]] = function_ref @_T0s16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
   // CHECK-NEXT: alloc_stack $Optional<MyClass>
+  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
   // CHECK-NEXT: apply [[NEXT]]<[MyClass]>
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   let objects = [MyClass(), MyClass() ]
@@ -522,6 +523,15 @@ func defer_in_generic<T>(_ x: T) {
   generic_callee_3(x)
 }
 
+// CHECK-LABEL: sil hidden @_T010statements017defer_in_closure_C8_genericyxlF : $@convention(thin) <T> (@in T) -> ()
+func defer_in_closure_in_generic<T>(_ x: T) {
+  // CHECK-LABEL: sil private @_T010statements017defer_in_closure_C8_genericyxlFyycfU_ : $@convention(thin) <T> () -> ()
+  _ = {
+    // CHECK-LABEL: sil private @_T010statements017defer_in_closure_C8_genericyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
+    defer { generic_callee_1(T.self) }
+  }
+}
+
 // CHECK-LABEL: sil hidden @_T010statements13defer_mutableySiF
 func defer_mutable(_ x: Int) {
   var x = x
@@ -552,7 +562,7 @@ func testRequireExprPattern(_ a : Int) {
   // CHECK: [[M1:%[0-9]+]] = function_ref @_T010statements8marker_1yyF : $@convention(thin) () -> ()
   // CHECK-NEXT: apply [[M1]]() : $@convention(thin) () -> ()
 
-  // CHECK: function_ref Swift.~= infix <A where A: Swift.Equatable> (A, A) -> Swift.Bool
+  // CHECK: function_ref Swift.~= infix<A where A: Swift.Equatable>(A, A) -> Swift.Bool
   // CHECK: cond_br {{.*}}, bb1, bb2
   guard case 4 = a else { marker_2(); return }
 
@@ -593,7 +603,7 @@ func testRequireOptional1(_ a : Int?) -> Int {
   guard let t = a else { abort() }
 
   // CHECK:  [[ABORT]]:
-  // CHECK-NEXT:    // function_ref statements.abort () -> Swift.Never
+  // CHECK-NEXT:    // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:    [[FUNC_REF:%.*]] = function_ref @_T010statements5aborts5NeverOyF
   // CHECK-NEXT:    apply [[FUNC_REF]]() : $@convention(thin) () -> Never
   // CHECK-NEXT:    unreachable
@@ -626,7 +636,7 @@ func testRequireOptional2(_ a : String?) -> String {
   // CHECK-NEXT:   return [[RETURN]] : $String
 
   // CHECK:        [[ABORT_BB]]:
-  // CHECK-NEXT:   // function_ref statements.abort () -> Swift.Never
+  // CHECK-NEXT:   // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:   [[ABORT_FUNC:%.*]] = function_ref @_T010statements5aborts5NeverOyF
   // CHECK-NEXT:   [[NEVER:%.*]] = apply [[ABORT_FUNC]]()
   // CHECK-NEXT:   unreachable

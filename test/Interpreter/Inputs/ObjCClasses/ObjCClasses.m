@@ -10,6 +10,12 @@
 @synthesize t;
 @end
 
+@implementation HasHiddenIvars2
+@synthesize x;
+@synthesize y;
+@synthesize z;
+@end
+
 @implementation TestingNSError
 + (BOOL)throwNilError:(NSError **)error {
   return 0;

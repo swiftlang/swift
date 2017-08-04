@@ -6,10 +6,13 @@ protocol P { func foo() }
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @phi_witness_method(%swift.type* %T, i8** %T.P) #0 {
 sil @phi_witness_method : $@convention(thin) <T: P> () -> () {
 entry:
+  // CHECK: [[LOAD:%.*]] = load i8*, i8** %T.P,
+  // CHECK: [[T0:%.*]] = bitcast i8* [[LOAD]] to void (%swift.type*, i8**, %T18witness_method_phi1PP*, %swift.type*, i8**)*
+  // CHECK: [[FUNC:%.*]] = bitcast void (%swift.type*, i8**, %T18witness_method_phi1PP*, %swift.type*, i8**)* [[T0]] to i8*
   %1 = witness_method $T, #P.foo!1 : $@convention(witness_method) <T: P> (@in P) -> ()
   br bb1(%1 : $@convention(witness_method) <T: P> (@in P) -> ())
 
-// CHECK:         phi i8* [ %0, %entry ]
+// CHECK:         phi i8* [ [[FUNC]], %entry ]
 bb1(%2 : $@convention(witness_method) <T: P> (@in P) -> ()):
   unreachable
 }

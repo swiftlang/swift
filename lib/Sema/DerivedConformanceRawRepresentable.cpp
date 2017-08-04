@@ -93,7 +93,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
 
   Type enumType = parentDC->getDeclaredTypeInContext();
 
-  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                           SourceLoc(), SourceLoc(),
@@ -198,7 +198,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
 
   auto selfDecl = cast<ConstructorDecl>(initDecl)->getImplicitSelfDecl();
   
-  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
     auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,
@@ -267,7 +267,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
                                          /*static*/false, /*inout*/true);
 
-  auto *rawDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(), SourceLoc(),
+  auto *rawDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                     C.Id_rawValue, SourceLoc(),
                                     C.Id_rawValue, rawType, parentDC);
   rawDecl->setInterfaceType(rawInterfaceType);
@@ -296,26 +296,25 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   Type retInterfaceType
     = OptionalType::get(parentDC->getDeclaredInterfaceType());
   Type interfaceType = FunctionType::get(interfaceArgType, retInterfaceType);
-  Type selfInterfaceType = initDecl->computeInterfaceSelfType();
-  Type selfInitializerInterfaceType
-    = initDecl->computeInterfaceSelfType(/*init*/ true);
+  auto selfParam = computeSelfParam(initDecl);
+  auto initSelfParam = computeSelfParam(initDecl, /*init*/ true);
 
   Type allocIfaceType;
   Type initIfaceType;
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     initDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
 
-    allocIfaceType = GenericFunctionType::get(sig, selfInterfaceType,
+    allocIfaceType = GenericFunctionType::get(sig, {selfParam},
                                               interfaceType,
                                               FunctionType::ExtInfo());
-    initIfaceType = GenericFunctionType::get(sig, selfInitializerInterfaceType,
+    initIfaceType = GenericFunctionType::get(sig, {initSelfParam},
                                              interfaceType,
                                              FunctionType::ExtInfo());
   } else {
-    allocIfaceType = FunctionType::get(selfInterfaceType,
-                                       interfaceType);
-    initIfaceType = FunctionType::get(selfInitializerInterfaceType,
-                                      interfaceType);
+    allocIfaceType = FunctionType::get({selfParam},
+                                       interfaceType, FunctionType::ExtInfo());
+    initIfaceType = FunctionType::get({initSelfParam},
+                                      interfaceType, FunctionType::ExtInfo());
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
@@ -334,6 +333,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
 
 static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl,
                                           EnumDecl *enumDecl) {
+  // Validate the enum and its raw type.
+  tc.validateDecl(enumDecl);
 
   // It must have a valid raw type.
   Type rawType = enumDecl->getRawType();
@@ -342,8 +343,9 @@ static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl,
   auto parentDC = cast<DeclContext>(parentDecl);
   rawType       = parentDC->mapTypeIntoContext(rawType);
 
-  if (!enumDecl->getInherited().empty() &&
-      enumDecl->getInherited().front().isError())
+  auto inherited = enumDecl->getInherited();
+  if (!inherited.empty() && inherited.front().wasValidated() &&
+      inherited.front().isError())
     return false;
 
   // The raw type must be Equatable, so that we have a suitable ~= for
@@ -388,10 +390,10 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   if (!canSynthesizeRawRepresentable(tc, parentDecl, enumDecl))
     return nullptr;
 
-  if (requirement->getName() == tc.Context.Id_rawValue)
+  if (requirement->getBaseName() == tc.Context.Id_rawValue)
     return deriveRawRepresentable_raw(tc, parentDecl, enumDecl);
-  
-  if (requirement->getName() == tc.Context.Id_init)
+
+  if (requirement->getBaseName() == tc.Context.Id_init)
     return deriveRawRepresentable_init(tc, parentDecl, enumDecl);
   
   tc.diagnose(requirement->getLoc(),

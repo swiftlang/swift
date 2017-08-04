@@ -30,7 +30,10 @@ extension Sub {
     // CHECK: bb0([[SELF:%.*]] : $Sub):
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK: [[SELF_COPY_CAST:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
-    // CHECK: [[SUPER_METHOD:%.*]] = super_method [volatile] [[SELF_COPY]] : $Sub, #Base.prop!getter.1.foreign
+    // CHECK: [[BORROWED_SELF_COPY_CAST:%.*]] = begin_borrow [[SELF_COPY_CAST]]
+    // CHECK: [[CAST_BACK:%.*]] = unchecked_ref_cast [[BORROWED_SELF_COPY_CAST]] : $Base to $Sub
+    // CHECK: [[SUPER_METHOD:%.*]] = super_method [volatile] [[CAST_BACK]] : $Sub, #Base.prop!getter.1.foreign
+    // CHECK: end_borrow [[BORROWED_SELF_COPY_CAST]] from [[SELF_COPY_CAST]]
     // CHECK: [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[SELF_COPY_CAST]])
     // CHECK: bb3(
     // CHECK: destroy_value [[SELF_COPY]]
@@ -61,7 +64,10 @@ extension Sub {
     // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<String>, [[SELF:%.*]] : $Sub):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
-    // CHECK:   [[GET_SUPER_METHOD:%.*]] = super_method [volatile] [[SELF_COPY]] : $Sub, #Base.prop!getter.1.foreign : (Base) -> () -> String!, $@convention(objc_method) (Base) -> @autoreleased Optional<NSString>
+    // CHECK:   [[BORROWED_UPCAST_SELF_COPY:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
+    // CHECK:   [[CAST_BACK:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF_COPY]] : $Base to $Sub
+    // CHECK:   [[GET_SUPER_METHOD:%.*]] = super_method [volatile] [[CAST_BACK]] : $Sub, #Base.prop!getter.1.foreign : (Base) -> () -> String!, $@convention(objc_method) (Base) -> @autoreleased Optional<NSString>
+    // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY]] from [[UPCAST_SELF_COPY]]
     // CHECK:   [[OLD_NSSTRING:%.*]] = apply [[GET_SUPER_METHOD]]([[UPCAST_SELF_COPY]])
 
     // CHECK: bb3([[OLD_NSSTRING_BRIDGED:%.*]] : $Optional<String>):
@@ -69,13 +75,17 @@ extension Sub {
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
+    // CHECK:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF_COPY]] : $Base
+    // CHECK:   [[SUPERREF_DOWNCAST:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF]] : $Base to $Sub
+    // CHECK:   [[SET_SUPER_METHOD:%.*]] = super_method [volatile] [[SUPERREF_DOWNCAST]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
+    // CHECK:   end_borrow [[BORROWED_UPCAST_SELF]]
     // CHECK:   [[BORROWED_NEW_VALUE:%.*]] = begin_borrow [[NEW_VALUE]]
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[BORROWED_NEW_VALUE]]
-    // CHECK:   [[SET_SUPER_METHOD:%.*]] = super_method [volatile] [[SELF_COPY]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
     // CHECK:   switch_enum [[NEW_VALUE_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
     //
     // CHECK: bb4([[OLD_STRING:%.*]] : $String):
     // CHECK: bb6([[BRIDGED_NEW_STRING:%.*]] : $Optional<NSString>):
+    // CHECK:    end_borrow [[BORROWED_NEW_VALUE]]
     // CHECK:    apply [[SET_SUPER_METHOD]]([[BRIDGED_NEW_STRING]], [[UPCAST_SELF_COPY]])
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
     // CHECK:    destroy_value [[SELF_COPY]]
@@ -130,7 +140,11 @@ class SubSub : Sub {
   // CHECK-LABEL: sil hidden @_T015objc_extensions03SubC0C14objCBaseMethodyyF
   // CHECK: bb0([[SELF:%.*]] : $SubSub):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:   super_method [volatile] [[SELF_COPY]] : $SubSub, #Sub.objCBaseMethod!1.foreign : (Sub) -> () -> (), $@convention(objc_method) (Sub) -> ()
+  // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $SubSub to $Sub
+  // CHECK:   [[BORROWED_UPCAST_SELF_COPY:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
+  // CHECK:   [[DOWNCAST:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF_COPY]] : $Sub to $SubSub
+  // CHECK:   super_method [volatile] [[DOWNCAST]] : $SubSub, #Sub.objCBaseMethod!1.foreign : (Sub) -> () -> (), $@convention(objc_method) (Sub) -> ()
+  // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY]] from [[UPCAST_SELF_COPY]]
   // CHECK: } // end sil function '_T015objc_extensions03SubC0C14objCBaseMethodyyF'
   override func objCBaseMethod() {
     super.objCBaseMethod()
@@ -141,9 +155,18 @@ extension SubSub {
   // CHECK-LABEL: sil hidden @_T015objc_extensions03SubC0C9otherPropSSfs
   // CHECK: bb0([[NEW_VALUE:%.*]] : $String, [[SELF:%.*]] : $SubSub):
   // CHECK:   [[SELF_COPY_1:%.*]] = copy_value [[SELF]]
-  // CHECK:   = super_method [volatile] [[SELF_COPY_1]] : $SubSub, #Sub.otherProp!getter.1.foreign
+  // CHECK:   [[UPCAST_SELF_COPY_1:%.*]] = upcast [[SELF_COPY_1]] : $SubSub to $Sub
+  // CHECK:   [[BORROWED_UPCAST_SELF_COPY_1:%.*]] = begin_borrow [[UPCAST_SELF_COPY_1]]
+  // CHECK:   [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_1:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF_COPY_1]] : $Sub to $SubSub
+  // CHECK:   = super_method [volatile] [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_1]] : $SubSub, #Sub.otherProp!getter.1.foreign
+  // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY_1]] from [[UPCAST_SELF_COPY_1]]
+
   // CHECK:   [[SELF_COPY_2:%.*]] = copy_value [[SELF]]
-  // CHECK:   = super_method [volatile] [[SELF_COPY_2]] : $SubSub, #Sub.otherProp!setter.1.foreign
+  // CHECK:   [[UPCAST_SELF_COPY_2:%.*]] = upcast [[SELF_COPY_2]] : $SubSub to $Sub
+  // CHECK:   [[BORROWED_UPCAST_SELF_COPY_2:%.*]] = begin_borrow [[UPCAST_SELF_COPY_2]]
+  // CHECK:   [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_2:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF_COPY_2]] : $Sub to $SubSub
+  // CHECK:   = super_method [volatile] [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_2]] : $SubSub, #Sub.otherProp!setter.1.foreign
+  // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY_2]] from [[UPCAST_SELF_COPY_2]]
   // CHECK: } // end sil function '_T015objc_extensions03SubC0C9otherPropSSfs'
   override var otherProp: String {
     didSet {

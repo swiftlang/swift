@@ -297,7 +297,7 @@ _ = foobar // OK.
 //===--- Recovery for parse errors in types.
 
 struct ErrorTypeInVarDecl1 {
-  var v1 : // expected-error {{expected type}}
+  var v1 : // expected-error {{expected type}} {{11-11= <#type#>}}
 }
 
 struct ErrorTypeInVarDecl2 {
@@ -311,7 +311,7 @@ struct ErrorTypeInVarDecl3 {
 }
 
 struct ErrorTypeInVarDecl4 {
-  var v1 : Int<, // expected-error {{expected type}}
+  var v1 : Int<, // expected-error {{expected type}} {{16-16= <#type#>}}
   var v2 : Int
 }
 
@@ -333,7 +333,7 @@ struct ErrorTypeInVarDecl7 {
 }
 
 struct ErrorTypeInVarDecl8 {
-  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol composition type}} expected-note {{to match this opening '<'}}
+  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol-constrained type}} expected-note {{to match this opening '<'}}
   var v2 : Int
 }
 
@@ -343,7 +343,7 @@ struct ErrorTypeInVarDecl9 {
 }
 
 struct ErrorTypeInVarDecl10 {
-  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol composition type}} expected-note {{to match this opening '<'}}
+  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol-constrained type}} expected-note {{to match this opening '<'}}
   var v2 : Int
 }
 
@@ -353,7 +353,7 @@ struct ErrorTypeInVarDecl11 {
 }
 
 func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected identifier for type name}}
-func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol composition type}}
+func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol-constrained type}}
                                             // expected-note@-1 {{to match this opening '<'}}
                                             // expected-error@-2 {{use of undeclared type 'F'}}
 
@@ -705,9 +705,16 @@ protocol B23086402 {
   var c: [String] { get }
 }
 
-// <rdar://problem/23550816> QoI: Poor diagnostic in argument list of "print" (varargs related)
 func test23086402(a: A23086402) {
-  print(a.b.c + "")  // expected-error {{binary operator '+' cannot be applied to operands of type '[String]' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
+  print(a.b.c + "") // should not crash but: expected-error {{}}
+}
+
+// <rdar://problem/23550816> QoI: Poor diagnostic in argument list of "print" (varargs related)
+// The situation has changed. String now conforms to the RangeReplaceableCollection protocol
+// and `ss + s` becomes ambiguous. Diambiguation is provided with the unavailable overload
+// in order to produce a meaningful diagnostics. (Related: <rdar://problem/31763930>)
+func test23550816(ss: [String], s: String) {
+  print(ss + s)  // expected-error {{'+' is unavailable: Operator '+' cannot be used to append a String to a sequence of strings}}
 }
 
 // <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)

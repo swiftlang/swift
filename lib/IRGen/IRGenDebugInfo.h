@@ -18,33 +18,24 @@
 #define SWIFT_IRGEN_DEBUGINFO_H
 
 #include "DebugTypeInfo.h"
-#include "IRBuilder.h"
 #include "IRGenFunction.h"
-#include "IRGenModule.h"
-#include "swift/SIL/SILLocation.h"
-#include "llvm/IR/DIBuilder.h"
-#include "llvm/Support/Allocator.h"
 
-#include <set>
+namespace llvm {
+class DIBuilder;
+}
 
 namespace swift {
 
-class ASTContext;
-class AllocStackInst;
 class ClangImporter;
 class IRGenOptions;
-class SILArgument;
-class SILDebugScope;
-class SILModule;
 
 enum class SILFunctionTypeRepresentation : uint8_t;
 
 namespace irgen {
 
+class IRBuilder;
 class IRGenFunction;
-
-typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
-    TrackingDIRefMap;
+class IRGenModule;
 
 enum IndirectionKind : bool { DirectValue = false, IndirectValue = true };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
@@ -53,61 +44,12 @@ enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 /// LexicalScope, and knows how to translate a \c SILLocation into an
 /// \c llvm::DebugLoc.
 class IRGenDebugInfo {
-  friend class ArtificialLocation;
-  const IRGenOptions &Opts;
-  ClangImporter &CI;
-  SourceManager &SM;
-  llvm::Module &M;
-  llvm::DIBuilder DBuilder;
-  IRGenModule &IGM;
-
-  /// Used for caching SILDebugScopes without inline information.
-  typedef std::pair<const void *, void *> LocalScopeHash;
-  struct LocalScope : public LocalScopeHash {
-    LocalScope(const SILDebugScope *DS)
-        : LocalScopeHash({DS->Loc.getOpaquePointerValue(),
-                          DS->Parent.getOpaqueValue()}) {}
-  };
-
-  /// Various caches.
-  /// @{
-  llvm::DenseMap<LocalScopeHash, llvm::TrackingMDNodeRef> ScopeCache;
-  llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
-  llvm::DenseMap<llvm::StringRef, llvm::TrackingMDNodeRef> DIFileCache;
-  llvm::DenseMap<const void *, SILLocation::DebugLoc> DebugLocCache;
-  llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
-  llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
-  TrackingDIRefMap DIRefMap;
-  /// @}
-
-  /// A list of replaceable fwddecls that need to be RAUWed at the end.
-  std::vector<std::pair<TypeBase *, llvm::TrackingMDRef>> ReplaceMap;
-
-  llvm::BumpPtrAllocator DebugInfoNames;
-  StringRef CWDName;                    /// The current working directory.
-  llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
-  llvm::DIFile *MainFile = nullptr;     /// The main file.
-  llvm::DIModule *MainModule = nullptr; /// The current module.
-  llvm::DIScope *EntryPointFn =
-      nullptr;                          /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
-  TypeAliasDecl *MetadataTypeDecl;      /// The type decl for swift.type.
-  llvm::DIType *InternalType; /// Catch-all type for opaque internal types.
-
-  SILLocation::DebugLoc LastDebugLoc; /// The last location that was emitted.
-  const SILDebugScope *LastScope;     /// The scope of that last location.
-#ifndef NDEBUG
-  /// The basic block where the location was last changed.
-  llvm::BasicBlock *LastBasicBlock;
-  bool lineNumberIsSane(IRBuilder &Builder, unsigned Line);
-#endif
-
-  /// Used by pushLoc.
-  SmallVector<std::pair<SILLocation::DebugLoc, const SILDebugScope *>, 8>
-      LocationStack;
-
 public:
-  IRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
-                 llvm::Module &M, SourceFile *SF);
+  static IRGenDebugInfo *createIRGenDebugInfo(const IRGenOptions &Opts,
+                                              ClangImporter &CI,
+                                              IRGenModule &IGM, llvm::Module &M,
+                                              SourceFile *SF);
+  virtual ~IRGenDebugInfo();
 
   /// Finalize the llvm::DIBuilder owned by this object.
   void finalize();
@@ -117,38 +59,29 @@ public:
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
                      Optional<SILLocation> Loc = None);
 
-  void clearLoc(IRBuilder &Builder) {
-    LastDebugLoc = {};
-    LastScope = nullptr;
-    Builder.SetCurrentDebugLocation(llvm::DebugLoc());
-  }
+  void clearLoc(IRBuilder &Builder);
 
   /// Push the current debug location onto a stack and initialize the
   /// IRBuilder to an empty location.
-  void pushLoc() {
-    LocationStack.push_back(std::make_pair(LastDebugLoc, LastScope));
-    LastDebugLoc = {};
-    LastScope = nullptr;
-  }
+  void pushLoc();
 
   /// Restore the current debug location from the stack.
-  void popLoc() {
-    std::tie(LastDebugLoc, LastScope) = LocationStack.pop_back_val();
-  }
+  void popLoc();
 
   /// Emit the final line 0 location for the unified trap block at the
   /// end of the function.
   void setArtificialTrapLocation(IRBuilder &Builder,
-                                 const SILDebugScope *Scope) {
-    auto DL = llvm::DebugLoc::get(0, 0, getOrCreateScope(Scope));
-    Builder.SetCurrentDebugLocation(DL);
-  }
+                                 const SILDebugScope *Scope);
 
   /// Set the location for SWIFT_ENTRY_POINT_FUNCTION.
   void setEntryPointLoc(IRBuilder &Builder);
 
   /// Return the scope for SWIFT_ENTRY_POINT_FUNCTION.
   llvm::DIScope *getEntryPointFn();
+
+  /// Translate a SILDebugScope into an llvm::DIDescriptor.
+  llvm::DIScope *getOrCreateScope(const SILDebugScope *DS);
+
   
   /// Emit debug info for an import declaration.
   ///
@@ -194,8 +127,8 @@ public:
                                DebugTypeInfo Ty, const SILDebugScope *DS,
                                ValueDecl *VarDecl, StringRef Name,
                                unsigned ArgNo = 0,
-                               IndirectionKind = DirectValue,
-                               ArtificialKind = RealValue);
+                               IndirectionKind Indirection = DirectValue,
+                               ArtificialKind Artificial = RealValue);
 
   /// Emit a dbg.declare or dbg.value intrinsic, depending on Storage.
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
@@ -215,158 +148,10 @@ public:
                         StringRef Name);
 
   /// Return the DIBuilder.
-  llvm::DIBuilder &getBuilder() { return DBuilder; }
+  llvm::DIBuilder &getBuilder();
 
   /// Decode (and cache) a SourceLoc.
   SILLocation::DebugLoc decodeSourceLoc(SourceLoc SL);
-private:
-  /// Decode (and cache) a SILLocation.
-  SILLocation::DebugLoc decodeDebugLoc(SILLocation Loc);
-  /// Return the debug location from a SILLocation.
-  SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc);
-  /// Return the start of the location's source range.
-  SILLocation::DebugLoc getStartLocation(Optional<SILLocation> OptLoc);
-
-
-  StringRef BumpAllocatedString(const char *Data, size_t Length);
-  StringRef BumpAllocatedString(std::string S);
-  StringRef BumpAllocatedString(StringRef S);
-
-  /// Construct a DIType from a DebugTypeInfo object.
-  ///
-  /// At this point we do not plan to emit full DWARF for all swift
-  /// types, the goal is to emit only the name and provenance of the
-  /// type, where possible. A can import the type definition directly
-  /// from the module/framework/source file the type is specified in.
-  /// For this reason we emit the fully qualified (=mangled) name for
-  /// each type whenever possible.
-  ///
-  /// The ultimate goal is to emit something like a
-  /// DW_TAG_APPLE_ast_ref_type (an external reference) instead of a
-  /// local reference to the type.
-  llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
-                           llvm::DIScope *Scope, llvm::DIFile *File);
-  /// Get a previously created type from the cache.
-  llvm::DIType *getTypeOrNull(TypeBase *Ty);
-  /// Get the DIType corresponding to this DebugTypeInfo from the cache,
-  /// or build a fresh DIType otherwise.  There is the underlying
-  /// assumption that no two types that share the same canonical type
-  /// can have different storage size or alignment.
-  llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy);
-  /// Translate a SILDebugScope into an llvm::DIDescriptor.
-  llvm::DIScope *getOrCreateScope(const SILDebugScope *DS);
-  /// Build the context chain for a given DeclContext.
-  llvm::DIScope *getOrCreateContext(DeclContext *DC);
-
-  /// Construct an LLVM inlined-at location from a SILDebugScope,
-  /// reversing the order in the process.
-  llvm::MDNode *createInlinedAt(const SILDebugScope *CallSite);
-
-  /// Translate filenames into DIFiles.
-  llvm::DIFile *getOrCreateFile(StringRef Filename);
-  /// Return a DIType for Ty reusing any DeclContext found in DbgTy.
-  llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy);
-
-  /// Attempt to figure out the unmangled name of a function.
-  StringRef getName(const FuncDecl &FD);
-  /// Attempt to figure out the unmangled name of a function.
-  StringRef getName(SILLocation L);
-  StringRef getMangledName(TypeAliasDecl *Decl);
-  /// Return the mangled name of any nominal type, including the global
-  /// _Tt prefix, which marks the Swift namespace for types in DWARF.
-  StringRef getMangledName(DebugTypeInfo DbgTy);
-  /// Create the array of function parameters for a function type.
-  llvm::DITypeRefArray createParameterTypes(CanSILFunctionType FnTy,
-                                            DeclContext *DeclCtx,
-                                            GenericEnvironment *GE);
-  /// Create the array of function parameters for FnTy. SIL Version.
-  llvm::DITypeRefArray createParameterTypes(SILType SILTy, DeclContext *DeclCtx,
-                                            GenericEnvironment *GE);
-  /// Create a single parameter type and push it.
-  void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
-                           SILType CanTy, DeclContext *DeclCtx,
-                           GenericEnvironment *GE);
-  /// Return an array with the DITypes for each of a tuple's elements.
-  llvm::DINodeArray
-  getTupleElements(TupleType *TupleTy, llvm::DIScope *Scope, llvm::DIFile *File,
-                   llvm::DINode::DIFlags Flags, DeclContext *DeclContext,
-                   GenericEnvironment *GE, unsigned &SizeInBits);
-  llvm::DIFile *getFile(llvm::DIScope *Scope);
-  llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule M);
-  /// Return a cached module for an access path or create a new one.
-  llvm::DIModule *getOrCreateModule(StringRef Key, llvm::DIScope *Parent,
-                                    StringRef Name, StringRef IncludePath);
-  llvm::DIScope *getModule(StringRef MangledName);
-  /// Return an array with the DITypes for each of a struct's elements.
-  llvm::DINodeArray getStructMembers(NominalTypeDecl *D, Type BaseTy,
-                                     llvm::DIScope *Scope, llvm::DIFile *File,
-                                     llvm::DINode::DIFlags Flags,
-                                     unsigned &SizeInBits);
-  /// Create a temporary forward declaration for a struct and add it to
-  /// the type cache so we can safely build recursive types.
-  llvm::DICompositeType *
-  createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
-                   llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
-                   unsigned SizeInBits, unsigned AlignInBits,
-                   llvm::DINode::DIFlags Flags,
-                   llvm::DIType *DerivedFrom, unsigned RuntimeLang,
-                   StringRef UniqueID);
-
-  /// Create a member of a struct, class, tuple, or enum.
-  llvm::DIDerivedType *createMemberType(DebugTypeInfo DbgTy, StringRef Name,
-                                        unsigned &OffsetInBits,
-                                        llvm::DIScope *Scope,
-                                        llvm::DIFile *File,
-                                        llvm::DINode::DIFlags Flags);
-  /// Return an array with the DITypes for each of an enum's elements.
-  llvm::DINodeArray getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
-                                    llvm::DIScope *Scope, llvm::DIFile *File,
-                                    llvm::DINode::DIFlags Flags);
-  /// Create a temporary forward declaration for an enum and add it to
-  /// the type cache so we can safely build recursive types.
-  llvm::DICompositeType *createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
-                                        StringRef MangledName,
-                                        llvm::DIScope *Scope,
-                                        llvm::DIFile *File, unsigned Line,
-                                        llvm::DINode::DIFlags Flags);
-  /// Convenience function that creates a forward declaration for PointeeTy.
-  llvm::DIType *createPointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
-                                         llvm::DIFile *File, unsigned Line,
-                                         llvm::DINode::DIFlags Flags,
-                                         StringRef MangledName);
-  /// Create a pointer-sized struct with a mangled name and a single
-  /// member of PointeeTy.
-  llvm::DIType *createPointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
-                                         llvm::DIType *PointeeTy,
-                                         llvm::DIFile *File, unsigned Line,
-                                         llvm::DINode::DIFlags Flags,
-                                         StringRef MangledName);
-  /// Create a 2*pointer-sized struct with a mangled name and a single
-  /// member of PointeeTy.
-  llvm::DIType *createDoublePointerSizedStruct(
-      llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
-      llvm::DIFile *File, unsigned Line, llvm::DINode::DIFlags Flags,
-      StringRef MangledName);
-
-  /// Create DWARF debug info for a function pointer type.
-  llvm::DIType *createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
-                                      unsigned SizeInBits, unsigned AlignInBits,
-                                      llvm::DINode::DIFlags Flags,
-                                      StringRef MangledName);
-
-  /// Create DWARF debug info for a tuple type.
-  llvm::DIType *createTuple(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
-                            unsigned SizeInBits, unsigned AlignInBits,
-                            llvm::DINode::DIFlags Flags, StringRef MangledName);
-
-  /// Create an opaque struct with a mangled name.
-  llvm::DIType *createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
-                                   llvm::DIFile *File, unsigned Line,
-                                   unsigned SizeInBits, unsigned AlignInBits,
-                                   llvm::DINode::DIFlags Flags,
-                                   StringRef MangledName);
-  uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy);
-  TypeAliasDecl *getMetadataType();
 };
 
 /// An RAII object that autorestores the debug location.
@@ -376,17 +161,9 @@ class AutoRestoreLocation {
   llvm::DebugLoc SavedLocation;
 
 public:
-  AutoRestoreLocation(IRGenDebugInfo *DI, IRBuilder &Builder)
-      : DI(DI), Builder(Builder) {
-    if (DI)
-      SavedLocation = Builder.getCurrentDebugLocation();
-  }
-
+  AutoRestoreLocation(IRGenDebugInfo *DI, IRBuilder &Builder);
   /// Autorestore everything back to normal.
-  ~AutoRestoreLocation() {
-    if (DI)
-      Builder.SetCurrentDebugLocation(SavedLocation);
-  }
+  ~AutoRestoreLocation();
 };
 
 /// An RAII object that temporarily switches to an artificial debug
@@ -400,13 +177,7 @@ class ArtificialLocation : public AutoRestoreLocation {
 public:
   /// Set the current location to line 0, but within scope DS.
   ArtificialLocation(const SILDebugScope *DS, IRGenDebugInfo *DI,
-                     IRBuilder &Builder)
-      : AutoRestoreLocation(DI, Builder) {
-    if (DI) {
-      auto DL = llvm::DebugLoc::get(0, 0, DI->getOrCreateScope(DS));
-      Builder.SetCurrentDebugLocation(DL);
-    }
-  }
+                     IRBuilder &Builder);
 };
 
 /// An RAII object that temporarily switches to an empty
@@ -414,11 +185,7 @@ public:
 class PrologueLocation : public AutoRestoreLocation {
 public:
   /// Set the current location to an empty location.
-  PrologueLocation(IRGenDebugInfo *DI, IRBuilder &Builder)
-      : AutoRestoreLocation(DI, Builder) {
-    if (DI)
-      DI->clearLoc(Builder);
-  }
+  PrologueLocation(IRGenDebugInfo *DI, IRBuilder &Builder);
 };
 
 } // irgen

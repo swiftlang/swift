@@ -32,6 +32,6 @@ public func run_OpenClose(_ N: Int) {
   for _ in 1...N*10000 {
       c += check_state(MyState.Closed)
   }
-  CheckResults(c == 0, "IncorrectResults in run_OpenClose")
+  CheckResults(c == 0)
 }
 

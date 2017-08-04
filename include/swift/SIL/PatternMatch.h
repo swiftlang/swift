@@ -77,7 +77,7 @@ struct bind_ty {
 
   template<typename ITy>
   bool match(ITy *V) {
-    if (Class *CV = dyn_cast<Class>(V)) {
+    if (auto *CV = dyn_cast<Class>(V)) {
       VR = CV;
       return true;
     }
@@ -345,7 +345,9 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCMetatypeToObjectInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCExistentialMetatypeToObjectInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(IsNonnullInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(RetainValueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(RetainValueAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ReleaseValueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ReleaseValueAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(AutoreleaseValueInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedEnumDataInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(InitEnumDataAddrInst)
@@ -364,12 +366,12 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(SuperMethodInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(DynamicMethodInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(OpenExistentialAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(OpenExistentialRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(OpenExistentialOpaqueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(OpenExistentialValueInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(InitExistentialAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(InitExistentialOpaqueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(InitExistentialValueInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(InitExistentialRefInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialOpaqueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialValueInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectBlockStorageInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongReleaseInst)

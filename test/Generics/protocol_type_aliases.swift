@@ -6,7 +6,7 @@
 func sameType<T>(_: T.Type, _: T.Type) {}
 
 protocol P {
-    associatedtype A
+    associatedtype A // expected-note{{'A' declared here}}
     typealias X = A
 }
 protocol Q {
@@ -16,7 +16,7 @@ protocol Q {
 // CHECK-LABEL: .requirementOnNestedTypeAlias@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   τ_0_0 : Q [τ_0_0: Explicit @ 22:51]
-// CHECK-NEXT:   τ_0_0[.Q].B : P [τ_0_0: Explicit @ 22:51 -> Protocol requirement (via Self.B in Q)]
+// CHECK-NEXT:   τ_0_0[.Q].B : P [τ_0_0: Explicit @ 22:51 -> Protocol requirement (via Self.B in Q)
 // CHECK-NEXT:   τ_0_0[.Q].B[.P].A == Int [τ_0_0[.Q].B[.P].X: Explicit @ 22:62]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q, τ_0_0.B.A == Int>
 func requirementOnNestedTypeAlias<T>(_: T) where T: Q, T.B.X == Int {}
@@ -35,7 +35,7 @@ protocol Q2 {
 // CHECK-LABEL: .requirementOnConcreteNestedTypeAlias@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   τ_0_0 : Q2 [τ_0_0: Explicit @ 42:59]
-// CHECK-NEXT:   τ_0_0[.Q2].B : P2 [τ_0_0: Explicit @ 42:59 -> Protocol requirement (via Self.B in Q2)]
+// CHECK-NEXT:   τ_0_0[.Q2].B : P2 [τ_0_0: Explicit @ 42:59 -> Protocol requirement (via Self.B in Q2)
 // CHECK-NEXT:   τ_0_0[.Q2].C == S<T.B.A> [τ_0_0[.Q2].C: Explicit]
 // CHECK-NEXT:   τ_0_0[.Q2].B[.P2].X == S<T.B.A> [τ_0_0[.Q2].B[.P2].X: Nested type match]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == S<τ_0_0.B.A>>
@@ -44,7 +44,7 @@ func requirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, T.C == T.B.X {}
 // CHECK-LABEL: .concreteRequirementOnConcreteNestedTypeAlias@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   τ_0_0 : Q2 [τ_0_0: Explicit @ 51:67]
-// CHECK-NEXT:   τ_0_0[.Q2].B : P2 [τ_0_0: Explicit @ 51:67 -> Protocol requirement (via Self.B in Q2)]
+// CHECK-NEXT:   τ_0_0[.Q2].B : P2 [τ_0_0: Explicit @ 51:67 -> Protocol requirement (via Self.B in Q2)
 // CHECK-NEXT:   τ_0_0[.Q2].C == τ_0_0[.Q2].B[.P2].A [τ_0_0[.Q2].C: Explicit]
 // CHECK-NEXT:   τ_0_0[.Q2].B[.P2].X == S<T.B.A> [τ_0_0[.Q2].B[.P2].X: Nested type match]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == τ_0_0.B.A>
@@ -53,26 +53,22 @@ func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> =
 
 // Incompatible concrete typealias types are flagged as such
 protocol P3 {
-    typealias T = Int // expected-error{{typealias 'T' requires types 'Q3.T' (aka 'Float') and 'Int' to be the same}}
+    typealias T = Int
 }
-protocol Q3: P3 {
+protocol Q3: P3 { // expected-error{{generic signature requires types 'Int'}}
     typealias T = Float
 }
 
 protocol P3_1 {
-    typealias T = Float // expected-error{{typealias 'T' requires types 'P3.T' (aka 'Int') and 'Float' to be the same}}
+    typealias T = Float
 }
-protocol Q3_1: P3, P3_1 {}
+protocol Q3_1: P3, P3_1 {} // expected-error{{generic signature requires types 'Float'}}
 
-// FIXME: these shouldn't be necessary to trigger the errors above, but are, due to
-// the 'recusive decl validation' FIXME in GenericSignatureBuilder.cpp.
-func useTypealias<T: Q3>(_: T, _: T.T) {}
-func useTypealias1<T: Q3_1>(_: T, _: T.T) {}
 
 // Subprotocols can force associated types in their parents to be concrete, and
 // this should be understood for types constrained by the subprotocols.
 protocol Q4: P {
-    typealias A = Int
+    typealias A = Int // expected-warning{{typealias overriding associated type 'A' from protocol 'P'}}
 }
 protocol Q5: P {
     typealias X = Int
@@ -98,13 +94,13 @@ func checkQ5_X<T: Q5>(x: T.Type) { sameType(getP_X(x), Int.self) }
 // Typealiases happen to allow imposing same type requirements between parent
 // protocols
 protocol P6_1 {
-    associatedtype A
+    associatedtype A // expected-note{{'A' declared here}}
 }
 protocol P6_2 {
     associatedtype B
 }
 protocol Q6: P6_1, P6_2 {
-    typealias A = B
+    typealias A = B // expected-warning{{typealias overriding associated type}}
 }
 
 func getP6_1_A<T: P6_1>(_: T.Type) -> T.A.Type { return T.A.self }
@@ -112,5 +108,13 @@ func getP6_2_B<T: P6_2>(_: T.Type) -> T.B.Type { return T.B.self }
 
 func checkQ6<T: Q6>(x: T.Type) {
     sameType(getP6_1_A(x), getP6_2_B(x))
+}
+
+protocol P7 {
+  typealias A = Int
+}
+
+protocol P7a : P7 {
+  associatedtype A   // expected-warning{{associated type 'A' is redundant with type 'A' declared in inherited protocol 'P7'}}
 }
 

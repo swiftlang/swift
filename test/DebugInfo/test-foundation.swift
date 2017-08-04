@@ -18,8 +18,9 @@ class MyObject : NSObject {
   var MyArr = NSArray()
 // IMPORT-CHECK: filename: "test-foundation.swift"
 // IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath:
-// IMPORT-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[FOUNDATION]]
-// IMPORT-CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
+  // IMPORT-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[NSARRAY:[0-9]+]]
+  //  IMPORT-CHECK-DAG: ![[NSARRAY]] = !DIModule(scope: ![[FOUNDATION:[0-9]+]], name: "NSArray"
+  // IMPORT-CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
 
   func foo(_ obj: MyObject) {
     return obj.foo(obj)
@@ -54,12 +55,10 @@ public func err() {
 public func date() {
   // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L1:.*]]
   let d1 = DateFormatter()
-  // LOC-CHECK: br{{.*}}, !dbg ![[L2:.*]]
-  d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2]]
+  d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2:.*]]
   // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L3:.*]]
   let d2 = DateFormatter()
-  // LOC-CHECK: br{{.*}}, !dbg ![[L4:.*]]
-  d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4]]
+  d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4:.*]]
 }
 
 // Make sure we build some witness tables for enums.

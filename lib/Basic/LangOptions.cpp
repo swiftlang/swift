@@ -36,6 +36,7 @@ static const StringRef SupportedConditionalCompilationOSs[] = {
   "Windows",
   "Android",
   "PS4",
+  "Cygwin",
 };
 
 static const StringRef SupportedConditionalCompilationArches[] = {
@@ -157,6 +158,8 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
   else if (triple.isOSWindows())
     addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
+  else if (triple.isWindowsCygwinEnvironment())
+    addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
   else if (triple.isPS4())
     addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
   else

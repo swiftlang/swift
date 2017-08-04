@@ -226,6 +226,23 @@ func f(x: Int) -> Int {
   // string interpolation is the best
   // CHECK: <str>"This is string </str>\<anchor>(</anchor>genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a})<anchor>)</anchor><str> interpolation"</str>
   "This is string \(genFn({(a:Int -> Int) in a})) interpolation"
+
+  // CHECK: <str>"""
+  // CHECK-NEXT: This is a multiline string.
+  // CHECK-NEXT: """</str>
+  """
+  This is a multiline string.
+"""
+
+  // CHECK: <str>"""
+  // CHECK-NEXT: This is a multiline</str>\<anchor>(</anchor> <str>"interpolated"</str> <anchor>)</anchor><str>string
+  // CHECK-NEXT: """</str>
+  """
+      This is a multiline\( "interpolated" )string
+   """
+
+  // CHECK: <str>"</str>\<anchor>(</anchor><int>1</int><anchor>)</anchor>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str>"</str>
+  "\(1)\(1)"
 }
 
 // CHECK: <kw>func</kw> bar(x: <type>Int</type>) -> (<type>Int</type>, <type>Float</type>) {

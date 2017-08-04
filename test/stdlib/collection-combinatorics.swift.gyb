@@ -25,6 +25,7 @@ struct CustomIndex : Comparable {
 %       for index in ['Int', 'CustomIndex']:
 %         indexLabel = 'Custom' if index == 'CustomIndex' else ''
 
+/// A rump implementation of Collection.
 struct ${indexLabel}${mutable}${rangeReplaceable}${capability}Butt
     : ${mutable}Collection
 %         if rangeReplaceable:

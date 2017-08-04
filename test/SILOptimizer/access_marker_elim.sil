@@ -11,7 +11,7 @@ public struct S {
   init(i: Int)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @initS : $@convention(thin) () -> @owned S {
+// CHECK-LABEL: sil hidden [noinline] @f010_initS : $@convention(thin) () -> @owned S {
 // CHECK: bb0:
 // CHECK:  %[[BOX:.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK:  %[[ADDRS:.*]] = project_box %[[BOX]] : ${ var S }, 0
@@ -25,8 +25,8 @@ public struct S {
 // CHECK-NOT: end_access
 // CHECK:  destroy_value %[[BOX]] : ${ var S }
 // CHECK:  return %[[VALS]] : $S
-// CHECK-LABEL: } // end sil function 'initS'
-sil hidden [noinline] @initS : $@convention(thin) () -> @owned S {
+// CHECK-LABEL: } // end sil function 'f010_initS'
+sil hidden [noinline] @f010_initS : $@convention(thin) () -> @owned S {
 bb0:
   %0 = alloc_box ${ var S }, var, name "s"
   %1 = project_box %0 : ${ var S }, 0
@@ -40,4 +40,28 @@ bb0:
   end_access %7 : $*S
   destroy_value %0 : ${ var S }
   return %8 : $S
+}
+
+// Test that box arguments are dynamic.
+// And since inactive elimination currently eliminates all dynamic markers,
+// they are gone from the output.
+//
+// CHECK-LABEL: sil hidden @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+// CHECK: bb0(%0 : ${ var Builtin.Int64 }):
+// CHECK:  [[ADR:%.*]] = project_box %0 : ${ var Builtin.Int64 }, 0
+// CHECK:  [[VAL:%.*]] = integer_literal $Builtin.Int64, 42
+// CHECK:  store [[VAL]] to [trivial] [[ADR]] : $*Builtin.Int64
+// CHECK:  destroy_value %0 : ${ var Builtin.Int64 }
+// CHECK:  return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'f020_boxArg'
+sil hidden @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+bb0(%0 : ${ var Builtin.Int64 }):
+  %1 = project_box %0 : ${ var Builtin.Int64 }, 0
+  %3 = integer_literal $Builtin.Int64, 42
+  %5 = begin_access [modify] [unknown] %1 : $*Builtin.Int64
+  store %3 to [trivial] %5 : $*Builtin.Int64
+  end_access %5 : $*Builtin.Int64
+  destroy_value %0 : ${ var Builtin.Int64 }
+  %9 = tuple ()
+  return %9 : $()
 }

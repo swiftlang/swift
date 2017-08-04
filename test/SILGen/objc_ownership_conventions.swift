@@ -43,7 +43,8 @@ func test5(_ g: Gizmo) {
   // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
   // CHECK:   [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:   [[V:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[GIZMO_BOX_PB]] : $*Gizmo
+  // CHECK:   [[V:%.*]] = load [copy] [[READ]]
   // CHECK:   [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
   // CHECK:   apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK:   destroy_value [[G]]
@@ -67,7 +68,8 @@ func test6(_ g: Gizmo) {
   // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
   // CHECK:   [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:   [[V:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[GIZMO_BOX_PB]] : $*Gizmo
+  // CHECK:   [[V:%.*]] = load [copy] [[READ]]
   // CHECK:   [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
   // CHECK:   apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK-NOT:  destroy_value [[G]]
@@ -90,7 +92,8 @@ func test7(_ g: Gizmo) {
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK:   [[G:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[GIZMO_BOX_PB]] : $*Gizmo
+  // CHECK:   [[G:%.*]] = load [copy] [[READ]]
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.fork!1.foreign
   // CHECK:   apply [[METHOD]]([[G]])
   // CHECK-NOT:  destroy_value [[G]]

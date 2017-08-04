@@ -70,3 +70,13 @@ public let ${prefix}_TRUE_MIN = ${type}.leastNonzeroMagnitude
 #endif
 % end
 %end
+
+// Macros defined in bsd/sys/proc.h that do not import into Swift.
+extension extern_proc {
+    // #define p_starttime p_un.__p_starttime
+    @_transparent
+    public var p_starttime: timeval {
+        get { return self.p_un.__p_starttime }
+        set { self.p_un.__p_starttime = newValue }
+    }
+}

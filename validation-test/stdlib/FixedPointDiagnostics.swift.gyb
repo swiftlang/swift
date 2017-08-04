@@ -1,14 +1,15 @@
-// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify %t/main.swift
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 3 %t/main.swift
 
 func testUnaryMinusInUnsigned() {
-  var a: UInt8 = -(1) // expected-error {{}} expected-note * {{}} expected-warning * {{}}
+  var a: UInt8 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt8'}} expected-note * {{}} expected-warning * {{}}
 
-  var b: UInt16 = -(1) // expected-error {{}} expected-note * {{}} expected-warning * {{}}
+  var b: UInt16 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt16'}} expected-note * {{}} expected-warning * {{}}
 
-  var c: UInt32 = -(1) // expected-error {{}} expected-note * {{}} expected-warning * {{}}
+  var c: UInt32 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt32'}} expected-note * {{}} expected-warning * {{}}
 
-  var d: UInt64 = -(1) // expected-error {{}} expected-note * {{}} expected-warning * {{}}
+  var d: UInt64 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt64'}} expected-note * {{}} expected-warning * {{}}
 }
 
 // Int and UInt are not identical to any fixed-size integer type
@@ -88,15 +89,15 @@ func testMixedSignArithmetic() {
     typealias Stride = ${T}.Stride
     _ = ${T}(1) + 0     // OK
     _ = 0 + ${T}(1)     // OK
-    ${T}(1) + Stride(0) // expected-error {{}} // ambiguous use of operator '+'
-    Stride(1) + ${T}(0) // expected-error {{}} // ambiguous use of operator '+'
-    ${T}(1) - Stride(0) // expected-error {{}} // ambiguous use of operator '-'
+    _ = ${T}(1) + Stride(0) // expected-warning {{}} // mixed-type arithmetics
+    _ = Stride(1) + ${T}(0) // expected-warning {{}} // mixed-type arithmetics
+    _ = ${T}(1) - Stride(0) // expected-warning {{}} // mixed-type arithmetics
     var x: ${T} = 0
     x += 1              // OK
-    x += Stride(1)      // expected-error {{}} // ambiguous use of operator '+='
-    x -= Stride(1)      // expected-error {{}} // ambiguous use of operator '-='
+    x += Stride(1)      // expected-warning {{}} // mixed-type arithmetics
+    x -= Stride(1)      // expected-warning {{}} // mixed-type arithmetics
 
-    (x - x) as Stride   // expected-error {{}} // ambiguous use of operator '-'
+    _ = (x - x) as Stride   // expected-warning {{}} // ambiguous use of operator '-'
 
     //===------------------------------------------------------------------===//
     // The following errors are different because they're not being
@@ -114,7 +115,7 @@ func testMixedSignArithmetic() {
 % end
 }
 
-func testOps<T : IntegerArithmetic>(_ x: T, _ y: T) -> T {
+func testOps<T : FixedWidthInteger>(_ x: T, _ y: T) -> T {
   let a = x + y
   let s = x - y
   let m = x * y

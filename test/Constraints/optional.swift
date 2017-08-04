@@ -245,3 +245,17 @@ class C2 {
         return p1 ?? p2?.prop
     }
 }
+
+
+// rdar://problem/31779785
+class X { }
+
+class Bar {
+  let xOpt: X?
+  let b: Bool
+
+  init() {
+    let result = b ? nil : xOpt
+    let _: Int = result // expected-error{{cannot convert value of type 'X?' to specified type 'Int'}}
+  }
+}

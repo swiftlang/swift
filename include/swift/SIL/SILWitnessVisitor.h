@@ -64,8 +64,7 @@ public:
       }
     };
 
-    for (auto &reqt : protocol->getRequirementSignature()
-                              ->getCanonicalSignature()->getRequirements()) {
+    for (const auto &reqt : protocol->getRequirementSignature()) {
       switch (reqt.getKind()) {
       // These requirements don't show up in the witness table.
       case RequirementKind::Superclass:
@@ -74,10 +73,11 @@ public:
         continue;
 
       case RequirementKind::Conformance: {
-        auto type = CanType(reqt.getFirstType());
+        auto type = reqt.getFirstType()->getCanonicalType();
         assert(type->isTypeParameter());
         auto requirement =
-          cast<ProtocolType>(CanType(reqt.getSecondType()))->getDecl();
+          cast<ProtocolType>(reqt.getSecondType()->getCanonicalType())
+            ->getDecl();
 
         // ObjC protocols do not have witnesses.
         if (!Lowering::TypeConverter::protocolRequiresWitnessTable(requirement))
@@ -141,6 +141,10 @@ public:
     if (func->isAccessor())
       return;
     asDerived().addMethod(func);
+  }
+
+  void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
+    asDerived().addPlaceholder(placeholder);
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {

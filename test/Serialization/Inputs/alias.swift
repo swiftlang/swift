@@ -31,3 +31,6 @@ public protocol ProtoWrapper {}
 extension ProtoWrapper {
   public typealias Boolean = Bool
 }
+
+public struct Outer { public typealias G<T> = T }
+public typealias GG = Outer.G

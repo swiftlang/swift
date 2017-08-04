@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out -O
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -12,7 +11,7 @@ import StdlibUnittest
 import Foundation
 
 protocol TestableUnicodeCodec : UnicodeCodec {
-  associatedtype CodeUnit : Integer
+  associatedtype CodeUnit : FixedWidthInteger
   static func encodingId() -> String.Encoding
   static func name() -> NSString
 }

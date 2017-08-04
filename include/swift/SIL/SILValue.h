@@ -36,7 +36,7 @@ class SILFunction;
 class SILInstruction;
 class SILLocation;
 class SILModule;
-class TransitivelyUnreachableBlocksInfo;
+class DeadEndBlocks;
 class ValueBaseUseIterator;
 class ValueUseIterator;
 
@@ -163,10 +163,15 @@ public:
   }
 
   /// Replace every use of a result of this instruction with the corresponding
-  /// result from RHS. The method assumes that both instructions have the same
-  /// number of results. To replace just one result use
-  /// SILValue::replaceAllUsesWith.
+  /// result from RHS.
+  ///
+  /// The method assumes that both instructions have the same number of
+  /// results. To replace just one result use SILValue::replaceAllUsesWith.
   void replaceAllUsesWith(ValueBase *RHS);
+
+  /// \brief Replace all uses of this instruction with an undef value of the
+  /// same type as the result of this instruction.
+  void replaceAllUsesWithUndef();
 
   /// Returns true if this value has no uses.
   /// To ignore debug-info instructions use swift::onlyHaveDebugUses instead
@@ -192,6 +197,9 @@ public:
   /// Returns .some(single user) if this value has a single user. Returns .none
   /// otherwise.
   inline Operand *getSingleUse() const;
+
+  template <class T>
+  inline T *getSingleUserOfType();
 
   /// Pretty-print the value.
   void dump() const;
@@ -296,7 +304,7 @@ public:
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(SILModule &Mod,
-                       TransitivelyUnreachableBlocksInfo *TUB = nullptr) const;
+                       DeadEndBlocks *DEBlocks = nullptr) const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored
@@ -520,6 +528,19 @@ inline Operand *ValueBase::getSingleUse() const {
 
   // Otherwise, the element that we accessed.
   return Op;
+}
+
+template <class T>
+inline T *ValueBase::getSingleUserOfType() {
+  T *Result = nullptr;
+  for (auto *Op : getUses()) {
+    if (auto *Tmp = dyn_cast<T>(Op->getUser())) {
+      if (Result)
+        return nullptr;
+      Result = Tmp;
+    }
+  }
+  return Result;
 }
 
 /// A constant-size list of the operands of an instruction.

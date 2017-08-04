@@ -20,7 +20,7 @@ let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type '
 
 let total = 15.0
 let count = 7
-let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int), (Double, Double)}}
+let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists:}}
 
 if (1) {} // expected-error{{'Int' is not convertible to 'Bool'}}
 if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
@@ -90,6 +90,9 @@ func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
 
 func insertA<T>(array : inout [T], elt : T) {
+  array.append(T.self); // expected-error {{cannot invoke 'append' with an argument list of type '(T.Type)'}} expected-note {{expected an argument list of type '(T)'}}
+
+  // FIXME: Kind of weird
   array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}} expected-note {{expected an argument list of type '(T)'}}
 }
 
@@ -106,9 +109,9 @@ func test17875634() {
 
   match += coord // expected-error{{argument type '@lvalue (Int, Int)' does not conform to expected type 'Sequence'}}
 
-  match.append(row, col) // expected-error{{extra argument in call}}
+  match.append(row, col) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 
-  match.append(1, 2) // expected-error{{extra argument in call}}
+  match.append(1, 2) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{20-20=)}}
 
   match.append(coord)
   match.append((1, 2))
@@ -118,8 +121,8 @@ func test17875634() {
     func append(_ p: (Int, Int)) {}
   }
   let a2 = FakeNonGenericArray()
-  a2.append(row, col) // expected-error{{extra argument in call}}
-  a2.append(1, 2) // expected-error{{extra argument in call}}
+  a2.append(row, col) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{13-13=(}} {{21-21=)}}
+  a2.append(1, 2) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{13-13=(}} {{17-17=)}}
   a2.append(coord)
   a2.append((1, 2))
 }
@@ -146,7 +149,7 @@ func tuple_splat2(_ q : (a : Int, b : Int)) {
   let y = (1, b: 2)
   tuple_splat2(y)          // Ok
   tuple_splat2((1, b: 2))  // Ok.
-  tuple_splat2(1, b: 2)    // expected-error {{extra argument 'b' in call}}
+  tuple_splat2(1, b: 2)    // expected-error {{global function 'tuple_splat2' expects a single parameter of type '(a: Int, b: Int)'}} {{16-16=(}} {{23-23=)}}
 }
 
 // SR-1612: Type comparison of foreign types is always true.

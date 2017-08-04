@@ -14,3 +14,68 @@ bb0(%0 : @trivial $Builtin.Int32):
   %1 = unconditional_checked_cast_value take_always %0 : $Builtin.Int32 to $T
   return %1 : $T
 }
+
+sil @opaque_identity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : @owned $T):
+  return %0 : $T
+}
+
+sil @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  return %1 : $T
+}
+
+sil @opaque_arg_copy : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : @owned $T):
+  %1 = begin_borrow %0 : $T
+  %2 = copy_value %1 : $T
+  %9 = function_ref @opaque_identity : $@convention(thin) <T> (@in T) -> @out T
+  %11 = apply %9<T>(%2) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  end_borrow %1 from %0 : $T, $T
+  destroy_value %0 : $T
+  return %11 : $T
+}
+
+sil @opaque_arg_borrow : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : @owned $T):
+  %1 = begin_borrow %0 : $T
+  %9 = function_ref @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %11 = apply %9<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  end_borrow %1 from %0 : $T, $T
+  destroy_value %0 : $T
+  return %11 : $T
+}
+
+sil @opaque_arg_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = begin_borrow %1 : $T
+  %3 = function_ref @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %4 = apply %3<T>(%2) : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  end_borrow %2 from %1 : $T, $T
+  destroy_value %1 : $T
+  return %4 : $T
+}
+
+public protocol AnyObject : class {}
+
+sil @takeType : $@convention(thin) (@thick AnyObject.Type) -> () {
+bb0(%0 : @trivial $@thick AnyObject.Type):
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// Test an unconditional cast from an owned value to a trivial value.
+sil @castToTrivial : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %6 = function_ref @takeType : $@convention(thin) (@thick AnyObject.Type) -> ()
+  %8 = begin_borrow %0 : $AnyObject
+  %9 = copy_value %8 : $AnyObject
+  %10 = unconditional_checked_cast_value take_always %9 : $AnyObject to $@thick AnyObject.Type
+  %11 = apply %6(%10) : $@convention(thin) (@thick AnyObject.Type) -> ()
+  end_borrow %8 from %0 : $AnyObject, $AnyObject
+  destroy_value %0 : $AnyObject
+  %18 = tuple ()
+  return %18 : $()
+}

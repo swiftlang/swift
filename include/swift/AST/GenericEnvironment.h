@@ -226,12 +226,6 @@ public:
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
 
-  /// Derive a contextual type substitution map from a substitution array.
-  /// This is just like GenericSignature::getSubstitutionMap(), except
-  /// with contextual types instead of interface types.
-  SubstitutionMap
-  getSubstitutionMap(SubstitutionList subs) const;
-
   /// Build a contextual type substitution map from a type substitution function
   /// and conformance lookup function.
   SubstitutionMap

@@ -53,7 +53,7 @@ ${SelfName}TestSuite.test("AssociatedTypes") {
 %   if IsRaw:
     iteratorType: ${SelfType}.Iterator.self,
 %   else:
-    iteratorType: IndexingIterator<${SelfType}>.self,
+    iteratorType: UnsafeBufferPointerIterator<Float>.self,
 %   end
     subSequenceType: ${'Mutable' if IsMutable else ''}RandomAccessSlice<${SelfType}>.self,
     indexType: Int.self,

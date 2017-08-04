@@ -99,7 +99,7 @@ function(_add_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  # MSVC and clang-cl dont't understand -target.
+  # MSVC and clang-cl don't understand -target.
   if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
   endif()
@@ -265,10 +265,6 @@ function(_add_variant_c_compile_flags)
         "-I${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include")
   endif()
 
-  if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
-    list(APPEND result "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
-  endif()
-
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -359,9 +355,10 @@ function(_add_variant_link_flags)
     endif()
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result
-        "-ldl"
+        "-ldl" "-llog" "-latomic" "-licudata" "-licui18n" "-licuuc"
         "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
     list(APPEND library_search_directories
+        "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/lib/armv7-a"
         "${SWIFT_ANDROID_PREBUILT_PATH}/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}.x")
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
@@ -636,10 +633,6 @@ function(_add_swift_library_single target name)
       list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-bitcode_hide_symbols" "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
       set(embed_bitcode_arg EMBED_BITCODE)
     endif()
-  endif()
-
-  if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
-    list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
   endif()
 
   if (SWIFT_COMPILER_VERSION)
@@ -1436,6 +1429,11 @@ function(add_swift_library name)
     endif()
 
     foreach(sdk ${SWIFTLIB_TARGET_SDKS})
+      if(NOT SWIFT_SDK_${sdk}_ARCHITECTURES)
+        # SWIFT_SDK_${sdk}_ARCHITECTURES is empty, so just continue
+        continue()
+      endif()
+
       set(THIN_INPUT_TARGETS)
 
       # For each architecture supported by this SDK
@@ -1499,6 +1497,12 @@ function(add_swift_library name)
           if("${lib}" STREQUAL "ICU_UC")
             list(APPEND swiftlib_private_link_libraries_targets
                  "${SWIFT_${sdk}_ICU_UC}")
+            # temporary fix for atomic needing to be
+            # after object files for libswiftCore.so
+            if("${sdk}" STREQUAL "ANDROID")
+              list(APPEND swiftlib_private_link_libraries_targets
+                   "-latomic")
+            endif()
           elseif("${lib}" STREQUAL "ICU_I18N")
             list(APPEND swiftlib_private_link_libraries_targets
                  "${SWIFT_${sdk}_ICU_I18N}")
@@ -1549,9 +1553,17 @@ function(add_swift_library name)
         endif()
 
         # Add PrivateFrameworks, rdar://28466433
+        set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
         if(SWIFTLIB_IS_SDK_OVERLAY)
           list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${SWIFT_SDK_${sdk}_PATH}/System/Library/PrivateFrameworks/")
         endif()
+       
+       if("${sdk}" STREQUAL "IOS_SIMULATOR")
+         if("${name}" STREQUAL "swiftMediaPlayer")
+           message("DISABLING AUTOLINK FOR swiftMediaPlayer")
+           list(APPEND swiftlib_link_flags_all "-Xlinker" "-ignore_auto_link")
+         endif()
+       endif()
 
         # Add this library variant.
         _add_swift_library_single(
@@ -1572,7 +1584,7 @@ function(add_swift_library name)
           FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
           C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
           SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all}
-          LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
+          LINK_FLAGS ${swiftlib_link_flags_all}
           PRIVATE_LINK_LIBRARIES ${swiftlib_private_link_libraries_targets}
           INCORPORATE_OBJECT_LIBRARIES ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES}
           INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY}
@@ -1639,6 +1651,7 @@ function(add_swift_library name)
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
           set(codesign_arg CODESIGN)
         endif()
+        precondition(THIN_INPUT_TARGETS)
         _add_swift_lipo_target(
             SDK ${sdk}
             TARGET ${lipo_target}
@@ -2115,3 +2128,8 @@ function(add_swift_host_tool executable)
     endif()
   endif()
 endfunction()
+
+macro(add_swift_tool_symlink name dest component)
+  add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
+  llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
+endmacro()

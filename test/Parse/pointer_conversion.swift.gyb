@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %gyb -DOPT_KIND=None %s -o %t/pointer_conversion.swift
 // RUN: %line-directive %t/pointer_conversion.swift -- %target-swift-frontend -typecheck -verify %t/pointer_conversion.swift
@@ -59,8 +59,8 @@ func mutablePointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesMutableArrayPointer(&ii)
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeMutablePointer<Int> = &i // expected-error{{cannot pass immutable value of type 'Int' as inout argument}}
-  x = &ii // expected-error{{cannot assign value of type '[Int]' to type 'Int'}}
+  var x: UnsafeMutablePointer<Int> = &i // expected-error{{cannot pass immutable value as inout argument: 'i' is immutable}}
+  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' to type 'UnsafeMutablePointer<Int>'}}
   _ = x
 }
 
@@ -93,7 +93,7 @@ func mutableVoidPointerArguments(_ p: UnsafeMutablePointer<Int>,
   // We don't allow these conversions outside of function arguments.
   var x: UnsafeMutableRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeMutableRawPointer'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeMutableRawPointer'}}
-  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' (aka 'inout Array<Int>') to type 'UnsafeMutableRawPointer'}}
+  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' to type 'UnsafeMutableRawPointer'}}
   _ = x
 }
 
@@ -128,7 +128,7 @@ func mutableRawPointerArguments(_ p: UnsafeMutablePointer<Int>,
   // We don't allow these conversions outside of function arguments.
   var x: UnsafeMutableRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeMutableRawPointer'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeMutableRawPointer'}}
-  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' (aka 'inout Array<Int>') to type 'UnsafeMutableRawPointer'}}
+  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' to type 'UnsafeMutableRawPointer'}}
   _ = x
 }
 
@@ -157,7 +157,7 @@ func constPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{cannot convert value of type 'Double' to expected element type 'Int'}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafePointer<Int> = &i // expected-error{{cannot pass immutable value of type 'Int' as inout argument}}
+  var x: UnsafePointer<Int> = &i // expected-error{{cannot pass immutable value as inout argument: 'i' is immutable}}
   x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafePointer<Int>'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafePointer<Int>'}}
 }

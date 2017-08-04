@@ -79,17 +79,44 @@ ERROR(writeback_overlap_subscript,none,
 NOTE(writebackoverlap_note,none,
       "concurrent writeback occurred here", ())
 
+ERROR(addressonly_type_used_in_multipattern_case,none,
+      "matching %select{type '%1'|a protocol value|a generic value}0 in multiple patterns "
+      "is not yet supported; use separate cases instead",
+      (unsigned, Type))
+
 ERROR(inout_argument_alias,none,
       "inout arguments are not allowed to alias each other", ())
 NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
+WARNING(exclusivity_access_required_swift3,none,
+        "overlapping accesses to %0, but "
+        "%select{initialization|read|modification|deinitialization}1 requires "
+        "exclusive access; "
+        "%select{consider copying to a local variable|"
+                "consider calling MutableCollection.swapAt(_:_:)}2",
+        (StringRef, unsigned, bool))
+
 ERROR(exclusivity_access_required,none,
-      "%select{initialization|read|modification|deinitialization}0 requires "
-      "%select{exclusive|shared}1 access", (unsigned, unsigned))
+      "overlapping accesses to %0, but "
+      "%select{initialization|read|modification|deinitialization}1 requires "
+      "exclusive access; "
+      "%select{consider copying to a local variable|"
+              "consider calling MutableCollection.swapAt(_:_:)}2",
+      (StringRef, unsigned, bool))
+
+ERROR(exclusivity_access_required_unknown_decl,none,
+        "overlapping accesses, but "
+        "%select{initialization|read|modification|deinitialization}0 requires "
+        "exclusive access; consider copying to a local variable", (unsigned))
+
+WARNING(exclusivity_access_required_unknown_decl_swift3,none,
+        "overlapping accesses, but "
+        "%select{initialization|read|modification|deinitialization}0 requires "
+"exclusive access; consider copying to a local variable", (unsigned))
+
 NOTE(exclusivity_conflicting_access,none,
-     "conflicting %select{initialization|read|modification|deinitialization}0 "
-     "requires %select{exclusive|shared}1 access", (unsigned, unsigned))
+     "conflicting access is here", ())
 
 ERROR(unsupported_c_function_pointer_conversion,none,
       "C function pointer signature %0 is not compatible with expected type %1",
@@ -127,7 +154,7 @@ ERROR(self_use_before_fully_init,none,
       "use of 'self' in %select{method call|property access}1 %0 before "
       "%select{all stored properties are initialized|"
       "super.init initializes self|"
-      "self.init initializes self}2", (Identifier, bool, unsigned))
+      "self.init initializes self}2", (DeclBaseName, bool, unsigned))
 ERROR(use_of_self_before_fully_init,none,
       "'self' used before all stored properties are initialized", ())
 ERROR(use_of_self_before_fully_init_protocol,none,
@@ -173,7 +200,7 @@ NOTE(initial_value_provided_in_let_decl,none,
 ERROR(mutating_method_called_on_immutable_value,none,
       "mutating %select{method|property access|subscript|operator}1 %0 may not"
       " be used on immutable value '%2'",
-      (Identifier, unsigned, StringRef))
+      (DeclBaseName, unsigned, StringRef))
 ERROR(immutable_value_passed_inout,none,
       "immutable value '%0' may not be passed inout",
       (StringRef))

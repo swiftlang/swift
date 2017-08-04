@@ -59,7 +59,7 @@
 // Weak references use a marker to tell when they are controlled by
 // the ObjC runtime and when they are controlled by the Swift runtime.
 // Non-ObjC platforms don't use this marker.
-#define SWIFT_ABI_DEFAULT_OBJC_WEAK_REFERENCE_MARKER_MASK  0
+#define SWIFT_ABI_DEFAULT_OBJC_WEAK_REFERENCE_MARKER_MASK 0
 #define SWIFT_ABI_DEFAULT_OBJC_WEAK_REFERENCE_MARKER_VALUE 0
 
 /*********************************** i386 *************************************/

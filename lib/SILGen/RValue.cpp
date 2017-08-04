@@ -21,6 +21,7 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
 
@@ -29,7 +30,7 @@ using namespace Lowering;
 
 
 static unsigned getTupleSize(CanType t) {
-  if (TupleType *tt = dyn_cast<TupleType>(t))
+  if (auto tt = dyn_cast<TupleType>(t))
     return tt->getNumElements();
   return 1;
 }
@@ -93,6 +94,7 @@ public:
       auto eltTy = tuple.getType().getTupleElementType(i);
       assert(eltTy.isAddress() == tuple.getType().isAddress());
       auto &eltTI = SGF.getTypeLowering(eltTy);
+      (void)eltTI;
 
       // Project the element.
       assert(eltTI.isLoadable() || !SGF.silConv.useLoweredAddresses());
@@ -424,10 +426,11 @@ RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
   if (values.size() == 1 && values[0].isInContext()) {
     values = ArrayRef<ManagedValue>();
     type = CanType();
-    elementsToBeAdded = Used;
+    elementsToBeAdded = InContext;
     return;
   }
 
+  verifyConsistentOwnership();
 }
 
 RValue RValue::withPreExplodedElements(ArrayRef<ManagedValue> values,
@@ -443,12 +446,13 @@ RValue::RValue(SILGenFunction &SGF, SILLocation l, CanType formalType,
 
   if (v.isInContext()) {
     type = CanType();
-    elementsToBeAdded = Used;
+    elementsToBeAdded = InContext;
     return;
   }
 
   ExplodeTupleValue(values, SGF, l).visit(formalType, v);
   assert(values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
@@ -456,13 +460,14 @@ RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
 
   if (v.isInContext()) {
     type = CanType();
-    elementsToBeAdded = Used;
+    elementsToBeAdded = InContext;
     return;
   }
 
   assert(v && "creating r-value with consumed value");
   ExplodeTupleValue(values, SGF, expr).visit(type, v);
   assert(values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 RValue::RValue(CanType type)
@@ -475,26 +480,30 @@ RValue::RValue(AbstractionPattern pattern, CanType type)
 
 void RValue::addElement(RValue &&element) & {
   assert(!element.isUsed() && "adding consumed value to r-value");
+  assert(!element.isInSpecialState() && "adding special value to r-value");
   assert(!isComplete() && "rvalue already complete");
-  assert(!isUsed() && "rvalue already used");
+  assert(!isInSpecialState() && "cannot add elements to a special r-value");
   --elementsToBeAdded;
   values.insert(values.end(),
                 element.values.begin(), element.values.end());
   element.makeUsed();
 
   assert(!isComplete() || values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
                         CanType formalType, SILLocation l) & {
   assert(element && "adding consumed value to r-value");
+  assert(!element.isInContext() && "adding in-context value to r-value");
   assert(!isComplete() && "rvalue already complete");
-  assert(!isUsed() && "rvalue already used");
+  assert(!isInSpecialState() && "cannot add elements to an in-context r-value");
   --elementsToBeAdded;
 
   ExplodeTupleValue(values, SGF, l).visit(formalType, element);
 
   assert(!isComplete() || values.size() == getRValueSize(type));
+  verifyConsistentOwnership();
 }
 
 SILValue RValue::forwardAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
@@ -559,6 +568,13 @@ void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
+  assert(!isUsed() && "r-value already used");
+
+  if (isInContext()) {
+    makeUsed();
+    return ManagedValue::forInContext();
+  }
+
   // Avoid killing and re-emitting the cleanup if the enclosed value isn't a
   // tuple.
   if (!isa<TupleType>(type)) {
@@ -662,16 +678,26 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   makeUsed();
 }
 
-RValue::RValue(const RValue &copied, SILGenFunction &SGF, SILLocation l)
-  : type(copied.type),
-    elementsToBeAdded(copied.elementsToBeAdded)
-{
-  assert((copied.isComplete() || copied.isUsed())
-         && "can't copy incomplete rvalue");
-  values.reserve(copied.values.size());
-  for (ManagedValue value : copied.values) {
-    values.push_back(value.copy(SGF, l));
+RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't copy an incomplete rvalue");
+  std::vector<ManagedValue> copiedValues;
+  copiedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    copiedValues.emplace_back(v.copy(SGF, loc));
   }
+  return RValue(std::move(copiedValues), type, elementsToBeAdded);
+}
+
+RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't borrow incomplete rvalue");
+  std::vector<ManagedValue> borrowedValues;
+  borrowedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    borrowedValues.emplace_back(v.borrow(SGF, loc));
+  }
+  return RValue(std::move(borrowedValues), type, elementsToBeAdded);
 }
 
 ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
@@ -689,4 +715,90 @@ ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
   auto temp = SGF.emitTemporary(loc, paramTL);
   std::move(*this).forwardInto(SGF, loc, temp.get());
   return temp->getManagedAddress();
+}
+
+bool RValue::isObviouslyEqual(const RValue &rhs) const {
+  assert(isComplete() && rhs.isComplete() && "Comparing incomplete rvalues");
+
+  // Compare the count of elements instead of the type.
+  if (values.size() != rhs.values.size())
+    return false;
+
+  return std::equal(values.begin(), values.end(), rhs.values.begin(),
+                [](const ManagedValue &lhs, const ManagedValue &rhs) -> bool {
+                  return areObviouslySameValue(lhs.getValue(), rhs.getValue());
+                });
+}
+
+static SILValue getCanonicalValueSource(SILValue value) {
+  while (true) {
+    if (auto access = dyn_cast<BeginAccessInst>(value)) {
+      value = access->getSource();
+    } else {
+      return value;
+    }
+  }
+}
+
+bool RValue::areObviouslySameValue(SILValue lhs, SILValue rhs) {
+  return getCanonicalValueSource(lhs) == getCanonicalValueSource(rhs);
+}
+
+void RValue::dump() const {
+  dump(llvm::errs());
+}
+
+void RValue::dump(raw_ostream &OS, unsigned indent) const {
+  if (isInContext()) {
+    OS.indent(indent) << "InContext\n";
+    return;
+  }
+
+  getType().dump(OS, indent);
+  for (auto &value : values) {
+    value.dump(OS, indent + 2);
+  }
+}
+
+void RValue::verifyConsistentOwnership() const {
+// This is a no-op in non-assert builds.
+#ifndef NDEBUG
+  auto result = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
+  Optional<bool> sameHaveCleanups;
+  for (ManagedValue v : values) {
+    ValueOwnershipKind kind = v.getOwnershipKind();
+    if (kind == ValueOwnershipKind::Trivial)
+      continue;
+
+    // Merge together whether or not the RValue has cleanups.
+    if (!sameHaveCleanups.hasValue()) {
+      sameHaveCleanups = v.hasCleanup();
+    } else {
+      assert(*sameHaveCleanups == v.hasCleanup());
+    }
+
+    // This variable is here so that if the assert below fires, the current
+    // reduction value is still available.
+    auto newResult = result.getValue().merge(kind);
+    assert(newResult.hasValue());
+    result = newResult;
+  }
+#endif
+}
+
+bool RValue::isPlusOne(SILGenFunction &SGF) const & {
+  return llvm::all_of(values, [&SGF](ManagedValue mv) -> bool {
+    // Ignore trivial values and objects with trivial value ownership kind.
+    if (mv.getType().isTrivial(SGF.F.getModule()) ||
+        (mv.getType().isObject() &&
+         mv.getOwnershipKind() == ValueOwnershipKind::Trivial))
+      return true;
+    return mv.hasCleanup();
+  });
+}
+
+bool RValue::isPlusZero(SILGenFunction &SGF) const & {
+  return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
+    return mv.hasCleanup();
+  });
 }

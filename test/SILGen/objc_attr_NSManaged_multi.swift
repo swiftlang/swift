@@ -4,7 +4,7 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_T025objc_attr_NSManaged_multi9testMultis9AnyObject_pAA10SwiftGizmoCF : $@convention(thin) (@owned SwiftGizmo) -> @owned AnyObject {
+// CHECK-LABEL: sil hidden @_T025objc_attr_NSManaged_multi9testMultiyXlAA10SwiftGizmoCF : $@convention(thin) (@owned SwiftGizmo) -> @owned AnyObject {
 // CHECK: bb0([[ARG:%.*]] : $SwiftGizmo):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: = class_method [volatile] [[BORROWED_ARG]] : $SwiftGizmo, #SwiftGizmo.kvc!1.foreign : (SwiftGizmo) -> () -> (), $@convention(objc_method) (SwiftGizmo) -> ()

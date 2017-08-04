@@ -21,7 +21,7 @@
 #include <memory>
 
 namespace llvm {
-  class raw_ostream;
+  class StringRef;
 }
 
 namespace swift {
@@ -30,13 +30,12 @@ namespace swift {
 
   namespace serialized_diagnostics {
     /// \brief Create a DiagnosticConsumer that serializes diagnostics to a
-    ///        stream.
+    ///        file.
     ///
-    /// \param OS the stream to emit the diagnostics.  The consumer takes
-    ///        ownership of the stream.
+    /// \param serializedDiagnosticsPath the file path to write the diagnostics.
     ///
     /// \returns A new diagnostic consumer that serializes diagnostics.
-    DiagnosticConsumer *createConsumer(std::unique_ptr<llvm::raw_ostream> OS);
+    DiagnosticConsumer *createConsumer(llvm::StringRef serializedDiagnosticsPath);
   }
 }
 

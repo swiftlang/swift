@@ -25,10 +25,12 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -43,7 +45,6 @@ class Decl;
 class ClassDecl;
 class GenericFunctionType;
 class TrailingWhereClause;
-struct TypeLoc;
 
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {
@@ -214,20 +215,10 @@ protected:
   enum { NumAccessibilityAttrBits = NumDeclAttrBits + 3 };
   static_assert(NumAccessibilityAttrBits <= 32, "fits in an unsigned");
 
-  class AutoClosureAttrBitFields {
-    friend class AutoClosureAttr;
-    unsigned : NumDeclAttrBits;
-
-    unsigned Escaping : 1;
-  };
-  enum { NumAutoClosureAttrBits = NumDeclAttrBits + 1 };
-  static_assert(NumAutoClosureAttrBits <= 32, "fits in an unsigned");
-
   union {
     DeclAttrBitFields DeclAttrBits;
     ObjCAttrBitFields ObjCAttrBits;
     AccessibilityAttrBitFields AccessibilityAttrBits;
-    AutoClosureAttrBitFields AutoClosureAttrBits;
   };
 
   DeclAttribute *Next = nullptr;
@@ -297,6 +288,9 @@ public:
     OnAssociatedType   = 1 << 29,
     OnParam            = 1 << 30,
     OnModule           = 1 << 31,
+
+    // Cannot have any attributes.
+    OnMissingMember = 0,
 
     // More coarse-grained aggregations for use in Attr.def.
     OnOperator = OnInfixOperator|OnPrefixOperator|OnPostfixOperator,
@@ -912,24 +906,6 @@ public:
   }
 };
 
-/// Represents the autoclosure attribute.
-class AutoClosureAttr : public DeclAttribute {
-public:
-  AutoClosureAttr(SourceLoc atLoc, SourceRange range, bool escaping,
-                  bool implicit = false)
-    : DeclAttribute(DAK_AutoClosure, atLoc, range, implicit)
-  {
-    AutoClosureAttrBits.Escaping = escaping;
-  }
-
-  /// Determine whether this autoclosure is escaping.
-  bool isEscaping() const { return AutoClosureAttrBits.Escaping; }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_AutoClosure;
-  }
-};
-
 /// Represents an inline attribute.
 class InlineAttr : public DeclAttribute {
   InlineKind Kind;
@@ -1127,6 +1103,76 @@ public:
   }
 };
 
+/// The @_implements attribute, which treats a decl as the implementation for
+/// some named protocol requirement (but otherwise not-visible by that name).
+class ImplementsAttr : public DeclAttribute {
+
+  TypeLoc ProtocolType;
+  DeclName MemberName;
+  DeclNameLoc MemberNameLoc;
+
+public:
+  ImplementsAttr(SourceLoc atLoc, SourceRange Range,
+                 TypeLoc ProtocolType,
+                 DeclName MemberName,
+                 DeclNameLoc MemberNameLoc);
+
+  static ImplementsAttr *create(ASTContext &Ctx, SourceLoc atLoc,
+                                SourceRange Range,
+                                TypeLoc ProtocolType,
+                                DeclName MemberName,
+                                DeclNameLoc MemberNameLoc);
+
+  TypeLoc getProtocolType() const;
+  TypeLoc &getProtocolType();
+  DeclName getMemberName() const { return MemberName; }
+  DeclNameLoc getMemberNameLoc() const { return MemberNameLoc; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Implements;
+  }
+};
+
+/// A limited variant of \c @objc that's used for classes with generic ancestry.
+class ObjCRuntimeNameAttr : public DeclAttribute {
+  static StringRef getSimpleName(const ObjCAttr &Original) {
+    assert(Original.hasName());
+    return Original.getName()->getSimpleName().str();
+  }
+public:
+  ObjCRuntimeNameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range,
+                      bool Implicit)
+    : DeclAttribute(DAK_ObjCRuntimeName, AtLoc, Range, Implicit),
+      Name(Name) {}
+
+  explicit ObjCRuntimeNameAttr(const ObjCAttr &Original)
+    : ObjCRuntimeNameAttr(getSimpleName(Original), Original.AtLoc,
+                          Original.Range, Original.isImplicit()) {}
+
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ObjCRuntimeName;
+  }
+};
+
+/// Attribute that specifies a protocol conformance that has been restated
+/// (i.e., is redundant) but should still be emitted in Objective-C metadata.
+class RestatedObjCConformanceAttr : public DeclAttribute {
+public:
+  explicit RestatedObjCConformanceAttr(ProtocolDecl *proto)
+    : DeclAttribute(DAK_RestatedObjCConformance, SourceLoc(), SourceRange(),
+                    /*Implicit=*/true),
+      Proto(proto) {}
+
+  /// The protocol to which this type conforms.
+  ProtocolDecl * const Proto;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_RestatedObjCConformance;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -1222,7 +1268,7 @@ public:
   template <typename ATTR>
   ATTR *getAttribute(bool AllowInvalid = false) {
     for (auto Attr : *this)
-      if (ATTR *SpecificAttr = dyn_cast<ATTR>(Attr))
+      if (auto *SpecificAttr = dyn_cast<ATTR>(Attr))
         if (SpecificAttr->isValid() || AllowInvalid)
           return SpecificAttr;
     return nullptr;

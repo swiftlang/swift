@@ -803,7 +803,7 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
     case ProjectionKind::Index:
       break;
     case ProjectionKind::Enum:
-      if (EnumInst *EI = dyn_cast<EnumInst>(I)) {
+      if (auto *EI = dyn_cast<EnumInst>(I)) {
         if (EI->getElement() == getEnumElementDecl(I->getType())) {
           assert(EI->hasOperand() && "expected data operand");
           return EI->getOperand();

@@ -88,11 +88,12 @@ class Hoozit : Gizmo {
 // Entries only exist for native Swift methods
 
 // CHECK: sil_vtable Hoozit {
-// CHECK:   #Hoozit.frob!1: {{.*}} : _T07vtables6HoozitC4frob{{[_0-9a-zA-Z]*}}F
-// CHECK:   #Hoozit.funge!1: {{.*}} : _T07vtables6HoozitC5funge{{[_0-9a-zA-Z]*}}F
-// CHECK:   #Hoozit.anse!1: {{.*}} : _T07vtables6HoozitC4anse{{[_0-9a-zA-Z]*}}F
-// CHECK:   #Hoozit.incorrige!1: {{.*}} : _T07vtables6HoozitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK: }
+// CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : _T07vtables6HoozitC4anse{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : _T07vtables6HoozitC9incorrige{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : _T07vtables6HoozitCSQyACGycfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T07vtables6HoozitCSQyACGSi7bellsOn_tcfc
+// CHECK-NEXT:   #Hoozit.deinit!deallocator: _T07vtables6HoozitCfD
+// CHECK-NEXT: }
 
 class Wotsit : Hoozit {
   override func funge() {}
@@ -100,11 +101,12 @@ class Wotsit : Hoozit {
 }
 
 // CHECK: sil_vtable Wotsit {
-// CHECK:   #Hoozit.frob!1: {{.*}} : _T07vtables6HoozitC4frob{{[_0-9a-zA-Z]*}}F
-// CHECK:   #Hoozit.funge!1: {{.*}} : _T07vtables6WotsitC5funge{{[_0-9a-zA-Z]*}}F
-// CHECK:   #Hoozit.anse!1: {{.*}} : _T07vtables6HoozitC4anse{{[_0-9a-zA-Z]*}}F
-// CHECK:   #Hoozit.incorrige!1: {{.*}} : _T07vtables6WotsitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK: }
+// CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : _T07vtables6HoozitC4anse{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : _T07vtables6WotsitC9incorrige{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : _T07vtables6WotsitCSQyACGycfc
+// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T07vtables6WotsitCSQyACGSi7bellsOn_tcfc
+// CHECK-NEXT:   #Wotsit.deinit!deallocator: _T07vtables6WotsitCfD
+// CHECK-NEXT: }
 
 // <rdar://problem/15282548>
 // CHECK: sil_vtable Base {
@@ -128,11 +130,11 @@ class Derived : Base {
   }
 }
 
-
 // CHECK: sil_vtable RequiredInitDerived {
 // CHECK-NEXT: #SimpleInitBase.init!initializer.1: {{.*}} : _T07vtables19RequiredInitDerivedC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NEXT  #RequiredInitDerived.init!allocator.1: {{.*}} : _TFC7vtables19RequiredInitDerivedC
-// CHECK-NEXT}
+// CHECK-NEXT: #RequiredInitDerived.init!allocator.1: {{.*}} : _T07vtables19RequiredInitDerivedC
+// CHECK-NEXT: #RequiredInitDerived.deinit!deallocator: _T07vtables19RequiredInitDerivedCfD
+// CHECK-NEXT: }
 
 class SimpleInitBase { }
 
@@ -169,3 +171,24 @@ class DerivedWithoutDefaults : BaseWithDefaults {
 
 // CHECK-LABEL: sil_vtable DerivedWithoutDefaults {
 // CHECK:         #BaseWithDefaults.a!1: {{.*}} : _T07vtables22DerivedWithoutDefaultsC1a{{[_0-9a-zA-Z]*}}F
+
+
+
+// Escape identifiers that represent special names
+
+class SubscriptAsFunction {
+  func `subscript`() {}
+}
+
+// CHECK-LABEL: sil_vtable SubscriptAsFunction {
+// CHECK-NOT:     #SubscriptAsFunction.subscript
+// CHECK:         #SubscriptAsFunction.`subscript`!1
+
+
+class DeinitAsFunction {
+  func `deinit`() {}
+}
+
+// CHECK-LABEL: sil_vtable DeinitAsFunction {
+// CHECK:         #DeinitAsFunction.`deinit`!1
+// CHECK:         #DeinitAsFunction.deinit!deallocator

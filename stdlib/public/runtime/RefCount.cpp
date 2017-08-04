@@ -143,7 +143,23 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::formWeakReference()
     return nullptr;
 }
 
-// namespace swift
+template <typename RefCountBits>
+void RefCounts<RefCountBits>::incrementUnownedSlow(uint32_t n) {
+  auto side = allocateSideTable();
+  if (side)
+    return side->incrementUnowned(n);
+  // Overflow but side table allocation failed.
+  swift_abortUnownedRetainOverflow();
 }
+
+template void RefCounts<InlineRefCountBits>::incrementUnownedSlow(uint32_t n);
+template <>
+void RefCounts<SideTableRefCountBits>::incrementUnownedSlow(uint32_t n) {
+  // Overflow from side table to a new side table?!
+  swift_abortUnownedRetainOverflow();
+}
+
+// namespace swift
+} // namespace swift
 
 

@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 3
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 class C { }
 
@@ -8,4 +9,24 @@ protocol P {
 
 struct X : P { // expected-error{{type 'X' does not conform to protocol 'P'}}
   typealias AssocP = Int // expected-note{{possibly intended match 'X.AssocP' (aka 'Int') does not inherit from 'C'}}
+}
+
+// SR-5166
+protocol FooType {
+    associatedtype BarType
+
+    func foo(bar: BarType)
+    func foo(action: (BarType) -> Void)
+}
+
+protocol Bar {}
+
+class Foo: FooType {
+    typealias BarType = Bar
+
+    func foo(bar: Bar) {
+    }
+
+    func foo(action: (Bar) -> Void) {
+    }
 }

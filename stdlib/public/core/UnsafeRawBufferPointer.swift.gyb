@@ -92,8 +92,6 @@
 ///
 ///     destBytes[0..<n] = someBytes[n..<(n + n)]
 % end
-///
-/// - SeeAlso: `Unsafe${Mutable}RawPointer`, `Unsafe${Mutable}BufferPointer`
 @_fixed_layout
 public struct Unsafe${Mutable}RawBufferPointer
   : ${Mutable}Collection, RandomAccessCollection {
@@ -235,22 +233,19 @@ public struct Unsafe${Mutable}RawBufferPointer
     baseAddress!.storeBytes(of: value, toByteOffset: offset, as: T.self)
   }
 
-  /// Copies the specified number of bytes from the given raw pointer's memory
-  /// into this buffer's memory.
+  /// Copies the bytes from the given buffer to this buffer's memory.
   ///
-  /// If the `count` bytes of memory referenced by this pointer are bound to a
-  /// type `T`, then `T` must be a trivial type, this pointer and `source`
-  /// must be properly aligned for accessing `T`, and `count` must be a
+  /// If the `source.count` bytes of memory referenced by this buffer are bound
+  /// to a type `T`, then `T` must be a trivial type, the underlying pointer
+  /// must be properly aligned for accessing `T`, and `source.count` must be a
   /// multiple of `MemoryLayout<T>.stride`.
   ///
-  /// After calling `copyBytes(from:count:)`, the `count` bytes of memory
-  /// referenced by this pointer are initialized to raw bytes. If the memory
-  /// is bound to type `T`, then it contains values of type `T`.
+  /// After calling `copyBytes(from:)`, the first `source.count` bytes of
+  /// memory referenced by this buffer are initialized to raw bytes. If the
+  /// memory is bound to type `T`, then it contains values of type `T`.
   ///
-  /// - Parameters:
-  ///   - source: A pointer to the memory to copy bytes from. The memory at
-  ///     `source..<(source + count)` must be initialized to a trivial type.
-  ///   - count: The number of bytes to copy. `count` must not be negative.
+  /// - Parameter source: A buffer of raw bytes from which to copy.
+  ///   `source.count` must be less than or equal to this buffer's `count`.
   @_inlineable
   public func copyBytes(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
@@ -260,21 +255,21 @@ public struct Unsafe${Mutable}RawBufferPointer
 
   /// Copies from a collection of `UInt8` into this buffer's memory.
   ///
-  /// If the `source.count` bytes of memory referenced by this pointer are
-  /// bound to a type `T`, then `T` must be a trivial type, the underlying
-  /// pointer must be properly aligned for accessing `T`, and `source.count`
-  /// must be a multiple of `MemoryLayout<T>.stride`.
+  /// If the `source.count` bytes of memory referenced by this buffer are bound
+  /// to a type `T`, then `T` must be a trivial type, the underlying pointer
+  /// must be properly aligned for accessing `T`, and `source.count` must be a
+  /// multiple of `MemoryLayout<T>.stride`.
   ///
   /// After calling `copyBytes(from:)`, the `source.count` bytes of memory
-  /// referenced by this pointer are initialized to raw bytes. If the memory
-  /// is bound to type `T`, then it contains values of type `T`.
+  /// referenced by this buffer are initialized to raw bytes. If the memory is
+  /// bound to type `T`, then it contains values of type `T`.
   ///
   /// - Parameter source: A collection of `UInt8` elements. `source.count` must
   ///   be less than or equal to this buffer's `count`.
   @_inlineable
   public func copyBytes<C : Collection>(from source: C
-  ) where C.Iterator.Element == UInt8 {
-    _debugPrecondition(numericCast(source.count) <= self.count,
+  ) where C.Element == UInt8 {
+    _debugPrecondition(source.count <= self.count,
       "${Self}.copyBytes source has too many elements")
     guard let position = _position else {
       return
@@ -290,9 +285,9 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// at the given pointer.
   ///
   /// - Parameters:
-  ///   - start: The address of the memory that starts the buffer. If `starts` is
-  ///     `nil`, `count` must be zero. However, `count` may be zero even for a
-  ///     non-`nil` `start`.
+  ///   - start: The address of the memory that starts the buffer. If `starts`
+  ///     is `nil`, `count` must be zero. However, `count` may be zero even
+  ///     for a non-`nil` `start`.
   ///   - count: The number of bytes to include in the buffer. `count` must not
   ///     be negative.
   @_inlineable
@@ -354,17 +349,26 @@ public struct Unsafe${Mutable}RawBufferPointer
 %  end # !mutable
 
 %  if not mutable:
-  /// Creates a raw buffer over the same memory as the given raw buffer slice.
+  /// Creates a raw buffer over the same memory as the given raw buffer slice,
+  /// with the indices rebased to zero.
   ///
-  /// The new raw buffer will represent the same region of memory as the slice,
-  /// but it's indices will be rebased to zero. Given:
+  /// The new buffer represents the same region of memory as the slice, but its
+  /// indices start at zero instead of at the beginning of the slice in the
+  /// original buffer. The following code creates `slice`, a slice covering
+  /// part of an existing buffer instance, then rebases it into a new `rebased`
+  /// buffer.
   ///
-  ///   let slice = buffer[n..<m]
-  ///   let rebased = UnsafeRawBufferPointer(rebasing: slice)
+  ///     let slice = buffer[n...]
+  ///     let rebased = UnsafeRawBufferPointer(rebasing: slice)
   ///
-  /// One may assume `rebased.startIndex == 0` and `rebased[0] == slice[n]`.
+  /// After this code has executed, the following are true:
   ///
-  /// - Parameter slice: the raw buffer slice to rebase.
+  /// - `rebased.startIndex == 0`
+  /// - `rebased[0] == slice[n]`
+  /// - `rebased[0] == buffer[n]`
+  /// - `rebased.count == slice.count`
+  ///
+  /// - Parameter slice: The raw buffer slice to rebase.
   @_inlineable
   public init(rebasing slice: RandomAccessSlice<UnsafeRawBufferPointer>) {
     self.init(start: slice.base.baseAddress! + slice.startIndex,
@@ -372,17 +376,26 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
 %  end # !mutable
 
-  /// Creates a raw buffer over the same memory as the given raw buffer slice.
+  /// Creates a raw buffer over the same memory as the given raw buffer slice,
+  /// with the indices rebased to zero.
   ///
-  /// The new raw buffer will represent the same region of memory as the slice,
-  /// but it's indices will be rebased to zero. Given:
+  /// The new buffer represents the same region of memory as the slice, but its
+  /// indices start at zero instead of at the beginning of the slice in the
+  /// original buffer. The following code creates `slice`, a slice covering
+  /// part of an existing buffer instance, then rebases it into a new `rebased`
+  /// buffer.
   ///
-  ///   let slice = buffer[n..<m]
-  ///   let rebased = UnsafeRawBufferPointer(rebasing: slice)
+  ///     let slice = buffer[n...]
+  ///     let rebased = UnsafeRawBufferPointer(rebasing: slice)
   ///
-  /// One may assume `rebased.startIndex == 0` and `rebased[0] == slice[n]`.
+  /// After this code has executed, the following are true:
   ///
-  /// - Parameter slice: the raw buffer slice to rebase.
+  /// - `rebased.startIndex == 0`
+  /// - `rebased[0] == slice[n]`
+  /// - `rebased[0] == buffer[n]`
+  /// - `rebased.count == slice.count`
+  ///
+  /// - Parameter slice: The raw buffer slice to rebase.
   @_inlineable
   public init(
     rebasing slice: MutableRandomAccessSlice<UnsafeMutableRawBufferPointer>
@@ -391,8 +404,7 @@ public struct Unsafe${Mutable}RawBufferPointer
       count: slice.count)
   }
 
-  /// Always zero, which is the index of the first byte in a
-  /// nonempty buffer.
+  /// Always zero, which is the index of the first byte in a nonempty buffer.
   @_inlineable
   public var startIndex: Int {
     return 0
@@ -492,36 +504,38 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
 
   %  if mutable:
-  /// Initializes memory in the buffer with the elements of
-  /// `source` and binds the initialized memory to type `T`.
+  /// Initializes the buffer's memory with the given elements, binding the
+  /// initialized memory to the elements' type.
   ///
-  /// Returns an iterator to any elements of `source` that didn't fit in the 
-  /// buffer, and a typed buffer of the written elements.
+  /// When calling the `initializeMemory(as:from:)` method on a buffer `b`,
+  /// the memory referenced by `b` must be uninitialized or initialized to a
+  /// trivial type, and must be properly aligned for accessing `S.Element`.
+  /// The buffer must contain sufficient memory to accommodate
+  /// `source.underestimatedCount`.
   ///
-  /// - Precondition: The memory in `startIndex..<(source.count *
-  ///   MemoryLayout<T>.stride)` is uninitialized or initialized to a
-  ///   trivial type.
+  /// This method initializes the buffer with elements from `source` until
+  /// `source` is exhausted or, if `source` is a sequence but not a
+  /// collection, the buffer has no more room for its elements. After calling
+  /// `initializeMemory(as:from:)`, the memory referenced by the returned
+  /// `UnsafeMutableBufferPointer` instance is bound and initialized to type
+  /// `S.Element`.
   ///
-  /// - Precondition: The buffer must contain sufficient memory to
-  ///   accommodate at least `source.underestimateCount` elements.
-  ///
-  /// - Postcondition: The memory at `self[startIndex..<source.count *
-  ///   MemoryLayout<T>.stride]                 
-  ///   is bound to type `T`.
-  ///
-  /// - Postcondition: The `T` values at `self[startIndex..<source.count *
-  ///   MemoryLayout<T>.stride]`
-  ///   are initialized.
-  ///
+  /// - Parameters:
+  ///   - type: The type of the elements to bind the buffer's memory to.
+  ///   - source: A sequence of elements with which to initialize the buffer.
+  /// - Returns: An iterator to any elements of `source` that didn't fit in the
+  ///   buffer, and a typed buffer of the written elements. The returned
+  ///   buffer references memory starting at the same base address as this
+  ///   buffer.
   // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
   @_inlineable
   public func initializeMemory<S: Sequence>(
-    as: S.Iterator.Element.Type, from source: S
-  ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Iterator.Element>) {
+    as type: S.Element.Type, from source: S
+  ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Element>) {
 
     var it = source.makeIterator()
     var idx = startIndex
-    let elementStride = MemoryLayout<S.Iterator.Element>.stride
+    let elementStride = MemoryLayout<S.Element>.stride
     
     // This has to be a debug precondition due to the cost of walking over some collections.
     _debugPrecondition(source.underestimatedCount <= (count / elementStride),
@@ -541,12 +555,12 @@ public struct Unsafe${Mutable}RawBufferPointer
       // underflow is permitted -- e.g. a sequence into
       // the spare capacity of an Array buffer
       guard let x = it.next() else { break }
-      p.initializeMemory(as: S.Iterator.Element.self, to: x)
+      p.initializeMemory(as: S.Element.self, to: x)
       formIndex(&idx, offsetBy: elementStride)
     }
 
     return (it, UnsafeMutableBufferPointer(
-                  start: base.assumingMemoryBound(to: S.Iterator.Element.self), 
+                  start: base.assumingMemoryBound(to: S.Element.self), 
                   count: idx / elementStride))
   }
   %  end # mutable
@@ -596,13 +610,11 @@ extension ${Self} {
 ///   - arg: An instance to temporarily access through a mutable raw buffer
 ///     pointer.
 ///   - body: A closure that takes a raw buffer pointer to the bytes of `arg`
-///     as its sole argument. If the closure has a return value, it is used as
-///     the return value of the `withUnsafeMutableBytes(of:_:)` function. The
-///     buffer pointer argument is valid only for the duration of the
-///     closure's execution.
-/// - Returns: The return value of the `body` closure, if any.
-///
-/// - SeeAlso: `withUnsafeMutablePointer(to:_:)`, `withUnsafeBytes(of:_:)`
+///     as its sole argument. If the closure has a return value, that value is
+///     also used as the return value of the `withUnsafeMutableBytes(of:_:)`
+///     function. The buffer pointer argument is valid only for the duration
+///     of the closure's execution.
+/// - Returns: The return value, if any, of the `body` closure.
 @_inlineable
 public func withUnsafeMutableBytes<T, Result>(
   of arg: inout T,
@@ -625,13 +637,11 @@ public func withUnsafeMutableBytes<T, Result>(
 /// - Parameters:
 ///   - arg: An instance to temporarily access through a raw buffer pointer.
 ///   - body: A closure that takes a raw buffer pointer to the bytes of `arg`
-///     as its sole argument. If the closure has a return value, it is used as
-///     the return value of the `withUnsafeBytes(of:_:)` function. The buffer
-///     pointer argument is valid only for the duration of the closure's
-///     execution.
-/// - Returns: The return value of the `body` closure, if any.
-///
-/// - SeeAlso: `withUnsafePointer(to:_:)`, `withUnsafeMutableBytes(of:_:)`
+///     as its sole argument. If the closure has a return value, that value is
+///     also used as the return value of the `withUnsafeBytes(of:_:)`
+///     function. The buffer pointer argument is valid only for the duration
+///     of the closure's execution.
+/// - Returns: The return value, if any, of the `body` closure.
 @_inlineable
 public func withUnsafeBytes<T, Result>(
   of arg: inout T,

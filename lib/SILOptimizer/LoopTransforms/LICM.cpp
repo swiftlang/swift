@@ -127,9 +127,9 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
 /// Check if an address does not depend on other values in a basic block.
 static SILInstruction *addressIndependent(SILValue Addr) {
   Addr = stripCasts(Addr);
-  if (GlobalAddrInst *SGAI = dyn_cast<GlobalAddrInst>(Addr))
+  if (auto *SGAI = dyn_cast<GlobalAddrInst>(Addr))
     return SGAI;
-  if (StructElementAddrInst *SEAI = dyn_cast<StructElementAddrInst>(Addr))
+  if (auto *SEAI = dyn_cast<StructElementAddrInst>(Addr))
     return addressIndependent(SEAI->getOperand());
   return nullptr;
 }
@@ -269,9 +269,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
     // that dominate all exits.
     if (!std::all_of(ExitingBBs.begin(), ExitingBBs.end(),
                      [=](SILBasicBlock *ExitBB) {
-          if (DT->dominates(CurBB, ExitBB))
-            return true;
-          return false;
+          return DT->dominates(CurBB, ExitBB);
         })) {
       DEBUG(llvm::dbgs() << "  skipping conditional block " << *CurBB << "\n");
       It.skipChildren();

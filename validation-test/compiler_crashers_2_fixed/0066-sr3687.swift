@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir
+// <rdar://problem/31798398>
 
 public protocol QHash : Collection, ExpressibleByArrayLiteral {
   associatedtype Key

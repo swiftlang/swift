@@ -77,14 +77,18 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   if (Options.EnableMandatorySemanticARCOpts) {
     P.addSemanticARCOpts();
   }
+  P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
+
+  // Select access kind after capture promotion and before stack promotion.
+  // This guarantees that stack-promotable boxes have [static] enforcement.
+  P.addAccessEnforcementSelection();
+
   P.addAllocBoxToStack();
-
-  P.addOwnershipModelEliminator();
   P.addNoReturnFolding();
-  P.addAccessMarkerElimination();
+  P.addOwnershipModelEliminator();
+  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
-
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
   P.addDiagnosticConstantPropagation();
@@ -265,10 +269,11 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   P.addCSE();
   P.addRedundantLoadElimination();
 
-  // Perform retain/release code motion and run the first ARC optimizer.
+  P.addPerformanceConstantPropagation();
   P.addCSE();
   P.addDCE();
 
+  // Perform retain/release code motion and run the first ARC optimizer.
   P.addEarlyCodeMotion();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
@@ -329,6 +334,10 @@ static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   // Specialize partially applied functions with dead arguments as a preparation
   // for CapturePropagation.
   P.addDeadArgSignatureOpt();
+
+  // Run loop unrolling after inlining and constant propagation, because loop
+  // trip counts may have became constant.
+  P.addLoopUnroll();
 }
 
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
@@ -398,6 +407,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Remove dead code.
   P.addDCE();
+  P.addSILCombine();
   P.addSimplifyCFG();
 
   // Try to hoist all releases, including epilogue releases. This should be
@@ -425,18 +435,32 @@ SILPassPipelinePlan::getLoweringPassPipeline() {
   return P;
 }
 
-/// Non-mandatory passes that should run as preparation for IRGen.
-static void addIRGenPreparePipeline(SILPassPipelinePlan &P) {
+SILPassPipelinePlan
+SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P;
   P.startPipeline("IRGen Preparation");
   // Insert SIL passes to run during IRGen.
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
   P.addAllocStackHoisting();
+  if (Options.EnableLargeLoadableTypes) {
+    P.addLoadableByAddress();
+  }
+  return P;
 }
 
-SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {
+SILPassPipelinePlan
+SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P;
-  addIRGenPreparePipeline(P);
+
+  if (Options.DebugSerialization) {
+    addPerfDebugSerializationPipeline(P);
+    return P;
+  }
+
+  P.startPipeline("SILOpt Prepare Passes");
+  P.addAccessMarkerElimination();
+
   return P;
 }
 
@@ -572,7 +596,7 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
                os << "        \"" << Pipeline.Name << "\"";
                for (PassKind Kind : getPipelinePasses(Pipeline)) {
                  os << ",\n        [\"" << PassKindID(Kind) << "\","
-                    << PassKindTag(Kind) << ']';
+                    << "\"" << PassKindTag(Kind) << "\"]";
                }
              },
              [&] { os << "\n    ],\n"; });

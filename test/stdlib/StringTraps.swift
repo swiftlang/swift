@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out_Debug
 // RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
@@ -89,8 +88,8 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = s.utf16.index(before: i)
   expectCrashLater()
+  i = s.utf16.index(before: i)
   s.utf16[i]
 }
 

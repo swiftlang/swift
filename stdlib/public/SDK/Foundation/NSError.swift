@@ -380,14 +380,14 @@ public protocol __BridgedNSError : Error {
 extension __BridgedNSError
     where Self: RawRepresentable, Self.RawValue: SignedInteger {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    return lhs.rawValue.toIntMax() == rhs.rawValue.toIntMax()
+    return lhs.rawValue == rhs.rawValue
   }
 }
 
 public extension __BridgedNSError 
     where Self: RawRepresentable, Self.RawValue: SignedInteger {
   public var _domain: String { return Self._nsErrorDomain }
-  public var _code: Int { return Int(rawValue.toIntMax()) }
+  public var _code: Int { return Int(rawValue) }
 
   public init?(rawValue: RawValue) {
     self = unsafeBitCast(rawValue, to: Self.self)
@@ -408,7 +408,7 @@ public extension __BridgedNSError
 extension __BridgedNSError
     where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    return lhs.rawValue.toUIntMax() == rhs.rawValue.toUIntMax()
+    return lhs.rawValue == rhs.rawValue
   }
 }
 
@@ -416,7 +416,7 @@ public extension __BridgedNSError
     where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
   public var _domain: String { return Self._nsErrorDomain }
   public var _code: Int {
-    return Int(bitPattern: UInt(rawValue.toUIntMax()))
+    return Int(bitPattern: UInt(rawValue))
   }
 
   public init?(rawValue: RawValue) {
@@ -602,13 +602,17 @@ public struct CocoaError : _BridgedStoredNSError {
   public static var _nsErrorDomain: String { return NSCocoaErrorDomain }
 
   /// The error code itself.
-  public struct Code : RawRepresentable, _ErrorCodeProtocol {
+  public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
     public typealias _ErrorType = CocoaError
 
     public let rawValue: Int
 
     public init(rawValue: Int) {
       self.rawValue = rawValue
+    }
+    
+    public var hashValue: Int {
+      return self.rawValue
     }
   }
 }
@@ -638,6 +642,16 @@ public extension CocoaError {
   var url: URL? {
     return _nsUserInfo[NSURLErrorKey as NSString] as? URL
   }
+}
+
+public extension CocoaError {
+    public static func error(_ code: CocoaError.Code, userInfo: [AnyHashable : Any]? = nil, url: URL? = nil) -> Error {
+        var info: [AnyHashable : Any] = userInfo ?? [:]
+        if let url = url {
+            info[NSURLErrorKey] = url
+        }
+        return NSError(domain: NSCocoaErrorDomain, code: code.rawValue, userInfo: info)
+    }
 }
 
 extension CocoaError.Code {
@@ -842,6 +856,10 @@ extension CocoaError.Code {
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderValueNotFound: CocoaError.Code {
     return CocoaError.Code(rawValue: 4865)
+  }
+
+  public static var coderInvalidValue: CocoaError.Code {
+    return CocoaError.Code(rawValue: 4866)
   }
 }
 
@@ -1281,6 +1299,10 @@ extension CocoaError {
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderValueNotFound: CocoaError.Code {
     return CocoaError.Code(rawValue: 4865)
+  }
+
+  public static var coderInvalidValue: CocoaError.Code {
+    return CocoaError.Code(rawValue: 4866)
   }
 }
 
@@ -1811,13 +1833,17 @@ public struct URLError : _BridgedStoredNSError {
   public static var _nsErrorDomain: String { return NSURLErrorDomain }
 
   /// The error code itself.
-  public struct Code : RawRepresentable, _ErrorCodeProtocol {
+  public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
     public typealias _ErrorType = URLError
 
     public let rawValue: Int
 
     public init(rawValue: Int) {
       self.rawValue = rawValue
+    }
+
+    public var hashValue: Int {
+      return self.rawValue
     }
   }
 }

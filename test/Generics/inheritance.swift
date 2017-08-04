@@ -25,8 +25,8 @@ func f0<T : A>(_ obji: T, _ ai: A, _ bi: B) {
   a = obj
 
   // Invalid assignments
-  obj = a // expected-error{{'A' is not convertible to 'T'}}
-  obj = b // expected-error{{'B' is not convertible to 'T'}}
+  obj = a // expected-error{{cannot assign value of type 'A' to type 'T'}}
+  obj = b // expected-error{{cannot assign value of type 'B' to type 'T'}}
 
   // Downcast that is actually a coercion
   a = (obj as? A)! // expected-warning{{conditional cast from 'T' to 'A' always succeeds}}

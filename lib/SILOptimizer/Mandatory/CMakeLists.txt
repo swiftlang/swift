@@ -1,8 +1,10 @@
 set(MANDATORY_SOURCES
+  Mandatory/AccessEnforcementSelection.cpp
   Mandatory/AccessMarkerElimination.cpp
   Mandatory/AddressLowering.cpp
   Mandatory/DefiniteInitialization.cpp
   Mandatory/DIMemoryUseCollector.cpp
+  Mandatory/DIMemoryUseCollectorOwnership.cpp
   Mandatory/DataflowDiagnostics.cpp
   Mandatory/DiagnoseStaticExclusivity.cpp
   Mandatory/DiagnoseUnreachable.cpp

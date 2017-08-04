@@ -8,7 +8,7 @@
 // APPLETVTARGETCPU2: "-target-cpu" "swift"
 
 // RUN: not %swift -typecheck -target armv7-apple-tvos9 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=APPLETVTARGETCPU3 %s
-// APPLETVTARGETCPU3: "-target-cpu" "cortex-a8"
+// APPLETVTARGETCPU3: "-target-cpu" "generic"
 
 // RUN: not %swift -typecheck -target armv7k-apple-watchos2 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=WATCHTARGETCPU1 %s
 // WATCHTARGETCPU1: "-target-cpu" "cortex-a7"
@@ -20,7 +20,7 @@
 // TARGETCPU2: "-target-cpu" "swift"
 
 // RUN: not %swift -typecheck -target armv7-apple-ios7 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=TARGETCPU3 %s
-// TARGETCPU3: "-target-cpu" "cortex-a8"
+// TARGETCPU3: "-target-cpu" "generic"
 
 // RUN: not %swift -typecheck -target i386-apple-ios7 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=SIMULATOR_CPU %s
 // SIMULATOR_CPU: "-target-cpu" "yonah"
@@ -36,4 +36,7 @@
 
 // RUN: not %swift -typecheck -target x86_64-apple-watchos2 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=WATCHSIMULATOR64_CPU %s
 // WATCHSIMULATOR64_CPU: "-target-cpu" "core2"
+
+// RUN: not %swift -typecheck -target s390x-unknown-linux-gnu -Xcc -### %s 2>&1 | %FileCheck -check-prefix=S390X_CPU %s
+// S390X_CPU: "-target-cpu" "z196"
 

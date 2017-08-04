@@ -46,8 +46,8 @@ extension String {
   public init(cString: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: cString)
     let (result, _) = cString.withMemoryRebound(to: UInt8.self, capacity: len) {
-      _decodeCString($0, as: UTF8.self, length: len,
-        repairingInvalidCodeUnits: true)!
+      _decodeCString(
+        $0, as: UTF8.self, length: len, repairingInvalidCodeUnits: true)!
     }
     self = result
   }
@@ -58,8 +58,8 @@ extension String {
   /// This is identical to init(cString: UnsafePointer<CChar> but operates on an
   /// unsigned sequence of bytes.
   public init(cString: UnsafePointer<UInt8>) {
-    self = String.decodeCString(cString, as: UTF8.self,
-      repairingInvalidCodeUnits: true)!.result
+    self = String.decodeCString(
+      cString, as: UTF8.self, repairingInvalidCodeUnits: true)!.result
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
@@ -143,9 +143,7 @@ extension String {
   /// - Returns: A tuple with the new string and a Boolean value that indicates
   ///   whether any repairs were made. If `isRepairing` is `false` and an
   ///   ill-formed sequence is detected, this method returns `nil`.
-  ///
-  /// - SeeAlso: `UnicodeCodec`
-  public static func decodeCString<Encoding : UnicodeCodec>(
+  public static func decodeCString<Encoding : _UnicodeEncoding>(
     _ cString: UnsafePointer<Encoding.CodeUnit>?,
     as encoding: Encoding.Type,
     repairingInvalidCodeUnits isRepairing: Bool = true)
@@ -154,8 +152,11 @@ extension String {
     guard let cString = cString else {
       return nil
     }
-    let len = encoding._nullCodeUnitOffset(in: cString)
-    return _decodeCString(cString, as: encoding, length: len,
+    var end = cString
+    while end.pointee != 0 { end += 1 }
+    let len = end - cString
+    return _decodeCString(
+      cString, as: encoding, length: len,
       repairingInvalidCodeUnits: isRepairing)
   }
 
@@ -180,7 +181,7 @@ public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
 /// the given pointer using the specified encoding.
 ///
 /// This internal helper takes the string length as an argument.
-func _decodeCString<Encoding : UnicodeCodec>(
+func _decodeCString<Encoding : _UnicodeEncoding>(
   _ cString: UnsafePointer<Encoding.CodeUnit>,
   as encoding: Encoding.Type, length: Int,
   repairingInvalidCodeUnits isRepairing: Bool = true)

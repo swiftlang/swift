@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NOWMO %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -wmo -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-WMO %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-print-debuginfo -enable-sil-verify-all %s -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NOWMO %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-print-debuginfo -enable-sil-verify-all %s -wmo -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-WMO %s
 
 sil_stage canonical
 

@@ -59,9 +59,7 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
 
   // Don't hoist generics with opened archetypes. We would have to hoist the
   // open archetype instruction which might not be possible.
-  if (!Inst->getTypeDependentOperands().empty())
-    return false;
-  return true;
+  return Inst->getTypeDependentOperands().empty();
 }
 
 /// A partition of alloc_stack instructions.
@@ -113,8 +111,7 @@ insertDeallocStackAtEndOf(SmallVectorImpl<SILInstruction *> &FunctionExits,
 /// Hack to workaround a clang LTO bug.
 LLVM_ATTRIBUTE_NOINLINE
 void moveAllocStackToBeginningOfBlock(AllocStackInst* AS, SILBasicBlock *BB) {
-  AS->removeFromParent();
-  BB->push_front(AS);
+  AS->moveFront(BB);
 }
 
 /// Assign a single alloc_stack instruction to all the alloc_stacks in the
@@ -390,8 +387,7 @@ void HoistAllocStack::hoist() {
     auto *EntryBB = F->getEntryBlock();
     for (auto *AllocStack : AllocStackToHoist) {
       // Insert at the beginning of the entry block.
-      AllocStack->removeFromParent();
-      EntryBB->push_front(AllocStack);
+      AllocStack->moveFront(EntryBB);
       // Delete dealloc_stacks.
       eraseDeallocStacks(AllocStack);
     }
@@ -429,6 +425,6 @@ class AllocStackHoisting : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
-SILFunctionTransform *irgen::createAllocStackHoisting() {
+SILTransform *irgen::createAllocStackHoisting() {
   return new AllocStackHoisting();
 }

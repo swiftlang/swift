@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-module -o %t -module-name HasPrivateAccess %S/Inputs/HasPrivateAccess1.swift %S/Inputs/HasPrivateAccess2.swift
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -I %t -sdk "" -disable-access-control 2>&1 | %FileCheck -check-prefix=CHECK-ERROR %s

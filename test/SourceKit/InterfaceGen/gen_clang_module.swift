@@ -4,8 +4,7 @@ var x: FooClassBase
 
 // REQUIRES: objc_interop
 
-// RUN: rm -rf %t.overlays
-// RUN: mkdir -p %t.overlays
+// RUN: %empty-directory(%t.overlays)
 //
 // RUN: %swift -emit-module -o %t.overlays -F %S/../Inputs/libIDE-mock-sdk %S/Inputs/Foo.swift
 //

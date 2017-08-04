@@ -283,6 +283,8 @@ class TestCharacterSet : TestCharacterSetSuper {
         // fix that corrected this behavior.
         // TODO: figure out why the simulator is claiming this as a failure.
         // https://bugs.swift.org/browse/SR-4457
+
+        /* Disabled now: rdar://problem/31746923
         #if os(macOS)
             if #available(OSX 10.12.4, iOS 10.3, watchOS 3.2, tvOS 10.2, *) {
                 let abcSet = CharacterSet(charactersIn: "abc")
@@ -297,6 +299,11 @@ class TestCharacterSet : TestCharacterSetSuper {
                 expectFalse(abcSet.isStrictSuperset(of:abcdSet))
             }
         #endif
+        */
+    }
+
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(CharacterSet(), CharacterSet._unconditionallyBridgeFromObjectiveC(nil))
     }
 }
 
@@ -322,6 +329,7 @@ CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
 CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
 CharacterSetTests.test("test_setOperationsOfEmptySet") { TestCharacterSet().test_setOperationsOfEmptySet() }
 CharacterSetTests.test("test_moreSetOperations") { TestCharacterSet().test_moreSetOperations() }
+CharacterSetTests.test("test_unconditionallyBridgeFromObjectiveC") { TestCharacterSet().test_unconditionallyBridgeFromObjectiveC() }
 runAllTests()
 #endif
 

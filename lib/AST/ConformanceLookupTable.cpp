@@ -17,6 +17,7 @@
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
@@ -416,28 +417,6 @@ void ConformanceLookupTable::loadAllConformances(
   }
 }
 
-namespace {
-  /// Visit the protocols referenced by the given type, which was
-  /// uttered at the given location.
-  template<typename AddProtocolFunc>
-  void visitProtocols(Type type, SourceLoc loc, AddProtocolFunc addProtocol) {
-    if (!type) return;
-
-    // Protocol types.
-    if (auto protocol = type->getAs<ProtocolType>()) {
-      addProtocol(protocol->getDecl(), loc);
-      return;
-    }
-
-    // Protocol compositions.
-    if (auto composition = type->getAs<ProtocolCompositionType>()) {
-      for (auto protocol : composition->getProtocols())
-        visitProtocols(protocol, loc, addProtocol);
-      return;
-    }
-  }
-} // end anonymous namespace
-
 bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
                                          ProtocolDecl *protocol, SourceLoc loc,
                                          ConformanceSource source) {
@@ -492,10 +471,11 @@ void ConformanceLookupTable::addProtocols(NominalTypeDecl *nominal,
   // Visit each of the types in the inheritance list to find
   // protocols.
   for (const auto &entry : inherited) {
-    visitProtocols(entry.getType(), entry.getLoc(),
-                   [&](ProtocolDecl *protocol, SourceLoc loc) {
-                     addProtocol(nominal, protocol, loc, source);
-                   });
+    if (!entry.getType() || !entry.getType()->isExistentialType())
+      continue;
+    auto layout = entry.getType()->getExistentialLayout();
+    for (auto *proto : layout.getProtocols())
+      addProtocol(nominal, proto->getDecl(), entry.getLoc(), source);
   }
 }
 
@@ -528,6 +508,7 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
     if (conformingProtocol->isSpecificProtocol(
           KnownProtocolKind::Error) &&
         isa<EnumDecl>(nominal) && nominal->isObjC() &&
+        cast<EnumDecl>(nominal)->hasCases() &&
         cast<EnumDecl>(nominal)->hasOnlyCasesWithoutAssociatedValues()) {
       ASTContext &ctx = nominal->getASTContext();
       if (auto bridgedNSError
@@ -820,16 +801,15 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
 
     // Find the superclass type that matches where the conformance was
     // declared.
-    Type superclassTy = type->getSuperclass(resolver);
+    Type superclassTy = type->getSuperclass();
     while (superclassTy->getAnyNominal() != conformingNominal)
-      superclassTy = superclassTy->getSuperclass(resolver);
+      superclassTy = superclassTy->getSuperclass();
 
     // Look up the inherited conformance.
     ModuleDecl *module = entry->getDeclContext()->getParentModule();
     auto inheritedConformance = module->lookupConformance(superclassTy,
                                                           protocol,
-                                                          resolver)
-                                  .getPointer();
+                                                          resolver);
 
     // Form the inherited conformance.
     conformance = ctx.getInheritedConformance(
@@ -1122,7 +1102,8 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
       if (conf->isInvalid())
         continue;
 
-      conf->forEachValueWitness(resolver, [&](ValueDecl *req,
+      auto normal = conf->getRootNormalConformance();
+      normal->forEachValueWitness(resolver, [&](ValueDecl *req,
                                               ConcreteDeclRef witness) {
         if (witness.getDecl() == member)
           reqs.push_back(req);

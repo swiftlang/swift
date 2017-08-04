@@ -26,9 +26,11 @@ public:
 
   virtual ~IndexDataConsumer() {}
 
+  virtual bool enableWarnings() { return false; }
+  virtual bool indexLocals() { return false; }
+
   virtual void failed(StringRef error) = 0;
   virtual void warning(StringRef warning) {}
-  virtual bool enableWarnings() { return false; }
 
   virtual bool recordHash(StringRef hash, bool isKnown) = 0;
   virtual bool startDependency(StringRef name, StringRef path, bool isClangModule,

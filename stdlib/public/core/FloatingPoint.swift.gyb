@@ -167,9 +167,14 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 ///     print("Average: \(average)°F in \(validTemps.count) " +
 ///           "out of \(tempsFahrenheit.count) observations.")
 ///     // Prints "Average: 74.84°F in 5 out of 7 observations."
-public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
+public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
 
-  /// A type that represents any written exponent.
+  // For the minimumMagnitude and maximumMagnitude methods
+  /// A type that can represent the absolute value of any possible value of the
+  /// conforming type.
+  associatedtype Magnitude = Self
+
+  /// A type that can represent any written exponent.
   associatedtype Exponent: SignedInteger
 
   /// Creates a new value from the given sign, exponent, and significand.
@@ -299,8 +304,6 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   ///     // Prints "false"
   ///     print(y.isNaN)
   ///     // Prints "true"
-  ///
-  /// - SeeAlso: `isNaN`, `signalingNaN`
   static var nan: Self { get }
 
   /// A signaling NaN ("not a number").
@@ -318,8 +321,6 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   ///
   /// Other than these signaling operations, a signaling NaN behaves in the
   /// same manner as a quiet NaN.
-  ///
-  /// - SeeAlso: `nan`
   static var signalingNaN: Self { get }
 
   /// Positive infinity.
@@ -489,60 +490,45 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   var significand: Self { get }
 
-  /// Returns the sum of this value and the given value, rounded to a
+  /// Adds two values and produces their sum, rounded to a
   /// representable value.
   ///
-  /// This method serves as the basis for the addition operator (`+`). For
+  /// The addition operator (`+`) calculates the sum of its two arguments. For
   /// example:
   ///
   ///     let x = 1.5
-  ///     print(x.adding(2.25))
-  ///     // Prints "3.75"
-  ///     print(x + 2.25)
-  ///     // Prints "3.75"
+  ///     let y = x + 2.25
+  ///     // y == 3.75
   ///
-  /// The `adding(_:)` method implements the addition operation defined by the
+  /// The `+` operator implements the addition operation defined by the
   /// [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to add.
-  /// - Returns: The sum of this value and `other`, rounded to a representable
-  ///   value.
-  ///
-  /// - SeeAlso: `add(_:)`
-  func adding(_ other: Self) -> Self
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
+  static func +(_ lhs: Self, _ rhs: Self) -> Self
 
-  /// Adds the given value to this value in place, rounded to a representable
-  /// value.
+  /// Adds two values and stores the result in the left-hand-side variable,
+  /// rounded to a representable value.
   ///
-  /// This method serves as the basis for the in-place addition operator
-  /// (`+=`). For example:
-  ///
-  ///     var (x, y) = (2.25, 2.25)
-  ///     x.add(7.0)
-  ///     // x == 9.25
-  ///     y += 7.0
-  ///     // y == 9.25
-  ///
-  /// - Parameter other: The value to add.
-  ///
-  /// - SeeAlso: `adding(_:)`
-  mutating func add(_ other: Self)
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
+  static func +=(_ lhs: inout Self, _ rhs: Self)
 
-  /// Returns the additive inverse of this value.
+  /// Calculates the additive inverse of a value.
   ///
-  /// The result is always exact. This method serves as the basis for the
-  /// negation operator (prefixed `-`). For example:
+  /// The unary minus operator (prefix `-`) calculates the negation of its
+  /// operand. The result is always exact.
   ///
   ///     let x = 21.5
-  ///     let y = x.negated()
+  ///     let y = -x
   ///     // y == -21.5
   ///
-  /// - Returns: The additive inverse of this value.
-  ///
-  /// - SeeAlso: `negate()`
-  func negated() -> Self
+  /// - Parameter operand: The value to negate.
+  static prefix func - (_ operand: Self) -> Self
 
   /// Replaces this value with its additive inverse.
   ///
@@ -552,132 +538,95 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   ///     var x = 21.5
   ///     x.negate()
   ///     // x == -21.5
-  ///
-  /// - SeeAlso: `negated()`
   mutating func negate()
 
-  /// Returns the difference of this value and the given value, rounded to a
-  /// representable value.
+  /// Subtracts one value from another and produces their difference, rounded
+  /// to a representable value.
   ///
-  /// This method serves as the basis for the subtraction operator (`-`). For
-  /// example:
+  /// The subtraction operator (`-`) calculates the difference of its two
+  /// arguments. For example:
   ///
   ///     let x = 7.5
-  ///     print(x.subtracting(2.25))
-  ///     // Prints "5.25"
-  ///     print(x - 2.25)
-  ///     // Prints "5.25"
-  ///
-  /// The `subtracting(_:)` method implements the subtraction operation
-  /// defined by the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameter other: The value to subtract from this value.
-  /// - Returns: The difference of this value and `other`, rounded to a
-  ///   representable value.
-  ///
-  /// - SeeAlso: `subtract(_:)`
-  func subtracting(_ other: Self) -> Self
-
-  /// Subtracts the given value from this value in place, rounding to a
-  /// representable value.
-  ///
-  /// This method serves as the basis for the in-place subtraction operator
-  /// (`-=`). For example:
-  ///
-  ///     var (x, y) = (7.5, 7.5)
-  ///     x.subtract(2.25)
-  ///     // x == 5.25
-  ///     y -= 2.25
+  ///     let y = x - 2.25
   ///     // y == 5.25
   ///
-  /// - Parameter other: The value to subtract.
-  ///
-  /// - SeeAlso: `subtracting(_:)`
-  mutating func subtract(_ other: Self)
-
-  /// Returns the product of this value and the given value, rounded to a
-  /// representable value.
-  ///
-  /// This method serves as the basis for the multiplication operator (`*`).
-  /// For example:
-  ///
-  ///     let x = 7.5
-  ///     print(x.multiplied(by: 2.25))
-  ///     // Prints "16.875"
-  ///     print(x * 2.25)
-  ///     // Prints "16.875"
-  ///
-  /// The `multiplied(by:)` method implements the multiplication operation
-  /// defined by the [IEEE 754 specification][spec].
+  /// The `-` operator implements the subtraction operation defined by the
+  /// [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to multiply by this value.
-  /// - Returns: The product of this value and `other`, rounded to a
-  ///   representable value.
-  ///
-  /// - SeeAlso: `multiply(by:)`
-  func multiplied(by other: Self) -> Self
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
+  static func -(_ lhs: Self, _ rhs: Self) -> Self
 
-  /// Multiplies this value by the given value in place, rounding to a
+  /// Subtracts the second value from the first and stores the difference in
+  /// the left-hand-side variable, rounding to a representable value.
+  ///
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
+  static func -=(_ lhs: inout Self, _ rhs: Self)
+
+  /// Multiplies two values and produces their product, rounding to a
   /// representable value.
   ///
-  /// This method serves as the basis for the in-place multiplication operator
-  /// (`*=`). For example:
-  ///
-  ///     var (x, y) = (7.5, 7.5)
-  ///     x.multiply(by: 2.25)
-  ///     // x == 16.875
-  ///     y *= 2.25
-  ///     // y == 16.875
-  ///
-  /// - Parameter other: The value to multiply by this value.
-  ///
-  /// - SeeAlso: `multiplied(by:)`
-  mutating func multiply(by other: Self)
-
-  /// Returns the quotient of this value and the given value, rounded to a
-  /// representable value.
-  ///
-  /// This method serves as the basis for the division operator (`/`). For
-  /// example:
+  /// The multiplication operator (`*`) calculates the product of its two
+  /// arguments. For example:
   ///
   ///     let x = 7.5
-  ///     let y = x.divided(by: 2.25)
+  ///     let y = x * 2.25
   ///     // y == 16.875
-  ///     let z = x * 2.25
-  ///     // z == 16.875
   ///
-  /// The `divided(by:)` method implements the division operation
-  /// defined by the [IEEE 754 specification][spec].
+  /// The `*` operator implements the multiplication operation defined by the
+  /// [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to use when dividing this value.
-  /// - Returns: The quotient of this value and `other`, rounded to a
-  ///   representable value.
-  ///
-  /// - SeeAlso: `divide(by:)`
-  func divided(by other: Self) -> Self
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  static func *(_ lhs: Self, _ rhs: Self) -> Self
 
-  /// Divides this value by the given value in place, rounding to a
-  /// representable value.
+  /// Multiplies two values and stores the result in the left-hand-side
+  /// variable, rounding to a representable value.
   ///
-  /// This method serves as the basis for the in-place division operator
-  /// (`/=`). For example:
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  static func *=(_ lhs: inout Self, _ rhs: Self)
+
+  /// Returns the quotient of dividing the first value by the second, rounded
+  /// to a representable value.
   ///
-  ///     var (x, y) = (16.875, 16.875)
-  ///     x.divide(by: 2.25)
-  ///     // x == 7.5
-  ///     y /= 2.25
+  /// The division operator (`/`) calculates the quotient of the division if
+  /// `rhs` is nonzero. If `rhs` is zero, the result of the division is
+  /// infinity, with the sign of the result matching the sign of `lhs`.
+  ///
+  ///     let x = 16.875
+  ///     let y = x / 2.25
   ///     // y == 7.5
   ///
-  /// - Parameter other: The value to use when dividing this value.
+  ///     let z = x / 0
+  ///     // z.isInfinite == true
   ///
-  /// - SeeAlso: `divided(by:)`
-  mutating func divide(by other: Self)
+  /// The `/` operator implements the division operation defined by the [IEEE
+  /// 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - lhs: The value to divide.
+  ///   - rhs: The value to divide `lhs` by.
+  static func /(_ lhs: Self, _ rhs: Self) -> Self
+
+  /// Divides the first value by the second and stores the quotient in the
+  /// left-hand-side variable, rounding to a representable value.
+  ///
+  /// - Parameters:
+  ///   - lhs: The value to divide.
+  ///   - rhs: The value to divide `lhs` by.
+  static func /=(_ lhs: inout Self, _ rhs: Self)
 
   /// Returns the remainder of this value divided by the given value.
   ///
@@ -711,9 +660,6 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other`.
-  ///
-  /// - SeeAlso: `formRemainder(dividingBy:)`,
-  ///   `truncatingRemainder(dividingBy:)`
   func remainder(dividingBy other: Self) -> Self
 
   /// Replaces this value with the remainder of itself divided by the given
@@ -745,9 +691,6 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   /// `remainder(dividingBy:)` method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
-  ///
-  /// - SeeAlso: `remainder(dividingBy:)`,
-  ///   `formTruncatingRemainder(dividingBy:)`
   mutating func formRemainder(dividingBy other: Self)
 
   /// Returns the remainder of this value divided by the given value using
@@ -781,9 +724,6 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
   ///   truncating division.
-  ///
-  /// - SeeAlso: `formTruncatingRemainder(dividingBy:)`,
-  ///   `remainder(dividingBy:)`
   func truncatingRemainder(dividingBy other: Self) -> Self
 
   /// Replaces this value with the remainder of itself divided by the given
@@ -815,9 +755,6 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   /// method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
-  ///
-  /// - SeeAlso: `truncatingRemainder(dividingBy:)`,
-  ///   `formRemainder(dividingBy:)`
   mutating func formTruncatingRemainder(dividingBy other: Self)
 
   /// Returns the square root of the value, rounded to a representable value.
@@ -834,14 +771,10 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   ///     // distance == 5.0
   ///
   /// - Returns: The square root of the value.
-  ///
-  /// - SeeAlso: `sqrt(_:)`, `formSquareRoot()`
   func squareRoot() -> Self
 
   /// Replaces this value with its square root, rounded to a representable
   /// value.
-  ///
-  /// - SeeAlso: `sqrt(_:)`, `squareRoot()`
   mutating func formSquareRoot()
 
   /// Returns the result of adding the product of the two given values to this
@@ -1020,8 +953,6 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   ///
   /// - Parameter rule: The rounding rule to use.
   /// - Returns: The integral value found by rounding using `rule`.
-  ///
-  /// - SeeAlso: `rounded()`, `round(_:)`, `FloatingPointRoundingRule`
   func rounded(_ rule: FloatingPointRoundingRule) -> Self
 
   /// Rounds the value to an integral value using the specified rounding rule.
@@ -1058,8 +989,6 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   ///     // w1 == 7.0
   ///
   /// - Parameter rule: The rounding rule to use.
-  ///
-  /// - SeeAlso: `round()`, `rounded(_:)`, `FloatingPointRoundingRule`
   mutating func round(_ rule: FloatingPointRoundingRule)
 
   /// The least representable value that compares greater than this value.
@@ -1076,7 +1005,7 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
 
   /// The greatest representable value that compares less than this value.
   ///
-  /// For any finite value `x`, `x.nextDown` is greater than `x`. For `nan` or
+  /// For any finite value `x`, `x.nextDown` is less than `x`. For `nan` or
   /// `-infinity`, `x.nextDown` is `x` itself. The following special cases
   /// also apply:
   ///
@@ -1109,7 +1038,8 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   ///
   /// - Parameter other: The value to compare with this value.
   /// - Returns: `true` if `other` has the same value as this instance;
-  ///   otherwise, `false`.
+  ///   otherwise, `false`. If either this value or `other` is NaN, the result
+  ///   of this method is `false`.
   func isEqual(to other: Self) -> Bool
 
   /// Returns a Boolean value indicating whether this instance is less than the
@@ -1139,7 +1069,9 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` is less than this value; otherwise, `false`.
+  /// - Returns: `true` if this value is less than `other`; otherwise, `false`.
+  ///   If either this value or `other` is NaN, the result of this method is
+  ///   `false`.
   func isLess(than other: Self) -> Bool
 
   /// Returns a Boolean value indicating whether this instance is less than or
@@ -1167,24 +1099,24 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` is less than this value; otherwise, `false`.
+  /// - Returns: `true` if `other` is greater than this value; otherwise,
+  ///   `false`. If either this value or `other` is NaN, the result of this
+  ///   method is `false`.
   func isLessThanOrEqualTo(_ other: Self) -> Bool
 
-  /// Returns a Boolean value indicating whether this instance should precede the
-  /// given value in an ascending sort.
+  /// Returns a Boolean value indicating whether this instance should precede
+  /// or tie positions with the given value in an ascending sort.
   ///
   /// This relation is a refinement of the less-than-or-equal-to operator
   /// (`<=`) that provides a total order on all values of the type, including
-  /// noncanonical encodings, signed zeros, and NaNs. Because it is used much
-  /// less frequently than the usual comparisons, there is no operator form of
-  /// this relation.
+  /// signed zeros and NaNs.
   ///
-  /// The following example uses `isTotallyOrdered(below:)` to sort an array of
-  /// floating-point values, including some that are NaN:
+  /// The following example uses `isTotallyOrdered(belowOrEqualTo:)` to sort an
+  /// array of floating-point values, including some that are NaN:
   ///
   ///     var numbers = [2.5, 21.25, 3.0, .nan, -9.5]
-  ///     numbers.sort { $0.isTotallyOrdered(below: $1) }
-  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, nan]
+  ///     numbers.sort { !$1.isTotallyOrdered(belowOrEqualTo: $0) }
+  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, NaN]
   ///
   /// The `isTotallyOrdered(belowOrEqualTo:)` method implements the total order
   /// relation as defined by the [IEEE 754 specification][spec].
@@ -1192,8 +1124,8 @@ public protocol FloatingPoint: Arithmetic, SignedNumber, Strideable, Hashable {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter other: A floating-point value to compare to this value.
-  /// - Returns: `true` if this value is ordered below `other` in a total
-  ///   ordering of the floating-point type; otherwise, `false`.
+  /// - Returns: `true` if this value is ordered below or the same as `other`
+  ///   in a total ordering of the floating-point type; otherwise, `false`.
   func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool
 
   /// A Boolean value indicating whether this instance is normal.
@@ -1313,14 +1245,10 @@ public enum FloatingPointClassification {
   case negativeInfinity
 
   /// A negative value that uses the full precision of the floating-point type.
-  ///
-  /// - SeeAlso: `FloatingPoint.isNormal`
   case negativeNormal
 
   /// A negative, nonzero number that does not use the full precision of the
   /// floating-point type.
-  ///
-  /// - SeeAlso: `FloatingPoint.isSubnormal`
   case negativeSubnormal
 
   /// A value equal to zero with a negative sign.
@@ -1331,13 +1259,9 @@ public enum FloatingPointClassification {
 
   /// A positive, nonzero number that does not use the full precision of the
   /// floating-point type.
-  ///
-  /// - SeeAlso: `FloatingPoint.isSubnormal`
   case positiveSubnormal
 
   /// A positive value that uses the full precision of the floating-point type.
-  ///
-  /// - SeeAlso: `FloatingPoint.isNormal`
   case positiveNormal
 
   /// A value equal to `+infinity`.
@@ -1471,61 +1395,31 @@ public enum FloatingPointRoundingRule {
   case awayFromZero
 }
 
-@_transparent
-public prefix func + <T : FloatingPoint>(x: T) -> T {
-  return x
-}
+extension FloatingPoint {
+  @_transparent
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.isEqual(to: rhs)
+  }
 
-@_transparent
-public prefix func - <T : FloatingPoint>(x: T) -> T {
-  return x.negated()
-}
+  @_transparent
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    return lhs.isLess(than: rhs)
+  }
 
-%{
-binary_arithmetic = [
-('+', 'adding',      'add',      None),
-('-', 'subtracting', 'subtract', None),
-('*', 'multiplied',  'multiply', 'by'),
-('/', 'divided',     'divide',   'by')
-]
-}%
+  @_transparent
+  public static func <= (lhs: Self, rhs: Self) -> Bool {
+    return lhs.isLessThanOrEqualTo(rhs)
+  }
 
-%for op in binary_arithmetic:
-@_transparent
-public func ${op[0]}<T : FloatingPoint>(lhs: T, rhs: T) -> T {
-  return lhs.${op[1]}(${op[3]+': ' if op[3] else ''}rhs)
-}
+  @_transparent
+  public static func > (lhs: Self, rhs: Self) -> Bool {
+    return rhs.isLess(than: lhs)
+  }
 
-@_transparent
-public func ${op[0]}=<T : FloatingPoint>(lhs: inout T, rhs: T) {
-  return lhs.${op[2]}(${op[3]+': ' if op[3] else ''}rhs)
-}
-
-%end
-
-@_transparent
-public func == <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
-  return lhs.isEqual(to: rhs)
-}
-
-@_transparent
-public func < <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
-  return lhs.isLess(than: rhs)
-}
-
-@_transparent
-public func <= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
-  return lhs.isLessThanOrEqualTo(rhs)
-}
-
-@_transparent
-public func > <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
-  return rhs.isLess(than: lhs)
-}
-
-@_transparent
-public func >= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
-  return rhs.isLessThanOrEqualTo(lhs)
+  @_transparent
+  public static func >= (lhs: Self, rhs: Self) -> Bool {
+    return rhs.isLessThanOrEqualTo(lhs)
+  }
 }
 
 /// A radix-2 (binary) floating-point type.
@@ -1536,8 +1430,6 @@ public func >= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
 /// the standard library by `Float`, `Double`, and `Float80` where available.
 ///
 /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-///
-/// - SeeAlso: `FloatingPoint`
 public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
 
   /// A type that represents the encoded significand of a value.
@@ -1576,7 +1468,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// - Parameter value: A floating-point value.
   init(_ value: Double)
 
-#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///
@@ -1647,8 +1539,6 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// The raw encoding of the value's exponent field.
   ///
   /// This value is unadjusted by the type's exponent bias.
-  ///
-  /// - SeeAlso: `exponentBitCount`
   var exponentBitPattern: RawExponent { get }
 
   /// The raw encoding of the value's significand field.
@@ -1709,10 +1599,48 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
 
 extension FloatingPoint {
 
+  /// The unit in the last place of 1.0.
+  ///
+  /// The positive difference between 1.0 and the next greater representable
+  /// number. The `ulpOfOne` constant corresponds to the C macros
+  /// `FLT_EPSILON`, `DBL_EPSILON`, and others with a similar purpose.
   public static var ulpOfOne: Self {
     return Self(1).ulp
   }
 
+  /// Returns this value rounded to an integral value using the specified
+  /// rounding rule.
+  ///
+  /// The following example rounds a value using four different rounding rules:
+  ///
+  ///     let x = 6.5
+  ///
+  ///     // Equivalent to the C 'round' function:
+  ///     print(x.rounded(.toNearestOrAwayFromZero))
+  ///     // Prints "7.0"
+  ///
+  ///     // Equivalent to the C 'trunc' function:
+  ///     print(x.rounded(.towardZero))
+  ///     // Prints "6.0"
+  ///
+  ///     // Equivalent to the C 'ceil' function:
+  ///     print(x.rounded(.up))
+  ///     // Prints "7.0"
+  ///
+  ///     // Equivalent to the C 'floor' function:
+  ///     print(x.rounded(.down))
+  ///     // Prints "6.0"
+  ///
+  /// For more information about the available rounding rules, see the
+  /// `FloatingPointRoundingRule` enumeration. To round a value using the
+  /// default "schoolbook rounding", you can use the shorter `rounded()`
+  /// method instead.
+  ///
+  ///     print(x.rounded())
+  ///     // Prints "7.0"
+  ///
+  /// - Parameter rule: The rounding rule to use.
+  /// - Returns: The integral value found by rounding using `rule`.
   @_transparent
   public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
     var lhs = self
@@ -1742,8 +1670,6 @@ extension FloatingPoint {
   ///
   /// - Returns: The nearest integral value, or, if two integral values are
   ///   equally close, the integral value with greater magnitude.
-  ///
-  /// - SeeAlso: `rounded(_:)`, `round()`, `FloatingPointRoundingRule`
   @_transparent
   public func rounded() -> Self {
     return rounded(.toNearestOrAwayFromZero)
@@ -1768,18 +1694,57 @@ extension FloatingPoint {
   ///
   /// To specify an alternative rule for rounding, use the `round(_:)` method
   /// instead.
-  ///
-  /// - SeeAlso: `round(_:)`, `rounded()`, `FloatingPointRoundingRule`
   @_transparent
   public mutating func round() {
     round(.toNearestOrAwayFromZero)
   }
 
+  /// The greatest representable value that compares less than this value.
+  ///
+  /// For any finite value `x`, `x.nextDown` is less than `x`. For `nan` or
+  /// `-infinity`, `x.nextDown` is `x` itself. The following special cases
+  /// also apply:
+  ///
+  /// - If `x` is `infinity`, then `x.nextDown` is `greatestFiniteMagnitude`.
+  /// - If `x` is `leastNonzeroMagnitude`, then `x.nextDown` is `0.0`.
+  /// - If `x` is zero, then `x.nextDown` is `-leastNonzeroMagnitude`.
+  /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
   @_transparent
   public var nextDown: Self {
     return -(-self).nextUp
   }
 
+  /// Returns the remainder of this value divided by the given value using
+  /// truncating division.
+  ///
+  /// Performing truncating division with floating-point values results in a
+  /// truncated integer quotient and a remainder. For values `x` and `y` and
+  /// their truncated integer quotient `q`, the remainder `r` satisfies
+  /// `x == y * q + r`.
+  ///
+  /// The following example calculates the truncating remainder of dividing
+  /// 8.625 by 0.75:
+  ///
+  ///     let x = 8.625
+  ///     print(x / 0.75)
+  ///     // Prints "11.5"
+  ///
+  ///     let q = (x / 0.75).rounded(.towardZero)
+  ///     // q == 11.0
+  ///     let r = x.truncatingRemainder(dividingBy: 0.75)
+  ///     // r == 0.375
+  ///
+  ///     let x1 = 0.75 * q + r
+  ///     // x1 == 8.625
+  ///
+  /// If this value and `other` are both finite numbers, the truncating
+  /// remainder has the same sign as this value and is strictly smaller in
+  /// magnitude than `other`. The `truncatingRemainder(dividingBy:)` method
+  /// is always exact.
+  ///
+  /// - Parameter other: The value to use when dividing this value.
+  /// - Returns: The remainder of this value divided by `other` using
+  ///   truncating division.
   @_transparent
   public func truncatingRemainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1787,13 +1752,59 @@ extension FloatingPoint {
     return lhs
   }
 
+  /// Returns the remainder of this value divided by the given value.
+  ///
+  /// For two finite values `x` and `y`, the remainder `r` of dividing `x` by
+  /// `y` satisfies `x == y * q + r`, where `q` is the integer nearest to
+  /// `x / y`. If `x / y` is exactly halfway between two integers, `q` is
+  /// chosen to be even. Note that `q` is *not* `x / y` computed in
+  /// floating-point arithmetic, and that `q` may not be representable in any
+  /// available integer type.
+  ///
+  /// The following example calculates the remainder of dividing 8.625 by 0.75:
+  ///
+  ///     let x = 8.625
+  ///     print(x / 0.75)
+  ///     // Prints "11.5"
+  ///
+  ///     let q = (x / 0.75).rounded(.toNearestOrEven)
+  ///     // q == 12.0
+  ///     let r = x.remainder(dividingBy: 0.75)
+  ///     // r == -0.375
+  ///
+  ///     let x1 = 0.75 * q + r
+  ///     // x1 == 8.625
+  ///
+  /// If this value and `other` are finite numbers, the remainder is in the
+  /// closed range `-abs(other / 2)...abs(other / 2)`. The
+  /// `remainder(dividingBy:)` method is always exact. This method implements
+  /// the remainder operation defined by the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameter other: The value to use when dividing this value.
+  /// - Returns: The remainder of this value divided by `other`.
   @_transparent
-  public func remainder(dividingBy rhs: Self) -> Self {
+  public func remainder(dividingBy other: Self) -> Self {
     var lhs = self
-    lhs.formRemainder(dividingBy: rhs)
+    lhs.formRemainder(dividingBy: other)
     return lhs
   }
 
+  /// Returns the square root of the value, rounded to a representable value.
+  ///
+  /// The following example declares a function that calculates the length of
+  /// the hypotenuse of a right triangle given its two perpendicular sides.
+  ///
+  ///     func hypotenuse(_ a: Double, _ b: Double) -> Double {
+  ///         return (a * a + b * b).squareRoot()
+  ///     }
+  ///
+  ///     let (dx, dy) = (3.0, 4.0)
+  ///     let distance = hypotenuse(dx, dy)
+  ///     // distance == 5.0
+  ///
+  /// - Returns: The square root of the value.
   @_transparent
   public func squareRoot( ) -> Self {
     var lhs = self
@@ -1801,6 +1812,19 @@ extension FloatingPoint {
     return lhs
   }
 
+  /// Returns the result of adding the product of the two given values to this
+  /// value, computed without intermediate rounding.
+  ///
+  /// This method is equivalent to the C `fma` function and implements the
+  /// `fusedMultiplyAdd` operation defined by the [IEEE 754
+  /// specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - lhs: One of the values to multiply before adding to this value.
+  ///   - rhs: The other value to multiply.
+  /// - Returns: The product of `lhs` and `rhs`, added to this value.
   @_transparent
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
@@ -1808,6 +1832,33 @@ extension FloatingPoint {
     return addend
   }
 
+  /// Returns the lesser of the two given values.
+  ///
+  /// This method returns the minimum of two values, preserving order and
+  /// eliminating NaN when possible. For two values `x` and `y`, the result of
+  /// `minimum(x, y)` is `x` if `x <= y`, `y` if `y < x`, or whichever of `x`
+  /// or `y` is a number if the other is a quiet NaN. If both `x` and `y` are
+  /// NaN, or either `x` or `y` is a signaling NaN, the result is NaN.
+  ///
+  ///     Double.minimum(10.0, -25.0)
+  ///     // -25.0
+  ///     Double.minimum(10.0, .nan)
+  ///     // 10.0
+  ///     Double.minimum(.nan, -25.0)
+  ///     // -25.0
+  ///     Double.minimum(.nan, .nan)
+  ///     // nan
+  ///
+  /// The `minimum` method implements the `minNum` operation defined by the
+  /// [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - x: A floating-point value.
+  ///   - y: Another floating-point value.
+  /// - Returns: The minimum of `x` and `y`, or whichever is a number if the
+  ///   other is NaN.
   public static func minimum(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
@@ -1817,6 +1868,33 @@ extension FloatingPoint {
     return y
   }
 
+  /// Returns the greater of the two given values.
+  ///
+  /// This method returns the maximum of two values, preserving order and
+  /// eliminating NaN when possible. For two values `x` and `y`, the result of
+  /// `maximum(x, y)` is `x` if `x > y`, `y` if `x <= y`, or whichever of `x`
+  /// or `y` is a number if the other is a quiet NaN. If both `x` and `y` are
+  /// NaN, or either `x` or `y` is a signaling NaN, the result is NaN.
+  ///
+  ///     Double.maximum(10.0, -25.0)
+  ///     // 10.0
+  ///     Double.maximum(10.0, .nan)
+  ///     // 10.0
+  ///     Double.maximum(.nan, -25.0)
+  ///     // -25.0
+  ///     Double.maximum(.nan, .nan)
+  ///     // nan
+  ///
+  /// The `maximum` method implements the `maxNum` operation defined by the
+  /// [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - x: A floating-point value.
+  ///   - y: Another floating-point value.
+  /// - Returns: The greater of `x` and `y`, or whichever is a number if the
+  ///   other is NaN.
   public static func maximum(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
@@ -1826,24 +1904,88 @@ extension FloatingPoint {
     return y
   }
 
+  /// Returns the value with lesser magnitude.
+  ///
+  /// This method returns the value with lesser magnitude of the two given
+  /// values, preserving order and eliminating NaN when possible. For two
+  /// values `x` and `y`, the result of `minimumMagnitude(x, y)` is `x` if
+  /// `x.magnitude <= y.magnitude`, `y` if `y.magnitude < x.magnitude`, or
+  /// whichever of `x` or `y` is a number if the other is a quiet NaN. If both
+  /// `x` and `y` are NaN, or either `x` or `y` is a signaling NaN, the result
+  /// is NaN.
+  ///
+  ///     Double.minimumMagnitude(10.0, -25.0)
+  ///     // 10.0
+  ///     Double.minimumMagnitude(10.0, .nan)
+  ///     // 10.0
+  ///     Double.minimumMagnitude(.nan, -25.0)
+  ///     // -25.0
+  ///     Double.minimumMagnitude(.nan, .nan)
+  ///     // nan
+  ///
+  /// The `minimumMagnitude` method implements the `minNumMag` operation
+  /// defined by the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - x: A floating-point value.
+  ///   - y: Another floating-point value.
+  /// - Returns: Whichever of `x` or `y` has lesser magnitude, or whichever is
+  ///   a number if the other is NaN.
   public static func minimumMagnitude(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
       return x + y
     }
-    if abs(x) <= abs(y) || y.isNaN { return x }
+    if x.magnitude <= y.magnitude || y.isNaN { return x }
     return y
   }
 
+  /// Returns the value with greater magnitude.
+  ///
+  /// This method returns the value with greater magnitude of the two given
+  /// values, preserving order and eliminating NaN when possible. For two
+  /// values `x` and `y`, the result of `maximumMagnitude(x, y)` is `x` if
+  /// `x.magnitude > y.magnitude`, `y` if `x.magnitude <= y.magnitude`, or
+  /// whichever of `x` or `y` is a number if the other is a quiet NaN. If both
+  /// `x` and `y` are NaN, or either `x` or `y` is a signaling NaN, the result
+  /// is NaN.
+  ///
+  ///     Double.maximumMagnitude(10.0, -25.0)
+  ///     // -25.0
+  ///     Double.maximumMagnitude(10.0, .nan)
+  ///     // 10.0
+  ///     Double.maximumMagnitude(.nan, -25.0)
+  ///     // -25.0
+  ///     Double.maximumMagnitude(.nan, .nan)
+  ///     // nan
+  ///
+  /// The `maximumMagnitude` method implements the `maxNumMag` operation
+  /// defined by the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - x: A floating-point value.
+  ///   - y: Another floating-point value.
+  /// - Returns: Whichever of `x` or `y` has greater magnitude, or whichever is
+  ///   a number if the other is NaN.
   public static func maximumMagnitude(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
       return x + y
     }
-    if abs(x) > abs(y) || y.isNaN { return x }
+    if x.magnitude > y.magnitude || y.isNaN { return x }
     return y
   }
 
+  /// The classification of this value.
+  ///
+  /// A value's `floatingPointClass` property describes its "class" as
+  /// described by the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   public var floatingPointClass: FloatingPointClassification {
     if isSignalingNaN { return .signalingNaN }
     if isNaN { return .quietNaN }
@@ -1851,22 +1993,6 @@ extension FloatingPoint {
     if isNormal { return sign == .minus ? .negativeNormal : .positiveNormal }
     if isSubnormal { return sign == .minus ? .negativeSubnormal : .positiveSubnormal }
     return sign == .minus ? .negativeZero : .positiveZero
-  }
-
-%for op in binary_arithmetic:
-  @_transparent
-  public func ${op[1]}(${op[3] if op[3] else '_'} other: Self) -> Self {
-    var lhs = self
-    lhs.${op[2]}(${op[3]+': ' if op[3] else ''}other)
-    return lhs
-  }
-%end
-
-  @_transparent
-  public func negated() -> Self {
-    var rhs = self
-    rhs.negate()
-    return rhs
   }
 }
 
@@ -1881,12 +2007,53 @@ extension BinaryFloatingPoint {
   ///     let magnitude = x.significand * F.radix ** x.exponent
   public static var radix: Int { return 2 }
 
+  /// Creates a new floating-point value using the sign of one value and the
+  /// magnitude of another.
+  ///
+  /// The following example uses this initializer to create a new `Double`
+  /// instance with the sign of `a` and the magnitude of `b`:
+  ///
+  ///     let a = -21.5
+  ///     let b = 305.15
+  ///     let c = Double(signOf: a, magnitudeOf: b)
+  ///     print(c)
+  ///     // Prints "-305.15"
+  ///
+  /// This initializer implements the IEEE 754 `copysign` operation.
+  ///
+  /// - Parameters:
+  ///   - signOf: A value from which to use the sign. The result of the
+  ///     initializer has the same sign as `signOf`.
+  ///   - magnitudeOf: A value from which to use the magnitude. The result of
+  ///     the initializer has the same magnitude as `magnitudeOf`.
   public init(signOf: Self, magnitudeOf: Self) {
     self.init(sign: signOf.sign,
       exponentBitPattern: magnitudeOf.exponentBitPattern,
       significandBitPattern: magnitudeOf.significandBitPattern)
   }
 
+  /// Returns a Boolean value indicating whether this instance should precede
+  /// or tie positions with the given value in an ascending sort.
+  ///
+  /// This relation is a refinement of the less-than-or-equal-to operator
+  /// (`<=`) that provides a total order on all values of the type, including
+  /// signed zeros and NaNs.
+  ///
+  /// The following example uses `isTotallyOrdered(belowOrEqualTo:)` to sort an
+  /// array of floating-point values, including some that are NaN:
+  ///
+  ///     var numbers = [2.5, 21.25, 3.0, .nan, -9.5]
+  ///     numbers.sort { !$1.isTotallyOrdered(belowOrEqualTo: $0) }
+  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, NaN]
+  ///
+  /// The `isTotallyOrdered(belowOrEqualTo:)` method implements the total order
+  /// relation as defined by the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameter other: A floating-point value to compare to this value.
+  /// - Returns: `true` if this value is ordered below or the same as `other`
+  ///   in a total ordering of the floating-point type; otherwise, `false`.
   public func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool {
     // Quick return when possible.
     if self < other { return true }
@@ -1953,6 +2120,53 @@ extension BinaryFloatingPoint {
 @_transparent
 public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {
   return x.magnitude
+}
+
+extension FloatingPoint {
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func negated() -> Self {
+    return -self
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func adding(_ other: Self) -> Self {
+    return self + other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public mutating func add(_ other: Self) {
+    self += other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func subtracting(_ other: Self) -> Self {
+    return self - other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public mutating func subtract(_ other: Self) {
+    self -= other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func multiplied(by other: Self) -> Self {
+    return self * other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public mutating func multiply(by other: Self) {
+    self *= other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func divided(by other: Self) -> Self {
+    return self / other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public mutating func divide(by other: Self) {
+    self /= other
+  }
 }
 
 extension FloatingPoint {

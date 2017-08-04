@@ -620,7 +620,7 @@ static SILValue getZeroToCountArray(SILValue Start, SILValue End) {
 /// loop is only executed if "Start < End".
 static bool isLessThanCheck(SILValue Start, SILValue End,
                             CondBranchInst *CondBr, SILBasicBlock *Preheader) {
-  BuiltinInst *BI = dyn_cast<BuiltinInst>(CondBr->getCondition());
+  auto *BI = dyn_cast<BuiltinInst>(CondBr->getCondition());
   if (!BI)
     return false;
 
@@ -651,9 +651,7 @@ static bool isLessThanCheck(SILValue Start, SILValue End,
       // Special case: if it is a 0-to-count loop, we know that the count cannot
       // be negative. In this case the 'Start < End' check can also be done with
       // 'count != 0'.
-      if (getZeroToCountArray(Start, End))
-        return true;
-      return false;
+      return getZeroToCountArray(Start, End);
     default:
       return false;
   }

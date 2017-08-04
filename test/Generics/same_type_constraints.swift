@@ -154,7 +154,7 @@ extension Dictionary {
 
 // rdar://problem/19245317
 protocol P {
-	associatedtype T: P // expected-error{{type may not reference itself as a requirement}}
+	associatedtype T: P
 }
 
 struct S<A: P> {
@@ -352,11 +352,11 @@ func intercomponentSameComponents<T: P10>(_: T)
                        // FIXME: directionality of constraint above is weird
 
 func intercomponentMoreThanSpanningTree<T: P10>(_: T)
-  where T.A == T.B, // expected-note{{previous same-type constraint 'T.A' == 'T.B' written here}}
+  where T.A == T.B,
         T.B == T.C,
-        T.D == T.E, // expected-warning{{redundant same-type constraint 'T.D' == 'T.E'}}
+        T.D == T.E, // expected-note{{previous same-type constraint 'T.D' == 'T.E' written here}}
         T.D == T.B,
-        T.E == T.B
+        T.E == T.B  // expected-warning{{redundant same-type constraint 'T.B' == 'T.E'}}
         { }
 
 func trivialRedundancy<T: P10>(_: T) where T.A == T.A { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.A'}}
@@ -365,3 +365,10 @@ struct X11<T: P10> where T.A == T.B { }
 
 func intracomponentInferred<T>(_: X11<T>) // expected-note{{previous same-type constraint 'T.A' == 'T.B' inferred from type here}}
   where T.A == T.B { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
+
+// Suppress redundant same-type constraint warnings from result types.
+struct StructTakingP1<T: P1> { }
+
+func resultTypeSuppress<T: P1>() -> StructTakingP1<T> {
+  return StructTakingP1()
+}

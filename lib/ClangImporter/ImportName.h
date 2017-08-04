@@ -54,7 +54,14 @@ enum class ImportNameVersion : unsigned {
   Swift4,
 
   /// A placeholder for the latest version, to be used in loops and such.
-  LAST_VERSION = Swift4
+  LAST_VERSION = Swift4,
+
+  /// The version which should be used for importing types, which need to have
+  /// one canonical definition.
+  ///
+  /// FIXME: Is this supposed to be the /newest/ version, or a canonical
+  /// version that lasts forever as part of the ABI?
+  ForTypes = Swift4
 };
 
 static inline ImportNameVersion &operator++(ImportNameVersion &value) {
@@ -355,9 +362,6 @@ private:
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
-
-  /// Whether we should import this as Swift Private
-  bool shouldBeSwiftPrivate(const clang::NamedDecl *, clang::Sema &clangSema);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,

@@ -18,11 +18,6 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
-  list(APPEND swift_runtime_compile_flags
-    "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
-endif()
-
 set(section_magic_compile_flags ${swift_runtime_compile_flags})
 
 list(APPEND swift_runtime_compile_flags
@@ -33,6 +28,7 @@ set(swift_runtime_objc_sources
     SwiftObject.mm
     SwiftValue.mm
     Reflection.mm
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
 
 set(swift_runtime_sources
@@ -45,6 +41,7 @@ set(swift_runtime_sources
     ErrorObjectNative.cpp
     Errors.cpp
     ErrorDefaultImpls.cpp
+    Exclusivity.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionMachO.cpp
@@ -91,13 +88,18 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   string(TOLOWER "${sdk}" lowercase_sdk)
 
   # These two libraries are only used with the static swiftcore
-  add_library(swiftImageInspectionStatic STATIC
-              ImageInspectionStatic.cpp
-              StaticBinaryELF.cpp)
+  add_swift_library(swiftImageInspectionStatic STATIC
+    ImageInspectionStatic.cpp
+    StaticBinaryELF.cpp
+    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
+    LINK_FLAGS ${swift_runtime_linker_flags})
   set_target_properties(swiftImageInspectionStatic PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
 
-  add_library(swiftImageInspectionShared STATIC ImageInspectionELF.cpp)
+  add_swift_library(swiftImageInspectionShared STATIC
+    ImageInspectionELF.cpp
+    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
+    LINK_FLAGS ${swift_runtime_linker_flags})
   set_target_properties(swiftImageInspectionShared PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
 
