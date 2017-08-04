@@ -26,7 +26,7 @@ TBD
 
 ### Builtins
 
-#### `_fastPath` and `_slowPath`
+#### `_fastPath` and `_slowPath` (also, `_branchHint`)
 
 `_fastPath` returns its argument, wrapped in a Builtin.expect. This informs the optimizer that the vast majority of the time, the branch will be taken (i.e. the then branch is “hot”). The SIL optimizer may alter heuristics for anything dominated by the then branch. But the real performance impact comes from the fact that the SIL optimizer will consider anything dominated by the else branch to be infrequently executed (i.e. “cold”). This means that transformations that may increase code size have very conservative heuristics to keep the rarely executed code small.
 
@@ -34,7 +34,7 @@ The probabilities are passed through to LLVM as branch weight metadata, to lever
 
 `_fastPath` probabilities are compounding, see the example below. For this reason, it can actually degrade performance in non-intuitive ways as it marks all other code (including subsequent `_fastPath`s) as being cold. Consider `_fastPath` as basically spraying the rest of the code with a Mr. Freeze-style ice gun.
 
-`_slowPath` is the same as `_fastPath`, just with the branches swapped.
+`_slowPath` is the same as `_fastPath`, just with the branches swapped. Both are just wrappers around `_branchHint`, which is otherwise never called directly.
 
 *Example:*
 
@@ -65,11 +65,40 @@ return
 This should be rarely used. It informs the SIL optimizer that any code dominated by it should be treated as the innermost loop of a performance critical section of code. It cranks optimizer heuristics to 11. Injudicious use of this will degrade performance and bloat binary size.
 
 
+#### `_precondition`, `_debugPrecondition`, and `_sanityCheck`
+
+These three functions are assertions that will trigger a run time trap if violated.
+
+* `_precondition` executes in all build configurations. Use this for invariant enforcement in all user code build configurations
+* `_debugPrecondition` will execute when **user code** is built with assertions enabled. Use this for invariant enforcement that's useful while debugging, but might be prohibitively expensive when user code is configured without assertions.
+* `_sanityCheck` will execute when **standard library code** is built with assertions enabled. Use this for internal only invariant checks that useful for debugging the standard library itself.
+
+
 ### Annotations
+
+#### `@_versioned`
+
+TBD
+
+#### `@_inlineable`
+
+TBD
+
+#### `@_inline(__always)` and `@inline(never)`
+
+TBD
+
+#### `@semantics(...)`
 
 TBD
 
 ### Versioning and Compatibility
+
+#### `@available`
+
+TBD
+
+#### `@_silgen_name`
 
 TBD
 
