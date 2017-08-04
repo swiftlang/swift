@@ -374,6 +374,8 @@ def Onone : Flag<["-"], "Onone">, Group<O_Group>, Flags<[FrontendOption]>,
   HelpText<"Compile without any optimization">;
 def O : Flag<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>,
   HelpText<"Compile with optimizations">;
+def Osize : Flag<["-"], "Osize">, Group<O_Group>, Flags<[FrontendOption]>,
+  HelpText<"Compile with optimizations and target small code size">;
 def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
   Flags<[FrontendOption]>,
   HelpText<"Compile with optimizations and remove runtime safety checks">;

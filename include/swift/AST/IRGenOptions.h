@@ -97,6 +97,9 @@ public:
   /// Whether or not to run optimization passes.
   unsigned Optimize : 1;
 
+  /// Whether or not to optimize for code size.
+  unsigned OptimizeForSize : 1;
+
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
 
@@ -173,7 +176,8 @@ public:
 
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
-        Verify(true), Optimize(false), Sanitizers(OptionSet<SanitizerKind>()),
+        Verify(true), Optimize(false), OptimizeForSize(false),
+        Sanitizers(OptionSet<SanitizerKind>()),
         DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
         DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
         DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
@@ -197,6 +201,7 @@ public:
   unsigned getLLVMCodeGenOptionsHash() {
     unsigned Hash = 0;
     Hash = (Hash << 1) | Optimize;
+    Hash = (Hash << 1) | OptimizeForSize;
     Hash = (Hash << 1) | DisableLLVMOptzns;
     Hash = (Hash << 1) | DisableLLVMARCOpts;
     return Hash;
