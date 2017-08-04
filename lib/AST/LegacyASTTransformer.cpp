@@ -537,13 +537,6 @@ LegacyASTTransformer::visitRepeatWhileStmt(RepeatWhileStmt *S,
 }
 
 RC<SyntaxData>
-LegacyASTTransformer::visitForStmt(ForStmt *S,
-                                   const SyntaxData *Parent,
-                                   const CursorIndex IndexInParent) {
-  return getUnknownStmt(S);
-}
-
-RC<SyntaxData>
 LegacyASTTransformer::visitForEachStmt(ForEachStmt *S,
                                        const SyntaxData *Parent,
                                        const CursorIndex IndexInParent) {

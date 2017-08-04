@@ -1078,9 +1078,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
   case StmtKind::RepeatWhile:
     return new (ctx) ASTScope(parent, cast<RepeatWhileStmt>(stmt));
 
-  case StmtKind::For:
-    llvm_unreachable("Parser doesn't produce ForStmt anymore");
-
   case StmtKind::ForEach:
     return new (ctx) ASTScope(ASTScopeKind::ForEachStmt, parent,
                               cast<ForEachStmt>(stmt));
