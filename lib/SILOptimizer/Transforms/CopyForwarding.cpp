@@ -1474,12 +1474,12 @@ void TempRValueOptimization::removeTemp() {
   for (auto *dealloc : deallocInsts)
     dealloc->eraseFromParent();
 
+  // This def may have been identified as a candidate for further attempts to
+  // perform copy forwarding.
+  CopiedDefs.remove(copyDest);
   copyDest->replaceAllUsesWith(copyInst->getSrc());
   copyDest->eraseFromParent();
 
-  // This copy might have been identified as a candidate for normal copy
-  // propagation.
-  CopiedDefs.remove(copyInst);
   copyInst->eraseFromParent();
 }
 

@@ -776,3 +776,20 @@ bb5:
   %40 = tuple ()
   return %40 : $()
 }
+
+// Make sure that we do not crash here.
+sil @copy_forwarding_crash_1 : $@convention(thin) (@in Builtin.NativeObject, @thick Builtin.NativeObject.Type) -> @out Builtin.NativeObject {
+bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @trivial $*Builtin.NativeObject, %2 : @trivial $@thick Builtin.NativeObject.Type):
+  %3 = alloc_stack $Builtin.NativeObject           // users: %6, %11, %10, %8
+  %4 = alloc_stack $Builtin.NativeObject           // users: %7, %6, %5
+  copy_addr %1 to [initialization] %4 : $*Builtin.NativeObject // id: %5
+  copy_addr [take] %4 to [initialization] %3 : $*Builtin.NativeObject // id: %6
+  dealloc_stack %4 : $*Builtin.NativeObject        // id: %7
+  copy_addr %3 to [initialization] %0 : $*Builtin.NativeObject // id: %8
+  destroy_addr %1 : $*Builtin.NativeObject         // id: %9
+  destroy_addr %3 : $*Builtin.NativeObject         // id: %10
+  dealloc_stack %3 : $*Builtin.NativeObject        // id: %11
+  %12 = tuple ()
+  %13 = tuple ()                                  // user: %14
+  return %13 : $()                                // id: %14
+}
