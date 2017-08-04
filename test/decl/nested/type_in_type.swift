@@ -381,12 +381,28 @@ struct Claws<A: ExpressibleByCatLiteral> {
   struct Fangs<B: ExpressibleByDogLiteral> { }
 }
 
+struct NotADog {}
+
 func pets<T>(fur: T) -> Claws<Kitten>.Fangs<T> {
   return Claws<Kitten>.Fangs<T>()
 }
 
+func something<T>() -> T { // expected-note {{in call to function 'something'}}
+  while true {}
+}
+
 func test() {
   let _: Claws<Kitten>.Fangs<Puppy> = pets(fur: Puppy())
+
+  // <https://bugs.swift.org/browse/SR-5600>
+  let _: Claws.Fangs<Puppy> = pets(fur: Puppy())
+  let _: Claws.Fangs<Puppy> = Claws<Kitten>.Fangs()
+  let _: Claws.Fangs<Puppy> = Claws.Fangs()
+  // expected-error@-1 {{cannot convert value of type 'Claws<_>.Fangs<_>' to specified type 'Claws.Fangs<Puppy>'}}
+  let _: Claws.Fangs<NotADog> = something()
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}} // FIXME: bad diagnostic
+  _ = Claws.Fangs<NotADog>()
+  // expected-error@-1 {{type 'NotADog' does not conform to protocol 'ExpressibleByDogLiteral'}}
 }
 
 // https://bugs.swift.org/browse/SR-4379
