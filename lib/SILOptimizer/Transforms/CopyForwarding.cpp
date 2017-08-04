@@ -538,6 +538,7 @@ propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
     if (forwardDeadTempCopy(srcCopy, CopyInst)) {
       DEBUG(llvm::dbgs() << "  Temp Copy:" << *srcCopy
             << "         to " << *CopyInst);
+      srcCopy->eraseFromParent();
       HasChanged = true;
       ++NumDeadTemp;
       return true;
@@ -675,7 +676,6 @@ forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy) {
 
   destCopy->setSrc(srcCopy->getSrc());
   destCopy->setIsTakeOfSrc(srcCopy->isTakeOfSrc());
-  srcCopy->eraseFromParent();
   return true;
 }
 
