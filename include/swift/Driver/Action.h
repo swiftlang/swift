@@ -19,6 +19,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Chrono.h"
 
 namespace llvm {
@@ -33,9 +34,9 @@ namespace driver {
 
 class Action {
 public:
-  typedef ActionList::size_type size_type;
-  typedef ActionList::iterator iterator;
-  typedef ActionList::const_iterator const_iterator;
+  typedef ArrayRef<const Action *>::size_type size_type;
+  typedef ArrayRef<const Action *>::iterator iterator;
+  typedef ArrayRef<const Action *>::const_iterator const_iterator;
 
   enum ActionClass {
     Input = 0,
@@ -96,11 +97,11 @@ public:
 };
 
 class JobAction : public Action {
-  ActionList Inputs;
+  TinyPtrVector<const Action *> Inputs;
   virtual void anchor();
 protected:
-  JobAction(ActionClass Kind, ArrayRef<Action *> Inputs, types::ID Type)
-      : Action(Kind, Type), Inputs(Inputs.begin(), Inputs.end()) {}
+  JobAction(ActionClass Kind, ArrayRef<const Action *> Inputs, types::ID Type)
+      : Action(Kind, Type), Inputs(Inputs) {}
 
 public:
   ~JobAction() override;
@@ -108,8 +109,8 @@ public:
   bool getOwnsInputs() const { return Action::getOwnsInputs(); }
   void setOwnsInputs(bool Value) { Action::setOwnsInputs(Value); }
 
-  ArrayRef<Action *> getInputs() const { return Inputs; }
-  void addInput(Action *Input) { Inputs.push_back(Input); }
+  ArrayRef<const Action *> getInputs() const { return Inputs; }
+  void addInput(const Action *Input) { Inputs.push_back(Input); }
 
   size_type size() const { return Inputs.size(); }
 
@@ -194,7 +195,7 @@ private:
   // This index specifies which of the files to select for the input.
   int InputIndex;
 public:
-  BackendJobAction(Action *Input, types::ID OutputType, int InputIndex)
+  BackendJobAction(const Action *Input, types::ID OutputType, int InputIndex)
       : JobAction(Action::BackendJob, Input, OutputType),
         InputIndex(InputIndex) {}
   static bool classof(const Action *A) {
@@ -229,7 +230,7 @@ public:
 class MergeModuleJobAction : public JobAction {
   virtual void anchor();
 public:
-  MergeModuleJobAction(ArrayRef<Action *> Inputs)
+  MergeModuleJobAction(ArrayRef<const Action *> Inputs)
       : JobAction(Action::MergeModuleJob, Inputs, types::TY_SwiftModuleFile) {}
 
   static bool classof(const Action *A) {
@@ -240,7 +241,7 @@ public:
 class ModuleWrapJobAction : public JobAction {
   virtual void anchor();
 public:
-  ModuleWrapJobAction(ArrayRef<Action *> Inputs)
+  ModuleWrapJobAction(ArrayRef<const Action *> Inputs)
       : JobAction(Action::ModuleWrapJob, Inputs, types::TY_Object) {}
 
   static bool classof(const Action *A) {
@@ -251,7 +252,7 @@ public:
 class AutolinkExtractJobAction : public JobAction {
   virtual void anchor();
 public:
-  AutolinkExtractJobAction(ArrayRef<Action *> Inputs)
+  AutolinkExtractJobAction(ArrayRef<const Action *> Inputs)
       : JobAction(Action::AutolinkExtractJob, Inputs, types::TY_AutolinkFile) {}
 
   static bool classof(const Action *A) {
@@ -262,7 +263,7 @@ public:
 class GenerateDSYMJobAction : public JobAction {
   virtual void anchor();
 public:
-  explicit GenerateDSYMJobAction(Action *Input)
+  explicit GenerateDSYMJobAction(const Action *Input)
     : JobAction(Action::GenerateDSYMJob, Input, types::TY_dSYM) {}
 
   static bool classof(const Action *A) {
@@ -273,7 +274,7 @@ public:
 class VerifyDebugInfoJobAction : public JobAction {
   virtual void anchor();
 public:
-  explicit VerifyDebugInfoJobAction(Action *Input)
+  explicit VerifyDebugInfoJobAction(const Action *Input)
     : JobAction(Action::VerifyDebugInfoJob, Input, types::TY_Nothing) {}
 
   static bool classof(const Action *A) {
@@ -286,7 +287,7 @@ class GeneratePCHJobAction : public JobAction {
 
   virtual void anchor();
 public:
-  GeneratePCHJobAction(Action *Input, StringRef persistentPCHDir)
+  GeneratePCHJobAction(const Action *Input, StringRef persistentPCHDir)
     : JobAction(Action::GeneratePCHJob, Input,
                 persistentPCHDir.empty() ? types::TY_PCH : types::TY_Nothing),
       PersistentPCHDir(persistentPCHDir) {}
@@ -304,7 +305,7 @@ class LinkJobAction : public JobAction {
   LinkKind Kind;
 
 public:
-  LinkJobAction(ArrayRef<Action *> Inputs, LinkKind K)
+  LinkJobAction(ArrayRef<const Action *> Inputs, LinkKind K)
       : JobAction(Action::LinkJob, Inputs, types::TY_Image), Kind(K) {
     assert(Kind != LinkKind::None);
   }

@@ -653,7 +653,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   }
 
   // Construct the graph of Actions.
-  ActionList Actions;
+  SmallVector<const Action *, 8> Actions;
   buildActions(*TC, *TranslatedArgList, Inputs, OI, OFM.get(),
                rebuildEverything ? nullptr : &outOfDateMap, Actions);
 
@@ -1335,9 +1335,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 }
 
 static void
-currentDependsOnPCHIfPresent(JobAction *PCH,
+currentDependsOnPCHIfPresent(const JobAction *PCH,
                              std::unique_ptr<Action> &Current,
-                             ActionList &Actions) {
+                             SmallVectorImpl<const Action *> &Actions) {
   if (PCH) {
     // FIXME: When we have a PCH job, it's officially owned by the Actions
     // array; but it's also a secondary input to each of the current
@@ -1361,14 +1361,14 @@ void Driver::buildActions(const ToolChain &TC,
                           const OutputInfo &OI,
                           const OutputFileMap *OFM,
                           const InputInfoMap *OutOfDateMap,
-                          ActionList &Actions) const {
+                          SmallVectorImpl<const Action *> &Actions) const {
   if (!SuppressNoInputFilesError && Inputs.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_no_input_files);
     return;
   }
 
-  ActionList AllModuleInputs;
-  ActionList AllLinkerInputs;
+  SmallVector<const Action *, 2> AllModuleInputs;
+  SmallVector<const Action *, 2> AllLinkerInputs;
 
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile: {
@@ -1679,7 +1679,7 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args) const {
   return OFM;
 }
 
-void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
+void Driver::buildJobs(ArrayRef<const Action *> Actions, const OutputInfo &OI,
                        const OutputFileMap *OFM, const ToolChain &TC,
                        Compilation &C) const {
   llvm::PrettyStackTraceString CrashInfo("Building compilation jobs");
@@ -2026,9 +2026,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   }
 
   // 2. Build up the list of input jobs.
-  ActionList InputActions;
+  SmallVector<const Action *, 4> InputActions;
   SmallVector<const Job *, 4> InputJobs;
-  for (Action *Input : *JA) {
+  for (const Action *Input : *JA) {
     if (auto *InputJobAction = dyn_cast<JobAction>(Input)) {
       InputJobs.push_back(buildJobsForAction(C, InputJobAction, OI, OFM,
                                              TC, false, JobCache));
@@ -2041,7 +2041,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   StringRef BaseInput;
   if (!InputActions.empty()) {
     // Use the first InputAction as our BaseInput.
-    InputAction *IA = cast<InputAction>(InputActions[0]);
+    const InputAction *IA = cast<InputAction>(InputActions[0]);
     BaseInput = IA->getInputArg().getValue();
   } else if (!InputJobs.empty()) {
     // Use the first Job's BaseInput as our BaseInput.
@@ -2080,8 +2080,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       Output->addPrimaryOutput(OutputFile, Input);
     };
     // Add an output file for each input action.
-    for (Action *A : InputActions) {
-      InputAction *IA = cast<InputAction>(A);
+    for (const Action *A : InputActions) {
+      const InputAction *IA = cast<InputAction>(A);
       OutputFunc(IA->getInputArg().getValue());
 
     }
@@ -2407,7 +2407,7 @@ static unsigned printActions(const Action *A,
   return Id;
 }
 
-void Driver::printActions(const ActionList &Actions) const {
+void Driver::printActions(ArrayRef<const Action *> Actions) const {
   llvm::DenseMap<const Action *, unsigned> Ids;
   for (const Action *A : Actions) {
     ::printActions(A, Ids);

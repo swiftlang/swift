@@ -43,6 +43,7 @@ namespace opt {
 namespace swift {
   class DiagnosticEngine;
 namespace driver {
+  class Action;
   class Compilation;
   class Job;
   class JobAction;
@@ -222,7 +223,7 @@ public:
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
                     const InputFileList &Inputs, const OutputInfo &OI,
                     const OutputFileMap *OFM, const InputInfoMap *OutOfDateMap,
-                    ActionList &Actions) const;
+                    SmallVectorImpl<const Action *> &Actions) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
   std::unique_ptr<OutputFileMap>
@@ -236,7 +237,7 @@ public:
   /// \param OFM The OutputFileMap for which Jobs should be generated.
   /// \param TC The ToolChain to build Jobs with.
   /// \param[out] C The Compilation to which Jobs should be added.
-  void buildJobs(const ActionList &Actions, const OutputInfo &OI,
+  void buildJobs(ArrayRef<const Action *> Actions, const OutputInfo &OI,
                  const OutputFileMap *OFM, const ToolChain &TC,
                  Compilation &C) const;
 
@@ -268,7 +269,7 @@ public:
   bool handleImmediateArgs(const llvm::opt::ArgList &Args, const ToolChain &TC);
 
   /// Print the list of Actions.
-  void printActions(const ActionList &Actions) const;
+  void printActions(ArrayRef<const Action *> Actions) const;
 
   /// Print the list of Jobs in a Compilation.
   void printJobs(const Compilation &C) const;

@@ -162,7 +162,7 @@ public:
   std::unique_ptr<Job> constructJob(const JobAction &JA,
                                     Compilation &C,
                                     SmallVectorImpl<const Job *> &&inputs,
-                                    const ActionList &inputActions,
+                                    ArrayRef<const Action *> inputActions,
                                     std::unique_ptr<CommandOutput> output,
                                     const OutputInfo &OI) const;
 
