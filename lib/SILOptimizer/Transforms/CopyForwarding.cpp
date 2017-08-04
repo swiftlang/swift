@@ -1250,7 +1250,10 @@ static SILValue getSingleModifiedSource(SILInstruction *inst) {
   case ValueKind::StoreUnownedInst:
     return cast<StoreUnownedInst>(inst)->getDest();
   case ValueKind::CopyAddrInst:
-    return cast<CopyAddrInst>(inst)->getSrc();
+    if (cast<CopyAddrInst>(inst)->isTakeOfSrc())
+      return SILValue();
+
+    return cast<CopyAddrInst>(inst)->getDest();
   }
 }
 
@@ -1265,25 +1268,107 @@ static bool isCopyIntoTemp(CopyAddrInst *copyInst) {
 }
 
 /// Precondition: isCopyIntoTemp(copyInst) == true.
-///
-/// Check if any instructions within this temporary copy's lifetime can modify
-/// memory. If so, return false.
-///
-/// Otherwise, the temporary itself must be read-only. Replace all uses of the
-/// copy's alloc_stack destination with the copy's source. Return true.
-static bool removeTempRValue(CopyAddrInst *copyInst) {
-  DEBUG(llvm::dbgs() << "Checking read only temp" << *copyInst);
+class TempRValueOptimization {
+  CopyAddrInst *copyInst;
 
   // The copy's destination is the temporary.
-  auto *copyDest = cast<AllocStackInst>(copyInst->getDest());
+  AllocStackInst *copyDest;
 
-  // Scan all uses of the temporary storage to verify they refer to the copy's
-  // destination value. It is sufficient to check that the only users that
-  // modify memory are the copy_addr [initialization] and destroy_addr.
-  SILBasicBlock *initBB = copyInst->getParent();
-  SmallVector<DestroyAddrInst *, 4> destroyInsts;
+  // Is the copy's source also an identified object. This isn't strictly
+  // necessary but can improve analysis.
+  bool identifiedCopySrc;
+
+  SILBasicBlock *initBB;
+
+  // All "normal" uses of the temporary,
+  // including copy_addr [take] %copyDest to ...
+  SmallPtrSet<SILInstruction *, 4> useInsts;
+
+  // These destroys cover all the temporary's end-of-lifetime points.
+  // Includes destroy_addr and copy_addr [take] %copyDest to ...
+  SmallVector<SILInstruction *, 4> destroyInsts;
+
+  // Record all DeallocStacks for conventience because don't want to subtitute
+  // their operands.
   SmallVector<DeallocStackInst *, 4> deallocInsts;
-  SmallPtrSet<SILBasicBlock *, 4> deadInBlocks;
+
+  // A set of copies for future optimization. If we erase a copy, remove it from
+  // this set (a bit hacky).
+  llvm::SmallSetVector<SILValue, 16> &CopiedDefs;
+
+public:
+  TempRValueOptimization(CopyAddrInst *copyInst,
+                         llvm::SmallSetVector<SILValue, 16> &CopiedDefs)
+      : copyInst(copyInst), copyDest(cast<AllocStackInst>(copyInst->getDest())),
+        identifiedCopySrc(isIdentifiedSourceValue(copyInst->getSrc())),
+        initBB(copyInst->getParent()), CopiedDefs(CopiedDefs) {}
+
+  bool optimize();
+
+protected:
+  bool collectLoads(SILInstruction *user);
+  bool collectUses();
+  bool mayModifySource(SILInstruction *inst);
+  bool checkNoSourceModification();
+  void removeTemp();
+};
+
+// collectUses helper. Transitively explore all data flow uses of the given
+// address until reaching a load or returning false.
+bool TempRValueOptimization::collectLoads(SILInstruction *user) {
+  // All normal uses (loads) must be in the initialization block.
+  // (The destroy and dealloc are commonly in a different block though.)
+  if (user->getParent() != initBB)
+    return false;
+
+  // Only allow uses that cannot destroy their operand. We need to be sure
+  // that replacing all this temporary's uses with the copy source doesn't
+  // destroy the source. This way, we know that the destroy_addr instructions
+  // that we recorded cover all the temporary's lifetime termination points.
+  //
+  // Currently we whitelist address projections and loads.
+  //
+  // FIXME: handle non-destructive projections of enums
+  // (unchecked_take_enum_data_addr of Optional is nondestructive.)
+  switch (user->getKind()) {
+  default:
+    DEBUG(llvm::dbgs() << "  Temp use may write/destroy its source" << *user);
+    return false;
+
+  // Transitively look through projections on stack addresses.
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+    for (auto *useOper : user->getUses()) {
+      if (!collectLoads(useOper->getUser()))
+        return false;
+    }
+    return true;
+
+  // Loads are the end of the data flow chain. The users of the load can't
+  // access the temporary storage.
+  case ValueKind::LoadInst:
+  case ValueKind::LoadBorrowInst:
+    useInsts.insert(user);
+    return true;
+
+  case ValueKind::CopyAddrInst:
+    if (cast<CopyAddrInst>(user)->getDest() == copyDest) {
+      DEBUG(llvm::dbgs() << "  Temp initialized by another copy" << *user);
+      return false;
+    }
+    // Allow a copy_addr that only reads from this temporary.
+    useInsts.insert(user);
+    if (cast<CopyAddrInst>(user)->isTakeOfSrc())
+      destroyInsts.push_back(user);
+
+    return true;
+  }
+}
+
+// Scan all uses of the temporary storage (copyDest) to verify they all refer to
+// the value initialized by this copy. It is sufficient to check that the only
+// users that modify memory are the copy_addr [initialization] and destroy_addr.
+bool TempRValueOptimization::collectUses() {
   for (auto *useOper : copyDest->getUses()) {
     SILInstruction *user = useOper->getUser();
 
@@ -1299,104 +1384,122 @@ static bool removeTempRValue(CopyAddrInst *copyInst) {
       continue;
     }
 
-    // Only handle temporaries within normal uses inside a block.
-    // (The destroy and dealloc are commonly in a different block though.)
-    if (user->getParent() != initBB)
+    if (!collectLoads(user))
       return false;
-
-    // Only allow uses that cannot destroy their operand. We need to be sure
-    // that replacing all this temporary's uses with the copy source doesn't
-    // destroy the source.
-    //
-    // Currently we whitelist address projections and loads.
-    switch (user->getKind()) {
-    default:
-      DEBUG(llvm::dbgs() << "  Temp use may write/destroy its source" << *user);
-      return false;
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
-    case ValueKind::LoadInst:
-    case ValueKind::LoadBorrowInst:
-      break;
-    case ValueKind::CopyAddrInst:
-      if (cast<CopyAddrInst>(user)->getDest() == copyDest) {
-        DEBUG(llvm::dbgs() << "  Temp initialized by another copy" << *user);
-        return false;
-      }
-      // Allow a copy_addr that only reads from this temporary.
-      break;
-    }
   }
+  return true;
+}
 
-  // If this copied value is destroyed before memory is written, then it
-  // is an optimizable temp rvalue. We allow some memory writes as long as they
-  // are to identified objects other than this copy's source and dest.
+// Return true if the given instruction may modify the copy source's storage.
+bool TempRValueOptimization::mayModifySource(SILInstruction *inst) {
+  if (!inst->mayWriteToMemory())
+    return false;
+
+  if (!identifiedCopySrc)
+    return true;
+
+  SILValue instSrc = getSingleModifiedSource(inst);
+  if (!instSrc)
+    return true;
+
+  instSrc = getUnderlyingObject(instSrc);
+  if (!isIdentifiedSourceValue(instSrc))
+    return true;
+
+  assert(instSrc != copyInst->getDest());
+  return instSrc == copyInst->getSrc();
+};
+
+// The temporary is only loaded from. Now check if the copy's source can be
+// modified within the temporary's lifetime. Unfortunately, we cannot simply use
+// the destroy points as the lifetime end, because SILGen sinks the
+// destroys. Instead we guarantee that all normal uses are within the init block
+// and look for the last use, which effectively ends the lifetime.
+bool TempRValueOptimization::checkNoSourceModification() {
+  // If this copied value is destroyed before the source memory is written, then
+  // it is an optimizable temp rvalue. We allow some memory writes as long as
+  // they are to identified objects other than this copy's source and dest.
+
+  if (useInsts.empty())
+    return true;
+
+  // The destination is a read-only stack-allocated temporary. Double-check that
+  // it's considered "identified" for alias analysis.
   assert(isIdentifiedDestValue(copyInst->getDest()));
-  bool identifiedCopySrc = isIdentifiedSourceValue(copyInst->getSrc());
 
-  auto mayModifyCopy = [copyInst, identifiedCopySrc](SILInstruction *inst) {
-    if (!inst->mayWriteToMemory())
-      return false;
-
-    if (!identifiedCopySrc)
-      return true;
-
-    SILValue instSrc = getSingleModifiedSource(inst);
-    if (!instSrc)
-      return true;
-
-    instSrc = getUnderlyingObject(instSrc);
-    if (!isIdentifiedSourceValue(instSrc))
-      return true;
-
-    return instSrc == copyInst->getSrc() || instSrc == copyInst->getDest();
-  };
-
-  auto regionMayModifyCopy = [mayModifyCopy](SILBasicBlock::iterator begin,
-                                             SILBasicBlock::iterator end) {
-    for (auto iter = begin; iter != end; ++iter) {
-      if (mayModifyCopy(&*iter)) {
-        DEBUG(llvm::dbgs() << "  Temp may be modified by" << *iter);
+  auto iter = std::next(copyInst->getIterator());
+  // collectUses guaranteed that the useful lifetime of the temporary ends in
+  // the initialization block.
+  auto iterEnd = copyInst->getParent()->end();
+  for (; iter != iterEnd; ++iter) {
+    // If this is the last use of the temp and modifies the source it is ok.
+    // This correctly handles copy_addr [take] %dest to %src. Since all uses
+    // are loads (or copy_addr), we know a use instruction cannot modify the
+    // source before reading the temporary.
+    if (useInsts.erase(&*iter)) {
+      if (useInsts.empty())
         return true;
-      }
     }
-    return false;
-  };
-
-  auto initBlockEnd = initBB->end();
-  for (auto *destroy : destroyInsts) {
-    SILBasicBlock *destroyBB = destroy->getParent();
-    if (destroyBB == initBB) {
-      assert(initBlockEnd == initBB->end());
-      initBlockEnd = destroy->getIterator();
-      continue;
-    }
-    if (destroyBB->getSinglePredecessorBlock() != initBB) {
-      DEBUG(llvm::dbgs() << "  Temp lifetime spans multiple CFG edges.");
+    if (mayModifySource(&*iter)) {
+      DEBUG(llvm::dbgs() << "  Temp may be modified by" << *iter);
       return false;
     }
-
-    if (regionMayModifyCopy(destroyBB->begin(), destroy->getIterator()))
-      return false;
   }
-  if (regionMayModifyCopy(std::next(copyInst->getIterator()), initBlockEnd))
-    return false;
+  // For some reason, not all normal uses have been seen between the copy and
+  // the end of the initialization block. If collectLoads does it's job well we
+  // should never reach here.
+  return false;
+}
 
+void TempRValueOptimization::removeTemp() {
   DEBUG(llvm::dbgs() << "Eliminating temp RValue copy" << *copyInst);
 
-  SILValue copySrc = copyInst->getSrc();
-
-  copyInst->eraseFromParent();
-
-  for (auto *destroy : destroyInsts)
-    destroy->eraseFromParent();
+  for (auto *destroy : destroyInsts) {
+    if (isa<DestroyAddrInst>(destroy)) {
+      destroy->eraseFromParent();
+      continue;
+    }
+    auto *copyTake = cast<CopyAddrInst>(destroy);
+    assert(copyTake->isTakeOfSrc() && copyTake->getSrc() == copyDest);
+    // Don't create identity copies.
+    if (copyTake->getDest() == copyInst->getSrc()) {
+      CopiedDefs.remove(copyTake);
+      copyTake->eraseFromParent();
+    } else {
+      // Convert it from a take to a normal copy.
+      copyTake->setIsTakeOfSrc(IsNotTake);
+    }
+  }
 
   for (auto *dealloc : deallocInsts)
     dealloc->eraseFromParent();
 
-  copyDest->replaceAllUsesWith(copySrc);
+  copyDest->replaceAllUsesWith(copyInst->getSrc());
   copyDest->eraseFromParent();
+
+  // This copy might have been identified as a candidate for normal copy
+  // propagation.
+  CopiedDefs.remove(copyInst);
+  copyInst->eraseFromParent();
+}
+
+/// Precondition: isCopyIntoTemp(copyInst) == true.
+///
+/// Check if any instructions within this temporary copy's lifetime can modify
+/// memory. If so, return false.
+///
+/// Otherwise, the temporary itself must be read-only. Replace all uses of the
+/// copy's alloc_stack destination with the copy's source. Return true.
+bool TempRValueOptimization::optimize() {
+  DEBUG(llvm::dbgs() << "Checking read only temp" << *copyInst);
+
+  if (!collectUses())
+    return false;
+
+  if (!checkNoSourceModification())
+    return false;
+
+  removeTemp();
 
   return true;
 }
@@ -1537,7 +1640,8 @@ class CopyForwardingPass : public SILFunctionTransform
     // TempCopies may also appear in other lists.  So we must process
     // TempCopies before removing any copies via other optimization.
     for (auto *copy : TempCopies) {
-      if (removeTempRValue(copy))
+      TempRValueOptimization rvalueOpt(copy, CopiedDefs);
+      if (rvalueOpt.optimize())
         invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
     // Perform NRVO
@@ -1573,7 +1677,6 @@ class CopyForwardingPass : public SILFunctionTransform
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
       }
   }
-
 };
 } // end anonymous namespace
 
