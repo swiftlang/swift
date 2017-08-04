@@ -532,7 +532,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
 /// \param solutions The set of solutions.
 ///
 /// \returns true if there are no solutions.
-bool ConstraintSystem::tryTypeVariableBindings(
+Optional<Score> ConstraintSystem::tryTypeVariableBindings(
     unsigned depth, TypeVariableType *typeVar,
     ArrayRef<ConstraintSystem::PotentialBinding> bindings,
     SmallVectorImpl<Solution> &solutions,
@@ -547,8 +547,9 @@ bool ConstraintSystem::tryTypeVariableBindings(
 
   // If we've already explored a lot of potential solutions, bail.
   if (getExpressionTooComplex(solutions))
-    return true;
+    return None;
 
+  Optional<Score> bestScore;
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
     // Try each of the bindings in turn.
     ++solverState->NumTypeVariableBindings;
@@ -640,8 +641,10 @@ bool ConstraintSystem::tryTypeVariableBindings(
         DefaultedConstraints.push_back(binding.DefaultableBinding);
       }
 
-      if (!solveRec(solutions, allowFreeTypeVariables))
-        anySolved = true;
+      if (auto score = solveRec(solutions, allowFreeTypeVariables)) {
+        if (!bestScore || bestScore > score)
+          bestScore = score;
+      }
 
       if (tc.getLangOpts().DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -650,7 +653,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
     }
 
     // If we found any solution, we're done.
-    if (anySolved)
+    if (bestScore)
       break;
 
     // None of the children had solutions, enumerate supertypes and
@@ -744,7 +747,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
     bindings = storedBindings;
   }
 
-  return !anySolved;
+  return bestScore;
 }
 
 /// \brief Solve the system of constraints.
@@ -1378,11 +1381,12 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   return solutions.empty();
 }
 
-bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
-                                FreeTypeVariableBinding allowFreeTypeVariables){
+Optional<Score>
+ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
+                           FreeTypeVariableBinding allowFreeTypeVariables) {
   // If we already failed, or simplification fails, we're done.
   if (failedConstraint || simplify()) {
-    return true;
+    return None;
   } else {
     assert(ActiveConstraints.empty() && "Active constraints remain?");
   }
@@ -1392,13 +1396,13 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     // If this solution is worse than the best solution we've seen so far,
     // skip it.
     if (worseThanBestSolution())
-      return true;
+      return None;
 
     // If any free type variables remain and we're not allowed to have them,
     // fail.
     if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow &&
         hasFreeTypeVariables())
-      return true;
+      return None;
 
     auto solution = finalize(allowFreeTypeVariables);
     if (TC.getLangOpts().DebugConstraintSolver) {
@@ -1408,7 +1412,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     }
 
     solutions.push_back(std::move(solution));
-    return false;
+    return solution.getFixedScore();
   }
 
   // Contract the edges of the constraint graph.
@@ -1521,7 +1525,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     CG.setOrphanedConstraint(orphaned);
 
     // Solve for this component. If it fails, we're done.
-    bool failed;
+    Optional<Score> score;
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       log.indent(solverState->depth * 2) << "(solving component #" 
@@ -1533,15 +1537,15 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       llvm::SaveAndRestore<SolverScope *> 
         partialSolutionScope(solverState->PartialSolutionScope, &scope);
 
-      failed = solveSimplified(partialSolutions[component], 
-                               allowFreeTypeVariables);
+      score =
+          solveSimplified(partialSolutions[component], allowFreeTypeVariables);
     }
 
     // Put the constraints back into their original bucket.
     auto &bucket = constraintBuckets[component];
     bucket.splice(bucket.end(), InactiveConstraints);
-    
-    if (failed) {
+
+    if (!score) {
       if (TC.getLangOpts().DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
         log.indent(solverState->depth * 2) << "failed component #" 
@@ -1550,7 +1554,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       
       TypeVariables = std::move(allTypeVariables);
       returnAllConstraints();
-      return true;
+      return None;
     }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
@@ -1592,7 +1596,8 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   // Produce all combinations of partial solutions.
   SmallVector<unsigned, 2> indices(numComponents, 0);
   bool done = false;
-  bool anySolutions = false;
+  Optional<Score> combinedScore;
+
   do {
     // Create a new solver scope in which we apply all of the partial
     // solutions.
@@ -1613,8 +1618,8 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
 
       // Save this solution.
       solutions.push_back(std::move(solution));
-
-      anySolutions = true;
+      if (!combinedScore || combinedScore > solution.getFixedScore())
+        combinedScore = solution.getFixedScore();
     }
     
     // Find the next combination.
@@ -1637,7 +1642,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     }
   } while (!done);
 
-  return !anySolutions;
+  return combinedScore;
 }
 
 /// Whether we should short-circuit a disjunction that already has a
@@ -1694,7 +1699,7 @@ void ConstraintSystem::collectDisjunctions(
   }
 }
 
-bool ConstraintSystem::solveSimplified(
+Optional<Score> ConstraintSystem::solveSimplified(
     SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
 
@@ -1721,12 +1726,12 @@ bool ConstraintSystem::solveSimplified(
   if (disjunctions.empty()) {
     if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow ||
         !hasFreeTypeVariables())
-      return true;
+      return None;
 
     // If this solution is worse than the best solution we've seen so far,
     // skip it.
     if (worseThanBestSolution())
-      return true;
+      return None;
 
     // If we only have relational or member constraints and are allowing
     // free type variables, save the solution.
@@ -1736,7 +1741,7 @@ bool ConstraintSystem::solveSimplified(
       case ConstraintClassification::Member:
         continue;
       default:
-        return true;
+        return None;
       }
     }
 
@@ -1747,7 +1752,7 @@ bool ConstraintSystem::solveSimplified(
     }
 
     solutions.push_back(std::move(solution));
-    return false;
+    return solution.getFixedScore();
   }
 
   // Pick the smallest disjunction.
@@ -1771,14 +1776,14 @@ bool ConstraintSystem::solveSimplified(
   // If there are no active constraints in the disjunction, there is
   // no solution.
   if (bestSize == 0)
-    return true;
+    return None;
 
   // Remove this disjunction constraint from the list.
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
   CG.removeConstraint(disjunction);
 
   Score initialScore = CurrentScore;
-  Optional<DisjunctionChoice> lastSolvedChoice;
+  Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
   Optional<Score> bestNonGenericScore;
 
   ++solverState->NumDisjunctions;
@@ -1816,7 +1821,7 @@ bool ConstraintSystem::solveSimplified(
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
     if (lastSolvedChoice) {
-      auto *lastChoice = lastSolvedChoice->getConstraint();
+      auto *lastChoice = lastSolvedChoice->first.getConstraint();
       if (shortCircuitDisjunctionAt(&currentChoice, lastChoice,
                                     getASTContext()))
         break;
@@ -1852,7 +1857,7 @@ bool ConstraintSystem::solveSimplified(
           bestNonGenericScore = score;
       }
 
-      lastSolvedChoice = currentChoice;
+      lastSolvedChoice = {currentChoice, *score};
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
       // FIXME: This should be more general.
@@ -1879,15 +1884,17 @@ bool ConstraintSystem::solveSimplified(
   auto tooComplex = getExpressionTooComplex(solutions) &&
     !getASTContext().isSwiftVersion3();
 
-  return tooComplex || !lastSolvedChoice;
+  if (tooComplex || !lastSolvedChoice)
+    return None;
+
+  return lastSolvedChoice->second;
 }
 
 Optional<Score>
 DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
                          FreeTypeVariableBinding allowFreeTypeVariables) {
   CS->simplifyDisjunctionChoice(Choice);
-  bool failed = CS->solveRec(solutions, allowFreeTypeVariables);
-  return failed ? None : Optional<Score>(CS->CurrentScore);
+  return CS->solveRec(solutions, allowFreeTypeVariables);
 }
 
 bool DisjunctionChoice::isGenericOperatorOrUnavailable() const {
