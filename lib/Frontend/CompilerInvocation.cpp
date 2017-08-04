@@ -1378,10 +1378,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_sil_serialize_witness_tables);
 
   // Parse the optimization level.
+  // Default to Onone settings if no option is passed.
+  IRGenOpts.Optimize = false;
+  Opts.Optimization = SILOptions::SILOptMode::None;
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
     if (A->getOption().matches(OPT_Onone)) {
-      IRGenOpts.Optimize = false;
-      Opts.Optimization = SILOptions::SILOptMode::None;
+      // Already set.
     } else if (A->getOption().matches(OPT_Ounchecked)) {
       // Turn on optimizations and remove all runtime checks.
       IRGenOpts.Optimize = true;
