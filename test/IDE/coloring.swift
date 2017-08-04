@@ -240,6 +240,9 @@ func f(x: Int) -> Int {
   """
       This is a multiline\( "interpolated" )string
    """
+
+  // CHECK: <str>"</str>\<anchor>(</anchor><int>1</int><anchor>)</anchor>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str>"</str>
+  "\(1)\(1)"
 }
 
 // CHECK: <kw>func</kw> bar(x: <type>Int</type>) -> (<type>Int</type>, <type>Float</type>) {
