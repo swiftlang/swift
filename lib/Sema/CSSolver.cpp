@@ -1342,8 +1342,7 @@ ConstraintSystem::solve(Expr *&expr,
   // had found at least one solution before deciding an expression was
   // "too complex". Maintain that behavior, but for Swift > 3 return
   // Unsolved in these cases.
-  auto tooComplex = getExpressionTooComplex(solutions) &&
-    !getASTContext().isSwiftVersion3();
+  auto tooComplex = getExpressionTooComplex(solutions);
   auto unsolved = tooComplex || solutions.empty();
 
   return unsolved ? SolutionKind::Unsolved : SolutionKind::Solved;
@@ -1876,9 +1875,7 @@ bool ConstraintSystem::solveSimplified(
   // not allow our caller to continue as if we have been successful.
   // Maintain the broken behavior under Swift 3 mode though, to avoid
   // breaking code.
-  auto tooComplex = getExpressionTooComplex(solutions) &&
-    !getASTContext().isSwiftVersion3();
-
+  auto tooComplex = getExpressionTooComplex(solutions);
   return tooComplex || !lastSolvedChoice;
 }
 

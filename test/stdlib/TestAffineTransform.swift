@@ -372,6 +372,16 @@ class TestAffineTransform : TestAffineTransformSuper {
     func test_unconditionallyBridgeFromObjectiveC() {
         expectEqual(AffineTransform(), AffineTransform._unconditionallyBridgeFromObjectiveC(nil))
     }
+
+    func test_rotation_compose() {
+        var t = AffineTransform.identity
+        t.translate(x: 1.0, y: 1.0)
+        t.rotate(byDegrees: 90)
+        t.translate(x: -1.0, y: -1.0)
+        let result = t.transform(NSPoint(x: 1.0, y: 2.0))
+        expectEqualWithAccuracy(0.0, Double(result.x), accuracy: accuracyThreshold)
+        expectEqualWithAccuracy(1.0, Double(result.y), accuracy: accuracyThreshold)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -395,6 +405,7 @@ AffineTransformTests.test("test_hashing_values") { TestAffineTransform().test_ha
 AffineTransformTests.test("test_AnyHashableContainingAffineTransform") { TestAffineTransform().test_AnyHashableContainingAffineTransform() }
 AffineTransformTests.test("test_AnyHashableCreatedFromNSAffineTransform") { TestAffineTransform().test_AnyHashableCreatedFromNSAffineTransform() }
 AffineTransformTests.test("test_unconditionallyBridgeFromObjectiveC") { TestAffineTransform().test_unconditionallyBridgeFromObjectiveC() }
+AffineTransformTests.test("test_rotation_compose") { TestAffineTransform().test_rotation_compose() }
 runAllTests()
 #endif
     
