@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "generic-specializer"
 
+#include "swift/AST/TypeMatcher.h"
 #include "swift/Strings.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
@@ -173,13 +174,55 @@ static bool isTypeTooComplex(Type t) {
   return TypeWidth >= TypeWidthThreshold || TypeDepth >= TypeDepthThreshold;
 }
 
-/// Check whether the type T1 is contained in the type T2
-static bool isContainedIn(CanType T1, CanType T2) {
-  return T2.findIf(
-      [&T1](Type T) -> bool { return T->getCanonicalType() == T1; });
-}
+namespace {
 
-/// Checks if a second substitution list is a expanded version of
+/// A helper class used to check whether one type is structurally contained
+/// the other type either completely or partially.
+class TypeComparator : public TypeMatcher<TypeComparator> {
+  bool IsContained = false;
+
+public:
+  bool isEqual(CanType T1, CanType T2) { return T1 == T2; }
+  /// Check whether the type T1 is different from T2 and contained in the type
+  /// T2.
+  bool isStrictlyContainedIn(CanType T1, CanType T2) {
+    if (isEqual(T1, T2))
+      return false;
+    return T2.findIf([&T1, this](Type T) -> bool {
+      return isEqual(T->getCanonicalType(), T1);
+    });
+  }
+
+  /// Check whether the type T1 is strictly or partially contained in the type
+  /// T2.
+  /// Partially contained means that if you drop the common structural "prefix"
+  /// of T1 and T2 and get T1' and T2' then T1' is strictly contained in T2'.
+  bool isPartiallyContainedIn(CanType T1, CanType T2) {
+    if (isStrictlyContainedIn(T1, T2))
+      return true;
+    match(T1, T2);
+    return IsContained;
+  }
+
+  /// This method is invoked aftre skipping a common prefix of two types,
+  /// when a structural difference is found.
+  bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                Type sugaredFirstType) {
+    auto firstCanType = firstType->getCanonicalType();
+    auto secondCanType = secondType->getCanonicalType();
+    if (isEqual(firstCanType, secondCanType))
+      return false;
+    if (isStrictlyContainedIn(firstCanType, secondCanType)) {
+      IsContained = true;
+      return false;
+    }
+    return false;
+  }
+};
+
+} // anonymous namespace
+
+/// Checks if a second substitution list is an expanded version of
 /// the first substitution list.
 /// This is the case if at least one of the substitution type in Subs2 is
 /// "bigger" than the corresponding substitution type in Subs1.
@@ -187,21 +230,25 @@ static bool isContainedIn(CanType T1, CanType T2) {
 static bool growingSubstitutions(SubstitutionList Subs1,
                                  SubstitutionList Subs2) {
   assert(Subs1.size() == Subs2.size());
-  // Perform component-wise substitution comparisions.
+  TypeComparator TypeCmp;
+  // Perform component-wise comparisions for substitutions.
   for (unsigned idx = 0, e = Subs1.size(); idx < e; ++idx) {
     auto Type1 = Subs1[idx].getReplacement()->getCanonicalType();
     auto Type2 = Subs2[idx].getReplacement()->getCanonicalType();
     // Replacement types should be concrete.
     assert(!Type1->hasArchetype());
     assert(!Type2->hasArchetype());
-    if (Type2 == Type1)
+    // If types are the same, the substitution type does not grow.
+    if (TypeCmp.isEqual(Type2, Type1))
       continue;
-    if (isContainedIn(Type2, Type1))
+    // If the new substitution type is getting smaller, the
+    // substitution type does not grow.
+    if (TypeCmp.isPartiallyContainedIn(Type2, Type1))
       continue;
-    if (isContainedIn(Type1, Type2)) {
+    if (TypeCmp.isPartiallyContainedIn(Type1, Type2)) {
       DEBUG(llvm::dbgs() << "Type:\n"; Type1.dump();
-            llvm::dbgs() << "is contained in type:\n"; Type2.dump());
-      DEBUG(llvm::dbgs() << "SubstitutionList[" << idx
+            llvm::dbgs() << "is (partially) contained in type:\n"; Type2.dump();
+            llvm::dbgs() << "SubstitutionList[" << idx
                          << "] has got bigger since last time.\n");
       return true;
     }

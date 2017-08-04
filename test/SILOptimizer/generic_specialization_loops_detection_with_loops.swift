@@ -4,10 +4,12 @@
 // creating and infinite loop of generic specializations.
 
 // This is a complete set of expected detected generic specialization loops:
+// CHECK-DAG: generic specialization loop{{.*}}testFoo7
+// CHECK-DAG: generic specialization loop{{.*}}testFoo6
 // CHECK-DAG: generic specialization loop{{.*}}foo3
 // CHECK-DAG: generic specialization loop{{.*}}foo4
 // CHECK-DAG: generic specialization loop{{.*}}bar4
-// CHECK-DAG: generic specialization loop{{.*}}Something{{.*}}map
+// CHECK-DAG: generic specialization loop{{.*}}Something{{.*}}compoundValue
 
 // CHECK-LABEL: sil_stage canonical
 
@@ -86,7 +88,7 @@ class Something<T> {
 
    init(compoundValue: T) {
       value = compoundValue
-      somethingArray = Something<Array<T>>(plainValue: [compoundValue])
+      somethingArray = Something<Array<T>>(compoundValue: [compoundValue])
       somethingOptional = Something<Optional<T>>(plainValue: compoundValue as T?)
    }
 
@@ -102,5 +104,65 @@ class Something<T> {
    }
 }
 
+print(Something<Int8>(compoundValue: 0))
 print(Something<Int8>(compoundValue: 0).map { Double($0) })
 
+// Test more complex cases, where types of substitutions are partially
+// contained in each other.
+protocol P {
+  associatedtype X: P
+}
+
+struct Start {}
+struct Step<Param> {}
+
+struct Outer<Param>: P {
+  typealias X = Outer<Step<Param>>
+}
+
+func testFoo6<T: P>(_: T.Type) {
+  testFoo6(T.X.self)
+}
+
+func testFoo7<T: P>(_: T.Type) {
+  testFoo7(T.X.self)
+}
+
+struct Outer1<Param>: P {
+  typealias X = Outer2<Param>
+}
+
+struct Outer2<Param>: P {
+  typealias X = Outer3<Param>
+}
+
+struct Outer3<Param>: P {
+  typealias X = Outer4<Param>
+}
+
+struct Outer4<Param>: P {
+  typealias X = Outer5<Param>
+}
+
+struct Outer5<Param>: P {
+  typealias X = Outer1<Step<Param>>
+}
+
+// T will look like:
+// Outer<Start>
+// Outer<Step<Start>>
+// Outer<Step<Step<Start>>>
+// ...
+// As it can be seen, the substitution type is growing, but a type
+// on each specialization iteration would not completely contain a type from
+// the previous iteration. Instead, it partially contains it. That is,
+// if all common structural prefixes are dropped, then it looks like:
+//  Start
+//  Step<Start>
+//  Step<Step<Start>>
+//  ...
+//  And it can be easily seen that the type used by the new iteration contains
+//  a type from the previous one.
+testFoo6(Outer<Start>.self)
+// Check a more complex, but similar idea.
+testFoo7(Outer1<Start>.self)
