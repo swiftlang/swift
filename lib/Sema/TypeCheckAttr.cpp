@@ -283,20 +283,21 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
 void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
 
+  // Verify we don't have both mutating and nonmutating.
+  if (FD->getAttrs().hasAttribute<MutatingAttr>() &&
+      FD->getAttrs().getAttribute<NonMutatingAttr>()) {
+    TC.diagnose(attr->getLocation(), diag::functions_mutating_and_not);
+    attr->setInvalid();
+  }
+
   auto contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
   if (!contextTy)
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
 
   if (contextTy->hasReferenceSemantics())
-    return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes);
-  
-  // Verify we don't have both mutating and nonmutating.
-  if (FD->getAttrs().hasAttribute<MutatingAttr>())
-    if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
-      diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not);
-      if (NMA == attr) return;
-    }
-  
+    return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
+                                 isa<NonMutatingAttr>(attr));
+
   // Verify that we don't have a static function.
   if (FD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
