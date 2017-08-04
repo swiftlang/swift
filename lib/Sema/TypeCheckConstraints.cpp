@@ -1784,7 +1784,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   if (options.contains(TypeCheckExprFlags::SkipApplyingSolution)) {
     cleanup.disable();
-    return cs.getType(expr);
+    return solution.simplifyType(cs.getType(expr));
   }
 
   // Apply the solution to the expression.
