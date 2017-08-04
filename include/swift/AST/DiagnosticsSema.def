@@ -2829,10 +2829,6 @@ NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
 
-// For Stmt
-ERROR(deprecated_c_style_for_stmt,none,
-      "C-style for statement has been removed in Swift 3", ())
-
 // ForEach Stmt
 ERROR(sequence_protocol_broken,none,
       "SequenceType protocol definition is broken", ())
