@@ -1373,6 +1373,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_sil_serialize_witness_tables);
 
   // Parse the optimization level.
+  // Default to Onone settings if no option is passed.
+  IRGenOpts.Optimize = false;
+  IRGenOpts.OptimizeForSize = false;
+  Opts.Optimization = SILOptions::SILOptMode::None;
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
     if (A->getOption().matches(OPT_Onone)) {
       IRGenOpts.Optimize = false;
@@ -1380,6 +1384,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     } else if (A->getOption().matches(OPT_Ounchecked)) {
       // Turn on optimizations and remove all runtime checks.
       IRGenOpts.Optimize = true;
+      IRGenOpts.OptimizeForSize = false;
       Opts.Optimization = SILOptions::SILOptMode::OptimizeUnchecked;
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
@@ -1387,9 +1392,15 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     } else if (A->getOption().matches(OPT_Oplayground)) {
       // For now -Oplayground is equivalent to -Onone.
       IRGenOpts.Optimize = false;
+      IRGenOpts.OptimizeForSize = false;
       Opts.Optimization = SILOptions::SILOptMode::None;
+    } else if (A->getOption().matches(OPT_Osize)) {
+      IRGenOpts.Optimize = true;
+      IRGenOpts.OptimizeForSize = true;
+      Opts.Optimization = SILOptions::SILOptMode::OptimizeForSize;
     } else {
       assert(A->getOption().matches(OPT_O));
+      IRGenOpts.OptimizeForSize = false;
       IRGenOpts.Optimize = true;
       Opts.Optimization = SILOptions::SILOptMode::Optimize;
     }
