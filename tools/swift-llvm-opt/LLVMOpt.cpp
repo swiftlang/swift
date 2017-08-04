@@ -136,7 +136,7 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
 
   return TheTarget->createTargetMachine(
       TheTriple.getTriple(), CPUStr, FeaturesStr, Options,
-      Optional<Reloc::Model>(RelocModel), CMModel, GetCodeGenOptLevel());
+      Optional<Reloc::Model>(RelocModel), getCodeModel(), GetCodeGenOptLevel());
 }
 
 static void dumpOutput(llvm::Module &M, llvm::raw_ostream &os) {
