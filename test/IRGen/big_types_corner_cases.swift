@@ -144,7 +144,7 @@ public func enumCallee(_ x: LargeEnum) {
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
-// CHECK-64: call %swift.type* @_T0ypMa()
+// CHECK-64: _T0s5printySayypGd_SS9separatorSS10terminatortF
 // CHECK-64: ret void
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*) #0 {

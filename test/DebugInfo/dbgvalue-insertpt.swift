@@ -5,6 +5,7 @@ for i in 0 ..< 3 {
   // CHECK: %i.addr = alloca i{{32|64}}
   // CHECK-NEXT: call void @llvm.dbg.declare(metadata i{{32|64}}* %i.addr,
   // CHECK-SAME:                           metadata ![[I:[0-9]+]],
+  // CHECK: bitcast %TSiSg* %[[ALLOCA]] to i{{32|64}}*
   // CHECK: %[[CAST:[0-9]+]] = bitcast %TSiSg* %[[ALLOCA]] to i{{32|64}}*
   // CHECK: %[[LD:[0-9]+]] = load i{{32|64}}, i{{32|64}}* %[[CAST]]
   // CHECK: br i1 {{%.*}}, label %[[FAIL:.*]], label %[[SUCCESS:.*]],
