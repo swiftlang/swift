@@ -447,8 +447,11 @@ protected:
   NodePointer demangleWitness();
   NodePointer demangleSpecialType();
   NodePointer demangleMetatypeRepresentation();
+  NodePointer demangleAccessor(NodePointer ChildNode);
   NodePointer demangleFunctionEntity();
   NodePointer demangleEntity(Node::Kind Kind);
+  NodePointer demangleVariable();
+  NodePointer demangleSubscript();
   NodePointer demangleProtocolList();
   NodePointer demangleProtocolListType();
   NodePointer demangleGenericSignature(bool hasParamCounts);

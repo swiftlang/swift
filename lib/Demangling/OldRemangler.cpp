@@ -257,6 +257,8 @@ namespace {
 
     void mangleIndex(Node::IndexType index);
     void mangleIdentifier(StringRef name, OperatorKind operatorKind);
+    void mangleAccessor(Node *storageNode, StringRef accessorCode,
+                        EntityContext &ctx);
 
     void mangleChildNodes(Node *node) { mangleNodes(node->begin(), node->end()); }
     void mangleNodes(Node::iterator i, Node::iterator e) {
@@ -766,6 +768,29 @@ void Remangler::mangleSubscript(Node *node, EntityContext &ctx) {
   mangleNamedAndTypedEntity(node, 'i', "", ctx);
 }
 
+void Remangler::mangleAccessor(Node *storageNode, StringRef accessorCode,
+                               EntityContext &ctx) {
+  Out << 'F';
+  mangleEntityContext(storageNode->getChild(0), ctx);
+  Out << accessorCode;
+  switch (storageNode->getKind()) {
+  case Demangle::Node::Kind::Variable:
+    mangleChildNode(storageNode, 1);
+    mangleEntityType(storageNode->getChild(2), ctx);
+    break;
+  case Demangle::Node::Kind::Subscript:
+    if (storageNode->getNumChildren() > 2 &&
+        storageNode->getChild(2)->getKind() == Node::Kind::PrivateDeclName) {
+      mangleChildNode(storageNode, 2);
+    }
+    mangleIdentifier("subscript", OperatorKind::NotOperator);
+    mangleEntityType(storageNode->getChild(1), ctx);
+    break;
+  default:
+      unreachable("Not a storage node");
+  }
+}
+
 void Remangler::mangleInitializer(Node *node, EntityContext &ctx) {
   mangleSimpleEntity(node, 'I', "i", ctx);
 }
@@ -800,61 +825,61 @@ void Remangler::mangleIVarDestroyer(Node *node, EntityContext &ctx) {
 }
 
 void Remangler::mangleGetter(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "g", ctx);
+  mangleAccessor(node->getFirstChild(), "g", ctx);
 }
 
 void Remangler::mangleGlobalGetter(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "G", ctx);
+  mangleAccessor(node->getFirstChild(), "G", ctx);
 }
 
 void Remangler::mangleSetter(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "s", ctx);
+  mangleAccessor(node->getFirstChild(), "s", ctx);
 }
 
 void Remangler::mangleMaterializeForSet(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "m", ctx);
+  mangleAccessor(node->getFirstChild(), "m", ctx);
 }
 
 void Remangler::mangleWillSet(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "w", ctx);
+  mangleAccessor(node->getFirstChild(), "w", ctx);
 }
 
 void Remangler::mangleDidSet(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "W", ctx);
+  mangleAccessor(node->getFirstChild(), "W", ctx);
 }
 
 void Remangler::mangleOwningMutableAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "aO", ctx);
+  mangleAccessor(node->getFirstChild(), "aO", ctx);
 }
 
 void Remangler::mangleNativeOwningMutableAddressor(Node *node,
                                                    EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "ao", ctx);
+  mangleAccessor(node->getFirstChild(), "ao", ctx);
 }
 
 void Remangler::mangleNativePinningMutableAddressor(Node *node,
                                                     EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "ap", ctx);
+  mangleAccessor(node->getFirstChild(), "ap", ctx);
 }
 
 void Remangler::mangleUnsafeMutableAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "au", ctx);
+  mangleAccessor(node->getFirstChild(), "au", ctx);
 }
 
 void Remangler::mangleOwningAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "lO", ctx);
+  mangleAccessor(node->getFirstChild(), "lO", ctx);
 }
 
 void Remangler::mangleNativeOwningAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "lo", ctx);
+  mangleAccessor(node->getFirstChild(), "lo", ctx);
 }
 
 void Remangler::mangleNativePinningAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "lp", ctx);
+  mangleAccessor(node->getFirstChild(), "lp", ctx);
 }
 
 void Remangler::mangleUnsafeAddressor(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 'F', "lu", ctx);
+  mangleAccessor(node->getFirstChild(), "lu", ctx);
 }
 
 void Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx) {

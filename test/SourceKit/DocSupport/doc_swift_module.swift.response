@@ -1204,7 +1204,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "p",
-        key.usr: "s:4cake2C1C1pSiv",
+        key.usr: "s:4cake2C1C1pSivp",
         key.offset: 78,
         key.length: 10,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>p</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type></decl.var.instance>",
@@ -1212,12 +1212,12 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "p",
-            key.usr: "s:4cake4ProtP1pSiv"
+            key.usr: "s:4cake4ProtP1pSivp"
           },
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "p",
-            key.usr: "s:4cake4ProtP1pSiv"
+            key.usr: "s:4cake4ProtP1pSivp"
           }
         ]
       },
@@ -1244,7 +1244,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:4cake2C1C9subscriptS2ici",
+        key.usr: "s:4cake2C1CS2icip",
         key.offset: 110,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>index</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>",
@@ -1261,7 +1261,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(index:)",
-        key.usr: "s:4cake2C1C9subscriptSiSf5index_tci",
+        key.usr: "s:4cake2C1CSiSf5index_tcip",
         key.offset: 154,
         key.length: 40,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>index</decl.var.parameter.argument_label> <decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>",
@@ -1321,8 +1321,8 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:4cake4ProtPAAE9subscriptS2ici::SYNTHESIZED::s:4cake2C1C",
-        key.original_usr: "s:4cake4ProtPAAE9subscriptS2ici",
+        key.usr: "s:4cake4ProtPAAES2icip::SYNTHESIZED::s:4cake2C1C",
+        key.original_usr: "s:4cake4ProtPAAES2icip",
         key.offset: 288,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>index</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>",
@@ -1462,8 +1462,8 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:4cake4ProtPAAE9subscriptS2ici::SYNTHESIZED::s:4cake2C2C",
-        key.original_usr: "s:4cake4ProtPAAE9subscriptS2ici",
+        key.usr: "s:4cake4ProtPAAES2icip::SYNTHESIZED::s:4cake2C2C",
+        key.original_usr: "s:4cake4ProtPAAES2icip",
         key.offset: 559,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>index</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>",
@@ -1624,7 +1624,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "p",
-        key.usr: "s:4cake4ProtP1pSiv",
+        key.usr: "s:4cake4ProtP1pSivp",
         key.offset: 896,
         key.length: 18,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>p</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
@@ -1669,7 +1669,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:4cake4ProtPAAE9subscriptS2ici",
+        key.usr: "s:4cake4ProtPAAES2icip",
         key.offset: 990,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>index</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>",
@@ -1771,7 +1771,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
           {
             key.kind: source.lang.swift.decl.var.instance,
             key.name: "b",
-            key.usr: "s:4cake2S1V2S2V1bSiv",
+            key.usr: "s:4cake2S1V2S2V1bSivp",
             key.offset: 1221,
             key.length: 10,
             key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>b</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type></decl.var.instance>"

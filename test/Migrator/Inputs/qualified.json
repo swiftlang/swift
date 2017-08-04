@@ -25,7 +25,7 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "s:6CitiesAAC8CityKindV4TownSivZ",
+    "Usr": "s:6CitiesAAC8CityKindV4TownSivpZ",
     "OldPrintedName": "town",
     "OldTypeName": "Cities.CityKind",
     "NewPrintedName": "NewTown",

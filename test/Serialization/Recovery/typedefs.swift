@@ -21,9 +21,9 @@ import Lib
 // CHECK-SIL-LABEL: sil hidden @_T08typedefs11testSymbolsyyF
 func testSymbols() {
   // Check that the symbols are not using 'Bool'.
-  // CHECK-SIL: function_ref @_T03Lib1xs5Int32Vfau
+  // CHECK-SIL: function_ref @_T03Lib1xs5Int32Vvau
   _ = Lib.x
-  // CHECK-SIL: function_ref @_T03Lib9usesAssocs5Int32VSgfau
+  // CHECK-SIL: function_ref @_T03Lib9usesAssocs5Int32VSgvau
   _ = Lib.usesAssoc
 } // CHECK-SIL: end sil function '_T08typedefs11testSymbolsyyF'
 

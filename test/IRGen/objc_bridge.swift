@@ -18,42 +18,42 @@ import Foundation
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(strRealProp)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_T011objc_bridge3BasC11strRealPropSSfgTo to i8*)
+// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_T011objc_bridge3BasC11strRealPropSSvgTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([16 x i8], [16 x i8]* @"\01L_selector_data(setStrRealProp:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC11strRealPropSSfsTo to i8*)
+// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC11strRealPropSSvsTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(strFakeProp)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_T011objc_bridge3BasC11strFakePropSSfgTo to i8*)
+// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_T011objc_bridge3BasC11strFakePropSSvgTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([16 x i8], [16 x i8]* @"\01L_selector_data(setStrFakeProp:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC11strFakePropSSfsTo to i8*)
+// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC11strFakePropSSvsTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(nsstrRealProp)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_T011objc_bridge3BasC13nsstrRealPropSo8NSStringCfgTo to i8*)
+// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_T011objc_bridge3BasC13nsstrRealPropSo8NSStringCvgTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([18 x i8], [18 x i8]* @"\01L_selector_data(setNsstrRealProp:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC13nsstrRealPropSo8NSStringCfsTo to i8*)
+// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC13nsstrRealPropSo8NSStringCvsTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(nsstrFakeProp)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_T011objc_bridge3BasC13nsstrFakePropSo8NSStringCfgTo to i8*)
+// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_T011objc_bridge3BasC13nsstrFakePropSo8NSStringCvgTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([18 x i8], [18 x i8]* @"\01L_selector_data(setNsstrFakeProp:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC13nsstrFakePropSo8NSStringCfsTo to i8*)
+// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_T011objc_bridge3BasC13nsstrFakePropSo8NSStringCvsTo to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(strResult)", i64 0, i64 0),
@@ -130,8 +130,8 @@ var NSS : NSString = NSString()
 
 // -- NSString methods don't convert 'self'
 extension NSString {
-  // CHECK: define internal [[OPAQUE:.*]]* @_T0So8NSStringC11objc_bridgeE13nsstrFakePropABfgTo([[OPAQUE:.*]]*, i8*) unnamed_addr
-  // CHECK: define internal void @_T0So8NSStringC11objc_bridgeE13nsstrFakePropABfsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
+  // CHECK: define internal [[OPAQUE:.*]]* @_T0So8NSStringC11objc_bridgeE13nsstrFakePropABvgTo([[OPAQUE:.*]]*, i8*) unnamed_addr
+  // CHECK: define internal void @_T0So8NSStringC11objc_bridgeE13nsstrFakePropABvsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
   var nsstrFakeProp : NSString {
     get {
       return NSS
@@ -147,12 +147,12 @@ extension NSString {
 }
 
 class Bas : NSObject {
-  // CHECK: define internal [[OPAQUE:.*]]* @_T011objc_bridge3BasC11strRealPropSSfgTo([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
-  // CHECK: define internal void @_T011objc_bridge3BasC11strRealPropSSfsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
+  // CHECK: define internal [[OPAQUE:.*]]* @_T011objc_bridge3BasC11strRealPropSSvgTo([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_T011objc_bridge3BasC11strRealPropSSvsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   var strRealProp : String
 
-  // CHECK: define internal [[OPAQUE:.*]]* @_T011objc_bridge3BasC11strFakePropSSfgTo([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
-  // CHECK: define internal void @_T011objc_bridge3BasC11strFakePropSSfsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
+  // CHECK: define internal [[OPAQUE:.*]]* @_T011objc_bridge3BasC11strFakePropSSvgTo([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_T011objc_bridge3BasC11strFakePropSSvsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   var strFakeProp : String {
     get {
       return ""
@@ -160,12 +160,12 @@ class Bas : NSObject {
     set {}
   }
 
-  // CHECK: define internal [[OPAQUE:.*]]* @_T011objc_bridge3BasC13nsstrRealPropSo8NSStringCfgTo([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
-  // CHECK: define internal void @_T011objc_bridge3BasC13nsstrRealPropSo8NSStringCfsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
+  // CHECK: define internal [[OPAQUE:.*]]* @_T011objc_bridge3BasC13nsstrRealPropSo8NSStringCvgTo([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_T011objc_bridge3BasC13nsstrRealPropSo8NSStringCvsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   var nsstrRealProp : NSString
 
-  // CHECK: define hidden swiftcc %TSo8NSStringC* @_T011objc_bridge3BasC13nsstrFakePropSo8NSStringCfg(%T11objc_bridge3BasC* swiftself) {{.*}} {
-  // CHECK: define internal void @_T011objc_bridge3BasC13nsstrFakePropSo8NSStringCfsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
+  // CHECK: define hidden swiftcc %TSo8NSStringC* @_T011objc_bridge3BasC13nsstrFakePropSo8NSStringCvg(%T11objc_bridge3BasC* swiftself) {{.*}} {
+  // CHECK: define internal void @_T011objc_bridge3BasC13nsstrFakePropSo8NSStringCvsTo([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   var nsstrFakeProp : NSString {
     get {
       return NSS

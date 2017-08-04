@@ -40,20 +40,20 @@ extension A {
 // CHECK-NOT: TY8
 // CHECK-NOT: TY9
 
-// CHECK: @_T07globals2g0Siv = hidden global [[INT]] zeroinitializer, align 8
-// CHECK: @_T07globals2g1yt_Siyttv = hidden global <{ [[INT]] }> zeroinitializer, align 8
-// CHECK: @_T07globals2g2yt_S2itv = hidden global <{ [[INT]], [[INT]] }> zeroinitializer, align 8
-// CHECK: @_T07globals2g3Sbv = hidden global [[BOOL]] zeroinitializer, align 1
-// CHECK: @_T07globals2g6Sdv = hidden global [[DOUBLE]] zeroinitializer, align 8
-// CHECK: @_T07globals2g7Sfv = hidden global [[FLOAT]] zeroinitializer, align 4
-// CHECK: @_T07globals1AV3fooSivZ = hidden global [[INT]] zeroinitializer, align 8
+// CHECK: @_T07globals2g0Sivp = hidden global [[INT]] zeroinitializer, align 8
+// CHECK: @_T07globals2g1yt_Siyttvp = hidden global <{ [[INT]] }> zeroinitializer, align 8
+// CHECK: @_T07globals2g2yt_S2itvp = hidden global <{ [[INT]], [[INT]] }> zeroinitializer, align 8
+// CHECK: @_T07globals2g3Sbvp = hidden global [[BOOL]] zeroinitializer, align 1
+// CHECK: @_T07globals2g6Sdvp = hidden global [[DOUBLE]] zeroinitializer, align 8
+// CHECK: @_T07globals2g7Sfvp = hidden global [[FLOAT]] zeroinitializer, align 4
+// CHECK: @_T07globals1AV3fooSivpZ = hidden global [[INT]] zeroinitializer, align 8
 
 // CHECK-NOT: g8
 // CHECK-NOT: g9
 
 // CHECK: define{{( protected)?}} i32 @main(i32, i8**) {{.*}} {
-// CHECK:      store  i64 {{.*}}, i64* getelementptr inbounds ([[INT]], [[INT]]* @_T07globals2g0Siv, i32 0, i32 0), align 8
+// CHECK:      store  i64 {{.*}}, i64* getelementptr inbounds ([[INT]], [[INT]]* @_T07globals2g0Sivp, i32 0, i32 0), align 8
 
 // FIXME: give these initializers a real mangled name
 // CHECK: define internal swiftcc void @globalinit_{{.*}}func0() {{.*}} {
-// CHECK:      store i64 5, i64* getelementptr inbounds (%TSi, %TSi* @_T07globals1AV3fooSivZ, i32 0, i32 0), align 8
+// CHECK:      store i64 5, i64* getelementptr inbounds (%TSi, %TSi* @_T07globals1AV3fooSivpZ, i32 0, i32 0), align 8

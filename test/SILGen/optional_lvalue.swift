@@ -51,8 +51,8 @@ func assign_optional_lvalue_reabstracted(_ x: inout Struct<(Int) -> Int>,
 }
 
 // CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B9_computedSiAA1SVSgz_SitF
-// CHECK:         function_ref @_T015optional_lvalue1SV8computedSifs
-// CHECK:         function_ref @_T015optional_lvalue1SV8computedSifg
+// CHECK:         function_ref @_T015optional_lvalue1SV8computedSivs
+// CHECK:         function_ref @_T015optional_lvalue1SV8computedSivg
 func assign_optional_lvalue_computed(_ x: inout S?, _ y: Int) -> Int {
   x!.computed = y
   return x!.computed

@@ -225,10 +225,12 @@ protected:
   
   void appendDestructorEntity(const DestructorDecl *decl, bool isDeallocating);
 
-  void appendAccessorEntity(AccessorKind kind,
-                            AddressorKind addressorKind,
-                            const AbstractStorageDecl *decl,
-                            bool isStatic);
+  /// \param accessorKindCode The code to describe the accessor and addressor
+  /// kind. Usually retrieved using getCodeForAccessorKind.
+  /// \param decl The storage decl for which to mangle the accessor
+  /// \param isStatic Whether or not the accessor is static
+  void appendAccessorEntity(StringRef accessorKindCode,
+                            const AbstractStorageDecl *decl, bool isStatic);
 
   void appendEntity(const ValueDecl *decl, StringRef EntityOp, bool isStatic);
 

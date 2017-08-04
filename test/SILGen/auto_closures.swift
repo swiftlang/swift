@@ -38,18 +38,18 @@ public class Base {
 }
 
 public class Sub : Base {
-  // CHECK-LABEL: sil hidden @_T013auto_closures3SubC1xAA4BoolVfg : $@convention(method) (@guaranteed Sub) -> Bool {
+  // CHECK-LABEL: sil hidden @_T013auto_closures3SubC1xAA4BoolVvg : $@convention(method) (@guaranteed Sub) -> Bool {
   // CHECK: bb0([[SELF:%.*]] : $Sub):
   // CHECK: [[AUTOCLOSURE_CONSUMER:%.*]] = function_ref @_T013auto_closures05call_A8_closureAA4BoolVADyXKF : $@convention(thin)
-  // CHECK: [[AUTOCLOSURE_FUNC:%.*]] = function_ref @_T013auto_closures3SubC1xAA4BoolVfgAFyXKfu_ : $@convention(thin) (@owned Sub) -> Bool
+  // CHECK: [[AUTOCLOSURE_FUNC:%.*]] = function_ref @_T013auto_closures3SubC1xAA4BoolVvgAFyXKfu_ : $@convention(thin) (@owned Sub) -> Bool
   // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK: [[AUTOCLOSURE:%.*]] = partial_apply [[AUTOCLOSURE_FUNC]]([[SELF_COPY]])
   // CHECK: [[RET:%.*]] = apply [[AUTOCLOSURE_CONSUMER]]([[AUTOCLOSURE]])
   // CHECK: return [[RET]] : $Bool
   // CHECK: }
 
-  // CHECK-LABEL: sil private [transparent] @_T013auto_closures3SubC1xAA4BoolVfgAFyXKfu_ : $@convention(thin) (@owned Sub) -> Bool {
-  // CHECK: [[SUPER:%[0-9]+]] = function_ref @_T013auto_closures4BaseC1xAA4BoolVfg : $@convention(method) (@guaranteed Base) -> Bool
+  // CHECK-LABEL: sil private [transparent] @_T013auto_closures3SubC1xAA4BoolVvgAFyXKfu_ : $@convention(thin) (@owned Sub) -> Bool {
+  // CHECK: [[SUPER:%[0-9]+]] = function_ref @_T013auto_closures4BaseC1xAA4BoolVvg : $@convention(method) (@guaranteed Base) -> Bool
   // CHECK: [[RET:%.*]] = apply [[SUPER]]({{%.*}})
   // CHECK: return [[RET]]
   override var x: Bool { return call_auto_closure(super.x) }

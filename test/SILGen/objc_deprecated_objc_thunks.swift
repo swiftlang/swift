@@ -27,7 +27,7 @@ class ObjCSubclass : NSObject {
   // CHECK-SWIFT4-NEXT: builtin "swift3ImplicitObjCEntrypoint"([[FILENAME]] : $Builtin.RawPointer, [[LENGTH]] : $Builtin.Word, [[LINE]] : $Builtin.Word, [[COLUMN]] : $Builtin.Word) : $() 
   func foo() { }
 
-  // CHECK-SWIFT4-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC3barSo8NSObjectCSgfgTo : $@convention(objc_method) (ObjCSubclass) -> @autoreleased Optional<NSObject>
+  // CHECK-SWIFT4-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC3barSo8NSObjectCSgvgTo : $@convention(objc_method) (ObjCSubclass) -> @autoreleased Optional<NSObject>
   // CHECK-SWIFT4: bb0(%0 : @unowned $ObjCSubclass):
   // CHECK-SWIFT4-NEXT: [[FILENAME:%.*]] = [[FILENAME_LITERAL]]
   // CHECK-SWIFT4-NEXT: [[LENGTH:%.*]] = integer_literal
@@ -36,7 +36,7 @@ class ObjCSubclass : NSObject {
   // CHECK-SWIFT4-NEXT: [[COLUMN:%.*]] = integer_literal $Builtin.Word, 3
   // CHECK-SWIFT4-NEXT: builtin "swift3ImplicitObjCEntrypoint"([[FILENAME]] : $Builtin.RawPointer, [[LENGTH]] : $Builtin.Word, [[LINE]] : $Builtin.Word, [[COLUMN]] : $Builtin.Word) : $() 
 
-  // CHECK-SWIFT4-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC3barSo8NSObjectCSgfsTo : $@convention(objc_method) (Optional<NSObject>, ObjCSubclass) -> () {
+  // CHECK-SWIFT4-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC3barSo8NSObjectCSgvsTo : $@convention(objc_method) (Optional<NSObject>, ObjCSubclass) -> () {
   // CHECK-SWIFT4: %0 : @unowned $Optional<NSObject>, %1 : @unowned $ObjCSubclass
   // CHECK-SWIFT4-NEXT: [[FILENAME:%.*]] = [[FILENAME_LITERAL]]
   // CHECK-SWIFT4-NEXT: [[LENGTH:%.*]] = integer_literal
@@ -46,7 +46,7 @@ class ObjCSubclass : NSObject {
   // CHECK-SWIFT4-NEXT: builtin "swift3ImplicitObjCEntrypoint"([[FILENAME]] : $Builtin.RawPointer, [[LENGTH]] : $Builtin.Word, [[LINE]] : $Builtin.Word, [[COLUMN]] : $Builtin.Word) : $() 
   var bar: NSObject? = nil
 
-  // CHECK-SWIFT4-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC9subscriptyXlSicfgTo : $@convention(objc_method) (Int, ObjCSubclass) -> @autoreleased AnyObject 
+  // CHECK-SWIFT4-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassCyXlSicigTo : $@convention(objc_method) (Int, ObjCSubclass) -> @autoreleased AnyObject
   // CHECK-SWIFT4: bb0(%0 : @trivial $Int, %1 : @unowned $ObjCSubclass):
   // CHECK-SWIFT4-NEXT: [[FILENAME:%.*]] = [[FILENAME_LITERAL]]
   // CHECK-SWIFT4-NEXT: [[LENGTH:%.*]] = integer_literal
@@ -55,7 +55,7 @@ class ObjCSubclass : NSObject {
   // CHECK-SWIFT4-NEXT: [[COLUMN:%.*]] = integer_literal $Builtin.Word, 3
   // CHECK-SWIFT4-NEXT: builtin "swift3ImplicitObjCEntrypoint"([[FILENAME]] : $Builtin.RawPointer, [[LENGTH]] : $Builtin.Word, [[LINE]] : $Builtin.Word, [[COLUMN]] : $Builtin.Word) : $() 
 
-  // CHECK-SWIFT4-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC9subscriptyXlSicfsTo : $@convention(objc_method) (AnyObject, Int, ObjCSubclass) ->
+  // CHECK-SWIFT4-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassCyXlSicisTo : $@convention(objc_method) (AnyObject, Int, ObjCSubclass) ->
   // CHECK-SWIFT4: bb0(%0 : @unowned $AnyObject, %1 : @trivial $Int, %2 : @unowned $ObjCSubclass):
   // CHECK-SWIFT4-NEXT: [[FILENAME:%.*]] = [[FILENAME_LITERAL]]
   // CHECK-SWIFT4-NEXT: [[LENGTH:%.*]] = integer_literal

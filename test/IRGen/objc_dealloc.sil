@@ -86,7 +86,7 @@ bb0(%0 : @unowned $SwiftGizmo):
 
   // Destroy instance variables
   // FIXME: This should move to .cxx_destruct
-  // CHECK: [[XOFFSET:%[a-zA-Z0-9]+]] = load i64, i64* @_T012objc_dealloc10SwiftGizmoC1xAA1XCvWvd, align 8
+  // CHECK: [[XOFFSET:%[a-zA-Z0-9]+]] = load i64, i64* @_T012objc_dealloc10SwiftGizmoC1xAA1XCvpWvd, align 8
   // CHECK-NEXT: bitcast
   // CHECK-NEXT: [[IVAR_ADDR:%[a-zA-Z0-9]+]] = getelementptr inbounds i8, i8* {{.*}}, i64 [[XOFFSET]]
   // CHECK-NEXT: [[XADDR:%[.a-zA-Z0-9]+]] = bitcast i8* [[IVAR_ADDR]] to %T12objc_dealloc1XC**

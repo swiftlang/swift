@@ -404,7 +404,7 @@ NodePointer Demangler::demangleOperator() {
     case 'f': return demangleFunctionEntity();
     case 'h': return createType(createWithChild(Node::Kind::Shared,
                                                 popTypeAndGetChild()));
-    case 'i': return demangleEntity(Node::Kind::Subscript);
+    case 'i': return demangleSubscript();
     case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
                                                 popNode(Node::Kind::Type)));
@@ -415,7 +415,7 @@ NodePointer Demangler::demangleOperator() {
     case 's': return createNode(Node::Kind::Module, STDLIB_NAME);
     case 't': return popTuple();
     case 'u': return demangleGenericType();
-    case 'v': return demangleEntity(Node::Kind::Variable);
+    case 'v': return demangleVariable();
     case 'w': return demangleValueWitness();
     case 'x': return createType(getDependentGenericParamType(0, 0));
     case 'y': return createNode(Node::Kind::EmptyList);
@@ -1744,11 +1744,44 @@ NodePointer Demangler::demangleMetatypeRepresentation() {
   }
 }
 
+NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
+  Node::Kind Kind;
+  switch (nextChar()) {
+    case 'm': Kind = Node::Kind::MaterializeForSet; break;
+    case 's': Kind = Node::Kind::Setter; break;
+    case 'g': Kind = Node::Kind::Getter; break;
+    case 'G': Kind = Node::Kind::GlobalGetter; break;
+    case 'w': Kind = Node::Kind::WillSet; break;
+    case 'W': Kind = Node::Kind::DidSet; break;
+    case 'a':
+      switch (nextChar()) {
+        case 'O': Kind = Node::Kind::OwningMutableAddressor; break;
+        case 'o': Kind = Node::Kind::NativeOwningMutableAddressor; break;
+        case 'P': Kind = Node::Kind::NativePinningMutableAddressor; break;
+        case 'u': Kind = Node::Kind::UnsafeMutableAddressor; break;
+        default: return nullptr;
+      }
+      break;
+    case 'l':
+      switch (nextChar()) {
+        case 'O': Kind = Node::Kind::OwningAddressor; break;
+        case 'o': Kind = Node::Kind::NativeOwningAddressor; break;
+        case 'p': Kind = Node::Kind::NativePinningAddressor; break;
+        case 'u': Kind = Node::Kind::UnsafeAddressor; break;
+        default: return nullptr;
+      }
+      break;
+    case 'p': // Pseudo-accessor referring to the variable/subscript itself
+      return ChildNode;
+    default: return nullptr;
+  }
+  NodePointer Entity = createWithChild(Kind, ChildNode);
+  return Entity;
+}
+
 NodePointer Demangler::demangleFunctionEntity() {
   enum {
     None,
-    Type,
-    TypeAndName,
     TypeAndMaybePrivateName,
     TypeAndIndex,
     Index
@@ -1765,32 +1798,6 @@ NodePointer Demangler::demangleFunctionEntity() {
       Args = TypeAndMaybePrivateName; Kind = Node::Kind::Allocator; break;
     case 'c':
       Args = TypeAndMaybePrivateName; Kind = Node::Kind::Constructor; break;
-    case 'g': Args = TypeAndName; Kind = Node::Kind::Getter; break;
-    case 'G': Args = TypeAndName; Kind = Node::Kind::GlobalGetter; break;
-    case 's': Args = TypeAndName; Kind = Node::Kind::Setter; break;
-    case 'm': Args = TypeAndName; Kind = Node::Kind::MaterializeForSet; break;
-    case 'w': Args = TypeAndName; Kind = Node::Kind::WillSet; break;
-    case 'W': Args = TypeAndName; Kind = Node::Kind::DidSet; break;
-    case 'a':
-      Args = TypeAndName;
-      switch (nextChar()) {
-        case 'O': Kind = Node::Kind::OwningMutableAddressor; break;
-        case 'o': Kind = Node::Kind::NativeOwningMutableAddressor; break;
-        case 'P': Kind = Node::Kind::NativePinningMutableAddressor; break;
-        case 'u': Kind = Node::Kind::UnsafeMutableAddressor; break;
-        default: return nullptr;
-      }
-      break;
-    case 'l':
-      Args = TypeAndName;
-      switch (nextChar()) {
-        case 'O': Kind = Node::Kind::OwningAddressor; break;
-        case 'o': Kind = Node::Kind::NativeOwningAddressor; break;
-        case 'p': Kind = Node::Kind::NativePinningAddressor; break;
-        case 'u': Kind = Node::Kind::UnsafeAddressor; break;
-        default: return nullptr;
-      }
-      break;
     case 'U': Args = TypeAndIndex; Kind = Node::Kind::ExplicitClosure; break;
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
@@ -1801,13 +1808,6 @@ NodePointer Demangler::demangleFunctionEntity() {
   NodePointer Child1 = nullptr, Child2 = nullptr;
   switch (Args) {
     case None:
-      break;
-    case Type:
-      Child1 = popNode(Node::Kind::Type);
-      break;
-    case TypeAndName:
-      Child2 = popNode(Node::Kind::Type);
-      Child1 = popNode(isDeclName);
       break;
     case TypeAndMaybePrivateName:
       Child1 = popNode(Node::Kind::PrivateDeclName);
@@ -1825,7 +1825,6 @@ NodePointer Demangler::demangleFunctionEntity() {
   switch (Args) {
     case None:
       break;
-    case Type:
     case Index:
       Entity = addChild(Entity, Child1);
       break;
@@ -1834,7 +1833,6 @@ NodePointer Demangler::demangleFunctionEntity() {
         Entity = addChild(Entity, Child1);
       Entity = addChild(Entity, Child2);
       break;
-    case TypeAndName:
     case TypeAndIndex:
       Entity = addChild(Entity, Child1);
       Entity = addChild(Entity, Child2);
@@ -1848,6 +1846,25 @@ NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   NodePointer Name = popNode(isDeclName);
   NodePointer Context = popContext();
   return createWithChildren(Kind, Context, Name, Type);
+}
+
+NodePointer Demangler::demangleVariable() {
+  NodePointer Variable = demangleEntity(Node::Kind::Variable);
+  return demangleAccessor(Variable);
+}
+
+NodePointer Demangler::demangleSubscript() {
+  NodePointer PrivateName = popNode(Node::Kind::PrivateDeclName);
+  NodePointer Type = popNode(Node::Kind::Type);
+  NodePointer Context = popContext();
+
+  NodePointer Subscript = createNode(Node::Kind::Subscript);
+  Subscript->addChild(Context, *this);
+  Subscript->addChild(Type, *this);
+  if (PrivateName)
+    Subscript->addChild(PrivateName, *this);
+
+  return demangleAccessor(Subscript);
 }
 
 NodePointer Demangler::demangleProtocolList() {

@@ -12,7 +12,7 @@ import Foundation
 
 class MyObject : NSObject {
   // Ensure we don't emit linetable entries for ObjC thunks.
-  // LOC-CHECK: define {{.*}} @_T04main8MyObjectC0B3ArrSo7NSArrayCfgTo
+  // LOC-CHECK: define {{.*}} @_T04main8MyObjectC0B3ArrSo7NSArrayCvgTo
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
   var MyArr = NSArray()
@@ -67,7 +67,7 @@ func useOptions(_ opt: URL.BookmarkCreationOptions)
   return [opt, opt]
 }
 
-// LOC-CHECK: ![[THUNK:.*]] = distinct !DISubprogram({{.*}}linkageName: "_T04main8MyObjectC0B3ArrSo7NSArrayCfgTo"
+// LOC-CHECK: ![[THUNK:.*]] = distinct !DISubprogram({{.*}}linkageName: "_T04main8MyObjectC0B3ArrSo7NSArrayCvgTo"
 // LOC-CHECK-NOT:                           line:
 // LOC-CHECK-SAME:                          isDefinition: true
 // LOC-CHECK: ![[DBG]] = !DILocation(line: 0, scope: ![[THUNK]])

@@ -41,6 +41,54 @@
 using namespace swift;
 using namespace swift::Mangle;
 
+static StringRef getCodeForAccessorKind(AccessorKind kind,
+                                        AddressorKind addressorKind) {
+  switch (kind) {
+  case AccessorKind::NotAccessor:
+    llvm_unreachable("bad accessor kind!");
+  case AccessorKind::IsGetter:
+    return "g";
+  case AccessorKind::IsSetter:
+    return "s";
+  case AccessorKind::IsWillSet:
+    return "w";
+  case AccessorKind::IsDidSet:
+    return "W";
+  case AccessorKind::IsAddressor:
+    // 'l' is for location. 'A' was taken.
+    switch (addressorKind) {
+    case AddressorKind::NotAddressor:
+      llvm_unreachable("bad combo");
+    case AddressorKind::Unsafe:
+      return "lu";
+    case AddressorKind::Owning:
+      return "lO";
+    case AddressorKind::NativeOwning:
+      return "lo";
+    case AddressorKind::NativePinning:
+      return "lp";
+    }
+    llvm_unreachable("bad addressor kind");
+  case AccessorKind::IsMutableAddressor:
+    switch (addressorKind) {
+    case AddressorKind::NotAddressor:
+      llvm_unreachable("bad combo");
+    case AddressorKind::Unsafe:
+      return "au";
+    case AddressorKind::Owning:
+      return "aO";
+    case AddressorKind::NativeOwning:
+      return "ao";
+    case AddressorKind::NativePinning:
+      return "aP";
+    }
+    llvm_unreachable("bad addressor kind");
+  case AccessorKind::IsMaterializeForSet:
+    return "m";
+  }
+  llvm_unreachable("bad accessor kind");
+}
+
 std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
                                             SymbolKind SKind) {
   beginMangling();
@@ -96,15 +144,17 @@ std::string ASTMangler::mangleAccessorEntity(AccessorKind kind,
                                              bool isStatic,
                                              SymbolKind SKind) {
   beginMangling();
-  appendAccessorEntity(kind, addressorKind, decl, isStatic);
+  appendAccessorEntity(getCodeForAccessorKind(kind, addressorKind), decl,
+                       isStatic);
   appendSymbolKind(SKind);
   return finalize();
 }
 
 std::string ASTMangler::mangleGlobalGetterEntity(const ValueDecl *decl,
                                                  SymbolKind SKind) {
+  assert(isa<VarDecl>(decl) && "Only variables can have global getters");
   beginMangling();
-  appendEntity(decl, "fG", false);
+  appendEntity(decl, "vG", /*isStatic*/false);
   appendSymbolKind(SKind);
   return finalize();
 }
@@ -381,6 +431,7 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   Node *NewGlobal = Dem.createNode(Node::Kind::Global);
   NewGlobal->addChild(TyMangling, Dem);
   std::string OldName = mangleNodeOld(NewGlobal);
+  verifyOld(OldName);
   return OldName;
 #endif
 }
@@ -424,7 +475,8 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
-  appendAccessorEntity(kind, addressorKind, decl, /*isStatic*/ false);
+  appendAccessorEntity(getCodeForAccessorKind(kind, addressorKind), decl,
+                       /*isStatic*/ false);
   // We have a custom prefix, so finalize() won't verify for us. Do it manually.
   verify(Storage.str().drop_front(USRPrefix.size()));
   return finalize();
@@ -540,17 +592,8 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         break;
     }
   } else if (decl->hasName()) {
-    // FIXME: Should a mangled subscript name contain the string "subscript"?
-    switch (decl->getBaseName().getKind()) {
-    case DeclBaseName::Kind::Normal:
-      appendIdentifier(decl->getBaseName().getIdentifier().str());
-      break;
-    case DeclBaseName::Kind::Subscript:
-      appendIdentifier("subscript");
-      break;
-    case DeclBaseName::Kind::Destructor:
-      llvm_unreachable("Destructors are not mangled using appendDeclName");
-    }
+    assert(!decl->getBaseName().isSpecial() && "Cannot print special names");
+    appendIdentifier(decl->getBaseName().getIdentifier().str());
   } else {
     assert(AllowNamelessEntities && "attempt to mangle unnamed decl");
     // Fall back to an unlikely name, so that we still generate a valid
@@ -1666,7 +1709,7 @@ void ASTMangler::appendDefaultArgumentEntity(const DeclContext *func,
 }
 
 void ASTMangler::appendInitializerEntity(const VarDecl *var) {
-  appendEntity(var, "v", var->isStatic());
+  appendEntity(var, "vp", var->isStatic());
   appendOperator("fi");
 }
 
@@ -1847,48 +1890,28 @@ void ASTMangler::appendDestructorEntity(const DestructorDecl *dtor,
   appendOperator(isDeallocating ? "fD" : "fd");
 }
 
-static StringRef getCodeForAccessorKind(AccessorKind kind,
-                                        AddressorKind addressorKind) {
-  switch (kind) {
-  case AccessorKind::NotAccessor: llvm_unreachable("bad accessor kind!");
-  case AccessorKind::IsGetter:    return "g";
-  case AccessorKind::IsSetter:    return "s";
-  case AccessorKind::IsWillSet:   return "w";
-  case AccessorKind::IsDidSet:    return "W";
-  case AccessorKind::IsAddressor:
-    // 'l' is for location. 'A' was taken.
-    switch (addressorKind) {
-    case AddressorKind::NotAddressor: llvm_unreachable("bad combo");
-    case AddressorKind::Unsafe: return "lu";
-    case AddressorKind::Owning: return "lO";
-    case AddressorKind::NativeOwning: return "lo";
-    case AddressorKind::NativePinning: return "lp";
-    }
-    llvm_unreachable("bad addressor kind");
-  case AccessorKind::IsMutableAddressor:
-    switch (addressorKind) {
-    case AddressorKind::NotAddressor: llvm_unreachable("bad combo");
-    case AddressorKind::Unsafe: return "au";
-    case AddressorKind::Owning: return "aO";
-    case AddressorKind::NativeOwning: return "ao";
-    case AddressorKind::NativePinning: return "aP";
-    }
-    llvm_unreachable("bad addressor kind");
-  case AccessorKind::IsMaterializeForSet: return "m";
-  }
-  llvm_unreachable("bad accessor kind");
-}
-
-void ASTMangler::appendAccessorEntity(AccessorKind kind,
-                                      AddressorKind addressorKind,
+void ASTMangler::appendAccessorEntity(StringRef accessorKindCode,
                                       const AbstractStorageDecl *decl,
                                       bool isStatic) {
-  assert(kind != AccessorKind::NotAccessor);
   appendContextOf(decl);
   bindGenericParameters(decl->getDeclContext());
-  appendDeclName(decl);
-  appendDeclType(decl);
-  appendOperator("f", getCodeForAccessorKind(kind, addressorKind));
+  if (isa<VarDecl>(decl)) {
+    appendDeclName(decl);
+    appendDeclType(decl);
+    appendOperator("v", accessorKindCode);
+  } else if (isa<SubscriptDecl>(decl)) {
+    appendDeclType(decl);
+
+    StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
+    if (!privateDiscriminator.empty()) {
+      appendIdentifier(privateDiscriminator);
+      appendOperator("Ll");
+    }
+
+    appendOperator("i", accessorKindCode);
+  } else {
+    llvm_unreachable("Unknown type of AbstractStorageDecl");
+  }
   if (isStatic)
     appendOperator("Z");
 }
@@ -1914,15 +1937,13 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   if (auto func = dyn_cast<FuncDecl>(decl)) {
     auto accessorKind = func->getAccessorKind();
     if (accessorKind != AccessorKind::NotAccessor)
-      return appendAccessorEntity(accessorKind, func->getAddressorKind(),
-                                  func->getAccessorStorageDecl(),
-                                  decl->isStatic());
+      return appendAccessorEntity(
+          getCodeForAccessorKind(accessorKind, func->getAddressorKind()),
+          func->getAccessorStorageDecl(), decl->isStatic());
   }
 
-  if (isa<VarDecl>(decl))
-    return appendEntity(decl, "v", decl->isStatic());
-  if (isa<SubscriptDecl>(decl))
-    return appendEntity(decl, "i", decl->isStatic());
+  if (auto storageDecl = dyn_cast<AbstractStorageDecl>(decl))
+    return appendAccessorEntity("p", storageDecl, decl->isStatic());
   if (isa<GenericTypeParamDecl>(decl))
     return appendEntity(decl, "fp", decl->isStatic());
 

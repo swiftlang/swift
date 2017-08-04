@@ -588,7 +588,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Then initialize the canary with nil. We are able to borrow the initialized self to avoid retain/release overhead.
-  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @_T021failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvfi :
+  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @_T021failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
   // CHECK:   [[OPT_CANARY:%.*]] = apply [[CANARY_FUNC]]()
   // CHECK:   [[SELF:%.*]] = load_borrow [[PROJ]]
   // CHECK:   [[CANARY_ADDR:%.*]] = ref_element_addr [[SELF]]
@@ -632,7 +632,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Then initialize the canary with nil. We are able to borrow the initialized self to avoid retain/release overhead.
-  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @_T021failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvfi :
+  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @_T021failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
   // CHECK:   [[OPT_CANARY:%.*]] = apply [[CANARY_FUNC]]()
   // CHECK:   [[SELF:%.*]] = load_borrow [[PROJ]]
   // CHECK:   [[CANARY_ADDR:%.*]] = ref_element_addr [[SELF]]

@@ -59,7 +59,7 @@ var g = foo(1.0);
 
 // Tuple types.
 var tuple: (Int, Bool) = (1, true)
-// CHECK-DAG: !DIGlobalVariable(name: "tuple", linkageName: "_T0{{9variables|4main}}5tupleSi_Sbtv",{{.*}} type: ![[TUPTY:[^,)]+]]
+// CHECK-DAG: !DIGlobalVariable(name: "tuple", linkageName: "_T0{{9variables|4main}}5tupleSi_Sbtvp",{{.*}} type: ![[TUPTY:[^,)]+]]
 // CHECK-DAG: ![[TUPTY]] = !DICompositeType({{.*}}identifier: "_T0Si_SbtD"
 func myprint(_ p: (i: Int, b: Bool)) {
      print("\(p.i) -> \(p.b)")

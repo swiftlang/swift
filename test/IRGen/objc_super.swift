@@ -87,7 +87,7 @@ class GenericRuncer<T> : Gizmo {
 // Use a constant indirect field access instead of a non-constant direct
 // access because the layout dependents on the alignment of y.
 
-// CHECK: define hidden swiftcc i64 @_T010objc_super13GenericRuncerC1xSo5GizmoCSgfg(%T10objc_super13GenericRuncerC* swiftself)
+// CHECK: define hidden swiftcc i64 @_T010objc_super13GenericRuncerC1xSo5GizmoCSgvg(%T10objc_super13GenericRuncerC* swiftself)
 // CHECK:    inttoptr
 // CHECK:   [[CAST:%.*]] = bitcast %T10objc_super13GenericRuncerC* %0 to i64*
 // CHECK:   [[ISA:%.*]] = load i64, i64* [[CAST]]

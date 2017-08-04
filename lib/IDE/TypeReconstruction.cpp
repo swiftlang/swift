@@ -893,7 +893,8 @@ static void VisitNodeDestructor(
   }
 
   if (kind_type_result.HasSingleType()) {
-    const size_t n = FindNamedDecls(ast, ast->Id_deinit, kind_type_result);
+    const size_t n = FindNamedDecls(ast, DeclBaseName::createDestructor(),
+                                    kind_type_result);
     if (n == 1) {
       kind_type_result._types[0] = FixCallingConv(
           kind_type_result._decls[0], kind_type_result._types[0].getPointer());
@@ -1352,9 +1353,18 @@ static void VisitNodeSetterGetter(
   VisitNodeResult decl_ctx_result;
   std::string identifier;
   VisitNodeResult type_result;
+
+  assert(cur_node->getNumChildren() == 1 &&
+         "Accessor should have a single abstract storage child");
+  Demangle::NodePointer referenced_node = cur_node->getFirstChild();
+  assert((referenced_node->getKind() == Demangle::Node::Kind::Variable ||
+          referenced_node->getKind() == Demangle::Node::Kind::Subscript) &&
+         "Accessor child should be a storage node");
+
   Demangle::Node::Kind node_kind = cur_node->getKind();
 
-  for (Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end();
+  for (Demangle::Node::iterator pos = referenced_node->begin(),
+                                end = referenced_node->end();
        pos != end; ++pos) {
     const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind) {
@@ -1377,13 +1387,11 @@ static void VisitNodeSetterGetter(
     }
   }
 
-  if (identifier == "subscript") {
-    // Subscript setters and getters are named with the reserved word
-    // "subscript".
+  if (referenced_node->getKind() == Demangle::Node::Kind::Subscript) {
     // Since there can be many subscripts for the same nominal type, we need to
     // find the one matching the specified type.
 
-    FindNamedDecls(ast, ast->getIdentifier(identifier), decl_ctx_result);
+    FindNamedDecls(ast, DeclBaseName::createSubscript(), decl_ctx_result);
     size_t num_decls = decl_ctx_result._decls.size();
 
     if (num_decls == 0) {

@@ -230,14 +230,14 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T014objc_protocols19StoredPropertyCountC5countSifgTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T014objc_protocols19StoredPropertyCountC5countSivgTo
 
 class ComputedPropertyCount {
   @objc var count: Int { return 0 }
 }
 
 extension ComputedPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols21ComputedPropertyCountC5countSifgTo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols21ComputedPropertyCountC5countSivgTo
 
 // -- adding @objc protocol conformances to native ObjC classes should not
 //    emit thunks since the methods are already available to ObjC.

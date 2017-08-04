@@ -35,7 +35,7 @@ func getRawValue(ed: ErrorDomain) -> String {
   return ed.rawValue
 }
 
-// CHECK-RAW-LABEL: sil shared [serializable] @_T0SC11ErrorDomainV8rawValueSSfg
+// CHECK-RAW-LABEL: sil shared [serializable] @_T0SC11ErrorDomainV8rawValueSSvg
 // CHECK-RAW: bb0([[SELF:%[0-9]+]] : $ErrorDomain):
 // CHECK-RAW: [[STORED_VALUE:%[0-9]+]] = struct_extract [[SELF]] : $ErrorDomain, #ErrorDomain._rawValue
 // CHECK-RAW: [[STORED_VALUE_COPY:%.*]] = copy_value [[STORED_VALUE]]
