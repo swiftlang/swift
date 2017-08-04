@@ -582,10 +582,14 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::ForEachStatement;
     SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
-    if (ForEachS->getPattern())
-      SN.Elements.emplace_back(SyntaxStructureElementKind::Id,
-                               charSourceRangeFromSourceRange(SM,
-                                     ForEachS->getPattern()->getSourceRange()));
+    if (ForEachS->getPattern()) {
+      auto Pat = ForEachS->getPattern();
+      if (!Pat->isImplicit()) {
+        SourceRange ElemRange = Pat->getSourceRange();
+        SN.Elements.emplace_back(SyntaxStructureElementKind::Id,
+                                 charSourceRangeFromSourceRange(SM, ElemRange));
+      }
+    }
     if (ForEachS->getSequence())
       addExprElem(SyntaxStructureElementKind::Expr, ForEachS->getSequence(),SN);
     pushStructureNode(SN, S);

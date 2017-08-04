@@ -1761,12 +1761,8 @@ ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
   // foreach.
   if ((Tok.isIdentifierOrUnderscore() &&
          peekToken().isAny(tok::colon, tok::kw_in)) ||
-      Tok.is(tok::kw_in))
+      Tok.isAny(tok::kw_in, tok::kw_case))
     return parseStmtForEach(ForLoc, LabelInfo);
-
-  // If we have "for ;" then this is clearly a c-style for loop.
-  if (Tok.is(tok::semi))
-    return parseStmtForCStyle(ForLoc, LabelInfo);
 
   // Otherwise, we have to do lookahead.  An unparenthesized valid C-style
   // for-each loop will start with "let/var <irrefutable pattern> =".  Check for
@@ -1781,10 +1777,11 @@ ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
     // Skip until we see eof, "in" (in which case we have a for-in loop),
     // ";" in which case we have a simple expression as the first part of a
     // c-style for loop, or "{" in which case we have a malformed statement.
-    while (Tok.isNot(tok::eof, tok::kw_in, tok::semi, tok::l_brace))
+    while (Tok.isNot(tok::eof, tok::kw_in, tok::semi, tok::l_brace,
+                     tok::r_brace, tok::r_paren) && !isStartOfStmt())
       skipSingle();
 
-    isCStyleFor = Tok.isAny(tok::semi, tok::l_brace, tok::eof);
+    isCStyleFor = Tok.isAny(tok::semi);
   }
   
   // Otherwise, this is some sort of c-style for loop.
@@ -2083,15 +2080,17 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
     InVarOrLetPattern = IVOLP_NotInVarOrLet;
   }
   
-  if (pattern.isNull())
+  SourceLoc InLoc;
+  if (pattern.isNull()) {
     // Recover by creating a "_" pattern.
     pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));
+    consumeIf(tok::kw_in, InLoc);
+  } else {
+    parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);
+  }
 
   // Bound variables all get their initial values from the generator.
   pattern.get()->markHasNonPatternBindingInit();
-  
-  SourceLoc InLoc;
-  parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);
 
   ParserResult<Expr> Container;
   if (Tok.is(tok::l_brace)) {

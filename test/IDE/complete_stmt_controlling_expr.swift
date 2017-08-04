@@ -22,7 +22,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_DO_WHILE_1 | %FileCheck %s -check-prefix=COND-WITH-RELATION
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_DO_WHILE_2 | %FileCheck %s -check-prefix=COND-WITH-RELATION1
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_1 | %FileCheck %s -check-prefix=COND_COMMON
+// FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_1 | %FileCheck %s -check-prefix=COND_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_2 | %FileCheck %s -check-prefix=COND_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=C_STYLE_FOR_INIT_3 | %FileCheck %s -check-prefix=COND_COMMON
 
