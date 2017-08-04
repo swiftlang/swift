@@ -685,3 +685,94 @@ bb0(%0 : $*S<T>):
   %7 = tuple ()
   return %7 : $()
 }
+
+struct GS<Base> {
+  var _base: Base
+  var _value: Builtin.Int64
+}
+
+// Test temp RValue elimination.
+// ---
+// CHECK-LABEL: sil @rvalue : $@convention(thin) <B> (@in GS<B>, @inout GS<B>) -> () {
+// CHECK: bb0(%0 : $*GS<B>, %1 : $*GS<B>):
+// CHECK:   [[A1:%.*]] = struct_element_addr %0 : $*GS<B>, #GS._value
+// CHECK:   [[V1:%.*]] = load [[A1]] : $*Builtin.Int64
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: copy_addr
+// CHECK:   [[A2:%.*]] = struct_element_addr %1 : $*GS<B>, #GS._value
+// CHECK:   [[V2:%.*]] = load [[A2]] : $*Builtin.Int64
+// CHECK:   %{{.*}} = builtin "cmp_slt_Int64"([[V1]] : $Builtin.Int64, [[V2]] : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NOT: destroy_addr
+// CHECK-NOT: dealloc_stack
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'rvalue'
+sil @rvalue : $@convention(thin) <B> (@in GS<B>, @inout GS<B>) -> () {
+bb0(%0 : $*GS<B>, %1 : $*GS<B>):
+  %2 = struct_element_addr %0 : $*GS<B>, #GS._value
+  %3 = load %2 : $*Builtin.Int64
+  %4 = alloc_stack $GS<B>
+  copy_addr %1 to [initialization] %4 : $*GS<B>
+  %6 = struct_element_addr %4 : $*GS<B>, #GS._value
+  %7 = load %6 : $*Builtin.Int64
+  %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  destroy_addr %4 : $*GS<B>
+  dealloc_stack %4 : $*GS<B>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test temp RValue elimination on switches.
+// TODO: Check that copy_addr %1 is gone.
+sil @rvalueSwitch : $@convention(method) <Element, State> (@inout UnfoldSequence<Element, State>) -> @out Optional<Element> {
+bb0(%0 : $*Optional<Element>, %1 : $*UnfoldSequence<Element, State>):
+  %2 = struct_element_addr %1 : $*UnfoldSequence<Element, State>, #UnfoldSequence._done
+  %3 = struct_element_addr %2 : $*Bool, #Bool._value
+  %4 = load %3 : $*Builtin.Int1
+  cond_br %4, bb4, bb1
+
+bb1:
+  %6 = alloc_stack $UnfoldSequence<Element, State>
+  copy_addr %1 to [initialization] %6 : $*UnfoldSequence<Element, State>
+  %8 = struct_element_addr %6 : $*UnfoldSequence<Element, State>, #UnfoldSequence._next
+  %9 = load %8 : $*@callee_owned (@inout State) -> @out Optional<Element>
+  %10 = alloc_stack $Optional<Element>
+  %11 = struct_element_addr %1 : $*UnfoldSequence<Element, State>, #UnfoldSequence._state
+  strong_retain %9 : $@callee_owned (@inout State) -> @out Optional<Element>
+  %13 = apply %9(%10, %11) : $@callee_owned (@inout State) -> @out Optional<Element>
+  switch_enum_addr %10 : $*Optional<Element>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb2
+
+bb2:
+  destroy_addr %10 : $*Optional<Element>
+  dealloc_stack %10 : $*Optional<Element>
+  destroy_addr %6 : $*UnfoldSequence<Element, State>
+  dealloc_stack %6 : $*UnfoldSequence<Element, State>
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = struct $Bool (%19 : $Builtin.Int1)
+  store %20 to %2 : $*Bool
+  %22 = alloc_stack $Optional<Element>
+  inject_enum_addr %22 : $*Optional<Element>, #Optional.none!enumelt
+  copy_addr [take] %22 to [initialization] %0 : $*Optional<Element>
+  dealloc_stack %22 : $*Optional<Element>
+  br bb5
+
+bb3:
+  %27 = unchecked_take_enum_data_addr %10 : $*Optional<Element>, #Optional.some!enumelt.1
+  %28 = init_enum_data_addr %0 : $*Optional<Element>, #Optional.some!enumelt.1
+  copy_addr [take] %27 to [initialization] %28 : $*Element
+  dealloc_stack %10 : $*Optional<Element>
+  destroy_addr %6 : $*UnfoldSequence<Element, State>
+  dealloc_stack %6 : $*UnfoldSequence<Element, State>
+  inject_enum_addr %0 : $*Optional<Element>, #Optional.some!enumelt.1
+  br bb5
+
+bb4:
+  %35 = alloc_stack $Optional<Element>
+  inject_enum_addr %35 : $*Optional<Element>, #Optional.none!enumelt
+  copy_addr [take] %35 to [initialization] %0 : $*Optional<Element>
+  dealloc_stack %35 : $*Optional<Element>
+  br bb5
+
+bb5:
+  %40 = tuple ()
+  return %40 : $()
+}
