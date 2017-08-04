@@ -46,7 +46,7 @@ function(get_test_dependencies SDK result_var_name)
       swift-api-digester)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
-         clang llc llvm-cov llvm-dwarfdump llvm-link llvm-profdata not)
+         clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-profdata not)
   endif()
   if(SWIFT_BUILD_SOURCEKIT)
     list(APPEND deps_binaries sourcekitd-test complete-test)
