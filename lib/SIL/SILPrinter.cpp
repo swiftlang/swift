@@ -42,6 +42,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/FileSystem.h"
@@ -239,11 +240,21 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
 
   if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
-  } else if (Decl->getBaseName() == "subscript" ||
-             Decl->getBaseName() == "deinit") {
-    OS << '`' << Decl->getBaseName() << '`';
   } else {
-    OS << Decl->getBaseName();
+    bool shouldEscape = !Decl->getBaseName().isSpecial() &&
+        llvm::StringSwitch<bool>(Decl->getBaseName().userFacingName())
+            // FIXME: Represent "init" by a special name and remove this case
+            .Case("init", false)
+#define KEYWORD(kw) \
+            .Case(#kw, true)
+#include "swift/Syntax/TokenKinds.def"
+            .Default(false);
+
+    if (shouldEscape) {
+      OS << '`' << Decl->getBaseName().userFacingName() << '`';
+    } else {
+      OS << Decl->getBaseName().userFacingName();
+    }
   }
 }
 
