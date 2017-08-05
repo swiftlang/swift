@@ -5,6 +5,18 @@ protocol ParentProtocol1 {
   func onlyParent1()
   // CHECK: Func/ParentProtocol1.onlyParent1 {{.*}} DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1()</Name><USR>s:14swift_ide_test15ParentProtocol1P11onlyParent1yyF</USR><Declaration>func onlyParent1()</Declaration><CommentParts><Abstract><Para>ParentProtocol1.onlyParent1()</Para></Abstract></CommentParts></Function>]
 
+  /// ParentProtocol.onlyParent1Var
+  var onlyParent1Var: Int { get }
+  // CHECK: Var/ParentProtocol1.onlyParent1Var {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1Var</Name><USR>s:14swift_ide_test15ParentProtocol1P14onlyParent1VarSiv</USR><Declaration>var onlyParent1Var: Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.onlyParent1Var</Para></Abstract></CommentParts></Other>]
+
+  /// ParentProtocol.subscript(index:)
+  subscript(index: Int) -> Int { get }
+  // CHECK: Subscript/ParentProtocol1.subscript {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>{{.*}}</USR><Declaration>subscript(index: Int) -&gt; Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.subscript(index:)</Para></Abstract></CommentParts></Other>]
+
+  /// ParentProtocol.AssocType
+  associatedtype AssocType
+  // CHECK: AssociatedType/ParentProtocol1.AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocType</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract></CommentParts></Other>]
+
   /// ParentProtocol1.commonParentRequirement()
   func commonParentRequirement()
   // CHECKL: Func/ParentProtocol1.commonParentRequirement {{.*}} DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>commonParentRequirement()</Name><USR>s:14swift_ide_test15ParentProtocol1P06commonD11RequirementyyF</USR><Declaration>func commonParentRequirement()</Declaration><CommentParts><Abstract><Para>ParentProtocol1.commonParentRequirement()</Para></Abstract></CommentParts></Function>]
@@ -52,6 +64,18 @@ extension ChildProtocol {
   // Should come from ParentProtocol1.
   func onlyParent1() {}
   // CHECK: Func/onlyParent1 {{.*}} DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1()</Name><USR>s:14swift_ide_test15ParentProtocol1P11onlyParent1yyF</USR><Declaration>func onlyParent1()</Declaration><CommentParts><Abstract><Para>ParentProtocol1.onlyParent1()</Para></Abstract></CommentParts></Function>]
+
+  // Should come from ParentProtocol1.
+  var onlyParent1Var: Int { return 0 }
+  // CHECK: Var/onlyParent1Var {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1Var</Name><USR>s:14swift_ide_test15ParentProtocol1P14onlyParent1VarSiv</USR><Declaration>var onlyParent1Var: Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.onlyParent1Var</Para></Abstract></CommentParts></Other>]
+
+  // Should come from ParentProtocol1.
+  subscript(index: Int) -> Int { return 0 }
+  // CHECK: Subscript/subscript {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>{{.*}}</USR><Declaration>subscript(index: Int) -&gt; Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.subscript(index:)</Para></Abstract></CommentParts></Other>]
+
+  // Should come from ParentProtocol1.
+  typealias AssocType = Int
+  // CHECK: TypeAlias/AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocType</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract></CommentParts></Other>]
 
   // Should come from ParentProtocol2.
   func onlyParent2() {}

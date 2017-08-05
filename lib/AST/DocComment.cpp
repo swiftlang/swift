@@ -415,7 +415,8 @@ getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
                          /*typeResolver=*/nullptr, Members);
     SmallVector<const ValueDecl *, 1> ProtocolRequirements;
     for (auto Member : Members)
-      if (!Member->isDefinition())
+      if (isa<ProtocolDecl>(Member->getDeclContext()) &&
+          Member->isProtocolRequirement())
         ProtocolRequirements.push_back(Member);
 
     if (ProtocolRequirements.size() == 1) {
