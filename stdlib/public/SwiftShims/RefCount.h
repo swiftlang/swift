@@ -961,7 +961,7 @@ class RefCounts {
   bool isUniquelyReferenced() const {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
-      return false;  // FIXME: implement side table path if useful
+      return bits.getSideTable()->isUniquelyReferenced();
     
     assert(!bits.getIsDeiniting());
     return bits.isUniquelyReferenced();
@@ -1382,6 +1382,10 @@ class HeapObjectSideTableEntry {
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getCount() const {
     return refCounts.getCount();
+  }
+
+  bool isUniquelyReferenced() const {
+    return refCounts.isUniquelyReferenced();
   }
 
   bool isUniquelyReferencedOrPinned() const {
