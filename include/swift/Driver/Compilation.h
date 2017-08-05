@@ -73,6 +73,11 @@ private:
   /// The OutputLevel at which this Compilation should generate output.
   OutputLevel Level;
 
+  /// The Actions which were used to build the Jobs.
+  ///
+  /// This is mostly only here for lifetime management.
+  SmallVector<std::unique_ptr<const Action>, 32> Actions;
+
   /// The Jobs which will be performed by this compilation.
   SmallVector<std::unique_ptr<const Job>, 32> Jobs;
 
@@ -157,12 +162,18 @@ private:
   /// -emit-loaded-module-trace, so no other job needs to do it.
   bool PassedEmitLoadedModuleTraceToFrontendJob = false;
 
-  static const Job *unwrap(const std::unique_ptr<const Job> &p) {
+  template <typename T>
+  static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
   }
+
+  template <typename T>
+  using UnwrappedArrayView =
+      ArrayRefView<std::unique_ptr<T>, T *, Compilation::unwrap<T>>;
   
 public:
   Compilation(DiagnosticEngine &Diags, OutputLevel Level,
+              SmallVectorImpl<std::unique_ptr<const Action>> &&Actions,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
@@ -175,8 +186,11 @@ public:
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
   ~Compilation();
 
-  ArrayRefView<std::unique_ptr<const Job>, const Job *, Compilation::unwrap>
-  getJobs() const {
+  UnwrappedArrayView<const Action> getActions() const {
+    return llvm::makeArrayRef(Actions);
+  }
+
+  UnwrappedArrayView<const Job> getJobs() const {
     return llvm::makeArrayRef(Jobs);
   }
   Job *addJob(std::unique_ptr<Job> J);

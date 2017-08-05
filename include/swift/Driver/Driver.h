@@ -223,7 +223,7 @@ public:
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
                     const InputFileList &Inputs, const OutputInfo &OI,
                     const OutputFileMap *OFM, const InputInfoMap *OutOfDateMap,
-                    SmallVectorImpl<const Action *> &Actions) const;
+                    SmallVectorImpl<std::unique_ptr<const Action>> &Actions) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
   std::unique_ptr<OutputFileMap>
@@ -232,14 +232,13 @@ public:
   /// Add top-level Jobs to Compilation \p C for the given \p Actions and
   /// OutputInfo.
   ///
-  /// \param Actions The Actions for which Jobs should be generated.
+  /// \param C The Compilation containing the Actions for which Jobs should be
+  /// created.
   /// \param OI The OutputInfo for which Jobs should be generated.
   /// \param OFM The OutputFileMap for which Jobs should be generated.
   /// \param TC The ToolChain to build Jobs with.
-  /// \param[out] C The Compilation to which Jobs should be added.
-  void buildJobs(ArrayRef<const Action *> Actions, const OutputInfo &OI,
-                 const OutputFileMap *OFM, const ToolChain &TC,
-                 Compilation &C) const;
+  void buildJobs(Compilation &C, const OutputInfo &OI, const OutputFileMap *OFM,
+                 const ToolChain &TC) const;
 
   /// A map for caching Jobs for a given Action/ToolChain pair
   using JobCacheMap =
@@ -269,7 +268,7 @@ public:
   bool handleImmediateArgs(const llvm::opt::ArgList &Args, const ToolChain &TC);
 
   /// Print the list of Actions.
-  void printActions(ArrayRef<const Action *> Actions) const;
+  void printActions(ArrayRef<std::unique_ptr<const Action>> Actions) const;
 
   /// Print the list of Jobs in a Compilation.
   void printJobs(const Compilation &C) const;

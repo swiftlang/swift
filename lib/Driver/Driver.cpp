@@ -653,7 +653,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   }
 
   // Construct the graph of Actions.
-  SmallVector<const Action *, 8> Actions;
+  SmallVector<std::unique_ptr<const Action>, 8> Actions;
   buildActions(*TC, *TranslatedArgList, Inputs, OI, OFM.get(),
                rebuildEverything ? nullptr : &outOfDateMap, Actions);
 
@@ -686,6 +686,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   }
 
   std::unique_ptr<Compilation> C(new Compilation(Diags, Level,
+                                                 std::move(Actions),
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  std::move(Inputs),
@@ -697,7 +698,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  ShowDriverTimeCompilation,
                                                  std::move(StatsReporter)));
 
-  buildJobs(Actions, OI, OFM.get(), *TC, *C);
+  buildJobs(*C, OI, OFM.get(), *TC);
 
   // For getting bulk fixits, or for when users explicitly request to continue
   // building despite errors.
@@ -1334,10 +1335,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                                          OI.SelectedSanitizer);
 }
 
-static void
-currentDependsOnPCHIfPresent(const JobAction *PCH,
-                             std::unique_ptr<Action> &Current,
-                             SmallVectorImpl<const Action *> &Actions) {
+static void currentDependsOnPCHIfPresent(
+    const JobAction *PCH,
+    std::unique_ptr<Action> &Current,
+    SmallVectorImpl<std::unique_ptr<const Action>> &Actions) {
   if (PCH) {
     // FIXME: When we have a PCH job, it's officially owned by the Actions
     // array; but it's also a secondary input to each of the current
@@ -1348,20 +1349,18 @@ currentDependsOnPCHIfPresent(const JobAction *PCH,
     // don't own _all_ of their inputs. Ownership can't vary
     // input-by-input.
     auto *job = cast<JobAction>(Current.get());
-    auto inputs = job->getInputs();
-    Actions.append(inputs.begin(), inputs.end());
+    for (const Action *input : job->getInputs())
+      Actions.emplace_back(input);
     job->setOwnsInputs(false);
     job->addInput(PCH);
   }
 }
 
-void Driver::buildActions(const ToolChain &TC,
-                          const DerivedArgList &Args,
-                          const InputFileList &Inputs,
-                          const OutputInfo &OI,
-                          const OutputFileMap *OFM,
-                          const InputInfoMap *OutOfDateMap,
-                          SmallVectorImpl<const Action *> &Actions) const {
+void Driver::buildActions(
+    const ToolChain &TC, const DerivedArgList &Args,
+    const InputFileList &Inputs, const OutputInfo &OI, const OutputFileMap *OFM,
+    const InputInfoMap *OutOfDateMap,
+    SmallVectorImpl<std::unique_ptr<const Action>> &Actions) const {
   if (!SuppressNoInputFilesError && Inputs.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_no_input_files);
     return;
@@ -1392,7 +1391,7 @@ void Driver::buildActions(const ToolChain &TC,
           }
           PCH = new GeneratePCHJobAction(HeaderInput.release(),
                                          PersistentPCHDir);
-          Actions.push_back(PCH);
+          Actions.emplace_back(PCH);
         }
       }
     }
@@ -1552,7 +1551,7 @@ void Driver::buildActions(const ToolChain &TC,
 
       CA->addInput(new InputAction(*InputArg, InputType));
     }
-    Actions.push_back(CA.release());
+    Actions.push_back(std::move(CA));
     return;
   }
   case OutputInfo::Mode::REPL: {
@@ -1571,7 +1570,7 @@ void Driver::buildActions(const ToolChain &TC,
         Mode = REPLJobAction::Mode::Integrated;
     }
 
-    Actions.push_back(new REPLJobAction(Mode));
+    Actions.emplace_back(new REPLJobAction(Mode));
     return;
   }
   }
@@ -1611,18 +1610,18 @@ void Driver::buildActions(const ToolChain &TC,
         } else
           LinkAction->addInput(MergeModuleAction.release());
       } else
-        Actions.push_back(MergeModuleAction.release());
+        Actions.push_back(std::move(MergeModuleAction));
     }
-    Actions.push_back(LinkAction);
+    Actions.emplace_back(LinkAction);
     if (TC.getTriple().isOSDarwin() &&
         OI.DebugInfoKind > IRGenDebugInfoKind::None) {
       auto *dSYMAction = new GenerateDSYMJobAction(LinkAction);
       dSYMAction->setOwnsInputs(false);
-      Actions.push_back(dSYMAction);
+      Actions.emplace_back(dSYMAction);
       if (Args.hasArg(options::OPT_verify_debug_info)) {
         auto *verifyDebugInfoAction = new VerifyDebugInfoJobAction(dSYMAction);
         verifyDebugInfoAction->setOwnsInputs(false);
-        Actions.push_back(verifyDebugInfoAction);
+        Actions.emplace_back(verifyDebugInfoAction);
       }
     }
   } else {
@@ -1631,8 +1630,9 @@ void Driver::buildActions(const ToolChain &TC,
     // action because there may be other actions (e.g. BackendJobActions) that
     // are not merge-module inputs but nonetheless should be run.
     if (MergeModuleAction)
-      Actions.push_back(MergeModuleAction.release());
-    Actions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
+      Actions.push_back(std::move(MergeModuleAction));
+    for (const Action *ExtraAction : AllLinkerInputs)
+      Actions.emplace_back(ExtraAction);
   }
 }
 
@@ -1679,9 +1679,8 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args) const {
   return OFM;
 }
 
-void Driver::buildJobs(ArrayRef<const Action *> Actions, const OutputInfo &OI,
-                       const OutputFileMap *OFM, const ToolChain &TC,
-                       Compilation &C) const {
+void Driver::buildJobs(Compilation &C, const OutputInfo &OI,
+                       const OutputFileMap *OFM, const ToolChain &TC) const {
   llvm::PrettyStackTraceString CrashInfo("Building compilation jobs");
 
   const DerivedArgList &Args = C.getArgs();
@@ -1690,7 +1689,7 @@ void Driver::buildJobs(ArrayRef<const Action *> Actions, const OutputInfo &OI,
   Arg *FinalOutput = Args.getLastArg(options::OPT_o);
   if (FinalOutput) {
     unsigned NumOutputs = 0;
-    for (const Action *A : Actions) {
+    for (const Action *A : C.getActions()) {
       types::ID Type = A->getType();
 
       // Skip any GeneratePCHJobActions or InputActions incidentally stored in
@@ -1723,7 +1722,7 @@ void Driver::buildJobs(ArrayRef<const Action *> Actions, const OutputInfo &OI,
     }
   }
 
-  for (const Action *A : Actions) {
+  for (const Action *A : C.getActions()) {
     if (auto *JA = dyn_cast<JobAction>(A)) {
       (void)buildJobsForAction(C, JA, OI, OFM, TC,
                                /*TopLevel*/true, JobCache);
@@ -2407,10 +2406,10 @@ static unsigned printActions(const Action *A,
   return Id;
 }
 
-void Driver::printActions(ArrayRef<const Action *> Actions) const {
+void Driver::printActions(ArrayRef<std::unique_ptr<const Action>> Actions) const {
   llvm::DenseMap<const Action *, unsigned> Ids;
-  for (const Action *A : Actions) {
-    ::printActions(A, Ids);
+  for (auto &A : Actions) {
+    ::printActions(A.get(), Ids);
   }
 }
 
