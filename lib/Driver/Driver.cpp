@@ -1320,7 +1320,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
     OI.SelectedSanitizers = parseSanitizerArgValues(
-        A, TC.getTriple(), Diags,
+        Args, A, TC.getTriple(), Diags,
         [&](StringRef sanitizerName) {
           return TC.sanitizerRuntimeLibExists(Args, sanitizerName);
         });

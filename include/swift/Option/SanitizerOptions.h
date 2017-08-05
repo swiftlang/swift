@@ -17,6 +17,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
+#include "llvm/Option/ArgList.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
@@ -31,6 +32,7 @@ class DiagnosticEngine;
 //         sanitizer dylib with a given name.
 /// \return Returns a SanitizerKind.
 OptionSet<SanitizerKind> parseSanitizerArgValues(
+        const llvm::opt::ArgList &Args,
         const llvm::opt::Arg *A,
         const llvm::Triple &Triple,
         DiagnosticEngine &Diag,
