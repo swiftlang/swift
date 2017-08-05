@@ -37,6 +37,8 @@ static StringRef toStringRef(const SanitizerKind kind) {
     return "thread";
   case SanitizerKind::Fuzzer:
     return "fuzzer";
+  case SanitizerKind::None:
+    llvm_unreachable("Unsupported sanitizer");
   }
   llvm_unreachable("Unsupported sanitizer");
 }
@@ -116,6 +118,7 @@ static bool isTSanSupported(
 }
 
 OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
+    const llvm::opt::ArgList &Args,
     const llvm::opt::Arg *A,
     const llvm::Triple &Triple,
     DiagnosticEngine &Diags,
@@ -123,23 +126,30 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
   OptionSet<SanitizerKind> sanitizerSet;
 
   // Find the sanitizer kind.
-  SanitizerKind pKind;
   for (int i = 0, n = A->getNumValues(); i != n; ++i) {
-    pKind =
-    llvm::StringSwitch<SanitizerKind>(A->getValue(i))
-      .Case("address", SanitizerKind::Address)
-      .Case("thread", SanitizerKind::Thread)
-      .Case("fuzzer", SanitizerKind::Fuzzer);
-
-    sanitizerSet |= pKind;
+    std::string opt = A->getValue(i);
+    if (opt == "address") {
+      sanitizerSet |= SanitizerKind::Address;
+    } else if (opt == "thread") {
+      sanitizerSet |= SanitizerKind::Thread;
+    } else if (opt == "fuzzer") {
+      sanitizerSet |= SanitizerKind::Fuzzer;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+          A->getOption().getPrefixedName(), A->getValue(i));
+      return sanitizerSet;
+    }
   }
 
-  // Check if the target is supported for this sanitizer.
+  // Sanitizers are only supported on Linux or Darwin.
   if (!(Triple.isOSDarwin() || Triple.isOSLinux())) {
     SmallString<128> b;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
-      (A->getOption().getPrefixedName() + toStringRef(pKind)).toStringRef(b),
+      (A->getOption().getPrefixedName() +
+          StringRef(A->getAsString(Args))).toStringRef(b),
       Triple.getTriple());
+
+    return sanitizerSet;
   }
 
   // Address and thread sanitizers can not be enabled concurrently.
@@ -152,17 +162,19 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
             + toStringRef(SanitizerKind::Address)).toStringRef(b1),
         (A->getOption().getPrefixedName()
             + toStringRef(SanitizerKind::Thread)).toStringRef(b2));
+    return sanitizerSet;
   }
 
   // Thread Sanitizer only works on OS X and the simulators. It's only supported
   // on 64 bit architectures.
-  // TODO: should port the new code logic here.
   if ((sanitizerSet & SanitizerKind::Thread) &&
       !isTSanSupported(Triple, sanitizerRuntimeLibExists)) {
     SmallString<128> b;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
-      (A->getOption().getPrefixedName() + toStringRef(pKind)).toStringRef(b),
+      (A->getOption().getPrefixedName()
+          + toStringRef(SanitizerKind::Thread)).toStringRef(b),
       Triple.getTriple());
+    return sanitizerSet;
   }
 
   return sanitizerSet;
