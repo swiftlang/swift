@@ -1699,10 +1699,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   if (getTriple().getOS() == llvm::Triple::Linux) {
     //Make sure we only add SanitizerLibs for executables
     if (job.getKind() == LinkKind::Executable) {
-      if (context.OI.SelectedSanitizer == SanitizerKind::Address) 
+      if (context.OI.SelectedSanitizers & SanitizerKind::Address)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "asan", *this);
 
-      if (context.OI.SelectedSanitizer == SanitizerKind::Thread) 
+      if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
     }
   }
