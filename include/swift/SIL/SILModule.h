@@ -88,6 +88,37 @@ enum class SILStage {
   Lowered,
 };
 
+typedef llvm::function_ref<void()> ActionCallback;
+
+// An executabe action.
+class ExecutableAction {
+  std::function<void()> Action;
+
+  public:
+  ExecutableAction(ActionCallback Action = [] {}) : Action(Action) {}
+  virtual ~ExecutableAction() {}
+  virtual void run() { Action(); }
+  virtual bool canBeExecuted() { return true; }
+};
+
+// An executable action that can be executed at most once.
+class ExecuteOnceAction : public ExecutableAction {
+  bool Executed;
+
+  public:
+  ExecuteOnceAction(ActionCallback action = [] {})
+    : ExecutableAction(action), Executed(false) {}
+  virtual void run() override {
+    if (Executed)
+      return;
+    Executed = true;
+    ExecutableAction::run();
+  }
+  bool isExecuted() const { return Executed; }
+  virtual bool canBeExecuted() override { return !isExecuted(); }
+  virtual ~ExecuteOnceAction() {}
+};
+
 /// \brief A SIL module. The SIL module owns all of the SILFunctions generated
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
@@ -212,6 +243,9 @@ private:
   /// The options passed into this SILModule.
   SILOptions &Options;
 
+  /// Action to be executed for serializing the SILModule.
+  ExecutableAction *SerializeSILAction;
+
   /// A list of clients that need to be notified when an instruction
   /// invalidation message is sent.
   llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
@@ -249,6 +283,10 @@ public:
   /// Send the invalidation message that \p V is being deleted to all
   /// registered handlers. The order of handlers is deterministic but arbitrary.
   void notifyDeleteHandlers(ValueBase *V);
+
+  /// Set a serialization action.
+  void setSerializeSILAction(ExecutableAction &SerializeSILAction);
+  ExecutableAction* getSerializeSILAction() const;
 
   /// \brief This converts Swift types to SILTypes.
   mutable Lowering::TypeConverter Types;

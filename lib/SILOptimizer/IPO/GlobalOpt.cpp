@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "globalopt"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Strings.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILInstruction.h"
@@ -925,6 +926,9 @@ class SILGlobalOptPass : public SILModuleTransform
 {
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+    // This is required if we serialize SIL after high-level opts.
+    if (getModule()->getOptions().SILSerializeAfterHighLevelOptz)
+      return;
     if (SILGlobalOpt(getModule(), DA).run()) {
       invalidateAll();
     }

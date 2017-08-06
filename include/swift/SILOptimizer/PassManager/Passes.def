@@ -271,6 +271,8 @@ PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",
      "Temporary pass for staging in mark_uninitialized changes.")
 PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
+PASS(SerializeSILPass, "serialize-sil",
+     "Utility pass. Serializes the current SILModule")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)

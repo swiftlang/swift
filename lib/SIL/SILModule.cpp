@@ -86,7 +86,8 @@ SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
                      const DeclContext *associatedDC, bool wholeModule)
     : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
       Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
-      wholeModule(wholeModule), Options(Options), Types(*this) {}
+      wholeModule(wholeModule), Options(Options), SerializeSILAction(nullptr),
+      Types(*this) {}
 
 SILModule::~SILModule() {
   // Decrement ref count for each SILGlobalVariable with static initializers.
@@ -758,4 +759,13 @@ bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   case BuiltinValueKind::ErrorInMain:
     return true;
   }
+}
+
+void SILModule::setSerializeSILAction(ExecutableAction &Action) {
+  assert(!SerializeSILAction && "Serialization action can be set only once");
+  SerializeSILAction = &Action;
+}
+
+ExecutableAction *SILModule::getSerializeSILAction() const {
+  return SerializeSILAction;
 }
