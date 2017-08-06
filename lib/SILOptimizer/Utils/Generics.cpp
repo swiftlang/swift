@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "generic-specializer"
 
 #include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Strings.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
@@ -22,6 +23,13 @@
 #include "swift/AST/GenericEnvironment.h"
 
 using namespace swift;
+
+STATISTIC(NumPreventedGenericSpecializationLoops,
+          "# of prevented infinite generic specializations loops");
+
+STATISTIC(NumPreventedTooComplexGenericSpecializations,
+          "# of prevented generic specializations with too complex "
+          "generic type parameters");
 
 /// Set to true to enable the support for partial specialization.
 llvm::cl::opt<bool> EnablePartialSpecialization(
@@ -399,6 +407,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
     if (isTypeTooComplex(Replacement)) {
       DEBUG(llvm::dbgs()
             << "    Cannot specialize because the generic type is too deep.\n");
+      NumPreventedTooComplexGenericSpecializations++;
       return false;
     }
   }
@@ -480,6 +489,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
       llvm::errs() << "Detected and prevented an infinite "
                       "generic specialization loop for callee: "
                    << Callee->getName() << '\n';
+    NumPreventedGenericSpecializationLoops++;
     return false;
   }
 
