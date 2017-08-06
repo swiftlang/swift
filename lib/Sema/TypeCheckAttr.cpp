@@ -164,8 +164,9 @@ public:
         diag.fixItInsert(resultLoc, fix);
       }
 
-      FD->getBodyResultTypeLoc() = TypeLoc::withoutLoc(
-          TC.Context.getNeverType());
+      auto neverType = TC.Context.getNeverType();
+      if (neverType)
+        FD->getBodyResultTypeLoc() = TypeLoc::withoutLoc(neverType);
     }
   }
 

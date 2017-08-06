@@ -701,7 +701,10 @@ CanType ASTContext::getAnyObjectType() const {
 }
 
 CanType ASTContext::getNeverType() const {
-  return getNeverDecl()->getDeclaredType()->getCanonicalType();
+  auto neverDecl = getNeverDecl();
+  if (!neverDecl)
+    return CanType();
+  return neverDecl->getDeclaredType()->getCanonicalType();
 }
 
 TypeAliasDecl *ASTContext::getVoidDecl() const {
@@ -884,6 +887,9 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
 FuncDecl *ASTContext::getEqualIntDecl() const {
   if (Impl.EqualIntDecl)
     return Impl.EqualIntDecl;
+
+  if (!getIntDecl() || !getBoolDecl())
+    return nullptr;
 
   auto intType = getIntDecl()->getDeclaredType();
   auto boolType = getBoolDecl()->getDeclaredType();
