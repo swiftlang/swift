@@ -1503,7 +1503,9 @@ recur:
     }
 
     EnumElementDecl *elementDecl = Context.getOptionalSomeDecl(optionalKind);
-    assert(elementDecl && "missing optional some decl?!");
+    if (!elementDecl)
+      return true;
+
     OP->setElementDecl(elementDecl);
 
     Pattern *sub = OP->getSubPattern();

@@ -2185,8 +2185,15 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       options |= TR_EditorPlaceholder;
     }
 
+    // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
+    // returns a Type and not bool, we should be able to simplify the listener
+    // implementation here.
+    auto initTy = listener.getInitType();
+    if (initTy->hasDependentMember())
+      return true;
+
     // Apply the solution to the pattern as well.
-    if (coercePatternToType(pattern, DC, listener.getInitType(), options,
+    if (coercePatternToType(pattern, DC, initTy, options,
                             nullptr, TypeLoc(), listener.isInOut())) {
       return true;
     }

@@ -3792,11 +3792,14 @@ static bool trySequenceSubsequenceConversionFixIts(InFlightDiagnostic &diag,
                                                    ConstraintSystem &CS,
                                                    Type fromType, Type toType,
                                                    Expr *expr) {
-  if (CS.TC.Context.getStdlibModule() == nullptr) {
+  if (CS.TC.Context.getStdlibModule() == nullptr)
     return false;
-  }
+
   auto String = CS.TC.getStringType(CS.DC);
   auto Substring = CS.TC.getSubstringType(CS.DC);
+
+  if (!String || !Substring)
+    return false;
 
   /// FIXME: Remove this flag when void subscripts are implemented.
   /// Make this unconditional and remove the if statement.
@@ -4744,13 +4747,17 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     // matches what the user actually wrote instead of what the typechecker
     // expects.
     SmallVector<TupleTypeElt, 4> elts;
-    for (auto *el : argTuple->getElements()) {
+    for (unsigned i = 0, e = argTuple->getNumElements(); i < e; ++i) {
       ConcreteDeclRef ref = nullptr;
+      auto *el = argTuple->getElement(i);
       auto typeResult =
         TC.getTypeOfExpressionWithoutApplying(el, CS.DC, ref);
       if (!typeResult)
         return false;
-      elts.push_back(typeResult);
+      auto flags = ParameterTypeFlags().withInOut(typeResult->is<InOutType>());
+      elts.push_back(TupleTypeElt(typeResult->getInOutObjectType(),
+                                  argTuple->getElementName(i),
+                                  flags));
     }
 
     argType = TupleType::get(elts, CS.getASTContext());
