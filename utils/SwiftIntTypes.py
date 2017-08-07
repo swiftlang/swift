@@ -9,7 +9,7 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 # Bit counts for all int types
-_all_integer_type_bitwidths = [8, 16, 32, 64]
+_all_integer_type_bitwidths = [8, 16, 32, 64, 128]
 
 # Number of bits in the biggest int type
 int_max_bits = max(_all_integer_type_bitwidths)
@@ -31,6 +31,7 @@ class SwiftIntegerType(object):
         self.is_word = is_word
         self.bits = bits
         self.is_signed = is_signed
+        self.access = 'public' if bits <= 64 else 'internal'
 
         if is_word:
             self.possible_bitwidths = [32, 64]
@@ -87,7 +88,7 @@ def should_define_truncating_bit_pattern_init(src_ty, dst_ty):
 
     for src_ty_bits in src_ty.possible_bitwidths:
         for dst_ty_bits in dst_ty.possible_bitwidths:
-            if src_ty_bits > dst_ty_bits:
+            if src_ty_bits > dst_ty_bits and src_ty_bits != 128:
                 return True
 
     return False

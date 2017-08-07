@@ -244,6 +244,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   init(signOf: Self, magnitudeOf: Self)
 
 % for src_ty in all_integer_types(word_bits):
+%   if src_ty.access == 'public':
   /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value
@@ -251,7 +252,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
   init(_ value: ${src_ty.stdlib_name})
-
+%   end
 % end
   /*  TODO: Implement the following APIs once a revised integer protocol is
       introduced that allows for them to be implemented. In particular, we

@@ -190,7 +190,7 @@ ${orderingExplanation}
   /// - Returns: The sequence's maximum element. If the sequence has no
   ///   elements, returns `nil`.
 %   end
-  @_inlineable
+  @inline(__always)
   @warn_unqualified_access
   public func max(
 %   if preds:
@@ -199,7 +199,7 @@ ${orderingExplanation}
   ) ${rethrows_}-> Element? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
-    for e in IteratorSequence(it) {
+    while let e = it.next() {
 %   if preds:
       if try areInIncreasingOrder(result, e) { result = e }
 %   else:
@@ -526,6 +526,7 @@ extension Sequence {
   /// - Returns: `true` if the sequence contains an element that satisfies
   ///   `predicate`; otherwise, `false`.
   @_inlineable
+  @inline(__always)
   public func contains(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Bool {

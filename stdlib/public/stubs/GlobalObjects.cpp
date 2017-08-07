@@ -28,6 +28,9 @@ namespace swift {
 SWIFT_RUNTIME_STDLIB_INTERFACE
 ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+ClassMetadata CLASS_METADATA_SYM(SS13_UTF16Storage);
+
 // _direct type metadata for Swift._RawNativeDictionaryStorage
 SWIFT_RUNTIME_STDLIB_INTERFACE
 ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);

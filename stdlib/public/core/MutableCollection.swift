@@ -319,6 +319,19 @@ public protocol MutableCollection : _MutableIndexable, Collection
   // <rdar://problem/21933004> Restore the signature of
   // _withUnsafeMutableBufferPointerIfSupported() that mentions
   // UnsafeMutableBufferPointer
+  
+  /// If there exists a contiguous memory buffer containing all elements in this
+  /// `Collection`, returns the result of calling `body` on that buffer.
+  ///
+  /// - Returns: the result of calling `body`, or `nil` if no such buffer
+  ///   exists.
+  ///
+  /// - Note: implementors should ensure that the lifetime of the memory
+  ///   persists throughout this call, typically by using
+  ///   `withExtendedLifetime(self)`.
+  func _withExistingUnsafeMutableBuffer<R>(
+    _ body: (UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R?
 }
 
 // TODO: swift-3-indexing-model - review the following
@@ -327,9 +340,19 @@ extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
   ) rethrows -> R? {
+    return try _withExistingUnsafeMutableBuffer { buffer in
+      // FIXME: audit force unwrap
+      try body(buffer.baseAddress!, buffer.count)
+    }
+  }
+
+  public func _withExistingUnsafeMutableBuffer<R>(
+    _ body: (UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R? {
     return nil
   }
 
+  
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the
