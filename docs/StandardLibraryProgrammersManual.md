@@ -22,7 +22,12 @@ TBD
 
 ## Internals
 
-TBD
+### Internal Functionality and SPI
+
+#### Optionals
+
+Optionals can be unwrapped with `!`, which triggers a trap on nil. Alternatively, they can be `.unsafelyUnwrapped()`, which will check and trap in debug builds of user code. Internal to the standard library is `._unsafelyUnwrappedUnchecked()` which will only check and trap in debug builds of the standard library itself. These correspond directly with `_precondition`, `_debugPrecondition`, and `_sanityCheck`. See [that section](#precondition) for details.
+
 
 ### Builtins
 
@@ -65,7 +70,7 @@ return
 This should be rarely used. It informs the SIL optimizer that any code dominated by it should be treated as the innermost loop of a performance critical section of code. It cranks optimizer heuristics to 11. Injudicious use of this will degrade performance and bloat binary size.
 
 
-#### `_precondition`, `_debugPrecondition`, and `_sanityCheck`
+#### <a name="precondition"></a>`_precondition`, `_debugPrecondition`, and `_sanityCheck`
 
 These three functions are assertions that will trigger a run time trap if violated.
 
@@ -81,7 +86,7 @@ A call to `_fixLifetime` is considered a use of its argument, meaning that the a
 
 ```swift
 var x = ...
-defer { _fixLifetime(x) } // Guarentee at least lexical lifetime for x
+defer { _fixLifetime(x) } // Guarantee at least lexical lifetime for x
 let theBits = unsafeBitCast(&x, ...)
 ... // use of theBits in ways that may outlive x if it weren't for the _fixLifetime call
 ```
