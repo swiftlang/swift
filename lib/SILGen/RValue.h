@@ -35,6 +35,33 @@ class SILGenFunction;
 /// An "exploded" SIL rvalue, in which tuple values are recursively
 /// destructured.
 ///
+/// In terms of implementation, an RValue is a collection of ManagedValues that
+/// the RValue class allows to be worked with as if they were one tuple. This
+/// allows for tuples to represent tuples without needing to canonicalize into
+/// the actual tuple value.
+///
+/// Once constructed, RValues obey the following invariants:
+///
+///   1. All non-trivially typed sub-ManagedValues must consistently have
+///   cleanups. This is verified upon construction of an RValue.
+///
+///   2. All sub-ManagedValues with non-trivial ValueOwnershipKind must have the
+///   same ValueOwnershipKind. There is a subtle thing occuring here. Since all
+///   addresses are viewed from an ownership perspective as having trivial
+///   ownership, this causes the verification to ignore address only
+///   values. Once we transition to opaque values, the verification will
+///   proceed.
+///
+///   3. All loadable sub-ManagedValues of an RValue must be of object
+///   type. This means that if the lowered type of an RValue is loadable, then
+///   the RValue's sub-parts must also be objects (i.e. not
+///   addresses). Originally this was a hard invariant of RValue constructors,
+///   but some parts of ArgEmission pass in addresses for loadable values. So
+///   RValue loads them in the constructor.
+///
+///  FIXME(opaque_values): Update invariant #2 once address only types are no
+///  longer emitted by SILGen.
+///
 /// *NOTE* In SILGen we don't try to explode structs, because doing so would
 /// require considering resilience, a job we want to delegate to IRGen.
 class RValue {
