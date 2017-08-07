@@ -301,8 +301,8 @@ extension Sequence ${"" if preds else "where Element : Equatable"} {
 
 %   if preds:
   /// Returns a Boolean value indicating whether this sequence and another
-  /// sequence contain equivalent elements, using the given predicate as the
-  /// equivalence test.
+  /// sequence contain equivalent elements in the same order, using the given
+  /// predicate as the equivalence test.
   ///
   /// At least one of the sequences must be finite.
   ///

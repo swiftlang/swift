@@ -51,19 +51,21 @@ public protocol CodingKey {
     /// The string to use in a named collection (e.g. a string-keyed dictionary).
     var stringValue: String { get }
 
-    /// Initializes `self` from a string.
+    /// Creates a new instance from the given string.
+    ///
+    /// If the string passed as `stringValue` does not correspond to any instance of this type, the result is `nil`.
     ///
     /// - parameter stringValue: The string value of the desired key.
-    /// - returns: An instance of `Self` from the given string, or `nil` if the given string does not correspond to any instance of `Self`.
     init?(stringValue: String)
 
-    /// The int to use in an indexed collection (e.g. an int-keyed dictionary).
+    /// The value to use in an integer-indexed collection (e.g. an int-keyed dictionary).
     var intValue: Int? { get }
 
-    /// Initializes `self` from an integer.
+    /// Creates a new instance from the specified integer.
+    ///
+    /// If the value passed as `intValue` does not correspond to any instance of this type, the result is `nil`.
     ///
     /// - parameter intValue: The integer value of the desired key.
-    /// - returns: An instance of `Self` from the given integer, or `nil` if the given integer does not correspond to any instance of `Self`.
     init?(intValue: Int)
 }
 
@@ -74,7 +76,6 @@ public protocol CodingKey {
 /// A type that can encode values into a native format for external representation.
 public protocol Encoder {
     /// The path of coding keys taken to get to this point in encoding.
-    /// A `nil` value indicates an unkeyed container.
     var codingPath: [CodingKey] { get }
 
     /// Any contextual information set by the user for encoding.
@@ -82,53 +83,51 @@ public protocol Encoder {
 
     /// Returns an encoding container appropriate for holding multiple values keyed by the given key type.
     ///
+    /// You must use only one kind of top-level encoding container. This method must not be called after a call to `unkeyedContainer()` or after encoding a value through a call to `singleValueContainer()`
+    ///
     /// - parameter type: The key type to use for the container.
     /// - returns: A new keyed encoding container.
-    /// - precondition: May not be called after a prior `self.unkeyedContainer()` call.
-    /// - precondition: May not be called after a value has been encoded through a previous `self.singleValueContainer()` call.
     func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key>
 
     /// Returns an encoding container appropriate for holding multiple unkeyed values.
     ///
+    /// You must use only one kind of top-level encoding container. This method must not be called after a call to `container(keyedBy:)` or after encoding a value through a call to `singleValueContainer()`
+    ///
     /// - returns: A new empty unkeyed container.
-    /// - precondition: May not be called after a prior `self.container(keyedBy:)` call.
-    /// - precondition: May not be called after a value has been encoded through a previous `self.singleValueContainer()` call.
     func unkeyedContainer() -> UnkeyedEncodingContainer
 
     /// Returns an encoding container appropriate for holding a single primitive value.
     ///
+    /// You must use only one kind of top-level encoding container. This method must not be called after a call to `unkeyedContainer()` or `container(keyedBy:)`, or after encoding a value through a call to `singleValueContainer()`
+    ///
     /// - returns: A new empty single value container.
-    /// - precondition: May not be called after a prior `self.container(keyedBy:)` call.
-    /// - precondition: May not be called after a prior `self.unkeyedContainer()` call.
-    /// - precondition: May not be called after a value has been encoded through a previous `self.singleValueContainer()` call.
     func singleValueContainer() -> SingleValueEncodingContainer
 }
 
 /// A type that can decode values from a native format into in-memory representations.
 public protocol Decoder {
     /// The path of coding keys taken to get to this point in decoding.
-    /// A `nil` value indicates an unkeyed container.
     var codingPath: [CodingKey] { get }
 
     /// Any contextual information set by the user for decoding.
     var userInfo: [CodingUserInfoKey : Any] { get }
 
-    /// Returns the data stored in `self` as represented in a container keyed by the given key type.
+    /// Returns the data stored in this decoder as represented in a container keyed by the given key type.
     ///
     /// - parameter type: The key type to use for the container.
-    /// - returns: A keyed decoding container view into `self`.
+    /// - returns: A keyed decoding container view into this decoder.
     /// - throws: `DecodingError.typeMismatch` if the encountered stored value is not a keyed container.
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key>
 
-    /// Returns the data stored in `self` as represented in a container appropriate for holding values with no keys.
+    /// Returns the data stored in this decoder as represented in a container appropriate for holding values with no keys.
     ///
-    /// - returns: An unkeyed container view into `self`.
+    /// - returns: An unkeyed container view into this decoder.
     /// - throws: `DecodingError.typeMismatch` if the encountered stored value is not an unkeyed container.
     func unkeyedContainer() throws -> UnkeyedDecodingContainer
 
-    /// Returns the data stored in `self` as represented in a container appropriate for holding a single primitive value.
+    /// Returns the data stored in this decoder as represented in a container appropriate for holding a single primitive value.
     ///
-    /// - returns: A single value container view into `self`.
+    /// - returns: A single value container view into this decoder.
     /// - throws: `DecodingError.typeMismatch` if the encountered stored value is not a single value container.
     func singleValueContainer() throws -> SingleValueDecodingContainer
 }
@@ -146,7 +145,6 @@ public protocol KeyedEncodingContainerProtocol {
     associatedtype Key : CodingKey
 
     /// The path of coding keys taken to get to this point in encoding.
-    /// A `nil` value indicates an unkeyed container.
     var codingPath: [CodingKey] { get }
 
     /// Encodes a null value for the given key.
@@ -262,7 +260,7 @@ public protocol KeyedEncodingContainerProtocol {
 
     /// Encodes a reference to the given object only if it is encoded unconditionally elsewhere in the payload (previously, or in the future).
     ///
-    /// For `Encoder`s which don't support this feature, the default implementation encodes the given object unconditionally.
+    /// For encoders which don't support this feature, the default implementation encodes the given object unconditionally.
     ///
     /// - parameter object: The object to encode.
     /// - parameter key: The key to associate the object with.
@@ -387,17 +385,17 @@ public protocol KeyedEncodingContainerProtocol {
     /// - returns: A new unkeyed encoding container.
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer
 
-    /// Stores a new nested container for the default `super` key and returns a new `Encoder` instance for encoding `super` into that container.
+    /// Stores a new nested container for the default `super` key and returns A new encoder instance for encoding `super` into that container.
     ///
     /// Equivalent to calling `superEncoder(forKey:)` with `Key(stringValue: "super", intValue: 0)`.
     ///
-    /// - returns: A new `Encoder` to pass to `super.encode(to:)`.
+    /// - returns: A new encoder to pass to `super.encode(to:)`.
     mutating func superEncoder() -> Encoder
 
-    /// Stores a new nested container for the given key and returns a new `Encoder` instance for encoding `super` into that container.
+    /// Stores a new nested container for the given key and returns A new encoder instance for encoding `super` into that container.
     ///
     /// - parameter key: The key to encode `super` for.
-    /// - returns: A new `Encoder` to pass to `super.encode(to:)`.
+    /// - returns: A new encoder to pass to `super.encode(to:)`.
     mutating func superEncoder(forKey key: Key) -> Encoder
 }
 
@@ -412,7 +410,7 @@ public struct KeyedEncodingContainer<K : CodingKey> : KeyedEncodingContainerProt
     @_versioned
     internal var _box: _KeyedEncodingContainerBase<Key>
 
-    /// Initializes `self` with the given container.
+    /// Creates a new instance with the given container.
     ///
     /// - parameter container: The container to hold.
     public init<Container : KeyedEncodingContainerProtocol>(_ container: Container) where Container.Key == Key {
@@ -420,7 +418,6 @@ public struct KeyedEncodingContainer<K : CodingKey> : KeyedEncodingContainerProt
     }
 
     /// The path of coding keys taken to get to this point in encoding.
-    /// A `nil` value indicates an unkeyed container.
     public var codingPath: [CodingKey] {
         return _box.codingPath
     }
@@ -570,7 +567,7 @@ public struct KeyedEncodingContainer<K : CodingKey> : KeyedEncodingContainerProt
 
     /// Encodes a reference to the given object only if it is encoded unconditionally elsewhere in the payload (previously, or in the future).
     ///
-    /// For `Encoder`s which don't support this feature, the default implementation encodes the given object unconditionally.
+    /// For encoders which don't support this feature, the default implementation encodes the given object unconditionally.
     ///
     /// - parameter object: The object to encode.
     /// - parameter key: The key to associate the object with.
@@ -731,19 +728,19 @@ public struct KeyedEncodingContainer<K : CodingKey> : KeyedEncodingContainerProt
         return _box.nestedUnkeyedContainer(forKey: key)
     }
 
-    /// Stores a new nested container for the default `super` key and returns a new `Encoder` instance for encoding `super` into that container.
+    /// Stores a new nested container for the default `super` key and returns A new encoder instance for encoding `super` into that container.
     ///
     /// Equivalent to calling `superEncoder(forKey:)` with `Key(stringValue: "super", intValue: 0)`.
     ///
-    /// - returns: A new `Encoder` to pass to `super.encode(to:)`.
+    /// - returns: A new encoder to pass to `super.encode(to:)`.
     public mutating func superEncoder() -> Encoder {
         return _box.superEncoder()
     }
 
-    /// Stores a new nested container for the given key and returns a new `Encoder` instance for encoding `super` into that container.
+    /// Stores a new nested container for the given key and returns A new encoder instance for encoding `super` into that container.
     ///
     /// - parameter key: The key to encode `super` for.
-    /// - returns: A new `Encoder` to pass to `super.encode(to:)`.
+    /// - returns: A new encoder to pass to `super.encode(to:)`.
     public mutating func superEncoder(forKey key: Key) -> Encoder {
         return _box.superEncoder(forKey: key)
     }
@@ -758,7 +755,6 @@ public protocol KeyedDecodingContainerProtocol {
     associatedtype Key : CodingKey
 
     /// The path of coding keys taken to get to this point in decoding.
-    /// A `nil` value indicates an unkeyed container.
     var codingPath: [CodingKey] { get }
 
     /// All the keys the `Decoder` has for this container.
@@ -766,9 +762,9 @@ public protocol KeyedDecodingContainerProtocol {
     /// Different keyed containers from the same `Decoder` may return different keys here; it is possible to encode with multiple key types which are not convertible to one another. This should report all keys present which are convertible to the requested type.
     var allKeys: [Key] { get }
 
-    /// Returns whether the `Decoder` contains a value associated with the given key.
+    /// Returns a Boolean value indicating whether the decoder contains a value associated with the given key.
     ///
-    /// The value associated with the given key may be a null value as appropriate for the data format.
+    /// The value associated with `key` may be a null value as appropriate for the data format.
     ///
     /// - parameter key: The key to search for.
     /// - returns: Whether the `Decoder` has an entry for the given key.
@@ -1125,7 +1121,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     @_versioned
     internal var _box: _KeyedDecodingContainerBase<Key>
 
-    /// Initializes `self` with the given container.
+    /// Creates a new instance with the given container.
     ///
     /// - parameter container: The container to hold.
     public init<Container : KeyedDecodingContainerProtocol>(_ container: Container) where Container.Key == Key {
@@ -1133,19 +1129,18 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     }
 
     /// The path of coding keys taken to get to this point in decoding.
-    /// A `nil` value indicates an unkeyed container.
     public var codingPath: [CodingKey] {
         return _box.codingPath
     }
 
-    /// All the keys the `Decoder` has for this container.
+    /// All the keys the decoder has for this container.
     ///
-    /// Different keyed containers from the same `Decoder` may return different keys here; it is possible to encode with multiple key types which are not convertible to one another. This should report all keys present which are convertible to the requested type.
+    /// Different keyed containers from the same decoder may return different keys here, because it is possible to encode with multiple key types which are not convertible to one another. This should report all keys present which are convertible to the requested type.
     public var allKeys: [Key] {
         return _box.allKeys
     }
 
-    /// Returns whether the `Decoder` contains a value associated with the given key.
+    /// Returns a Boolean value indicating whether the decoder contains a value associated with the given key.
     ///
     /// The value associated with the given key may be a null value as appropriate for the data format.
     ///
@@ -1575,7 +1570,6 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
 /// their format.
 public protocol UnkeyedEncodingContainer {
     /// The path of coding keys taken to get to this point in encoding.
-    /// A `nil` value indicates an unkeyed container.
     var codingPath: [CodingKey] { get }
 
     /// The number of elements encoded into the container.
@@ -1678,7 +1672,7 @@ public protocol UnkeyedEncodingContainer {
 
     /// Encodes a reference to the given object only if it is encoded unconditionally elsewhere in the payload (previously, or in the future).
     ///
-    /// For `Encoder`s which don't support this feature, the default implementation encodes the given object unconditionally.
+    /// For encoders which don't support this feature, the default implementation encodes the given object unconditionally.
     ///
     /// For formats which don't support this feature, the default implementation encodes the given object unconditionally.
     ///
@@ -1789,7 +1783,7 @@ public protocol UnkeyedEncodingContainer {
 
     /// Encodes a nested container and returns an `Encoder` instance for encoding `super` into that container.
     ///
-    /// - returns: A new `Encoder` to pass to `super.encode(to:)`.
+    /// - returns: A new encoder to pass to `super.encode(to:)`.
     mutating func superEncoder() -> Encoder
 }
 
@@ -1800,13 +1794,14 @@ public protocol UnkeyedEncodingContainer {
 /// their format.
 public protocol UnkeyedDecodingContainer {
     /// The path of coding keys taken to get to this point in decoding.
-    /// A `nil` value indicates an unkeyed container.
     var codingPath: [CodingKey] { get }
 
-    /// Returns the number of elements (if known) contained within this container.
+    /// The number of elements contained within this container.
+    ///
+    /// If the number of elements is unknown, the value is `nil`.
     var count: Int? { get }
 
-    /// Returns whether there are no more elements left to be decoded in the container.
+    /// A Boolean value indicating whether there are no more elements left to be decoded in the container.
     var isAtEnd: Bool { get }
 
     /// The current decoding index of the container (i.e. the index of the next element to be decoded.)
@@ -2104,7 +2099,6 @@ public protocol UnkeyedDecodingContainer {
 /// non-keyed value.
 public protocol SingleValueEncodingContainer {
     /// The path of coding keys taken to get to this point in encoding.
-    /// A `nil` value indicates an unkeyed container.
     var codingPath: [CodingKey] { get }
 
     /// Encodes a null value.
@@ -2222,7 +2216,6 @@ public protocol SingleValueEncodingContainer {
 /// A `SingleValueDecodingContainer` is a container which can support the storage and direct decoding of a single non-keyed value.
 public protocol SingleValueDecodingContainer {
     /// The path of coding keys taken to get to this point in encoding.
-    /// A `nil` value indicates an unkeyed container.
     var codingPath: [CodingKey] { get }
 
     /// Decodes a null value.
@@ -2362,14 +2355,14 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
     /// The key's string value.
     public let rawValue: String
 
-    /// Initializes `self` with the given raw value.
+    /// Creates a new instance with the given raw value.
     ///
     /// - parameter rawValue: The value of the key.
     public init?(rawValue: String) {
         self.rawValue = rawValue
     }
 
-    /// Returns whether the given keys are equal.
+    /// Returns a Boolean value indicating whether the given keys are equal.
     ///
     /// - parameter lhs: The key to compare against.
     /// - parameter rhs: The key to compare with.
@@ -2391,7 +2384,7 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
 public enum EncodingError : Error {
     /// The context in which the error occurred.
     public struct Context {
-        /// The path of `CodingKey`s taken to get to the point of the failing encode call.
+        /// The path of coding keys taken to get to the point of the failing encode call.
         public let codingPath: [CodingKey]
 
         /// A description of what went wrong, for debugging purposes.
@@ -2400,9 +2393,9 @@ public enum EncodingError : Error {
         /// The underlying error which caused this error, if any.
         public let underlyingError: Error?
 
-        /// Initializes `self` with the given path of `CodingKey`s and a description of what went wrong.
+        /// Creates a new context with the given path of coding keys and a description of what went wrong.
         ///
-        /// - parameter codingPath: The path of `CodingKey`s taken to get to the point of the failing encode call.
+        /// - parameter codingPath: The path of coding keys taken to get to the point of the failing encode call.
         /// - parameter debugDescription: A description of what went wrong, for debugging purposes.
         /// - parameter underlyingError: The underlying error which caused this error, if any.
         public init(codingPath: [CodingKey], debugDescription: String, underlyingError: Error? = nil) {
@@ -2412,9 +2405,9 @@ public enum EncodingError : Error {
         }
     }
 
-    /// `.invalidValue` indicates that an `Encoder` or its containers could not encode the given value.
+    /// An indication that an encoder or its containers could not encode the given value.
     ///
-    /// Contains the attempted value, along with context for debugging.
+    /// As associated values, this case contains the attempted value and context for debugging.
     case invalidValue(Any, Context)
 
     // MARK: - NSError Bridging
@@ -2460,7 +2453,7 @@ public enum EncodingError : Error {
 public enum DecodingError : Error {
     /// The context in which the error occurred.
     public struct Context {
-        /// The path of `CodingKey`s taken to get to the point of the failing decode call.
+        /// The path of coding keys taken to get to the point of the failing decode call.
         public let codingPath: [CodingKey]
 
         /// A description of what went wrong, for debugging purposes.
@@ -2469,9 +2462,9 @@ public enum DecodingError : Error {
         /// The underlying error which caused this error, if any.
         public let underlyingError: Error?
 
-        /// Initializes `self` with the given path of `CodingKey`s and a description of what went wrong.
+        /// Creates a new context with the given path of coding keys and a description of what went wrong.
         ///
-        /// - parameter codingPath: The path of `CodingKey`s taken to get to the point of the failing decode call.
+        /// - parameter codingPath: The path of coding keys taken to get to the point of the failing decode call.
         /// - parameter debugDescription: A description of what went wrong, for debugging purposes.
         /// - parameter underlyingError: The underlying error which caused this error, if any.
         public init(codingPath: [CodingKey], debugDescription: String, underlyingError: Error? = nil) {
@@ -2481,24 +2474,24 @@ public enum DecodingError : Error {
         }
     }
 
-    /// `.typeMismatch` indicates that a value of the given type could not be decoded because it did not match the type of what was found in the encoded payload.
+    /// An indication that a value of the given type could not be decoded because it did not match the type of what was found in the encoded payload.
     ///
-    /// Contains the attempted type, along with context for debugging.
+    /// As associated values, this case contains the attempted type and context for debugging.
     case typeMismatch(Any.Type, Context)
 
-    /// `.valueNotFound` indicates that a non-optional value of the given type was expected, but a null value was found.
+    /// An indication that a non-optional value of the given type was expected, but a null value was found.
     ///
-    /// Contains the attempted type, along with context for debugging.
+    /// As associated values, this case contains the attempted type and context for debugging.
     case valueNotFound(Any.Type, Context)
 
-    /// `.keyNotFound` indicates that a `KeyedDecodingContainer` was asked for an entry for the given key, but did not contain one.
+    ///  An indication that a keyed decoding container was asked for an entry for the given key, but did not contain one.
     ///
-    /// Contains the attempted key, along with context for debugging.
+    /// As associated values, this case contains the attempted key and context for debugging.
     case keyNotFound(CodingKey, Context)
 
-    /// `.dataCorrupted` indicates that the data is corrupted or otherwise invalid.
+    /// An indication that the data is corrupted or otherwise invalid.
     ///
-    /// Contains context for debugging.
+    /// As an associated value, this case contains the context for debugging.
     case dataCorrupted(Context)
 
     // MARK: - NSError Bridging
@@ -2563,37 +2556,40 @@ internal struct _GenericIndexKey : CodingKey {
 }
 
 public extension DecodingError {
-    /// A convenience method which creates a new .dataCorrupted error using a constructed coding path and the given debug description.
+    /// Returns a new `.dataCorrupted` error using a constructed coding path and the given debug description.
     ///
-    /// Constructs a coding path by appending the given key to the given container's coding path.
+    /// The coding path for the returned error is constructed by appending the given key to the given container's coding path.
     ///
     /// - param key: The key which caused the failure.
     /// - param container: The container in which the corrupted data was accessed.
     /// - param debugDescription: A description of the error to aid in debugging.
+    /// - Returns: A new `.dataCorrupted` error with the given information.
     static func dataCorruptedError<C : KeyedDecodingContainerProtocol>(forKey key: C.Key, in container: C, debugDescription: String) -> DecodingError {
         let context = DecodingError.Context(codingPath: container.codingPath + [key],
                                             debugDescription: debugDescription)
         return .dataCorrupted(context)
     }
 
-    /// A convenience method which creates a new .dataCorrupted error using a constructed coding path and the given debug description.
+    /// Returns a new `.dataCorrupted` error using a constructed coding path and the given debug description.
     ///
-    /// Constructs a coding path by appending a nil key to the given container's coding path.
+    /// The coding path for the returned error is constructed by appending the given container's current index to its coding path.
     ///
     /// - param container: The container in which the corrupted data was accessed.
     /// - param debugDescription: A description of the error to aid in debugging.
+    /// - Returns: A new `.dataCorrupted` error with the given information.
     static func dataCorruptedError(in container: UnkeyedDecodingContainer, debugDescription: String) -> DecodingError {
         let context = DecodingError.Context(codingPath: container.codingPath + [_GenericIndexKey(intValue: container.currentIndex)!],
                                             debugDescription: debugDescription)
         return .dataCorrupted(context)
     }
 
-    /// A convenience method which creates a new .dataCorrupted error using a constructed coding path and the given debug description.
+    /// Returns a new `.dataCorrupted` error using a constructed coding path and the given debug description.
     ///
-    /// Uses the given container's coding path as the constructed path.
+    /// The coding path for the returned error is the given container's coding path.
     ///
     /// - param container: The container in which the corrupted data was accessed.
     /// - param debugDescription: A description of the error to aid in debugging.
+    /// - Returns: A new `.dataCorrupted` error with the given information.
     static func dataCorruptedError(in container: SingleValueDecodingContainer, debugDescription: String) -> DecodingError {
         let context = DecodingError.Context(codingPath: container.codingPath,
                                             debugDescription: debugDescription)
