@@ -583,6 +583,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (Action == FrontendOptions::Parse ||
       Action == FrontendOptions::DumpParse ||
+      Action == FrontendOptions::EmitSyntax ||
       Action == FrontendOptions::DumpInterfaceHash ||
       Action == FrontendOptions::EmitImportedModules)
     Instance.performParseOnly();
