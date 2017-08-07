@@ -365,21 +365,69 @@ done:
 /// parseExprSequenceElement
 ///
 ///   expr-sequence-element(Mode):
-///     'try' expr-unary(Mode)
-///     'try' '?' expr-unary(Mode)
-///     'try' '!' expr-unary(Mode)
+///     'await' expr-sequence-element(Mode)
+///     'try' expr-sequence-element(Mode)
+///     'try' '?' expr-sequence-element(Mode)
+///     'try' '!' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
 ///
 /// 'try' is not actually allowed at an arbitrary position of a
 /// sequence, but this isn't enforced until sequence-folding.
 ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
                                                     bool isExprBasic) {
-  SourceLoc tryLoc;
-  bool hadTry = consumeIf(tok::kw_try, tryLoc);
-  Optional<Token> trySuffix;
-  if (hadTry && Tok.isAny(tok::exclaim_postfix, tok::question_postfix)) {
-    trySuffix = Tok;
-    consumeToken();
+  if (Tok.is(tok::kw_await)) {
+    SourceLoc awaitLoc = consumeToken(tok::kw_await);
+    auto sub = parseExprSequenceElement(diag::expected_expr_after_await,
+                                        isExprBasic);
+    if (sub.hasCodeCompletion() || sub.isNull())
+      return sub;
+    return makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
+  }
+  
+  if (Tok.is(tok::kw_try)) {
+      SourceLoc tryLoc = consumeToken(tok::kw_try);
+
+    Token trySuffix = Tok;
+    if (Tok.isAny(tok::exclaim_postfix, tok::question_postfix))
+      consumeToken();
+    
+    auto sub = parseExprSequenceElement(diag::expected_expr_after_try,
+                                        isExprBasic);
+    if (sub.hasCodeCompletion() || sub.isNull())
+      return sub;
+
+    switch (trySuffix.getKind()) {
+    case tok::exclaim_postfix:  // 'try!'
+      return makeParserResult(
+          new (Context) ForceTryExpr(tryLoc, sub.get(), trySuffix.getLoc()));
+    case tok::question_postfix: // 'try?'
+      return makeParserResult(
+          new (Context) OptionalTryExpr(tryLoc, sub.get(),
+                                        trySuffix.getLoc()));
+    default: // normal 'try'.
+      break;
+    }
+    
+    // If this is a simple "try expr" situation, where the expr is a closure
+    // literal, and the next token is a 'catch', then the user wrote
+    // try/catch instead of do/catch.  Emit a fixit hint to rewrite to the
+    // correct do/catch construct.
+    if (Tok.is(tok::kw_catch) && isa<ClosureExpr>(sub.get())) {
+      diagnose(tryLoc, diag::docatch_not_trycatch)
+        .fixItReplace(tryLoc, "do");
+      
+      // Eat all of the catch clauses, so we don't trip over them in error
+      // recovery.
+      while (Tok.is(tok::kw_catch)) {
+        ParserResult<CatchStmt> clause = parseStmtCatch();
+        if (clause.hasCodeCompletion() && clause.isNull())
+          break;
+      }
+
+      return makeParserResult(new (Context) ErrorExpr(tryLoc));
+    }
+        
+    return makeParserResult(new (Context) TryExpr(tryLoc, sub.get()));
   }
 
   // Try to parse '@' sign or 'inout' as a attributed typerepr.
@@ -399,45 +447,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     }
   }
 
-  ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
-
-  if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
-    switch (trySuffix ? trySuffix->getKind() : tok::NUM_TOKENS) {
-    case tok::exclaim_postfix:
-      sub = makeParserResult(
-          new (Context) ForceTryExpr(tryLoc, sub.get(), trySuffix->getLoc()));
-      break;
-    case tok::question_postfix:
-      sub = makeParserResult(
-          new (Context) OptionalTryExpr(tryLoc, sub.get(),
-                                        trySuffix->getLoc()));
-      break;
-    default:
-      // If this is a simple "try expr" situation, where the expr is a closure
-      // literal, and the next token is a 'catch', then the user wrote
-      // try/catch instead of do/catch.  Emit a fixit hint to rewrite to the
-      // correct do/catch construct.
-      if (Tok.is(tok::kw_catch) && isa<ClosureExpr>(sub.get())) {
-        diagnose(tryLoc, diag::docatch_not_trycatch)
-          .fixItReplace(tryLoc, "do");
-        
-        // Eat all of the catch clauses, so we don't trip over them in error
-        // recovery.
-        while (Tok.is(tok::kw_catch)) {
-          ParserResult<CatchStmt> clause = parseStmtCatch();
-          if (clause.hasCodeCompletion() && clause.isNull())
-            break;
-        }
-
-        return makeParserResult(new (Context) ErrorExpr(tryLoc));
-      }
-        
-      sub = makeParserResult(new (Context) TryExpr(tryLoc, sub.get()));
-      break;
-    }
-  }
-
-  return sub;
+  // Otherwise, this is just a unary expression.
+  return parseExprUnary(message, isExprBasic);
 }
 
 /// parseExprUnary

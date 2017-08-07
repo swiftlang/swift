@@ -210,6 +210,8 @@ public:
       recurse = asImpl().checkClosure(closure);
     } else if (auto autoclosure = dyn_cast<AutoClosureExpr>(E)) {
       recurse = asImpl().checkAutoClosure(autoclosure);
+    } else if (auto awaitExpr = dyn_cast<AwaitExpr>(E)) {
+      recurse = asImpl().checkAwait(awaitExpr);
     } else if (auto tryExpr = dyn_cast<TryExpr>(E)) {
       recurse = asImpl().checkTry(tryExpr);
     } else if (auto forceTryExpr = dyn_cast<ForceTryExpr>(E)) {
@@ -312,9 +314,6 @@ enum class ThrowingKind {
   /// The call/function can't throw.
   None,
 
-  /// The call/function contains invalid code.
-  Invalid,
-
   /// The call/function can only throw if one of the parameters in
   /// the current rethrows context can throw.
   RethrowingOnly,
@@ -326,13 +325,16 @@ enum class ThrowingKind {
 /// A type expressing the result of classifying whether a call or function
 /// throws.
 class Classification {
-  ThrowingKind Result;
+  bool IsInvalid = false;  // The AST is malformed.  Don't diagnose.
+  bool IsAsync = false;
+  ThrowingKind Result = ThrowingKind::None;
   Optional<PotentialReason> Reason;
-
+  
 public:
   Classification() : Result(ThrowingKind::None) {}
-  explicit Classification(ThrowingKind result, PotentialReason reason)
-      : Result(result) {
+  explicit Classification(ThrowingKind result, PotentialReason reason,
+                          bool isAsync)
+      : IsAsync(isAsync), Result(result) {
     if (result == ThrowingKind::Throws ||
         result == ThrowingKind::RethrowingOnly) {
       Reason = reason;
@@ -341,16 +343,25 @@ public:
 
   /// Return a classification saying that there's an unconditional
   /// throw site.
-  static Classification forThrow(PotentialReason reason) {
+  static Classification forThrow(PotentialReason reason, bool isAsync) {
     Classification result;
     result.Result = ThrowingKind::Throws;
     result.Reason = reason;
+    result.IsAsync = isAsync;
     return result;
   }
 
+  /// Return a classification saying that there's an unconditional
+  /// throw site.
+  static Classification forAsync() {
+    Classification result;
+    result.IsAsync = true;
+    return result;
+  }
+  
   static Classification forInvalidCode() {
     Classification result;
-    result.Result = ThrowingKind::Invalid;
+    result.IsInvalid = true;
     return result;
   }
 
@@ -362,41 +373,28 @@ public:
   }
 
   void merge(Classification other) {
-    if (other.getResult() > getResult()) {
+    if (other.getResult() > getResult())
       *this = other;
-    }
+    IsAsync |= other.IsAsync;
   }
 
+  bool isInvalid() const { return IsInvalid; }
   ThrowingKind getResult() const { return Result; }
   PotentialReason getThrowsReason() const {
     assert(getResult() == ThrowingKind::Throws ||
            getResult() == ThrowingKind::RethrowingOnly);
     return *Reason;
   }
+  
+  bool isAsync() const { return IsAsync; }
 };
 
-/// Given the type of a function, classify whether calling it with the
-/// given number of arguments would throw.
-static ThrowingKind
-classifyFunctionByType(Type type, unsigned numArgs) {
-  if (!type) return ThrowingKind::Invalid;
-
-  assert(numArgs > 0);
-  while (true) {
-    auto fnType = type->getAs<AnyFunctionType>();
-    if (!fnType) return ThrowingKind::Invalid;
-    if (--numArgs == 0) {
-      return fnType->getExtInfo().throws()
-        ? ThrowingKind::Throws : ThrowingKind::None;
-    }
-
-    type = fnType->getResult();
-  }
-}
 
 /// A class for collecting information about rethrowing functions.
 class ApplyClassifier {
-  llvm::DenseMap<void*, ThrowingKind> Cache;
+  /// The key to this cache is the function decl or closure being analyzed.  The
+  /// value in this cache is nil when the body has an error detected in it.
+  llvm::DenseMap<void*, Optional<ThrowingKind>> Cache;
 
 public:
   DeclContext *RethrowsDC = nullptr;
@@ -414,8 +412,11 @@ public:
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
 
+    bool isAsync = fnType->isAsync();
+    
     // If the function doesn't throw at all, we're done here.
-    if (!fnType->throws()) return Classification();
+    if (!fnType->throws())
+      return isAsync ? Classification::forAsync() : Classification();
 
     // Decompose the application.
     SmallVector<Expr*, 4> args;
@@ -447,7 +448,8 @@ public:
 
       assert(args.size() > fnRef.getNumArgumentsForFullApply() &&
              "partial application was throwing?");
-      return Classification::forThrow(PotentialReason::forThrowingApply());
+      return Classification::forThrow(PotentialReason::forThrowingApply(),
+                                      isAsync);
     }
 
     // If the function's body is 'rethrows' for the number of
@@ -463,7 +465,7 @@ public:
         if (auto fnType = type->getAs<AnyFunctionType>()) {
           type = fnType->getResult();
         } else {
-          Classification::forInvalidCode();
+          return Classification::forInvalidCode();
         }
       }
 
@@ -485,6 +487,10 @@ public:
       classifyThrowingFunctionBody(fnRef, PotentialReason::forThrowingApply());
     assert(result.getResult() != ThrowingKind::None &&
            "body classification decided function was no-throw");
+    
+    if (isAsync)
+      result = Classification(result.getResult(), result.getThrowsReason(),
+                              isAsync);
     return result;
   }
 
@@ -503,11 +509,11 @@ private:
     // distinguish between 'throws' and 'rethrows'.  But don't even
     // trust 'throws' for autoclosures.
     if (!inRethrowsContext() && !fn.isAutoClosure())
-      return Classification::forThrow(reason);
+      return Classification::forThrow(reason, /*async*/false);
 
     switch (fn.getKind()) {
     case AbstractFunction::Opaque:
-      return Classification::forThrow(reason);
+      return Classification::forThrow(reason, /*async*/false);
     case AbstractFunction::Parameter:
       return classifyThrowingParameterBody(fn.getParameter(), reason);
     case AbstractFunction::Function:
@@ -528,7 +534,7 @@ private:
       return Classification::forRethrowingOnly(reason);
 
     // Otherwise, it throws unconditionally.
-    return Classification::forThrow(reason);
+    return Classification::forThrow(reason, /*async*/false);
   }
 
   bool isLocallyDefinedInRethrowsContext(DeclContext *DC) {
@@ -545,11 +551,13 @@ private:
     // Functions can't be rethrowing-only unless they're defined
     // within the rethrows context.
     if (!isLocallyDefinedInRethrowsContext(fn) || !fn->hasBody())
-      return Classification::forThrow(reason);
+      return Classification::forThrow(reason, /*async*/false);
 
     auto kind = classifyThrowingFunctionBodyImpl(fn, fn->getBody(),
                                                  /*allowNone*/ false);
-    return Classification(kind, reason);
+    if (kind.hasValue())
+      return Classification(kind.getValue(), reason, /*async*/false);
+    return Classification::forInvalidCode();
   }
 
   Classification classifyThrowingFunctionBody(AbstractClosureExpr *closure,
@@ -559,7 +567,7 @@ private:
     // Closures can't be rethrowing-only unless they're defined
     // within the rethrows context.
     if (!isAutoClosure && !isLocallyDefinedInRethrowsContext(closure))
-      return Classification::forThrow(reason);
+      return Classification::forThrow(reason, /*async*/false);
 
     BraceStmt *body;
     if (auto autoclosure = dyn_cast<AutoClosureExpr>(closure)) {
@@ -571,18 +579,21 @@ private:
 
     auto kind = classifyThrowingFunctionBodyImpl(closure, body,
                                                  /*allowNone*/ isAutoClosure);
-    return Classification(kind, reason);
+    if (kind.hasValue())
+      return Classification(kind.getValue(), reason, /*async*/false);
+    return Classification::forInvalidCode();
   }
 
   class FunctionBodyClassifier
       : public ErrorHandlingWalker<FunctionBodyClassifier> {
     ApplyClassifier &Self;
   public:
+    bool IsInvalid = false;
     ThrowingKind Result = ThrowingKind::None;
     FunctionBodyClassifier(ApplyClassifier &self) : Self(self) {}
 
     void flagInvalidCode() {
-      Result = std::max(Result, ThrowingKind::Invalid);
+      IsInvalid = true;
     }
 
     ShouldRecurse_t checkClosure(ClosureExpr *closure) {
@@ -590,6 +601,9 @@ private:
     }
     ShouldRecurse_t checkAutoClosure(AutoClosureExpr *closure) {
       return ShouldNotRecurse;
+    }
+    ShouldRecurse_t checkAwait(AwaitExpr *E) {
+      return ShouldRecurse;
     }
     ShouldRecurse_t checkTry(TryExpr *E) {
       return ShouldRecurse;
@@ -601,7 +615,9 @@ private:
       return ShouldNotRecurse;
     }
     ShouldRecurse_t checkApply(ApplyExpr *E) {
-      Result = std::max(Result, Self.classifyApply(E).getResult());
+      auto classification = Self.classifyApply(E);
+      IsInvalid |= classification.isInvalid();
+      Result = std::max(Result, classification.getResult());
       return ShouldRecurse;
     }
     ShouldRecurse_t checkThrow(ThrowStmt *E) {
@@ -648,8 +664,9 @@ private:
     }
   };
 
-  ThrowingKind classifyThrowingFunctionBodyImpl(void *key, BraceStmt *body,
-                                                bool allowNone) {
+  Optional<ThrowingKind>
+  classifyThrowingFunctionBodyImpl(void *key, BraceStmt *body,
+                                   bool allowNone) {
     // Look for the key in the cache.
     auto existingIter = Cache.find(key);
     if (existingIter != Cache.end())
@@ -662,10 +679,16 @@ private:
     Cache.insert({key, ThrowingKind::RethrowingOnly});
 
     // Walk the body.
-    ThrowingKind result; {
+    ThrowingKind result;
+    {
       FunctionBodyClassifier classifier(*this);
       body->walk(classifier);
       result = classifier.Result;
+      if (classifier.IsInvalid) {
+        // Represent invalid code as being null.
+        Cache[key] = Optional<ThrowingKind>();
+        return Optional<ThrowingKind>();
+      }
     }
 
     // The body result cannot be 'none' unless it's an autoclosure.
@@ -829,7 +852,7 @@ private:
       return Classification::forInvalidCode();
     if (auto fnType = paramType->getAs<AnyFunctionType>()) {
       if (fnType->throws()) {
-        return Classification::forThrow(reason);
+        return Classification::forThrow(reason, /*async*/false);
       } else {
         return Classification();
       }
@@ -881,21 +904,29 @@ public:
     /// The pattern of a catch.
     CatchPattern,
 
-    /// The pattern of a catch.
+    /// The guard expression controlling a catch.
     CatchGuard,
   };
 
 private:
   static Kind getKindForFunctionBody(Type type, unsigned numArgs) {
-    switch (classifyFunctionByType(type, numArgs)) {
-    case ThrowingKind::None:
-      return Kind::NonThrowingFunction;
-    case ThrowingKind::Invalid:
-    case ThrowingKind::RethrowingOnly:
-    case ThrowingKind::Throws:
-      return Kind::Handled;
+    /// Determine whether calling a function of the specified type with the
+    /// specified number of arguments would throw.
+    if (!type) return Kind::Handled;
+    
+    assert(numArgs > 0);
+    while (true) {
+      auto fnType = type->getAs<AnyFunctionType>();
+      if (!fnType) return Kind::Handled;
+      
+      if (fnType->getExtInfo().throws())
+        return Kind::Handled;
+      
+      if (--numArgs == 0)
+        return Kind::NonThrowingFunction;
+      
+      type = fnType->getResult();
     }
-    llvm_unreachable("invalid classify result");
   }
 
   Kind TheKind;
@@ -971,7 +1002,6 @@ public:
   bool handles(ThrowingKind errorKind) const {
     switch (errorKind) {
     case ThrowingKind::None:
-    case ThrowingKind::Invalid:
       return true;
 
     // A call that's rethrowing-only can be handled by 'rethrows'.
@@ -1209,6 +1239,15 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
 
       /// Do we have a throw site using 'try' in this context?
       HasTryThrowSite = 0x10,
+      
+      /// Are we in the context of an 'await'?
+      IsAsyncCovered = 0x20,
+      
+      /// Do we have any calls to 'async' functions in this context?
+      HasAnyAsyncSite = 0x40,
+      
+      /// Do we have any 'await's in this context?
+      HasAnyAwait = 0x80,
     };
   private:
     unsigned Bits;
@@ -1265,6 +1304,11 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
       Self.Flags.set(ContextFlags::IsTryCovered);
       Self.Flags.clear(ContextFlags::HasTryThrowSite);
     }
+    
+    void enterAwait() {
+      Self.Flags.set(ContextFlags::IsAsyncCovered);
+      Self.Flags.clear(ContextFlags::HasAnyAsyncSite);
+    }
 
     void refineLocalContext(Context newContext) {
       Self.CurContext = newContext;
@@ -1295,6 +1339,10 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
     void preserveCoverageFromNonExhaustiveCatch() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+    }
+
+    void preserveCoverageFromAwaitOperand() {
+      OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
     }
 
     void preserveCoverageFromTryOperand() {
@@ -1430,7 +1478,7 @@ private:
     // But if the expression didn't type-check, suppress diagnostics.
     auto classification = Classifier.classifyApply(E);
 
-    checkThrowSite(E, /*requiresTry*/ true, classification);
+    checkThrowAsyncSite(E, /*requiresTry*/ true, classification);
 
     // HACK: functions can get queued multiple times in
     // definedFunctions, so be sure to be idempotent.
@@ -1481,24 +1529,44 @@ private:
   }
 
   ShouldRecurse_t checkThrow(ThrowStmt *S) {
-    checkThrowSite(S, /*requiresTry*/ false,
-                   Classification::forThrow(PotentialReason::forThrow()));
+    checkThrowAsyncSite(S, /*requiresTry*/ false,
+                        Classification::forThrow(PotentialReason::forThrow(),
+                                                 /*async*/false));
     return ShouldRecurse;
   }
 
-  void checkThrowSite(ASTNode E, bool requiresTry,
-                      const Classification &classification) {
+  void checkThrowAsyncSite(ASTNode E, bool requiresTry,
+                           const Classification &classification) {
     MaxThrowingKind = std::max(MaxThrowingKind, classification.getResult());
 
+    // Suppress all diagnostics when there's an un-analyzable throw site.
+    if (classification.isInvalid()) {
+      Flags.set(ContextFlags::HasAnyThrowSite);
+      if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
+      return;
+    }
+
+    // If the call to the function is async, handle it.
+    if (classification.isAsync()) {
+      // Remember that we've seen an async call.
+      Flags.set(ContextFlags::HasAnyAsyncSite);
+      
+      // Diagnose async calls that are outside of an await context.
+      if (!Flags.has(ContextFlags::IsAsyncCovered)) {
+        SourceRange highlight;
+        
+        // Generate more specific messages in some cases.
+        if (auto e = dyn_cast_or_null<ApplyExpr>(E.dyn_cast<Expr*>()))
+          highlight = e->getSourceRange();
+        
+        TC.diagnose(E.getStartLoc(), diag::async_call_without_await)
+          .highlight(highlight);
+      }
+    }
+    
     switch (classification.getResult()) {
     // Completely ignores sites that don't throw.
     case ThrowingKind::None:
-      return;
-
-    // Suppress all diagnostics when there's an un-analyzable throw site.
-    case ThrowingKind::Invalid:
-      Flags.set(ContextFlags::HasAnyThrowSite);
-      if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
       return;
 
     // For the purposes of handling and try-coverage diagnostics,
@@ -1526,7 +1594,23 @@ private:
     }
     llvm_unreachable("bad throwing kind");
   }
+  ShouldRecurse_t checkAwait(AwaitExpr *E) {
 
+    // Walk the operand.
+    ContextScope scope(*this, None);
+    scope.enterAwait();
+    
+    E->getSubExpr()->walk(*this);
+    
+    // Warn about 'await' expressions that weren't actually needed.
+    if (!Flags.has(ContextFlags::HasAnyAsyncSite))
+      TC.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
+    
+    // Inform the parent of the walk that an 'await' exists here.
+    scope.preserveCoverageFromAwaitOperand();
+    return ShouldNotRecurse;
+  }
+  
   ShouldRecurse_t checkTry(TryExpr *E) {
     // Walk the operand.
     ContextScope scope(*this, None);

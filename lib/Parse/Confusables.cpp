@@ -12,7 +12,8 @@
 
 #include "swift/Parse/Confusables.h"
 
-char swift::confusable::tryConvertConfusableCharacterToASCII(uint32_t codepoint) {
+char swift::confusable::
+tryConvertConfusableCharacterToASCII(uint32_t codepoint) {
   switch (codepoint) {
 #define CONFUSABLE(CONFUSABLE_POINT, BASEPOINT) \
   case CONFUSABLE_POINT: return BASEPOINT;

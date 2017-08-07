@@ -1193,6 +1193,10 @@ ERROR(expected_colon_after_if_question,none,
       "expected ':' after '? ...' in ternary expression", ())
 ERROR(expected_expr_after_if_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
+ERROR(expected_expr_after_try, none,
+      "expected expression after 'try'", ())
+ERROR(expected_expr_after_await, none,
+      "expected expression after 'await'", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,

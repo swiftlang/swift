@@ -440,6 +440,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(Sequence);
   PASS_THROUGH_REFERENCE(Paren, getSubExpr);
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
+  PASS_THROUGH_REFERENCE(Await, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
@@ -738,6 +739,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::DynamicType:
     return true;
 
+  case ExprKind::Await:
   case ExprKind::Try:
   case ExprKind::ForceTry:
   case ExprKind::OptionalTry:
@@ -1878,8 +1880,15 @@ Type AbstractClosureExpr::getResultType(
 bool AbstractClosureExpr::isBodyThrowing() const {
   if (getType()->hasError())
     return false;
-
+  
   return getType()->castTo<FunctionType>()->getExtInfo().throws();
+}
+
+bool AbstractClosureExpr::isBodyAsync() const {
+  if (getType()->hasError())
+    return false;
+
+  return getType()->castTo<FunctionType>()->getExtInfo().isAsync();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
@@ -2193,3 +2202,4 @@ KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
   return Component(&elementType->getASTContext(),
                    subscript, index, {}, Kind::Subscript, elementType, loc);
 }
+

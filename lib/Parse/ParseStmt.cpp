@@ -59,7 +59,7 @@ bool Parser::isStartOfStmt() {
 
   case tok::kw_try: {
     // "try" cannot actually start any statements, but we parse it there for
-    // better recovery.
+    // better recovery in cases like 'try return'.
     Parser::BacktrackingScope backtrack(*this);
     consumeToken(tok::kw_try);
     return isStartOfStmt();

@@ -1894,7 +1894,7 @@ public:
 /// ForceTryExpr - A 'try!' surrounding an expression, marking that
 /// the expression contains code which might throw, but that the code
 /// should dynamically assert if it does.
-class ForceTryExpr : public AnyTryExpr {
+class ForceTryExpr final : public AnyTryExpr {
   SourceLoc ExclaimLoc;
 
 public:
@@ -1913,7 +1913,7 @@ public:
 /// A 'try?' surrounding an expression, marking that the expression contains
 /// code which might throw, and that the result should be injected into an
 /// Optional. If the code does throw, \c nil is produced.
-class OptionalTryExpr : public AnyTryExpr {
+class OptionalTryExpr final : public AnyTryExpr {
   SourceLoc QuestionLoc;
 
 public:
@@ -1932,7 +1932,6 @@ public:
 /// An expression node that does not affect the evaluation of its subexpression.
 class IdentityExpr : public Expr {
   Expr *SubExpr;
-  
 public:
   IdentityExpr(ExprKind kind,
                Expr *subExpr, Type ty = Type(),
@@ -2021,6 +2020,32 @@ public:
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
 };
+  
+/// AwaitExpr - An 'await' surrounding an expression, marking that the
+/// expression contains code which is a coroutine that may block.
+///
+/// getSemanticsProvidingExpr() looks through this because it doesn't
+/// provide the value and only very specific clients care where the
+/// 'await' was written.
+class AwaitExpr final : public IdentityExpr {
+  SourceLoc AwaitLoc;
+public:
+  AwaitExpr(SourceLoc awaitLoc, Expr *sub, Type type = Type(),
+            bool implicit = false)
+    : IdentityExpr(ExprKind::Await, sub, type, implicit), AwaitLoc(awaitLoc) {
+  }
+  
+  SourceLoc getLoc() const { return AwaitLoc; }
+  
+  SourceLoc getAwaitLoc() const { return AwaitLoc; }
+  SourceLoc getStartLoc() const { return AwaitLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Await;
+  }
+};
+
   
 /// TupleExpr - Parenthesized expressions like '(a: x+x)' and '(x, y, 4)'.  Also
 /// used to represent the operands to a binary operator.  Note that
@@ -3429,6 +3454,9 @@ public:
 
   /// \brief Return whether this closure is throwing when fully applied.
   bool isBodyThrowing() const;
+
+  /// \brief Return whether this closure is async when fully applied.
+  bool isBodyAsync() const;
 
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;

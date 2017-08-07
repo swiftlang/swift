@@ -206,18 +206,30 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   if (!LHS || !RHS)
     return nullptr;
 
-  // If the left-hand-side is a 'try', hoist it up.
-  auto *tryEval = dyn_cast<AnyTryExpr>(LHS);
-  if (tryEval) {
-    LHS = tryEval->getSubExpr();
+  // If the left-hand-side is a 'try' or 'await', hoist it up turning
+  // "(try x) + y" into try (x + y).
+  if (auto *tryEval = dyn_cast<AnyTryExpr>(LHS)) {
+    auto sub = makeBinOp(TC, Op, tryEval->getSubExpr(), RHS,
+                         opPrecedence, isEndOfSequence);
+    tryEval->setSubExpr(sub);
+    return tryEval;
+  }
+  
+  if (auto *await = dyn_cast<AwaitExpr>(LHS)) {
+    auto sub = makeBinOp(TC, Op, await->getSubExpr(), RHS,
+                         opPrecedence, isEndOfSequence);
+    await->setSubExpr(sub);
+    return await;
   }
   
   // If this is an assignment operator, and the left operand is an optional
   // evaluation, pull the operator into the chain.
-  OptionalEvaluationExpr *optEval = nullptr;
   if (opPrecedence && opPrecedence->isAssignment()) {
-    if ((optEval = dyn_cast<OptionalEvaluationExpr>(LHS))) {
-      LHS = optEval->getSubExpr();
+    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(LHS)) {
+      auto sub = makeBinOp(TC, Op, optEval->getSubExpr(), RHS,
+                           opPrecedence, isEndOfSequence);
+      optEval->setSubExpr(sub);
+      return optEval;
     }
   }
 
@@ -237,12 +249,13 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   //   x ? try foo() : try bar() $#! 1
   // assuming $#! is some crazy operator with lower precedence
   // than the conditional operator.
-  if (isa<AnyTryExpr>(RHS)) {
+  if (isa<AnyTryExpr>(RHS) || isa<AwaitExpr>(RHS)) {
     // If you change this, also change TRY_KIND_SELECT in diagnostics.
     enum class TryKindForDiagnostics : unsigned {
       Try,
       ForceTry,
-      OptionalTry
+      OptionalTry,
+      Await
     };
     TryKindForDiagnostics tryKind;
     switch (RHS->getKind()) {
@@ -254,6 +267,9 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
       break;
     case ExprKind::OptionalTry:
       tryKind = TryKindForDiagnostics::OptionalTry;
+      break;
+    case ExprKind::Await:
+      tryKind = TryKindForDiagnostics::Await;
       break;
     default:
       llvm_unreachable("unknown try-like expression");
@@ -276,25 +292,12 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     }
   }
 
-  // Fold the result into the optional evaluation or try.
-  auto makeResultExpr = [&](Expr *result) -> Expr * {
-    if (optEval) {
-      optEval->setSubExpr(result);
-      result = optEval;
-    }
-    if (tryEval) {
-      tryEval->setSubExpr(result);
-      result = tryEval;
-    }
-    return result;
-  };
-  
   if (auto *ifExpr = dyn_cast<IfExpr>(Op)) {
     // Resolve the ternary expression.
     assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
     ifExpr->setCondExpr(LHS);
     ifExpr->setElseExpr(RHS);
-    return makeResultExpr(ifExpr);
+    return ifExpr;
   }
 
   if (auto *assign = dyn_cast<AssignExpr>(Op)) {
@@ -302,7 +305,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     assign->setDest(LHS);
     assign->setSrc(RHS);
-    return makeResultExpr(assign);
+    return assign;
   }
   
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
@@ -310,7 +313,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);    
-    return makeResultExpr(as);
+    return as;
   }
 
   if (auto *arrow = dyn_cast<ArrowExpr>(Op)) {
@@ -318,7 +321,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
     arrow->setArgsExpr(LHS);
     arrow->setResultExpr(RHS);
-    return makeResultExpr(arrow);
+    return arrow;
   }
   
   // Build the argument to the operation.
@@ -333,7 +336,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   
   
   // Build the operation.
-  return makeResultExpr(new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit()));
+  return new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit());
 }
 
 namespace {

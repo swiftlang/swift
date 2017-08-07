@@ -2419,7 +2419,7 @@ ERROR(missing_builtin_precedence_group,none,
       (Identifier))
 
 // If you change this, also change enum TryKindForDiagnostics.
-#define TRY_KIND_SELECT(SUB) "%select{try|try!|try?}" #SUB
+#define TRY_KIND_SELECT(SUB) "%select{try|try!|try?|await}" #SUB
 
 ERROR(try_rhs,none,
       "'" TRY_KIND_SELECT(0) "' cannot appear to the right of a "
@@ -3031,6 +3031,10 @@ NOTE(note_error_to_optional,none,
       "did you mean to handle error as optional value?", ())
 NOTE(note_disable_error_propagation,none,
       "did you mean to disable error propagation?", ())
+ERROR(async_call_without_await,none,
+      "call is 'async' but is not marked with 'await'", ())
+WARNING(no_async_in_await,none,
+        "no calls to 'async' functions occur within 'await' expression", ())
 
 WARNING(no_throw_in_try,none,
         "no calls to throwing functions occur within 'try' expression", ())

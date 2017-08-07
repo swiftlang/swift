@@ -817,6 +817,12 @@ LegacyASTTransformer::visitDotSelfExpr(DotSelfExpr *E,
 }
 
 RC<SyntaxData>
+LegacyASTTransformer::visitAwaitExpr(AwaitExpr *E, const SyntaxData *Parent,
+                                     const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
+RC<SyntaxData>
 LegacyASTTransformer::visitTryExpr(TryExpr *E,
                                    const SyntaxData *Parent,
                                    const CursorIndex IndexInParent) {
