@@ -109,19 +109,17 @@ SILModule &SILInstruction::getModule() const {
   return getFunction()->getModule();
 }
 
-/// removeFromParent - This method unlinks 'self' from the containing basic
-/// block, but does not delete it.
-///
-void SILInstruction::removeFromParent() {
-  getParent()->remove(this);
-}
-
 /// eraseFromParent - This method unlinks 'self' from the containing basic
 /// block and deletes it.
 ///
 void SILInstruction::eraseFromParent() {
   assert(use_empty() && "There are uses of instruction being deleted.");
   getParent()->erase(this);
+}
+
+void SILInstruction::moveFront(SILBasicBlock *Block) {
+  getParent()->remove(this);
+  Block->push_front(this);
 }
 
 /// Unlink this instruction from its current basic block and insert it into
@@ -152,25 +150,30 @@ void SILInstruction::dropAllReferences() {
 
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
-  auto *FRI = dyn_cast<FunctionRefInst>(this);
-  if (!FRI || !FRI->getReferencedFunction())
+  if (auto *FRI = dyn_cast<FunctionRefInst>(this)) {
+    if (!FRI->getReferencedFunction())
+      return;
+    FRI->dropReferencedFunction();
     return;
+  }
 
-  FRI->dropReferencedFunction();
-}
-
-void SILInstruction::replaceAllUsesWithUndef() {
-  SILModule &Mod = getModule();
-  while (!use_empty()) {
-    Operand *Op = *use_begin();
-    Op->set(SILUndef::get(Op->get()->getType(), Mod));
+  // If we have a KeyPathInst, drop its pattern reference so that we can
+  // decrement refcounts on referenced functions.
+  if (auto *KPI = dyn_cast<KeyPathInst>(this)) {
+    if (!KPI->hasPattern())
+      return;
+    
+    KPI->dropReferencedPattern();
+    return;
   }
 }
 
 namespace {
-  class InstructionDestroyer : public SILVisitor<InstructionDestroyer> {
-  public:
-#define VALUE(CLASS, PARENT) void visit##CLASS(CLASS *I) { I->~CLASS(); }
+class InstructionDestroyer
+    : public SILInstructionVisitor<InstructionDestroyer> {
+public:
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, MAYRELEASE)              \
+  void visit##CLASS(CLASS *I) { I->~CLASS(); }
 #include "swift/SIL/SILNodes.def"
   };
 } // end anonymous namespace
@@ -207,7 +210,15 @@ namespace {
       return true;
     }
 
+    bool visitReleaseValueAddrInst(const ReleaseValueAddrInst *RHS) {
+      return true;
+    }
+
     bool visitRetainValueInst(const RetainValueInst *RHS) {
+      return true;
+    }
+
+    bool visitRetainValueAddrInst(const RetainValueAddrInst *RHS) {
       return true;
     }
 
@@ -263,6 +274,29 @@ namespace {
 
     bool visitProjectExistentialBoxInst(const ProjectExistentialBoxInst *RHS) {
       return true;
+    }
+
+    bool visitBeginAccessInst(const BeginAccessInst *right) {
+      auto left = cast<BeginAccessInst>(LHS);
+      return left->getAccessKind() == right->getAccessKind()
+          && left->getEnforcement() == right->getEnforcement();
+    }
+
+    bool visitEndAccessInst(const EndAccessInst *right) {
+      auto left = cast<EndAccessInst>(LHS);
+      return left->isAborting() == right->isAborting();
+    }
+
+    bool visitBeginUnpairedAccessInst(const BeginUnpairedAccessInst *right) {
+      auto left = cast<BeginUnpairedAccessInst>(LHS);
+      return left->getAccessKind() == right->getAccessKind()
+          && left->getEnforcement() == right->getEnforcement();
+    }
+
+    bool visitEndUnpairedAccessInst(const EndUnpairedAccessInst *right) {
+      auto left = cast<EndUnpairedAccessInst>(LHS);
+      return left->getEnforcement() == right->getEnforcement()
+          && left->isAborting() == right->isAborting();
     }
 
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
@@ -339,6 +373,12 @@ namespace {
         && LHS_->getValue().equals(RHS->getValue());
     }
 
+    bool visitConstStringLiteralInst(const ConstStringLiteralInst *RHS) {
+      auto LHS_ = cast<ConstStringLiteralInst>(LHS);
+      return LHS_->getEncoding() == RHS->getEncoding() &&
+             LHS_->getValue().equals(RHS->getValue());
+    }
+
     bool visitStructInst(const StructInst *RHS) {
       // We have already checked the operands. Make sure that the StructDecls
       // match up.
@@ -369,9 +409,7 @@ namespace {
 
     bool visitRefTailAddrInst(RefTailAddrInst *RHS) {
       auto *X = cast<RefTailAddrInst>(LHS);
-      if (X->getTailType() != RHS->getTailType())
-        return false;
-      return true;
+      return X->getTailType() == RHS->getTailType();
     }
 
     bool visitStructElementAddrInst(const StructElementAddrInst *RHS) {
@@ -447,9 +485,7 @@ namespace {
 
     bool visitTailAddrInst(TailAddrInst *RHS) {
       auto *X = cast<TailAddrInst>(LHS);
-      if (X->getTailType() != RHS->getTailType())
-        return false;
-      return true;
+      return X->getTailType() == RHS->getTailType();
     }
 
     bool visitCondFailInst(CondFailInst *RHS) {
@@ -861,6 +897,7 @@ bool SILInstruction::mayRelease() const {
   case ValueKind::StrongReleaseInst:
   case ValueKind::UnownedReleaseInst:
   case ValueKind::ReleaseValueInst:
+  case ValueKind::ReleaseValueAddrInst:
     return true;
 
   case ValueKind::DestroyValueInst:
@@ -1005,7 +1042,8 @@ bool SILInstruction::isTriviallyDuplicatable() const {
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
-      isa<OpenExistentialOpaqueInst>(this)) {
+      isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
+      isa<OpenExistentialBoxValueInst>(this)) {
     // Don't know how to duplicate these properly yet. Inst.clone() per
     // instruction does not work. Because the follow-up instructions need to
     // reuse the same archetype uuid which would only work if we used a

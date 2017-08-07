@@ -19,7 +19,7 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
   char OutputBuffer[128];
 
   const char *FunctionName = "_TFC3foo3bar3basfT3zimCS_3zim_T_";
-  const char *DemangledName = "foo.bar.bas (zim : foo.zim) -> ()";
+  const char *DemangledName = "foo.bar.bas(zim: foo.zim) -> ()";
 
   size_t Result = swift_demangle_getDemangledName(FunctionName, OutputBuffer,
                                                   sizeof(OutputBuffer));
@@ -29,7 +29,7 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
 
   // Make sure the SynthesizeSugarOnTypes option is functioning.
   const char *FunctionNameWithSugar = "_TF4main3fooFT3argGSqGSaSi___T_";
-  const char *DemangledNameWithSugar = "main.foo (arg : [Swift.Int]?) -> ()";
+  const char *DemangledNameWithSugar = "main.foo(arg: [Swift.Int]?) -> ()";
 
   Result = swift_demangle_getDemangledName(FunctionNameWithSugar, OutputBuffer,
                                            sizeof(OutputBuffer));
@@ -40,7 +40,7 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
 
 TEST(FunctionNameDemangledTests, WorksWithNULLBuffer) {
   const char *FunctionName = "_TFC3foo3bar3basfT3zimCS_3zim_T_";
-  const char *DemangledName = "foo.bar.bas (zim : foo.zim) -> ()";
+  const char *DemangledName = "foo.bar.bas(zim: foo.zim) -> ()";
 
   // When given a null buffer, swift_demangle_getDemangledName should still be
   // able to return the size of the demangled string.

@@ -91,7 +91,8 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
     return false;
 
   // Public declarations are OK.
-  if (D->getEffectiveAccess() >= Accessibility::Public)
+  if (D->getFormalAccessScope(/*useDC=*/nullptr,
+                              /*respectVersionedAttr=*/true).isPublic())
     return false;
 
   // Enum cases are handled as part of their containing enum.
@@ -110,9 +111,27 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
 
   diagnose(loc, diag::resilience_decl_unavailable,
            D->getDescriptiveKind(), D->getFullName(),
-           D->getFormalAccess(), getFragileFunctionKind(DC));
-  diagnose(D, diag::resilience_decl_declared_here,
-           D->getDescriptiveKind(), D->getFullName());
+           D->getFormalAccessScope().accessibilityForDiagnostics(),
+           getFragileFunctionKind(DC));
+
+  bool isDefaultArgument = false;
+  while (DC->isLocalContext()) {
+    if (isa<DefaultArgumentInitializer>(DC)) {
+      isDefaultArgument = true;
+      break;
+    }
+
+    DC = DC->getParent();
+  }
+
+  if (isDefaultArgument) {
+    diagnose(D, diag::resilience_decl_declared_here,
+             D->getDescriptiveKind(), D->getFullName());
+  } else {
+    diagnose(D, diag::resilience_decl_declared_here_versioned,
+             D->getDescriptiveKind(), D->getFullName());
+  }
+
   return true;
 }
 

@@ -68,11 +68,12 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
   endif()
 
-  find_program(SWIFT_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
+  find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
     NO_DEFAULT_PATH)
-  if ("${SWIFT_TABLEGEN_EXE}" STREQUAL "SWIFT_TABLEGEN_EXE-NOTFOUND")
+  if ("${LLVM_TABLEGEN_EXE}" STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
     message(FATAL_ERROR "Failed to find tablegen in ${${product}_NATIVE_LLVM_TOOLS_PATH}")
   endif()
+  set(SWIFT_TABLEGEN_TARGET "${SWIFT_TABLEGEN_EXE}")
 
   include(AddLLVM)
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
@@ -219,7 +220,6 @@ macro(swift_common_unified_build_config product)
   set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(LLVM_PACKAGE_VERSION ${PACKAGE_VERSION})
-  set(SWIFT_TABLEGEN_EXE llvm-tblgen)
   set(LLVM_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 
   # If cmark was checked out into tools/cmark, expect to build it as
@@ -257,6 +257,11 @@ endmacro()
 # Common cmake project config for additional warnings.
 #
 macro(swift_common_cxx_warnings)
+  # Make unhandled switch cases be an error in assert builds
+  if(DEFINED LLVM_ENABLE_ASSERTIONS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=switch")
+  endif()
+
   check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLAG)
   append_if(CXX_SUPPORTS_DOCUMENTATION_FLAG "-Wdocumentation" CMAKE_CXX_FLAGS)
 

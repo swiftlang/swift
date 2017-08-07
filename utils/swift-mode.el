@@ -20,6 +20,11 @@
     (set
      (make-local-variable 'parse-sexp-ignore-comments) t)))
 
+(unless (fboundp 'defvar-local)
+  (defmacro defvar-local (var val &optional docstring)
+    "Define VAR as a buffer-local variable with default value VAL."
+    `(make-variable-buffer-local (defvar ,var ,val ,docstring))))
+
 ;; Create mode-specific variables
 (defcustom swift-basic-offset 2
   "Default indentation width for Swift source"
@@ -350,7 +355,7 @@ Use `M-x hs-show-all' to show them again."
                            1)
                           ((save-match-data
                              (looking-at
-                              "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\)\\>"))
+                              "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\|repeat\\)\\>"))
                            1)
                           (t 0))))))
       (indent-line-to (max target-column 0)))

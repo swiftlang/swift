@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck %s < %t.simple.txt
@@ -37,16 +37,13 @@
 
 // RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %S/../Inputs/empty.swift -module-name main -driver-use-filelists 2>&1 | %FileCheck -check-prefix=FILELIST %s
 
-// RUN: rm -rf %t && mkdir -p %t/DISTINCTIVE-PATH/usr/bin/
+// RUN: %empty-directory(%t)/DISTINCTIVE-PATH/usr/bin/
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/DISTINCTIVE-PATH/usr/bin/swiftc)
 // RUN: ln -s "swiftc" %t/DISTINCTIVE-PATH/usr/bin/swift-update
-// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -update-code -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -c -update-code -target x86_64-apple-macosx10.9 %s 2>&1 > %t.upd.txt
 // RUN: %FileCheck -check-prefix UPDATE-CODE %s < %t.upd.txt
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
-
-// RUN: %swiftc_driver -driver-print-jobs -fixit-code -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
-// RUN: %FileCheck -check-prefix FIXIT-CODE %s < %t.upd.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -whole-module-optimization -incremental %s 2>&1 > %t.wmo-inc.txt
 // RUN: %FileCheck %s < %t.wmo-inc.txt
@@ -113,17 +110,9 @@
 // FILELIST: -primary-file {{.*/(driver-compile.swift|empty.swift)}}
 // FILELIST: -output-filelist {{[^-]}}
 
-// UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift-update
-// UPDATE-CODE: -c{{ }}
-// UPDATE-CODE: -o {{.+}}.remap
-// UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift-update
-// UPDATE-CODE: -emit-module{{ }}
-// UPDATE-CODE: -o {{.+}}.mod
-
-// FIXIT-CODE: bin/swift
-// FIXIT-CODE: -c{{ }}
-// FIXIT-CODE: -emit-fixits-path {{.+}}.remap
-
+// UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift
+// UPDATE-CODE: -frontend -c
+// UPDATE-CODE: -emit-remap-file-path {{.+}}.remap
 
 // NO-REFERENCE-DEPENDENCIES: bin/swift
 // NO-REFERENCE-DEPENDENCIES-NOT: -emit-reference-dependencies

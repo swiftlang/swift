@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILModule.h"
@@ -61,6 +62,13 @@ SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
 
 SILType SILType::getBuiltinWordType(const ASTContext &C) {
   return getPrimitiveObjectType(CanType(BuiltinIntegerType::getWordType(C)));
+}
+
+SILType SILType::getOptionalType(SILType type) {
+  auto &ctx = type.getSwiftRValueType()->getASTContext();
+  auto optType = BoundGenericEnumType::get(ctx.getOptionalDecl(), Type(),
+                                           { type.getSwiftRValueType() });
+  return getPrimitiveType(CanType(optType), type.getCategory());
 }
 
 bool SILType::isTrivial(SILModule &M) const {
@@ -151,7 +159,7 @@ static bool canUnsafeCastTuple(SILType fromType, CanTupleType fromTupleTy,
     return true;
   }
   // Otherwise, flatten one level of tuple elements on each side.
-  CanTupleType toTupleTy = dyn_cast<TupleType>(toType.getSwiftRValueType());
+  auto toTupleTy = dyn_cast<TupleType>(toType.getSwiftRValueType());
   if (!toTupleTy)
     return false;
 
@@ -177,7 +185,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   if (EnumDecl *toEnum = toType.getEnumOrBoundGenericEnum()) {
     for (auto toElement : toEnum->getAllElements()) {
       ++numToElements;
-      if (!toElement->getArgumentInterfaceType())
+      if (!toElement->hasAssociatedValues())
         continue;
       // Bail on multiple payloads.
       if (!toElementTy.isNull())
@@ -201,7 +209,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   // If any of the fromElements can be cast by value to the singleton toElement,
   // then the overall enum can be cast by value.
   for (auto fromElement : fromElements) {
-    if (!fromElement->getArgumentInterfaceType())
+    if (!fromElement->hasAssociatedValues())
       continue;
 
     auto fromElementTy = fromType.getEnumElementType(fromElement, M);
@@ -309,7 +317,7 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
-  assert(elt->getArgumentInterfaceType());
+  assert(elt->hasAssociatedValues());
 
   if (auto objectType = getSwiftRValueType().getAnyOptionalObjectType()) {
     assert(elt == M.getASTContext().getOptionalSomeDecl());
@@ -405,7 +413,7 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
     // Then if we have an enum...
     if (EnumDecl *E = Ty.getEnumOrBoundGenericEnum()) {
       for (auto Elt : E->getAllElements())
-        if (Elt->getArgumentInterfaceType())
+        if (Elt->hasAssociatedValues())
           Worklist.push_back(Ty.getEnumElementType(Elt, Mod));
       continue;
     }
@@ -466,34 +474,27 @@ static bool isBridgedErrorClass(SILModule &M,
 
   // NSError (TODO: and CFError) can be bridged.
   auto nsErrorType = M.Types.getNSErrorType();
-  if (t && nsErrorType && nsErrorType->isExactSuperclassOf(t, nullptr)) {
+  if (t && nsErrorType && nsErrorType->isExactSuperclassOf(t)) {
     return true;
   }
   
   return false;
 }
 
-static bool isErrorExistential(ArrayRef<ProtocolDecl*> protocols) {
-  return protocols.size() == 1
-    && protocols[0]->isSpecificProtocol(KnownProtocolKind::Error);
-}
-
 ExistentialRepresentation
 SILType::getPreferredExistentialRepresentation(SILModule &M,
                                                Type containedType) const {
-  SmallVector<ProtocolDecl *, 4> protocols;
-  
   // Existential metatypes always use metatype representation.
   if (is<ExistentialMetatypeType>())
     return ExistentialRepresentation::Metatype;
   
-  // Get the list of existential constraints. If the type isn't existential,
-  // then there is no representation.
-  if (!getSwiftRValueType()->isAnyExistentialType(protocols))
+  // If the type isn't existential, then there is no representation.
+  if (!isExistentialType())
     return ExistentialRepresentation::None;
-  
-  // The (uncomposed) Error existential uses a special boxed representation.
-  if (isErrorExistential(protocols)) {
+
+  auto layout = getSwiftRValueType().getExistentialLayout();
+
+  if (layout.isErrorExistential()) {
     // NSError or CFError references can be adopted directly as Error
     // existentials.
     if (isBridgedErrorClass(M, containedType)) {
@@ -502,13 +503,11 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
       return ExistentialRepresentation::Boxed;
     }
   }
-  
+
   // A class-constrained protocol composition can adopt the conforming
   // class reference directly.
-  for (auto proto : protocols) {
-    if (proto->requiresClass())
-      return ExistentialRepresentation::Class;
-  }
+  if (layout.requiresClass())
+    return ExistentialRepresentation::Class;
   
   // Otherwise, we need to use a fixed-sized buffer.
   return ExistentialRepresentation::Opaque;
@@ -525,23 +524,24 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   case ExistentialRepresentation::Class:
   case ExistentialRepresentation::Boxed: {
     // Look at the protocols to see what representation is appropriate.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (!getSwiftRValueType()->isAnyExistentialType(protocols))
+    if (!getSwiftRValueType().isExistentialType())
       return false;
+
+    auto layout = getSwiftRValueType().getExistentialLayout();
+
     // The (uncomposed) Error existential uses a special boxed
     // representation. It can also adopt class references of bridged error types
     // directly.
-    if (isErrorExistential(protocols))
+    if (layout.isErrorExistential())
       return repr == ExistentialRepresentation::Boxed
         || (repr == ExistentialRepresentation::Class
             && isBridgedErrorClass(M, containedType));
     
     // A class-constrained composition uses ClassReference representation;
-    // otherwise, we use a fixed-sized buffer
-    for (auto *proto : protocols) {
-      if (proto->requiresClass())
-        return repr == ExistentialRepresentation::Class;
-    }
+    // otherwise, we use a fixed-sized buffer.
+    if (layout.requiresClass())
+      return repr == ExistentialRepresentation::Class;
+
     return repr == ExistentialRepresentation::Opaque;
   }
   case ExistentialRepresentation::Metatype:
@@ -707,4 +707,61 @@ bool SILType::hasAbstractionDifference(SILFunctionTypeRepresentation rep,
   // Assuming that we've applied the same substitutions to both types,
   // abstraction equality should equal type equality.
   return (*this != type2);
+}
+
+bool SILType::isLoweringOf(SILModule &Mod, CanType formalType) {
+  SILType loweredType = *this;
+
+  // Optional lowers its contained type. The difference between Optional
+  // and IUO is lowered away.
+  SILType loweredObjectType = loweredType.getAnyOptionalObjectType();
+  CanType formalObjectType = formalType.getAnyOptionalObjectType();
+
+  if (loweredObjectType) {
+    return formalObjectType &&
+           loweredObjectType.isLoweringOf(Mod, formalObjectType);
+  }
+
+  // Metatypes preserve their instance type through lowering.
+  if (loweredType.is<MetatypeType>()) {
+    if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
+      return loweredType.getMetatypeInstanceType(Mod).isLoweringOf(
+          Mod, formalMT.getInstanceType());
+    }
+  }
+
+  if (auto loweredEMT = loweredType.getAs<ExistentialMetatypeType>()) {
+    if (auto formalEMT = dyn_cast<ExistentialMetatypeType>(formalType)) {
+      return loweredEMT.getInstanceType() == formalEMT.getInstanceType();
+    }
+  }
+
+  // TODO: Function types go through a more elaborate lowering.
+  // For now, just check that a SIL function type came from some AST function
+  // type.
+  if (loweredType.is<SILFunctionType>())
+    return isa<AnyFunctionType>(formalType);
+
+  // Tuples are lowered elementwise.
+  // TODO: Will this always be the case?
+  if (auto loweredTT = loweredType.getAs<TupleType>()) {
+    if (auto formalTT = dyn_cast<TupleType>(formalType)) {
+      if (loweredTT->getNumElements() != formalTT->getNumElements())
+        return false;
+      for (unsigned i = 0, e = loweredTT->getNumElements(); i < e; ++i) {
+        auto loweredTTEltType =
+            SILType::getPrimitiveAddressType(loweredTT.getElementType(i));
+        if (!loweredTTEltType.isLoweringOf(Mod, formalTT.getElementType(i)))
+          return false;
+      }
+      return true;
+    }
+  }
+
+  // Dynamic self has the same lowering as its contained type.
+  if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
+    formalType = dynamicSelf.getSelfType();
+
+  // Other types are preserved through lowering.
+  return loweredType.getSwiftRValueType() == formalType;
 }

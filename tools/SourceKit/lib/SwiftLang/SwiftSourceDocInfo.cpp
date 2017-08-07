@@ -455,7 +455,7 @@ template <typename FnTy>
 void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
   ++NamesSeen[VD->getFullName()];
-  SmallVector<ValueDecl *, 8> RelatedDecls;
+  SmallVector<LookupResultEntry, 8> RelatedDecls;
 
   if (isa<ParamDecl>(VD))
     return; // Parameters don't have interesting related declarations.
@@ -465,7 +465,8 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   // For now we use UnqualifiedLookup to fetch other declarations with the same
   // base name.
   auto TypeResolver = VD->getASTContext().getLazyResolver();
-  UnqualifiedLookup Lookup(VD->getName(), VD->getDeclContext(), TypeResolver);
+  UnqualifiedLookup Lookup(VD->getBaseName(), VD->getDeclContext(),
+                           TypeResolver);
   for (auto result : Lookup.Results) {
     ValueDecl *RelatedVD = result.getValueDecl();
     if (RelatedVD->getAttrs().isUnavailable(VD->getASTContext()))
@@ -473,13 +474,16 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
 
     if (RelatedVD != VD) {
       ++NamesSeen[RelatedVD->getFullName()];
-      RelatedDecls.push_back(RelatedVD);
+      RelatedDecls.push_back(result);
     }
   }
 
   // Now provide the results along with whether the name is duplicate or not.
-  for (auto RelatedVD : RelatedDecls) {
-    Fn(RelatedVD, NamesSeen[RelatedVD->getFullName()] > 1);
+  ValueDecl *OriginalBase = VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  for (auto Related : RelatedDecls) {
+    ValueDecl *RelatedVD = Related.getValueDecl();
+    bool SameBase = Related.getBaseDecl() && Related.getBaseDecl() == OriginalBase;
+    Fn(RelatedVD, SameBase, NamesSeen[RelatedVD->getFullName()] > 1);
   }
 }
 
@@ -610,6 +614,35 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   return false;
 }
 
+static Optional<unsigned>
+getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
+  if (Cursor.isInvalid())
+    return None;
+  SourceLoc Loc;
+  if (auto PD = dyn_cast<ParamDecl>(VD)) {
+
+    // Avoid returning parent loc for internal-only names.
+    if (PD->getArgumentNameLoc().isValid() && PD->getArgumentNameLoc() != Cursor)
+      return None;
+    auto *DC = PD->getDeclContext();
+    switch (DC->getContextKind()) {
+      case DeclContextKind::SubscriptDecl:
+        Loc = cast<SubscriptDecl>(DC)->getNameLoc();
+        break;
+      case DeclContextKind::AbstractFunctionDecl:
+        Loc = cast<AbstractFunctionDecl>(DC)->getNameLoc();
+        break;
+      default:
+        break;
+    }
+  }
+  if (Loc.isInvalid())
+    return None;
+  auto &SM = VD->getASTContext().SourceMgr;
+  return SM.getLocOffsetInBuffer(Loc, SM.getIDForBufferIdentifier(SM.
+    getBufferIdentifierForLoc(Loc)).getValue());
+}
+
 /// Returns true for failure to resolve.
 static bool passCursorInfoForDecl(const ValueDecl *VD,
                                   const ModuleDecl *MainModule,
@@ -617,6 +650,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
                                   const Type ContainerTy,
                                   bool IsRef,
                                   Optional<unsigned> OrigBufferID,
+                                  SourceLoc CursorLoc,
                                   SwiftLangSupport &Lang,
                                   const CompilerInvocation &Invok,
                             ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps,
@@ -630,7 +664,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   if (BaseType) {
     if (auto Target = BaseType->getAnyNominal()) {
       SynthesizedExtensionAnalyzer Analyzer(Target,
-                                            PrintOptions::printInterface());
+                                          PrintOptions::printModuleInterface());
       InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
     }
   }
@@ -741,7 +775,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   });
 
   DelayedStringRetriever RelDeclsStream(SS);
-  walkRelatedDecls(VD, [&](const ValueDecl *RelatedDecl, bool DuplicateName) {
+  walkRelatedDecls(VD, [&](const ValueDecl *RelatedDecl, bool UseOriginalBase, bool DuplicateName) {
     RelDeclsStream.startPiece();
     {
       RelDeclsStream<<"<RelatedName usr=\"";
@@ -755,7 +789,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.SkipIntroducerKeywords = true;
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(RelDeclsStream);
-        if (BaseType) {
+        if (UseOriginalBase && BaseType) {
           PO.setBaseType(BaseType);
           PO.PrintAsMember = true;
         }
@@ -850,12 +884,15 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.LocalizationKey = LocalizationKey;
   Info.IsSystem = IsSystem;
   Info.TypeInterface = StringRef();
+  Info.ParentNameOffset = getParamParentNameOffset(VD, CursorLoc);
   Receiver(Info);
   return false;
 }
 
 static clang::DeclarationName
-getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
+getClangDeclarationName(const clang::NamedDecl *ND, NameTranslatingInfo &Info) {
+  auto &Ctx = ND->getASTContext();
+  auto OrigName = ND->getDeclName();
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::ObjC);
   if (Info.BaseName.empty() == Info.ArgNames.empty()) {
     // cannot have both.
@@ -864,41 +901,82 @@ getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
   if (!Info.BaseName.empty()) {
     return clang::DeclarationName(&Ctx.Idents.get(Info.BaseName));
   } else {
+    switch (OrigName.getNameKind()) {
+    case clang::DeclarationName::ObjCZeroArgSelector:
+    case clang::DeclarationName::ObjCOneArgSelector:
+    case clang::DeclarationName::ObjCMultiArgSelector:
+      break;
+    default:
+      return clang::DeclarationName();
+    }
+
+    auto OrigSel = OrigName.getObjCSelector();
+    unsigned NumPieces = OrigSel.isUnarySelector() ? 1 : OrigSel.getNumArgs();
+    if (Info.ArgNames.size() > NumPieces)
+      return clang::DeclarationName();
+
     ArrayRef<StringRef> Args = llvm::makeArrayRef(Info.ArgNames);
-    std::vector<clang::IdentifierInfo *> Pieces(Args.size(), nullptr);
-    std::transform(Args.begin(), Args.end(), Pieces.begin(),
-      [&](StringRef T) { return &Ctx.Idents.get(T.endswith(":") ?
-                                                T.drop_back() : T); });
-    return clang::DeclarationName(Ctx.Selectors.getSelector(
-      /*Calculate Args*/std::accumulate(Args.begin(), Args.end(), (unsigned)0,
-        [](unsigned I, StringRef T) { return I + (T.endswith(":") ? 1 : 0); }),
-      Pieces.data()));
+    std::vector<clang::IdentifierInfo *> Pieces;
+    for (unsigned i = 0; i < NumPieces; ++i) {
+      if (i >= Info.ArgNames.size() || Info.ArgNames[i].empty()) {
+        Pieces.push_back(OrigSel.getIdentifierInfoForSlot(i));
+      } else {
+        StringRef T = Args[i];
+        Pieces.push_back(&Ctx.Idents.get(T.endswith(":") ? T.drop_back() : T));
+      }
+    }
+    return clang::DeclarationName(
+        Ctx.Selectors.getSelector(OrigSel.getNumArgs(), Pieces.data()));
   }
 }
 
-static DeclName
-getSwiftDeclName(ASTContext &Ctx, NameTranslatingInfo &Info) {
+static DeclName getSwiftDeclName(const ValueDecl *VD,
+                                 NameTranslatingInfo &Info) {
+  auto &Ctx = VD->getDeclContext()->getASTContext();
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
-  std::vector<Identifier> Args(Info.ArgNames.size(), Identifier());
-  std::transform(Info.ArgNames.begin(), Info.ArgNames.end(), Args.begin(),
-                 [&](StringRef T) { return Ctx.getIdentifier(T); });
-  return DeclName(Ctx, Ctx.getIdentifier(Info.BaseName),
-                  llvm::makeArrayRef(Args));
+  DeclName OrigName = VD->getFullName();
+  DeclBaseName BaseName = Info.BaseName.empty()
+                              ? OrigName.getBaseName()
+                              : DeclBaseName(Ctx.getIdentifier(Info.BaseName));
+  auto OrigArgs = OrigName.getArgumentNames();
+  SmallVector<Identifier, 8> Args(OrigArgs.begin(), OrigArgs.end());
+  if (Info.ArgNames.size() > OrigArgs.size())
+    return DeclName();
+  for (unsigned i = 0; i < OrigArgs.size(); ++i) {
+    if (i < Info.ArgNames.size() && !Info.ArgNames[i].empty()) {
+      StringRef Arg = Info.ArgNames[i];
+      Args[i] = Ctx.getIdentifier(Arg == "_" ? StringRef() : Arg);
+    }
+  }
+  return DeclName(Ctx, BaseName, llvm::makeArrayRef(Args));
 }
 
 /// Returns true for failure to resolve.
-static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
+static bool passNameInfoForDecl(SemaToken SemaTok, NameTranslatingInfo &Info,
                     std::function<void(const NameTranslatingInfo &)> Receiver) {
+  auto *VD = SemaTok.ValueD;
+
+  // If the given name is not a function name, and the cursor points to
+  // a contructor call, we use the type declaration instead of the init
+  // declaration to translate the name.
+  if (Info.ArgNames.empty() && !Info.IsZeroArgSelector) {
+    if (auto *TD = SemaTok.CtorTyRef) {
+      VD = TD;
+    }
+  }
   switch (SwiftLangSupport::getNameKindForUID(Info.NameKind)) {
   case NameKind::Swift: {
     NameTranslatingInfo Result;
-    auto &Ctx = VD->getDeclContext()->getASTContext();
-    auto ResultPair = swift::objc_translation::getObjCNameForSwiftDecl(VD,
-      getSwiftDeclName(Ctx, Info));
+    auto DeclName = getSwiftDeclName(VD, Info);
+    if (!DeclName)
+      return true;
+    auto ResultPair =
+        swift::objc_translation::getObjCNameForSwiftDecl(VD, DeclName);
     Identifier Name = ResultPair.first;
     if (!Name.empty()) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
       Result.BaseName = Name.str();
+      Receiver(Result);
     } else if (ObjCSelector Selector = ResultPair.second) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
       SmallString<64> Buffer;
@@ -908,36 +986,45 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
       if (Selector.getNumArgs()) {
         assert(Pieces.back().empty());
         Pieces.pop_back();
-        std::transform(Pieces.begin(), Pieces.end(), Pieces.begin(),
-          [](StringRef P) { return StringRef(P.data(), P.size() + 1); });
+      } else {
+        Result.IsZeroArgSelector = true;
       }
       Result.ArgNames.insert(Result.ArgNames.begin(), Pieces.begin(), Pieces.end());
+      Receiver(Result);
     } else {
       Receiver(Result);
       return true;
     }
-    Receiver(Result);
     return false;
   }
   case NameKind::ObjC: {
     ClangImporter *Importer = static_cast<ClangImporter *>(VD->getDeclContext()->
       getASTContext().getClangModuleLoader());
 
-    if (auto *Named = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
-      DeclName Name = Importer->importName(Named,
-        getClangDeclarationName(Named->getASTContext(), Info));
-      NameTranslatingInfo Result;
-      Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
-      Result.BaseName = Name.getBaseName().str();
-      Result.ArgNames.resize(Name.getArgumentNames().size());
-      std::transform(Name.getArgumentNames().begin(),
-                     Name.getArgumentNames().end(),
-                     Result.ArgNames.begin(),
-                     [](Identifier Id) { return Id.str(); });
-      Receiver(Result);
-      return false;
+    const clang::NamedDecl *Named = nullptr;
+    auto *BaseDecl = VD;
+
+    while (!Named && BaseDecl) {
+      Named = dyn_cast_or_null<clang::NamedDecl>(BaseDecl->getClangDecl());
+      BaseDecl = BaseDecl->getOverriddenDecl();
     }
-    return true;
+    if (!Named)
+      return true;
+
+    auto ObjCName = getClangDeclarationName(Named, Info);
+    if (!ObjCName)
+      return true;
+
+    DeclName Name = Importer->importName(Named, ObjCName);
+    NameTranslatingInfo Result;
+    Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
+    Result.BaseName = Name.getBaseIdentifier().str();
+    std::transform(Name.getArgumentNames().begin(),
+                   Name.getArgumentNames().end(),
+                   std::back_inserter(Result.ArgNames),
+                   [](Identifier Id) { return Id.str(); });
+    Receiver(Result);
+    return false;
   }
   }
 }
@@ -955,6 +1042,8 @@ private:
   SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
 
 protected:
+  bool CancelOnSubsequentRequest;
+protected:
   ArrayRef<ImmutableTextSnapshotRef> getPreviousASTSnaps() {
     return llvm::makeArrayRef(PreviousASTSnaps);
   }
@@ -962,9 +1051,10 @@ protected:
 public:
   CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                           SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
-                          bool TryExistingAST)
+                          bool TryExistingAST, bool CancelOnSubsequentRequest)
     : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile), Offset(Offset),
-      Length(Length), TryExistingAST(TryExistingAST) { }
+      Length(Length), TryExistingAST(TryExistingAST),
+      CancelOnSubsequentRequest(CancelOnSubsequentRequest) {}
 
   bool canUseASTWithSnapshots(ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
     if (!TryExistingAST) {
@@ -1019,11 +1109,13 @@ public:
     return false;
   }
 };
+
 static void resolveCursor(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset,
                           unsigned Length, bool Actionables,
                           SwiftInvocationRef Invok,
                           bool TryExistingAST,
+                          bool CancelOnSubsequentRequest,
                           std::function<void(const CursorInfo &)> Receiver) {
   assert(Invok);
 
@@ -1037,9 +1129,11 @@ static void resolveCursor(SwiftLangSupport &Lang,
                        SwiftLangSupport &Lang,
                        SwiftInvocationRef ASTInvok,
                        bool TryExistingAST,
+                       bool CancelOnSubsequentRequest,
                        std::function<void(const CursorInfo &)> Receiver)
     : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
-                              TryExistingAST), Actionables(Actionables),
+                              TryExistingAST, CancelOnSubsequentRequest),
+      Actionables(Actionables),
       Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
@@ -1083,20 +1177,22 @@ static void resolveCursor(SwiftLangSupport &Lang,
         bool Failed = passCursorInfoForDecl(VD, MainModule,
                                             SemaTok.ContainerType,
                                             SemaTok.ContainerType,
-                                            SemaTok.IsRef, BufferID, Lang,
+                                            SemaTok.IsRef, BufferID, Loc, Lang,
                                             CompInvok, getPreviousASTSnaps(),
                                             Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursor(Lang, InputFile, Offset, Length, Actionables, ASTInvok,
-                          /*TryExistingAST=*/false, Receiver);
+                          /*TryExistingAST=*/false, CancelOnSubsequentRequest,
+                          Receiver);
           } else {
             Receiver({});
           }
         }
         return;
       }
+      case SemaTokenKind::ExprStart:
       case SemaTokenKind::StmtStart: {
         Receiver({});
         return;
@@ -1121,11 +1217,16 @@ static void resolveCursor(SwiftLangSupport &Lang,
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
     InputFile, Offset, Length, Actionables, Lang, Invok, TryExistingAST,
-    Receiver);
+    CancelOnSubsequentRequest, Receiver);
+
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
+  static const char OncePerASTTokenWithActionables = 0;
+  const void *Once = nullptr;
+  if (CancelOnSubsequentRequest)
+    Once = Actionables ? &OncePerASTTokenWithActionables : &OncePerASTToken;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), Once);
 }
 
 static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
@@ -1145,8 +1246,9 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
                      bool TryExistingAST, NameTranslatingInfo Input,
                      std::function<void(const NameTranslatingInfo &)> Receiver)
     : CursorRangeInfoConsumer(InputFile, Offset, 0, Lang, ASTInvok,
-                              TryExistingAST), Input(std::move(Input)),
-      Receiver(std::move(Receiver)){ }
+                              TryExistingAST,
+                              /*CancelOnSubsequentRequest=*/false),
+      Input(std::move(Input)), Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
@@ -1183,7 +1285,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         return;
 
       case SemaTokenKind::ValueRef: {
-        bool Failed = passNameInfoForDecl(SemaTok.ValueD, Input, Receiver);
+        bool Failed = passNameInfoForDecl(SemaTok, Input, Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
@@ -1195,6 +1297,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         }
         return;
       }
+      case SemaTokenKind::ExprStart:
       case SemaTokenKind::StmtStart: {
         Receiver({});
         return;
@@ -1219,17 +1322,13 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
   auto Consumer = std::make_shared<NameInfoConsumer>(
     InputFile, Offset, Lang, Invok, TryExistingAST, Input, Receiver);
 
-  /// FIXME: When request cancellation is implemented and Xcode adopts it,
-  /// don't use 'OncePerASTToken'.
-  static const char OncePerASTToken = 0;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
-                                       &OncePerASTToken);
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), nullptr);
 }
 
 static void resolveRange(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset, unsigned Length,
                           SwiftInvocationRef Invok,
-                          bool TryExistingAST,
+                          bool TryExistingAST, bool CancelOnSubsequentRequest,
                           std::function<void(const RangeInfo&)> Receiver) {
   assert(Invok);
 
@@ -1239,10 +1338,11 @@ static void resolveRange(SwiftLangSupport &Lang,
   public:
     RangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
-                       bool TryExistingAST,
+                       bool TryExistingAST, bool CancelOnSubsequentRequest,
                        std::function<void(const RangeInfo&)> Receiver)
     : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
-                              TryExistingAST), Receiver(std::move(Receiver)){ }
+                              TryExistingAST, CancelOnSubsequentRequest),
+      Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       if (trace::enabled()) {
@@ -1255,12 +1355,12 @@ static void resolveRange(SwiftLangSupport &Lang,
       ASTInvok->applyTo(CompInvok);
       RangeInfo Result;
       Result.RangeKind = Lang.getUIDForRangeKind(Info.Kind);
-      Result.RangeContent = Info.Content;
+      Result.RangeContent = Info.ContentRange.str();
       switch (Info.Kind) {
       case RangeKind::SingleExpression: {
         SmallString<64> SS;
         llvm::raw_svector_ostream OS(SS);
-        Info.Ty.print(OS);
+        Info.ExitInfo.ReturnType->print(OS);
         Result.ExprType = OS.str();
         Receiver(Result);
         return;
@@ -1271,11 +1371,13 @@ static void resolveRange(SwiftLangSupport &Lang,
         Receiver(Result);
         return;
       }
+      case RangeKind::PartOfExpression:
       case RangeKind::Invalid:
         if (!getPreviousASTSnaps().empty()) {
           // Attempt again using the up-to-date AST.
           resolveRange(Lang, InputFile, Offset, Length, ASTInvok,
-                      /*TryExistingAST=*/false, Receiver);
+                      /*TryExistingAST=*/false, CancelOnSubsequentRequest,
+                      Receiver);
         } else {
           Receiver(Result);
         }
@@ -1296,17 +1398,18 @@ static void resolveRange(SwiftLangSupport &Lang,
   };
 
   auto Consumer = std::make_shared<RangeInfoConsumer>(
-    InputFile, Offset, Length, Lang, Invok, TryExistingAST, Receiver);
+    InputFile, Offset, Length, Lang, Invok, TryExistingAST,
+    CancelOnSubsequentRequest, Receiver);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
-                                       &OncePerASTToken);
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), Once);
 }
 
 void SwiftLangSupport::getCursorInfo(
     StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
-    ArrayRef<const char *> Args,
+    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
     std::function<void(const CursorInfo &)> Receiver) {
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
@@ -1337,7 +1440,7 @@ void SwiftLangSupport::getCursorInfo(
           // it's not necessary.
           passCursorInfoForDecl(
               Entity.Dcl, /*MainModule*/ nullptr, Type(), Type(), Entity.IsRef,
-              /*OrigBufferID=*/None, *this, Invok, {}, Receiver);
+              /*OrigBufferID=*/None, SourceLoc(), *this, Invok, {}, Receiver);
         }
       } else {
         Receiver({});
@@ -1356,12 +1459,12 @@ void SwiftLangSupport::getCursorInfo(
   }
 
   resolveCursor(*this, InputFile, Offset, Length, Actionables, Invok,
-                /*TryExistingAST=*/true, Receiver);
+                /*TryExistingAST=*/true, CancelOnSubsequentRequest, Receiver);
 }
 
 void SwiftLangSupport::
 getRangeInfo(StringRef InputFile, unsigned Offset, unsigned Length,
-             ArrayRef<const char *> Args,
+             bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
              std::function<void(const RangeInfo&)> Receiver) {
   if (IFaceGenContexts.get(InputFile)) {
     // FIXME: return range info for generated interfaces.
@@ -1381,7 +1484,7 @@ getRangeInfo(StringRef InputFile, unsigned Offset, unsigned Length,
     return;
   }
   resolveRange(*this, InputFile, Offset, Length, Invok, /*TryExistingAST=*/true,
-                Receiver);
+               CancelOnSubsequentRequest, Receiver);
 }
 
 void SwiftLangSupport::
@@ -1412,10 +1515,8 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
         if (Entity.Mod) {
           // Module is ignored
         } else {
-          NameTranslatingInfo NewInput = Input;
           // FIXME: Should pass the main module for the interface but currently
           // it's not necessary.
-          passNameInfoForDecl(Entity.Dcl, NewInput, Receiver);
         }
       } else {
         Receiver({});
@@ -1440,6 +1541,7 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
 static void
 resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
                      SwiftInvocationRef Invok, bool TryExistingAST,
+                     bool CancelOnSubsequentRequest,
                      std::function<void(const CursorInfo &)> Receiver) {
   assert(Invok);
 
@@ -1449,16 +1551,18 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
     SwiftLangSupport &Lang;
     SwiftInvocationRef ASTInvok;
     const bool TryExistingAST;
+    bool CancelOnSubsequentRequest;
     std::function<void(const CursorInfo &)> Receiver;
     SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
 
   public:
     CursorInfoConsumer(StringRef InputFile, StringRef USR,
                        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
-                       bool TryExistingAST,
+                       bool TryExistingAST, bool CancelOnSubsequentRequest,
                        std::function<void(const CursorInfo &)> Receiver)
         : InputFile(InputFile), USR(USR), Lang(Lang),
           ASTInvok(std::move(ASTInvok)), TryExistingAST(TryExistingAST),
+          CancelOnSubsequentRequest(CancelOnSubsequentRequest),
           Receiver(std::move(Receiver)) {}
 
     bool canUseASTWithSnapshots(
@@ -1524,13 +1628,14 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
         }
         bool Failed =
             passCursorInfoForDecl(VD, MainModule, selfTy, Type(),
-                                  /*isRef=*/false, BufferID, Lang, CompInvok,
-                                  PreviousASTSnaps, Receiver);
+                                  /*IsRef=*/false, BufferID, SourceLoc(), Lang,
+                                  CompInvok, PreviousASTSnaps, Receiver);
         if (Failed) {
           if (!PreviousASTSnaps.empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursorFromUSR(Lang, InputFile, USR, ASTInvok,
-                                 /*TryExistingAST=*/false, Receiver);
+                                 /*TryExistingAST=*/false,
+                                 CancelOnSubsequentRequest, Receiver);
           } else {
             Receiver({});
           }
@@ -1551,16 +1656,18 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
   };
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
-      InputFile, USR, Lang, Invok, TryExistingAST, Receiver);
+      InputFile, USR, Lang, Invok, TryExistingAST, CancelOnSubsequentRequest,
+      Receiver);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
-                                       &OncePerASTToken);
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), Once);
 }
 
 void SwiftLangSupport::getCursorInfoFromUSR(
-    StringRef filename, StringRef USR, ArrayRef<const char *> args,
+    StringRef filename, StringRef USR, bool CancelOnSubsequentRequest,
+    ArrayRef<const char *> args,
     std::function<void(const CursorInfo &)> receiver) {
   if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
     LOG_WARN_FUNC("info from usr for generated interface not implemented yet");
@@ -1578,7 +1685,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
   }
 
   resolveCursorFromUSR(*this, filename, USR, invok, /*TryExistingAST=*/true,
-                       receiver);
+                       CancelOnSubsequentRequest, receiver);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1643,10 +1750,11 @@ private:
   }
 };
 
-}
+} // end anonymous namespace
 
 void SwiftLangSupport::findRelatedIdentifiersInFile(
     StringRef InputFile, unsigned Offset,
+    bool CancelOnSubsequentRequest,
     ArrayRef<const char *> Args,
     std::function<void(const RelatedIdentsInfo &)> Receiver) {
 
@@ -1743,5 +1851,6 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  ASTMgr->processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  ASTMgr->processASTAsync(Invok, std::move(Consumer), Once);
 }

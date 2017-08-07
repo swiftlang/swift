@@ -32,7 +32,8 @@ internal struct _ArrayBody {
     _storage = _SwiftArrayBodyStorage(
       count: count,
       _capacityAndFlags:
-        (UInt(capacity) << 1) | (elementTypeIsBridgedVerbatim ? 1 : 0))
+        (UInt(truncatingIfNeeded: capacity) &<< 1) |
+        (elementTypeIsBridgedVerbatim ? 1 : 0))
   }
 
   /// In principle ArrayBody shouldn't need to be default
@@ -62,7 +63,7 @@ internal struct _ArrayBody {
   @_inlineable
   @_versioned
   var capacity: Int {
-    return Int(_capacityAndFlags >> 1)
+    return Int(_capacityAndFlags &>> 1)
   }
 
   /// Is the Element type bitwise-compatible with some Objective-C

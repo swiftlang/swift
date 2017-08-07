@@ -12,9 +12,9 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
+
 import StdlibUnittest
 import StdlibCollectionUnittest
-
 
 % from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
 
@@ -275,7 +275,10 @@ LazyTestSuite.test("EmptyCollection/${name}/Trap")
   .forEach(in: [-1 ..< -1, -1..<0, -1..<1, 0..<1, 1..<1] as [Range<Int>]) {
   r in
   var c = EmptyCollection<OpaqueValue<Int>>()
-  expectCrashLater()
+  // Access is guarded by a _debugPrecondition in EmptyCollection
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
   ${operation}
 }
 
@@ -295,7 +298,10 @@ LazyTestSuite.test("EmptyCollection/index(_:offsetBy:)/Trap")
   ]) {
   (i, offset) in
   let c = EmptyCollection<OpaqueValue<Int>>()
-  expectCrashLater()
+  // Access is guarded by a _debugPrecondition in EmptyCollection
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
   _ = c.index(i, offsetBy: offset)
 }
 
@@ -312,7 +318,10 @@ LazyTestSuite.test("EmptyCollection/index(_:offsetBy:limitedBy:)/Trap")
   ]) {
   (i, offset, limit) in
   let c = EmptyCollection<OpaqueValue<Int>>()
-  expectCrashLater()
+  // Access is guarded by a _debugPrecondition in EmptyCollection
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
   _ = c.index(i, offsetBy: offset, limitedBy: limit)
 }
 
@@ -339,7 +348,10 @@ LazyTestSuite.test("EmptyCollection/distance(from:to:)/Trap")
   ]) {
   (start, end) in
   let c = EmptyCollection<OpaqueValue<Int>>()
-  expectCrashLater()
+  // Access is guarded by a _debugPrecondition in EmptyCollection
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
   _ = c.distance(from: start, to: end)
 }
 
@@ -638,10 +650,10 @@ tests.test("LazySequence/Sequence") {
 }
 
 func expectSequencePassthrough<
-  S : Sequence,
+  S : LazySequenceProtocol,
   Base : Sequence
 >(_ s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int)
-where S : LazySequenceProtocol, Base : LoggingType,
+where Base : LoggingType,
 Base.Iterator.Element == S.Iterator.Element {
   let baseType = type(of: base)
 
@@ -698,7 +710,7 @@ tests.test("Lazy${TraversalCollection}/Collection") {
     Minimal${TraversalCollection}<OpaqueValue<Int>>
   >.self, &again)
 
-  check${Traversal}Collection(
+  checkOneLevelOf${Traversal}Collection(
     expected, base.lazy, resiliencyChecks: .none
   ) { $0.value == $1.value }
 
@@ -825,7 +837,7 @@ tests.test("LazyMapCollection/Passthrough") {
   let startIndex = CollectionLog.startIndex.expectIncrement(type(of: base)) {
     mapped.startIndex
   }
-  let endIndex = CollectionLog.endIndex.expectIncrement(type(of: base)) {
+  _ = CollectionLog.endIndex.expectIncrement(type(of: base)) {
     mapped.endIndex
   }
   // Not exactly passthrough, because mapping transforms the result
@@ -1023,9 +1035,7 @@ tests.test("ReversedCollection/Lazy") {
 // Given a couple of sequences backed by FilterGenerator's, check that
 // the first selects even numbers and the second selects odd numbers,
 // both from an underlying sequence of whole numbers.
-func checkFilterIteratorBase<
-  S : Sequence, I : IteratorProtocol
->(_ s1: S, _ s2: S)
+func checkFilterIteratorBase<  S : Sequence, I>(_ s1: S, _ s2: S)
 where S.Iterator == LazyFilterIterator<I>, I.Element == OpaqueValue<Int> {
   var iter1 = s1.makeIterator()
   expectEqual(0, iter1.next()!.value)
@@ -1098,16 +1108,16 @@ tests.test("LazyFilterIndex/base") {
   let evens = base.lazy.filter { $0.value % 2 == 0 }
   let odds = base.lazy.filter { $0.value % 2 != 0 }
 
-  expectEqual(base.startIndex, evens.startIndex.base)
-  expectEqual(base.index(after: base.startIndex), odds.startIndex.base)
+  expectEqual(base.startIndex, evens.startIndex)
+  expectEqual(base.index(after: base.startIndex), odds.startIndex)
 
   expectEqual(
     base.index(after: base.index(after: base.startIndex)),
-    evens.index(after: evens.startIndex).base)
+    evens.index(after: evens.startIndex))
 
   expectEqual(
     base.index(after: base.index(after: base.index(after: base.startIndex))),
-    odds.index(after: odds.startIndex).base)
+    odds.index(after: odds.startIndex))
 }
 
 tests.test("LazyFilterCollection") {
@@ -1124,7 +1134,7 @@ tests.test("LazyFilterCollection") {
     LazyFilterCollection<MinimalCollection<OpaqueValue<Int>>>
   >.test(filtered)
 
-  checkForwardCollection(
+  checkOneLevelOfForwardCollection(
     stride(from: 0, to: 100, by: 2).map(OpaqueValue.init), filtered,
     resiliencyChecks: .none
   ) {

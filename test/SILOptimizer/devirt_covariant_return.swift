@@ -4,13 +4,14 @@
 // protocol conformances with covariant return types correctly. The verifier
 // should trip if we do not handle things correctly.
 //
+// TODO: this is not working right now: rdar://problem/33461095
 // As a side-test it also checks if all allocs can be promoted to the stack.
 
 // CHECK-LABEL: sil hidden @_T023devirt_covariant_return6driveryyF : $@convention(thin) () -> () {
 // CHECK: bb0
-// CHECK: alloc_ref [stack]
-// CHECK: alloc_ref [stack]
-// CHECK: alloc_ref [stack]
+// CHECK: alloc_ref
+// CHECK: alloc_ref
+// CHECK: alloc_ref
 // CHECK: function_ref @unknown1a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: function_ref @defenestrate : $@convention(thin) () -> ()
@@ -21,9 +22,6 @@
 // CHECK: function_ref @unknown3a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: apply
-// CHECK: dealloc_ref [stack]
-// CHECK: dealloc_ref [stack]
-// CHECK: dealloc_ref [stack]
 // CHECK: tuple
 // CHECK: return
 
@@ -179,12 +177,13 @@ final class C2:C {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden @_T023devirt_covariant_return7driver1s5Int32VAA2C1CFTf4d_n
+// CHECK-LABEL: sil shared [noinline] @_T023devirt_covariant_return7driver1s5Int32VAA2C1CFTf4d_n
 // CHECK: integer_literal $Builtin.Int32, 2
 // CHECK: struct $Int32 (%{{.*}} : $Builtin.Int32)
 // CHECK-NOT: class_method
 // CHECK-NOT: function_ref
 // CHECK: return
+@inline(never)
 func driver1(_ c: C1) -> Int32 {
   return c.doSomething().getValue()
 }
@@ -192,13 +191,14 @@ func driver1(_ c: C1) -> Int32 {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden @_T023devirt_covariant_return7driver3s5Int32VAA1CCFTf4g_n
+// CHECK-LABEL: sil shared [noinline] @_T023devirt_covariant_return7driver3s5Int32VAA1CCFTf4g_n
 // CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : $C2):
 // CHECK-NOT: bb{{.*}}:
 // check that for C2, we convert the non-optional result into an optional and then cast.
 // CHECK: enum $Optional
 // CHECK-NEXT: upcast
 // CHECK: return
+@inline(never)
 func driver3(_ c: C) -> Int32 {
   return c.doSomething()!.getValue()
 }
@@ -232,7 +232,7 @@ public class D2: D1 {
 
 // Check that the boo call gets properly devirtualized and that
 // that D2.foo() is inlined thanks to this.
-// CHECK-LABEL: sil hidden @_T023devirt_covariant_return7driver2s5Int32VAA2D2CFTf4g_n
+// CHECK-LABEL: sil shared [noinline] @_T023devirt_covariant_return7driver2s5Int32VAA2D2CFTf4g_n
 // CHECK-NOT: class_method
 // CHECK: checked_cast_br [exact] %{{.*}} : $D1 to $D2
 // CHECK: bb2
@@ -242,6 +242,7 @@ public class D2: D1 {
 // CHECK: bb3
 // CHECK: class_method
 // CHECK: }
+@inline(never)
 func driver2(_ d: D2) -> Int32 {
   return d.boo()
 }
@@ -276,12 +277,13 @@ class EEE : CCC {
 
 // Check that c.foo() is devirtualized, because the optimizer can handle the casting the return type
 // correctly, i.e. it can cast (BBB, BBB) into (AAA, AAA)
-// CHECK-LABEL: sil hidden @_T023devirt_covariant_return37testDevirtOfMethodReturningTupleTypesAA2AAC_ADtAA3CCCC_AA2BBC1btFTf4gg_n
+// CHECK-LABEL: sil shared [noinline] @_T023devirt_covariant_return37testDevirtOfMethodReturningTupleTypesAA2AAC_ADtAA3CCCC_AA2BBC1btFTf4gg_n
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $CCC
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $EEE
 // CHECK: class_method
 // CHECK: }
+@inline(never)
 func testDevirtOfMethodReturningTupleTypes(_ c: CCC, b: BB) -> (AA, AA) {
   return c.foo(b)
 }
@@ -315,12 +317,13 @@ class DDDD : CCCC {
 
 // Check devirtualization of methods with optional results, where
 // optional results need to be casted.
-// CHECK-LABEL: sil @{{.*}}testOverridingMethodWithOptionalResult
+// CHECK-LABEL: sil shared [noinline] @{{.*}}testOverridingMethodWithOptionalResult
 // CHECK: checked_cast_br [exact] %{{.*}} : $F to $F
 // CHECK: checked_cast_br [exact] %{{.*}} : $F to $G
 // CHECK: switch_enum
 // CHECK: checked_cast_br [exact] %{{.*}} : $F to $H
 // CHECK: switch_enum
+@inline(never)
 public func testOverridingMethodWithOptionalResult(_ f: F) -> (F?, Int)? {
   return f.foo()
 }

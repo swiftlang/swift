@@ -1,0 +1,907 @@
+//===--- Integers.swift.gyb -----------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/Integers.swift
+// RUN: %line-directive %t/Integers.swift -- %target-build-swift %t/Integers.swift -swift-version 4 -Onone -o %t/a.out
+// RUN: %line-directive %t/Integers.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+// FIXME: this test runs forever on iOS arm64
+// REQUIRES: OS=macosx
+%{
+word_bits = int(WORD_BITS) / 2
+from SwiftIntTypes import all_integer_types
+}%
+
+/// Prints the message if the body is uncommented; used for
+/// diagnostics.
+@_transparent
+public func _log(_ message: @autoclosure () -> String) {
+  // print(message())
+}
+
+extension FixedWidthInteger where Words : Collection {
+  /// a hex representation of every bit in the number
+  func hexBits(_ bitWidth: Int) -> String {
+    let hexDigits: [Unicode.Scalar] = [
+      "0", "1", "2", "3", "4", "5", "6", "7",
+      "8", "9", "A", "B", "C", "D", "E", "F"]
+
+    var result = "".unicodeScalars
+    var x = self
+    var nibbles: Int = 0
+    repeat {
+      if nibbles % 4 == 0 && nibbles != 0 {
+        result.insert("_", at: result.startIndex)
+      }
+      let lowUWord = x.words.first ?? 0
+      result.insert(
+        hexDigits[Int(lowUWord._value) & 0xF],
+        at: result.startIndex
+      )
+      x /= 16
+      nibbles += 1
+    }
+    while (nibbles << 2 < bitWidth || (x != 0 && x + 1 != 0))
+    return (self < 0 ? "[-]" : "[+]") + String(result)
+  }
+
+  var hex: String { return hexBits(0) }
+}
+
+typealias Word = Int${word_bits}
+typealias UWord = UInt${word_bits}
+typealias DWord = Int${word_bits*2}
+typealias UDWord = UInt${word_bits*2}
+
+import StdlibUnittest
+
+
+func expectEqual<T : FixedWidthInteger>(
+  _ expected: T, _ actual: T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) where T.Words : Collection {
+  if expected != actual {
+    expectationFailure(
+      "expected: \(String(reflecting: expected))"
+      + " (of type \(String(reflecting: type(of: expected))))\n"
+      + "  = \(expected.hex)\n"
+      + "actual: \(String(reflecting: actual))"
+      + " (of type \(String(reflecting: type(of: actual))))\n"
+      + "  = \(actual.hex)\n",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
+}
+
+func expectEqual<T : FixedWidthInteger>(
+  _ expected: (T, Bool), _ actual: (T, Bool),
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
+% for i in 0, 1:
+  expectEqual(
+    expected.${i}, actual.${i}, message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
+    showFrame: false)
+% end
+}
+
+var tests = TestSuite("Integers")
+
+tests.test("Literals") {
+  // Testing against the official Int types so as not to depend on
+  // unimplemented stuff.
+  let a: UInt8 = 0b1_0_11_0_111
+  expectEqual(a, 0b1_0_11_0_111)
+
+  let b: Int16 = 183
+  expectEqual(b, 0b1_0_11_0_111)
+
+  let c: Int16 = -183
+  expectEqual(c, -183)
+
+  let d: Int8 = 127
+  expectEqual(d, 127)
+
+  let e: UInt8 = 255
+  expectEqual(e, 255)
+}
+
+tests.test("Equality") {
+  expectEqual(183 as UInt8, 183)
+  expectNotEqual(183 as UInt8, 184)
+
+  expectEqual(49 as Int8, 49)
+  expectNotEqual(-49 as Int8, 49)
+}
+
+func indexOrder<T: Comparable>(x: T, y: T)
+  -> ExpectedComparisonResult {
+  return x < y ? .lt : x > y ? .gt : .eq
+}
+
+tests.test("Ordering") {
+  checkComparable([127, 183, 184, 255] as [UInt8], oracle: indexOrder)
+  checkComparable([-128, -1, 83, 84, 127] as [Int8], oracle: indexOrder)
+  checkComparable([127, 183, 184, 255, 65535] as [UInt16], oracle: indexOrder)
+  checkComparable([-32768, -32767, 83, 84, 32767] as [Int16], oracle: indexOrder)
+}
+
+tests.test("Simple-Arithmetic") {
+  expectEqual(1 as Int8 + 2, 3)
+  expectEqual(1 as Int8 - 2, -1)
+  expectEqual(-5 as Int8 + 11, 6)
+  expectEqual(3 as Int8 * 4, 12)
+  expectEqual(4 as Int8 * -7, -28)
+  expectEqual(-4 as Int8 * -7, 28)
+  expectEqual(5 as Int8 / 2, 2)
+  expectEqual(6 as Int8 / 2, 3)
+  expectEqual(7 as Int8 / 2, 3)
+  expectEqual(5 as Int8 % 3, 2)
+  expectEqual(6 as Int8 % 3, 0)
+  expectEqual(7 as Int8 % 3, 1)
+}
+
+% for w in map(lambda x: x.bits, all_integer_types(word_bits)):
+%   for prefix in ['U', '']:
+%     Type = '{}Int{}'.format(prefix, w)
+tests.test("${Type}/Add/Overflow") {
+  func f(_ x: ${Type}) -> ${Type} {
+    return x + 1
+  }
+  expectCrashLater()
+  _ = f(${Type}.max)
+}
+
+tests.test("${Type}/Subtract/Underflow") {
+  func f(_ x: ${Type}) -> ${Type} {
+    return x - 1
+  }
+  expectCrashLater()
+  _ = f(${Type}.min)
+}
+
+tests.test("${Type}/AddInPlace/Overflow") {
+  func f(_ x: inout ${Type}) {
+    x += 1
+  }
+  expectCrashLater()
+  var x = ${Type}.max
+  f(&x)
+}
+
+tests.test("${Type}/SubtractInPlace/Underflow") {
+  func f(_ x: inout ${Type}) {
+    x -= 1
+  }
+  expectCrashLater()
+  var x = ${Type}.min
+  f(&x)
+}
+%   end
+% end
+
+tests.test("Simple-Bitwise") {
+  expectEqual(0b100_1001 as Int8 >> 1, 0b10_0100)
+  expectEqual(-0b100_1001 as Int8 >> 1, -0b10_0101)
+  expectEqual(0b1011_0111 as UInt8 >> 1, 0b0101_1011)
+
+  expectEqual(0b100_1001 as Int8 >> 1, 0b10_0100)
+  expectEqual(-0b100_1001 as Int8 >> 1, -0b10_0101)
+  expectEqual(0b1011_0111 as UInt8 >> 1, 0b0101_1011)
+
+  expectEqual((0b1011_0111 as UInt8) & 0b0110_1110, 0b0010_0110)
+  expectEqual((0b1011_0111 as UInt8) | 0b0110_1110, 0xFF)
+  expectEqual((0b1011_0111 as UInt8) ^ 0b0110_1110, 0b1101_1001)
+}
+
+tests.test("MinMax") {
+  expectEqual(255, UInt8.max)
+  expectEqual(0, UInt8.min)
+  expectEqual(127, Int8.max)
+  expectEqual(-128, Int8.min)
+}
+
+tests.test("CountLeadingZeros") {
+  expectEqual(0, UInt8.max.leadingZeroBitCount)
+  expectEqual(8, UInt8.min.leadingZeroBitCount)
+  expectEqual(1, Int8.max.leadingZeroBitCount)
+  expectEqual(0, Int8.min.leadingZeroBitCount)
+}
+
+tests.test("CountTrainlingZeros") {
+  expectEqual(0, UInt8.max.trailingZeroBitCount)
+  expectEqual(8, UInt8.min.trailingZeroBitCount)
+  expectEqual(0, Int8.max.trailingZeroBitCount)
+  expectEqual(7, Int8.min.trailingZeroBitCount)
+}
+
+tests.test("Conversion8to16") {
+  expectEqual(255, UInt16(UInt8.max))
+  expectEqual(255, Int16(UInt8.max))
+  expectEqual(0, UInt16(UInt8.min))
+  expectEqual(0, Int16(UInt8.min))
+  expectEqual(127, Int16(Int8.max))
+  let negativeValue = Int8.min
+  expectCrashLater()
+  _ = UInt16(negativeValue)
+}
+
+
+tests.test("Conversion16to8") {
+  expectEqual(255, UInt8(255 as UInt16))
+  expectEqual(255, UInt8(255 as Int16))
+
+  expectEqual(0, UInt8(0 as UInt16))
+  expectEqual(0, UInt8(0 as Int16))
+
+  expectEqual(127, Int8(127 as UInt16))
+  expectEqual(127, Int8(127 as Int16))
+
+  expectEqual(-128, Int8(-128 as Int16))
+  let tooLarge: UInt16 = 128
+  expectCrashLater()
+  _ = Int8(tooLarge)
+}
+
+tests.test("Conversion16to8a") {
+  let tooLarge: Int16 = 128
+  expectCrashLater()
+  _ = Int8(tooLarge)
+}
+
+tests.test("Conversion16to8b") {
+  let tooLarge: Int16 = 256
+  expectCrashLater()
+  _ = UInt8(tooLarge)
+}
+
+tests.test("Conversion16to8c") {
+  let tooLarge: UInt16 = 256
+  expectCrashLater()
+  _ = UInt8(tooLarge)
+}
+
+tests.test("ConversionWordToDWord") {
+  expectEqual(1 << ${word_bits} - 1, UDWord(UWord.max))
+  expectEqual(1 << ${word_bits} - 1, DWord(UWord.max))
+  expectEqual(0, UDWord(UWord.min))
+  expectEqual(0, DWord(UWord.min))
+  expectEqual(1 << ${word_bits-1} - 1, DWord(Word.max))
+  let negativeValue = Word.min
+  expectCrashLater()
+  _ = UDWord(negativeValue)
+}
+
+tests.test("ConversionDWordToWord") {
+  expectEqual(~0, UWord(1 << ${word_bits} - 1 as UDWord))
+  expectEqual(~0, UWord(1 << ${word_bits} - 1 as DWord))
+
+  expectEqual(0, UWord(0 as UDWord))
+  expectEqual(0, UWord(0 as DWord))
+
+  expectEqual(Word.max, Word(1 << ${word_bits-1} - 1 as UDWord))
+  expectEqual(Word.max, Word(1 << ${word_bits-1} - 1 as DWord))
+
+  expectEqual(Word.min, Word(-1 << ${word_bits-1} as DWord))
+  let tooLarge: UDWord = 1 << ${word_bits-1}
+  expectCrashLater()
+  _ = Word(tooLarge)
+}
+
+tests.test("ConversionDWordToWordA") {
+  let tooLarge: DWord = 1 << ${word_bits}
+  expectCrashLater()
+  _ = Word(tooLarge)
+}
+
+tests.test("ConversionDWordToWordB") {
+  let tooLarge: DWord = 1 << ${word_bits}
+  expectCrashLater()
+  _ = UWord(tooLarge)
+}
+
+tests.test("ConversionDWordToWordC") {
+  let tooLarge: UDWord = 1 << ${word_bits}
+  expectCrashLater()
+  _ = UWord(tooLarge)
+}
+
+tests.test("truncatingIfNeeded") {
+
+  expectEqual(-2, Int8(truncatingIfNeeded: UInt8.max - 1))
+  expectEqual(3, Int8(truncatingIfNeeded: 3 as UInt8))
+  expectEqual(UInt8.max - 1, UInt8(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, UInt8(truncatingIfNeeded: 3 as Int8))
+
+  expectEqual(-2, DWord(truncatingIfNeeded: UDWord.max - 1))
+  expectEqual(3, DWord(truncatingIfNeeded: 3 as UDWord))
+  expectEqual(UDWord.max - 1, UDWord(truncatingIfNeeded: -2 as DWord))
+  expectEqual(3, UDWord(truncatingIfNeeded: 3 as DWord))
+
+  expectEqual(-2, Int32(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, Int32(truncatingIfNeeded: 3 as Int8))
+  expectEqual(127, Int32(truncatingIfNeeded: 127 as UInt8))
+  expectEqual(129, Int32(truncatingIfNeeded: 129 as UInt8))
+  expectEqual((1 << 31 - 1) << 1, UInt32(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, UInt32(truncatingIfNeeded: 3 as Int8))
+  expectEqual(128, UInt32(truncatingIfNeeded: 128 as UInt8))
+  expectEqual(129, UInt32(truncatingIfNeeded: 129 as UInt8))
+
+  expectEqual(-2, DWord(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, DWord(truncatingIfNeeded: 3 as Int8))
+  expectEqual(127, DWord(truncatingIfNeeded: 127 as UInt8))
+  expectEqual(129, DWord(truncatingIfNeeded: 129 as UInt8))
+  expectEqual(
+    (1 << ${word_bits*2-1} - 1) << 1,
+    UDWord(truncatingIfNeeded: -2 as Int8))
+  expectEqual(3, UDWord(truncatingIfNeeded: 3 as Int8))
+  expectEqual(128, UDWord(truncatingIfNeeded: 128 as UInt8))
+  expectEqual(129, UDWord(truncatingIfNeeded: 129 as UInt8))
+
+  expectEqual(-2, Int8(truncatingIfNeeded: -2 as DWord))
+  expectEqual(-2, Int8(truncatingIfNeeded: -1 << 67 - 2 as DWord))
+  expectEqual(127, Int8(truncatingIfNeeded: 127 as UDWord))
+  expectEqual(-127, Int8(truncatingIfNeeded: 129 as UDWord))
+  expectEqual(0b1111_1100, UInt8(truncatingIfNeeded: -4 as DWord))
+  expectEqual(0b1111_1100, UInt8(truncatingIfNeeded: -1 << 67 - 4 as DWord))
+  expectEqual(128, UInt8(truncatingIfNeeded: 128 + 1024 as UDWord))
+  expectEqual(129, UInt8(truncatingIfNeeded: 129 + 1024 as UDWord))
+}
+
+tests.test("Parsing/LosslessStringConvertible") {
+  func _toArray<T: LosslessStringConvertible>(_ text: String) -> [T] {
+    return text.split(separator: " ").map { T(String($0)) }.flatMap { $0 }
+  }
+
+  expectEqualSequence([1, 2, 3], _toArray("1 2 3") as [Int])
+  expectEqualSequence(
+    [Int](), _toArray("21-50 ff6600 10000000000000000000000000") as [Int])
+}
+
+tests.test("HeterogeneousEquality") {
+  expectTrue(-1 as DWord != UDWord.max)
+  expectTrue(DWord.max == UDWord.max / 2)
+  expectTrue((0 as DWord) == 0 as UDWord)
+
+  expectTrue(-1 as Int8 == -1 as DWord)
+  expectTrue(UInt8.max != -1 as DWord)
+  expectTrue(UInt8.max == 255 as DWord)
+  expectTrue((0 as UInt8) == 0 as DWord)
+
+  expectTrue(UInt8.max == 255 as UDWord)
+  expectTrue(UInt8.max != UDWord.max)
+  expectTrue((0 as UInt8) == (0 as UDWord))
+}
+
+tests.test("HeterogeneousOrdering") {
+  expectTrue((-1 as DWord) < UDWord.max)
+  expectTrue(DWord.max <= UDWord.max / 2)
+  expectTrue(DWord.max >= UDWord.max / 2)
+  expectTrue((0 as DWord) <= (0 as UDWord))
+  expectTrue((0 as DWord) >= (0 as UDWord))
+
+  expectTrue((-1 as Int8) <= -1 as DWord)
+  expectTrue((-1 as Int8) >= -1 as DWord)
+  expectTrue(UInt8.max > -1 as DWord)
+  expectTrue(UInt8.max <= 255 as DWord)
+  expectTrue(UInt8.max >= 255 as DWord)
+  expectTrue((0 as UInt8) <= (0 as DWord))
+  expectTrue((0 as UInt8) >= (0 as DWord))
+
+  expectTrue(UInt8.max <= 255 as UDWord)
+  expectTrue(UInt8.max >= 255 as UDWord)
+  expectTrue(UInt8.max < UDWord.max)
+  expectTrue((0 as UInt8) <= (0 as UDWord))
+  expectTrue((0 as UInt8) >= (0 as UDWord))
+}
+
+tests.test("SmartBitShift/Homogeneous/Left/Int16") {
+  let all1s = ~0 as Int16
+  expectEqual(all1s, all1s << (0 as Int16))
+  expectEqual(-2, all1s << (1 as Int16))
+  expectEqual(Int16.min, all1s << (15 as Int16))
+  expectEqual(0, all1s << (16 as Int16))
+
+  expectEqual(-1, all1s << (-1 as Int16))
+  expectEqual(-1, all1s << (-15 as Int16))
+  expectEqual(-1, all1s << (-16 as Int16))
+}
+
+tests.test("SmartBitShift/Unconstrained/Left/Int16") {
+  let all1s = ~0 as Int16
+  expectEqual(all1s, all1s << 0)
+  expectEqual(-2, all1s << 1)
+  expectEqual(Int16.min, all1s << 15)
+  expectEqual(0, all1s << 16)
+
+  expectEqual(-1, all1s << -1)
+  expectEqual(-1, all1s << -15)
+  expectEqual(-1, all1s << -16)
+}
+
+tests.test("SmartBitShift/Homogeneous/Left/UInt16") {
+  let all1s = ~0 as UInt16
+  expectEqual(all1s, all1s << 0)
+  expectEqual(0b1111_1111_1111_1110, all1s << 1)
+  expectEqual(UInt16.max / 2 + 1, all1s << 15)
+  expectEqual(0, all1s << 16)
+}
+
+tests.test("SmartBitShift/Heterogeneous/Left/Int16") {
+  let all1s = ~0 as Int16
+  expectEqual(all1s, all1s << (0 as Int8))
+  expectEqual(-2, all1s << (1 as Int32))
+  expectEqual(Int16.min, all1s << (15 as UInt32))
+  expectEqual(0, all1s << (16 as UInt8))
+
+  expectEqual(-1, all1s << (-1 as DWord))
+  expectEqual(-1, all1s << (-15 as Int))
+  expectEqual(-1, all1s << (-16 as Int32))
+}
+
+tests.test("SmartBitShift/Heterogeneous/Left/UInt16") {
+  let all1s = ~0 as UInt16
+  expectEqual(all1s, all1s << (0 as Int8))
+  expectEqual(0b1111_1111_1111_1110, all1s << (1 as Int32))
+  expectEqual(UInt16.max / 2 + 1, all1s << (15 as UInt32))
+  expectEqual(0, all1s << (16 as UInt8))
+
+  expectEqual(UInt16.max / 2, all1s << (-1 as DWord))
+  expectEqual(1, all1s << (-15 as Int))
+  expectEqual(0, all1s << (-16 as Int32))
+}
+
+tests.test("SmartBitShift/Unconstrained/Left/UInt16") {
+  let all1s = ~0 as UInt16
+  expectEqual(all1s, all1s << 0)
+  expectEqual(0b1111_1111_1111_1110, all1s << 1)
+  expectEqual(UInt16.max / 2 + 1, all1s << 15)
+  expectEqual(0, all1s << 16)
+
+  expectEqual(UInt16.max / 2, all1s << -1)
+  expectEqual(1, all1s << -15)
+  expectEqual(0, all1s << -16)
+}
+
+tests.test("Basics") {
+  typealias I8 = UInt8
+  let b8: I8 = 0b1_0_11_0_111
+  expectEqual(b8, 0b1_0_11_0_111)
+  expectEqual(b8, 183)
+  expectNotEqual(b8, I8())
+  expectEqual(I8(), 0)
+  expectEqual(8, I8.bitWidth)
+  expectEqual(16, Int16.bitWidth)
+  expectEqual(32, Int32.bitWidth)
+}
+
+tests.test("words") {
+  expectEqualSequence([UInt.max], UInt.max.words)
+  expectEqualSequence([0xFF as UInt], UInt8.max.words)
+  expectEqualSequence([0xFFFF as UInt], UInt16.max.words)
+  expectEqualSequence([0xFFFFFFFF as UInt], UInt32.max.words)
+
+  expectEqualSequence([0 as UInt], UInt.min.words)
+  expectEqualSequence([0 as UInt], UInt8.min.words)
+  expectEqualSequence([0 as UInt], UInt16.min.words)
+  expectEqualSequence([0 as UInt], UInt32.min.words)
+
+  expectEqualSequence([UInt.max >> 1], Int.max.words)
+  expectEqualSequence([0x7F as UInt], Int8.max.words)
+  expectEqualSequence([0x7FFF as UInt], Int16.max.words)
+  expectEqualSequence([0x7FFFFFFF as UInt], Int32.max.words)
+
+  expectEqualSequence([UInt.max << (Int.bitWidth - 1)], Int.min.words)
+  expectEqualSequence([UInt.max << 7], Int8.min.words)
+  expectEqualSequence([UInt.max << 15], Int16.min.words)
+  expectEqualSequence([UInt.max << 31], Int32.min.words)
+  
+  expectEqualSequence([UInt.max], (-1 as Int).words)
+  expectEqualSequence([UInt.max], (-1 as Int8).words)
+  expectEqualSequence([UInt.max], (-1 as Int16).words)
+  expectEqualSequence([UInt.max], (-1 as Int32).words)
+
+% if int(WORD_BITS) == 64:
+  expectEqualSequence([UInt.max], UInt64.max.words)
+  expectEqualSequence([0 as UInt], UInt64.min.words)
+  expectEqualSequence([UInt.max >> 1], Int64.max.words)
+  expectEqualSequence([(1 as UInt) << 63], Int64.min.words)
+  expectEqualSequence([UInt.max], (-1 as Int64).words)
+% else:
+  expectEqualSequence([UInt.max, UInt.max], Int64.max.words)
+  expectEqualSequence([0 as UInt, 0], UInt64.min.words)
+  expectEqualSequence([UInt.max, UInt.max >> 1], Int64.max.words)
+  expectEqualSequence([0 as UInt, 1 << 31], Int64.min.words)
+  expectEqualSequence([UInt.max, UInt.max], (-1 as Int64).words)
+% end
+
+  expectEqualSequence([1], 1.words)
+  expectEqualSequence([0], 0.words)
+}
+
+tests.test("multipliedFullWidth/UInt8") {
+  let a: UInt8 = 42
+  let b: UInt8 = 42
+  let res = a.multipliedFullWidth(by: b)
+  expectEqual(0x06, res.high)
+  expectEqual(0xe4, res.low)
+}
+
+tests.test("multipliedFullWidth/Int8") {
+  let a: Int8 = 42
+  let b: Int8 = -42
+  let res = a.multipliedFullWidth(by: b)
+  expectEqual(Int8(bitPattern: 0xf9), res.high)
+  expectEqual(0x1c, res.low)
+}
+
+tests.test("multipliedFullWidth/Int8/BothNegative") {
+  let a: Int8 = -42
+  let b: Int8 = -42
+  let res = a.multipliedFullWidth(by: b)
+  expectEqual(0x06, res.high)
+  expectEqual(0xe4, res.low)
+}
+
+tests.test("MultiplyAndDivideFullWidth/Int8") {
+  let a: Int8 = 42
+  let b: Int8 = 43
+  let res = a.multipliedFullWidth(by: b)
+  let (quotient, remainder) = b.dividingFullWidth(res)
+  expectEqual(a, quotient)
+  expectEqual(0, remainder)
+}
+
+tests.test("Remainder/DividingBy0") {
+  func f(_ x: Int, _ y: Int) -> Int {
+    return x % y
+  }
+  expectCrashLater()
+  _ = f(42, 0)
+}
+
+tests.test("Division/By0") {
+  func f(_ x: Int, _ y: Int) -> Int {
+    return x / y
+  }
+  expectCrashLater()
+  _ = f(42, 0)
+}
+
+tests.test("DivideMinByMinusOne") {
+  func f(_ x: Int) -> Int {
+    return x / -1
+  }
+  expectCrashLater()
+  _ = f(Int.min)
+}
+
+tests.test("MultiplyMinByMinusOne") {
+  func f(_ x: Int) -> Int {
+    return x * -1
+  }
+  expectCrashLater()
+  _ = f(Int.min)
+}
+
+tests.test("signum/generic") {
+  func check<T : BinaryInteger>(_ expected: T, _ x: T) {
+    expectEqual(expected, x.signum())
+  }
+% for suffix in ['8', '16', '32', '64', '']:
+  check(-1, Int${suffix}.min)
+  check(-1, (-42) as Int${suffix})
+  check(-1, (-1) as Int${suffix})
+%   for u in ['U', '']:
+  check(0, 0 as ${u}Int${suffix})
+  check(1, 1 as ${u}Int${suffix})
+  check(1, 42 as ${u}Int${suffix})
+  check(1, ${u}Int${suffix}.max)
+%   end
+% end
+}
+
+tests.test("signum/concrete") {
+% for suffix in ['8', '16', '32', '64', '']:
+  expectEqual(-1 as Int${suffix}, Int${suffix}.min.signum())
+  expectEqual(-1 as Int${suffix}, (-42 as Int${suffix}).signum())
+  expectEqual(-1 as Int${suffix}, (-1 as Int${suffix}).signum())
+%   for u in ['U', '']:
+  expectEqual(0 as ${u}Int${suffix}, (0 as ${u}Int${suffix}).signum())
+  expectEqual(1 as ${u}Int${suffix}, (1 as ${u}Int${suffix}).signum())
+  expectEqual(1 as ${u}Int${suffix}, (42 as ${u}Int${suffix}).signum())
+  expectEqual(1 as ${u}Int${suffix}, ${u}Int${suffix}.max.signum())
+%   end
+% end
+}
+
+var dwTests = TestSuite("DoubleWidth")
+
+typealias UInt128 = DoubleWidth<UInt64>
+typealias UInt256 = DoubleWidth<UInt128>
+typealias UInt512 = DoubleWidth<UInt256>
+typealias UInt1024 = DoubleWidth<UInt512>
+
+typealias Int128 = DoubleWidth<Int64>
+typealias Int256 = DoubleWidth<Int128>
+typealias Int512 = DoubleWidth<Int256>
+typealias Int1024 = DoubleWidth<Int512>
+
+dwTests.test("Literals") {
+  let w: DoubleWidth<UInt8> = 100
+  expectTrue(w == 100 as Int)
+
+  let x: DoubleWidth<UInt8> = 1000
+  expectTrue(x == 1000 as Int)
+
+  let y: DoubleWidth<Int8> = 1000
+  expectTrue(y == 1000 as Int)
+  
+  let z: DoubleWidth<Int8> = -1000
+  expectTrue(z == -1000 as Int)
+}
+
+dwTests.test("Arithmetic/unsigned") {
+  let x: DoubleWidth<UInt8> = 1000
+  let y: DoubleWidth<UInt8> = 1111
+  expectEqual(x + 1, 1001)
+  expectEqual(x + x, 2000)
+  expectEqual(x - 1, 999)
+  expectEqual(x - x, 0)
+  expectEqual(y - x, 111)
+
+  expectEqual(x * 7, 7000)
+  expectEqual(y * 7, 7777)
+
+  expectEqual(x / 3, 333)
+  expectEqual(x / x, 1)
+  expectEqual(x / y, 0)
+  expectEqual(y / x, 1)
+
+  expectEqual(x % 3, 1)
+  expectEqual(x % y, x)
+}
+
+dwTests.test("Arithmetic/signed") {
+  let x: DoubleWidth<Int8> = 1000
+  let y: DoubleWidth<Int8> = -1111
+  expectEqual(x + 1, 1001)
+  expectEqual(x + x, 2000)
+  expectEqual(x - 1, 999)
+  expectEqual(x - x, 0)
+  expectEqual(0 - x, -1000)
+  expectEqual(x + y, -111)
+  expectEqual(x - y, 2111)
+  
+  expectEqual(x * 7, 7000)
+  expectEqual(y * 7, -7777)
+  expectEqual(x * -7, -7000)
+  expectEqual(y * -7, 7777)
+
+  expectEqual(x / 3, 333)
+  expectEqual(x / -3, -333)
+  expectEqual(x / x, 1)
+  expectEqual(x / y, 0)
+  expectEqual(y / x, -1)
+  expectEqual(y / y, 1)
+
+  expectEqual(x % 3, 1)
+  expectEqual(x % -3, 1)
+  expectEqual(y % 3, -1)
+  expectEqual(y % -3, -1)
+
+  expectEqual(-y, 1111)
+  expectEqual(-x, -1000)
+}
+
+dwTests.test("Nested") {
+  do {
+    let x = UInt1024.max
+    let (y, o) = x.addingReportingOverflow(1)
+    expectEqual(y, 0)
+    expectTrue(y == (0 as Int))
+    expectTrue(o)
+  }
+
+  do {
+    let x = Int1024.max
+    let (y, o) = x.addingReportingOverflow(1)
+    expectEqual(y, Int1024.min)
+    expectLT(y, 0)
+    expectTrue(y < (0 as Int))
+    expectTrue(y < (0 as UInt))
+    expectTrue(o)
+  }
+
+  expectFalse(UInt1024.isSigned)
+  expectEqual(UInt1024.bitWidth, 1024)
+  expectTrue(Int1024.isSigned)
+  expectEqual(Int1024.bitWidth, 1024)
+
+  expectEqualSequence(UInt1024.max.words, repeatElement(UInt.max, count: 1024 / UInt.bitWidth))
+}
+
+dwTests.test("inits") {
+  typealias DWU16 = DoubleWidth<UInt8>
+
+  expectTrue(DWU16(UInt16.max) == UInt16.max)
+  expectNil(DWU16(exactly: UInt32.max))
+  expectEqual(DWU16(truncatingIfNeeded: UInt64.max), DWU16.max)
+
+  expectCrashLater()
+  _ = DWU16(UInt32.max)
+}
+
+dwTests.test("TwoWords") {
+  typealias DW = DoubleWidth<Int>
+
+  expectEqual(-1 as DW, DW(truncatingIfNeeded: -1 as Int8))
+
+  expectNil(Int(exactly: DW(Int.min) - 1))
+  expectNil(Int(exactly: DW(Int.max) + 1))
+
+  expectTrue(DW(Int.min) - 1 < Int.min)
+  expectTrue(DW(Int.max) + 1 > Int.max)
+}
+
+dwTests.test("Bitshifts") {
+  typealias DWU64 = DoubleWidth<DoubleWidth<DoubleWidth<UInt8>>>
+  typealias DWI64 = DoubleWidth<DoubleWidth<DoubleWidth<Int8>>>
+
+  func f<T: FixedWidthInteger, U: FixedWidthInteger>(_ x: T, type: U.Type) {
+    let y = U(x)
+    expectEqual(T.bitWidth, U.bitWidth)
+    for i in -(T.bitWidth + 1)...(T.bitWidth + 1) {
+      expectTrue(x << i == y << i)
+      expectTrue(x >> i == y >> i)
+
+      expectTrue(x &<< i == y &<< i)
+      expectTrue(x &>> i == y &>> i)
+    }
+  }
+
+  f(1 as UInt64, type: DWU64.self)
+  f(~(~0 as UInt64 >> 1), type: DWU64.self)
+  f(UInt64.max, type: DWU64.self)
+  f(0b11110000_10100101_11110000_10100101_11110000_10100101_11110000_10100101 as UInt64, type: DWU64.self)
+
+  f(1 as Int64, type: DWI64.self)
+  f(Int64.min, type: DWI64.self)
+  f(Int64.max, type: DWI64.self)
+  f(0b01010101_10100101_11110000_10100101_11110000_10100101_11110000_10100101 as Int64, type: DWI64.self)
+}
+
+dwTests.test("Remainder/DividingBy0") {
+  func f(_ x: Int1024, _ y: Int1024) -> Int1024 {
+    return x % y
+  }
+  expectCrashLater()
+  _ = f(42, 0)
+}
+
+dwTests.test("Division/By0") {
+  func f(_ x: Int1024, _ y: Int1024) -> Int1024 {
+    return x / y
+  }
+  expectCrashLater()
+  _ = f(42, 0)
+}
+
+dwTests.test("DivideMinByMinusOne") {
+  func f(_ x: Int1024) -> Int1024 {
+    return x / -1
+  }
+  expectCrashLater()
+  _ = f(Int1024.min)
+}
+
+dwTests.test("MultiplyMinByMinusOne") {
+  func f(_ x: Int1024) -> Int1024 {
+    return x * -1
+  }
+  expectCrashLater()
+  _ = f(Int1024.min)
+}
+
+typealias DWI16 = DoubleWidth<Int8>
+typealias DWU16 = DoubleWidth<UInt8>
+
+dwTests.test("Conversions") {
+  expectTrue(DWI16(1 << 15 - 1) == Int(1 << 15 - 1))
+  expectTrue(DWI16(-1 << 15) == Int(-1 << 15))
+  expectTrue(DWU16(1 << 16 - 1) == Int(1 << 16 - 1))
+  expectTrue(DWU16(0) == Int(0))
+
+  expectTrue(DWI16(Double(1 << 15 - 1)) == Int(1 << 15 - 1))
+  expectTrue(DWI16(Double(-1 << 15)) == Int(-1 << 15))
+  expectTrue(DWU16(Double(1 << 16 - 1)) == Int(1 << 16 - 1))
+  expectTrue(DWU16(Double(0)) == Int(0))
+
+  expectTrue(DWI16(Double(1 << 15 - 1) + 0.9) == Int(1 << 15 - 1))
+  expectTrue(DWI16(Double(-1 << 15) - 0.9) == Int(-1 << 15))
+  expectTrue(DWU16(Double(1 << 16 - 1) + 0.9) == Int(1 << 16 - 1))
+  expectTrue(DWU16(Double(0) - 0.9) == Int(0))
+
+  expectEqual(DWI16(0.00001), 0)
+  expectEqual(DWU16(0.00001), 0)
+}
+
+dwTests.test("Exact Conversions") {
+  expectEqual(DWI16(Double(1 << 15 - 1)), DWI16(exactly: Double(1 << 15 - 1))!)
+  expectEqual(DWI16(Double(-1 << 15)), DWI16(exactly: Double(-1 << 15))!)
+  expectEqual(DWU16(Double(1 << 16 - 1)), DWU16(exactly: Double(1 << 16 - 1))!)
+  expectEqual(DWU16(Double(0)), DWU16(exactly: Double(0))!)
+
+  expectNil(DWI16(exactly: Double(1 << 15 - 1) + 0.9))
+  expectNil(DWI16(exactly: Double(-1 << 15) - 0.9))
+  expectNil(DWU16(exactly: Double(1 << 16 - 1) + 0.9))
+  expectNil(DWU16(exactly: Double(0) - 0.9))
+
+  expectNil(DWI16(exactly: Double(1 << 15)))
+  expectNil(DWI16(exactly: Double(-1 << 15) - 1))
+  expectNil(DWU16(exactly: Double(1 << 16)))
+  expectNil(DWU16(exactly: Double(-1)))
+
+  expectNil(DWI16(exactly: 0.00001))
+  expectNil(DWU16(exactly: 0.00001))
+
+  expectNil(DWU16(exactly: Double.nan))
+  expectNil(DWU16(exactly: Float.nan))
+  expectNil(DWU16(exactly: Double.infinity))
+  expectNil(DWU16(exactly: Float.infinity))
+}
+
+dwTests.test("Conversions/SignedMax+1") {
+  expectCrashLater()
+  _ = DWI16(1 << 15)
+}
+
+dwTests.test("Conversions/SignedMin-1") {
+  expectCrashLater()
+  _ = DWI16(-1 << 15 - 1)
+}
+
+dwTests.test("Conversions/UnsignedMax+1") {
+  expectCrashLater()
+  _ = DWU16(1 << 16)
+}
+
+dwTests.test("Conversions/Unsigned-1") {
+  expectCrashLater()
+  _ = DWU16(-1)
+}
+
+dwTests.test("Words") {
+  expectEqualSequence((0 as DoubleWidth<Int8>).words, [0])
+  expectEqualSequence((1 as DoubleWidth<Int8>).words, [1])
+  expectEqualSequence((-1 as DoubleWidth<Int8>).words, [UInt.max])
+  expectEqualSequence((256 as DoubleWidth<Int8>).words, [256])
+  expectEqualSequence((-256 as DoubleWidth<Int8>).words, [UInt.max - 255])
+  expectEqualSequence(DoubleWidth<Int8>.max.words, [32767])
+  expectEqualSequence(DoubleWidth<Int8>.min.words, [UInt.max - 32767])
+
+  expectEqualSequence((0 as Int1024).words, 
+    repeatElement(0 as UInt, count: 1024 / UInt.bitWidth))
+  expectEqualSequence((-1 as Int1024).words,
+    repeatElement(UInt.max, count: 1024 / UInt.bitWidth))
+  expectEqualSequence((1 as Int1024).words, 
+      [1] + Array(repeating: 0, count: 1024 / UInt.bitWidth - 1))
+}
+
+runAllTests()

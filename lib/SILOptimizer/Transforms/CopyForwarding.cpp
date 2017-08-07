@@ -61,6 +61,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -75,6 +76,7 @@ STATISTIC(NumCopyNRVO, "Number of copies removed via named return value opt.");
 STATISTIC(NumCopyForward, "Number of copies removed via forward propagation");
 STATISTIC(NumCopyBackward,
           "Number of copies removed via backward propagation");
+STATISTIC(NumDeadTemp, "Number of copies removed from unused temporaries");
 
 using namespace swift;
 
@@ -426,7 +428,9 @@ public:
 
 protected:
   bool collectUsers();
-  bool propagateCopy(CopyAddrInst *CopyInst);
+  bool propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy);
+  CopyAddrInst *findCopyIntoDeadTemp(CopyAddrInst *destCopy);
+  bool forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy);
   bool forwardPropagateCopy(CopyAddrInst *CopyInst,
                             SmallPtrSetImpl<SILInstruction*> &DestUserInsts);
   bool backwardPropagateCopy(CopyAddrInst *CopyInst,
@@ -517,12 +521,27 @@ bool CopyForwarding::collectUsers() {
 ///
 /// The caller has already proven that lifetime of the value being copied ends
 /// at the copy. (Either it is a [take] or is immediately destroyed).
+/// 
 ///
 /// If the forwarded copy is not an [init], then insert a destroy of the copy's
 /// dest.
-bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
+bool CopyForwarding::
+propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
   if (!EnableCopyForwarding)
     return false;
+
+  // Handle copy-of-copy without analyzing uses.
+  // Assumes that CopyInst->getSrc() is dead after CopyInst.
+  assert(CopyInst->isTakeOfSrc() || hoistingDestroy);
+  if (auto *srcCopy = findCopyIntoDeadTemp(CopyInst)) {
+    if (forwardDeadTempCopy(srcCopy, CopyInst)) {
+      DEBUG(llvm::dbgs() << "  Temp Copy:" << *srcCopy
+            << "         to " << *CopyInst);
+      HasChanged = true;
+      ++NumDeadTemp;
+      return true;
+    }
+  }
 
   SILValue CopyDest = CopyInst->getDest();
   SILBasicBlock *BB = CopyInst->getParent();
@@ -559,6 +578,104 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
     return true;
   }
   return false;
+}
+
+/// Find a copy into an otherwise dead temporary:
+///
+/// The given copy is copying out of the temporary
+/// copy_addr %temp, %dest
+///
+/// Precondition: The lifetime of %temp ends at `destCopy`
+/// (%temp is CurrentDef).
+///
+/// Find a previous copy:
+/// copy_addr %src, %temp
+///
+/// Such that it is safe to forward its source into the source of
+/// `destCopy`. i.e. `destCopy` can be safely rewritten as:
+/// copy_addr %src, %dest
+///
+/// Otherwise return nullptr. No instructions are harmed in this analysis.
+///
+/// This can be checked with a simple instruction walk that ends at:
+/// - an intervening instruction that may write to memory
+/// - a use of the temporary, %temp
+///
+/// Unlike the forward and backward propagation that finds all use points, this
+/// handles copies of address projections. By conservatively checking all
+/// intervening instructions, it avoids the need to analyze projection paths.
+CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(CopyAddrInst *destCopy) {
+  auto tmpVal = destCopy->getSrc();
+  assert(tmpVal == CurrentDef);
+  assert(isIdentifiedSourceValue(tmpVal));
+
+  for (auto II = destCopy->getIterator(), IB = destCopy->getParent()->begin();
+       II != IB;) {
+    --II;
+    SILInstruction *UserInst = &*II;
+    if (auto *srcCopy = dyn_cast<CopyAddrInst>(UserInst)) {
+      if (srcCopy->getDest() == tmpVal)
+        return srcCopy;
+    }
+    if (SrcUserInsts.count(UserInst))
+      return nullptr;
+    if (UserInst->mayWriteToMemory())
+      return nullptr;
+  }
+  return nullptr;
+}
+
+/// Forward a copy into a dead temporary as identified by
+/// `findCopyIntoDeadTemp`.
+///
+/// Returns true if the copy was successfully forwarded.
+///
+/// Old SIL: 
+/// copy_addr %src, %temp
+/// copy_addr %temp, %dest
+///
+/// New SIL: 
+/// copy_addr %src, %dest
+///
+/// Precondition: `srcCopy->getDest()` == `destCopy->getSrc()`
+/// Precondition: %src is unused between srcCopy and destCopy.
+/// Precondition: The lifetime of %temp ends immediate after `destCopy`.
+/// 
+/// Postcondition:
+/// - `srcCopy` is erased.
+/// - Any initial value in %temp is destroyed at `srcCopy` position.
+/// - %temp is uninitialized following `srcCopy` and subsequent instruction
+///   attempts to destroy this uninitialized value.
+bool CopyForwarding::
+forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy) {
+  assert(srcCopy->getDest() == destCopy->getSrc());
+  
+  // This pattern can be trivially folded without affecting %temp destroys:
+  // copy_addr [...] %src, [init] %temp
+  // copy_addr [take] %temp, [...] %dest
+
+  // If copy into temp is not initializing, add a destroy:
+  // - copy_addr %src, %temp
+  // + destroy %temp
+  if (!srcCopy->isInitializationOfDest()) {
+    SILBuilderWithScope(srcCopy)
+      .createDestroyAddr(srcCopy->getLoc(), srcCopy->getDest());
+  }
+
+  // Either `destCopy` is a take, or the caller is hoisting a destroy:
+  // copy_addr %temp, %dest
+  // ...
+  // destroy %temp
+  //
+  // If the caller is hoisting a destroy, and we return `true` then it will
+  // erase the destroy for us. Either way, it's safe to simply rewrite destCopy.
+  // For now, don't bother finding the subsequent destroy, because this isn't
+  // the common case.
+
+  destCopy->setSrc(srcCopy->getSrc());
+  destCopy->setIsTakeOfSrc(srcCopy->isTakeOfSrc());
+  srcCopy->eraseFromParent();
+  return true;
 }
 
 /// Check that the lifetime of %src ends at the copy and is not reinitialized
@@ -937,7 +1054,7 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
       if (!CopyInst->isTakeOfSrc() && CopyInst->getSrc() == CurrentDef) {
         // This use is a copy of CurrentDef. Attempt to forward CurrentDef to
         // all uses of the copy's value.
-        if (propagateCopy(CopyInst))
+        if (propagateCopy(CopyInst, /*hoistingDestroy=*/true))
           return true;
       }
     }
@@ -969,7 +1086,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   // First forward any copies that implicitly destroy CurrentDef. There is no
   // need to hoist Destroy for these.
   for (auto *CopyInst : TakePoints)
-    propagateCopy(CopyInst);
+    propagateCopy(CopyInst, /*hoistingDestroy=*/false);
 
   // If the copied address is also loaded from, then destroy hoisting is unsafe.
   //
@@ -1208,11 +1325,244 @@ class CopyForwardingPass : public SILFunctionTransform
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
       }
   }
-
-  StringRef getName() override { return "Copy Forwarding"; }
 };
+
+/// Temporary RValue Optimization
+///
+/// Peephole optimization to eliminate short-lived immutable temporary copies.
+/// This handles a common pattern generated by SILGen where temporary RValues
+/// are emitted as copies...
+///
+///   %temp = alloc_stack $T
+///   copy_addr %src to [initialization] %temp : $*T
+///   // no writes to %src and %temp
+///   destroy_addr %temp : $*T
+///   dealloc_stack %temp : $*T
+///
+/// This differs from the copy forwarding algorithm because it handles
+/// copy source and dest lifetimes that are unavoidably overlappying. Instead,
+/// it finds cases in which it is easy to determine that the source is
+/// unmodified during the copy destination's lifetime. Thus, the destination can
+/// be viewed as a short-lived "rvalue".
+class TempRValueOptPass : public SILFunctionTransform
+{
+  AliasAnalysis *AA = nullptr;
+
+  static bool collectLoads(SILInstruction *CurrentInst, SILInstruction *addr,
+                           llvm::SmallPtrSetImpl<SILInstruction *> &loadInsts);
+
+  bool checkNoSourceModification(CopyAddrInst *copyInst,
+                       const llvm::SmallPtrSetImpl<SILInstruction *> &useInsts);
+
+  bool tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst);
+
+  void run() override;
+};
+
+/// The main entry point of the pass.
+void TempRValueOptPass::run() {
+  DEBUG(llvm::dbgs() << "Copy Peephole in Func " << getFunction()->getName()
+        << "\n");
+
+  AA = PM->getAnalysis<AliasAnalysis>();
+  bool Changed = false;
+
+  // Find all copy_addr instructions.
+  for (auto &BB : *getFunction()) {
+    auto II = BB.begin();
+    while (II != BB.end()) {
+      auto *CopyInst = dyn_cast<CopyAddrInst>(&*II);
+
+      if (CopyInst) {
+        // In case of success, this may delete instructions, but not the
+        // CopyInst itself.
+        Changed |= tryOptimizeCopyIntoTemp(CopyInst);
+      }
+
+      // Increment the instruction iterator here. We can't do it at the begin of
+      // the loop because the instruction after CopyInst might be deleted in
+      // in tryOptimizeCopyIntoTemp. We can't do it at the end of the loop
+      // because the CopyInst might be deleted in the following code.
+      ++II;
+
+      // Remove identity copies which are a result of this optimization.
+      if (CopyInst && CopyInst->getSrc() == CopyInst->getDest() &&
+          // Identity copies cannot take the source. This check is just here
+          // to be on the safe side.
+          !CopyInst->isTakeOfSrc()) {
+        // This is either the CopyInst which just got optimized or it is a
+        // follow-up from an earlier iteration, where another copy_addr copied
+        // the temporary back to the source location.
+        CopyInst->eraseFromParent();
+      }
+    }
+  }
+
+  if (Changed) {
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  }
+}
+
+/// Transitively explore all data flow uses of the given \p address until
+/// reaching a load or returning false.
+bool TempRValueOptPass::
+collectLoads(SILInstruction *user, SILInstruction *address,
+             llvm::SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+  // All normal uses (loads) must be in the initialization block.
+  // (The destroy and dealloc are commonly in a different block though.)
+  if (user->getParent() != address->getParent())
+    return false;
+
+  // Only allow uses that cannot destroy their operand. We need to be sure
+  // that replacing all this temporary's uses with the copy source doesn't
+  // destroy the source. This way, we know that the destroy_addr instructions
+  // that we recorded cover all the temporary's lifetime termination points.
+  //
+  // Currently we whitelist address projections and loads.
+  //
+  // TODO: handle non-destructive projections of enums
+  // (unchecked_take_enum_data_addr of Optional is nondestructive.)
+  switch (user->getKind()) {
+    default:
+      DEBUG(llvm::dbgs() << "  Temp use may write/destroy its source" << *user);
+      return false;
+
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+      // Transitively look through projections on stack addresses.
+      for (auto *useOper : user->getUses()) {
+        if (!collectLoads(useOper->getUser(), user, loadInsts))
+          return false;
+      }
+      return true;
+
+    case ValueKind::LoadInst:
+    case ValueKind::LoadBorrowInst:
+      // Loads are the end of the data flow chain. The users of the load can't
+      // access the temporary storage.
+      loadInsts.insert(user);
+      return true;
+
+    case ValueKind::CopyAddrInst: {
+      // copy_addr which read from the temporary are like loads.
+      // TODO: Handle copy_addr [take]. But this doesn't seem to be important.
+      auto *copyFromTmp = cast<CopyAddrInst>(user);
+      if (copyFromTmp->getDest() == address || copyFromTmp->isTakeOfSrc()) {
+        DEBUG(llvm::dbgs() << "  Temp written or taken" << *user);
+        return false;
+      }
+      loadInsts.insert(user);
+      return true;
+    }
+  }
+}
+
+/// Checks if the copy's source can be modified within the temporary's lifetime.
+///
+/// Unfortunately, we cannot simply use the destroy points as the lifetime end,
+/// because they can be in a different basic block (that's what SILGen
+/// generates). Instead we guarantee that all normal uses are within the block
+/// of the temporary and look for the last use, which effectively ends the
+/// lifetime.
+bool TempRValueOptPass::checkNoSourceModification(CopyAddrInst *copyInst,
+                     const llvm::SmallPtrSetImpl<SILInstruction *> &useInsts) {
+  unsigned NumLoadsFound = 0;
+  auto iter = std::next(copyInst->getIterator());
+  // We already checked that the useful lifetime of the temporary ends in
+  // the initialization block.
+  auto iterEnd = copyInst->getParent()->end();
+  for (; iter != iterEnd; ++iter) {
+    SILInstruction *I = &*iter;
+
+    if (useInsts.count(I))
+      NumLoadsFound++;
+
+    // If this is the last use of the temp we are ok. After this point,
+    // modifications to the source don't matter anymore.
+    if (NumLoadsFound == useInsts.size())
+      return true;
+
+    if (AA->mayWriteToMemory(I, copyInst->getSrc())) {
+      DEBUG(llvm::dbgs() << "  Source modified by" << *iter);
+      return false;
+    }
+  }
+  // For some reason, not all normal uses have been seen between the copy and
+  // the end of the initialization block. We should never reach here.
+  return false;
+}
+
+/// Tries to perform the temporary rvalue copy elimination for \p copyInst
+bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
+  if (copyInst->isTakeOfSrc() || !copyInst->isInitializationOfDest())
+    return false;
+
+  auto *tempObj = dyn_cast<AllocStackInst>(copyInst->getDest());
+  if (!tempObj)
+    return false;
+
+  assert(tempObj != copyInst->getSrc() &&
+           "can't initialize temporary with itself");
+
+  // Scan all uses of the temporary storage (tempObj) to verify they all refer
+  // to the value initialized by this copy. It is sufficient to check that the
+  // only users that modify memory are the copy_addr [initialization] and
+  // destroy_addr.
+  llvm::SmallPtrSet<SILInstruction *, 8> loadInsts;
+  for (auto *useOper : tempObj->getUses()) {
+    SILInstruction *user = useOper->getUser();
+
+    if (user == copyInst)
+      continue;
+
+    // Destroys and deallocations are allowed to be in a different block.
+    if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
+      continue;
+
+    if (!collectLoads(user, tempObj, loadInsts))
+      return false;
+  }
+
+  // Check if the source is modified within the lifetime of the temporary.
+  if (!checkNoSourceModification(copyInst, loadInsts))
+    return false;
+
+  DEBUG(llvm::dbgs() << "  Success: replace temp" << *tempObj);
+
+  // Do a "replaceAllUses" by either deleting the users or replacing them with
+  // the source address. Note: we must not delete the original copyInst because
+  // it would crash the instruction iteration in run(). Instead the copyInst
+  // gets identical Src and Dest operands.
+  while (!tempObj->use_empty()) {
+    Operand *use = *tempObj->use_begin();
+    SILInstruction *user = use->getUser();
+    switch (user->getKind()) {
+      case ValueKind::DestroyAddrInst:
+      case ValueKind::DeallocStackInst:
+        user->eraseFromParent();
+        break;
+      case ValueKind::CopyAddrInst:
+      case ValueKind::StructElementAddrInst:
+      case ValueKind::TupleElementAddrInst:
+      case ValueKind::LoadInst:
+      case ValueKind::LoadBorrowInst:
+        use->set(copyInst->getSrc());
+        break;
+
+      default:
+        llvm_unreachable("unhandled instruction");
+    }
+  }
+  tempObj->eraseFromParent();
+  return true;
+}
+
 } // end anonymous namespace
 
 SILTransform *swift::createCopyForwarding() {
   return new CopyForwardingPass();
+}
+
+SILTransform *swift::createTempRValueOpt() {
+  return new TempRValueOptPass();
 }

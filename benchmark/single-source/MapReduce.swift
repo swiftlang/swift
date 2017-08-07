@@ -22,7 +22,7 @@ public func run_MapReduce(_ N: Int) {
     numbers = numbers.map { $0 &+ 5 }
     c += numbers.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -34,7 +34,7 @@ public func run_MapReduceAnyCollection(_ N: Int) {
     let mapped = numbers.map { $0 &+ 5 }
     c += mapped.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -46,7 +46,7 @@ public func run_MapReduceAnyCollectionShort(_ N: Int) {
     let mapped = numbers.map { $0 &+ 5 }
     c += mapped.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -58,7 +58,7 @@ public func run_MapReduceShort(_ N: Int) {
     numbers = numbers.map { $0 &+ 5 }
     c += numbers.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -70,7 +70,7 @@ public func run_MapReduceSequence(_ N: Int) {
     let mapped = numbers.map { $0 &+ 5 }
     c += mapped.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -82,7 +82,7 @@ public func run_MapReduceLazySequence(_ N: Int) {
     let mapped = numbers.lazy.map { $0 &+ 5 }
     c += mapped.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -94,7 +94,7 @@ public func run_MapReduceLazyCollection(_ N: Int) {
     let mapped = numbers.lazy.map { $0 &+ 5 }
     c += mapped.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -106,7 +106,7 @@ public func run_MapReduceLazyCollectionShort(_ N: Int) {
     let mapped = numbers.lazy.map { $0 &+ 5 }
     c += mapped.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -117,7 +117,7 @@ public func run_MapReduceString(_ N: Int) {
   for _ in 1...N*100 {
     c += s.utf8.map { UInt64($0 &+ 5) }.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -128,7 +128,7 @@ public func run_MapReduceShortString(_ N: Int) {
   for _ in 1...N*100 {
     c += s.utf8.map { UInt64($0 &+ 5) }.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 }
 
 @inline(never)
@@ -141,7 +141,7 @@ public func run_MapReduceClass(_ N: Int) {
     let mapped = numbers.map { $0.intValue &+ 5 }
     c += mapped.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 #endif
 }
 
@@ -155,7 +155,7 @@ public func run_MapReduceClassShort(_ N: Int) {
     let mapped = numbers.map { $0.intValue &+ 5 }
     c += mapped.reduce(0, &+)
   }
-  CheckResults(c != 0, "IncorrectResults in MapReduce")
+  CheckResults(c != 0)
 #endif
 }
 

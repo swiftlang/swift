@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 
@@ -12,19 +12,11 @@ func getInt() -> Int { return zero }
 // CHECK:   [[PBX:%.*]] = project_box [[X]]
 // CHECK:   [[Y:%.*]] = alloc_box ${ var Builtin.Int64 }
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
-// CHECK:   copy_addr [[PBX]] to [initialization] [[PBY]] : $*Builtin.Int64
+// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
+// CHECK:   copy_addr [[READ]] to [initialization] [[PBY]] : $*Builtin.Int64
 func init_var_from_lvalue(x: Int) {
   var x = x
   var y = x
-}
-
-// CHECK-LABEL: sil hidden @_T021copy_lvalue_peepholes016assign_var_from_B0{{[_0-9a-zA-Z]*}}F
-// CHECK:   [[Y:%.*]] = alloc_box ${ var Builtin.Int64 }
-// CHECK:   [[PBY:%.*]] = project_box [[Y]]
-// CHECK:   copy_addr [[PBY]] to %0
-func assign_var_from_lvalue(x: inout Int, y: Int) {
-  var y = y
-  x = y
 }
 
 // -- Peephole doesn't apply to computed lvalues
@@ -47,7 +39,8 @@ func init_var_from_computed_lvalue() {
 // CHECK-LABEL: sil hidden @_T021copy_lvalue_peepholes021assign_computed_from_B0{{[_0-9a-zA-Z]*}}F
 // CHECK:   [[Y:%.*]] = alloc_box
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
-// CHECK:   [[Y_VAL:%.*]] = load [trivial] [[PBY]]
+// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBY]]
+// CHECK:   [[Y_VAL:%.*]] = load [trivial] [[READ]]
 // CHECK:   [[SETTER:%.*]] = function_ref @_T021copy_lvalue_peepholes8computedBi64_fs
 // CHECK:   apply [[SETTER]]([[Y_VAL]])
 func assign_computed_from_lvalue(y: Int) {
@@ -56,7 +49,8 @@ func assign_computed_from_lvalue(y: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_T021copy_lvalue_peepholes24assign_var_from_computed{{[_0-9a-zA-Z]*}}F
-// CHECK:   assign {{%.*}} to %0
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK:   assign {{%.*}} to [[WRITE]]
 func assign_var_from_computed(x: inout Int) {
   x = computed
 }

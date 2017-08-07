@@ -172,7 +172,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
   case ObjectLiteralExpr::colorLiteral: {
     return DeclName(Context, Context.Id_init,
-                    { Context.getIdentifier("colorLiteralRed"),
+                    { Context.getIdentifier("_colorLiteralRed"),
                       Context.getIdentifier("green"),
                       Context.getIdentifier("blue"),
                       Context.getIdentifier("alpha") });
@@ -575,6 +575,21 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
 
+  // Now that all types have been finalized, run any delayed
+  // circularity checks.
+  // This has been written carefully to fail safe + finitely if
+  // for some reason a type gets re-delayed in a non-assertions
+  // build in an otherwise successful build.
+  // Types can be redelayed in a failing build because we won't
+  // type-check required declarations from different files.
+  for (size_t i = 0, e = TC.DelayedCircularityChecks.size(); i != e; ++i) {
+    TC.checkDeclCircularity(TC.DelayedCircularityChecks[i]);
+    assert((e == TC.DelayedCircularityChecks.size() ||
+            TC.Context.hadError()) &&
+           "circularity checking for type was re-delayed!");
+  }
+  TC.DelayedCircularityChecks.clear();
+
   // Compute captures for functions and closures we visited.
   for (AnyFunctionRef closure : TC.ClosuresWithUncomputedCaptures) {
     TC.computeCaptures(closure);
@@ -606,7 +621,9 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 OptionSet<TypeCheckingFlags> Options,
                                 unsigned StartElem,
-                                unsigned WarnLongFunctionBodies) {
+                                unsigned WarnLongFunctionBodies,
+                                unsigned WarnLongExpressionTypeChecking,
+                                unsigned ExpressionTimeoutThreshold) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -631,6 +648,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     if (MyTC) {
       MyTC->setWarnLongFunctionBodies(WarnLongFunctionBodies);
+      MyTC->setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
+      if (ExpressionTimeoutThreshold != 0)
+        MyTC->setExpressionTimeoutThreshold(ExpressionTimeoutThreshold);
+
       if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
         MyTC->enableDebugTimeFunctionBodies();
 
@@ -693,7 +714,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     bool hasTopLevelCode = false;
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
-      if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         hasTopLevelCode = true;
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
@@ -823,14 +844,17 @@ static Optional<Type> getTypeOfCompletionContextExpr(
                         CompletionTypeCheckKind kind,
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
+  if (TC.preCheckExpression(parsedExpr, DC))
+    return None;
+
   switch (kind) {
   case CompletionTypeCheckKind::Normal:
     // Handle below.
     break;
 
-  case CompletionTypeCheckKind::ObjCKeyPath:
+  case CompletionTypeCheckKind::KeyPath:
     referencedDecl = nullptr;
-    if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(parsedExpr))
+    if (auto keyPath = dyn_cast<KeyPathExpr>(parsedExpr))
       return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResultType=*/true);
 
     return None;
@@ -838,7 +862,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
 
   Type originalType = parsedExpr->getType();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                 referencedDecl, FreeTypeVariableBinding::GenericParameters))
+                 referencedDecl, FreeTypeVariableBinding::UnresolvedType))
     return T;
 
   // Try to recover if we've made any progress.
@@ -894,12 +918,14 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   if (ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
-    return TC->typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC->typeCheckExpression(parsedExpr, DC);
+    return !resultTy;
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(ctx.SourceMgr);
     TypeChecker TC(ctx, diags);
-    return TC.typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC.typeCheckExpression(parsedExpr, DC);
+    return !resultTy;
   }
 }
 
@@ -962,14 +988,16 @@ void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
-    checkForForbiddenPrefix(VD->getNameStr());
+    if (!VD->getBaseName().isSpecial())
+      checkForForbiddenPrefix(VD->getBaseName().getIdentifier().str());
   }
 }
 
 void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
-  checkForForbiddenPrefix(E->getName().getBaseName());
+  if (!E->getName().isSpecial())
+    checkForForbiddenPrefix(E->getName().getBaseIdentifier());
 }
 
 void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {

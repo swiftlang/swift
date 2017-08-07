@@ -1,18 +1,20 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B0ySiSgz_SitF
+// CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
 // CHECK:         [[PRECOND:%.*]] = function_ref @_T0s30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]](
-// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr %0 : $*Optional<Int>, #Optional.some!enumelt.1
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt.1
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
   x! = y
 }
 
 // CHECK-LABEL: sil hidden @_T015optional_lvalue011assign_iuo_B0ySQySiGz_SitF
+// CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
 // CHECK:         [[PRECOND:%.*]] = function_ref @_T0s30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]](
-// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr %0 : $*Optional<Int>, #Optional.some!enumelt.1
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt.1
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_iuo_lvalue(_ x: inout Int!, _ y: Int) {
   x! = y
@@ -28,7 +30,8 @@ struct S {
 }
 
 // CHECK-LABEL: sil hidden @_T015optional_lvalue011assign_iuo_B9_implicitySQyAA1SVGz_SitF
-// CHECK:         [[SOME:%.*]] = unchecked_take_enum_data_addr %0
+// CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<S>
+// CHECK:         [[SOME:%.*]] = unchecked_take_enum_data_addr [[WRITE]]
 // CHECK:         [[X:%.*]] = struct_element_addr [[SOME]]
 func assign_iuo_lvalue_implicit(_ s: inout S!, _ y: Int) {
   s.x = y

@@ -70,6 +70,7 @@ static long double swift_strtold_l(const char *nptr,
 #include "swift/Runtime/Debug.h"
 #include "swift/Basic/Lazy.h"
 
+#include "../SwiftShims/LibcShims.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "../SwiftShims/RuntimeStubs.h"
 
@@ -263,7 +264,8 @@ uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 ///
 /// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occurred, or EOF was reached.
-ssize_t swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
+swift::__swift_ssize_t
+swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #if defined(_WIN32)
   if (LinePtr == nullptr)
     return -1;
@@ -564,3 +566,4 @@ int swift::_swift_stdlib_putc_stderr(int C) {
 size_t swift::_swift_stdlib_getHardwareConcurrency() {
   return std::thread::hardware_concurrency();
 }
+

@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-ownership -ownership-model-eliminator %s | %FileCheck %s
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 

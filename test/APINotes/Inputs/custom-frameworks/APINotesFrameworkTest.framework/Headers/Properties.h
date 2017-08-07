@@ -1,10 +1,6 @@
 #ifdef __OBJC__
 #pragma clang assume_nonnull begin
 
-__attribute__((objc_root_class))
-@interface Base
-@end
-
 @interface TestProperties: Base
 @property (nonatomic, readwrite, retain) id accessorsOnly;
 @property (nonatomic, readwrite, retain, class) id accessorsOnlyForClass;

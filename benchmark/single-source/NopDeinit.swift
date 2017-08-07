@@ -30,7 +30,6 @@ public func run_NopDeinit(_ N: Int) {
     let size = 500
     for i in 1...size { arr.append(X(i)) }
     arr.removeAll()
-    CheckResults(arr.count == 0,
-                 "Incorrect results in NopDeinit: \(arr.count) != 0.")
+    CheckResults(arr.count == 0)
   }
 }

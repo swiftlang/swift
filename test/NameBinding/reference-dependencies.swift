@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 // RUN: %FileCheck %s < %t.swiftdeps
@@ -111,7 +111,7 @@ extension ExpressibleByArrayLiteral {
 }
 
 // CHECK-DAG: OtherFileElementType
-extension ExpressibleByArrayLiteral where Element == OtherFileElementType {
+extension ExpressibleByArrayLiteral where ArrayLiteralElement == OtherFileElementType {
   func useless2() {}
 }
 
@@ -215,6 +215,8 @@ func lookUpManyTopLevelNames() {
   switch getOtherFileEnum() {
   case .Value:
     break
+  default:
+    break
   }
 
   _ = .Value as OtherFileEnumWrapper.Enum
@@ -231,11 +233,15 @@ func lookUpManyTopLevelNames() {
   switch value {
   case is OtherFileEnumWrapper.Enum:
     break
+  default:
+    break
   }
 
   // CHECK-DAG: !private "~="
   switch 42 {
   case 50:
+    break
+  default:
     break
   }
   

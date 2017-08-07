@@ -7,6 +7,7 @@ import StdlibCollectionUnittest
 import Foundation
 
 var DataTestSuite = TestSuite("Data")
+
 DataTestSuite.test("Data.Iterator semantics") {
   // Empty data
   checkSequence([], Data())
@@ -55,6 +56,8 @@ DataTestSuite.test("Data SubSequence") {
         expectEqual(dataSlice.startIndex, i)
         expectEqual(dataSlice.endIndex, j)
         
+        expectEqual(dataSlice[i], arraySlice[i])
+
         dataSlice[i] = 0xFF
         
         expectEqual(dataSlice.startIndex, i)

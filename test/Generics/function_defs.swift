@@ -244,7 +244,7 @@ protocol GeneratesMetaAssoc2 {
 
 func recursiveSameType
        <T : GeneratesMetaAssoc1, U : GeneratesMetaAssoc2, V : GeneratesAssoc1>
-       (_ t: T, u: U)
+       (_ t: T, u: U, v: V)
   where T.MetaAssoc1 == V.Assoc1, V.Assoc1 == U.MetaAssoc2
 {
   t.get().accept(t.get().makeIterator())
@@ -284,7 +284,7 @@ func beginsWith3<S0: P2, S1: P2>(_ seq1: S0, _ seq2: S1) -> Bool
 // Bogus requirements
 //===----------------------------------------------------------------------===//
 func nonTypeReq<T>(_: T) where T : Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
-func badProtocolReq<T>(_: T) where T : Int {} // expected-error{{type 'T' constrained to non-protocol type 'Int'}}
+func badProtocolReq<T>(_: T) where T : Int {} // expected-error{{type 'T' constrained to non-protocol, non-class type 'Int'}}
 
 func nonTypeSameType<T>(_: T) where T == Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
 func nonTypeSameType2<T>(_: T) where Wibble == T {} // expected-error{{use of undeclared type 'Wibble'}}
@@ -295,5 +295,5 @@ func badTypeConformance1<T>(_: T) where Int : EqualComparable {} // expected-err
 
 func badTypeConformance2<T>(_: T) where T.Blarg : EqualComparable { } // expected-error{{'Blarg' is not a member type of 'T'}}
 
-func badSameType<T, U : GeneratesAnElement, V>(_ : T)
+func badSameType<T, U : GeneratesAnElement, V>(_ : T, _ : U)
   where T == U.Element, U.Element == V {} // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}

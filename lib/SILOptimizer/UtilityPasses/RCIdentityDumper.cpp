@@ -73,7 +73,6 @@ class RCIdentityDumper : public SILFunctionTransform {
     llvm::outs() << "\n";
   }
 
-  StringRef getName() override { return "RC Identity Dumper"; }
 };
 
 } // end anonymous namespace

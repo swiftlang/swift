@@ -13,43 +13,29 @@
 import SwiftShims
 
 extension String {
-  /// Creates a string representing the given character repeated the specified
-  /// number of times.
-  ///
-  /// For example, use this initializer to create a string with ten `"0"`
-  /// characters in a row.
-  ///
-  ///     let zeroes = String("0" as Character, count: 10)
-  ///     print(zeroes)
-  ///     // Prints "0000000000"
-  @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
-  public init(repeating repeatedValue: Character, count: Int) {
-    Builtin.unreachable()
-  }
-
   /// Creates a string representing the given Unicode scalar repeated the
   /// specified number of times.
   ///
   /// For example, use this initializer to create a string with ten `"0"`
   /// scalars in a row.
   ///
-  ///     let zeroes = String("0" as UnicodeScalar, count: 10)
+  ///     let zeroes = String("0" as Unicode.Scalar, count: 10)
   ///     print(zeroes)
   ///     // Prints "0000000000"
   @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
-  public init(repeating repeatedValue: UnicodeScalar, count: Int) {
+  public init(repeating repeatedValue: Unicode.Scalar, count: Int) {
     Builtin.unreachable()
   }
 
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
   ///
-  /// For example, use this initializer to create a string with ten `"00"`
+  /// For example, use this initializer to create a string with ten `"ab"`
   /// strings in a row.
   ///
-  ///     let zeroes = String(repeating: "00", count: 10)
+  ///     let zeroes = String(repeating: "ab", count: 10)
   ///     print(zeroes)
-  ///     // Prints "00000000000000000000"
+  ///     // Prints "abababababababababab"
   ///
   /// - Parameters:
   ///   - repeatedValue: The string to repeat.
@@ -71,15 +57,6 @@ extension String {
     }
   }
 
-  public var _lines : [String] {
-    return _split(separator: "\n")
-  }
-  
-  public func _split(separator: UnicodeScalar) -> [String] {
-    let scalarSlices = unicodeScalars.split { $0 == separator }
-    return scalarSlices.map { String($0) }
-  }
-
   /// A Boolean value indicating whether a string has no characters.
   public var isEmpty: Bool {
     return _core.count == 0
@@ -87,7 +64,7 @@ extension String {
 }
 
 extension String {
-  public init(_ _c: UnicodeScalar) {
+  public init(_ _c: Unicode.Scalar) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF32.self,
       input: repeatElement(_c.value, count: 1))
@@ -139,7 +116,7 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
-  /// - Returns: `true` if the string begins with `prefix`, otherwise, `false`.
+  /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
   public func hasPrefix(_ prefix: String) -> Bool {
     let selfCore = self._core
     let prefixCore = prefix._core
@@ -153,10 +130,10 @@ extension String {
         // Prefix is longer than self.
         return false
       }
-      return Int(_swift_stdlib_memcmp(
+      return _swift_stdlib_memcmp(
         selfASCIIBuffer.baseAddress!,
         prefixASCIIBuffer.baseAddress!,
-        prefixASCIIBuffer.count)) == 0
+        prefixASCIIBuffer.count) == (0 as CInt)
     }
     if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
       let lhsStr = _NSContiguousString(selfCore)
@@ -197,7 +174,7 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
-  /// - Returns: `true` if the string ends with `suffix`, otherwise, `false`.
+  /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
   public func hasSuffix(_ suffix: String) -> Bool {
     let selfCore = self._core
     let suffixCore = suffix._core
@@ -211,11 +188,11 @@ extension String {
         // Suffix is longer than self.
         return false
       }
-      return Int(_swift_stdlib_memcmp(
+      return _swift_stdlib_memcmp(
         selfASCIIBuffer.baseAddress!
           + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
         suffixASCIIBuffer.baseAddress!,
-        suffixASCIIBuffer.count)) == 0
+        suffixASCIIBuffer.count) == (0 as CInt)
     }
     if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
       let lhsStr = _NSContiguousString(selfCore)
@@ -242,7 +219,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -264,12 +241,14 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
-  public init<T : _SignedInteger>(
+  // FIXME(integers): support a more general BinaryInteger protocol
+  // FIXME(integers): support larger bitwidths than 64
+  public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _int64ToString(
-      value.toIntMax(), radix: Int64(radix), uppercase: uppercase)
+      Int64(value), radix: Int64(radix), uppercase: uppercase)
   }
   
   /// Creates a string representing the given value in base 10, or some other
@@ -279,7 +258,46 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
+  ///
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  /// 
+  ///     let v = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36. The default is 10.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  // FIXME(integers): tiebreaker between T : FixedWidthInteger and other obsoleted
+  @available(swift, obsoleted: 4)
+  public init<T : FixedWidthInteger>(
+    _ value: T, radix: Int = 10, uppercase: Bool = false
+  ) where T : SignedInteger {
+    _precondition(radix > 1, "Radix must be greater than 1")
+    self = _int64ToString(
+      Int64(value), radix: Int64(radix), uppercase: uppercase)
+  }
+  
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
+  ///
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -301,50 +319,89 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
+  // FIXME(integers): support a more general BinaryInteger protocol
+  public init<T : FixedWidthInteger>(
+    _ value: T, radix: Int = 10, uppercase: Bool = false
+  ) where T : UnsignedInteger {
+    _precondition(radix > 1, "Radix must be greater than 1")
+    self = _uint64ToString(
+      UInt64(value), radix: Int64(radix), uppercase: uppercase)
+  }
+  
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
+  ///
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
+  ///
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  /// 
+  ///     let v = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36. The default is 10.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  @available(swift, obsoleted: 4, message: "Please use the version for FixedWidthInteger instead.")
+  public init<T : SignedInteger>(
+    _ value: T, radix: Int = 10, uppercase: Bool = false
+  ) {
+    _precondition(radix > 1, "Radix must be greater than 1")
+    self = _int64ToString(
+      Int64(value), radix: Int64(radix), uppercase: uppercase)
+  }
+  
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
+  ///
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
+  ///
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  ///
+  ///     let v: UInt = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36. The default is 10.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  @available(swift, obsoleted: 4, message: "Please use the version for FixedWidthInteger instead.")
   public init<T : UnsignedInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _uint64ToString(
-      value.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
-  }
-}
-
-extension String {
-  /// Split the given string at the given delimiter character, returning the
-  /// strings before and after that character (neither includes the character
-  /// found) and a boolean value indicating whether the delimiter was found.
-  public func _splitFirst(separator delim: UnicodeScalar)
-    -> (before: String, after: String, wasFound : Bool)
-  {
-    let rng = unicodeScalars
-    for i in rng.indices {
-      if rng[i] == delim {
-        return (String(rng[rng.startIndex..<i]), 
-                String(rng[rng.index(after: i)..<rng.endIndex]),
-                true)
-      }
-    }
-    return (self, "", false)
-  }
-
-  /// Split the given string at the first character for which the given
-  /// predicate returns true. Returns the string before that character, the 
-  /// character that matches, the string after that character,
-  /// and a boolean value indicating whether any character was found.
-  public func _splitFirstIf(_ predicate: (UnicodeScalar) -> Bool)
-    -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
-  {
-    let rng = unicodeScalars
-    for i in rng.indices {
-      if predicate(rng[i]) {
-        return (String(rng[rng.startIndex..<i]),
-                rng[i], 
-                String(rng[rng.index(after: i)..<rng.endIndex]),
-                true)
-      }
-    }
-    return (self, "🎃", String(), false)
+      UInt64(value), radix: Int64(radix), uppercase: uppercase)
   }
 }
 
@@ -355,7 +412,7 @@ extension String {
   }
 
   @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
-  public init(count: Int, repeatedValue c: UnicodeScalar) {
+  public init(count: Int, repeatedValue c: Unicode.Scalar) {
     Builtin.unreachable()
   }
 }

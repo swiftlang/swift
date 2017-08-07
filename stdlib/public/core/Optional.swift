@@ -68,7 +68,7 @@
 /// -----------------
 ///
 /// To safely access the properties and methods of a wrapped instance, use the
-/// postfix optional chaining operator (`?`). The following example uses
+/// postfix optional chaining operator (postfix `?`). The following example uses
 /// optional chaining to access the `hasSuffix(_:)` method on a `String?`
 /// instance.
 ///
@@ -178,11 +178,11 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///
   ///     let possibleNumber: Int? = Int("42")
   ///     let nonOverflowingSquare = possibleNumber.flatMap { x -> Int? in
-  ///         let (result, overflowed) = Int.multiplyWithOverflow(x, x)
-  ///         return overflowed ? nil : result
+  ///         let (result, overflowed) = x.multipliedReportingOverflow(by: x)
+  ///         return overflowed == .overflow ? nil : result
   ///     }
   ///     print(nonOverflowingSquare)
-  ///     // Prints "Optional(1746)"
+  ///     // Prints "Optional(1764)"
   ///
   /// - Parameter transform: A closure that takes the unwrapped value
   ///   of the instance.  

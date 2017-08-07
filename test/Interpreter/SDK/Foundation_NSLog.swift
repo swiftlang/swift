@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: echo 'void testNSLog();' > %t/NSLogIsWorking.h
 // RUN: echo '@import Foundation; void testNSLog() { NSLog(@"working"); }' | %target-clang -fobjc-arc -fmodules -x objective-c - -c -o %t/NSLogIsWorking.o

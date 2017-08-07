@@ -43,6 +43,7 @@ extension FileManager {
     }
 
     @available(OSX 10.6, iOS 4.0, *)
+    @nonobjc
     public func enumerator(at url: URL, includingPropertiesForKeys keys: [URLResourceKey]?, options mask: FileManager.DirectoryEnumerationOptions = [], errorHandler handler: ((URL, Error) -> Bool)? = nil) -> FileManager.DirectoryEnumerator? {
         return __NSFileManagerEnumeratorAtURL(self, url, keys, mask, { (url, error) in
             var errorResult = true

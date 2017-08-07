@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/clang_conformances.sil -module-name clang_conformances -import-objc-header %S/Inputs/clang_conformances_helper.h -assume-parsing-unqualified-ownership-sil
 // RUN: %target-swift-frontend -emit-sil -o %t -I %t -primary-file %s -module-name main -O
 

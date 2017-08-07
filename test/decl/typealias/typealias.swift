@@ -35,3 +35,36 @@ struct Hair<Style> {
 typealias FunnyHair = Hair<Color>
 
 var f: FunnyHair
+
+// Class inheritance through a typealias.
+class BaseClass {}
+typealias BaseAlias = BaseClass
+class SubClass : BaseAlias {}
+let _: BaseClass = SubClass()
+let _: BaseAlias = SubClass()
+
+func generic<T: BaseAlias>(_: T) {}
+generic(SubClass())
+extension BaseAlias {}
+
+class GenericBaseClass<T: AnyObject> {}
+typealias GenericBaseAlias = GenericBaseClass
+class ConcreteSubClass : GenericBaseAlias<BaseClass> {}
+let _: GenericBaseClass<BaseClass> = ConcreteSubClass()
+let _: GenericBaseAlias<BaseClass> = ConcreteSubClass()
+
+func generic<T: GenericBaseAlias<BaseClass>>(_: T) {}
+generic(ConcreteSubClass())
+extension GenericBaseAlias {
+  func doSomething(with: T) {}
+}
+
+// Protocol adoption through a typealias.
+protocol SomeProto {}
+typealias SomeProtoAlias = SomeProto
+class SomeProtoImpl : SomeProtoAlias {}
+let _: SomeProto = SomeProtoImpl()
+let _: SomeProtoAlias = SomeProtoImpl()
+
+func generic<T: SomeProtoAlias>(_: T) {}
+generic(SomeProtoImpl())

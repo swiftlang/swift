@@ -25,6 +25,21 @@
               key.filepath: Swift.swiftmodule,
               key.hash: <hash>,
               key.is_system: 1
+            },
+            {
+              key.kind: source.lang.swift.import.module.swift,
+              key.name: "SwiftOnoneSupport",
+              key.filepath: SwiftOnoneSupport.swiftmodule,
+              key.hash: <hash>,
+              key.dependencies: [
+                {
+                  key.kind: source.lang.swift.import.module.swift,
+                  key.name: "Swift",
+                  key.filepath: Swift.swiftmodule,
+                  key.hash: <hash>,
+                  key.is_system: 1
+                }
+              ]
             }
           ]
         },
@@ -34,6 +49,12 @@
           key.filepath: Swift.swiftmodule,
           key.hash: <hash>,
           key.is_system: 1
+        },
+        {
+          key.kind: source.lang.swift.import.module.swift,
+          key.name: "SwiftOnoneSupport",
+          key.filepath: SwiftOnoneSupport.swiftmodule,
+          key.hash: <hash>
         }
       ]
     },
@@ -43,6 +64,12 @@
       key.filepath: Swift.swiftmodule,
       key.hash: <hash>,
       key.is_system: 1
+    },
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "SwiftOnoneSupport",
+      key.filepath: SwiftOnoneSupport.swiftmodule,
+      key.hash: <hash>
     }
   ],
   key.entities: [
@@ -54,7 +81,23 @@
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "x",
-          key.usr: "s:1AAAC1x1BADCv"
+          key.usr: "s:1AAAC1x1BADCv",
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:1AAAC1x1BADCfg",
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:1AAAC1x1BADCfs",
+              key.is_dynamic: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:1AAACABycfc"
         }
       ]
     }

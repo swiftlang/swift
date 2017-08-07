@@ -17,6 +17,7 @@
 #include "SourceKit/SwiftLang/Factory.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/TargetSelect.h"
 #include "gtest/gtest.h"
 
 using namespace SourceKit;
@@ -51,6 +52,8 @@ class NullEditorConsumer : public EditorConsumer {
                                  unsigned NameLength,
                                  unsigned BodyOffset,
                                  unsigned BodyLength,
+                                 unsigned DocOffset,
+                                 unsigned DocLength,
                                  StringRef DisplayName,
                                  StringRef TypeName,
                                  StringRef RuntimeName,
@@ -101,7 +104,11 @@ class CursorInfoTest : public ::testing::Test {
 public:
   LangSupport &getLang() { return Ctx.getSwiftLangSupport(); }
 
-  void SetUp() {
+  void SetUp() override {
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmPrinters();
+    llvm::InitializeAllAsmParsers();
     NumTasks = 0;
   }
 
@@ -129,7 +136,7 @@ public:
     Semaphore sema(0);
 
     TestCursorInfo TestInfo;
-    getLang().getCursorInfo(DocName, Offset, 0, false, Args,
+    getLang().getCursorInfo(DocName, Offset, 0, false, false, Args,
       [&](const CursorInfo &Info) {
         TestInfo.Name = Info.Name;
         TestInfo.Typename = Info.TypeName;

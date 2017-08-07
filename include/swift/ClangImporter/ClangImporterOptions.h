@@ -13,6 +13,8 @@
 #ifndef SWIFT_CLANGIMPORTER_CLANGIMPORTEROPTIONS_H
 #define SWIFT_CLANGIMPORTER_CLANGIMPORTEROPTIONS_H
 
+#include "llvm/ADT/Hashing.h"
+
 #include <string>
 #include <vector>
 
@@ -35,6 +37,9 @@ public:
   /// Equivalent to Clang's -mcpu=.
   std::string TargetCPU;
 
+  /// The path to which we should store indexing data, if any.
+  std::string IndexStorePath;
+
   /// The bridging header or PCH that will be imported.
   std::string BridgingHeader;
 
@@ -42,8 +47,15 @@ public:
   /// header, place it in this directory.
   std::string PrecompiledHeaderOutputDir;
 
+  /// The optimizaton setting.  This doesn't typically matter for
+  /// import, but it can affect Clang's IR generation of static functions.
+  std::string Optimization;
+
+  /// Disable validating the persistent PCH.
+  bool PCHDisableValidation = false;
+
   /// \see Mode
-  enum class Modes {
+  enum class Modes : uint8_t {
     /// Set up Clang for importing modules into Swift and generating IR from
     /// Swift code.
     Normal,
@@ -84,6 +96,28 @@ public:
 
   /// When set, don't look for or load adapter modules.
   bool DisableAdapterModules = false;
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Bridging PCH hash.
+  llvm::hash_code getPCHHashComponents() const {
+    using llvm::hash_value;
+    using llvm::hash_combine;
+
+    auto Code = hash_value(ModuleCachePath);
+    // ExtraArgs ignored - already considered in Clang's module hashing.
+    Code = hash_combine(Code, OverrideResourceDir);
+    Code = hash_combine(Code, TargetCPU);
+    Code = hash_combine(Code, BridgingHeader);
+    Code = hash_combine(Code, PrecompiledHeaderOutputDir);
+    Code = hash_combine(Code, static_cast<uint8_t>(Mode));
+    Code = hash_combine(Code, DetailedPreprocessingRecord);
+    Code = hash_combine(Code, ImportForwardDeclarations);
+    Code = hash_combine(Code, InferImportAsMember);
+    Code = hash_combine(Code, DisableSwiftBridgeAttr);
+    Code = hash_combine(Code, DisableModulesValidateSystemHeaders);
+    Code = hash_combine(Code, DisableAdapterModules);
+    return Code;
+  }
 };
 
 } // end namespace swift

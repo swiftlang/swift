@@ -43,7 +43,7 @@ bb0:
   return %2 : $()
 }
 
-sil hidden  @call_bottom : $@convention(thin) () -> () {
+sil hidden @call_bottom : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()

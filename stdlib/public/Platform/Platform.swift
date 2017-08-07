@@ -141,23 +141,23 @@ public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: Unsa
 // fcntl.h
 //===----------------------------------------------------------------------===//
 
-#if !os(Windows) || CYGWIN
-@_silgen_name("_swift_Platform_open")
-func _swift_Platform_open(
-  _ path: UnsafePointer<CChar>,
-  _ oflag: Int32,
-  _ mode: mode_t
-) -> Int32
-#else
+#if os(Windows)
 @_silgen_name("_swift_Platform_open")
 func _swift_Platform_open(
   _ path: UnsafePointer<CChar>,
   _ oflag: Int32,
   _ mode: Int32
 ) -> Int32
+#else
+@_silgen_name("_swift_Platform_open")
+func _swift_Platform_open(
+  _ path: UnsafePointer<CChar>,
+  _ oflag: Int32,
+  _ mode: mode_t
+) -> Int32
 #endif
 
-#if !os(Windows) || CYGWIN
+#if !os(Windows)
 @_silgen_name("_swift_Platform_openat")
 func _swift_Platform_openat(
   _ fd: Int32,
@@ -174,7 +174,15 @@ public func open(
   return _swift_Platform_open(path, oflag, 0)
 }
 
-#if !os(Windows) || CYGWIN
+#if os(Windows)
+public func open(
+  _ path: UnsafePointer<CChar>,
+  _ oflag: Int32,
+  _ mode: Int32
+) -> Int32 {
+  return _swift_Platform_open(path, oflag, mode)
+}
+#else
 public func open(
   _ path: UnsafePointer<CChar>,
   _ oflag: Int32,
@@ -199,17 +207,9 @@ public func openat(
 ) -> Int32 {
   return _swift_Platform_openat(fd, path, oflag, mode)
 }
-#else
-public func open(
-  _ path: UnsafePointer<CChar>,
-  _ oflag: Int32,
-  _ mode: Int32
-) -> Int32 {
-  return _swift_Platform_open(path, oflag, mode)
-}
 #endif
 
-#if !os(Windows) || CYGWIN
+#if !os(Windows)
 @_silgen_name("_swift_Platform_fcntl")
 internal func _swift_Platform_fcntl(
   _ fd: Int32,
@@ -248,7 +248,18 @@ public func fcntl(
 }
 #endif
 
-#if !os(Windows) || CYGWIN
+#if os(Windows)
+public var S_IFMT: Int32 { return Int32(0xf000) }
+
+public var S_IFREG: Int32 { return Int32(0x8000) }
+public var S_IFDIR: Int32 { return Int32(0x4000) }
+public var S_IFCHR: Int32 { return Int32(0x2000) }
+public var S_IFIFO: Int32 { return Int32(0x1000) }
+
+public var S_IREAD: Int32  { return Int32(0x0100) }
+public var S_IWRITE: Int32 { return Int32(0x0080) }
+public var S_IEXEC: Int32  { return Int32(0x0040) }
+#else
 public var S_IFMT: mode_t   { return mode_t(0o170000) }
 public var S_IFIFO: mode_t  { return mode_t(0o010000) }
 public var S_IFCHR: mode_t  { return mode_t(0o020000) }
@@ -286,24 +297,13 @@ public var S_IREAD: mode_t  { return S_IRUSR }
 public var S_IWRITE: mode_t { return S_IWUSR }
 public var S_IEXEC: mode_t  { return S_IXUSR }
 #endif
-#else
-public var S_IFMT: Int32 { return Int32(0xf000) }
-
-public var S_IFREG: Int32 { return Int32(0x8000) }
-public var S_IFDIR: Int32 { return Int32(0x4000) }
-public var S_IFCHR: Int32 { return Int32(0x2000) }
-public var S_IFIFO: Int32 { return Int32(0x1000) }
-
-public var S_IREAD: Int32  { return Int32(0x0100) }
-public var S_IWRITE: Int32 { return Int32(0x0080) }
-public var S_IEXEC: Int32  { return Int32(0x0040) }
 #endif
 
 //===----------------------------------------------------------------------===//
 // ioctl.h
 //===----------------------------------------------------------------------===//
 
-#if !os(Windows) || CYGWIN
+#if !os(Windows)
 @_silgen_name("_swift_Platform_ioctl")
 internal func _swift_Platform_ioctl(
   _ fd: CInt,
@@ -380,8 +380,7 @@ public var SIG_ERR: sighandler_t {
 public var SIG_HOLD: sighandler_t {
   return unsafeBitCast(2, to: sighandler_t.self)
 }
-#elseif os(Windows)
-#if CYGWIN
+#elseif os(Cygwin)
 public typealias sighandler_t = _sig_func_ptr
 
 public var SIG_DFL: sighandler_t? { return nil }
@@ -394,7 +393,7 @@ public var SIG_ERR: sighandler_t {
 public var SIG_HOLD: sighandler_t {
   return unsafeBitCast(2, to: sighandler_t.self)
 }
-#else
+#elseif os(Windows)
 public var SIG_DFL: _crt_signal_t? { return nil }
 public var SIG_IGN: _crt_signal_t {
   return unsafeBitCast(1, to: _crt_signal_t.self)
@@ -402,7 +401,6 @@ public var SIG_IGN: _crt_signal_t {
 public var SIG_ERR: _crt_signal_t {
   return unsafeBitCast(-1, to: _crt_signal_t.self)
 }
-#endif
 #else
 internal var _ignore = _UnsupportedPlatformError()
 #endif
@@ -411,13 +409,13 @@ internal var _ignore = _UnsupportedPlatformError()
 // semaphore.h
 //===----------------------------------------------------------------------===//
 
-#if !os(Windows) || CYGWIN
+#if !os(Windows) 
 /// The value returned by `sem_open()` in the case of failure.
 public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
   // The value is ABI.  Value verified to be correct on Glibc.
   return UnsafeMutablePointer<sem_t>(bitPattern: 0)
 #else

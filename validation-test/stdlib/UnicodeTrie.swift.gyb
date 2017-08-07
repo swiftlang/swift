@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t && mkdir -p %t && %gyb -DunicodeGraphemeBreakPropertyFile=%utils/UnicodeData/GraphemeBreakProperty.txt -DunicodeGraphemeBreakTestFile=%utils/UnicodeData/GraphemeBreakTest.txt %s -o %t/UnicodeTrie.swift
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DunicodeGraphemeBreakPropertyFile=%utils/UnicodeData/GraphemeBreakProperty.txt -DunicodeGraphemeBreakTestFile=%utils/UnicodeData/GraphemeBreakTest.txt %s -o %t/UnicodeTrie.swift
 // RUN: %line-directive %t/UnicodeTrie.swift -- %target-build-swift %t/UnicodeTrie.swift -o %t/a.out -g -Xfrontend -disable-access-control
 // RUN: %line-directive %t/UnicodeTrie.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
@@ -87,6 +88,10 @@ class NonContiguousNSString : NSString {
     fatalError("don't call this initializer")
   }
 
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")    
+  }
+
   @nonobjc
   init(_ value: [UInt16]) {
     _value = value
@@ -144,7 +149,7 @@ func checkGraphemeClusterSegmentation(
   )
 
   let expectedCharacters: [Character] = Array(subject.characters)
-  checkSliceableWithBidirectionalIndex(expectedCharacters, subject.characters)
+  checkBidirectionalCollection(expectedCharacters, subject.characters)
 }
 
 func checkGraphemeClusterSegmentation(

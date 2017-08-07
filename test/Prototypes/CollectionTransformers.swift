@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
-// Remove XFAIL once rdar://31286125 is resolved.
-// REQUIRES: rdar31286125
 
 // FIXME: This test runs very slowly on watchOS.
 // UNSUPPORTED: OS=watchos
@@ -62,11 +60,11 @@ internal func _splitRandomAccessIndexRange<
 ) -> [Range<C.Index>] {
   let startIndex = range.lowerBound
   let endIndex = range.upperBound
-  let length = elements.distance(from: startIndex, to: endIndex).toIntMax()
+  let length = elements.distance(from: startIndex, to: endIndex)
   if length < 2 {
     return [range]
   }
-  let middle = elements.index(startIndex, offsetBy: C.IndexDistance(length / 2))
+  let middle = elements.index(startIndex, offsetBy: length / 2)
   return [startIndex ..< middle, middle ..< endIndex]
 }
 

@@ -1166,3 +1166,55 @@ bb0(%0 : $Builtin.RawPointer):
   return %6 : $Int
 }
 
+sil @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()
+
+// CHECK-LABEL: sil @test_address_block_args
+// CHECK: bb2({{.*}}):
+// CHECK: apply
+// CHECK: [[L:%.*]] = load
+// CHECK: return [[L]]
+sil @test_address_block_args : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %4 = alloc_stack $Int
+  store %0 to %4 : $*Int
+  cond_br undef, bb1(%4 : $*Int), bb2(%4 : $*Int)
+
+bb1(%a1 : $*Int):
+  br bb2(%a1 : $*Int)
+
+bb2(%a : $*Int):
+  %l1 = load %a : $*Int
+  %60 = function_ref @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()
+  %61 = apply %60(%4, %l1) : $@convention(thin) (@inout Int, Int) -> ()
+  %r = load %a : $*Int
+  dealloc_stack %4 : $*Int
+  return %r : $Int
+} 
+
+// Make sure that the store is forwarded to the load, ie. the load is
+// eliminated. That's correct as the stored value can't be changed by the
+// callee as it's passed with @in_guaranteed.
+sil @test_rle_in_guaranteed_sink : $@convention(thin) (Int) -> ()
+sil @test_rle_in_guaranteed_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+
+// CHECK-LABEL: sil @test_rle_in_guaranteed_entry
+sil @test_rle_in_guaranteed_entry : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %value_raw = integer_literal $Builtin.Int64, 42
+  // CHECK: [[VAL:%.*]] = struct $Int
+  %value = struct $Int (%value_raw : $Builtin.Int64)
+  store %value to %0 : $*Int
+
+  %f_callee = function_ref @test_rle_in_guaranteed_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+  %r1 = apply %f_callee(%0) : $@convention(thin) (@in_guaranteed Int) -> ()
+
+  // CHECK-NOT: load
+  %value_again = load %0 : $*Int
+
+  %f_sink = function_ref @test_rle_in_guaranteed_sink : $@convention(thin) (Int) -> ()
+  // CHECK: ([[VAL]])
+  %r2 = apply %f_sink(%value_again) : $@convention(thin) (Int) -> ()
+
+  %3 = tuple()
+  return %3 : $()
+}

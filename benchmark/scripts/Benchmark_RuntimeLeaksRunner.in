@@ -89,9 +89,15 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
                 "--num-iters={}".format(num_iters), data['test_name']],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             error_out = p.communicate()[1].split("\n")
-        except OSError:
-            print("Child Process Failed! (%s,%s)" % (
+            result = p.returncode
+            if result is None:
+                raise RuntimeError("Expected one line of output")
+            if result != 0:
+                raise RuntimeError("Process segfaulted")
+        except Exception:
+            sys.stderr.write("Child Process Failed! (%s,%s)\n" % (
                 data['path'], data['test_name']))
+            sys.stderr.flush()
             return None
 
         try:
@@ -104,9 +110,10 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
             total_count = d['objc_count'] + d['swift_count']
             return total_count
-        except (KeyError, ValueError):
-            print("Failed parse output! (%s,%s)" %
-                  (data['path'], data['test_name']))
+        except Exception:
+            tmp = (data['path'], data['test_name'])
+            sys.stderr.write("Failed parse output! (%s,%s)\n" % tmp)
+            sys.stderr.flush()
             return None
 
     def process_input(self, data):

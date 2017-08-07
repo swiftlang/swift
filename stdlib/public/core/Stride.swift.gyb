@@ -26,10 +26,7 @@
 public protocol ${Self} : ${Conformance} {
 %   if Self == '_Strideable':
   /// A type that represents the distance between two values of `Self`.
-  associatedtype Stride : SignedNumber
-%   else:
-  /// A type that represents the distance between two values of `Self`.
-  associatedtype Stride
+  associatedtype Stride : SignedNumeric, Comparable
 %   end
 
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
@@ -58,114 +55,71 @@ public protocol ${Self} : ${Conformance} {
 
 % end
 
-/// Compare two `Strideable`s.
-@_inlineable
-public func < <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distance(to: y) > 0
+extension Strideable {
+  @_inlineable
+  public static func < (x: Self, y: Self) -> Bool {
+    return x.distance(to: y) > 0
+  }
+
+  @_inlineable
+  public static func == (x: Self, y: Self) -> Bool {
+    return x.distance(to: y) == 0
+  }
 }
 
-@_inlineable
-public func == <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distance(to: y) == 0
-}
+//===----------------------------------------------------------------------===//
 
-% for Base in ['Strideable', 'SignedInteger']:
-%   deprecated = Base == 'SignedInteger'
-%   # FIXME: technically the deprecation version is incorrect and should be 3.1
-%   #        instead but due to <rdar://problem/29884401> it does not work as
-%   #        expected.
-%   DeprecationVersion = '3.0'
+%{
+  # Strideable used to provide + and - unconditionally. With the updated
+  # collection indexing model of Swift 3 this became unnecessary for integer
+  # types, and was deprecated, as it was a way to write mixed-type arithmetic
+  # expressions, that are otherwise are not allowed.
+}%
+% for Base, VersionInfo in [
+%   ('Strideable where Self : _Pointer', None),
+%   ('Strideable', 'deprecated: 3, obsoleted: 4'),
+%   ]:
+%   Availability = '@available(swift, %s, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")' % (VersionInfo) if VersionInfo else ''
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type addition is deprecated. Please use explicit type conversion.")
-%   end
-@_inlineable
-public func + <T : ${Base}>(lhs: T, rhs: T.Stride) -> T {
-  return lhs.advanced(by: rhs)
-}
+extension ${Base} {
+  @_transparent
+  ${Availability}
+  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: rhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type addition is deprecated. Please use explicit type conversion.")
-%   end
-@_inlineable
-public func + <T : ${Base}>(lhs: T.Stride, rhs: T) -> T {
-  return rhs.advanced(by: lhs)
-}
+  @_transparent
+  ${Availability}
+  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
+    return rhs.advanced(by: lhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type subtraction is deprecated. Please use explicit type conversion.")
-%   end
-@_inlineable
-public func - <T : ${Base}>(lhs: T, rhs: T.Stride) -> T {
-  return lhs.advanced(by: -rhs)
-}
+  @_transparent
+  ${Availability}
+  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: -rhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type subtraction is deprecated. Please use explicit type conversion.")
-%   end
-@_inlineable
-public func - <T : ${Base}>(lhs: T, rhs: T) -> T.Stride {
-  return rhs.distance(to: lhs)
-}
+  @_transparent
+  ${Availability}
+  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
+    return rhs.distance(to: lhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type addition is deprecated. Please use explicit type conversion.")
-%   end
-@_inlineable
-public func += <T : ${Base}>(lhs: inout T, rhs: T.Stride) {
-  lhs = lhs.advanced(by: rhs)
-}
+  @_transparent
+  ${Availability}
+  public static func += (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: rhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type subtraction is deprecated. Please use explicit type conversion.")
-%   end
-@_inlineable
-public func -= <T : ${Base}>(lhs: inout T, rhs: T.Stride) {
-  lhs = lhs.advanced(by: -rhs)
+  @_transparent
+  ${Availability}
+  public static func -= (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: -rhs)
+  }
 }
 
 % end
-
-//===--- Deliberately-ambiguous operators for UnsignedIntegerTypes --------===//
-// The UnsignedIntegerTypes all have a signed Stride type.  Without these     //
-// overloads, expressions such as UInt(2) + Int(3) would compile.             //
-//===----------------------------------------------------------------------===//
-
-public func + <T : UnsignedInteger>(
-  lhs: T, rhs: T._DisallowMixedSignArithmetic
-) -> T {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func + <T : UnsignedInteger>(
-  lhs: T._DisallowMixedSignArithmetic, rhs: T
-) -> T {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func - <T : _DisallowMixedSignArithmetic>(
-  lhs: T, rhs: T._DisallowMixedSignArithmetic
-) -> T {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func - <T : _DisallowMixedSignArithmetic>(
-  lhs: T, rhs: T
-) -> T._DisallowMixedSignArithmetic {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func += <T : UnsignedInteger>(
-  lhs: inout T, rhs: T._DisallowMixedSignArithmetic
-) {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func -= <T : UnsignedInteger>(
-  lhs: inout T, rhs: T._DisallowMixedSignArithmetic
-) {
-  _sanityCheckFailure("Should not be callable.")
-}
 
 //===----------------------------------------------------------------------===//
 
@@ -175,7 +129,7 @@ extension Strideable {
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
   ) -> (index: Int?, value: Self) {
-    return (nil, current.value + distance)
+    return (nil, current.value.advanced(by: distance))
   }
 }
 
@@ -186,12 +140,13 @@ extension Strideable where Stride : FloatingPoint {
     from start: Self, by distance: Self.Stride
   ) -> (index: Int?, value: Self) {
     if let i = current.index {
-      return (i + 1, start + Stride(i + 1) * distance)
+      return (i + 1, start.advanced(by: Stride(i + 1) * distance))
     }
     // If current.index == nil, either we're just starting out (in which case
     // the next index is 1), or we should proceed without an index just as
     // though this floating point specialization doesn't exist.
-    return (current.value == start ? 1 : nil, current.value + distance)
+    return (current.value == start ? 1 : nil,
+            current.value.advanced(by: distance))
   }
 }
 

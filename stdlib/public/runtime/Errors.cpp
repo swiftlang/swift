@@ -46,8 +46,10 @@
 #include <execinfo.h>
 #endif
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
 #include <asl.h>
+#elif defined(__ANDROID__)
+#include <android/log.h>
 #endif
 
 namespace FatalErrorFlags {
@@ -57,8 +59,6 @@ enum: uint32_t {
 } // end namespace FatalErrorFlags
 
 using namespace swift;
-
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 
 static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
@@ -98,9 +98,9 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   return true;
 }
 
-/// This function dumps one line of a stack trace. It is assumed that \p address
-/// is the address of the stack frame at index \p index.
-static void dumpStackTraceEntry(unsigned index, void *framePC) {
+void swift::dumpStackTraceEntry(unsigned index, void *framePC,
+                                bool shortOutput) {
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   SymbolInfo syminfo;
 
   // 0 is failure for lookupSymbol
@@ -120,6 +120,14 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
   uintptr_t symbolAddr = uintptr_t(framePC);
   bool foundSymbol =
       getSymbolNameAddr(libraryName, syminfo, symbolName, symbolAddr);
+  ptrdiff_t offset = 0;
+  if (foundSymbol) {
+    offset = ptrdiff_t(uintptr_t(framePC) - symbolAddr);
+  } else {
+    offset = ptrdiff_t(uintptr_t(framePC) - uintptr_t(syminfo.baseAddress));
+    symbolAddr = uintptr_t(framePC);
+    symbolName = "<unavailable>";
+  }
 
   // We do not use %p here for our pointers since the format is implementation
   // defined. This makes it logically impossible to check the output. Forcing
@@ -128,20 +136,38 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
   // from the base address of where the image containing framePC is mapped.
   // This gives enough info to reconstruct identical debugging target after
   // this process terminates.
-  if (foundSymbol) {
-    static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx %s + %td\n";
-    fprintf(stderr, backtraceEntryFormat, index, libraryName.data(), symbolAddr,
-            symbolName.c_str(), ptrdiff_t(uintptr_t(framePC) - symbolAddr));
+  if (shortOutput) {
+    fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
+            offset);
   } else {
-    static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx "
-                                              "<unavailable> + %td\n";
-    fprintf(stderr, backtraceEntryFormat, index, libraryName.data(),
-            uintptr_t(framePC),
-            ptrdiff_t(uintptr_t(framePC) - uintptr_t(syminfo.baseAddress)));
+    constexpr const char *format = "%-4u %-34s 0x%0.16lx %s + %td\n";
+    fprintf(stderr, format, index, libraryName.data(), symbolAddr,
+            symbolName.c_str(), offset);
   }
+#else
+  if (shortOutput) {
+    fprintf(stderr, "<unavailable>");
+  } else {
+    constexpr const char *format = "%-4u 0x%0.16lx\n";
+    fprintf(stderr, format, index, framePC);
+  }
+#endif
 }
 
+LLVM_ATTRIBUTE_NOINLINE
+void swift::printCurrentBacktrace(unsigned framesToSkip) {
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+  constexpr unsigned maxSupportedStackDepth = 128;
+  void *addrs[maxSupportedStackDepth];
+
+  int symbolCount = backtrace(addrs, maxSupportedStackDepth);
+  for (int i = framesToSkip; i < symbolCount; ++i) {
+    dumpStackTraceEntry(i - framesToSkip, addrs[i]);
+  }
+#else
+  fprintf(stderr, "<backtrace unavailable>\n");
 #endif
+}
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 #include <malloc/malloc.h>
@@ -204,27 +230,44 @@ reportNow(uint32_t flags, const char *message)
 #else
   write(STDERR_FILENO, message, strlen(message));
 #endif
-#ifdef __APPLE__
+#if defined(__APPLE__)
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#elif defined(__ANDROID__)
+  __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {
     fputs("Current stack trace:\n", stderr);
-    constexpr unsigned maxSupportedStackDepth = 128;
-    void *addrs[maxSupportedStackDepth];
-
-    int symbolCount = backtrace(addrs, maxSupportedStackDepth);
-    for (int i = 0; i < symbolCount; ++i) {
-      dumpStackTraceEntry(i, addrs[i]);
-    }
+    printCurrentBacktrace();
   }
 #endif
+}
+
+LLVM_ATTRIBUTE_NOINLINE SWIFT_RUNTIME_EXPORT
+void _swift_runtime_on_report(uintptr_t flags, const char *message,
+                              RuntimeErrorDetails *details) {
+  // Do nothing. This function is meant to be used by the debugger.
+
+  // The following is necessary to avoid calls from being optimized out.
+  asm volatile("" // Do nothing.
+               : // Output list, empty.
+               : "r" (flags), "r" (message), "r" (details) // Input list.
+               : // Clobber list, empty.
+               );
+}
+
+void swift::_swift_reportToDebugger(uintptr_t flags, const char *message,
+                                    RuntimeErrorDetails *details) {
+  _swift_runtime_on_report(flags, message, details);
 }
 
 /// Report a fatal error to system console, stderr, and crash logs.
 /// Does not crash by itself.
 void swift::swift_reportError(uint32_t flags,
                               const char *message) {
+#if defined(__APPLE__) && NDEBUG
+  flags &= ~FatalErrorFlags::ReportBacktrace;
+#endif
   reportNow(flags, message);
   reportOnCrash(flags, message);
 }
@@ -264,6 +307,21 @@ swift::fatalError(uint32_t flags, const char *format, ...)
   abort();
 }
 
+// Report a warning to system console and stderr.
+void
+swift::warning(uint32_t flags, const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+
+  char *log;
+  swift_vasprintf(&log, format, args);
+
+  reportNow(flags, log);
+
+  free(log);
+}
+
 // Crash when a deleted method is called by accident.
 SWIFT_RUNTIME_EXPORT
 LLVM_ATTRIBUTE_NORETURN
@@ -279,6 +337,13 @@ swift_deletedMethodError() {
 void swift::swift_abortRetainOverflow() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
                     "fatal error: object was retained too many times");
+}
+
+// Crash due to an unowned retain count overflow.
+// FIXME: can't pass the object's address from InlineRefCounts without hacks
+void swift::swift_abortUnownedRetainOverflow() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "fatal error: object's unowned reference was retained too many times");
 }
 
 // Crash due to retain of a dead unowned reference.

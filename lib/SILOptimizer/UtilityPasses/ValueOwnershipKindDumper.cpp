@@ -72,7 +72,6 @@ class ValueOwnershipKindDumper : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "Value Ownership Kind Dumper"; }
 };
 
 } // end anonymous namespace

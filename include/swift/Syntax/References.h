@@ -16,14 +16,12 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 
 namespace swift {
-namespace syntax {
 
 /// A shorthand to clearly indicate that a value is a reference counted and
 /// heap-allocated.
 template <typename Inner>
 using RC = llvm::IntrusiveRefCntPtr<Inner>;
 
-} // end namespace syntax
 } // end namespace swift
 
 #endif // SWIFT_SYNTAX_REFERENCES_H

@@ -612,7 +612,7 @@ be simultaneously accessed.  This will interfere with certain
 common idioms for working with arrays, although some cases
 (like concurrently modifying different slices of an array)
 are already quite problematic in Swift.  We believe that we
-can mitigate the majority of the impact here with targetted
+can mitigate the majority of the impact here with targeted
 improvements to the collection APIs.
 
 ## Enforcing the Law of Exclusivity
@@ -1573,6 +1573,8 @@ We can summarize it as follows:
   - Further design work
   - DI enforcement
   - `moveonly` contexts
+
+### Priorities for ABI stability
 
 The single most important goal for the upcoming releases is
 ABI stability.  The prioritization and analysis of these

@@ -6,6 +6,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Boxing.swift
   Calendar.swift
   CharacterSet.swift
+  Codable.swift
   Data.swift
   DataThunks.m
   Date.swift
@@ -17,6 +18,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Foundation.swift
   IndexPath.swift
   IndexSet.swift
+  JSONEncoder.swift
   Locale.swift
   Measurement.swift
   Notification.swift
@@ -29,10 +31,13 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSFastEnumeration.swift
   NSGeometry.swift
   NSIndexSet.swift
-  NSNumber.swift.gyb
+  NSItemProvider.swift
+  NSNumber.swift
+  NSObject.swift
   NSPredicate.swift
   NSRange.swift
   NSSet.swift
+  NSSortDescriptor.swift
   NSString.swift
   NSStringAPI.swift
   NSStringEncodings.swift
@@ -41,29 +46,24 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSURL.swift
   NSValue.swift.gyb
   PersonNameComponents.swift
+  PlistEncoder.swift
+  Progress.swift
   ReferenceConvertible.swift
   String.swift
   TimeZone.swift
-  TypePreservingNSNumber.mm
   URL.swift
   URLComponents.swift
   URLRequest.swift
   UUID.swift
+  CheckClass.mm
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xllvm" "-sil-inline-generics" "-Xllvm" "-sil-partial-specialization"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
-  SWIFT_MODULE_DEPENDS_OSX Darwin CoreGraphics Dispatch IOKit ObjectiveC # auto-updated
-  # CoreGraphics is used by the overlay but not by the Foundation
-  # framework, so we need to add it as a dependency.
-  # The ./utils/find-overlay-dependencies.sh tool only touches the
-  # OSX|IOS|TVOS|WATCHOS lines, so the standalone CoreGraphics lines remain.
-  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch ObjectiveC # auto-updated
-    CoreGraphics
-  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch ObjectiveC # auto-updated
-    CoreGraphics
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin Dispatch ObjectiveC # auto-updated
-    CoreGraphics
+  SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation CoreGraphics Dispatch IOKit ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin CoreFoundation CoreGraphics Dispatch ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreFoundation CoreGraphics Dispatch ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin CoreFoundation CoreGraphics Dispatch ObjectiveC # auto-updated
   FRAMEWORK_DEPENDS Foundation
 
   DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_FOUNDATION_OSX}

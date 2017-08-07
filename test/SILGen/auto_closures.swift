@@ -15,7 +15,7 @@ func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   return x()
 }
 
-// CHECK-LABEL sil @_T013auto_closures05test_A21_closure_with_capture{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T013auto_closures05test_A21_closure_with_capture{{[_0-9a-zA-Z]*}}F
 func test_auto_closure_with_capture(_ x: Bool) -> Bool {
   // CHECK: [[CLOSURE:%.*]] = function_ref @_T013auto_closures05test_A21_closure_with_capture
   // CHECK: [[WITHCAPTURE:%.*]] = partial_apply [[CLOSURE]](
@@ -48,7 +48,7 @@ public class Sub : Base {
   // CHECK: return [[RET]] : $Bool
   // CHECK: }
 
-  // CHECK-LABEL: sil shared [transparent] @_T013auto_closures3SubC1xAA4BoolVfgAFyXKfu_ : $@convention(thin) (@owned Sub) -> Bool {
+  // CHECK-LABEL: sil private [transparent] @_T013auto_closures3SubC1xAA4BoolVfgAFyXKfu_ : $@convention(thin) (@owned Sub) -> Bool {
   // CHECK: [[SUPER:%[0-9]+]] = function_ref @_T013auto_closures4BaseC1xAA4BoolVfg : $@convention(method) (@guaranteed Base) -> Bool
   // CHECK: [[RET:%.*]] = apply [[SUPER]]({{%.*}})
   // CHECK: return [[RET]]
@@ -57,9 +57,9 @@ public class Sub : Base {
 
 // CHECK-LABEL: sil hidden @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtF : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil shared [transparent] @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil private [transparent] @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil shared @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_A2DcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil private @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_A2DcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
 func compareBool(_ lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
 func testBool(_ x: Bool, _ pred: (Bool) -> Bool) -> Bool {

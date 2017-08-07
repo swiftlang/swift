@@ -14,21 +14,33 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// PASS(Id, Name, Description)
-///   The pass is identified by PassKind::Id, and there exists a
-///   global function swift::create##Id().
+/// PASS(Id, Tag, Name)
+///   Id is a pass "identifier", used for its enum case, PassKind::Id,
+///   and type name, as returned by the global function swift::create##Id().
+///
+///   Tag identifies the pass as a command-line compatible option string.
+///
+///   Name is the descriptive, human readable pass name.
+///
+///   All three if these fields are unique identifiers which may be used in test
+///   cases and tools to specify a pass by string. Different tools simply prefer
+///   different identifier formats. Changing any of one these strings may change
+///   the functionality of some tests.
 ///
 ///   This macro must be defined by the includer.
 #ifndef PASS
 #error "Macro must be defined by includer"
 #endif
 
-/// IRGEN_PASS(Id, Name, Description)
-///   The pass is identified by PassKind::Id.
-///   An IRGen pass is created by IRGen and needs to be register with the pass
+/// IRGEN_PASS(Id, Tag, Name)
+///   This macro follows the same conventions as PASS(Id, Tag, Name),
+///   but is used for IRGen passes which are built outside of the
+///   SILOptimizer library.
+///   
+///   An IRGen pass is created by IRGen and needs to be registered with the pass
 ///   manager dynamically.
 #ifndef IRGEN_PASS
-#define IRGEN_PASS(Id, Name, Description) PASS(Id, Name, Description)
+#define IRGEN_PASS(Id, Tag, Name) PASS(Id, Tag, Name)
 #endif
 
 /// PASS_RANGE(RANGE_ID, START, END)
@@ -39,220 +51,228 @@
 #endif
 
 PASS(AADumper, "aa-dump",
-     "Dump AA result for all pairs of ValueKinds in all functions")
+     "Dump Alias Analysis over all Pairs")
 PASS(ABCOpt, "abcopts",
-     "Optimization of array bounds checks")
+     "Array Bounds Check Optimization")
+PASS(AccessEnforcementSelection, "access-enforcement-selection",
+     "Access Enforcement Selection")
+PASS(AccessSummaryDumper, "access-summary-dump",
+     "Dump Address Parameter Access Summary")
+PASS(AccessMarkerElimination, "access-marker-elim",
+     "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
-     "SIL AddressOnly lowering.")
+     "SIL Address Lowering")
 PASS(AllocBoxToStack, "allocbox-to-stack",
-     "Promote heap allocations to stack allocations")
+     "Stack Promotion of Box Objects")
 IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
-           "Hoist generic alloc_stack instructions to the entry block")
+           "SIL alloc_stack Hoisting")
 PASS(ArrayCountPropagation, "array-count-propagation",
-     "Propagate the count of arrays")
+     "Array Count Propagation")
 PASS(ArrayElementPropagation, "array-element-propagation",
-     "Propagate the value of array elements")
+     "Array Element Propagation")
 PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
-     "Assume that code will be executed in a single-threaded environment")
+     "Assume Single-Threaded Environment")
 PASS(BasicInstructionPropertyDumper, "basic-instruction-property-dump",
-     "Dump MemBehavior and ReleaseBehavior results from calling "
-     "SILInstruction::{getMemoryBehavior,getReleasingBehavior}()"
-     " on all instructions")
+     "Print SIL Instruction MemBehavior and ReleaseBehavior Information")
 PASS(BasicCalleePrinter, "basic-callee-printer",
-     "Construct basic callee analysis and use it to print callees "
-     "for testing purposes")
+     "Print Basic Callee Analysis for Testing")
 PASS(CFGPrinter, "view-cfg",
-     "View the CFG of all passed in functions")
+     "View Function CFGs")
 PASS(COWArrayOpts, "cowarray-opt",
-     "COW Array optimizations")
+     "COW Array Optimization")
 PASS(CSE, "cse",
-     "Common subexpression elimination")
+     "Common Subexpression Elimination")
 PASS(CallerAnalysisPrinter, "caller-analysis-printer",
-     "Print callsites of every function in the module")
+     "Print Caller Analysis for Testing")
 PASS(CapturePromotion, "capture-promotion",
-     "Promote captures from by-reference to by-value")
+     "Capture Promotion to Eliminate Escaping Boxes")
 PASS(CapturePropagation, "capture-prop",
      "Captured Constant Propagation")
 PASS(ClosureSpecializer, "closure-specialize",
-     "Specialize functions passed a closure to call the closure directly")
+     "Closure Specialization on Constant Function Arguments")
 PASS(CodeSinking, "code-sinking",
-     "Sinks code closer to users")
+     "Code Sinking")
 PASS(ComputeDominanceInfo, "compute-dominance-info",
-     "Utility pass that computes (post-)dominance info for all functions in "
-     "order to help test dominanceinfo updating")
+     "Compute Dominance Information for Testing")
 PASS(ComputeLoopInfo, "compute-loop-info",
-     "Utility pass that computes loop info for all functions in order to help "
-     "test loop info updating")
+     "Compute Loop Information for Testing")
 PASS(ConditionForwarding, "condition-forwarding",
-     "Forward conditional branch instructions")
+     "Conditional Branch Forwarding to Fold SIL switch_enum")
 PASS(CopyForwarding, "copy-forwarding",
-     "Eliminate redundant copies")
+     "Copy Forwarding to Remove Redundant Copies")
 PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
-     "Dump epilogue retains for return value and releases for arguments")
+     "Print Epilogue retains of Returned Values and Argument releases")
 PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",
-     "Dump epilogue retains for return value and releases for arguments")
+     "Print Epilogue retains of Returned Values and Argument releases")
 PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
-     "Removes redundant overflow checks")
+     "Redundant Overflow Check Removal")
 PASS(DCE, "dce",
-     "Eliminate dead code")
+     "Dead Code Elimination")
 PASS(DeadArgSignatureOpt, "dead-arg-signature-opt",
-     "Create function with removed dead arguments")
+     "Dead Argument Elimination via Function Specialization")
 PASS(DeadFunctionElimination, "sil-deadfuncelim",
-     "Remove unused functions")
+     "Dead Function Elimination")
 PASS(DeadObjectElimination, "deadobject-elim",
-     "Eliminate unused objects that do not have destructors with side effects")
+     "Dead Object Elimination for Classes with Trivial Destruction")
 PASS(DefiniteInitialization, "definite-init",
-     "Definite Initialization")
-PASS(Devirtualizer, "devirtualizer", "Devirtualize indirect calls")
+     "Definite Initialization for Diagnostics")
+PASS(Devirtualizer, "devirtualizer",
+     "Indirect Call Devirtualization")
+PASS(DiagnoseStaticExclusivity, "diagnose-static-exclusivity",
+     "Static Enforcement of Law of Exclusivity")
 PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
-     "Propagate constants and emit diagnostics")
+     "Constants Propagation for Diagnostics")
 PASS(EagerSpecializer, "eager-specializer",
-     "Specialize speculatively and insert dispatch guarded by type checks")
+     "Eager Specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
-     "Code motion without release hoisting")
+     "Early Code Motion without Release Hoisting")
 PASS(EarlyInliner, "early-inline",
-     "Inline functions that are not marked as having special semantics")
+     "Early Inlining Preserving Semantic Functions")
 PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
 PASS(EscapeAnalysisDumper, "escapes-dump",
-     "Dumps the results of escape analysis for all functions")
+     "Dump Escape Analysis Results")
 PASS(ExternalDefsToDecls, "external-defs-to-decls",
-     "Convert external definitions to decls")
+     "External Definition To Declaration Conversion")
 PASS(ExternalFunctionDefinitionsElimination, "external-func-definition-elim",
-     "Eliminate external function definitions")
+     "External Function Definition Elimination")
 PASS(FunctionOrderPrinter, "function-order-printer",
-     "Print function orderings for test purposes")
+     "Print Function Order for Testing")
 PASS(FunctionSignatureOpts, "function-signature-opts",
-     "Create function with optimized signatures")
+     "Function Signature Optimization")
 PASS(ARCSequenceOpts, "arc-sequence-opts",
-     "Optimize sequences of retain/release opts by removing redundant inner "
-     "retain/release sequences")
+     "ARC Sequence Optimization")
 PASS(ARCLoopOpts, "arc-loop-opts",
-     "Run all arc loop passes")
+     "ARC Loop Optimization")
 PASS(RedundantLoadElimination, "redundant-load-elim",
-     "Multiple basic block redundant load elimination")
+     "Redundant Load Elimination")
 PASS(DeadStoreElimination, "dead-store-elim",
-     "Multiple basic block dead store elimination")
+     "Dead Store Elimination")
 PASS(GenericSpecializer, "generic-specializer",
-     "Specialization of generic functions by static types")
+     "Generic Function Specialization on Static Types")
 PASS(GlobalOpt, "global-opt",
-     "Global variable optimizations")
+     "SIL Global Optimization")
 PASS(GlobalPropertyOpt, "global-property-opt",
-     "Optimize properties")
+     "Global Property Optimization")
 PASS(GuaranteedARCOpts, "guaranteed-arc-opts",
-     "Guaranteed ARC optimizations")
+     "Guaranteed ARC Optimization")
 PASS(HighLevelCSE, "high-level-cse",
-     "Common subexpression elimination on High-level SIL")
+     "Common Subexpression Elimination on High-Level SIL")
 PASS(HighLevelLICM, "high-level-licm",
-     "High Level Loop invariant code motion")
+     "Loop Invariant Code Motion in High-Level SIL")
 PASS(IVInfoPrinter, "iv-info-printer",
-     "Display induction variable information")
+     "Print Induction Variable Information for Testing")
 PASS(InstCount, "inst-count",
-     "Count all instructions in the module using llvm Statistics")
+     "Record SIL Instruction, Block, and Function Counts as LLVM Statistics")
 PASS(JumpThreadSimplifyCFG, "simplify-cfg",
-     "Clean up the CFG of SIL functions")
+     "Simplify CFG via Jump Threading")
 PASS(LetPropertiesOpt, "let-properties-opt",
-     "SIL let properties optimization")
+     "Let Property Optimization")
 PASS(LICM, "licm",
-     "Loop invariant code motion")
+     "Loop Invariant Code Motion")
 PASS(LateCodeMotion, "late-codemotion",
-     "Code motion with release hoisting")
+     "Late Code Motion with Release Hoisting")
 PASS(LateInliner, "late-inline",
-     "Run the late inliner")
+     "Late Function Inlining")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
-     "Canonicalize loops")
+     "Loop Canonicalization")
 PASS(LoopInfoPrinter, "loop-info-printer",
-     "Display loop information")
+     "Print Loop Information for Testing")
 PASS(LoopRegionViewText, "loop-region-view-text",
-     "Construct the loop region data structure and dump its contents as text")
+     "Print Loop Region Information for Testing")
 PASS(LoopRegionViewCFG, "loop-region-view-cfg",
-     "Construct the loop region data structure and dump its contents as a pdf cfg")
+     "View Loop Region CFG")
 PASS(LoopRotate, "loop-rotate",
-     "Rotate loops")
+     "Loop Rotation")
 PASS(LoopUnroll, "loop-unroll",
-     "Unroll loops")
+     "Loop Unrolling")
 PASS(LowerAggregateInstrs, "lower-aggregate-instrs",
-     "Lower aggregate instructions to scalar instructions")
+     "Lower Aggregate SIL Instructions to Multiple Scalar Operations")
 PASS(MandatoryInlining, "mandatory-inlining",
-     "Inline transparent functions")
+     "Mandatory Inlining of Transparent Functions")
 PASS(Mem2Reg, "mem2reg",
-     "Promote stack allocations to SSA values")
+     "Memory to SSA Value Conversion to Remove Stack Allocation")
 PASS(MemBehaviorDumper, "mem-behavior-dump",
-     "Dump MemBehavior results from alias analysis for all instruction pairs")
+     "Print SIL Instruction MemBehavior from Alias Analysis over all Pairs")
 PASS(LSLocationPrinter, "lslocation-dump",
-     "Dump LSLocation results from analyzing all accessed locations")
+     "Print Load-Store Location Results Covering all Accesses")
 PASS(MergeCondFails, "merge-cond_fails",
-     "Remove redundant overflow checks")
+     "Merge SIL cond_fail to Eliminate Redundant Overflow Checks")
 PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
-     "Test pass that hoists conditional fails to predecessors blocks when "
-     "profitable")
+     "Move SIL cond_fail by Hoisting Checks")
 PASS(NoReturnFolding, "noreturn-folding",
-     "Add 'unreachable' after noreturn calls")
+     "Prune Control Flow at No-Return Calls Using SIL unreachable")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
-     "Eliminate SIL ownership constructs that are not supported by the whole"
-     " compiler from the IR")
+     "Eliminate Ownership Annotation of SIL")
 PASS(RCIdentityDumper, "rc-id-dumper",
-     "Dump the RCIdentity of all values in a function")
-// TODO: It makes no sense to have early inliner, late inliner, and
-// perf inliner in terms of names.
+     "Print Reference Count Identities")
 PASS(PerfInliner, "inline",
-     "Inline functions which are determined to be less than a pre-set cost")
+     "Performance Function Inlining")
 PASS(PerformanceConstantPropagation, "performance-constant-propagation",
-     "Propagate constants and do not emit diagnostics")
+     "Constant Propagation for Performance without Diagnostics")
 PASS(PredictableMemoryOptimizations, "predictable-memopt",
-     "Predictable early memory optimizations")
+     "Predictable Memory Optimization for Diagnostics")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
-     "Devirtualize release-instructions")
+     "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
-     "Sink retains")
+     "SIL retain Sinking")
 PASS(ReleaseHoisting, "release-hoisting",
-     "Hoist releases")
+     "SIL release Hoisting")
 PASS(LateReleaseHoisting, "late-release-hoisting",
-     "Hoist releases")
+     "Late SIL release Hoisting Preserving Epilogues")
+IRGEN_PASS(LoadableByAddress, "loadable-address",
+     "SIL Large Loadable type by-address lowering.")
 PASS(RemovePins, "remove-pins",
-     "Remove pin/unpin pairs")
+     "Remove SIL pin/unpin pairs")
+PASS(TempRValueOpt, "temp-rvalue-opt",
+     "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
-     "Dumps the results of side-effect analysis for all functions")
+     "Print Side-Effect Information for all Functions")
 PASS(SILCleanup, "cleanup",
-     "Cleanup SIL in preparation for IRGen")
+     "SIL Cleanup Preparation for IRGen")
 PASS(SILCombine, "sil-combine",
-     "Perform small peepholes and combine operations")
+     "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
-     "Write a SIL file for debugging")
+     "Generate Debug Information with Source Locations into Textual SIL")
 PASS(SILLinker, "linker",
-     "Link in all of the serialized SIL referenced in the module")
+     "Link all SIL Referenced within the Module via Deserialization")
 PASS(SROA, "sroa",
-     "SIL scalar replacement of aggregates")
+     "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
-     "SIL scalar replacement of aggregates of bb arguments")
+     "Scalar Replacement of Aggregate SIL Block Arguments")
 PASS(SimplifyBBArgs, "simplify-bb-args",
-     "Simplify basic block arguments")
-// TODO: What should this be called. We are just following what was previously in SILOpt.
+     "SIL Block Argument Simplification")
+// TODO: Rename this command line string.
 PASS(SimplifyCFG, "normal-simplify-cfg",
-     "Clean up the CFG of SIL functions")
+     "SIL CFG Simplification")
 PASS(SpeculativeDevirtualization, "specdevirt",
-     "Speculate targets of virtual calls")
+     "Speculative Devirtualization via Guarded Calls")
 PASS(SplitAllCriticalEdges, "split-critical-edges",
-     "Split all critical edges")
+     "Split all Critical Edges in the SIL CFG")
 PASS(SplitNonCondBrCriticalEdges, "split-non-cond_br-critical-edges",
-     "Split all critical edges that do not involve cond_br")
+     "Split all Critical Edges not from SIL cond_br")
 PASS(StackPromotion, "stack-promotion",
-     "Promote allocated objects on the stack")
+     "Stack Promotion of Class Objects")
 PASS(StripDebugInfo, "strip-debug-info",
-     "Strip debug info")
+     "Strip Debug Information")
 PASS(SwiftArrayOpts, "array-specialize",
-     "Specialize arrays")
+     "Loop Specialization for Array Properties")
 PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
-     "Peephole retain/release removal for regions denoted by "
-     "Builtin.unsafeGuaranteed")
+     "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
-     "Use pre-specialized functions")
+     "Use Pre-Specialized Functions")
 PASS(ValueOwnershipKindDumper, "value-ownership-kind-dumper",
-     "Print the value ownership kind of all ValueBase in a SILModule")
+     "Print Value Ownership Kind for Testing")
+PASS(SemanticARCOpts, "semantic-arc-opts",
+     "Semantic ARC Optimization")
+PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",
+     "Temporary pass for staging in mark_uninitialized changes.")
+PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
+     "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(BugReducerTester, "bug-reducer-tester",
-     "Utility pass for testing sil-bug-reducer. Asserts when visits an apply that calls a specific function")
+     "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)
 
 #undef IRGEN_PASS

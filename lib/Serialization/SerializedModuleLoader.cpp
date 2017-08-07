@@ -232,7 +232,7 @@ FileUnit *SerializedModuleLoader::loadAST(
 
     SmallString<32> versionBuf;
     llvm::raw_svector_ostream versionString(versionBuf);
-    versionString << version::Version::getCurrentLanguageVersion();
+    versionString << Ctx.LangOpts.EffectiveLanguageVersion;
     if (versionString.str() == shortVersion)
       return false;
 
@@ -523,6 +523,12 @@ void SerializedASTFile::lookupValue(ModuleDecl::AccessPathTy accessPath,
 
 TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{
   return File.lookupLocalType(MangledName);
+}
+
+TypeDecl *
+SerializedASTFile::lookupNestedType(Identifier name,
+                                    const NominalTypeDecl *parent) const {
+  return File.lookupNestedType(name, parent);
 }
 
 OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,

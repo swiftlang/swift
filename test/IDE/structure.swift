@@ -184,3 +184,31 @@ class A {
   func perform() {foo(5, animations: {})}
 // CHECK:  <ifunc>func <name>perform()</name> {<call><name>foo</name>(<arg>5</arg>, <arg><name>animations</name>: <brace>{}</brace></arg>)</call>}</ifunc>
 }
+
+// CHECK: <typealias>typealias <name>OtherA</name> = A</typealias>
+typealias OtherA = A
+
+class SubscriptTest {
+  subscript(index: Int) -> Int {
+    return 0
+  }
+  // CHECK: <subscript>subscript(<param>index: Int</param>) -> Int {
+  // CHECK:  return 0
+  // CHECK: }</subscript>
+
+  subscript(string: String) -> Int {
+    get {
+      return 0
+    }
+    set(value) {
+      print(value)
+    }
+  }
+  // CHECK: <subscript>subscript(<param>string: String</param>) -> Int {
+  // CHECK: get {
+  // CHECK:   return 0
+  // CHECK: }
+  // CHECK: set(<param>value</param>) {
+  // CHECK:   <call><name>print</name>(value)</call>
+  // CHECK: }</subscript>
+}

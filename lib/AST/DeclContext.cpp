@@ -20,6 +20,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
@@ -60,17 +61,10 @@ DeclContext::getAsTypeOrTypeExtensionContext() const {
     auto ED = cast<ExtensionDecl>(this);
     auto type = ED->getExtendedType();
 
-    if (type.isNull() || type->hasError())
+    if (!type)
       return nullptr;
 
-    if (auto ND = type->getNominalOrBoundGenericNominal())
-      return ND;
-
-    if (auto unbound = dyn_cast<UnboundGenericType>(type.getPointer())) {
-      return unbound->getDecl();
-    }
-
-    return nullptr;
+    return type->getAnyNominal();
   }
 
   case DeclContextKind::GenericTypeDecl:
@@ -111,14 +105,6 @@ ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   assert(getAsProtocolOrProtocolExtensionContext() && "not a protocol");
 
-  // FIXME: This comes up when the extension didn't resolve,
-  // and we have a protocol nested inside that extension
-  // (which is not allowed in the first place).
-  //
-  // Handle this more systematically elsewhere.
-  if (!isInnermostContextGeneric())
-    return nullptr;
-
   return getGenericParamsOfContext()->getParams().front()
       ->getDeclaredInterfaceType()
       ->castTo<GenericTypeParamType>();
@@ -139,8 +125,9 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
   }
 
   if (type->is<UnboundGenericType>()) {
-    ED->getASTContext().getLazyResolver()->resolveExtension(
-      const_cast<ExtensionDecl *>(ED));
+    auto *resolver = ED->getASTContext().getLazyResolver();
+    assert(resolver && "Too late to resolve extensions");
+    resolver->resolveExtension(const_cast<ExtensionDecl *>(ED));
     type = ED->getExtendedType();
   }
 
@@ -285,6 +272,37 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
   }
 }
 
+bool DeclContext::contextHasLazyGenericEnvironment() const {
+  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
+    switch (dc->getContextKind()) {
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+    case DeclContextKind::TopLevelCodeDecl:
+      return false;
+
+    case DeclContextKind::Initializer:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::AbstractClosureExpr:
+      // Closures and initializers can't themselves be generic, but they
+      // can occur in generic contexts.
+      continue;
+
+    case DeclContextKind::SubscriptDecl:
+      return cast<SubscriptDecl>(dc)->hasLazyGenericEnvironment();
+
+    case DeclContextKind::AbstractFunctionDecl:
+      return cast<AbstractFunctionDecl>(dc)->hasLazyGenericEnvironment();
+
+    case DeclContextKind::GenericTypeDecl:
+      return cast<GenericTypeDecl>(dc)->hasLazyGenericEnvironment();
+
+    case DeclContextKind::ExtensionDecl:
+      return cast<ExtensionDecl>(dc)->hasLazyGenericEnvironment();
+    }
+    llvm_unreachable("bad DeclContextKind");
+  }
+}
+
 Type DeclContext::mapTypeIntoContext(Type type) const {
   return GenericEnvironment::mapTypeIntoContext(
       getGenericEnvironmentOfContext(), type);
@@ -405,6 +423,22 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
   return nullptr;
 }
 
+DeclContext *DeclContext::getParentForLookup() const {
+  if (isa<ProtocolDecl>(this) || isa<ExtensionDecl>(this)) {
+    // If we are inside a protocol or an extension, skip directly
+    // to the module scope context, without looking at any (invalid)
+    // outer types.
+    return getModuleScopeContext();
+  }
+  if (isa<NominalTypeDecl>(this)) {
+    // If we are inside a nominal type that is inside a protocol,
+    // skip the protocol.
+    if (isa<ProtocolDecl>(getParent()))
+      return getModuleScopeContext();
+  }
+  return getParent();
+}
+
 ModuleDecl *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())
@@ -501,7 +535,8 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
 
       // If the function is not externally visible, we will not be serializing
       // its body.
-      if (AFD->getEffectiveAccess() < Accessibility::Public)
+      if (!AFD->getFormalAccessScope(/*useDC=*/nullptr,
+                                     /*respectVersionedAttr=*/true).isPublic())
         break;
 
       // Bodies of public transparent and always-inline functions are
@@ -613,6 +648,30 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   return getParent()->isCascadingContextForLookup(true);
 }
 
+unsigned DeclContext::getSyntacticDepth() const {
+  // Module scope == depth 0.
+  if (isModuleScopeContext())
+    return 0;
+
+  return 1 + getParent()->getSyntacticDepth();
+}
+
+unsigned DeclContext::getSemanticDepth() const {
+  // For extensions, count the depth of the nominal type being extended.
+  if (auto ext = dyn_cast<ExtensionDecl>(this)) {
+    if (auto nominal = getAsNominalTypeOrNominalTypeExtensionContext())
+      return nominal->getSemanticDepth();
+
+    return 1;
+  }
+
+  // Module scope == depth 0.
+  if (isModuleScopeContext())
+    return 0;
+
+  return 1 + getParent()->getSemanticDepth();
+}
+
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
   case DeclContextKind::Module:
@@ -708,7 +767,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     break;
   case DeclContextKind::SubscriptDecl:    Kind = "SubscriptDecl"; break;
   }
-  OS.indent(Depth*2 + indent) << "0x" << (void*)this << " " << Kind;
+  OS.indent(Depth*2 + indent) << (void*)this << " " << Kind;
 
   switch (getContextKind()) {
   case DeclContextKind::Module:
@@ -747,7 +806,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     break;
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    OS << " name=" << AFD->getName();
+    OS << " name=" << AFD->getFullName();
     if (AFD->hasInterfaceType())
       OS << " : " << AFD->getInterfaceType();
     else
@@ -756,7 +815,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   }
   case DeclContextKind::SubscriptDecl: {
     auto *SD = cast<SubscriptDecl>(this);
-    OS << " name=" << SD->getName();
+    OS << " name=" << SD->getBaseName();
     if (SD->hasInterfaceType())
       OS << " : " << SD->getInterfaceType();
     else
@@ -888,6 +947,11 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 
   ++NumLazyIterableDeclContexts;
   ++NumUnloadedLazyIterableDeclContexts;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (ctx.Stats) {
+    ++ctx.Stats->getFrontendCounters().NumLazyIterableDeclContexts;
+    ++ctx.Stats->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
+  }
 }
 
 void IterableDeclContext::loadAllMembers() const {
@@ -915,6 +979,9 @@ void IterableDeclContext::loadAllMembers() const {
                                       contextInfo->memberData);
 
   --NumUnloadedLazyIterableDeclContexts;
+  // FIXME: (transitional) decrement the redundant "always-on" counter.
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumUnloadedLazyIterableDeclContexts--;
 }
 
 bool IterableDeclContext::classof(const Decl *D) {
@@ -947,8 +1014,38 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
+/// Return the DeclContext to compare when checking private access in
+/// Swift 4 mode. The context returned is the type declaration if the context
+/// and the type declaration are in the same file, otherwise it is the types
+/// last extension in the source file. If the context does not refer to a
+/// declaration or extension, the supplied context is returned.
+static const DeclContext *
+getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
+  auto NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!NTD)
+    return DC;
+
+  // use the type declaration as the private scope if it is in the same
+  // file as useSF. This occurs for both extensions and declarations.
+  if (NTD->getParentSourceFile() == useSF)
+    return NTD;
+
+  // Otherwise use the last extension declaration in the same file.
+  const DeclContext *lastExtension = nullptr;
+  for (ExtensionDecl *ED : NTD->getExtensions())
+    if (ED->getParentSourceFile() == useSF)
+      lastExtension = ED;
+
+  // If there's no last extension, return the supplied context.
+  return lastExtension ? lastExtension : DC;
+}
+
 AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
     : Value(DC, isPrivate) {
+  if (isPrivate) {
+    DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
+    Value.setPointer(DC);
+  }
   if (!DC || isa<ModuleDecl>(DC))
     assert(!isPrivate && "public or internal scope can't be private");
 }
@@ -968,4 +1065,42 @@ Accessibility AccessScope::accessibilityForDiagnostics() const {
   }
 
   return Accessibility::Private;
+}
+
+bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
+  // Check the lexical scope.
+  if (useDC->isChildContextOf(sourceDC))
+    return true;
+
+  // Only check lexical scope in Swift 3 mode
+  if (useDC->getASTContext().isSwiftVersion3())
+    return false;
+
+  // Do not allow access if the sourceDC is in a different file
+  auto useSF = useDC->getParentSourceFile();
+  if (useSF != sourceDC->getParentSourceFile())
+    return false;
+
+  // Do not allow access if the sourceDC does not represent a type.
+  auto sourceNTD = sourceDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!sourceNTD)
+    return false;
+
+  // Compare the private scopes and iterate over the parent types.
+  sourceDC = getPrivateDeclContext(sourceDC, useSF);
+  while (!useDC->isModuleContext()) {
+    useDC = getPrivateDeclContext(useDC, useSF);
+    if (useDC == sourceDC)
+      return true;
+
+    // Get the parent type. If the context represents a type, look at the types
+    // declaring context instead of the contexts parent. This will crawl up
+    // the type hierarchy in nested extensions correctly.
+    if (auto NTD = useDC->getAsNominalTypeOrNominalTypeExtensionContext())
+      useDC = NTD->getDeclContext();
+    else
+      useDC = useDC->getParent();
+  }
+
+  return false;
 }

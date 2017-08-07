@@ -69,12 +69,14 @@ public struct DispatchTime : Comparable {
 	}
 }
 
-public func <(a: DispatchTime, b: DispatchTime) -> Bool {
-	return a.rawValue < b.rawValue
-}
+extension DispatchTime {
+  public static func < (a: DispatchTime, b: DispatchTime) -> Bool {
+    return a.rawValue < b.rawValue
+  }
 
-public func ==(a: DispatchTime, b: DispatchTime) -> Bool {
-	return a.rawValue == b.rawValue
+  public static func ==(a: DispatchTime, b: DispatchTime) -> Bool {
+    return a.rawValue == b.rawValue
+  }
 }
 
 public struct DispatchWallTime : Comparable {
@@ -96,24 +98,29 @@ public struct DispatchWallTime : Comparable {
 	}
 }
 
-public func <(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
-	if b.rawValue == ~0 {
-		return a.rawValue != ~0
-	} else if a.rawValue == ~0 {
-		return false
-	}
-	return -Int64(bitPattern: a.rawValue) < -Int64(bitPattern: b.rawValue)
+extension DispatchWallTime {
+  public static func <(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
+    let negativeOne: dispatch_time_t = ~0
+    if b.rawValue == negativeOne {
+      return a.rawValue != negativeOne
+    } else if a.rawValue == negativeOne {
+      return false
+    }
+    return -Int64(bitPattern: a.rawValue) < -Int64(bitPattern: b.rawValue)
+  }
+
+  public static func ==(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
+    return a.rawValue == b.rawValue
+  }
 }
 
-public func ==(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
-	return a.rawValue == b.rawValue
-}
-
-public enum DispatchTimeInterval {
+public enum DispatchTimeInterval : Equatable {
 	case seconds(Int)
 	case milliseconds(Int)
 	case microseconds(Int)
 	case nanoseconds(Int)
+	@_downgrade_exhaustivity_check
+	case never
 
 	internal var rawValue: Int64 {
 		switch self {
@@ -121,6 +128,16 @@ public enum DispatchTimeInterval {
 		case .milliseconds(let ms): return Int64(ms) * Int64(NSEC_PER_MSEC)
 		case .microseconds(let us): return Int64(us) * Int64(NSEC_PER_USEC)
 		case .nanoseconds(let ns): return Int64(ns)
+		case .never: return Int64.max
+		}
+	}
+
+	public static func ==(lhs: DispatchTimeInterval, rhs: DispatchTimeInterval) -> Bool {
+		switch (lhs, rhs) {
+		case (.never, .never): return true
+		case (.never, _): return false
+		case (_, .never): return false
+		default: return lhs.rawValue == rhs.rawValue
 		}
 	}
 }

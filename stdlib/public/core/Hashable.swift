@@ -14,7 +14,7 @@
 ///
 /// You can use any type that conforms to the `Hashable` protocol in a set or
 /// as a dictionary key. Many types in the standard library conform to
-/// `Hashable`: strings, integers, floating-point and Boolean values, and even
+/// `Hashable`: Strings, integers, floating-point and Boolean values, and even
 /// sets provide a hash value by default. Your own custom types can be
 /// hashable as well. When you define an enumeration without associated
 /// values, it gains `Hashable` conformance automatically, and you can add
@@ -23,12 +23,12 @@
 ///
 /// A hash value, provided by a type's `hashValue` property, is an integer that
 /// is the same for any two instances that compare equally. That is, for two
-/// instances `a` and `b` of the same type, if `a == b` then
+/// instances `a` and `b` of the same type, if `a == b`, then
 /// `a.hashValue == b.hashValue`. The reverse is not true: Two instances with
 /// equal hash values are not necessarily equal to each other.
 ///
 /// - Important: Hash values are not guaranteed to be equal across different
-///   executions of your program. Do not save hash values to use during a
+///   executions of your program. Do not save hash values to use in a
 ///   future execution.
 ///
 /// Conforming to the Hashable Protocol
@@ -56,7 +56,7 @@
 ///
 ///     extension GridPoint: Hashable {
 ///         var hashValue: Int {
-///             return x.hashValue ^ y.hashValue
+///             return x.hashValue ^ y.hashValue &* 16777619
 ///         }
 ///
 ///         static func == (lhs: GridPoint, rhs: GridPoint) -> Bool {
@@ -64,12 +64,16 @@
 ///         }
 ///     }
 ///
-/// The `hashValue` property in this example combines the hash values of a grid
-/// point's `x` and `y` values using the bitwise XOR operator (`^`). The `^`
-/// operator is one way to combine two integer values into a single value.
+/// The `hashValue` property in this example combines the hash value of a grid
+/// point's `x` property with the hash value of its `y` property multiplied by
+/// a prime constant.
 ///
-/// - Note: Set and dictionary performance depends on hash values that minimize
-///   collisions for their associated element and key types, respectively.
+/// - Note: The above example above is a reasonably good hash function for a
+///   simple type. If you're writing a hash function for a custom type, choose
+///   a hashing algorithm that is appropriate for the kinds of data your type
+///   comprises. Set and dictionary performance depends on hash values that
+///   minimize collisions for their associated element and key types,
+///   respectively.
 ///
 /// Now that `GridPoint` conforms to the `Hashable` protocol, you can create a
 /// set of previously tapped grid points.

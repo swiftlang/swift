@@ -17,17 +17,18 @@
 #include "GenArchetype.h"
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Types.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "EnumPayload.h"
 #include "Explosion.h"
@@ -43,7 +44,6 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Linking.h"
 #include "ProtocolInfo.h"
 #include "ResilientTypeInfo.h"
 #include "TypeInfo.h"
@@ -277,32 +277,28 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   assert(isExemplarArchetype(archetype) && "lowering non-exemplary archetype");
 
-  LayoutConstraint LayoutInfo = archetype->getLayoutConstraint();
+  auto layout = archetype->getLayoutConstraint();
 
   // If the archetype is class-constrained, use a class pointer
   // representation.
   if (archetype->requiresClass() ||
-      (LayoutInfo && LayoutInfo->isRefCounted())) {
-    ReferenceCounting refcount;
-    llvm::PointerType *reprTy;
+      (layout && layout->isRefCounted())) {
+    auto refcount = getReferenceCountingForType(IGM, CanType(archetype));
 
-    if (!IGM.ObjCInterop) {
-      refcount = ReferenceCounting::Native;
-      reprTy = IGM.RefCountedPtrTy;
-    } else {
-      refcount = ReferenceCounting::Unknown;
-      reprTy = IGM.UnknownRefCountedPtrTy;
-    }
+    llvm::PointerType *reprTy;
 
     // If the archetype has a superclass constraint, it has at least the
     // retain semantics of its superclass, and it can be represented with
     // the supertype's pointer type.
-    if (Type super = archetype->getSuperclass()) {
-      ClassDecl *superClass = super->getClassOrBoundGenericClass();
-      refcount = getReferenceCountingForClass(IGM, superClass);
-
+    if (auto super = archetype->getSuperclass()) {
       auto &superTI = IGM.getTypeInfoForUnlowered(super);
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
+    } else {
+      if (refcount == ReferenceCounting::Native) {
+        reprTy = IGM.RefCountedPtrTy;
+      } else {
+        reprTy = IGM.UnknownRefCountedPtrTy;
+      }
     }
 
     // As a hack, assume class archetypes never have spare bits. There's a
@@ -320,9 +316,9 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
 
   // If the archetype is trivial fixed-size layout-constrained, use a fixed size
   // representation.
-  if (LayoutInfo && LayoutInfo->isFixedSizeTrivial()) {
-    Size size(LayoutInfo->getTrivialSizeInBytes());
-    Alignment align(LayoutInfo->getTrivialSizeInBytes());
+  if (layout && layout->isFixedSizeTrivial()) {
+    Size size(layout->getTrivialSizeInBytes());
+    Alignment align(layout->getTrivialSizeInBytes());
     auto spareBits =
       SpareBitVector::getConstant(size.getValueInBits(), false);
     // Get an integer type of the required size.
@@ -336,7 +332,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // If the archetype is a trivial layout-constrained, use a POD
   // representation. This type is not loadable, but it is known
   // to be a POD.
-  if (LayoutInfo && LayoutInfo->isAddressOnlyTrivial()) {
+  if (layout && layout->isAddressOnlyTrivial()) {
     // TODO: Create NonFixedSizeArchetypeTypeInfo and return it.
   }
 

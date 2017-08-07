@@ -62,9 +62,9 @@ func checkCorrectness() {
   InverseWalshTransform(&data)
   for i in 0..<In.count {
     // Check encode.
-    CheckResults(abs(data[i] - In[i]) < 0.0001, "Incorrect results in Walsh.")
+    CheckResults(abs(data[i] - In[i]) < 0.0001)
     // Check decode.
-    CheckResults(abs(mid[i] - Out[i]) < 0.0001, "Incorrect results in Walsh.")
+    CheckResults(abs(mid[i] - Out[i]) < 0.0001)
   }
 }
 

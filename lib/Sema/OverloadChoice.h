@@ -27,7 +27,6 @@
 
 namespace swift {
 
-class TypeDecl;
 class ValueDecl;
 
 namespace constraints {
@@ -42,13 +41,12 @@ enum class OverloadChoiceKind : int {
   /// found via dynamic lookup and, therefore, might not actually be
   /// available at runtime.
   DeclViaDynamic,
-  /// \brief The overload choice selects a particular declaration from a
-  /// set of declarations and treats it as a type.
-  TypeDecl,
   /// \brief The overload choice equates the member type with the
   /// base type. Used for unresolved member expressions like ".none" that
   /// refer to enum members with unit type.
   BaseType,
+  /// \brief The overload choice selects a key path subscripting operation.
+  KeyPathApplication,
   /// \brief The overload choice indexes into a tuple. Index zero will
   /// have the value of this enumerator, index one will have the value of this
   /// enumerator + 1, and so on. Thus, this enumerator must always be last.
@@ -67,8 +65,6 @@ enum class OverloadChoiceKind : int {
 /// 
 class OverloadChoice {
   enum : unsigned {
-    /// Indicates whether this overload was immediately specialized.
-    IsSpecializedBit = 0x01,
     /// Indicates whether this declaration was bridged, turning a
     /// "Decl" kind into "DeclViaBridge" kind.
     IsBridgedBit = 0x02,
@@ -83,9 +79,7 @@ class OverloadChoice {
   };
 
   /// \brief The base type to be used when referencing the declaration
-  /// along with two bits: the low bit indicates whether this overload
-  /// was immediately specialized and the second lowest bit indicates
-  /// whether the declaration was bridged.
+  /// along with the two bits above.
   llvm::PointerIntPair<Type, 3, unsigned> BaseAndBits;
 
   /// \brief Either the declaration pointer (if the low bit is clear) or the
@@ -98,28 +92,18 @@ class OverloadChoice {
 
 public:
   OverloadChoice()
-    : BaseAndBits(nullptr, 0), DeclOrKind(),
+    : BaseAndBits(nullptr, 0), DeclOrKind(0),
       TheFunctionRefKind(FunctionRefKind::Unapplied) {}
 
-  OverloadChoice(Type base, ValueDecl *value, bool isSpecialized,
+  OverloadChoice(Type base, ValueDecl *value,
                  FunctionRefKind functionRefKind)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
+    : BaseAndBits(base, 0),
       TheFunctionRefKind(functionRefKind) {
     assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
     
     DeclOrKind = reinterpret_cast<uintptr_t>(value);
-  }
-  
-  OverloadChoice(Type base, TypeDecl *type, bool isSpecialized,
-                 FunctionRefKind functionRefKind)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
-      TheFunctionRefKind(functionRefKind) {
-    assert(!base || !base->hasTypeParameter());
-    assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
-           && "Badly aligned decl");
-    DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
   }
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
@@ -130,7 +114,6 @@ public:
     assert(!base->hasTypeParameter());
     assert(kind != OverloadChoiceKind::Decl &&
            kind != OverloadChoiceKind::DeclViaDynamic &&
-           kind != OverloadChoiceKind::TypeDecl &&
            kind != OverloadChoiceKind::DeclViaBridge &&
            kind != OverloadChoiceKind::DeclViaUnwrappedOptional &&
            "wrong constructor for decl");
@@ -143,6 +126,13 @@ public:
                     | (uintptr_t)0x03),
         TheFunctionRefKind(FunctionRefKind::Unapplied) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
+  }
+
+  bool isInvalid() const {
+    return BaseAndBits.getPointer().isNull()
+      && BaseAndBits.getInt() == 0
+      && DeclOrKind == 0
+      && TheFunctionRefKind == FunctionRefKind::Unapplied;
   }
 
   /// Retrieve an overload choice for a declaration that was found via
@@ -184,14 +174,6 @@ public:
 
   /// \brief Retrieve the base type used to refer to the declaration.
   Type getBaseType() const { return BaseAndBits.getPointer(); }
-
-  /// \brief Determine whether the referenced declaration was immediately
-  /// specialized with <...>.
-  ///
-  /// This value only has meaning when there is no base type.
-  bool isSpecialized() const { 
-    return BaseAndBits.getInt() & IsSpecializedBit;
-  }
   
   /// \brief Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
@@ -204,7 +186,6 @@ public:
 
       return OverloadChoiceKind::Decl;
       
-    case 0x01: return OverloadChoiceKind::TypeDecl;
     case 0x02: return OverloadChoiceKind::DeclViaDynamic;
     case 0x03: {
       uintptr_t value = DeclOrKind >> 2;
@@ -223,13 +204,13 @@ public:
     switch (getKind()) {
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
-    case OverloadChoiceKind::TypeDecl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
       return true;
 
     case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::KeyPathApplication:
       return false;
     }
 
@@ -241,6 +222,9 @@ public:
     assert(isDecl() && "Not a declaration");
     return reinterpret_cast<ValueDecl *>(DeclOrKind & ~(uintptr_t)0x03);
   }
+  
+  /// Get the name of the overload choice.
+  DeclName getName() const;
 
   /// \brief Retrieve the tuple index that corresponds to this overload
   /// choice.

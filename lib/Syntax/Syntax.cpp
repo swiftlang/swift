@@ -16,9 +16,6 @@
 using namespace swift;
 using namespace swift::syntax;
 
-Syntax::Syntax(const RC<SyntaxData> Root, const SyntaxData *Data)
-  : Root(Root), Data(Data) {}
-
 RC<RawSyntax> Syntax::getRaw() const {
   return Data->getRaw();
 }
@@ -55,7 +52,56 @@ bool Syntax::isExpr() const {
   return Data->isExpr();
 }
 
+bool Syntax::isPattern() const {
+  return Data->isPattern();
+}
+
 bool Syntax::isUnknown() const {
   return Data->isUnknown();
 }
 
+bool Syntax::isPresent() const {
+  return getRaw()->isPresent();
+}
+
+bool Syntax::isMissing() const {
+  return getRaw()->isMissing();
+}
+
+llvm::Optional<Syntax> Syntax::getParent() const {
+  auto ParentData = getData().Parent;
+  if (ParentData == nullptr) return llvm::None;
+  return llvm::Optional<Syntax> {
+    Syntax { Root, ParentData }
+  };
+}
+
+size_t Syntax::getNumChildren() const {
+  size_t NonTokenChildren = 0;
+  for (auto Child : getRaw()->Layout) {
+    if (!Child->isToken()) {
+      ++NonTokenChildren;
+    }
+  }
+  return NonTokenChildren;
+}
+
+Syntax Syntax::getChild(const size_t N) const {
+  // The actual index of the Nth non-token child.
+  size_t ActualIndex = 0;
+  // The number of non-token children we've seen.
+  size_t NumNonTokenSeen = 0;
+  for (auto Child : getRaw()->Layout) {
+    // If we see a child that's not a token, count it.
+    if (!Child->isToken()) {
+      ++NumNonTokenSeen;
+    }
+    // If the number of children we've seen indexes the same (count - 1) as
+    // the number we're looking for, then we're done.
+    if (NumNonTokenSeen == N + 1) { break; }
+
+    // Otherwise increment the actual index and keep searching.
+    ++ActualIndex;
+  }
+  return Syntax { Root, Data->getChild(ActualIndex).get() };
+}

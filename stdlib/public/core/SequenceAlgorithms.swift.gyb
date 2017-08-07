@@ -12,10 +12,6 @@
 
 %{
 
-# We know we will eventually get a Sequence.Element type.  Define
-# a shorthand that we can use today.
-GElement = "Iterator.Element"
-
 orderingExplanation = """\
   /// The predicate must be a *strict weak ordering* over the elements. That
   /// is, for any elements `a`, `b`, and `c`, the following conditions must
@@ -56,7 +52,7 @@ extension Sequence {
   /// This example enumerates the characters of the string "Swift" and prints
   /// each character along with its place in the string.
   ///
-  ///     for (n, c) in "Swift".characters.enumerated() {
+  ///     for (n, c) in "Swift".enumerated() {
   ///         print("\(n): '\(c)'")
   ///     }
   ///     // Prints "0: 'S'"
@@ -65,21 +61,21 @@ extension Sequence {
   ///     // Prints "3: 'f'"
   ///     // Prints "4: 't'"
   ///
-  /// When enumerating a collection, the integer part of each pair is a counter
-  /// for the enumeration, not necessarily the index of the paired value.
-  /// These counters can only be used as indices in instances of zero-based,
+  /// When you enumerate a collection, the integer part of each pair is a counter
+  /// for the enumeration, but is not necessarily the index of the paired value.
+  /// These counters can be used as indices only in instances of zero-based,
   /// integer-indexed collections, such as `Array` and `ContiguousArray`. For
   /// other collections the counters may be out of range or of the wrong type
   /// to use as an index. To iterate over the elements of a collection with its
   /// indices, use the `zip(_:_:)` function.
   ///
   /// This example iterates over the indices and elements of a set, building a
-  /// list of indices of names with five or fewer letters.
+  /// list consisting of indices of names with five or fewer letters.
   ///
   ///     let names: Set = ["Sofia", "Camilla", "Martina", "Mateo", "Nicolás"]
   ///     var shorterIndices: [SetIndex<String>] = []
   ///     for (i, name) in zip(names.indices, names) {
-  ///         if name.characters.count <= 5 {
+  ///         if name.count <= 5 {
   ///             shorterIndices.append(i)
   ///         }
   ///     }
@@ -110,7 +106,7 @@ extension Sequence {
 % for preds in [True, False]:
 %   rethrows_ = "rethrows " if preds else ""
 
-extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
+extension Sequence ${"" if preds else "where Element : Comparable"} {
 
 %   if preds:
   /// Returns the minimum element in the sequence, using the given predicate as
@@ -131,8 +127,6 @@ ${orderingExplanation}
   /// - Returns: The sequence's minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns
   ///   `nil`.
-  ///
-  /// - SeeAlso: `min()`
 %   else:
   /// Returns the minimum element in the sequence.
   ///
@@ -145,16 +139,14 @@ ${orderingExplanation}
   ///
   /// - Returns: The sequence's minimum element. If the sequence has no
   ///   elements, returns `nil`.
-  ///
-  /// - SeeAlso: `min(by:)`
 %   end
   @_inlineable
   @warn_unqualified_access
   public func min(
 %   if preds:
-    by areInIncreasingOrder: (${GElement}, ${GElement}) throws -> Bool
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
 %   end
-  ) ${rethrows_}-> ${GElement}? {
+  ) ${rethrows_}-> Element? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
     for e in IteratorSequence(it) {
@@ -185,8 +177,6 @@ ${orderingExplanation}
   ///   otherwise, `false`.
   /// - Returns: The sequence's maximum element if the sequence is not empty;
   ///   otherwise, `nil`.
-  ///
-  /// - SeeAlso: `max()`
 %   else:
   /// Returns the maximum element in the sequence.
   ///
@@ -199,16 +189,14 @@ ${orderingExplanation}
   ///
   /// - Returns: The sequence's maximum element. If the sequence has no
   ///   elements, returns `nil`.
-  ///
-  /// - SeeAlso: `max(by:)`
 %   end
   @_inlineable
   @warn_unqualified_access
   public func max(
 %   if preds:
-    by areInIncreasingOrder: (${GElement}, ${GElement}) throws -> Bool
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
 %   end
-  ) ${rethrows_}-> ${GElement}? {
+  ) ${rethrows_}-> Element? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
     for e in IteratorSequence(it) {
@@ -233,7 +221,7 @@ ${orderingExplanation}
 % for preds in [True, False]:
 %   rethrows_ = "rethrows " if preds else ""
 
-extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
+extension Sequence ${"" if preds else "where Element : Equatable"} {
 
 %   if preds:
   /// Returns a Boolean value indicating whether the initial elements of the
@@ -248,8 +236,6 @@ ${equivalenceExplanation}
   /// - Returns: `true` if the initial elements of the sequence are equivalent
   ///   to the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-  ///
-  /// - SeeAlso: `starts(with:)`
 %   else:
   /// Returns a Boolean value indicating whether the initial elements of the
   /// sequence are the same as the elements in another sequence.
@@ -273,19 +259,17 @@ ${equivalenceExplanation}
   /// - Returns: `true` if the initial elements of the sequence are the same as
   ///   the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-  ///
-  /// - SeeAlso: `starts(with:by:)`
 %   end
   @_inlineable
   public func starts<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
-    by areEquivalent: (${GElement}, ${GElement}) throws -> Bool
+    by areEquivalent: (Element, Element) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
     PossiblePrefix : Sequence,
-    PossiblePrefix.${GElement} == ${GElement} {
+    PossiblePrefix.Element == Element {
 
     var possiblePrefixIterator = possiblePrefix.makeIterator()
     for e0 in self {
@@ -313,12 +297,12 @@ ${equivalenceExplanation}
 % for preds in [True, False]:
 %   rethrows_ = "rethrows " if preds else ""
 
-extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
+extension Sequence ${"" if preds else "where Element : Equatable"} {
 
 %   if preds:
   /// Returns a Boolean value indicating whether this sequence and another
-  /// sequence contain equivalent elements, using the given predicate as the
-  /// equivalence test.
+  /// sequence contain equivalent elements in the same order, using the given
+  /// predicate as the equivalence test.
   ///
   /// At least one of the sequences must be finite.
   ///
@@ -329,8 +313,6 @@ ${equivalenceExplanation}
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if this sequence and `other` contain equivalent items,
   ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
-  ///
-  /// - SeeAlso: `elementsEqual(_:)`
 %   else:
   /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain the same elements in the same order.
@@ -351,19 +333,17 @@ ${equivalenceExplanation}
   /// - Parameter other: A sequence to compare to this sequence.
   /// - Returns: `true` if this sequence and `other` contain the same elements
   ///   in the same order.
-  ///
-  /// - SeeAlso: `elementsEqual(_:by:)`
 %   end
   @_inlineable
   public func elementsEqual<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    by areEquivalent: (${GElement}, ${GElement}) throws -> Bool
+    by areEquivalent: (Element, Element) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
     OtherSequence: Sequence,
-    OtherSequence.${GElement} == ${GElement} {
+    OtherSequence.Element == Element {
 
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
@@ -394,7 +374,7 @@ ${equivalenceExplanation}
 % for preds in [True, False]:
 %   rethrows_ = "rethrows " if preds else ""
 
-extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
+extension Sequence ${"" if preds else "where Element : Comparable"} {
 
 %   if preds:
   /// Returns a Boolean value indicating whether the sequence precedes another
@@ -414,7 +394,6 @@ ${orderingExplanation}
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that perform
   ///   localized comparison instead.
-  /// - SeeAlso: `lexicographicallyPrecedes(_:)`
 %   else:
   /// Returns a Boolean value indicating whether the sequence precedes another
   /// sequence in a lexicographical (dictionary) ordering, using the
@@ -439,19 +418,18 @@ ${orderingExplanation}
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that
   ///   perform localized comparison.
-  /// - SeeAlso: `lexicographicallyPrecedes(_:by:)`
 %   end
   @_inlineable
   public func lexicographicallyPrecedes<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
     by areInIncreasingOrder:
-      (${GElement}, ${GElement}) throws -> Bool
+      (Element, Element) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
     OtherSequence : Sequence,
-    OtherSequence.${GElement} == ${GElement} {
+    OtherSequence.Element == Element {
 
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
@@ -480,7 +458,7 @@ ${orderingExplanation}
 // contains()
 //===----------------------------------------------------------------------===//
 
-extension Sequence where Iterator.Element : Equatable {
+extension Sequence where Element : Equatable {
   /// Returns a Boolean value indicating whether the sequence contains the
   /// given element.
   ///
@@ -497,7 +475,7 @@ extension Sequence where Iterator.Element : Equatable {
   /// - Returns: `true` if the element was found in the sequence; otherwise,
   ///   `false`.
   @_inlineable
-  public func contains(_ element: ${GElement}) -> Bool {
+  public func contains(_ element: Element) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
     }
@@ -549,7 +527,7 @@ extension Sequence {
   ///   `predicate`; otherwise, `false`.
   @_inlineable
   public func contains(
-    where predicate: (${GElement}) throws -> Bool
+    where predicate: (Element) throws -> Bool
   ) rethrows -> Bool {
     for e in self {
       if try predicate(e) {
@@ -610,11 +588,66 @@ extension Sequence {
   public func reduce<Result>(
     _ initialResult: Result,
     _ nextPartialResult:
-      (_ partialResult: Result, ${GElement}) throws -> Result
+      (_ partialResult: Result, Element) throws -> Result
   ) rethrows -> Result {
     var accumulator = initialResult
     for element in self {
       accumulator = try nextPartialResult(accumulator, element)
+    }
+    return accumulator
+  }
+  
+  /// Returns the result of combining the elements of the sequence using the
+  /// given closure.
+  ///
+  /// Use the `reduce(into:_:)` method to produce a single value from the
+  /// elements of an entire sequence. For example, you can use this method on an
+  /// array of integers to filter adjacent equal entries or count frequencies.
+  ///
+  /// This method is preferred over `reduce(_:_:)` for efficiency when the
+  /// result is a copy-on-write type, for example an Array or a Dictionary.
+  ///
+  /// The `updateAccumulatingResult` closure is called sequentially with a
+  /// mutable accumulating value initialized to `initialResult` and each element
+  /// of the sequence. This example shows how to build a dictionary of letter
+  /// frequencies of a string.
+  ///
+  ///     let letters = "abracadabra"
+  ///     let letterCount = letters.reduce(into: [:]) { counts, letter in
+  ///         counts[letter, default: 0] += 1
+  ///     }
+  ///     // letterCount == ["a": 5, "b": 2, "r": 2, "c": 1, "d": 1]
+  ///
+  /// When `letters.reduce(into:_:)` is called, the following steps occur:
+  ///
+  /// 1. The `updateAccumulatingResult` closure is called with the initial
+  ///    accumulating value---`[:]` in this case---and the first character of
+  ///    `letters`, modifying the accumulating value by setting `1` for the key
+  ///    `"a"`.
+  /// 2. The closure is called again repeatedly with the updated accumulating
+  ///    value and each element of the sequence.
+  /// 3. When the sequence is exhausted, the accumulating value is returned to
+  ///    the caller.
+  ///
+  /// If the sequence has no elements, `updateAccumulatingResult` is never
+  /// executed and `initialResult` is the result of the call to
+  /// `reduce(into:_:)`.
+  ///
+  /// - Parameters:
+  ///   - initialResult: The value to use as the initial accumulating value.
+  ///   - updateAccumulatingResult: A closure that updates the accumulating
+  ///     value with an element of the sequence.
+  /// - Returns: The final accumulated value. If the sequence has no elements,
+  ///   the result is `initialResult`.
+  @_inlineable
+  public func reduce<Result>(
+    into initialResult: Result,
+    _ updateAccumulatingResult:
+      (_ partialResult: inout Result, Element) throws -> ()
+  ) rethrows -> Result {
+    var accumulator = initialResult
+    for element in self {
+      try updateAccumulatingResult(&accumulator, element)
     }
     return accumulator
   }
@@ -635,14 +668,14 @@ extension Sequence {
   /// - Returns: An array containing the elements of this sequence in
   ///   reverse order.
   @_inlineable
-  public func reversed() -> [${GElement}] {
+  public func reversed() -> [Element] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
     // though.
     var result = Array(self)
     let count = result.count
     for i in 0..<count/2 {
-      swap(&result[i], &result[count - i - 1])
+      result.swapAt(i, count - ((i + 1) as Int))
     }
     return result
   }
@@ -679,12 +712,11 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  /// - SeeAlso: `joined()`, `map(_:)`
   @_inlineable
   public func flatMap<SegmentOfResult : Sequence>(
-    _ transform: (${GElement}) throws -> SegmentOfResult
-  ) rethrows -> [SegmentOfResult.${GElement}] {
-    var result: [SegmentOfResult.${GElement}] = []
+    _ transform: (Element) throws -> SegmentOfResult
+  ) rethrows -> [SegmentOfResult.Element] {
+    var result: [SegmentOfResult.Element] = []
     for element in self {
       result.append(contentsOf: try transform(element))
     }
@@ -719,7 +751,17 @@ extension Sequence {
   ///   and *n* is the length of the result.
   @_inlineable
   public func flatMap<ElementOfResult>(
-    _ transform: (${GElement}) throws -> ElementOfResult?
+    _ transform: (Element) throws -> ElementOfResult?
+  ) rethrows -> [ElementOfResult] {
+    return try _flatMap(transform)
+  }
+
+  // The implementation of flatMap accepting a closure with an optional result.
+  // Factored out into a separate functions in order to be used in multiple
+  // overloads.
+  @inline(__always)
+  public func _flatMap<ElementOfResult>(
+    _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
     var result: [ElementOfResult] = []
     for element in self {
@@ -728,13 +770,6 @@ extension Sequence {
       }
     }
     return result
-  }
-
-  @available(*, deprecated, message: "This call uses implicit promotion to optional. Please use map instead.")
-  public func flatMap<T>(
-    _ transform: (${GElement}) throws -> T
-  ) rethrows -> [T] {
-    return try map(transform)
   }
 }
 
@@ -746,42 +781,42 @@ extension Sequence {
 
   @available(*, unavailable, renamed: "min(by:)")
   public func minElement(
-    _ isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
-  ) rethrows -> Iterator.Element? {
+    _ isOrderedBefore: (Element, Element) throws -> Bool
+  ) rethrows -> Element? {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "max(by:)")
   public func maxElement(
-    _ isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
-  ) rethrows -> Iterator.Element? {
+    _ isOrderedBefore: (Element, Element) throws -> Bool
+  ) rethrows -> Element? {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "reversed()")
-  public func reverse() -> [Iterator.Element] {
+  public func reverse() -> [Element] {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "starts(with:by:)")
   public func startsWith<PossiblePrefix>(
     _ possiblePrefix: PossiblePrefix,
-    isEquivalent: (Iterator.Element, Iterator.Element) throws -> Bool
+    isEquivalent: (Element, Element) throws -> Bool
   ) rethrows-> Bool
     where
     PossiblePrefix : Sequence,
-    PossiblePrefix.Iterator.Element == Iterator.Element {
+    PossiblePrefix.Element == Element {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "elementsEqual(_:by:)")
   public func elementsEqual<OtherSequence>(
     _ other: OtherSequence,
-    isEquivalent: (${GElement}, ${GElement}) throws -> Bool
+    isEquivalent: (Element, Element) throws -> Bool
   ) rethrows -> Bool
     where
     OtherSequence: Sequence,
-    OtherSequence.${GElement} == ${GElement} {
+    OtherSequence.Element == Element {
     Builtin.unreachable()
   }
 
@@ -790,17 +825,17 @@ extension Sequence {
     OtherSequence
   >(
     _ other: OtherSequence,
-    isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
+    isOrderedBefore: (Element, Element) throws -> Bool
   ) rethrows -> Bool
     where
     OtherSequence : Sequence,
-    OtherSequence.${GElement} == ${GElement} {
+    OtherSequence.Element == Element {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "contains(where:)")
   public func contains(
-    _ predicate: (${GElement}) throws -> Bool
+    _ predicate: (Element) throws -> Bool
   ) rethrows -> Bool {
     Builtin.unreachable()
   }
@@ -808,20 +843,20 @@ extension Sequence {
   @available(*, unavailable, renamed: "reduce(_:_:)")
   public func reduce<Result>(
     _ initial: Result,
-    combine: (_ partialResult: Result, ${GElement}) throws -> Result
+    combine: (_ partialResult: Result, Element) throws -> Result
   ) rethrows -> Result {
     Builtin.unreachable()
   }
 }
 
-extension Sequence where Iterator.Element : Comparable {
+extension Sequence where Element : Comparable {
   @available(*, unavailable, renamed: "min()")
-  public func minElement() -> Iterator.Element? {
+  public func minElement() -> Element? {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "max()")
-  public func maxElement() -> Iterator.Element? {
+  public func maxElement() -> Element? {
     Builtin.unreachable()
   }
 
@@ -831,7 +866,7 @@ extension Sequence where Iterator.Element : Comparable {
   ) -> Bool
     where
     PossiblePrefix : Sequence,
-    PossiblePrefix.${GElement} == ${GElement} {
+    PossiblePrefix.Element == Element {
     Builtin.unreachable()
   }
 
@@ -841,7 +876,7 @@ extension Sequence where Iterator.Element : Comparable {
   ) -> Bool
     where
     OtherSequence : Sequence,
-    OtherSequence.${GElement} == ${GElement} {
+    OtherSequence.Element == Element {
     Builtin.unreachable()
   }
 }

@@ -18,9 +18,11 @@ public func importAsUnaryInit() {
 public func foo(_ x: Double) {
 // CHECK: bb0([[X:%.*]] : $Double):
   // CHECK: [[GLOBALVAR:%.*]] = global_addr @IAMStruct1GlobalVar
-  // CHECK: [[ZZ:%.*]] = load [trivial] [[GLOBALVAR]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBALVAR]] : $*Double
+  // CHECK: [[ZZ:%.*]] = load [trivial] [[READ]]
   let zz = Struct1.globalVar
-  // CHECK: assign [[ZZ]] to [[GLOBALVAR]]
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[GLOBALVAR]] : $*Double
+  // CHECK: assign [[ZZ]] to [[WRITE]]
   Struct1.globalVar = zz
 
   // CHECK: [[Z:%.*]] = project_box
@@ -51,17 +53,20 @@ public func foo(_ x: Double) {
   // z = b(x)
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1InvertInPlace
-  // CHECK: apply [[FN]]([[Z]])
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
+  // CHECK: apply [[FN]]([[WRITE]])
   z.invert()
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[WRITE:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[WRITE]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
   // CHECK: apply [[FN]]([[ZTMP]], [[X]])
   z = z.translate(radians: x)
 
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@_T0SC7Struct1V9translateABSd7radians_tFTcTO]]
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
@@ -82,12 +87,14 @@ public func foo(_ x: Double) {
   // z = e(z, x)
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Scale
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: apply [[FN]]([[ZVAL]], [[X]])
   z = z.scale(x)
 
   // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V5scaleABSdFTcTO
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
   // CHECK: [[F_COPY:%.*]] = copy_value [[BORROWED_F]]
@@ -98,7 +105,8 @@ public func foo(_ x: Double) {
   // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V5scaleABSdFTcTO
   // CHECK: thin_to_thick_function [[THUNK]]
   let g = Struct1.scale
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK:  [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   z = g(z)(x)
 
   // TODO: If we implement SE-0042, this should directly reference the
@@ -106,25 +114,30 @@ public func foo(_ x: Double) {
   // let h: @convention(c) (Struct1, Double) -> Struct1 = Struct1.scale
   // z = h(z, x)
 
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c) (@in Struct1) -> Double
   // CHECK: apply [[GET]]([[ZTMP]])
   _ = z.radius
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetRadius : $@convention(c) (Struct1, Double) -> ()
   // CHECK: apply [[SET]]([[ZVAL]], [[X]])
   z.radius = x
 
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetAltitude : $@convention(c) (Struct1) -> Double
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.altitude
   // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
-  // CHECK: apply [[SET]]([[Z]], [[X]])
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
+  // CHECK: apply [[SET]]([[WRITE]], [[X]])
   z.altitude = x
   
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetMagnitude : $@convention(c) (Struct1) -> Double
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.magnitude
@@ -173,7 +186,8 @@ public func foo(_ x: Double) {
   _ = makeMetatype().getOnlyProperty
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesLast : $@convention(c) (Double, Struct1) -> ()
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: apply [[FN]]([[X]], [[ZVAL]])
   z.selfComesLast(x: x)
   let k: (Double) -> () = z.selfComesLast(x:)
@@ -186,7 +200,8 @@ public func foo(_ x: Double) {
   // m(z, x)
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesThird : $@convention(c) (Int32, Float, Struct1, Double) -> ()
-  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: apply [[FN]]({{.*}}, {{.*}}, [[ZVAL]], [[X]])
   z.selfComesThird(a: y, b: 0, x: x)
   let n: (Int32, Float, Double) -> () = z.selfComesThird(a:b:x:)

@@ -1,4 +1,4 @@
-//===--- NSDictionaryShims.h - Foundation declarations for Dictionary overlay ------===//
+//===--- NSDictionaryShims.h - Foundation decl. for Dictionary overlay ----===//
 //
 // This source file is part of the Swift.org open source project
 //

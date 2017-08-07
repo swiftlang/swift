@@ -20,3 +20,9 @@ extension NSExpression {
     self.init(format: expressionFormat, arguments: va_args)
   }
 }
+
+extension NSExpression {
+    public convenience init<Root, Value>(forKeyPath keyPath: KeyPath<Root, Value>) {
+        self.init(forKeyPath: _bridgeKeyPathToString(keyPath))
+    }
+}

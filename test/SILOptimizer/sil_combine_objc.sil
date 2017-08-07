@@ -4,6 +4,9 @@
 // FIXME: https://bugs.swift.org/browse/SR-2808
 // XFAIL: resilient_stdlib
 
+// See https://bugs.swift.org/browse/SR-5065, rdar://32511494
+// XFAIL: *
+
 sil_stage canonical
 
 import Builtin

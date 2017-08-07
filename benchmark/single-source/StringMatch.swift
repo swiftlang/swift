@@ -1,4 +1,4 @@
-//===--- StringMatch.swift-------------------------------------------------===//
+//===--- StringMatch.swift ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,8 +17,13 @@ import Glibc
 import Darwin
 #endif
 
-// FIXME: remove when String is a Collection
-extension String: Collection { }
+extension String {
+  @inline(__always)
+  func dropFirst(_ n: Int = 1) -> String {
+    let startIndex = self.index(self.startIndex, offsetBy: n)
+    return self[startIndex ..< self.endIndex]
+  }
+}
 
 /* match: search for regexp anywhere in text */
 func match(regexp: String, text: String) -> Bool {

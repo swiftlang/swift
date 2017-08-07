@@ -8,14 +8,27 @@ var zero: Int
 func generic_nondependent_context<T>(_ x: T, y: Int) -> Int {
   func foo() -> Int { return y }
 
+  func bar() -> Int { return y }
+
   // CHECK: [[FOO:%.*]] = function_ref @_T016generic_closures0A21_nondependent_context{{.*}} : $@convention(thin) (Int) -> Int
   // CHECK: [[FOO_CLOSURE:%.*]] = partial_apply [[FOO]](%1)
   // CHECK: destroy_value [[FOO_CLOSURE]]
   let _ = foo
 
+  // CHECK: [[BAR:%.*]] = function_ref @_T016generic_closures0A21_nondependent_context{{.*}} : $@convention(thin) (Int) -> Int
+  // CHECK: [[BAR_CLOSURE:%.*]] = partial_apply [[BAR]](%1)
+  // CHECK: destroy_value [[BAR_CLOSURE]]
+  let _ = bar
+
   // CHECK: [[FOO:%.*]] = function_ref @_T016generic_closures0A21_nondependent_context{{.*}} : $@convention(thin) (Int) -> Int
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
-  return foo()
+  _ = foo()
+
+  // CHECK: [[BAR:%.*]] = function_ref @_T016generic_closures0A21_nondependent_context{{.*}} : $@convention(thin) (Int) -> Int
+  // CHECK: [[BAR_CLOSURE:%.*]] = apply [[BAR]]
+
+  // CHECK: [[BAR_CLOSURE]]
+  return bar()
 }
 
 // CHECK-LABEL: sil hidden @_T016generic_closures0A8_capture{{[_0-9a-zA-Z]*}}F
@@ -29,6 +42,8 @@ func generic_capture<T>(_ x: T) -> Any.Type {
 
   // CHECK: [[FOO:%.*]] = function_ref @_T016generic_closures0A8_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick Any.Type
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>()
+
+  // CHECK: return [[FOO_CLOSURE]]
   return foo()
 }
 
@@ -43,6 +58,8 @@ func generic_capture_cast<T>(_ x: T, y: Any) -> Bool {
 
   // CHECK: [[FOO:%.*]] = function_ref @_T016generic_closures0A13_capture_cast{{.*}} : $@convention(thin) <τ_0_0> (@in Any) -> Bool
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>([[ARG:%.*]])
+
+  // CHECK: return [[FOO_CLOSURE]]
   return foo(y)
 }
 
@@ -61,6 +78,8 @@ func generic_nocapture_existential<T>(_ x: T, y: Concept) -> Bool {
 
   // CHECK: [[FOO:%.*]] = function_ref @_T016generic_closures0A22_nocapture_existential{{.*}} : $@convention(thin) (@in Concept) -> Bool
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]([[ARG:%.*]])
+
+  // CHECK: return [[FOO_CLOSURE]]
   return foo(y)
 }
 
@@ -75,6 +94,8 @@ func generic_dependent_context<T>(_ x: T, y: Int) -> T {
 
   // CHECK: [[FOO:%.*]] = function_ref @_T016generic_closures0A18_dependent_context{{.*}} : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>
+
+  // CHECK: return
   return foo()
 }
 
@@ -122,9 +143,9 @@ class NestedGeneric<U> {
 
 // CHECK: sil hidden @_T016generic_closures018nested_closure_in_A0xxlF : $@convention(thin) <T> (@in T) -> @out T
 // CHECK:   function_ref [[OUTER_CLOSURE:@_T016generic_closures018nested_closure_in_A0xxlFxycfU_]]
-// CHECK: sil shared [[OUTER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T
+// CHECK: sil private [[OUTER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T
 // CHECK:   function_ref [[INNER_CLOSURE:@_T016generic_closures018nested_closure_in_A0xxlFxycfU_xycfU_]]
-// CHECK: sil shared [[INNER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T {
+// CHECK: sil private [[INNER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T {
 func nested_closure_in_generic<T>(_ x:T) -> T {
   return { { x }() }()
 }
@@ -291,9 +312,9 @@ func mixed_generic_nongeneric_nesting<T>(t: T) {
   outer()
 }
 
-// CHECK-LABEL: sil shared @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF : $@convention(thin) <T> () -> ()
-// CHECK-LABEL: sil shared @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF6middleL_yqd__1u_tr__lF : $@convention(thin) <T><U> (@in U) -> ()
-// CHECK-LABEL: sil shared @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF6middleL_yqd__1u_tr__lF5innerL_qd__yr__lF : $@convention(thin) <T><U> (@owned <τ_0_0><τ_1_0> { var τ_1_0 } <T, U>) -> @out U
+// CHECK-LABEL: sil private @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF : $@convention(thin) <T> () -> ()
+// CHECK-LABEL: sil private @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF6middleL_yqd__1u_tr__lF : $@convention(thin) <T><U> (@in U) -> ()
+// CHECK-LABEL: sil private @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF6middleL_yqd__1u_tr__lF5innerL_qd__yr__lF : $@convention(thin) <T><U> (@owned <τ_0_0><τ_1_0> { var τ_1_0 } <T, U>) -> @out U
 
 protocol Doge {
   associatedtype Nose : NoseProtocol
@@ -307,7 +328,7 @@ protocol Doggo {}
 
 struct DogSnacks<A : Doggo> {}
 
-func capture_same_type_representative<Daisy: Doge, Roo: Doggo>(slobber: Roo)
+func capture_same_type_representative<Daisy: Doge, Roo: Doggo>(slobber: Roo, daisy: Daisy)
     where Roo == Daisy.Nose.Squeegee {
   var s = DogSnacks<Daisy.Nose.Squeegee>()
   _ = { _ = s }

@@ -174,9 +174,8 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
   }
   
   // `Any` can bridge to `AnyObject` (`id` in ObjC).
-  if (t->isAny()) {
-    return Context.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType();
-  }
+  if (t->isAny())
+    return Context.getAnyObjectType();
   
   if (auto funTy = t->getAs<FunctionType>()) {
     switch (funTy->getExtInfo().getSILRepresentation()) {

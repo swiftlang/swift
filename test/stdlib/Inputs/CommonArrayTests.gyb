@@ -87,7 +87,7 @@ ${Suite}.test("${ArrayType}/Sliceable/Enums") {
   do {
     let expected = [E.A, E.B, E.C, E.D]
     let sliceable = ${ArrayType}(expected)
-    checkSliceableWithBidirectionalIndex(expected, sliceable)
+    checkBidirectionalCollection(expected, sliceable)
   }
 
   /*
@@ -95,13 +95,16 @@ ${Suite}.test("${ArrayType}/Sliceable/Enums") {
   do {
     let expected = [[E.A, E.B], [E.B, E.C], [E.D], [E.A, E.B, E.D]]
     let sliceable = ${ArrayType}(expected)
-    checkSliceableWithBidirectionalIndex(
+    checkBidirectionalCollection(
       expected, sliceable, SourceLocStack().withCurrentLoc())
   }
   */
 }
 
-${Suite}.test("${ArrayType}/appendNonUnique") {
+${Suite}.test("${ArrayType}/appendNonUnique")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var x: ${ArrayType}<Int> = []
   x.reserveCapacity(10002)
   let capacity = x.capacity
@@ -153,19 +156,17 @@ ${Suite}.test("${ArrayType}/filter") {
     let arr: ${ArrayType}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.filter() { (x: Int) -> Bool in true }
     expectEqual([ 0, 30, 10, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
   }
   do {
     let arr: ${ArrayType}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.filter() { (x: Int) -> Bool in false }
     expectEqual([], result)
-    expectGE(2 * result.count, result.capacity)
+    expectEqual(0, result.capacity)
   }
   do {
     let arr: ${ArrayType}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.filter() { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
   }
 }
 
@@ -267,7 +268,10 @@ let withUnsafeMutableBufferPointerIfSupportedTests = [
   WithUnsafeMutableBufferPointerIfSupportedTest([ 10, 20, 30, 40, 50 ]),
 ]
 
-${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported") {
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   for test in withUnsafeMutableBufferPointerIfSupportedTests {
     var a = getFresh${ArrayType}(test.sequence.map(OpaqueValue.init))
     do {
@@ -304,7 +308,10 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported") {
   // FIXME: tests for arrays bridged from Objective-C.
 }
 
-${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1") {
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
     (baseAddress, count) -> OpaqueValue<Int> in
@@ -315,7 +322,10 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
   }
 }
 
-${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2") {
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
     (baseAddress, count) -> OpaqueValue<Int> in
@@ -331,7 +341,10 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
 //===----------------------------------------------------------------------===//
 
 // Test the uniqueness of the raw buffer.
-${Suite}.test("${ArrayType}/withUnsafeMutableBytes") {
+${Suite}.test("${ArrayType}/withUnsafeMutableBytes")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var a = getFresh${ArrayType}([UInt8](repeating: 10, count: 1))
   let b = a
   a.withUnsafeMutableBytes { bytes in
@@ -354,7 +367,10 @@ ${Suite}.test(
 }
 
 ${Suite}.test(
-  "${ArrayType}/mutationDoesNotAffectIterator/subscript/append") {
+  "${ArrayType}/mutationDoesNotAffectIterator/subscript/append")
+  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
+                 reason: "rdar://33358110"))
+  .code {
   var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
   var iter = arr.makeIterator()
   arr.append(1040)
@@ -372,6 +388,23 @@ ${Suite}.test(
 //===----------------------------------------------------------------------===//
 // Special cases and one-off tests.
 //===----------------------------------------------------------------------===//
+
+${Suite}.test(
+  "${ArrayType}/subscriptSelfAssignDifferentRanges") {
+  var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
+  arr[0..<0] = arr[...]
+  expectEqual([ 1010, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[1..<1] = arr[1..<2]
+  expectEqual([ 1010, 1020, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[1..<1] = arr[1..<2]
+  expectEqual([ 1010, 1020, 1020, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[1..<2] = arr[0..<1]
+  expectEqual([ 1010, 1010, 1020, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[0..<5] = arr.dropFirst(5)
+  expectEqual([ 1010, 1020, 1030, 1010, 1020, 1030 ], arr)
+  arr[...] = arr[0..<0]
+  expectEqual([  ], arr)
+}
 
 ${Suite}.test("${ArrayType}<Void>/map") {
   // This code used to crash because it generated an array of Void with

@@ -26,6 +26,8 @@ protocol Test2 {
 
   associatedtype mytype
   associatedtype mybadtype = Int
+
+  associatedtype V : Test = // expected-error {{expected type in associated type declaration}} {{28-28= <#type#>}}
 }
 
 func test1() {
@@ -36,7 +38,9 @@ func test1() {
   v1.creator = "Me"                   // expected-error {{cannot assign to property: 'creator' is a get-only property}}
 }
 
-protocol Bogus : Int {} // expected-error{{inheritance from non-protocol, non-class type 'Int'}}
+protocol Bogus : Int {}
+// expected-error@-1{{inheritance from non-protocol type 'Int'}}
+// expected-error@-2{{type 'Self' constrained to non-protocol, non-class type 'Int'}}
 
 // Explicit conformance checks (successful).
 
@@ -71,6 +75,25 @@ enum NotPrintableO : Any, CustomStringConvertible {} // expected-error{{type 'No
 
 struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'NotFormattedPrintable' does not conform to protocol 'CustomStringConvertible'}}
   func print(format: TestFormat) {} // expected-note{{candidate has non-matching type '(TestFormat) -> ()'}}
+}
+
+// Protocol compositions in inheritance clauses
+protocol Left {
+  func l() // expected-note {{protocol requires function 'l()' with type '() -> ()'; do you want to add a stub?}}
+}
+protocol Right {
+  func r() // expected-note {{protocol requires function 'r()' with type '() -> ()'; do you want to add a stub?}}
+}
+typealias Both = Left & Right
+
+protocol Up : Both {
+  func u()
+}
+
+struct DoesNotConform : Up {
+  // expected-error@-1 {{type 'DoesNotConform' does not conform to protocol 'Left'}}
+  // expected-error@-2 {{type 'DoesNotConform' does not conform to protocol 'Right'}}
+  func u() {}
 }
 
 // Circular protocols
@@ -345,8 +368,8 @@ final class ClassNode : IntrusiveListNode {
 }
 
 struct StructNode : IntrusiveListNode { // expected-error{{non-class type 'StructNode' cannot conform to class protocol 'IntrusiveListNode'}}
-  // expected-error@-1{{value type 'StructNode' cannot have a stored property that references itself}}
-  var next : StructNode
+  var next : StructNode  // expected-error {{value type 'StructNode' cannot have a stored property that recursively contains it}}
+
 }
 
 final class ClassNodeByExtension { }
@@ -375,8 +398,7 @@ final class GenericClassNode<T> : IntrusiveListNode {
 }
 
 struct GenericStructNode<T> : IntrusiveListNode { // expected-error{{non-class type 'GenericStructNode<T>' cannot conform to class protocol 'IntrusiveListNode'}}
-  // expected-error@-1{{value type 'GenericStructNode<T>' cannot have a stored property that references itself}}
-  var next : GenericStructNode<T>
+  var next : GenericStructNode<T> // expected-error {{value type 'GenericStructNode<T>' cannot have a stored property that recursively contains it}}
 }
 
 // Refined protocols inherit class-ness
@@ -391,8 +413,7 @@ final class ClassDNode : IntrusiveDListNode {
 
 struct StructDNode : IntrusiveDListNode { // expected-error{{non-class type 'StructDNode' cannot conform to class protocol 'IntrusiveDListNode'}}
   // expected-error@-1{{non-class type 'StructDNode' cannot conform to class protocol 'IntrusiveListNode'}}
-  // expected-error@-2{{value type 'StructDNode' cannot have a stored property that references itself}}
-  var prev : StructDNode
+  var prev : StructDNode // expected-error {{value type 'StructDNode' cannot have a stored property that recursively contains it}}
   var next : StructDNode
 }
 

@@ -145,8 +145,7 @@ class BugReducerTester : public SILFunctionTransform {
         RuntimeCrasherFunc->dump();
         SILBuilder B(Apply->getIterator());
         B.createApply(Loc, B.createFunctionRef(Loc, RuntimeCrasherFunc),
-                      RuntimeCrasherFunc->getLoweredType(),
-                      M.Types.getEmptyTupleType(), SubstitutionList(),
+                      SubstitutionList(),
                       ArrayRef<SILValue>(), false /*NoThrow*/);
 
         Apply->replaceAllUsesWith(SILUndef::get(Apply->getType(), M));
@@ -158,7 +157,6 @@ class BugReducerTester : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "Bug Reducer Tester"; }
 };
 
 } // end anonymous namespace

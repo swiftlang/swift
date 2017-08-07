@@ -407,16 +407,15 @@ public:
 
   /// Return the immediate superclass type of this type, or null if
   /// it's the most-derived type.
-  SILType getSuperclass(LazyResolver *resolver) const {
-    auto superclass = getSwiftRValueType()->getSuperclass(resolver);
+  SILType getSuperclass() const {
+    auto superclass = getSwiftRValueType()->getSuperclass();
     if (!superclass) return SILType();
     return SILType::getPrimitiveObjectType(superclass->getCanonicalType());
   }
 
   /// Return true if Ty is a subtype of this exact SILType, or false otherwise.
   bool isExactSuperclassOf(SILType Ty) const {
-    return getSwiftRValueType()->isExactSuperclassOf(Ty.getSwiftRValueType(),
-                                                     nullptr);
+    return getSwiftRValueType()->isExactSuperclassOf(Ty.getSwiftRValueType());
   }
 
   /// Return true if Ty is a subtype of this SILType, or if this SILType
@@ -424,8 +423,13 @@ public:
   /// otherwise.
   bool isBindableToSuperclassOf(SILType Ty) const {
     return getSwiftRValueType()->isBindableToSuperclassOf(
-                                                        Ty.getSwiftRValueType(),
-                                                        nullptr);
+                                                        Ty.getSwiftRValueType());
+  }
+
+  /// Look through reference-storage types on this type.
+  SILType getReferenceStorageReferentType() const {
+    return SILType(getSwiftRValueType().getReferenceStorageReferent(),
+                   getCategory());
   }
 
   /// Transform the function type SILType by replacing all of its interface
@@ -498,6 +502,10 @@ public:
   bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
                                 SILType type2);
 
+  /// Returns true if this SILType could be potentially a lowering of the given
+  /// formal type. Meant for verification purposes/assertions.
+  bool isLoweringOf(SILModule &M, CanType formalType);
+
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);
@@ -522,6 +530,9 @@ public:
                                      const ASTContext &C);
   /// Get the builtin word type as a SILType;
   static SILType getBuiltinWordType(const ASTContext &C);
+
+  /// Given a value type, return an optional type wrapping it.
+  static SILType getOptionalType(SILType valueType);
 
   /// Get the standard exception type.
   static SILType getExceptionType(const ASTContext &C);
@@ -560,10 +571,9 @@ NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
 
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
-                        Lowering::AbstractionPattern orig,
-                        CanAnyFunctionType substInterface,
-                        Optional<SILDeclRef> constant = None,
-                        SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
+                        Lowering::AbstractionPattern origType,
+                        CanAnyFunctionType substType,
+                        Optional<SILDeclRef> constant = None);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);

@@ -34,25 +34,51 @@ namespace swift {
   class TypeDecl;
   class ValueDecl;
 
-/// UnqualifiedLookupResult - One result of unqualified lookup.
-struct UnqualifiedLookupResult {
+/// LookupResultEntry - One result of unqualified lookup.
+struct LookupResultEntry {
 private:
-  ValueDecl *Base;
+
+  /// The declaration context through which we found Value. For instance,
+  /// class BaseClass {
+  ///   func foo() {}
+  /// }
+  ///
+  /// class DerivedClass : BaseClass {
+  ///   func bar() {}
+  /// }
+  ///
+  /// When finding foo() from the body of DerivedClass, BaseDC is DerivedClass.
+  ///
+  /// Another example:
+  ///
+  /// class BaseClass {
+  ///   func bar() {}
+  ///   func foo() {}
+  /// }
+  ///
+  /// When finding bar() from the function body of foo(), BaseDC is the method
+  /// foo().
+  DeclContext *BaseDC;
+
+  /// The declaration corresponds to the given name; i.e. the decl we are
+  /// looking up.
   ValueDecl *Value;
 
 public:
-  UnqualifiedLookupResult(ValueDecl *value) : Base(nullptr), Value(value) { }
+  LookupResultEntry(ValueDecl *value) : BaseDC(nullptr), Value(value) { }
 
-  UnqualifiedLookupResult(ValueDecl *base, ValueDecl *value)
-    : Base(base), Value(value) { }
+  LookupResultEntry(DeclContext *baseDC, ValueDecl *value)
+    : BaseDC(baseDC), Value(value) { }
 
   ValueDecl *getValueDecl() const {
     return Value;
   }
-  
-  ValueDecl *getBaseDecl() const {
-    return Base;
+
+  DeclContext *getDeclContext() const {
+    return BaseDC;
   }
+
+  ValueDecl *getBaseDecl() const;
 };
 
 /// \brief This class implements and represents the result of performing
@@ -71,7 +97,7 @@ public:
                     bool AllowProtocolMembers = false,
                     bool IgnoreAccessControl = false);
 
-  SmallVector<UnqualifiedLookupResult, 4> Results;
+  SmallVector<LookupResultEntry, 4> Results;
 
   /// \brief Return true if anything was found by the name lookup.
   bool isSuccess() const { return !Results.empty(); }
@@ -194,11 +220,11 @@ class NamedDeclConsumer : public VisibleDeclConsumer {
   virtual void anchor() override;
 public:
   DeclName name;
-  SmallVectorImpl<UnqualifiedLookupResult> &results;
+  SmallVectorImpl<LookupResultEntry> &results;
   bool isTypeLookup;
 
   NamedDeclConsumer(DeclName name,
-                    SmallVectorImpl<UnqualifiedLookupResult> &results,
+                    SmallVectorImpl<LookupResultEntry> &results,
                     bool isTypeLookup)
     : name(name), results(results), isTypeLookup(isTypeLookup) {}
 
@@ -208,7 +234,7 @@ public:
     if (isTypeLookup && !isa<TypeDecl>(VD))
       return;
     if (VD->getFullName().matchesRef(name))
-      results.push_back(UnqualifiedLookupResult(VD));
+      results.push_back(LookupResultEntry(VD));
   }
 };
 
@@ -263,7 +289,8 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               Type BaseTy,
                               const DeclContext *CurrDC,
                               LazyResolver *typeResolver,
-                              bool includeInstanceMembers);
+                              bool includeInstanceMembers,
+                              GenericSignatureBuilder *GSB = nullptr);
 
 namespace namelookup {
 enum class ResolutionKind {

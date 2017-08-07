@@ -8,4 +8,4 @@ func test2() {
   "" + [""]#^B^#
 }
 // Sanity check results.
-// CHECK: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ==
+// CHECK: Decl[InstanceVar]/CurrNominal:      .startIndex[#Int#]; name=startIndex

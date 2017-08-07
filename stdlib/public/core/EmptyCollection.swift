@@ -18,8 +18,6 @@
 //===----------------------------------------------------------------------===//
 
 /// An iterator that never produces an element.
-///
-/// - SeeAlso: `EmptyCollection<Element>`.
 public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
   /// Creates an instance.
   public init() {}
@@ -90,12 +88,12 @@ public struct EmptyCollection<Element> :
 
   public subscript(bounds: Range<Index>) -> EmptyCollection<Element> {
     get {
-      _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+      _debugPrecondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
         "Index out of range")
       return self
     }
     set {
-      _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+      _debugPrecondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
         "Index out of range")
     }
   }
@@ -106,37 +104,37 @@ public struct EmptyCollection<Element> :
   }
 
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    _precondition(i == startIndex && n == 0, "Index out of range")
+    _debugPrecondition(i == startIndex && n == 0, "Index out of range")
     return i
   }
 
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    _precondition(i == startIndex && limit == startIndex,
+    _debugPrecondition(i == startIndex && limit == startIndex,
       "Index out of range")
     return n == 0 ? i : nil
   }
 
   /// The distance between two indexes (always zero).
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    _precondition(start == 0, "From must be startIndex (or endIndex)")
-    _precondition(end == 0, "To must be endIndex (or startIndex)")
+    _debugPrecondition(start == 0, "From must be startIndex (or endIndex)")
+    _debugPrecondition(end == 0, "To must be endIndex (or startIndex)")
     return 0
   }
 
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
-    _precondition(index == 0, "out of bounds")
-    _precondition(bounds == Range(indices),
+    _debugPrecondition(index == 0, "out of bounds")
+    _debugPrecondition(bounds == Range(indices),
       "invalid bounds for an empty collection")
   }
 
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {
-    _precondition(range == Range(indices),
+    _debugPrecondition(range == Range(indices),
       "invalid range for an empty collection")
-    _precondition(bounds == Range(indices),
+    _debugPrecondition(bounds == Range(indices),
       "invalid bounds for an empty collection")
   }
 

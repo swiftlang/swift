@@ -783,3 +783,25 @@ func testVariadic() {
   variadic3(1, b: 2, 3, d: "test") // expected-error {{'variadic3(_:b:c:d:)' has been renamed to 'after(x:_:y:z:)'}} {{3-12=after}} {{13-13=x: }} {{16-19=}} {{25-26=z}} {{none}}
   variadic3(1, d:"test") // expected-error {{'variadic3(_:b:c:d:)' has been renamed to 'after(x:_:y:z:)'}} {{3-12=after}} {{13-13=x: }} {{16-17=z}} {{none}}
 }
+
+enum E_32526620 {
+  case foo
+  case bar
+
+  func set() {}
+}
+
+@available(*, unavailable, renamed: "E_32526620.set(self:)")
+func rdar32526620_1(a: E_32526620) {} // expected-note {{here}}
+rdar32526620_1(a: .foo)
+// expected-error@-1 {{'rdar32526620_1(a:)' has been replaced by instance method 'E_32526620.set()'}} {{1-15=E_32526620.foo.set}} {{16-23=}}
+
+@available(*, unavailable, renamed: "E_32526620.set(a:self:)")
+func rdar32526620_2(a: Int, b: E_32526620) {} // expected-note {{here}}
+rdar32526620_2(a: 42, b: .bar)
+// expected-error@-1 {{'rdar32526620_2(a:b:)' has been replaced by instance method 'E_32526620.set(a:)'}} {{1-15=E_32526620.bar.set}} {{21-30=}}
+
+@available(*, unavailable, renamed: "E_32526620.set(a:self:c:)")
+func rdar32526620_3(a: Int, b: E_32526620, c: String) {} // expected-note {{here}}
+rdar32526620_3(a: 42, b: .bar, c: "question")
+// expected-error@-1 {{'rdar32526620_3(a:b:c:)' has been replaced by instance method 'E_32526620.set(a:c:)'}} {{1-15=E_32526620.bar.set}} {{23-32=}}

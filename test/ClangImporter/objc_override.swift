@@ -88,6 +88,26 @@ class FailSub : FailBase {
   override class func processValue() {} // expected-error {{overriding a throwing @objc method with a non-throwing method is not supported}}
 }
 
+class CallbackSubA : CallbackBase {
+  override func perform(handler: () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+  // expected-note@-1 {{type does not match superclass instance method with type '(@escaping () -> Void) -> Void'}}
+  override func perform(optHandler: () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+  override func perform(nonescapingHandler: () -> Void) {}
+  override func perform(optNonescapingHandler: () -> Void) {} // expected-error {{cannot override instance method parameter of type '(() -> Void)?' with non-optional type '() -> Void'}}
+}
+class CallbackSubB : CallbackBase {
+  override func perform(handler: (() -> Void)?) {}
+  override func perform(optHandler: (() -> Void)?) {}
+  override func perform(nonescapingHandler: (() -> Void)?) {} // expected-error {{method does not override any method from its superclass}}
+  override func perform(optNonescapingHandler: (() -> Void)?) {}
+}
+class CallbackSubC : CallbackBase {
+  override func perform(handler: @escaping () -> Void) {}
+  override func perform(optHandler: @escaping () -> Void) {} // expected-error {{cannot override instance method parameter of type '(() -> Void)?' with non-optional type '() -> Void'}}
+  override func perform(nonescapingHandler: @escaping () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+  override func perform(optNonescapingHandler: @escaping () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: overridden declaration is here
 // <unknown>:0: error: unexpected note produced: setter for 'boolProperty' declared here

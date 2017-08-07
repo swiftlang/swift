@@ -59,9 +59,6 @@ function(handle_swift_sources
   if (NOT SWIFTSOURCES_IS_MAIN)
     list(APPEND swift_compile_flags "-module-link-name" "${name}")
   endif()
-  if("${SWIFTSOURCES_SDK}" STREQUAL "CYGWIN")
-    list(APPEND swift_compile_flags -DCYGWIN)
-  endif()
 
   if(swift_sources)
     compute_library_subdir(SWIFTSOURCES_LIBRARY_SUBDIR
@@ -243,10 +240,6 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 
-  if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
-    list(APPEND swift_flags "-Xfrontend" "-enable-cow-existentials")
-  endif()
-
   if(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP AND SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
   endif()
@@ -268,8 +261,17 @@ function(_compile_swift_files
     endif()
   endif()
 
+  # Force swift 3 compatibility mode for Standard Library and overlay.
+  if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY)
+    list(APPEND swift_flags "-swift-version" "3")
+  endif()
+
   if(SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-autolink-force-load")
+  endif()
+
+  if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
+    list(APPEND swift_flags "-warn-swift3-objc-inference-complete")
   endif()
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
@@ -385,6 +387,11 @@ function(_compile_swift_files
     set(swift_compiler_tool "${SWIFT_SOURCE_DIR}/utils/check-incremental" "${swift_compiler_tool}")
   endif()
 
+  if (SWIFT_REPORT_STATISTICS)
+    list(GET obj_dirs 0 first_obj_dir)
+    list(APPEND swift_flags "-stats-output-dir" ${first_obj_dir})
+  endif()
+
   set(standard_outputs ${SWIFTFILE_OUTPUT})
   set(apinotes_outputs ${apinote_files})
   set(module_outputs "${module_file}" "${module_doc_file}")
@@ -465,7 +472,7 @@ function(_compile_swift_files
       OUTPUT ${standard_outputs}
       DEPENDS
         ${swift_compiler_tool_dep}
-        ${source_files} ${SWIFTFILE_DEPENDS}
+        ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency} ${api_notes_dependency_target}
         ${obj_dirs_dependency_target}
       COMMENT "Compiling ${first_output}")

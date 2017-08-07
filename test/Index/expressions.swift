@@ -11,5 +11,7 @@ func test(_ o: P1?) {
   // CHECK: [[@LINE+1]]:17 | struct/Swift | S1 | [[S1_USR]] | Ref
   case let s as S1:
     test(s)
+  default:
+    test(o)
   }
 }

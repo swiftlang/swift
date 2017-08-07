@@ -12,6 +12,11 @@ module CFAndObjC {
   export *
 }
 
+module CInsideObjC {
+  header "CInsideObjC.h"
+  export *
+}
+
 module ClangModuleUser {
   header "ClangModuleUser.h"
   export *
@@ -69,8 +74,20 @@ module MissingHeader {
   header "this-header-does-not-exist.h"
 }
 
+module MoreSwiftNewtypes {
+  header "MoreSwiftNewtypes.h"
+}
+
 module Newtype {
   header "Newtype.h"
+}
+
+module ImportAsMember {
+  export *
+
+  module A {
+    header "ImportAsMember.h"
+  }
 }
 
 module ObjCIRExtras {
@@ -134,6 +151,10 @@ module TypeAndValue {
   export *
 }
 
+module UnimportableMembers {
+  header "UnimportableMembers.h"
+}
+
 module UsesSubmodule {
   header "UsesSubmodule.h"
   export *
@@ -158,4 +179,8 @@ module MacrosRedefB {
 
 module IndirectFields {
   header "IndirectFields.h"
+}
+
+module ObjCBridgeNonconforming {
+  header "ObjCBridgeNonconforming.h"
 }

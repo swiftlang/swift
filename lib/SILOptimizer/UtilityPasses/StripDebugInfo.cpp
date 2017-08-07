@@ -43,7 +43,6 @@ class StripDebugInfo : public swift::SILFunctionTransform {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
-  StringRef getName() override { return "Strip Debug Info"; }
 };
 } // end anonymous namespace
 

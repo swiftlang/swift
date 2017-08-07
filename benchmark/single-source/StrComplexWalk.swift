@@ -21,7 +21,7 @@ public func run_StrComplexWalk(_ N: Int) {
     for _ in s.unicodeScalars {
       count += 1
     }
-    CheckResults(count == ref_result, "Incorrect results in StrComplexWalk: \(count) != \(ref_result)")
+    CheckResults(count == ref_result)
   }
 }
 

@@ -60,4 +60,37 @@ extension String : _ObjectiveCBridgeable {
   }
 }
 
+extension Substring : _ObjectiveCBridgeable {
+  @_semantics("convertToObjectiveC")
+  public func _bridgeToObjectiveC() -> NSString {
+    return String(self)._bridgeToObjectiveC()
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSString,
+    result: inout Substring?
+  ) {
+    let s = String(x)
+    result = Substring(_base: s, s.startIndex ..< s.endIndex)
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSString,
+    result: inout Substring?
+  ) -> Bool {
+    self._forceBridgeFromObjectiveC(x, result: &result)
+    return result != nil
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSString?
+  ) -> Substring {
+    // `nil` has historically been used as a stand-in for an empty
+    // string; map it to an empty substring.
+    if _slowPath(source == nil) { return Substring() }
+    let s = String(source!)
+    return Substring(_base: s, s.startIndex ..< s.endIndex)
+  }
+}
+
 extension String: CVarArg {}

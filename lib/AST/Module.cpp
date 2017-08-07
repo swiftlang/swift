@@ -22,6 +22,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -180,23 +181,23 @@ template<typename Range>
 void SourceLookupCache::doPopulateCache(Range decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D))
       if (onlyOperators ? VD->isOperator() : VD->hasName()) {
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
       }
-    if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
       doPopulateCache(NTD->getMembers(), true);
-    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D))
+    if (auto *ED = dyn_cast<ExtensionDecl>(D))
       doPopulateCache(ED->getMembers(), true);
   }
 }
 
 void SourceLookupCache::populateMemberCache(const SourceFile &SF) {
   for (const Decl *D : SF.Decls) {
-    if (const NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
+    if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       addToMemberCache(NTD->getMembers());
-    } else if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+    } else if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
       addToMemberCache(ED->getMembers());
     }
   }
@@ -345,7 +346,7 @@ void SourceLookupCache::invalidate() {
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   : TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
     DeclContext(DeclContextKind::Module, nullptr),
-    Flags({0, 0, 0}), DSOHandle(nullptr) {
+    Flags({0, 0, 0}) {
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
@@ -477,7 +478,7 @@ void ModuleDecl::lookupObjCMethods(
 void BuiltinUnit::lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
                               NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
-  getCache().lookupValue(name.getBaseName(), lookupKind, *this, result);
+  getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
 
 void BuiltinUnit::lookupObjCMethods(
@@ -586,13 +587,6 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
       }
     }
 
-    if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      if (archetype->requiresClass())
-        return ProtocolConformanceRef(protocol);
-
-      return None;
-    }
-
     for (auto ap : archetype->getConformsTo()) {
       if (ap == protocol || ap->inheritsFrom(protocol))
         return ProtocolConformanceRef(protocol);
@@ -605,17 +599,9 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
-    SmallVector<ProtocolDecl *, 4> protocols;
-    type->getAnyExistentialTypeProtocols(protocols);
-
-    // Due to an IRGen limitation, witness tables cannot be passed from an
-    // existential to an archetype parameter, so for now we restrict this to
-    // @objc protocols.
-    for (auto proto : protocols) {
-      if (!proto->isObjC() &&
-          !proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-        return None;
-    }
+    // FIXME: Recursion break.
+    if (!protocol->hasValidSignature())
+      return None;
 
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
@@ -623,17 +609,26 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
         !protocol->existentialTypeSupported(resolver))
       return None;
 
-    // Special-case AnyObject, which may not be in the list of conformances.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      if (type->isClassExistentialType())
-        return ProtocolConformanceRef(protocol);
+    auto layout = type->getExistentialLayout();
 
+    // Due to an IRGen limitation, witness tables cannot be passed from an
+    // existential to an archetype parameter, so for now we restrict this to
+    // @objc protocols.
+    if (!layout.isObjC())
       return None;
+
+    // If the existential is class-constrained, the class might conform
+    // concretely.
+    if (layout.superclass) {
+      if (auto result = lookupConformance(layout.superclass, protocol,
+                                          resolver))
+        return result;
     }
 
-    // Look for this protocol within the existential's list of conformances.
-    for (auto proto : protocols) {
-      if (proto == protocol || proto->inheritsFrom(protocol))
+    // Otherwise, the existential might conform abstractly.
+    for (auto proto : layout.getProtocols()) {
+      auto *protoDecl = proto->getDecl();
+      if (protoDecl == protocol || protoDecl->inheritsFrom(protocol))
         return ProtocolConformanceRef(protocol);
     }
 
@@ -676,9 +671,9 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
       = rootConformance->getType()->getClassOrBoundGenericClass();
 
     // Map up to our superclass's type.
-    Type superclassTy = type->getSuperclass(resolver);
+    Type superclassTy = type->getSuperclass();
     while (superclassTy->getAnyNominal() != conformingNominal)
-      superclassTy = superclassTy->getSuperclass(resolver);
+      superclassTy = superclassTy->getSuperclass();
 
     // Compute the conformance for the inherited type.
     auto inheritedConformance = lookupConformance(superclassTy, protocol,

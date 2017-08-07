@@ -28,6 +28,9 @@ func test2() -> Int {
     do {
       var x: Int = 0
       x = foo() // expected-error {{call can throw but is not marked with 'try'}}
+      // expected-note@-1 {{did you mean to use 'try'?}} {{11-11=try }}
+      // expected-note@-2 {{did you mean to handle error as optional value?}} {{11-11=try? }}
+      // expected-note@-3 {{did you mean to disable error propagation?}} {{11-11=try! }}
       x = try foo()
       return x
     } catch {

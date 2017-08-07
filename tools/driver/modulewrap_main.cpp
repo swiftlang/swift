@@ -74,8 +74,7 @@ public:
       TargetTriple = llvm::Triple(llvm::sys::getDefaultTargetTriple());
 
     if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
-      for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_UNKNOWN),
-                                     ParsedArgs.filtered_end())) {
+      for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
         Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
                        A->getAsString(ParsedArgs));
       }
@@ -89,8 +88,7 @@ public:
       return 1;
     }
 
-    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_INPUT),
-                                   ParsedArgs.filtered_end())) {
+    for (const Arg *A : ParsedArgs.filtered(OPT_INPUT)) {
       InputFilenames.push_back(A->getValue());
     }
 
@@ -168,7 +166,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   LangOpts.Target = Invocation.getTargetTriple();
   ASTContext ASTCtx(LangOpts, SearchPathOpts, SrcMgr, Instance.getDiags());
   ClangImporterOptions ClangImporterOpts;
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts),
+  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts, ""),
                          true);
   ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   SILOptions SILOpts;

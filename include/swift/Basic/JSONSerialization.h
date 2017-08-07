@@ -27,6 +27,8 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <vector>
+
 namespace swift {
 namespace json {
 
@@ -443,6 +445,16 @@ private:
 
 private:
   void indent();
+};
+
+template <typename T> struct ArrayTraits<std::vector<T>> {
+  static size_t size(Output &out, std::vector<T> &seq) { return seq.size(); }
+
+  static T &element(Output &out, std::vector<T> &seq, size_t index) {
+    if (index >= seq.size())
+      seq.resize(index + 1);
+    return seq[index];
+  }
 };
 
 template<>

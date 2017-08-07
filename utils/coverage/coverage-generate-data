@@ -225,15 +225,15 @@ def main():
 
     logging.info('Starting merge on %s', build_dir)
     folders = find_folders(build_dir, '.profdir')
-    pool.map_async(merge_profdir, folders).get(9999999)
+    pool.map_async(merge_profdir, folders).get(999999)
 
     logging.info('Starting coverage data dump...')
     merged_profraw_files = find_files(build_dir, 'merged.profraw')
-    pool.map_async(dump_coverage_data, merged_profraw_files).get(9999999)
+    pool.map_async(dump_coverage_data, merged_profraw_files).get(999999)
 
     logging.info('Starting coverage data dump demangling...')
     coverage_log_files = find_files(build_dir, 'coverage.log')
-    pool.map_async(demangle_coverage_data, coverage_log_files).get(9999999)
+    pool.map_async(demangle_coverage_data, coverage_log_files).get(999999)
     return 0
 
 

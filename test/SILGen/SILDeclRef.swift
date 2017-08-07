@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -sil-serialize-witness-tables %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -sil-serialize-witness-tables %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
 
 // Check that all SILDeclRefs are represented in the text form with a signature.
 // This allows to avoid ambiguities which sometimes arise e.g. when a
@@ -55,16 +55,16 @@ public func testBase(b: Base) -> Int32 {
 // Check that vtables and witness tables contain SILDeclRefs with signatures.
 
 // CHECK: sil_vtable Base {
-// CHECK-NEXT:  #Base.foo!1: (Base) -> () -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VyF	// Base.foo() -> Int32
-// CHECK-NEXT:  #Base.foo!1: (Base) -> (Int32) -> () : _T010SILDeclRef4BaseC3fooys5Int32V1n_tF	// Base.foo(n : Int32) -> ()
-// CHECK-NEXT:  #Base.foo!1: (Base) -> (Float) -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VSf1f_tF	// Base.foo(f : Float) -> Int32
-// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010SILDeclRef4BaseCACycfc	// Base.init() -> Base
+// CHECK-NEXT:  #Base.foo!1: (Base) -> () -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VyF	// Base.foo()
+// CHECK-NEXT:  #Base.foo!1: (Base) -> (Int32) -> () : _T010SILDeclRef4BaseC3fooys5Int32V1n_tF	// Base.foo(n:)
+// CHECK-NEXT:  #Base.foo!1: (Base) -> (Float) -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VSf1f_tF	// Base.foo(f:)
+// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010SILDeclRef4BaseCACycfc	// Base.init()
 // CHECK-NEXT:  #Base.deinit!deallocator: _T010SILDeclRef4BaseCfD	// Base.__deallocating_deinit
 // CHECK-NEXT: }
 
 // CHECK:sil_witness_table [serialized] Base: P module SILDeclRef {
-// CHECK-NEXT: method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : @_T010SILDeclRef4BaseCAA1PA2aDP3foos5Int32VyFTW	// protocol witness for P.foo() -> Int32 in conformance Base
-// CHECK-NEXT: method #P.foo!1: <Self where Self : P> (Self) -> (Int32) -> () : @_T010SILDeclRef4BaseCAA1PA2aDP3fooys5Int32V1n_tFTW	// protocol witness for P.foo(n : Int32) -> () in conformance Base
+// CHECK-NEXT: method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : @_T010SILDeclRef4BaseCAA1PA2aDP3foos5Int32VyFTW	// protocol witness for P.foo()
+// CHECK-NEXT: method #P.foo!1: <Self where Self : P> (Self) -> (Int32) -> () : @_T010SILDeclRef4BaseCAA1PA2aDP3fooys5Int32V1n_tFTW	// protocol witness for P.foo(n:) in conformance Base
 // CHECK-NEXT: }
 
 

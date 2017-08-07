@@ -29,6 +29,11 @@ namespace swift {
   class LazyResolver;
   class ExtensionDecl;
   class ProtocolDecl;
+  class Type;
+  class DeclContext;
+  class ConcreteDeclRef;
+  class ValueDecl;
+  class DeclName;
 
   /// \brief Typecheck a declaration parsed during code completion.
   ///
@@ -48,15 +53,6 @@ namespace swift {
 
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
-
-  /// \brief Collect all the protocol requirements that a given declaration can
-  ///   provide default implementations for. VD is a declaration in extension
-  ///   declaration. Scratch is the buffer to collect those protocol
-  ///   requirements.
-  ///
-  /// \returns the slice of Scratch
-  ArrayRef<ValueDecl*> canDeclProvideDefaultImplementationFor(ValueDecl* VD,
-                                  llvm::SmallVectorImpl<ValueDecl*> &Scractch);
 
   /// \brief Given an unresolved member E and its parent P, this function tries
   /// to infer the type of E.
@@ -97,7 +93,7 @@ namespace swift {
     Normal,
 
     /// Type check the argument to an Objective-C #keyPath.
-    ObjCKeyPath,
+    KeyPath,
   };
 
   /// \brief Return the type of an expression parsed during code completion, or
@@ -140,6 +136,33 @@ namespace swift {
 
   /// Creates a lazy type resolver for use in lookups.
   OwnedResolver createLazyResolver(ASTContext &Ctx);
+
+  typedef std::pair<ExtensionDecl*, bool> ExtensionAndIsSynthesized;
+
+  typedef llvm::function_ref<void(ArrayRef<ExtensionAndIsSynthesized>)>
+    ExtensionGroupOperation;
+
+  class SynthesizedExtensionAnalyzer {
+    struct Implementation;
+    Implementation &Impl;
+  public:
+    SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
+                                 PrintOptions Options,
+                                 bool IncludeUnconditional = true);
+    ~SynthesizedExtensionAnalyzer();
+
+    enum class MergeGroupKind : char {
+      All,
+      MergeableWithTypeDef,
+      UnmergeableWithTypeDef,
+    };
+
+    void forEachExtensionMergeGroup(MergeGroupKind Kind,
+                                    ExtensionGroupOperation Fn);
+    bool isInSynthesizedExtension(const ValueDecl *VD);
+    bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
+    bool hasMergeGroup(MergeGroupKind Kind);
+  };
 }
 
 #endif

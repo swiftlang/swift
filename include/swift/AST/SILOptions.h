@@ -19,6 +19,7 @@
 #define SWIFT_AST_SILOPTIONS_H
 
 #include "swift/Basic/Sanitizers.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 #include <climits>
@@ -55,6 +56,11 @@ public:
 
   /// Controls how to perform SIL linking.
   LinkingMode LinkMode = LinkNormal;
+
+  /// Controls whether to pull in SIL from partial modules during the
+  /// merge modules step. Could perhaps be merged with the link mode
+  /// above but the interactions between all the flags are tricky.
+  bool MergePartialModules = false;
 
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
@@ -124,24 +130,39 @@ public:
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
 
-  /// Use the copy-on-write implementation for opaque existentials.
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
-  bool UseCOWExistentials = true;
-#else
-  bool UseCOWExistentials = false;
-#endif
-
   /// Indicates which sanitizer is turned on.
   SanitizerKind Sanitize : 2;
 
   /// Emit compile-time diagnostics when the law of exclusivity is violated.
-  bool EnforceExclusivityStatic = false;
+  bool EnforceExclusivityStatic = true;
 
   /// Emit checks to trap at run time when the law of exclusivity is violated.
-  bool EnforceExclusivityDynamic = false;
+  bool EnforceExclusivityDynamic = true;
+
+  /// Enable the mandatory semantic arc optimizer.
+  bool EnableMandatorySemanticARCOpts = false;
+
+  /// \brief Enable large loadable types IRGen pass.
+  bool EnableLargeLoadableTypes = true;
+
+  /// Enables the "fully fragile" resilience strategy.
+  ///
+  /// \see ResilienceStrategy::Fragile
+  bool SILSerializeAll = false;
+
+  /// If set, SIL witness tables will be serialized.
+  ///
+  /// It is supposed to be used only for compiling overlays.
+  /// User code should never be compiled with this flag set.
+  bool SILSerializeWitnessTables = false;
 
   SILOptions() : Sanitize(SanitizerKind::None) {}
 
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Bridging PCH hash.
+  llvm::hash_code getPCHHashComponents() const {
+    return llvm::hash_value(0);
+  }
 };
 
 } // end namespace swift

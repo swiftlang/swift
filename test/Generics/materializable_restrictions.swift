@@ -15,7 +15,7 @@ func test20807269() {
 func test15921530() {
     struct X {}
 
-    func makef<T>() -> (T) -> () { // expected-note {{in call to function 'makef'}}
+    func makef<T>() -> (T) -> () { // expected-note {{in call to function 'makef()'}}
       return {
         x in ()
       }

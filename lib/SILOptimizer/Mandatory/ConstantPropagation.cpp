@@ -232,6 +232,7 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
   }
 
+  // Comparisons of an unsigned value with 0.
   SILValue Other;
   auto MatchNonNegative =
       m_BuiltinInst(BuiltinValueKind::AssumeNonNegative, m_ValueBase());
@@ -257,6 +258,132 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
                                           MatchNonNegative)))) {
     SILBuilderWithScope B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
+  }
+
+  // Comparisons with Int.Max.
+  IntegerLiteralInst *IntMax;
+
+  // Check signed comparisons.
+  if (match(BI,
+            m_CombineOr(
+                // Int.max < x
+                m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
+                              m_IntegerLiteralInst(IntMax), m_SILValue(Other)),
+                // x > Int.max
+                m_BuiltinInst(BuiltinValueKind::ICMP_SGT, m_SILValue(Other),
+                              m_IntegerLiteralInst(IntMax)))) &&
+      IntMax->getValue().isMaxSignedValue()) {
+    // Any signed number should be <= then IntMax.
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
+  }
+
+  if (match(BI,
+            m_CombineOr(
+                m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
+                              m_IntegerLiteralInst(IntMax), m_SILValue(Other)),
+                m_BuiltinInst(BuiltinValueKind::ICMP_SLE, m_SILValue(Other),
+                              m_IntegerLiteralInst(IntMax)))) &&
+      IntMax->getValue().isMaxSignedValue()) {
+    // Any signed number should be <= then IntMax.
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
+  }
+
+  // For any x of the same size as Int.max and n>=1 , (x>>n) is always <= Int.max,
+  // that is (x>>n) <= Int.max and Int.max >= (x>>n) are true.
+  if (match(BI,
+            m_CombineOr(
+                // Int.max >= x
+                m_BuiltinInst(BuiltinValueKind::ICMP_UGE,
+                              m_IntegerLiteralInst(IntMax), m_SILValue(Other)),
+                // x <= Int.max
+                m_BuiltinInst(BuiltinValueKind::ICMP_ULE, m_SILValue(Other),
+                              m_IntegerLiteralInst(IntMax)),
+                // Int.max >= x
+                m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
+                              m_IntegerLiteralInst(IntMax), m_SILValue(Other)),
+                // x <= Int.max
+                m_BuiltinInst(BuiltinValueKind::ICMP_SLE, m_SILValue(Other),
+                              m_IntegerLiteralInst(IntMax)))) &&
+      IntMax->getValue().isMaxSignedValue()) {
+    // Check if other is a result of a logical shift right by a strictly
+    // positive number of bits.
+    IntegerLiteralInst *ShiftCount;
+    if (match(Other, m_BuiltinInst(BuiltinValueKind::LShr, m_ValueBase(),
+                                   m_IntegerLiteralInst(ShiftCount))) &&
+        ShiftCount->getValue().isStrictlyPositive()) {
+      SILBuilderWithScope B(BI);
+      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
+    }
+  }
+
+  // At the same time (x>>n) > Int.max and Int.max < (x>>n) is false.
+  if (match(BI,
+            m_CombineOr(
+                // Int.max < x
+                m_BuiltinInst(BuiltinValueKind::ICMP_ULT,
+                              m_IntegerLiteralInst(IntMax), m_SILValue(Other)),
+                // x > Int.max
+                m_BuiltinInst(BuiltinValueKind::ICMP_UGT, m_SILValue(Other),
+                              m_IntegerLiteralInst(IntMax)),
+                // Int.max < x
+                m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
+                              m_IntegerLiteralInst(IntMax), m_SILValue(Other)),
+                // x > Int.max
+                m_BuiltinInst(BuiltinValueKind::ICMP_SGT, m_SILValue(Other),
+                              m_IntegerLiteralInst(IntMax)))) &&
+      IntMax->getValue().isMaxSignedValue()) {
+    // Check if other is a result of a logical shift right by a strictly
+    // positive number of bits.
+    IntegerLiteralInst *ShiftCount;
+    if (match(Other, m_BuiltinInst(BuiltinValueKind::LShr, m_ValueBase(),
+                                   m_IntegerLiteralInst(ShiftCount))) &&
+        ShiftCount->getValue().isStrictlyPositive()) {
+      SILBuilderWithScope B(BI);
+      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
+    }
+  }
+
+  // Fold x < 0 into false, if x is known to be a result of an unsigned
+  // operation with overflow checks enabled.
+  BuiltinInst *BIOp;
+  if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
+                              m_TupleExtractInst(m_BuiltinInst(BIOp), 0),
+                              m_Zero()))) {
+    // Check if Other is a result of an unsigned operation with overflow.
+    switch (BIOp->getBuiltinInfo().ID) {
+    default:
+      break;
+    case BuiltinValueKind::UAddOver:
+    case BuiltinValueKind::USubOver:
+    case BuiltinValueKind::UMulOver:
+      // Was it an operation with an overflow check?
+      if (match(BIOp->getOperand(2), m_One())) {
+        SILBuilderWithScope B(BI);
+        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
+      }
+    }
+  }
+
+  // Fold x >= 0 into true, if x is known to be a result of an unsigned
+  // operation with overflow checks enabled.
+  if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
+                              m_TupleExtractInst(m_BuiltinInst(BIOp), 0),
+                              m_Zero()))) {
+    // Check if Other is a result of an unsigned operation with overflow.
+    switch (BIOp->getBuiltinInfo().ID) {
+    default:
+      break;
+    case BuiltinValueKind::UAddOver:
+    case BuiltinValueKind::USubOver:
+    case BuiltinValueKind::UMulOver:
+      // Was it an operation with an overflow check?
+      if (match(BIOp->getOperand(2), m_One())) {
+        SILBuilderWithScope B(BI);
+        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
+      }
+    }
   }
 
   return nullptr;
@@ -1154,8 +1281,6 @@ private:
       invalidateAnalysis(Invalidation);
     }
   }
-
-  StringRef getName() override { return "Constant Propagation"; }
 };
 
 } // end anonymous namespace

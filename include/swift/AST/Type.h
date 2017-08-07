@@ -51,6 +51,7 @@ class SubstitutionMap;
 class TypeBase;
 class Type;
 class TypeWalker;
+struct ExistentialLayout;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
@@ -68,6 +69,15 @@ using TypeSubstitutionFn
 struct QueryTypeSubstitutionMap {
   const TypeSubstitutionMap &substitutions;
 
+  Type operator()(SubstitutableType *type) const;
+};
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c TypeSubstitutionMap, or returns the original type
+/// if no match was found.
+struct QueryTypeSubstitutionMapOrIdentity {
+  const TypeSubstitutionMap &substitutions;
+  
   Type operator()(SubstitutableType *type) const;
 };
 
@@ -155,7 +165,24 @@ enum class SubstFlags {
 };
 
 /// Options for performing substitutions into a type.
-typedef OptionSet<SubstFlags> SubstOptions;
+struct SubstOptions : public OptionSet<SubstFlags> {
+  // Note: The unfortunate use of TypeBase * here, rather than Type,
+  // is due to a libc++ quirk that requires the result type to be
+  // complete.
+  typedef std::function<TypeBase *(const NormalProtocolConformance *,
+                                   AssociatedTypeDecl *)>
+    GetTentativeTypeWitness;
+
+  /// Function that retrieves a tentative type witness for a protocol
+  /// conformance with the state \c CheckingTypeWitnesses.
+  GetTentativeTypeWitness getTentativeTypeWitness;
+
+  SubstOptions(llvm::NoneType) : OptionSet(None) { }
+
+  SubstOptions(SubstFlags flags) : OptionSet(flags) { }
+
+  SubstOptions(OptionSet<SubstFlags> options) : OptionSet(options) { }
+};
 
 inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
   return SubstOptions(lhs) | rhs;
@@ -350,17 +377,11 @@ class CanType : public Type {
   static bool isReferenceTypeImpl(CanType type, bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
-  static bool isExistentialTypeImpl(CanType type,
-                                    SmallVectorImpl<ProtocolDecl*> &protocols);
-  static bool isAnyExistentialTypeImpl(CanType type,
-                                    SmallVectorImpl<ProtocolDecl*> &protocols);
-  static void getAnyExistentialTypeProtocolsImpl(CanType type,
-                                    SmallVectorImpl<ProtocolDecl*> &protocols);
   static bool isObjCExistentialTypeImpl(CanType type);
   static CanType getAnyOptionalObjectTypeImpl(CanType type,
                                               OptionalTypeKind &kind);
   static CanType getReferenceStorageReferentImpl(CanType type);
-  static CanType getLValueOrInOutObjectTypeImpl(CanType type);
+  static CanType getWithoutSpecifierTypeImpl(CanType type);
 
 public:
   explicit CanType(TypeBase *P = 0) : Type(P) {
@@ -404,27 +425,13 @@ public:
     return isExistentialTypeImpl(*this);
   }
 
-  /// Is this type existential?
-  bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return isExistentialTypeImpl(*this, protocols);
-  }
-
   /// Is this type an existential or an existential metatype?
   bool isAnyExistentialType() const {
     return isAnyExistentialTypeImpl(*this);
   }
 
-  /// Is this type an existential or an existential metatype?
-  bool isAnyExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return isAnyExistentialTypeImpl(*this, protocols);
-  }
-
-  /// Given that this type is any kind of existential, return its
-  /// protocols in a canonical order.
-  void getAnyExistentialTypeProtocols(
-                                SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return getAnyExistentialTypeProtocolsImpl(*this, protocols);
-  }
+  /// Break an existential down into a set of constraints.
+  ExistentialLayout getExistentialLayout();
 
   /// Is this an ObjC-compatible existential type?
   bool isObjCExistentialType() const {
@@ -439,11 +446,6 @@ public:
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 
-  /// Returns information about the layout constraint represented by
-  /// this type. If this type does not represent a layout constraint,
-  /// it returns an empty LayoutConstraint.
-  LayoutConstraint getLayoutConstraint() const;
-
   CanType getAnyOptionalObjectType() const {
     OptionalTypeKind kind;
     return getAnyOptionalObjectTypeImpl(*this, kind);
@@ -457,8 +459,8 @@ public:
     return getReferenceStorageReferentImpl(*this);
   }
   
-  CanType getLValueOrInOutObjectType() const {
-    return getLValueOrInOutObjectTypeImpl(*this);
+  CanType getWithoutSpecifierType() const {
+    return getWithoutSpecifierTypeImpl(*this);
   }
 
   // Direct comparison is allowed for CanTypes - they are known canonical.

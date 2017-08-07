@@ -52,10 +52,6 @@ class UsePrespecialized: public SILModuleTransform {
     }
   }
 
-  StringRef getName() override {
-    return "Use pre-specialized versions of functions";
-  }
-
   bool replaceByPrespecialized(SILFunction &F);
 };
 

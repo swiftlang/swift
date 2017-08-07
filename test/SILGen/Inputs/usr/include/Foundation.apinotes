@@ -1,0 +1,145 @@
+Name: Foundation
+Classes:
+- Name: NSArray
+  SwiftBridge: Swift.Array
+  SwiftImportAsNonGeneric: true
+- Name: NSMutableArray
+  SwiftImportAsNonGeneric: true
+- Name: NSDictionary
+  SwiftBridge: Swift.Dictionary
+  SwiftImportAsNonGeneric: true
+- Name: NSMutableDictionary
+  SwiftImportAsNonGeneric: true
+- Name: NSError
+  SwiftBridge: Swift.Error
+- Name: NSNumber
+  Methods:
+  - Selector: 'initWithChar:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedChar:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithShort:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedShort:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithInt:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedInt:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithLong:'
+    Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedLong:'
+    Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'initWithLongLong:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedLongLong:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithFloat:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithDouble:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithBool:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithInteger:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedInteger:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'numberWithChar:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedChar:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithShort:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedShort:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithInt:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedInt:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithLongLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedLongLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithFloat:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithDouble:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithBool:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithInteger:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedInteger:'
+    Availability: nonswift
+    MethodKind: Class
+  Properties:
+  - Name: charValue
+    SwiftName: int8Value
+  - Name: unsignedCharValue
+    SwiftName: uint8Value
+  - Name: shortValue
+    SwiftName: int16Value
+  - Name: unsignedShortValue
+    SwiftName: uint16Value
+  - Name: intValue
+    SwiftName: int32Value
+  - Name: unsignedIntValue
+    SwiftName: uint32Value
+  - Name: longValue
+    Availability: nonswift
+  - Name: unsignedLongValue
+    Availability: nonswift
+    AvailabilityMsg: use 'uintValue'
+  - Name: longLongValue
+    SwiftName: int64Value
+  - Name: unsignedLongLongValue
+    SwiftName: uint64Value
+  - Name: integerValue
+    SwiftName: intValue
+  - Name: unsignedIntegerValue
+    SwiftName: uintValue
+- Name: NSSet
+  SwiftBridge: Swift.Set
+  SwiftImportAsNonGeneric: true
+  Methods:
+  - Selector: 'filteredSetUsingPredicate:'
+    SwiftName: filtered(using:)
+    MethodKind: Instance
+- Name: NSMutableSet
+  SwiftImportAsNonGeneric: true
+- Name: NSString
+  SwiftBridge: Swift.String
+- Name: NSURL
+  SwiftBridge: URL

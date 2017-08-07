@@ -2,7 +2,7 @@
 
 func noArgs() {}
 func oneArg(x: Int) {}
-func oneUnlabelledArg(_ x: Int) {}
+func oneUnlabeledArg(_ x: Int) {}
 
 typealias FunctionAlias = (_ x: inout Int) -> Bool
 typealias FunctionAliasNoLabel = (Int) -> Bool

@@ -6,7 +6,7 @@ import Swift
 import SwiftShims
 
 protocol CanAdd {
-  func +(lhs: Self, rhs: Self) -> Self
+  static func +(lhs: Self, rhs: Self) -> Self
 }
 
 extension Int64 : CanAdd {

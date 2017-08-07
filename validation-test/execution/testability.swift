@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // This file is intended to match the run lines in
 // test/Interpreter/testability.swift, but with -O added to all compilations.

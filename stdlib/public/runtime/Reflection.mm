@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Reflection.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -23,6 +24,7 @@
 #include "WeakReference.h"
 #include "llvm/Support/Compiler.h"
 #include <cassert>
+#include <cinttypes>
 #include <cstdio>
 #include <cstring>
 #include <new>
@@ -172,14 +174,9 @@ AnyReturn swift_MagicMirrorData_value(HeapObject *owner,
   Any result;
 
   result.Type = type;
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   auto *opaqueValueAddr = type->allocateBoxForExistentialIn(&result.Buffer);
   type->vw_initializeWithCopy(opaqueValueAddr,
                               const_cast<OpaqueValue *>(value));
-#else
-  type->vw_initializeBufferWithCopy(&result.Buffer,
-                                    const_cast<OpaqueValue*>(value));
-#endif
 
   return AnyReturn(result);
 }
@@ -386,7 +383,7 @@ void swift_TupleMirror_subscript(String *outString,
   if (!hasLabel) {
     // The name is the stringized element number '.0'.
     char buf[32];
-    snprintf(buf, sizeof(buf), ".%zd", i);
+    snprintf(buf, sizeof(buf), ".%" PRIdPTR, i);
     new (outString) String(buf, strlen(buf));
   }
 
@@ -445,14 +442,8 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
   // allocated storage.
   ValueBuffer temporaryBuffer;
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   auto temporaryValue = reinterpret_cast<ClassExistentialContainer *>(
       type->allocateBufferIn(&temporaryBuffer));
-#else
-  auto temporaryValue =
-    reinterpret_cast<ClassExistentialContainer *>(
-      type->vw_allocateBuffer(&temporaryBuffer));
-#endif
 
   // Now copy the entire value out of the parent, which will include the
   // witness tables.
@@ -467,11 +458,7 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
   new (outMirror) MagicMirror(reinterpret_cast<OpaqueValue *>(temporaryValue),
                               type, /*take*/ true);
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   type->deallocateBufferIn(&temporaryBuffer);
-#else
-  type->vw_deallocateBuffer(&temporaryBuffer);
-#endif
 
   // swift_StructMirror_subscript and swift_ClassMirror_subscript
   // requires that the owner be consumed. Since we have the new heap box as the
@@ -1224,9 +1211,8 @@ char *swift_demangle(const char *mangledName,
 
   // Check if we are dealing with Swift mangled name, otherwise, don't try
   // to demangle and send indication to the user.
-  if (mangledName[0] != '_' || mangledName[1] != 'T') {
-    return nullptr;
-  }
+  if (!Demangle::isSwiftSymbol(mangledName))
+    return nullptr; // Not a mangled name
 
   // Demangle the name.
   auto options = Demangle::DemangleOptions();

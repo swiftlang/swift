@@ -99,7 +99,7 @@ public:
     // Do we have enough space in the current slab?
     if (CurPtr + ObjectSize > End) {
       // No. We have to malloc a new slab.
-      // We doulbe the slab size for each allocated slab.
+      // We double the slab size for each allocated slab.
       SlabSize = std::max(SlabSize * 2, ObjectSize + alignof(T));
       size_t AllocSize = sizeof(Slab) + SlabSize;
       Slab *newSlab = (Slab *)malloc(AllocSize);
@@ -125,8 +125,8 @@ public:
 
   /// Tries to enlarge the \p Capacity of an array of \p Objects.
   ///
-  /// If \p Objects is allcoated at the end of the current slab and the slab
-  /// has enough free space, the \p Capacity is simpliy enlarged and no new
+  /// If \p Objects is allocated at the end of the current slab and the slab
+  /// has enough free space, the \p Capacity is simply enlarged and no new
   /// allocation needs to be done.
   /// Otherwise a new array of objects is allocated and \p Objects is set to the
   /// new memory address.
@@ -171,7 +171,7 @@ public:
 
   /// Creates a node of kind \p K with a \p Text payload.
   ///
-  /// The \p Text string must be already allocted with the Factory and therefore
+  /// The \p Text string must be already allocated with the Factory and therefore
   /// it is _not_ copied.
   NodePointer createNodeWithAllocatedText(Node::Kind K, llvm::StringRef Text);
 
@@ -184,7 +184,7 @@ public:
 
   /// Creates a node of kind \p K with a \p Text payload.
   ///
-  /// The \p Text string is already allocted with the Factory and therefore
+  /// The \p Text string is already allocated with the Factory and therefore
   /// it is _not_ copied.
   NodePointer createNode(Node::Kind K, const CharVector &Text);
   
@@ -212,7 +212,7 @@ public:
 
   Vector() { }
 
-  /// Construct a vector with an inital capacity.
+  /// Construct a vector with an initial capacity.
   explicit Vector(NodeFactory &Factory, size_t InitialCapacity) {
     init(Factory, InitialCapacity);
   }
@@ -283,19 +283,14 @@ public:
 
 /// The demangler.
 ///
-/// It de-mangles a string and it also ownes the returned node-tree. This means
+/// It de-mangles a string and it also owns the returned node-tree. This means
 /// The nodes of the tree only live as long as the Demangler itself.
 class Demangler : public NodeFactory {
-private:
+protected:
   StringRef Text;
   size_t Pos = 0;
 
-  struct NodeWithPos {
-    NodePointer Node;
-    size_t Pos;
-  };
-
-  Vector<NodeWithPos> NodeStack;
+  Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
   Vector<unsigned> PendingSubstitutions;
 
@@ -333,19 +328,25 @@ private:
     Pos--;
   }
 
+  StringRef consumeAll() {
+    StringRef str = Text.drop_front(Pos);
+    Pos = Text.size();
+    return str;
+  }
+
   void pushNode(NodePointer Nd) {
-    NodeStack.push_back({ Nd, Pos }, *this);
+    NodeStack.push_back(Nd, *this);
   }
 
   NodePointer popNode() {
-    return NodeStack.pop_back_val().Node;
+    return NodeStack.pop_back_val();
   }
 
   NodePointer popNode(Node::Kind kind) {
     if (NodeStack.empty())
       return nullptr;
 
-    Node::Kind NdKind = NodeStack.back().Node->getKind();
+    Node::Kind NdKind = NodeStack.back()->getKind();
     if (NdKind != kind)
       return nullptr;
 
@@ -356,7 +357,7 @@ private:
     if (NodeStack.empty())
       return nullptr;
 
-    Node::Kind NdKind = NodeStack.back().Node->getKind();
+    Node::Kind NdKind = NodeStack.back()->getKind();
     if (!pred(NdKind))
       return nullptr;
     
@@ -381,7 +382,7 @@ private:
     return createWithChild(kind, popNode(Node::Kind::Type));
   }
 
-  void parseAndPushNodes();
+  bool parseAndPushNodes();
 
   NodePointer changeKind(NodePointer Node, Node::Kind NewKind);
 
@@ -405,8 +406,7 @@ private:
   NodePointer popTypeAndGetChild();
   NodePointer popTypeAndGetNominal();
   NodePointer demangleBuiltinType();
-  NodePointer demangleNominalType(Node::Kind kind);
-  NodePointer demangleTypeAlias();
+  NodePointer demangleAnyGenericType(Node::Kind kind);
   NodePointer demangleExtensionContext();
   NodePointer demanglePlainFunction();
   NodePointer popFunctionType(Node::Kind kind);
@@ -447,6 +447,7 @@ private:
   NodePointer demangleMetatypeRepresentation();
   NodePointer demangleFunctionEntity();
   NodePointer demangleEntity(Node::Kind Kind);
+  NodePointer demangleProtocolList();
   NodePointer demangleProtocolListType();
   NodePointer demangleGenericSignature(bool hasParamCounts);
   NodePointer demangleGenericRequirement();
@@ -454,6 +455,8 @@ private:
   NodePointer demangleValueWitness();
 
   NodePointer demangleObjCTypeName();
+
+  void dump();
 
 public:
   Demangler() {}

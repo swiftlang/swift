@@ -58,6 +58,7 @@ class FormatContext {
   swift::ASTWalker::ParentTy End;
   bool InDocCommentBlock;
   bool InCommentLine;
+  bool InStringLiteral;
   SiblingAlignInfo SiblingInfo;
 
 public:
@@ -67,9 +68,11 @@ public:
                 swift::ASTWalker::ParentTy End = swift::ASTWalker::ParentTy(),
                 bool InDocCommentBlock = false,
                 bool InCommentLine = false,
+                bool InStringLiteral = false,
                 SiblingAlignInfo SiblingInfo = SiblingAlignInfo())
     :SM(SM), Stack(Stack), Cursor(Stack.rbegin()), Start(Start), End(End),
      InDocCommentBlock(InDocCommentBlock), InCommentLine(InCommentLine),
+     InStringLiteral(InStringLiteral),
      SiblingInfo(SiblingInfo) { }
 
   FormatContext parent() {
@@ -87,21 +90,42 @@ public:
     return InCommentLine;
   }
 
+  bool IsInStringLiteral() const {
+    return InStringLiteral;
+  }
+
   bool isSwitchControlStmt(unsigned LineIndex, StringRef Text) {
     if (!isSwitchContext())
       return false;
-    StringRef LineText = swift::ide::getTrimmedTextForLine(LineIndex, Text);
+    StringRef LineText = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
     return LineText.startswith("break") || LineText.startswith("continue") ||
       LineText.startswith("return") || LineText.startswith("fallthrough");
   }
 
-  void padToSiblingColumn(StringBuilder &Builder) {
+  void padToSiblingColumn(StringBuilder &Builder,
+                          const CodeFormatOptions &FmtOptions) {
     assert(SiblingInfo.Loc.isValid() && "No sibling to align with.");
     CharSourceRange Range(SM, Lexer::getLocForStartOfLine(SM, SiblingInfo.Loc),
                           SiblingInfo.Loc);
-    for (auto C : Range.str()) {
-      Builder.append(1, C == '\t' ? C : ' ');
+    unsigned SpaceLength = 0;
+    unsigned TabLength = 0;
+
+    // Calculating space length
+    for (auto C: Range.str()) {
+      if (C == '\t')
+        SpaceLength += FmtOptions.TabWidth;
+      else
+        SpaceLength += 1;
     }
+
+    // If we are using tabs, calculating the number of tabs and spaces we need
+    // to insert.
+    if (FmtOptions.UseTabs) {
+      TabLength = SpaceLength / FmtOptions.TabWidth;
+      SpaceLength = SpaceLength % FmtOptions.TabWidth;
+    }
+    Builder.append(TabLength, '\t');
+    Builder.append(SpaceLength, ' ');
   }
 
   bool HasSibling() {
@@ -200,7 +224,7 @@ public:
 
       if (ParentLineAndColumn.first != LineAndColumn.first) {
         // The start line is not the same, see if this is at the 'else' clause.
-        if (IfStmt *If = dyn_cast_or_null<IfStmt>(Cursor->getAsStmt())) {
+        if (auto *If = dyn_cast_or_null<IfStmt>(Cursor->getAsStmt())) {
           SourceLoc ElseLoc = If->getElseLoc();
           // If we're at 'else', take the indent of 'if' and continue.
           if (ElseLoc.isValid() &&
@@ -268,7 +292,7 @@ public:
     }
 
     // Handle switch / case, indent unless at a case label.
-    if (CaseStmt *Case = dyn_cast_or_null<CaseStmt>(Cursor->getAsStmt())) {
+    if (auto *Case = dyn_cast_or_null<CaseStmt>(Cursor->getAsStmt())) {
       auto LabelItems = Case->getCaseLabelItems();
       SourceLoc Loc;
       if (!LabelItems.empty())
@@ -635,6 +659,7 @@ class FormatWalker : public SourceEntityWalker {
   swift::ASTWalker::ParentTy AtEnd;
   bool InDocCommentBlock = false;
   bool InCommentLine = false;
+  bool InStringLiteral = false;
   std::vector<Token> Tokens;
   LangOptions Options;
   TokenIt CurrentTokIt;
@@ -644,7 +669,7 @@ class FormatWalker : public SourceEntityWalker {
   /// Sometimes, target is a part of "parent", for instance, "#else" is a part
   /// of an ifconfigstmt, so that ifconfigstmt is not really the parent of "#else".
   bool isTargetPartOf(swift::ASTWalker::ParentTy Parent) {
-    if (auto Conf = dyn_cast_or_null<IfConfigStmt>(Parent.getAsStmt())) {
+    if (auto Conf = dyn_cast_or_null<IfConfigDecl>(Parent.getAsDecl())) {
       for (auto Clause : Conf->getClauses()) {
         if (Clause.Loc == TargetLocation)
           return true;
@@ -726,7 +751,8 @@ public:
     walk(SF);
     scanForComments(SourceLoc());
     return FormatContext(SM, Stack, AtStart, AtEnd, InDocCommentBlock,
-                         InCommentLine, SCollector.getSiblingInfo());
+                         InCommentLine, InStringLiteral,
+                         SCollector.getSiblingInfo());
   }
 
   ArrayRef<Token> getTokens() {
@@ -760,6 +786,12 @@ public:
   }
 
   bool walkToExprPre(Expr *E) override {
+    if (E->getKind() == ExprKind::StringLiteral &&
+        SM.isBeforeInBuffer(E->getStartLoc(), TargetLocation) &&
+        SM.isBeforeInBuffer(TargetLocation,
+                            Lexer::getLocForEndOfToken(SM, E->getEndLoc()))) {
+      InStringLiteral = true;
+    }
     return HandlePre(E, E->getStartLoc(), E->getEndLoc());
   }
 
@@ -784,9 +816,9 @@ public:
 
     // If having sibling locs to align with, respect siblings.
     if (FC.HasSibling()) {
-      StringRef Line = swift::ide::getTrimmedTextForLine(LineIndex, Text);
+      StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
       StringBuilder Builder;
-      FC.padToSiblingColumn(Builder);
+      FC.padToSiblingColumn(Builder, FmtOptions);
       if (FC.needExtraIndentationForSibling()) {
         if (FmtOptions.UseTabs)
           Builder.append(1, '\t');
@@ -795,6 +827,11 @@ public:
       }
       Builder.append(Line);
       return std::make_pair(LineRange(LineIndex, 1), Builder.str().str());
+    }
+
+    if (FC.IsInStringLiteral()) {
+      return std::make_pair(LineRange(LineIndex, 1),
+        swift::ide::getTextForLine(LineIndex, Text, /*Trim*/false));
     }
 
     // Take the current indent position of the outer context, then add another
@@ -833,7 +870,7 @@ public:
     }
 
     // Reformat the specified line with the calculated indent.
-    StringRef Line = swift::ide::getTrimmedTextForLine(LineIndex, Text);
+    StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
     std::string IndentedLine;
     if (FmtOptions.UseTabs)
       IndentedLine.assign(ExpandedIndent / FmtOptions.TabWidth, '\t');
@@ -905,20 +942,20 @@ size_t swift::ide::getOffsetOfLine(unsigned LineIndex, StringRef Text) {
   return LineOffset;
 }
 
-size_t swift::ide::getOffsetOfTrimmedLine(unsigned LineIndex, StringRef Text) {
+size_t swift::ide::getOffsetOfLine(unsigned LineIndex, StringRef Text, bool Trim) {
   size_t LineOffset = swift::ide::getOffsetOfLine(LineIndex, Text);
-
+  if (!Trim)
+    return LineOffset;
   // Skip leading whitespace.
   size_t FirstNonWSOnLine = Text.find_first_not_of(" \t\v\f", LineOffset);
   if (FirstNonWSOnLine != std::string::npos)
     LineOffset = FirstNonWSOnLine;
-
   return LineOffset;
 }
 
-llvm::StringRef swift::ide::getTrimmedTextForLine(unsigned LineIndex,
-                                                  StringRef Text) {
-  size_t LineOffset = getOffsetOfTrimmedLine(LineIndex, Text);
+llvm::StringRef swift::ide::getTextForLine(unsigned LineIndex, StringRef Text,
+                                           bool Trim) {
+  size_t LineOffset = getOffsetOfLine(LineIndex, Text, Trim);
   size_t LineEnd = Text.find_first_of("\r\n", LineOffset);
   return Text.slice(LineOffset, LineEnd);
 }
@@ -948,7 +985,7 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
   auto SourceBufferID = SF.getBufferID().getValue();
   StringRef Text = SM.getLLVMSourceMgr()
     .getMemoryBuffer(SourceBufferID)->getBuffer();
-  size_t Offset = getOffsetOfTrimmedLine(Range.startLine(), Text);
+  size_t Offset = getOffsetOfLine(Range.startLine(), Text, /*Trim*/true);
   SourceLoc Loc = SM.getLocForBufferStart(SourceBufferID)
     .getAdvancedLoc(Offset);
   FormatContext FC = walker.walkToLocation(Loc);

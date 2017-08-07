@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -inline -print-shortest-path-info 2>%t/log >/dev/null
 // RUN: %FileCheck %s <%t/log
 // REQUIRES: asserts

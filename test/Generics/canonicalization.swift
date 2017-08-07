@@ -4,11 +4,11 @@
 protocol P0 { }
 
 protocol P {
-  associatedtype A
+  associatedtype A // expected-note{{declared here}}
 }
 
 protocol Q : P {
-  associatedtype A
+  associatedtype A // expected-warning{{redeclaration of associated type 'A' from protocol 'P' is better expressed as a 'where' clause on the protocol}}
 }
 
 func f<T>(t: T) where T : P, T : Q, T.A : P0 { } // expected-note{{'f(t:)' previously declared here}}

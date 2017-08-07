@@ -61,17 +61,6 @@ public:
     return finalize();
   }
 
-  std::string mangleWitnessTableOffset(const ValueDecl *Decl) {
-    beginMangling();
-    if (auto ctor = dyn_cast<ConstructorDecl>(Decl)) {
-      appendConstructorEntity(ctor, /*isAllocating=*/true);
-    } else {
-      appendEntity(Decl);
-    }
-    appendOperator("Wo");
-    return finalize();
-  }
-
   std::string mangleFieldOffsetFull(const ValueDecl *Decl, bool isIndirect) {
     beginMangling();
     appendEntity(Decl);
@@ -125,7 +114,7 @@ public:
     beginMangling();
     appendProtocolConformance(Conformance);
     appendAssociatedTypePath(AssociatedType);
-    appendNominalType(Proto);
+    appendAnyGenericType(Proto);
     appendOperator("WT");
     return finalize();
   }
@@ -156,16 +145,29 @@ public:
     return mangleNominalTypeSymbol(Decl, "MC");
   }
 
-  std::string mangleOutlinedCopyFunction(const NominalTypeDecl *Decl) {
+  std::string mangleOutlinedCopyFunction(const GenericTypeDecl *Decl) {
     beginMangling();
-    appendNominalType(Decl);
+    appendAnyGenericType(Decl);
     appendOperator("Wy");
     return finalize();
   }
-  std::string mangleOutlinedConsumeFunction(const NominalTypeDecl *Decl) {
+  std::string mangleOutlinedConsumeFunction(const GenericTypeDecl *Decl) {
     beginMangling();
-    appendNominalType(Decl);
+    appendAnyGenericType(Decl);
     appendOperator("We");
+    return finalize();
+  }
+
+  std::string mangleOutlinedRetainFunction(const Type t) {
+    beginMangling();
+    appendType(t);
+    appendOperator("Wr");
+    return finalize();
+  }
+  std::string mangleOutlinedReleaseFunction(const Type t) {
+    beginMangling();
+    appendType(t);
+    appendOperator("Ws");
     return finalize();
   }
 
@@ -201,7 +203,7 @@ protected:
   std::string mangleNominalTypeSymbol(const NominalTypeDecl *Decl,
                                       const char *Op) {
     beginMangling();
-    appendNominalType(Decl);
+    appendAnyGenericType(Decl);
     appendOperator(Op);
     return finalize();
   }

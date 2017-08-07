@@ -7,9 +7,9 @@
 struct X {
   func f0(_ i: Int) -> X { }
 
-  func f1(_ i: Int) { } // expected-note {{found this candidate}}
+  func f1(_ i: Int) { }
 
-  mutating func f1(_ f: Float) { } // expected-note {{found this candidate}}
+  mutating func f1(_ f: Float) { }
 
   func f2<T>(_ x: T) -> T { }
 }
@@ -28,9 +28,7 @@ func g0(_: (inout X) -> (Float) -> ()) {}
 _ = x.f0(i)
 x.f0(i).f1(i)
 
-// FIXME: Is this a bug in Swift 4 mode?
 g0(X.f1)
-// expected-error@-1 {{ambiguous reference to member 'f1'}}
 
 _ = x.f0(x.f2(1))
 _ = x.f0(1).f2(i)
@@ -88,9 +86,6 @@ var zcurriedFull = z.curried(0)(1)
 
 // Module
 Swift.print(3, terminator: "")
-
-var format : String
-_ = format._splitFirstIf({ $0.isASCII })
 
 ////
 // Unqualified references
@@ -394,4 +389,43 @@ func r25341015_local(x: Int, y: Int) {}
 func r25341015_inner() {
   func r25341015_local() {}
   r25341015_local(x: 1, y: 2) // expected-error {{argument passed to call that takes no arguments}}
+}
+
+// rdar://problem/32854314 - Emit shadowing diagnostics even if argument types do not much completely
+
+func foo_32854314() -> Double {
+  return 42
+}
+
+func bar_32854314() -> Int {
+  return 0
+}
+
+extension Array where Element == Int {
+  func foo() {
+    let _ = min(foo_32854314(), bar_32854314()) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
+    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+  }
+
+  func foo(_ x: Int, _ y: Double) {
+    let _ = min(x, y) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
+    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+  }
+
+  func bar() {
+    let _ = min(1.0, 2) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
+    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+  }
+}
+
+// Crash in diagnoseImplicitSelfErrors()
+
+struct Aardvark {
+  var snout: Int
+
+  mutating func burrow() {
+    dig(&snout, .y) // expected-error {{type 'Int' has no member 'y'}}
+  }
+
+  func dig(_: inout Int, _: Int) {}
 }

@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
@@ -133,16 +134,16 @@ public:
 
 /// Returns true on success.
 bool PartialApplyCombiner::allocateTemporaries() {
-  // Copy the original arguments of the partial_apply into
-  // newly created temporaries and use these temporaries instead of
-  // the original arguments afterwards.
-  // This is done to "extend" the life-time of original partial_apply
-  // arguments, as they may be destroyed/deallocated before the last
-  // use by one of the apply instructions.
-  // TODO:
-  // Copy arguments of the partial_apply into new temporaries
-  // only if the lifetime of arguments ends before their uses
-  // by apply instructions.
+  // Copy the original arguments of the partial_apply into newly created
+  // temporaries and use these temporaries instead of the original arguments
+  // afterwards.
+  //
+  // This is done to "extend" the life-time of original partial_apply arguments,
+  // as they may be destroyed/deallocated before the last use by one of the
+  // apply instructions.
+  //
+  // TODO: Copy arguments of the partial_apply into new temporaries only if the
+  // lifetime of arguments ends before their uses by apply instructions.
   bool needsReleases = false;
   CanSILFunctionType PAITy =
     PAI->getCallee()->getType().getAs<SILFunctionType>();
@@ -150,14 +151,15 @@ bool PartialApplyCombiner::allocateTemporaries() {
   // Emit a destroy value for each captured closure argument.
   ArrayRef<SILParameterInfo> Params = PAITy->getParameters();
   auto Args = PAI->getArguments();
-  unsigned Delta = Params.size() - Args.size();
+  Params = Params.drop_front(Params.size() - Args.size());
 
   llvm::SmallVector<std::pair<SILValue, unsigned>, 8> ArgsToHandle;
-  for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
-    SILValue Arg = Args[AI];
-    SILParameterInfo Param = Params[AI + Delta];
+  for (unsigned i : indices(Args)) {
+    SILValue Arg = Args[i];
+    SILParameterInfo Param = Params[i];
     if (Param.isIndirectMutating())
       continue;
+
     // Create a temporary and copy the argument into it, if:
     // - the argument stems from an alloc_stack
     // - the argument is consumed by the callee and is indirect
@@ -165,10 +167,18 @@ bool PartialApplyCombiner::allocateTemporaries() {
     if (isa<AllocStackInst>(Arg)
         || (Param.isConsumed()
             && PAI->getSubstCalleeConv().isSILIndirect(Param))) {
+      // If the argument has a dependent type, then we can not create a
+      // temporary for it at the beginning of the function, so we must bail.
+      //
+      // TODO: This is because we are inserting alloc_stack at the beginning/end
+      // of functions where the dependent type may not exist yet.
+      if (Arg->getType().hasOpenedExistential())
+        return false;
+
       // If the temporary is non-trivial, we need to release it later.
       if (!Arg->getType().isTrivial(PAI->getModule()))
         needsReleases = true;
-      ArgsToHandle.push_back(std::make_pair(Arg, AI));
+      ArgsToHandle.push_back(std::make_pair(Arg, i));
     }
   }
 
@@ -296,8 +306,6 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   }
 
   auto Callee = PAI->getCallee();
-  auto FnType = PAI->getSubstCalleeSILType();
-  SILType ResultTy = PAI->getSubstCalleeConv().getSILResultType();
   SubstitutionList Subs = PAI->getSubstitutions();
 
   // The partial_apply might be substituting in an open existential type.
@@ -305,13 +313,11 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
 
   FullApplySite NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NAI =
-      Builder.createTryApply(AI.getLoc(), Callee, FnType, Subs, Args,
-                              TAI->getNormalBB(), TAI->getErrorBB());
+    NAI = Builder.createTryApply(AI.getLoc(), Callee, Subs, Args,
+                                 TAI->getNormalBB(), TAI->getErrorBB());
   else
-    NAI =
-      Builder.createApply(AI.getLoc(), Callee, FnType, ResultTy, Subs, Args,
-                          cast<ApplyInst>(AI)->isNonThrowing());
+    NAI = Builder.createApply(AI.getLoc(), Callee, Subs, Args,
+                              cast<ApplyInst>(AI)->isNonThrowing());
 
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
@@ -398,7 +404,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                 ConvertFunctionInst *CFI) {
   // We only handle simplification of static function references. If we don't
   // have one, bail.
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CFI->getOperand());
+  auto *FRI = dyn_cast<FunctionRefInst>(CFI->getOperand());
   if (!FRI)
     return nullptr;
 
@@ -449,17 +455,15 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
     }
   }
 
-  SILType CCSILTy = SILType::getPrimitiveObjectType(ConvertCalleeTy);
   // Create the new apply inst.
   SILInstruction *NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NAI = Builder.createTryApply(AI.getLoc(), FRI, CCSILTy,
+    NAI = Builder.createTryApply(AI.getLoc(), FRI, 
                                  SubstitutionList(), Args,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   else
-    NAI = Builder.createApply(
-        AI.getLoc(), FRI, CCSILTy, convertConventions.getSILResultType(),
-        SubstitutionList(), Args, cast<ApplyInst>(AI)->isNonThrowing());
+    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionList(), Args,
+                              cast<ApplyInst>(AI)->isNonThrowing());
   return NAI;
 }
 
@@ -516,6 +520,7 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
       auto Arg = FAS.getArgument(i);
       switch (PI.getConvention()) {
         case ParameterConvention::Indirect_In:
+        case ParameterConvention::Indirect_In_Constant:
           Builder.createDestroyAddr(FAS.getLoc(), Arg);
           break;
         case ParameterConvention::Direct_Owned:
@@ -686,27 +691,30 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   }
   Args.push_back(NewSelf);
 
+  auto FnTy = AI.getCallee()->getType().castTo<SILFunctionType>();
+  SILType SubstCalleeType = AI.getSubstCalleeSILType();
+  SILType NewSubstCalleeType;
+
   // Form a new set of substitutions where Self is
   // replaced by a concrete type.
   SmallVector<Substitution, 8> Substitutions;
-  for (auto Subst : AI.getSubstitutions()) {
-    auto *A = Subst.getReplacement()->getAs<ArchetypeType>();
-    if (A && A == OpenedArchetype) {
-      auto Conformances = AI.getModule().getASTContext()
-                            .AllocateUninitialized<ProtocolConformanceRef>(1);
-      Conformances[0] = Conformance;
-      Substitution NewSubst(ConcreteType, Conformances);
-      Substitutions.push_back(NewSubst);
-    } else
-      Substitutions.push_back(Subst);
-  }
-
-  SILType SubstCalleeType = AI.getSubstCalleeSILType();
-
-  SILType NewSubstCalleeType;
-
-  auto FnTy = AI.getCallee()->getType().castTo<SILFunctionType>();
   if (FnTy->isPolymorphic()) {
+    auto FnSubsMap =
+        FnTy->getGenericSignature()->getSubstitutionMap(AI.getSubstitutions());
+    auto FinalSubsMap = FnSubsMap.subst(
+        [&](SubstitutableType *type) -> Type {
+          if (type == OpenedArchetype)
+            return ConcreteType;
+          return type;
+        },
+        [&](CanType origTy, Type substTy,
+            ProtocolType *proto) -> Optional<ProtocolConformanceRef> {
+          if (substTy->isEqual(ConcreteType)) {
+            return Conformance.getInherited(proto->getDecl());
+          }
+          return ProtocolConformanceRef(proto->getDecl());
+        });
+    FnTy->getGenericSignature()->getSubstitutions(FinalSubsMap, Substitutions);
     // Handle polymorphic functions by properly substituting
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
@@ -729,15 +737,11 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   Builder.addOpenedArchetypeOperands(AI.getInstruction());
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NewAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
-                                    NewSubstCalleeType,
-                                    Substitutions, Args,
-                                    TAI->getNormalBB(), TAI->getErrorBB());
+    NewAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(), Substitutions,
+                                   Args, TAI->getNormalBB(), TAI->getErrorBB());
   else
-    NewAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
-                                 NewSubstCalleeType,
-                                 AI.getType(), Substitutions, Args,
-                                 cast<ApplyInst>(AI)->isNonThrowing());
+    NewAI = Builder.createApply(AI.getLoc(), AI.getCallee(), Substitutions,
+                                Args, cast<ApplyInst>(AI)->isNonThrowing());
 
   if (isa<ApplyInst>(NewAI))
     replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction());
@@ -794,10 +798,8 @@ getConformanceAndConcreteType(FullApplySite AI,
     if (Requirement->inheritsFrom(Protocol)) {
       // If Requirement != Protocol, then the abstract conformance cannot be used
       // as is and we need to create a proper conformance.
-      return std::make_tuple(Conformance.isAbstract()
-                                ? ProtocolConformanceRef(Protocol)
-                                : Conformance,
-                            ConcreteType, ConcreteTypeDef);
+      return std::make_tuple(Conformance.getInherited(Protocol), ConcreteType,
+                             ConcreteTypeDef);
     }
   }
 
@@ -1176,10 +1178,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     }
     // The type of the substitution is the source type of the thin to thick
     // instruction.
-    SILType substTy = TTTFI->getOperand()->getType();
     Builder.addOpenedArchetypeOperands(AI);
     auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),
-                                      substTy, AI->getType(),
                                       AI->getSubstitutions(), Arguments,
                                       AI->isNonThrowing());
     return NewAI;
@@ -1309,9 +1309,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
     }
     // The type of the substitution is the source type of the thin to thick
     // instruction.
-    SILType substTy = TTTFI->getOperand()->getType();
     auto *NewAI = Builder.createTryApply(AI->getLoc(), TTTFI->getOperand(),
-                                         substTy,
                                          AI->getSubstitutions(), Arguments,
                                          AI->getNormalBB(), AI->getErrorBB());
     return NewAI;

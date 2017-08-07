@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
@@ -187,24 +188,6 @@ static bool hasAccessors(AbstractStorageDecl *asd) {
   llvm_unreachable("Unhandled ContinuationKind in switch.");
 }
 
-/// Determine whether this is a top-level code declaration that isn't just
-/// wrapping an #if.
-static bool isRealTopLevelCodeDecl(Decl *decl) {
-  auto topLevelCode = dyn_cast<TopLevelCodeDecl>(decl);
-  if (!topLevelCode) return false;
-
-  // Drop top-level statements containing just an IfConfigStmt.
-  // FIXME: The modeling of IfConfig is weird.
-  auto braceStmt = topLevelCode->getBody();
-  auto elements = braceStmt->getElements();
-  if (elements.size() == 1 &&
-      elements[0].is<Stmt *>() &&
-      isa<IfConfigStmt>(elements[0].get<Stmt *>()))
-    return false;
-
-  return true;
-}
-
 void ASTScope::expand() const {
   assert(!isExpanded() && "Already expanded the children of this node");
   ASTContext &ctx = getASTContext();
@@ -312,7 +295,7 @@ void ASTScope::expand() const {
 
         // If the declaration is a top-level code declaration, turn the source
         // file into a continuation. We're done.
-        if (isRealTopLevelCodeDecl(decl)) {
+        if (isa<TopLevelCodeDecl>(decl)) {
           addActiveContinuation(this);
           break;
         }
@@ -928,6 +911,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   case DeclKind::Param:
   case DeclKind::EnumElement:
   case DeclKind::IfConfig:
+  case DeclKind::MissingMember:
     // These declarations do not introduce scopes.
     return nullptr;
 
@@ -948,7 +932,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   }
 
   case DeclKind::TopLevelCode:
-    if (!isRealTopLevelCodeDecl(decl)) return nullptr;
     return new (ctx) ASTScope(parent, cast<TopLevelCodeDecl>(decl));
 
   case DeclKind::Protocol:
@@ -1151,7 +1134,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
   case StmtKind::Break:
   case StmtKind::Continue:
   case StmtKind::Fallthrough:
-  case StmtKind::IfConfig:
   case StmtKind::Fail:
   case StmtKind::Throw:
     // Nothing to do for these statements.
@@ -1901,28 +1883,17 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     }
     break;
 
-  case ASTScopeKind::PatternInitializer:
-    // FIXME: This causes recursion that we cannot yet handle.
-#if false
+  case ASTScopeKind::PatternInitializer: {
     // 'self' is available within the pattern initializer of a 'lazy' variable.
-    if (auto singleVar = patternBinding.decl->getSingleVar()) {
-      if (singleVar->getAttrs().hasAttribute<LazyAttr>() &&
-          singleVar->getDeclContext()->isTypeContext()) {
-        // If there is no getter (yet), add them.
-        if (!singleVar->getGetter()) {
-          ASTContext &ctx = singleVar->getASTContext();
-          if (auto resolver = ctx.getLazyResolver())
-            resolver->introduceLazyVarAccessors(singleVar);
-        }
-
-        // Add the getter's 'self'.
-        if (auto getter = singleVar->getGetter())
-          if (auto self = getter->getImplicitSelfDecl())
-            result.push_back(self);
-      }
+    auto *initContext = cast_or_null<PatternBindingInitializer>(
+      patternBinding.decl->getPatternList()[0].getInitContext());
+    if (initContext) {
+      if (auto *selfParam = initContext->getImplicitSelfDecl())
+        result.push_back(selfParam);
     }
-#endif
+
     break;
+  }
 
   case ASTScopeKind::Closure:
     // Note: Parameters all at once is different from functions, but it's not

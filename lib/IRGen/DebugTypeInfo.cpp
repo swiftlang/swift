@@ -17,7 +17,6 @@
 
 #include "DebugTypeInfo.h"
 #include "FixedTypeInfo.h"
-#include "IRGen.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -27,13 +26,21 @@ using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(DeclContext *DC, GenericEnvironment *GE,
                              swift::Type Ty, llvm::Type *StorageTy, Size size,
-                             Alignment align)
+                             Alignment align, bool HasDefaultAlignment)
     : DeclCtx(DC), GenericEnv(GE), Type(Ty.getPointer()),
-      StorageType(StorageTy), size(size), align(align) {
-  assert((!isArchetype() || (isArchetype() && DC)) &&
-         "archetype without a declcontext");
+      StorageType(StorageTy), size(size), align(align),
+      DefaultAlignment(HasDefaultAlignment) {
   assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);
+}
+
+/// Determine whether this type has a custom @_alignment attribute.
+static bool hasDefaultAlignment(swift::Type Ty) {
+  if (auto CanTy = Ty->getCanonicalType())
+    if (auto *TyDecl = CanTy.getNominalOrBoundGenericNominal())
+      if (TyDecl->getAttrs().getAttribute<AlignmentAttr>())
+        return false;
+  return true;
 }
 
 DebugTypeInfo DebugTypeInfo::getFromTypeInfo(DeclContext *DC,
@@ -50,7 +57,7 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(DeclContext *DC,
     size = Size(0);
   }
   return DebugTypeInfo(DC, GE, Ty.getPointer(), Info.getStorageType(), size,
-                       Info.getBestKnownAlignment());
+                       Info.getBestKnownAlignment(), hasDefaultAlignment(Ty));
 }
 
 DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DC,
@@ -84,7 +91,7 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DC,
 DebugTypeInfo DebugTypeInfo::getMetadata(swift::Type Ty, llvm::Type *StorageTy,
                                          Size size, Alignment align) {
   DebugTypeInfo DbgTy(nullptr, nullptr, Ty.getPointer(), StorageTy, size,
-                      align);
+                      align, true);
   assert(!DbgTy.isArchetype() && "type metadata cannot contain an archetype");
   return DbgTy;
 }
@@ -107,7 +114,8 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
     if (DeclType->isEqual(LowTy))
       Type = DeclType.getPointer();
   }
-  DebugTypeInfo DbgTy(DC, GE, Type, StorageTy, size, align);
+  DebugTypeInfo DbgTy(DC, GE, Type, StorageTy, size, align,
+                      hasDefaultAlignment(Type));
   assert(StorageTy && "StorageType is a nullptr");
   assert(!DbgTy.isArchetype() &&
          "type of a global var cannot contain an archetype");
@@ -120,7 +128,7 @@ DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
                                           Alignment align) {
   DebugTypeInfo DbgTy(nullptr, nullptr,
                       theClass->getInterfaceType().getPointer(), StorageType,
-                      size, align);
+                      size, align, true);
   assert(!DbgTy.isArchetype() &&
          "type of an objc class cannot contain an archetype");
   return DbgTy;

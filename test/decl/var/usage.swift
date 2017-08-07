@@ -12,10 +12,10 @@ func basicTests() -> Int {
   return y
 }
 
-func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-error {{parameters may not have the 'var' specifier}}
-  i += 1
+func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-error {{'var' as a parameter attribute is not allowed}}
+  i += 1 // expected-error {{left side of mutating operator isn't mutable: 'i' is a 'let' constant}}
   var j = j
-  swap(&i, &j)
+  swap(&i, &j) // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
   return i+g
 }
 
@@ -197,7 +197,7 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
     _ = b2
   }
   
-  for var b in [42] {   // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
+  for var b in [42] { // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-11=}}
     _ = b
   }
 

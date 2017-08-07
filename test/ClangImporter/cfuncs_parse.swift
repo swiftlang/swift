@@ -16,23 +16,23 @@ func test_cfunc2(_ i: Int) {
 
 func test_cfunc3_a() {
   let b = cfunc3( { (a : Double, b : Double) -> Double in a + b } )
-  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' not unwrapped; did you mean to use '!' or '?'?}}
+  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') not unwrapped; did you mean to use '!' or '?'?}}
   _ = b!(1.5, 2.5) as Double
-  _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block?' to type 'Double' in coercion}}
+  _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') to type 'Double' in coercion}}
 }
 
 func test_cfunc3_b() {
   let b = cfunc3( { a, b in a + b } )
-  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' not unwrapped; did you mean to use '!' or '?'?}}
+  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') not unwrapped; did you mean to use '!' or '?'?}}
   _ = b!(1.5, 2.5) as Double
-  _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block?' to type 'Double' in coercion}}
+  _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') to type 'Double' in coercion}}
 }
 
 func test_cfunc3_c() {
   let b = cfunc3({ $0 + $1 })
-  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' not unwrapped; did you mean to use '!' or '?'?}}
+  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') not unwrapped; did you mean to use '!' or '?'?}}
   _ = b!(1.5, 2.5) as Double
-  _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block?' to type 'Double' in coercion}}
+  _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') to type 'Double' in coercion}}
 }
 
 func test_cfunc3_d() {

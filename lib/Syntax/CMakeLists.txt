@@ -1,16 +1,16 @@
+set(SWIFT_GYB_FLAGS
+  --line-directive "''")
+
 add_swift_library(swiftSyntax STATIC
-  DeclSyntax.cpp
-  ExprSyntax.cpp
-  Format.cpp
-  TokenSyntax.cpp
-  GenericSyntax.cpp
-  LegacyASTTransformer.cpp
+  SyntaxNodes.cpp.gyb
+  SyntaxBuilders.cpp.gyb
+  SyntaxKind.cpp.gyb
+  SyntaxFactory.cpp.gyb
   Trivia.cpp
   RawSyntax.cpp
-  StmtSyntax.cpp
+  RawTokenSyntax.cpp
   Syntax.cpp
-  SyntaxFactory.cpp
   SyntaxData.cpp
-  TypeSyntax.cpp
   UnknownSyntax.cpp
-)
+  DEPENDS
+    swift-syntax-generated-headers)

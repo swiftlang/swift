@@ -34,7 +34,7 @@ public func run_Dictionary2(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result, "Incorrect results in Dictionary2: \(res) != \(ref_result)")
+  CheckResults(res == ref_result)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -48,7 +48,7 @@ class Box<T : Hashable> : Hashable {
     return value.hashValue
   }
 
-  static func ==<T>(lhs: Box<T>, rhs: Box<T>) -> Bool {
+  static func ==(lhs: Box, rhs: Box) -> Bool {
     return lhs.value == rhs.value
   }
 }
@@ -75,5 +75,5 @@ public func run_Dictionary2OfObjects(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result, "Incorrect results in Dictionary2AllObjects: \(res) != \(ref_result)")
+  CheckResults(res == ref_result)
 }

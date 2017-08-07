@@ -6,12 +6,9 @@ class DeepThought {
 
 func foo() -> Int64 {
   // CHECK: call void @llvm.dbg.declare(metadata %T3let11DeepThoughtC** {{.*}}, metadata ![[A:.*]], metadata !{{[0-9]+}})
-  // CHECK: !DILocalVariable(name: "machine"
-  // CHECK-NOT:              flags:
-  // CHECK-SAME:             line: [[@LINE+1]],
+  // CHECK-DAG: !DILocalVariable(name: "machine",{{.*}}line: [[@LINE+1]], type: !{{[0-9]+}})
   let machine = DeepThought()
-  // CHECK: !DILocalVariable(name: "a"
-  // CHECK-SAME:             line: [[@LINE+1]],
+  // CHECK-DAG: !DILocalVariable(name: "a", {{.*}}line: [[@LINE+1]],
   let a = machine.query()
   return a
 }

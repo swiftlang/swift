@@ -36,14 +36,9 @@ void Context::clear() {
 }
 
 NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
-#ifndef NO_NEW_DEMANGLING
-  if (MangledName.startswith(MANGLING_PREFIX_STR)
-      // Also accept the future mangling prefix.
-      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
-      || MangledName.startswith("_S")) {
+  if (isMangledName(MangledName.data())) {
     return D->demangleSymbol(MangledName);
   }
-#endif
   return demangleOldSymbolAsNode(MangledName, *D);
 }
 
@@ -74,15 +69,15 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
 }
 
 bool Context::isThunkSymbol(llvm::StringRef MangledName) {
-  if (MangledName.startswith(MANGLING_PREFIX_STR)
-      // Also accept the future mangling prefix.
-      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
-      || MangledName.startswith("_S")) {
+  if (isMangledName(MangledName)) {
     // First do a quick check
     if (MangledName.endswith("TA") ||  // partial application forwarder
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
         MangledName.endswith("To") ||  // swift-as-ObjC thunk
-        MangledName.endswith("TO")) {  // ObjC-as-swift thunk
+        MangledName.endswith("TO") ||  // ObjC-as-swift thunk
+        MangledName.endswith("TR") ||  // reabstraction thunk helper function
+        MangledName.endswith("Tr") ||  // reabstraction thunk
+        MangledName.endswith("TW")) {  // protocol witness thunk
 
       // To avoid false positives, we need to fully demangle the symbol.
       NodePointer Nd = D->demangleSymbol(MangledName);
@@ -95,6 +90,9 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         case Node::Kind::NonObjCAttribute:
         case Node::Kind::PartialApplyObjCForwarder:
         case Node::Kind::PartialApplyForwarder:
+        case Node::Kind::ReabstractionThunkHelper:
+        case Node::Kind::ReabstractionThunk:
+        case Node::Kind::ProtocolWitness:
           return true;
         default:
           break;
@@ -120,10 +118,12 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
   if (!isThunkSymbol(MangledName))
     return std::string();
 
-  if (MangledName.startswith(MANGLING_PREFIX_STR)
-      // Also accept the future mangling prefix.
-      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
-      || MangledName.startswith("_S")) {
+  if (isMangledName(MangledName)) {
+    // The targets of those thunks not derivable from the mangling.
+    if (MangledName.endswith("TR") ||
+        MangledName.endswith("Tr") ||
+        MangledName.endswith("TW") )
+      return std::string();
 
     return MangledName.substr(0, MangledName.size() - 2).str();
   }
@@ -182,5 +182,5 @@ std::string demangleTypeAsString(const char *MangledName,
                                   Options);
 }
 
-} // end namespace Mangle
-} // end namespace swift
+} // namespace Demangle
+} // namespace swift

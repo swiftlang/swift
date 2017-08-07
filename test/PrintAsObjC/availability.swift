@@ -51,70 +51,70 @@
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ SWIFT_UNAVAILABLE;
 // CHECK-NEXT: @end
 @objc class Availability {
-    func alwaysAvailable() {}
+    @objc func alwaysAvailable() {}
 
     @available(*, unavailable)
-    func alwaysUnavailable() {}
+    @objc func alwaysUnavailable() {}
     @available(*, unavailable, message: "stuff happened")
-    func alwaysUnavailableTwo() {}
+    @objc func alwaysUnavailableTwo() {}
     @available(*, unavailable, renamed: "bar")
-    func alwaysUnavailableThree() {}
+    @objc func alwaysUnavailableThree() {}
     @available(*, unavailable, message: "whatever", renamed: "baz")
-    func alwaysUnavailableFour() {}
+    @objc func alwaysUnavailableFour() {}
 
     @available(*, deprecated)
-    func alwaysDeprecated() {}
+    @objc func alwaysDeprecated() {}
     @available(*, deprecated, message: "it's old")
-    func alwaysDeprecatedTwo() {}
+    @objc func alwaysDeprecatedTwo() {}
     @available(*, deprecated, renamed: "qux")
-    func alwaysDeprecatedThree() {}
+    @objc func alwaysDeprecatedThree() {}
     @available(*, deprecated, message: "use something else", renamed: "quux")
-    func alwaysDeprecatedFour() {}
+    @objc func alwaysDeprecatedFour() {}
 
     @available(*, deprecated, message: "one\ntwo\tthree\rfour\\ \"five\"")
-    func escapeMessage() {}
+    @objc func escapeMessage() {}
     @available(*, deprecated, message: "über")
-    func unicodeMessage() {}
+    @objc func unicodeMessage() {}
 
     @available(macOS 10.10, *)
-    func singlePlatShorthand() {}
+    @objc func singlePlatShorthand() {}
     @available(macOS 10.11, iOS 9.0, tvOS 9.0, watchOS 3.0, *)
-    func multiPlatShorthand() {}
+    @objc func multiPlatShorthand() {}
 
     @available(iOS, introduced: 9.0)
-    func singlePlatIntroduced() {}
+    @objc func singlePlatIntroduced() {}
     @available(macOS, deprecated: 10.10)
-    func singlePlatDeprecated() {}
+    @objc func singlePlatDeprecated() {}
     @available(macOS, deprecated: 10.10, renamed: "flubber")
-    func singlePlatDeprecatedTwo() {}
+    @objc func singlePlatDeprecatedTwo() {}
     @available(macOS, deprecated: 10.10, message: "we changed our minds", renamed: "fozzybear")
-    func singlePlatDeprecatedThree() {}
+    @objc func singlePlatDeprecatedThree() {}
     @available(tvOS, deprecated)
-    func singlePlatDeprecatedAlways() {}
+    @objc func singlePlatDeprecatedAlways() {}
     @available(macOS, introduced: 10.7, deprecated)
-    func singlePlatDeprecatedAlwaysTwo() {}
+    @objc func singlePlatDeprecatedAlwaysTwo() {}
     @available(watchOS, unavailable)
-    func singlePlatUnavailable() {}
+    @objc func singlePlatUnavailable() {}
     @available(watchOS, introduced: 2.0, unavailable)
-    func singlePlatUnavailableTwo() {}
+    @objc func singlePlatUnavailableTwo() {}
     @available(iOS, obsoleted: 8.1)
-    func singlePlatObsoleted() {}
+    @objc func singlePlatObsoleted() {}
     @available(macOS, introduced: 10.7, deprecated: 10.9, obsoleted: 10.10)
-    func singlePlatCombined() {}
+    @objc func singlePlatCombined() {}
 
     @available(macOS, introduced: 10.6, deprecated: 10.8, obsoleted: 10.9)
     @available(iOS, introduced: 7.0, deprecated: 9.0, obsoleted: 10.0)
-    func multiPlatCombined() {}
+    @objc func multiPlatCombined() {}
 
     @available(macOSApplicationExtension, unavailable)
     @available(iOSApplicationExtension, unavailable)
     @available(tvOSApplicationExtension, unavailable)
     @available(watchOSApplicationExtension, unavailable)
-    func extensionUnavailable() {}
+    @objc func extensionUnavailable() {}
 
-    init() {}
+    @objc init() {}
     @available(macOS 10.10, *)
-    init(x _: Int) {}
+    @objc init(x _: Int) {}
 }
 
 @objc class AvailabilitySub: Availability {

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
@@ -25,7 +25,7 @@ import OtherModule
 // CHECK-LABEL: @interface Test
 public class Test: NSObject {
   // CHECK: - (void)testSimpleTypealias:(id <Fungible> _Nonnull)_;
-  func testSimpleTypealias(_: AliasForFungible) {}
+  @objc func testSimpleTypealias(_: AliasForFungible) {}
   // CHECK: - (void)testGenericTypealias:(FungibleContainer<id <Fungible>> * _Nonnull)_;
-  func testGenericTypealias(_: FungibleContainer<AliasForFungible>) {}
+  @objc func testGenericTypealias(_: FungibleContainer<AliasForFungible>) {}
 } // CHECK: @end

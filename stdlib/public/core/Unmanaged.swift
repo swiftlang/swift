@@ -40,7 +40,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   /// This operation does not change reference counts.
   ///
-  ///     let str0: CFString = "boxcar"
+  ///     let str0 = "boxcar" as CFString
   ///     let bits = Unmanaged.passUnretained(str0)
   ///     let ptr = bits.toOpaque()
   ///

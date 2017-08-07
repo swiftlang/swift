@@ -1,4 +1,4 @@
-//===--- NSCalendarShims.h - Foundation declarations for Calendar overlay ------===//
+//===--- NSCalendarShims.h - Foundation declarations for Calendar overlay -===//
 //
 // This source file is part of the Swift.org open source project
 //

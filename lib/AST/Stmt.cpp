@@ -412,15 +412,22 @@ CaseStmt *CaseStmt::create(ASTContext &C, SourceLoc CaseLoc,
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                Expr *SubjectExpr,
                                SourceLoc LBraceLoc,
-                               ArrayRef<CaseStmt *> Cases,
+                               ArrayRef<ASTNode> Cases,
                                SourceLoc RBraceLoc,
                                ASTContext &C) {
-  void *p = C.Allocate(totalSizeToAlloc<CaseStmt *>(Cases.size()),
+#ifndef NDEBUG
+  for (auto N : Cases)
+    assert((N.is<Stmt*>() && isa<CaseStmt>(N.get<Stmt*>())) ||
+           (N.is<Decl*>() && isa<IfConfigDecl>(N.get<Decl*>())));
+#endif
+
+  void *p = C.Allocate(totalSizeToAlloc<ASTNode>(Cases.size()),
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
                                                Cases.size(), RBraceLoc);
+
   std::uninitialized_copy(Cases.begin(), Cases.end(),
-                          theSwitch->getTrailingObjects<CaseStmt *>());
+                          theSwitch->getTrailingObjects<ASTNode>());
   return theSwitch;
 }

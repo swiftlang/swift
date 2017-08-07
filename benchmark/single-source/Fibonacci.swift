@@ -38,6 +38,5 @@ public func run_Fibonacci(_ N: Int) {
       break
     }
   }
-  CheckResults(result == ref_result,
-               "Incorrect results in Fibonacci: \(result) != \(ref_result)")
+  CheckResults(result == ref_result)
 }

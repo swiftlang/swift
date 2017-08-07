@@ -5,18 +5,26 @@ option(SOURCEKITD_BUILD_STATIC_INPROC
 
 set(sourcekitdInProc_args
   sourcekitdInProc.cpp
-  DEPENDS SourceKitSwiftLang sourcekitdAPI
+  LINK_LIBS SourceKitSwiftLang sourcekitdAPI
   LLVM_COMPONENT_DEPENDS support coverage
 )
 
 if (SOURCEKIT_INSTALLING_INPROC)
-  add_sourcekit_framework(sourcekitdInProc
-    ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
-    ${sourcekitdInProc_args}
-    MODULEMAP module.modulemap
-    INSTALL_IN_COMPONENT sourcekit-inproc
-  )
-  set_property(TARGET sourcekitdInProc APPEND_STRING PROPERTY LINK_FLAGS " -fapplication-extension")
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    add_sourcekit_framework(sourcekitdInProc
+      ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
+      ${sourcekitdInProc_args}
+      MODULEMAP module.modulemap
+      INSTALL_IN_COMPONENT sourcekit-inproc
+    )
+    set_property(TARGET sourcekitdInProc APPEND_STRING PROPERTY LINK_FLAGS " -fapplication-extension")
+  else()
+    add_sourcekit_library(sourcekitdInProc
+      ${sourcekitdInProc_args}
+      INSTALL_IN_COMPONENT sourcekit-inproc
+      SHARED
+    )
+  endif()
 else()
   add_sourcekit_library(sourcekitdInProc
     ${sourcekitdInProc_args}

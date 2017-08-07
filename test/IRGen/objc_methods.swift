@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-os %s
 
@@ -50,7 +50,7 @@ class Foo: Fooable {
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(garply:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[GARPLY_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*, i8*)* @_T012objc_methods3FooC6garplyys9AnyObject_pSgFTo to i8*)
+// CHECK:     i8* bitcast (void (i8*, i8*, i8*)* @_T012objc_methods3FooC6garplyyyXlSgFTo to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(block:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([12 x i8], [12 x i8]* [[BLOCK_SIGNATURE_TRAD]], i64 0, i64 0),

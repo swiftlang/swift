@@ -241,7 +241,6 @@ class UnsafeGuaranteedPeephole : public swift::SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
-  StringRef getName() override { return "UnsafeGuaranteed Peephole"; }
 };
 } // end anonymous namespace
 

@@ -122,8 +122,7 @@ public func run_Dictionary(scale: Int) {
       Dict[word] = true
     }
   }
-  CheckResults(Dict.count == 270,
-               "IncorrectResults in DictTest: \(Dict.count) != 270.")
+  CheckResults(Dict.count == 270)
 
   // Check performance of searching in the dictionary:
   // Fill the dictionary with words from the first half of the text
@@ -142,8 +141,7 @@ public func run_Dictionary(scale: Int) {
       }
     }
   }
-  CheckResults(count == N*541,
-               "IncorrectResults in DictTest: \(count) != \(N*541).")
+  CheckResults(count == N*541)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -157,7 +155,7 @@ class Box<T : Hashable> : Hashable {
     return value.hashValue
   }
 
-  static func ==<T>(lhs: Box<T>, rhs: Box<T>) -> Bool {
+  static func ==(lhs: Box, rhs: Box) -> Bool {
     return lhs.value == rhs.value
   }
 }
@@ -272,8 +270,7 @@ public func run_DictionaryOfObjects(scale: Int) {
       Dict[Box(word)] = Box(true)
     }
   }
-  CheckResults(Dict.count == 270,
-               "IncorrectResults in DictTest: \(Dict.count) != 270.")
+  CheckResults(Dict.count == 270)
 
   // Check performance of searching in the dictionary:
   // Fill the dictionary with words from the first half of the text
@@ -292,6 +289,5 @@ public func run_DictionaryOfObjects(scale: Int) {
       }
     }
   }
-  CheckResults(count == N*541,
-               "IncorrectResults in DictTestAllObjects: \(count) != \(N*541).")
+  CheckResults(count == N*541)
 }

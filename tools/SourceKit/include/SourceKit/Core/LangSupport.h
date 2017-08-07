@@ -141,6 +141,7 @@ struct CustomCompletionInfo {
     Stmt = 1 << 0,
     Expr = 1 << 1,
     Type = 1 << 2,
+    ForEachSequence = 1 << 3,
   };
   swift::OptionSet<Context> Contexts;
 };
@@ -153,6 +154,7 @@ struct FilterRule {
     Literal,
     CustomCompletion,
     Identifier,
+    Description,
   };
   Kind kind;
   bool hide;
@@ -209,6 +211,8 @@ public:
                                          unsigned NameLength,
                                          unsigned BodyOffset,
                                          unsigned BodyLength,
+                                         unsigned DocOffset,
+                                         unsigned DocLength,
                                          StringRef DisplayName,
                                          StringRef TypeName,
                                          StringRef RuntimeName,
@@ -285,6 +289,7 @@ struct CursorInfo {
   /// All available actions on the code under cursor.
   ArrayRef<StringRef> AvailableActions;
   bool IsSystem = false;
+  llvm::Optional<unsigned> ParentNameOffset;
 };
 
 struct RangeInfo {
@@ -299,6 +304,7 @@ struct NameTranslatingInfo {
   UIdent NameKind;
   StringRef BaseName;
   std::vector<StringRef> ArgNames;
+  bool IsZeroArgSelector = false;
 };
 
 struct RelatedIdentsInfo {
@@ -327,6 +333,7 @@ struct DocGenericParam {
 struct DocEntityInfo {
   UIdent Kind;
   llvm::SmallString<32> Name;
+  llvm::SmallString<32> SubModuleName;
   llvm::SmallString<32> Argument;
   llvm::SmallString<64> USR;
   llvm::SmallString<64> OriginalUSR;
@@ -441,7 +448,9 @@ public:
                                          StringRef Name,
                                          StringRef HeaderName,
                                          ArrayRef<const char *> Args,
-                                         bool SynthesizedExtensions) = 0;
+                                         bool UsingSwiftArgs,
+                                         bool SynthesizedExtensions,
+                                         Optional<unsigned> swiftVersion) = 0;
 
   virtual void editorOpenSwiftSourceInterface(StringRef Name,
                                               StringRef SourceName,
@@ -472,6 +481,7 @@ public:
 
   virtual void getCursorInfo(StringRef Filename, unsigned Offset,
                              unsigned Length, bool Actionables,
+                             bool CancelOnSubsequentRequest,
                              ArrayRef<const char *> Args,
                           std::function<void(const CursorInfo &)> Receiver) = 0;
 
@@ -482,16 +492,19 @@ public:
                 std::function<void(const NameTranslatingInfo &)> Receiver) = 0;
 
   virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
+                            bool CancelOnSubsequentRequest,
                             ArrayRef<const char *> Args,
                             std::function<void(const RangeInfo&)> Receiver) = 0;
 
   virtual void
   getCursorInfoFromUSR(StringRef Filename, StringRef USR,
+                       bool CancelOnSubsequentRequest,
                        ArrayRef<const char *> Args,
                        std::function<void(const CursorInfo &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,
+                                            bool CancelOnSubsequentRequest,
                                             ArrayRef<const char *> Args,
                    std::function<void(const RelatedIdentsInfo &)> Receiver) = 0;
 

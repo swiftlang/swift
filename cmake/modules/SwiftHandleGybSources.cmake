@@ -46,6 +46,17 @@ function(handle_gyb_source_single dependency_out_var_name)
 
   get_filename_component(dir "${GYB_SINGLE_OUTPUT}" DIRECTORY)
   get_filename_component(basename "${GYB_SINGLE_OUTPUT}" NAME)
+
+  # Handle foo.gyb in pattern ``gyb.expand('foo.gyb'`` as a dependency
+  set(gyb_expand_deps "")
+  file(READ "${GYB_SINGLE_SOURCE}" gyb_file)
+  string(REGEX MATCHALL "\\\$\{[\r\n\t ]*gyb.expand\\\([\r\n\t ]*[\'\"]([^\'\"]*)[\'\"]" gyb_expand_matches "${gyb_file}")
+  foreach(match ${gyb_expand_matches})
+    string(REGEX MATCH "[\'\"]\([^\'\"]*\)[\'\"]" gyb_dep "${match}")
+    list(APPEND gyb_expand_deps "${CMAKE_MATCH_1}")
+  endforeach()
+  list(REMOVE_DUPLICATES gyb_expand_deps)
+
   add_custom_command_target(
       dependency_target
       COMMAND
@@ -59,7 +70,7 @@ function(handle_gyb_source_single dependency_out_var_name)
       COMMAND
           "${CMAKE_COMMAND}" -E remove "${GYB_SINGLE_OUTPUT}.tmp"
       OUTPUT "${GYB_SINGLE_OUTPUT}"
-      DEPENDS "${gyb_tool_source}" "${GYB_SINGLE_DEPENDS}" "${GYB_SINGLE_SOURCE}"
+      DEPENDS "${gyb_tool_source}" "${GYB_SINGLE_DEPENDS}" "${GYB_SINGLE_SOURCE}" "${gyb_expand_deps}"
       COMMENT "Generating ${basename} from ${GYB_SINGLE_SOURCE} ${GYB_SINGLE_COMMENT}"
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
       SOURCES "${GYB_SINGLE_SOURCE}"
@@ -107,7 +118,20 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt"
       "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_unittest_support.py"
-  )
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/__init__.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Child.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/kinds.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Node.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/AttributeNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/CommonNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/DeclNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/ExprNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/GenericNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/PatternNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/StmtNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/TypeNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Token.py")
+
   foreach (src ${${sources_var_name}})
     string(REGEX REPLACE "[.]gyb$" "" src_sans_gyb "${src}")
     if(src STREQUAL src_sans_gyb)
@@ -141,4 +165,17 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
   endforeach()
   set("${dependency_out_var_name}" "${dependency_targets}" PARENT_SCOPE)
   set("${sources_var_name}" "${de_gybbed_sources}" PARENT_SCOPE)
+endfunction()
+
+function(add_gyb_target target sources)
+  set(options)
+  set(single_value_args ARCH)
+  set(multi_value_args)
+  cmake_parse_arguments(GYB
+    "${options}" "${single_value_args}" "${multi_value_args}" ${ARGN})
+
+  handle_gyb_sources(gyb_sources_depends sources "${GYB_ARCH}")
+
+  add_custom_target(${target}
+    DEPENDS "${gyb_sources_depends}")
 endfunction()

@@ -25,6 +25,11 @@ Type Type::join(Type type1, Type type2) {
   assert(!type1->hasTypeVariable() && !type2->hasTypeVariable() &&
          "Cannot compute join of types involving type variables");
 
+  assert(type1->getWithoutSpecifierType()->isEqual(type1) &&
+         "Expected simple type!");
+  assert(type2->getWithoutSpecifierType()->isEqual(type2) &&
+         "Expected simple type!");
+
   // FIXME: This algorithm is woefully incomplete, and is only currently used
   // for optimizing away extra exploratory work in the constraint solver. It
   // should eventually encompass all of the subtyping rules of the language.
@@ -65,14 +70,11 @@ Type Type::join(Type type1, Type type2) {
   // If both are class types or opaque types that potentially have superclasses,
   // find the common superclass.
   if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
-    ASTContext &ctx = type1->getASTContext();
-    LazyResolver *resolver = ctx.getLazyResolver();
-
     /// Walk the superclasses of type1 looking for type2. Record them for our
     /// second step.
     llvm::SmallPtrSet<CanType, 8> superclassesOfType1;
     CanType canType2 = type2->getCanonicalType();
-    for (Type super1 = type1; super1; super1 = super1->getSuperclass(resolver)){
+    for (Type super1 = type1; super1; super1 = super1->getSuperclass()) {
       CanType canSuper1 = super1->getCanonicalType();
 
       // If we have found the second type, we're done.
@@ -83,7 +85,7 @@ Type Type::join(Type type1, Type type2) {
 
     // Look through the superclasses of type2 to determine if any were also
     // superclasses of type1.
-    for (Type super2 = type2; super2; super2 = super2->getSuperclass(resolver)){
+    for (Type super2 = type2; super2; super2 = super2->getSuperclass()) {
       CanType canSuper2 = super2->getCanonicalType();
 
       // If we found the first type, we're done.

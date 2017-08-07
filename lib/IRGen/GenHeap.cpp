@@ -1249,9 +1249,9 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   // Don't inline the function, so it stays as a signal to the ARC passes.
   // The ARC passes will remove references to the function when they're
   // no longer needed.
-  fixLifetime->addAttribute(llvm::AttributeSet::FunctionIndex,
+  fixLifetime->addAttribute(llvm::AttributeList::FunctionIndex,
                             llvm::Attribute::NoInline);
-  
+
   // Give the function an empty body.
   auto entry = llvm::BasicBlock::Create(LLVMContext, "", fixLifetime);
   llvm::ReturnInst::Create(LLVMContext, entry);
@@ -1430,7 +1430,7 @@ public:
   allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const override {
     return OwnedAddress(IGF.getTypeInfo(boxedType).getUndefAddress(),
-                        IGF.IGM.RefCountedNull);
+                        IGF.emitAllocEmptyBoxCall());
   }
 
   void
@@ -1584,7 +1584,11 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // For fixed-sized types, we can emit concrete box metadata.
   auto &fixedTI = cast<FixedTypeInfo>(eltTI);
 
-  // For empty types, we don't really need to allocate anything.
+  // Because we assume in enum's that payloads with a Builtin.NativeObject which
+  // is also the type for indirect enum cases have extra inhabitants of pointers
+  // we can't have a nil pointer as a representation for an empty box type --
+  // nil conflicts with the extra inhabitants. We return a static singleton
+  // empty box object instead.
   if (fixedTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     if (!EmptyBoxTI)
       EmptyBoxTI = new EmptyBoxTypeInfo(IGM);

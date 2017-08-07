@@ -40,7 +40,7 @@ public:
   }
 
   ArrayRef<StringRef> getTags() const {
-    return Parts.Tags;
+    return llvm::makeArrayRef(Parts.Tags.begin(), Parts.Tags.end());
   }
 
   Optional<const swift::markup::Paragraph *> getBrief() const {

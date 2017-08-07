@@ -23,8 +23,6 @@ public struct ObjectIdentifier : Hashable {
   /// The hash value is not guaranteed to be stable across different
   /// invocations of the same program.  Do not persist the hash value across
   /// program runs.
-  ///
-  /// - SeeAlso: `Hashable`
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_value))
   }

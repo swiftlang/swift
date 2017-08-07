@@ -443,7 +443,7 @@ class LazyProperties {
 // CHECK-SEARCHES-NEXT: DefaultArgument {{.*}} [166:32 - 166:32] expanded
 // CHECK-SEARCHES-NEXT: Module name=scope_map
 // CHECK-SEARCHES-NEXT:   FileUnit file="{{.*}}scope_map.swift"
-// CHECK-SEARCHES-NEXT:     AbstractFunctionDecl name=defaultArguments : (Int, Int) -> ()
+// CHECK-SEARCHES-NEXT:     AbstractFunctionDecl name=defaultArguments(i:j:) : (Int, Int) -> ()
 // CHECK-SEARCHES-NEXT:       {{.*}} Initializer DefaultArgument index=0
 
 // CHECK-SEARCHES-LABEL: ***Scope at 179:18***
@@ -460,8 +460,7 @@ class LazyProperties {
 // CHECK-SEARCHES-NEXT:     ClassDecl name=LazyProperties
 // CHECK-SEARCHES-NEXT:       Initializer PatternBinding {{.*}} #0
 
-// FIXME: Re-enable the binding below
-// CHECK-SEARCHES-NOT: Local bindings: self
+// CHECK-SEARCHES-NEXT: Local bindings: self
 
 // CHECK-SEARCHES-LABEL: ***Complete scope map***
 // CHECK-SEARCHES-NEXT: SourceFile {{.*}} '{{.*}}scope_map.swift' [1:1 - [[EOF:[0-9]+:[0-9]+]]] unexpanded

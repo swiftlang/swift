@@ -14,7 +14,7 @@ import SwiftPrivate
 import SwiftPrivateLibcExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
 import Glibc
 #endif
 
@@ -26,6 +26,10 @@ import Foundation
 // These APIs don't really belong in a unit testing library, but they are
 // useful in tests, and stdlib does not have such facilities yet.
 //
+
+func findSubstring(_ haystack: Substring, _ needle: String) -> String.Index? {
+  return findSubstring(String(haystack._ephemeralContent), needle)
+}
 
 func findSubstring(_ string: String, _ substring: String) -> String.Index? {
   if substring.isEmpty {
@@ -48,7 +52,7 @@ func findSubstring(_ string: String, _ substring: String) -> String.Index? {
     while true {
       if needleIndex == needle.endIndex {
         // if we hit the end of the search string, we found the needle
-        return matchStartIndex.samePosition(in: string)
+        return matchStartIndex
       }
       if matchIndex == haystack.endIndex {
         // if we hit the end of the string before finding the end of the needle,
@@ -149,7 +153,7 @@ extension MutableCollection
     var f = subrange.lowerBound
     var l = index(before: subrange.upperBound)
     while f < l {
-      swap(&self[f], &self[l])
+      swapAt(f, l)
       formIndex(after: &f)
       formIndex(before: &l)
     }
@@ -195,7 +199,7 @@ extension MutableCollection
         repeat {
           formIndex(before: &j)
         } while !(elementAtBeforeI < self[j])
-        swap(&self[beforeI], &self[j])
+        swapAt(beforeI, j)
         _reverseSubrange(i..<endIndex)
         return .success
       }
@@ -245,3 +249,11 @@ public func cartesianProduct<C1 : Collection, C2 : Collection>(
   return result
 }
 
+/// Return true if the standard library was compiled in a debug configuration.
+public func _isStdlibDebugConfiguration() -> Bool {
+#if SWIFT_STDLIB_DEBUG
+  return true
+#else
+  return false
+#endif
+}

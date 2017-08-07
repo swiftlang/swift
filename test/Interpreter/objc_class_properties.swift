@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %clang %target-cc-options -isysroot %sdk -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
 // RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out
@@ -205,6 +205,37 @@ ClassProperties.test("namingConflict/protocol") {
 
   let type: PropertyNamingConflictProto.Type = NamingConflictSubclass.self
   expectNil(type.protoProp)
+}
+
+var global1: Int = 0
+
+var global2: Int = 0
+
+class Steak : NSObject {
+  @objc override var thickness: Int {
+    get { return global1 } set { global1 = newValue }
+  }
+}
+
+extension NSObject : HasThickness {
+  @objc var thickness: Int { get { return global2 } set { global2 = newValue } }
+}
+
+protocol HasThickness : class {
+  var thickness: Int { get set }
+}
+
+ClassProperties.test("dynamicOverride") {
+  // Calls NSObject.thickness
+  NSObject().thickness += 1
+
+  // Calls Steak.thickness
+  (Steak() as NSObject).thickness += 1
+  Steak().thickness += 1
+  (Steak() as HasThickness).thickness += 1
+
+  expectEqual(3, global1)
+  expectEqual(1, global2)
 }
 
 runAllTests()

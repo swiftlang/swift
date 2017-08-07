@@ -1,4 +1,4 @@
-//===--- StringEdits.swift-------------------------------------------------===//
+//===--- StringEdits.swift ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -22,9 +22,6 @@ var editWords: [String] = [
   "lakism",
   "gastroperiodynia",
 ]
-
-// FIXME: remove when String is a Collection
-extension String: RangeReplaceableCollection { }
 
 let alphabet = "abcdefghijklmnopqrstuvwxyz"
 /// All edits that are one edit away from `word`

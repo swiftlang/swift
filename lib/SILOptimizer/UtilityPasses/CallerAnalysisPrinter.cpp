@@ -39,7 +39,6 @@ class CallerAnalysisPrinterPass : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "Caller Analysis Printer"; }
 };
 
 } // end anonymous namespace

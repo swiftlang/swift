@@ -76,6 +76,9 @@ public:
   /// The command line string that is to be stored in the DWARF debug info.
   std::string DWARFDebugFlags;
 
+  /// List of -Xcc -D macro definitions.
+  std::vector<std::string> ClangDefines;
+
   /// The libraries and frameworks specified on the command line.
   SmallVector<LinkLibrary, 4> LinkLibraries;
 
@@ -208,6 +211,12 @@ public:
     } else {
       return OutputKind == IRGenOutputKind::LLVMAssembly;
     }
+  }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Bridging PCH hash.
+  llvm::hash_code getPCHHashComponents() const {
+    return llvm::hash_value(0);
   }
 };
 

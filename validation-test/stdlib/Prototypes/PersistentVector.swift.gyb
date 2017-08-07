@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/PersistentVector.swift
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/PersistentVector.swift
 // RUN: %line-directive %t/PersistentVector.swift -- %target-build-swift -parse-stdlib %t/PersistentVector.swift -o %t/a.out
 // RUN: %line-directive %t/PersistentVector.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
@@ -208,15 +209,15 @@ struct _${name}Bitmap {
 
   subscript(i: Int) -> Bool {
     get {
-      precondition(i >= 0 && i < Int(${underlyingType}._sizeInBits)) // sanity check
+      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
       return _bits & (1 << ${underlyingType}(i)) != 0
     }
     set {
-      precondition(i >= 0 && i < Int(${underlyingType}._sizeInBits)) // sanity check
+      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
 %   if underlyingType == 'UInt':
       let iAsUnderlyingType = UInt(bitPattern: i)
 %   elif underlyingType == 'UInt32':
-      let iAsUnderlyingType = UInt32(truncatingBitPattern: i)
+      let iAsUnderlyingType = UInt32(truncatingIfNeeded: i)
 %   end
       _bits =
         (_bits & ~(1 << iAsUnderlyingType))
@@ -225,11 +226,11 @@ struct _${name}Bitmap {
   }
 
   func countBitsSetBelow(_ i: Int) -> Int {
-    precondition(i >= 0 && i < Int(${underlyingType}._sizeInBits)) // sanity check
+    precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
 %   if underlyingType == 'UInt':
       let iAsUnderlyingType = UInt(bitPattern: i)
 %   elif underlyingType == 'UInt32':
-      let iAsUnderlyingType = UInt32(truncatingBitPattern: i)
+      let iAsUnderlyingType = UInt32(truncatingIfNeeded: i)
 %   end
     let lowBits = _bits & ((1 << iAsUnderlyingType) - 1)
     return _${name}Bitmap(_bits: lowBits).setBitCount

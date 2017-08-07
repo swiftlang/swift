@@ -351,7 +351,7 @@ public extension _BridgedStoredNSError
 }
 
 extension NSDictionary {
-  public subscript(_: Any) -> Any? {
+  @objc public subscript(_: Any) -> Any? {
     @objc(_swift_objectForKeyedSubscript:)
     get { fatalError() }
   }

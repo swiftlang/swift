@@ -109,7 +109,7 @@ public:
     wrapper.flush();
 
     for (const Action *A : Cmd.getSource().getInputs()) {
-      if (const InputAction *IA = dyn_cast<InputAction>(A))
+      if (const auto *IA = dyn_cast<InputAction>(A))
         Inputs.push_back(CommandInput(IA->getInputArg().getValue()));
     }
 

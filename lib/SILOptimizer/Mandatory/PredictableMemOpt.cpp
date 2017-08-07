@@ -70,6 +70,10 @@ static SILValue getAccessPathRoot(SILValue Pointer) {
       Pointer = TEAI->getOperand();
     else if (auto SEAI = dyn_cast<StructElementAddrInst>(Pointer))
       Pointer = SEAI->getOperand();
+    else if (auto BAI = dyn_cast<BeginAccessInst>(Pointer))
+      Pointer = BAI->getSource();
+    else if (auto BUAI = dyn_cast<BeginUnpairedAccessInst>(Pointer))
+      Pointer = BUAI->getSource();
     else
       return Pointer;
   }
@@ -100,7 +104,19 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
     auto *Inst = cast<SILInstruction>(Pointer);
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Inst)) {
       Pointer = PBI->getOperand();
-    } else if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Inst)) {
+      continue;
+    }
+
+    if (auto *BAI = dyn_cast<BeginAccessInst>(Inst)) {
+      Pointer = BAI->getSource();
+      continue;
+    }
+    if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(Inst)) {
+      Pointer = BUAI->getSource();
+      continue;
+    }
+
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Inst)) {
       SILType TT = TEAI->getOperand()->getType();
       
       // Keep track of what subelement is being referenced.
@@ -108,7 +124,10 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
         SubEltNumber += getNumSubElements(TT.getTupleElementType(i), M);
       }
       Pointer = TEAI->getOperand();
-    } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Inst)) {
+      continue;
+    }
+
+    if (auto *SEAI = dyn_cast<StructElementAddrInst>(Inst)) {
       SILType ST = SEAI->getOperand()->getType();
       
       // Keep track of what subelement is being referenced.
@@ -119,12 +138,14 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
       }
       
       Pointer = SEAI->getOperand();
-    } else {
-      assert((isa<InitExistentialAddrInst>(Inst) || isa<InjectEnumAddrInst>(Inst))&&
-             "Unknown access path instruction");
-      // Cannot promote loads and stores from within an existential projection.
-      return ~0U;
+      continue;
     }
+
+    
+    assert((isa<InitExistentialAddrInst>(Inst) || isa<InjectEnumAddrInst>(Inst))&&
+           "Unknown access path instruction");
+    // Cannot promote loads and stores from within an existential projection.
+    return ~0U;
   }
 }
 
@@ -1010,7 +1031,6 @@ class PredictableMemoryOptimizations : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
-  StringRef getName() override { return "Predictable Memory Opts"; }
 };
 } // end anonymous namespace
 

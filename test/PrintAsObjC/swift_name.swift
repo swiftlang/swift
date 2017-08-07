@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
@@ -26,10 +26,10 @@ import Foundation
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 class Test : NSObject {
-  func makeArray(_: ZZStringAlias) -> [ZZStringAlias] { return [] }
-  func usePoint(_: ZZPoint) {}
-  func useAlignment(_: ZZAlignment) {}
-  func useObjects(_: ZZClass) -> [ZZProto] { return [] }
+  @objc func makeArray(_: ZZStringAlias) -> [ZZStringAlias] { return [] }
+  @objc func usePoint(_: ZZPoint) {}
+  @objc func useAlignment(_: ZZAlignment) {}
+  @objc func useObjects(_: ZZClass) -> [ZZProto] { return [] }
 }
 
 @objc

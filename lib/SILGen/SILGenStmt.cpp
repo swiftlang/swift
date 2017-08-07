@@ -200,8 +200,8 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   
   for (auto &ESD : S->getElements()) {
     
-    if (auto S = ESD.dyn_cast<Stmt*>())
-      if (isa<IfConfigStmt>(S))
+    if (auto D = ESD.dyn_cast<Decl*>())
+      if (isa<IfConfigDecl>(D))
         continue;
     
     // If we ever reach an unreachable point, stop emitting statements and issue
@@ -209,9 +209,9 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     if (!SGF.B.hasValidInsertionPoint()) {
       // If this is an implicit statement or expression, just skip over it,
       // don't emit a diagnostic here.
-      if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+      if (auto *S = ESD.dyn_cast<Stmt*>()) {
         if (S->isImplicit()) continue;
-      } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+      } else if (auto *E = ESD.dyn_cast<Expr*>()) {
         if (E->isImplicit()) continue;
       }
       
@@ -226,7 +226,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     }
 
     // Process children.
-    if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+    if (auto *S = ESD.dyn_cast<Stmt*>()) {
       visit(S);
       if (isa<ReturnStmt>(S))
         StmtType = ReturnStmtType;
@@ -236,7 +236,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         StmtType = ContinueStmtType;
       if (isa<ThrowStmt>(S))
         StmtType = ThrowStmtType;
-    } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+    } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
     } else {
       SGF.visit(ESD.get<Decl*>());
@@ -253,7 +253,6 @@ namespace {
                               SmallVectorImpl<CleanupHandle> &cleanups)
       : Storage(storage), Cleanups(cleanups) {}
 
-    SILValue getAddressOrNull() const override { return SILValue(); }
     void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
                              ManagedValue value, bool isInit) override {
       Storage = value.getValue();
@@ -540,12 +539,6 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
   // Emit the condition bindings, branching to the bodyBB if they fail.  Since
   // we didn't push a scope, the bound variables are live after this statement.
   SGF.emitStmtCondition(S->getCond(), bodyBB, S);
-}
-
-
-void StmtEmitter::visitIfConfigStmt(IfConfigStmt *S) {
-  // Active members are attached to the enclosing declaration, so there's no
-  // need to walk anything within.
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {

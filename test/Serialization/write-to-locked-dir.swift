@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: test ! -d %t || chmod +w %t
+// RUN: %empty-directory(%t)
 // RUN: touch %t/main.swiftmodule %t/main.swiftdoc
 // RUN: chmod -w %t
 

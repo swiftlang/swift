@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify -import-cf-types -I %S/Inputs/custom-modules %s -verify-ignore-unknown
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify -import-cf-types -I %S/Inputs/custom-modules %s
 
 // REQUIRES: objc_interop
 
@@ -132,8 +132,8 @@ func nameCollisions() {
   cf = cfAlias // okay
 
   var otherAlias: MyProblematicAlias?
-  otherAlias = cfAlias // expected-error {{cannot assign value of type 'MyProblematicAliasRef?' to type 'MyProblematicAlias?'}}
-  cfAlias = otherAlias // expected-error {{cannot assign value of type 'MyProblematicAlias?' to type 'MyProblematicAliasRef?'}}
+  otherAlias = cfAlias // expected-error {{cannot assign value of type 'MyProblematicAliasRef?' (aka 'Optional<MyProblematicObjectRef>') to type 'MyProblematicAlias?' (aka 'Optional<Float>')}}
+  cfAlias = otherAlias // expected-error {{cannot assign value of type 'MyProblematicAlias?' (aka 'Optional<Float>') to type 'MyProblematicAliasRef?' (aka 'Optional<MyProblematicObjectRef>')}}
 
   func isOptionalFloat(_: inout Optional<Float>) {}
   isOptionalFloat(&otherAlias) // okay
@@ -160,7 +160,3 @@ protocol SwiftProto {}
 @objc protocol ObjCProto {}
 extension CCRefrigerator: ObjCProto {} // expected-error {{Core Foundation class 'CCRefrigerator' cannot conform to @objc protocol 'ObjCProto' because Core Foundation types are not classes in Objective-C}}
 extension CCRefrigerator: SwiftProto {}
-
-// FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected note produced: 'CCFridgeRef' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'NotAProblemRef' was obsoleted in Swift 3

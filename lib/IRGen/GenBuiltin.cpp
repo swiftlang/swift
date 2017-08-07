@@ -27,6 +27,7 @@
 
 #include "Explosion.h"
 #include "GenCall.h"
+#include "GenCast.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -333,7 +334,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       llvm::Instruction *I = static_cast<llvm::Instruction *>(v);
       if (I->getParent() == IGF.Builder.GetInsertBlock()) {
         llvm::LLVMContext &ctx = IGF.IGM.Module.getContext();
-        llvm::IntegerType *intType = dyn_cast<llvm::IntegerType>(v->getType());
+        auto *intType = dyn_cast<llvm::IntegerType>(v->getType());
         llvm::Metadata *rangeElems[] = {
           llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(intType, 0)),
           llvm::ConstantAsMetadata::get(
@@ -385,8 +386,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
     assert(BuiltinName.empty() && "Mismatch with sema");
     
-    IGF.Builder.CreateFence(ordering,
-                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    IGF.Builder.CreateFence(ordering, isSingleThread
+                                          ? llvm::SyncScope::SingleThread
+                                          : llvm::SyncScope::System);
     return;
   }
 
@@ -435,10 +437,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(cmp->getType()));
-    llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(pointer, cmp, newval,
-                                                         successOrdering,
-                                                         failureOrdering,
-                                                         isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(
+        pointer, cmp, newval, successOrdering, failureOrdering,
+        isSingleThread ? llvm::SyncScope::SingleThread
+                       : llvm::SyncScope::System);
     cast<llvm::AtomicCmpXchgInst>(value)->setVolatile(isVolatile);
     cast<llvm::AtomicCmpXchgInst>(value)->setWeak(isWeak);
 
@@ -503,9 +505,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(val->getType()));
-    llvm::Value *value = IGF.Builder.CreateAtomicRMW(SubOpcode, pointer, val,
-                                                      ordering,
-                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    llvm::Value *value = IGF.Builder.CreateAtomicRMW(
+        SubOpcode, pointer, val, ordering,
+        isSingleThread ? llvm::SyncScope::SingleThread
+                       : llvm::SyncScope::System);
     cast<AtomicRMWInst>(value)->setVolatile(isVolatile);
 
     if (origTy->isPointerTy())
@@ -557,8 +560,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     if (Builtin.ID == BuiltinValueKind::AtomicLoad) {
       auto load = IGF.Builder.CreateLoad(pointer,
                                          valueTI.getBestKnownAlignment());
-      load->setAtomic(ordering,
-                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+      load->setAtomic(ordering, isSingleThread ? llvm::SyncScope::SingleThread
+                                               : llvm::SyncScope::System);
       load->setVolatile(isVolatile);
 
       llvm::Value *value = load;
@@ -572,8 +575,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
         value = IGF.Builder.CreateBitCast(value, valueTy);
       auto store = IGF.Builder.CreateStore(value, pointer,
                                            valueTI.getBestKnownAlignment());
-      store->setAtomic(ordering,
-                       isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+      store->setAtomic(ordering, isSingleThread ? llvm::SyncScope::SingleThread
+                                                : llvm::SyncScope::System);
       store->setVolatile(isVolatile);
       return;
     } else {
@@ -697,12 +700,20 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return out.add(V);
   }
 
-  if (Builtin.ID == BuiltinValueKind::Once) {
+  if (Builtin.ID == BuiltinValueKind::Once
+      || Builtin.ID == BuiltinValueKind::OnceWithContext) {
     // The input type is statically (Builtin.RawPointer, @convention(thin) () -> ()).
     llvm::Value *PredPtr = args.claimNext();
     // Cast the predicate to a OnceTy pointer.
     PredPtr = IGF.Builder.CreateBitCast(PredPtr, IGF.IGM.OnceTy->getPointerTo());
     llvm::Value *FnCode = args.claimNext();
+    // Get the context if any.
+    llvm::Value *Context;
+    if (Builtin.ID == BuiltinValueKind::OnceWithContext) {
+      Context = args.claimNext();
+    } else {
+      Context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+    }
     
     // If we know the platform runtime's "done" value, emit the check inline.
     llvm::BasicBlock *doneBB = nullptr;
@@ -723,7 +734,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     
     // Emit the runtime "once" call.
     auto call
-      = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(), {PredPtr, FnCode});
+      = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(), {PredPtr, FnCode, Context});
     call->setCallingConv(IGF.IGM.DefaultCC);
     
     // If we emitted the "done" check inline, join the branches.
@@ -847,6 +858,57 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::TSanInoutAccess) {
     auto address = args.claimNext();
     IGF.emitTSanInoutAccessCall(address);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::Swift3ImplicitObjCEntrypoint) {
+    llvm::Value *entrypointArgs[7];
+    auto argIter = IGF.CurFn->arg_begin();
+
+    // self
+    entrypointArgs[0] = &*argIter++;
+    if (entrypointArgs[0]->getType() != IGF.IGM.ObjCPtrTy)
+      entrypointArgs[0] = IGF.Builder.CreateBitCast(entrypointArgs[0], IGF.IGM.ObjCPtrTy);
+
+    // _cmd
+    entrypointArgs[1] = &*argIter;
+    if (entrypointArgs[1]->getType() != IGF.IGM.ObjCSELTy)
+      entrypointArgs[1] = IGF.Builder.CreateBitCast(entrypointArgs[1], IGF.IGM.ObjCSELTy);
+    
+    // Filename pointer
+    entrypointArgs[2] = args.claimNext();
+    // Filename length
+    entrypointArgs[3] = args.claimNext();
+    // Line
+    entrypointArgs[4] = args.claimNext();
+    // Column
+    entrypointArgs[5] = args.claimNext();
+    
+    // Create a flag variable so that this invocation logs only once.
+    auto flagStorageTy = llvm::ArrayType::get(IGF.IGM.Int8Ty,
+                                        IGF.IGM.getAtomicBoolSize().getValue());
+    auto flag = new llvm::GlobalVariable(IGF.IGM.Module, flagStorageTy,
+                               /*constant*/ false,
+                               llvm::GlobalValue::PrivateLinkage,
+                               llvm::ConstantAggregateZero::get(flagStorageTy));
+    flag->setAlignment(IGF.IGM.getAtomicBoolAlignment().getValue());
+    entrypointArgs[6] = llvm::ConstantExpr::getBitCast(flag, IGF.IGM.Int8PtrTy);
+
+    IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(),
+                           entrypointArgs);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::IsSameMetatype) {
+    auto metatypeLHS = args.claimNext();
+    auto metatypeRHS = args.claimNext();
+    (void)args.claimAll();
+    llvm::Value *metatypeLHSCasted =
+        IGF.Builder.CreateBitCast(metatypeLHS, IGF.IGM.Int8PtrTy);
+    llvm::Value *metatypeRHSCasted =
+        IGF.Builder.CreateBitCast(metatypeRHS, IGF.IGM.Int8PtrTy);
+
+    out.add(IGF.Builder.CreateICmpEQ(metatypeLHSCasted, metatypeRHSCasted));
     return;
   }
 

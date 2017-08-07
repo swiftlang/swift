@@ -1,4 +1,4 @@
-//===--- NSCoderShims.h - Foundation declarations for NSCoder overlay ------===//
+//===--- NSCoderShims.h - Foundation declarations for NSCoder overlay -----===//
 //
 // This source file is part of the Swift.org open source project
 //

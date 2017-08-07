@@ -169,8 +169,8 @@ class H : G {
 
   func manyA(_: AnyObject, _: AnyObject) {}
   func manyB(_ a: AnyObject, b: AnyObject) {}
-  func manyC(var a: AnyObject,  // expected-error {{parameters may not have the 'var' specifier}} {{14-17=}}
-             var b: AnyObject) {} // expected-error {{parameters may not have the 'var' specifier}} {{14-18=}}
+  func manyC(var a: AnyObject,  // expected-error {{'var' as a parameter attribute is not allowed}}
+             var b: AnyObject) {} // expected-error {{'var' as a parameter attribute is not allowed}}
 
   func result() -> AnyObject? { return nil }
   func both(_ x: AnyObject) -> AnyObject? { return x }
@@ -304,3 +304,29 @@ class GenericSubscriptDerived : GenericSubscriptBase {
     }
   }
 }
+
+
+// @escaping
+
+class CallbackBase {
+  func perform(handler: @escaping () -> Void) {} // expected-note * {{here}}
+  func perform(optHandler: (() -> Void)?) {} // expected-note * {{here}}
+  func perform(nonescapingHandler: () -> Void) {} // expected-note * {{here}}
+}
+class CallbackSubA: CallbackBase {
+  override func perform(handler: () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+  // expected-note@-1 {{type does not match superclass instance method with type '(@escaping () -> Void) -> ()'}}
+  override func perform(optHandler: () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+  override func perform(nonescapingHandler: () -> Void) {}
+}
+class CallbackSubB : CallbackBase {
+  override func perform(handler: (() -> Void)?) {}
+  override func perform(optHandler: (() -> Void)?) {}
+  override func perform(nonescapingHandler: (() -> Void)?) {} // expected-error {{method does not override any method from its superclass}}
+}
+class CallbackSubC : CallbackBase {
+  override func perform(handler: @escaping () -> Void) {}
+  override func perform(optHandler: @escaping () -> Void) {} // expected-error {{cannot override instance method parameter of type '(() -> Void)?' with non-optional type '() -> Void'}}
+  override func perform(nonescapingHandler: @escaping () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+}
+

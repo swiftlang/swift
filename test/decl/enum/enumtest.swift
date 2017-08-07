@@ -36,7 +36,7 @@ func test1a() -> unionSearchFlags {
 
 func test1b(_ b : Bool) {
   _ = 123
-  _ = .description == 1 // expected-error{{type of expression is ambiguous without more context}} 
+  _ = .description == 1 // expected-error {{ambiguous reference to member '=='}} 
 }
 
 enum MaybeInt {

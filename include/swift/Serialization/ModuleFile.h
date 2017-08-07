@@ -26,6 +26,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitcode/BitstreamReader.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 namespace llvm {
@@ -71,6 +72,9 @@ class ModuleFile : public LazyMemberLoader {
   /// The target the module was built for.
   StringRef TargetTriple;
 
+  /// The Swift compatibility version in use when this module was built.
+  version::Version CompatibilityVersion;
+
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
@@ -79,17 +83,6 @@ class ModuleFile : public LazyMemberLoader {
 
   /// The number of entities that are currently being deserialized.
   unsigned NumCurrentDeserializingEntities = 0;
-
-  /// Declaration contexts with delayed generic environments, which will be
-  /// completed as a pending action.
-  ///
-  /// This should only be used on the module returned by
-  /// getModuleFileForDelayedActions().
-  ///
-  /// FIXME: This is needed because completing a generic environment can
-  /// require the type checker, which might be gone if we delay generic
-  /// environments too far. It is a hack.
-  std::vector<DeclContext *> DelayedGenericEnvironments;
 
   /// RAII class to be used when deserializing an entity.
   class DeserializingEntityRAII {
@@ -426,14 +419,20 @@ public:
   /// as being malformed.
   Status error(Status issue = Status::Malformed) {
     assert(issue != Status::Valid);
-    // This would normally be an assertion but it's more useful to print the
-    // PrettyStackTrace here even in no-asserts builds. Malformed modules are
-    // generally unrecoverable.
-    if (FileContext && issue == Status::Malformed)
-      abort();
+    if (FileContext && issue == Status::Malformed) {
+      // This would normally be an assertion but it's more useful to print the
+      // PrettyStackTrace here even in no-asserts builds. Malformed modules are
+      // generally unrecoverable.
+      fatal(llvm::make_error<llvm::StringError>(
+          "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
+    }
     setStatus(issue);
     return getStatus();
   }
+
+  /// Emits one last diagnostic, logs the error, and then aborts for the stack
+  /// trace.
+  void fatal(llvm::Error error) LLVM_ATTRIBUTE_NORETURN;
 
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");
@@ -495,9 +494,7 @@ private:
   bool readCommentBlock(llvm::BitstreamCursor &cursor);
 
   /// Recursively reads a pattern from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a pattern, returns null.
-  Pattern *maybeReadPattern(DeclContext *owningDC);
+  llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
   ParameterList *readParameterList();
   
@@ -518,15 +515,6 @@ private:
                    GenericContext *genericDecl,
                    serialization::GenericEnvironmentID envID);
 
-  /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
-  ///
-  /// Returns true if there is an error.
-  ///
-  /// Note: this destroys the cursor's position in the stream. Furthermore,
-  /// because it reads from the cursor, it is not possible to reset the cursor
-  /// after reading. Nothing should ever follow a MEMBERS record.
-  bool readMembers(SmallVectorImpl<Decl *> &Members);
-
   /// Populates the protocol's default witness table.
   ///
   /// Returns true if there is an error.
@@ -542,12 +530,14 @@ private:
   /// because it reads from the cursor, it is not possible to reset the cursor
   /// after reading. Nothing should ever follow an XREF record except
   /// XREF_PATH_PIECE records.
-  Decl *resolveCrossReference(ModuleDecl *M, uint32_t pathLen);
+  llvm::Expected<Decl *> resolveCrossReference(ModuleDecl *M, uint32_t pathLen);
 
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
-  void configureStorage(AbstractStorageDecl *storage, unsigned rawStorageKind,
+  /// Sets the accessors for \p storage based on \p rawStorageKind.
+  void configureStorage(AbstractStorageDecl *storage,
+                        unsigned rawStorageKind,
                         serialization::DeclID getter,
                         serialization::DeclID setter,
                         serialization::DeclID materializeForSet,
@@ -613,7 +603,7 @@ public:
 
   /// Searches the module's nested type decls table for the given member of
   /// the given type.
-  TypeDecl *lookupNestedType(Identifier name, const ValueDecl *parent);
+  TypeDecl *lookupNestedType(Identifier name, const NominalTypeDecl *parent);
 
   /// Searches the module's operators for one with the given name and fixity.
   ///
@@ -743,9 +733,18 @@ public:
   }
 
   /// Returns the type with the given ID, deserializing it if needed.
+  ///
+  /// \sa getTypeChecked
   Type getType(serialization::TypeID TID);
 
-  /// Returns the identifier with the given ID, deserializing it if needed.
+  /// Returns the type with the given ID, deserializing it if needed.
+  llvm::Expected<Type> getTypeChecked(serialization::TypeID TID);
+
+  /// Returns the base name with the given ID, deserializing it if needed.
+  DeclBaseName getDeclBaseName(serialization::IdentifierID IID);
+
+  /// Convenience method to retrieve the identifier backing the name with
+  /// given ID. Asserts that the name with this ID is not special.
   Identifier getIdentifier(serialization::IdentifierID IID);
 
   /// Returns the decl with the given ID, deserializing it if needed.
@@ -754,8 +753,20 @@ public:
   /// \param ForcedContext Optional override for the decl context of certain
   ///                      kinds of decls, used to avoid re-entrant
   ///                      deserialization.
+  ///
+  /// \sa getDeclChecked
   Decl *getDecl(serialization::DeclID DID,
                 Optional<DeclContext *> ForcedContext = None);
+
+  /// Returns the decl with the given ID, deserializing it if needed.
+  ///
+  /// \param DID The ID for the decl within this module.
+  /// \param ForcedContext Optional override for the decl context of certain
+  ///                      kinds of decls, used to avoid re-entrant
+  ///                      deserialization.
+  llvm::Expected<Decl *>
+  getDeclChecked(serialization::DeclID DID,
+                 Optional<DeclContext *> ForcedContext = None);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);

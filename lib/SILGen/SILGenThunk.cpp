@@ -14,7 +14,7 @@
 // referenced from code, such as dynamic thunks, curry thunks, native to foreign
 // thunks and foreign to native thunks.
 //
-// VTable thunks and witness thunks can be found in SILGenType.cpp, and and the
+// VTable thunks and witness thunks can be found in SILGenType.cpp, and the
 // meat of the bridging thunk implementation is in SILGenBridging.cpp, and
 // re-abstraction thunks are in SILGenPoly.cpp.
 //
@@ -35,6 +35,8 @@ using namespace Lowering;
 
 SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
                                            SILConstantInfo constantInfo) {
+  assert(constant.kind != SILDeclRef::Kind::Allocator &&
+         "allocating entry point for constructor is never dynamic");
   // Mangle the constant with a _TTD header.
   auto name = constant.mangle(SILDeclRef::ManglingKind::DynamicThunk);
 
@@ -73,61 +75,71 @@ SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
 
 static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        SILLocation loc,
-                                       SILDeclRef next,
-                                       bool direct,
+                                       SILDeclRef thunk,
                                        SILValue selfArg,
                                        SubstitutionList curriedSubs) {
-  if (next.isForeign || next.isCurried || !next.hasDecl() || direct)
-    return gen.emitGlobalFunctionRef(loc, next.asForeign(false));
+  auto *vd = thunk.getDecl();
+
+  // Reference the next uncurrying level of the function.
+  SILDeclRef next = SILDeclRef(vd, thunk.kind);
+  assert(!next.isCurried);
+
+  // If the function is natively foreign, reference its foreign entry point.
+  if (requiresForeignToNativeThunk(vd))
+    return gen.emitGlobalFunctionRef(loc, next);
+
+  // If the thunk is a curry thunk for a direct method reference, we are
+  // doing a direct dispatch (eg, a fragile 'super.foo()' call).
+  if (thunk.isDirectReference)
+    return gen.emitGlobalFunctionRef(loc, next);
 
   auto constantInfo = gen.SGM.Types.getConstantInfo(next);
 
-  if (isa<AbstractFunctionDecl>(next.getDecl()) &&
-      getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
-        == MethodDispatch::Class) {
-    // Use the dynamic thunk if dynamic.
-    if (next.getDecl()->isDynamic()) {
-      auto dynamicThunk = gen.SGM.getDynamicThunk(next, constantInfo);
-      return gen.B.createFunctionRef(loc, dynamicThunk);
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
+    if (getMethodDispatch(func) == MethodDispatch::Class) {
+      // Use the dynamic thunk if dynamic.
+      if (vd->isDynamic()) {
+        auto dynamicThunk = gen.SGM.getDynamicThunk(next, constantInfo);
+        return gen.B.createFunctionRef(loc, dynamicThunk);
+      }
+
+      return gen.B.createClassMethod(loc, selfArg, next);
     }
 
-    return gen.B.createClassMethod(loc, selfArg, next);
-  }
-
-  // If the fully-uncurried reference is to a generic method, look up the
-  // witness.
-  if (constantInfo.SILFnType->getRepresentation()
-        == SILFunctionTypeRepresentation::WitnessMethod) {
-    // FIXME: This is wrong if the requirement makes Self non-canonical,
-    // eg <Self, T where Self : P, T : Q, T.X == Self>
-    auto selfType = curriedSubs[0].getReplacement()->getCanonicalType();
-    assert(isa<ArchetypeType>(selfType) && "no archetype for witness?!");
-    SILValue OpenedExistential;
-    if (!cast<ArchetypeType>(selfType)->getOpenedExistentialType().isNull())
-      OpenedExistential = selfArg;
-    auto protocol =
-      next.getDecl()->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-    auto conformance = ProtocolConformanceRef(protocol);
-    return gen.B.createWitnessMethod(loc, selfType, conformance, next,
-                                     constantInfo.getSILType(),
-                                     OpenedExistential);
+    // If the fully-uncurried reference is to a generic method, look up the
+    // witness.
+    if (constantInfo.SILFnType->getRepresentation()
+          == SILFunctionTypeRepresentation::WitnessMethod) {
+      auto protocol =
+        func->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto subMap = func->getGenericSignature()
+        ->getSubstitutionMap(curriedSubs);
+      auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
+      auto substSelfType = origSelfType.subst(subMap)->getCanonicalType();
+      auto conformance = subMap.lookupConformance(origSelfType, protocol);
+      SILValue OpenedExistential;
+      if (substSelfType->isOpenedExistential())
+        OpenedExistential = selfArg;
+      return gen.B.createWitnessMethod(loc, substSelfType, *conformance, next,
+                                      constantInfo.getSILType(),
+                                      OpenedExistential);
+    }
   }
 
   // Otherwise, emit a direct call.
   return gen.emitGlobalFunctionRef(loc, next);
 }
 
-void SILGenFunction::emitCurryThunk(ValueDecl *vd,
-                                    SILDeclRef from, SILDeclRef to) {
-#ifndef NDEBUG
-  assert(from.uncurryLevel == 0 && to.uncurryLevel == 1
-         && "currying function at level other than one?!");
+void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
+  assert(thunk.isCurried);
+
+  auto *vd = thunk.getDecl();
 
   if (auto *fd = dyn_cast<AbstractFunctionDecl>(vd)) {
     assert(!SGM.M.Types.hasLoweredLocalCaptures(fd) &&
            "methods cannot have captures");
+    (void) fd;
   }
-#endif
 
   auto selfTy = vd->getInterfaceType()->castTo<AnyFunctionType>()
     ->getInput();
@@ -137,14 +149,14 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   // Forward substitutions.
   auto subs = F.getForwardingSubstitutions();
 
-  SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,
+  SILValue toFn = getNextUncurryLevelRef(*this, vd, thunk,
                                          selfArg, subs);
 
   // FIXME: Using the type from the ConstantInfo instead of looking at
   // getConstantOverrideInfo() for methods looks suspect in the presence
   // of covariant overrides and multiple vtable entries.
   SILFunctionConventions fromConv(
-      SGM.Types.getConstantInfo(from).SILFnType, SGM.M);
+      SGM.Types.getConstantInfo(thunk).SILFnType, SGM.M);
   SILType resultTy = fromConv.getSingleSILResultType();
   resultTy = F.mapTypeIntoContext(resultTy);
   auto substTy = toFn->getType().substGenericArgs(SGM.M,  subs);
@@ -161,20 +173,20 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(vd), toClosure);
 }
 
-void SILGenModule::emitCurryThunk(ValueDecl *fd,
-                                  SILDeclRef entryPoint,
-                                  SILDeclRef nextEntryPoint) {
+void SILGenModule::emitCurryThunk(SILDeclRef constant) {
+  assert(constant.isCurried);
+
   // Thunks are always emitted by need, so don't need delayed emission.
-  SILFunction *f = getFunction(entryPoint, ForDefinition);
+  SILFunction *f = getFunction(constant, ForDefinition);
   f->setThunk(IsThunk);
   f->setBare(IsBare);
 
-  preEmitFunction(entryPoint, fd, f, fd);
+  auto *fd = constant.getDecl();
+  preEmitFunction(constant, fd, f, fd);
   PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
 
-  SILGenFunction(*this, *f)
-    .emitCurryThunk(fd, entryPoint, nextEntryPoint);
-  postEmitFunction(entryPoint, f);
+  SILGenFunction(*this, *f).emitCurryThunk(constant);
+  postEmitFunction(constant, f);
 }
 
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
@@ -223,27 +235,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
   // If the constant is a thunk we haven't emitted yet, emit it.
   if (!SGM.hasFunction(constant)) {
     if (constant.isCurried) {
-      auto vd = constant.getDecl();
-      // Reference the next uncurrying level of the function.
-      SILDeclRef next = SILDeclRef(vd, constant.kind,
-                                 SILDeclRef::ConstructAtBestResilienceExpansion,
-                                 constant.uncurryLevel + 1);
-      // If the function is fully uncurried and natively foreign, reference its
-      // foreign entry point.
-      if (!next.isCurried) {
-        if (requiresForeignToNativeThunk(vd))
-          next = next.asForeign();
-      }
-      
-      // Preserve whether the curry thunks lead to a direct reference to the
-      // method implementation.
-      next = next.asDirectReference(constant.isDirectReference);
-
-      SGM.emitCurryThunk(vd, constant, next);
-    }
-    // Otherwise, if this is a calling convention thunk we haven't emitted yet,
-    // emit it.
-    else if (constant.isForeignToNativeThunk()) {
+      SGM.emitCurryThunk(constant);
+    } else if (constant.isForeignToNativeThunk()) {
       SGM.emitForeignToNativeThunk(constant);
     } else if (constant.isNativeToForeignThunk()) {
       SGM.emitNativeToForeignThunk(constant);

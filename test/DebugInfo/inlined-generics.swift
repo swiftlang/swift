@@ -12,7 +12,7 @@ func foo1<T:P>(_ t: T, _ dt: T.DT1) -> T.DT1 {
 
 // CHECK: define {{.*}}@_T04main4foo2yxAA1PRzlF
 public func foo2<S:P>(_ s: S) {
-  // CHECK: call void @llvm.dbg.value(metadata %swift.type* %S.DT1, i64 0,
+  // CHECK: call void @llvm.dbg.value(metadata %swift.type* %S.DT1,
   // CHECK-SAME:                     metadata ![[META:[0-9]+]]
   foo1(s, s.getDT())
   // T.DT1 should get substituted with S.DT1.

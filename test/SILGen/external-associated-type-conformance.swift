@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -import-objc-header %S/Inputs/external-associated-type-conformance.h %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sil-serialize-witness-tables -import-objc-header %S/Inputs/external-associated-type-conformance.h %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 extension BadError: LocalizedError {}

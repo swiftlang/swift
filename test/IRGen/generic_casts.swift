@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
@@ -38,12 +38,12 @@ func allToInt<T>(_ x: T) -> Int {
 	// CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
   // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
   // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-  // CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+  // CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
   // CHECK: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
   // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
   // CHECK: [[T_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
   // CHECK: [[T_TMP:%.*]] = bitcast i8* [[T_ALLOCA]] to %swift.opaque*
-  // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}(%swift.opaque* [[T_TMP]], %swift.opaque* %0, %swift.type* %T)
+  // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}(%swift.opaque* noalias [[T_TMP]], %swift.opaque* noalias %0, %swift.type* %T)
   // CHECK: [[T0:%.*]] = bitcast %TSi* [[INT_TEMP]] to %swift.opaque*
   // CHECK: call i1 @swift_rt_swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[T_TMP]], %swift.type* %T, %swift.type* @_T0SiN, i64 7)
   // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, %TSi* [[INT_TEMP]], i32 0, i32 0

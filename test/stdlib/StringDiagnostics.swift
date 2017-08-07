@@ -30,11 +30,6 @@ func testIntSubscripting(s: String, i: Int) {
   _ = s[CountableClosedRange(17...20)] // expected-error{{subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}}
 }
 
-// Common pitfall: trying to access `String.count`.
-func testStringCount(s: String) {
-  _ = s.count // expected-error{{'count' is unavailable: there is no universally good answer, see the documentation comment for discussion}}
-}
-
 func testNonAmbiguousStringComparisons() {
   let s1 = "a"
   let s2 = "b"
@@ -60,12 +55,6 @@ func testAmbiguousStringComparisons(s: String) {
   let a12 = nsString > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
 }
 
-func acceptsSequence<S : Sequence>(_ sequence: S) {}
-
-func testStringIsNotASequence(s: String) {
-  acceptsSequence(s) // expected-error {{argument type 'String' does not conform to expected type 'Sequence'}}
-}
-
 func testStringDeprecation(hello: String) {
   let hello2 = hello
     .addingPercentEscapes(using: .utf8) // expected-warning{{'addingPercentEscapes(using:)' is deprecated}}
@@ -82,13 +71,12 @@ func acceptsRandomAccessCollection<C: RandomAccessCollection>(_: C) {}
 
 func testStringCollectionTypes(s: String) {
   acceptsCollection(s.utf8)
-  acceptsBidirectionalCollection(s.utf8) // expected-error{{argument type 'String.UTF8View' does not conform to expected type 'BidirectionalCollection'}}
+  acceptsBidirectionalCollection(s.utf8) 
   acceptsRandomAccessCollection(s.utf8) // expected-error{{argument type 'String.UTF8View' does not conform to expected type 'RandomAccessCollection'}}
 
-  // UTF16View.Collection is random-access with Foundation, bidirectional without
-  acceptsCollection(s.utf16)
+  acceptsCollection(s.utf16) 
   acceptsBidirectionalCollection(s.utf16)
-  acceptsRandomAccessCollection(s.utf16)
+  acceptsRandomAccessCollection(s.utf16) // expected-error{{argument type 'String.UTF16View' does not conform to expected type 'RandomAccessCollection'}}
 
   acceptsCollection(s.unicodeScalars)
   acceptsBidirectionalCollection(s.unicodeScalars)

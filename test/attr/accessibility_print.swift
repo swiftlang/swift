@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -print-accessibility -source-filename=%s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-SRC
 // RUN: %target-swift-frontend -emit-module-path %t/accessibility_print.swiftmodule %s
 // RUN: %target-swift-ide-test -skip-deinit=false -print-module -print-accessibility -module-to-print=accessibility_print -I %t -source-filename=%s | %FileCheck %s

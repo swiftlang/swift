@@ -36,6 +36,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
@@ -48,6 +49,7 @@ namespace swift {
   class AnyFunctionType;
   class ASTContext;
   class FuncDecl;
+  class KeyPathPattern;
   class SILUndef;
   class SourceFile;
   class SerializedSILLoader;
@@ -99,18 +101,19 @@ public:
   using LinkingMode = SILOptions::LinkingMode;
 
 private:
-  friend class SILBasicBlock;
-  friend class SILCoverageMap;
-  friend class SILDefaultWitnessTable;
-  friend class SILFunction;
-  friend class SILGlobalVariable;
-  friend class SILLayout;
-  friend class SILType;
-  friend class SILVTable;
-  friend class SILUndef;
-  friend class SILWitnessTable;
-  friend class Lowering::SILGenModule;
-  friend class Lowering::TypeConverter;
+  friend KeyPathPattern;
+  friend SILBasicBlock;
+  friend SILCoverageMap;
+  friend SILDefaultWitnessTable;
+  friend SILFunction;
+  friend SILGlobalVariable;
+  friend SILLayout;
+  friend SILType;
+  friend SILVTable;
+  friend SILUndef;
+  friend SILWitnessTable;
+  friend Lowering::SILGenModule;
+  friend Lowering::TypeConverter;
   class SerializationCallback;
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
@@ -188,6 +191,12 @@ private:
   /// The callback used by the SILLoader.
   std::unique_ptr<SerializationCallback> Callback;
 
+  // Callbacks registered by the SIL optimizer to run on each deserialized
+  // function body. This is intentionally a stateless type because the
+  // ModuleDecl and SILFunction should be sufficient context.
+  typedef void (*SILFunctionBodyCallback)(ModuleDecl *, SILFunction *F);
+  SmallVector<SILFunctionBodyCallback, 0> DeserializationCallbacks;
+
   /// The SILLoader used when linking functions into this module.
   ///
   /// This is lazily initialized the first time we attempt to
@@ -219,8 +228,17 @@ private:
   /// has not been created yet.
   SerializedSILLoader *getSILLoader();
 
+  /// Folding set for key path patterns.
+  llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
+
 public:
   ~SILModule();
+
+  /// Add a callback for each newly deserialized SIL function body.
+  void registerDeserializationCallback(SILFunctionBodyCallback callBack);
+
+  /// Return set of registered deserialization callbacks.
+  ArrayRef<SILFunctionBodyCallback> getDeserializationCallbacks();
 
   /// Add a delete notification handler \p Handler to the module context.
   void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);
@@ -264,21 +282,18 @@ public:
   ///
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file, starting from the specified element number.
-  ///
-  /// If \p makeModuleFragile is true, all functions and global variables of
-  /// the module are marked as serialized. This is used for compiling the stdlib.
   static std::unique_ptr<SILModule>
   constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
                Optional<unsigned> startElem = None,
-               bool makeModuleFragile = false,
                bool isWholeModule = false);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
-  static std::unique_ptr<SILModule> createEmptyModule(ModuleDecl *M,
-                                                      SILOptions &Options,
-                                                      bool WholeModule = false) {
-    return std::unique_ptr<SILModule>(new SILModule(M, Options, M, WholeModule));
+  static std::unique_ptr<SILModule>
+  createEmptyModule(ModuleDecl *M, SILOptions &Options,
+                    bool WholeModule = false) {
+    return std::unique_ptr<SILModule>(
+        new SILModule(M, Options, M, WholeModule));
   }
 
   /// Get the Swift module associated with this SIL module.
@@ -305,6 +320,9 @@ public:
   bool isWholeModule() const {
     return wholeModule;
   }
+
+  /// Returns true if everything in this SILModule is being serialized.
+  bool isWholeModuleSerialized() const { return Options.SILSerializeAll; }
 
   SILOptions &getOptions() const { return Options; }
 
@@ -459,6 +477,10 @@ public:
   /// Link in all VTables in the module.
   void linkAllVTables();
 
+  /// Link all definitions in all segments that are logically part of
+  /// the same AST module.
+  void linkAllFromCurrentModule();
+
   /// \brief Return the declaration of a utility function that can,
   /// but needn't, be shared between modules.
   SILFunction *getOrCreateSharedFunction(SILLocation loc,
@@ -471,16 +493,12 @@ public:
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist.
-  SILFunction *getOrCreateFunction(SILLocation loc,
-                                   StringRef name,
-                                   SILLinkage linkage,
-                                   CanSILFunctionType type,
-                                   IsBare_t isBareSILFunction,
-                                   IsTransparent_t isTransparent,
-                                   IsSerialized_t isSerialized,
-                                   IsThunk_t isThunk = IsNotThunk,
-                                   SILFunction::ClassVisibility_t CV =
-                                           SILFunction::NotRelevant);
+  SILFunction *getOrCreateFunction(
+      SILLocation loc, StringRef name, SILLinkage linkage,
+      CanSILFunctionType type, IsBare_t isBareSILFunction,
+      IsTransparent_t isTransparent, IsSerialized_t isSerialized,
+      IsThunk_t isThunk = IsNotThunk,
+      SubclassScope subclassScope = SubclassScope::NotApplicable);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist.
@@ -498,7 +516,7 @@ public:
       GenericEnvironment *genericEnv, Optional<SILLocation> loc,
       IsBare_t isBareSILFunction, IsTransparent_t isTrans,
       IsSerialized_t isSerialized, IsThunk_t isThunk = IsNotThunk,
-      SILFunction::ClassVisibility_t classVisibility = SILFunction::NotRelevant,
+      SubclassScope subclassScope = SubclassScope::NotApplicable,
       Inline_t inlineStrategy = InlineDefault,
       EffectsKind EK = EffectsKind::Unspecified,
       SILFunction *InsertBefore = nullptr,

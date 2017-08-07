@@ -410,9 +410,12 @@ public:
   SourceLoc getSourceLoc() const;
   SourceLoc getStartSourceLoc() const;
   SourceLoc getEndSourceLoc() const;
-  
   SourceRange getSourceRange() const {
-    return { getStartSourceLoc(), getEndSourceLoc() };
+    return {getStartSourceLoc(), getEndSourceLoc()};
+  }
+  DebugLoc getDebugInfoLoc() const {
+    assert(isDebugInfoLoc());
+    return Loc.DebugInfoLoc;
   }
 
   /// Fingerprint a DebugLoc for use in a DenseMap.

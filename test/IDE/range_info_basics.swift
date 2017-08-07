@@ -135,6 +135,15 @@ func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
   return components.map { "\($0)=\($1)" }.joined(separator: "&")
 }
 
+func testExpressionVariables() -> Int {
+  func bar() -> Int {
+    let x = 5
+    let y = 6
+    return x + y
+  }
+  return bar()
+}
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -164,13 +173,14 @@ func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
 // RUN: %target-swift-ide-test -range -pos=109:6 -end-pos=111:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INVALID
 // RUN: %target-swift-ide-test -range -pos=114:1 -end-pos=115:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
 // RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=119:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
-// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
 // RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:20 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
-// RUN: %target-swift-ide-test -range -pos=127:7 -end-pos=127:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=127:7 -end-pos=127:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
 // RUN: %target-swift-ide-test -range -pos=127:3 -end-pos=127:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
 // RUN: %target-swift-ide-test -range -pos=128:13 -end-pos=128:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-INOUT
 // RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=120:22 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
 // RUN: %target-swift-ide-test -range -pos=133:1 -end-pos=135:65 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NO-PATTERN
+// RUN: %target-swift-ide-test -range -pos=142:12 -end-pos=142:17 -source-filename %s | %FileCheck %s -check-prefix=CHECK-X-Y
 
 // CHECK-NO-PATTERN: <Kind>MultiStatement</Kind>
 // CHECK-NO-PATTERN-NEXT: <Content>for key in parameters.keys.sorted(by: <) {
@@ -445,6 +455,7 @@ func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
 // CHECK20-NEXT: <Type>Void</Type>
 // CHECK20-NEXT: <Context>swift_ide_test.(file).foo7(a:)</Context>
 // CHECK20-NEXT: <Entry>Multi</Entry>
+// CHECK20-NEXT: <Referenced>a</Referenced><Type>Int</Type>
 // CHECK20-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK20-NEXT: <end>
 
@@ -463,3 +474,6 @@ func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
 // CHECK27-NEXT: <Referenced>foo9</Referenced><Type>(Int, Int) -> Int</Type>
 // CHECK27-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK27-NEXT: <end>
+
+// CHECK-X-Y: <Referenced>x</Referenced><Type>Int</Type>
+// CHECK-X-Y: <Referenced>y</Referenced><Type>Int</Type>

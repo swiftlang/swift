@@ -183,6 +183,10 @@ class TestAffineTransform : TestAffineTransformSuper {
         var reflectAboutOrigin = AffineTransform.identity
         reflectAboutOrigin.rotate(byRadians: .pi)
         checkPointTransformation(reflectAboutOrigin, point: point, expectedPoint: NSPoint(x: CGFloat(-10.0), y: CGFloat(-10.0)))
+        
+        var scaleThenRotate = AffineTransform(scale: 2)
+        scaleThenRotate.rotate(byRadians: .pi / 2)
+        checkPointTransformation(scaleThenRotate, point: point, expectedPoint: NSPoint(x: CGFloat(-20.0), y: CGFloat(20.0)))
     }
     
     func test_Inversion() {
@@ -364,6 +368,20 @@ class TestAffineTransform : TestAffineTransformSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(AffineTransform(), AffineTransform._unconditionallyBridgeFromObjectiveC(nil))
+    }
+
+    func test_rotation_compose() {
+        var t = AffineTransform.identity
+        t.translate(x: 1.0, y: 1.0)
+        t.rotate(byDegrees: 90)
+        t.translate(x: -1.0, y: -1.0)
+        let result = t.transform(NSPoint(x: 1.0, y: 2.0))
+        expectEqualWithAccuracy(0.0, Double(result.x), accuracy: accuracyThreshold)
+        expectEqualWithAccuracy(1.0, Double(result.y), accuracy: accuracyThreshold)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -386,6 +404,8 @@ AffineTransformTests.test("test_hashing_identity") { TestAffineTransform().test_
 AffineTransformTests.test("test_hashing_values") { TestAffineTransform().test_hashing_values() }
 AffineTransformTests.test("test_AnyHashableContainingAffineTransform") { TestAffineTransform().test_AnyHashableContainingAffineTransform() }
 AffineTransformTests.test("test_AnyHashableCreatedFromNSAffineTransform") { TestAffineTransform().test_AnyHashableCreatedFromNSAffineTransform() }
+AffineTransformTests.test("test_unconditionallyBridgeFromObjectiveC") { TestAffineTransform().test_unconditionallyBridgeFromObjectiveC() }
+AffineTransformTests.test("test_rotation_compose") { TestAffineTransform().test_rotation_compose() }
 runAllTests()
 #endif
     

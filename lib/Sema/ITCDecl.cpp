@@ -19,6 +19,7 @@
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include <tuple>
 using namespace swift;
 
@@ -59,10 +60,6 @@ decomposeInheritedClauseDecl(
           dc = dc->getParent();
         }
       }
-    }
-
-    if (!isa<EnumDecl>(typeDecl)) {
-      options |= TR_NonEnumInheritanceClauseOuterLayer;
     }
   } else {
     auto ext = decl.get<ExtensionDecl *>();
@@ -111,14 +108,22 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
 
   // Validate the type of this inherited clause entry.
   // FIXME: Recursion into existing type checker.
-  GenericTypeToArchetypeResolver resolver(dc);
-  if (TC.validateType(*inherited, dc, options, &resolver,
+  ProtocolRequirementTypeResolver protoResolver;
+  GenericTypeToArchetypeResolver archetypeResolver(dc);
+  GenericTypeResolver *resolver;
+  if (isa<ProtocolDecl>(dc)) {
+    resolver = &protoResolver;
+  } else {
+    resolver = &archetypeResolver;
+  }
+
+  if (TC.validateType(*inherited, dc, options, resolver,
                       &unsatisfiedDependency)) {
     inherited->setInvalidType(getASTContext());
   }
 
   auto type = inherited->getType();
-  if (!type.isNull())
+  if (!type.isNull() && !isa<ProtocolDecl>(dc))
     inherited->setType(dc->mapTypeOutOfContext(type));
 }
 
@@ -255,9 +260,11 @@ void IterativeTypeChecker::processInheritedProtocols(
 
     // Collect existential types.
     // FIXME: We'd prefer to keep what the user wrote here.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (inherited.getType()->isExistentialType(protocols)) {
-      for (auto inheritedProtocol: protocols) {
+    if (inherited.getType()->isExistentialType()) {
+      auto layout = inherited.getType()->getExistentialLayout();
+      for (auto inheritedProtocolTy: layout.getProtocols()) {
+        auto *inheritedProtocol = inheritedProtocolTy->getDecl();
+
         if (inheritedProtocol == protocol ||
             inheritedProtocol->inheritsFrom(protocol)) {
           if (!diagnosedCircularity) {
@@ -333,9 +340,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
         typeAliasDecl->getGenericParams() == nullptr) {
-      typeAliasDecl->setValidationStarted();
-
-      TypeResolutionOptions options;
+      TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
       if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 

@@ -144,3 +144,28 @@ func test006() {
 // KEYWORD_0-NOT: for_
 // KEYWORD_0-NOT: fortest
 // KEYWORD_0-NOT: for.
+
+enum E0 {
+  case case0
+}
+
+// RUN: %complete-test %s -group=none -no-inner-results -no-inner-operators -tok=LEADING_DOT_0 | %FileCheck %s -check-prefix=LEADING_NODOT_E0
+// RUN: %complete-test %s -group=none -no-inner-results -inner-operators -tok=LEADING_DOT_0 | %FileCheck %s -check-prefix=LEADING_DOT_E0
+func test007() {
+  var e: E0
+  e = #^LEADING_DOT_0^#
+}
+// LEADING_NODOT_E0-NOT: .
+// LEADING_DOT_E0: .
+
+struct WithLeading {
+  static var foo: WithLeading = WithLeading()
+}
+
+// RUN: %complete-test %s -group=none -no-inner-results -inner-operators -tok=LEADING_DOT_1 | %FileCheck %s -check-prefix=LEADING_DOT_S
+func test009() {
+  var e: WithLeading
+  e = #^LEADING_DOT_1^#
+}
+// FIXME: should have leading dot.
+// LEADING_DOT_S-NOT: .

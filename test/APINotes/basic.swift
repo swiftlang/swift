@@ -1,6 +1,26 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -swift-version 4
 import APINotesTest
 import APINotesFrameworkTest
+
+#if _runtime(_ObjC)
+extension A {
+  func implicitlyObjC() { }
+}
+
+extension C {
+  func alsoImplicitlyObjC() { }
+}
+
+class D : C {
+  func yetAnotherImplicitlyObjC() { }
+}
+
+func testSelectors(a: AnyObject) {
+  a.implicitlyObjC?()  // okay: would complain without SwiftObjCMembers
+  a.alsoImplicitlyObjC?()  // okay: would complain without SwiftObjCMembers
+  a.yetAnotherImplicitlyObjC?()  // okay: would complain without SwiftObjCMembers
+}
+#endif
 
 func testSwiftName() {
   moveTo(x: 0, y: 0, z: 0)
@@ -23,9 +43,3 @@ func testSwiftName() {
   jumpTo(x: 0, y: 0, z: 0)
   jumpTo(0, 0, 0) // expected-error{{missing argument labels 'x:y:z:' in call}}
 }
-
-// FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected note produced: 'ANTGlobalValue' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'PointStruct' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'real_t' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'RectStruct' was obsoleted in Swift 3

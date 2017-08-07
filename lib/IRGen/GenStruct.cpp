@@ -21,6 +21,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -34,12 +35,11 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Linking.h"
 #include "IndirectTypeInfo.h"
 #include "MemberAccessStrategy.h"
 #include "NonFixedTypeInfo.h"
 #include "ResilientTypeInfo.h"
-#include "StructMetadataLayout.h"
+#include "StructMetadataVisitor.h"
 
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
 
@@ -414,6 +414,8 @@ namespace {
     }
     
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
+      // TODO: do this with StructMetadataLayout::getFieldOffset
+
       // Get the field offset vector from the struct metadata.
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       Address fieldVector = emitAddressOfFieldOffsetVector(IGF,

@@ -56,7 +56,6 @@ class LoopCanonicalizer : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "Loop Canonicalizer"; }
 };
 
 } // end anonymous namespace

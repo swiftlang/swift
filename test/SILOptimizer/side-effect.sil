@@ -201,7 +201,7 @@ bb0(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil @checkedcast
-// CHECK: <func=,param0=;trap>
+// CHECK: <func=,param0=r;trap>
 sil @checkedcast : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   unconditional_checked_cast %0 : $Builtin.NativeObject to $X

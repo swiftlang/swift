@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend %s -O -emit-sil -enable-testing | %FileCheck -check-prefix=CHECK-TESTING %s
+// RUN: %target-swift-frontend %s -O -emit-sil -sil-serialize-witness-tables | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-sil -sil-serialize-witness-tables -enable-testing | %FileCheck -check-prefix=CHECK-TESTING %s
 
 // Check if cycles are removed.
 

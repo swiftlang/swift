@@ -35,7 +35,8 @@ class Context {
 public:
   Context(StringRef RuntimeLibPath,
           llvm::function_ref<
-              std::unique_ptr<LangSupport>(Context &)> LangSupportFactoryFn);
+              std::unique_ptr<LangSupport>(Context &)> LangSupportFactoryFn,
+          bool shouldDispatchNotificationsOnMain = true);
   ~Context();
 
   StringRef getRuntimeLibPath() const { return RuntimeLibPath; }

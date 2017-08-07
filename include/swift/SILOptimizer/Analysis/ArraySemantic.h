@@ -33,9 +33,14 @@ enum class ArrayCallKind {
   kGetElementAddress,
   kMakeMutable,
   kMutateUnknown,
+  kReserveCapacityForAppend,
   kWithUnsafeMutableBufferPointer,
+  kAppendContentsOf,
+  kAppendElement,
   // The following two semantic function kinds return the result @owned
-  // instead of operating on self passed as parameter.
+  // instead of operating on self passed as parameter. If you are adding
+  // a function, and it has a self parameter, make sure that it is defined
+  // before this comment.
   kArrayInit,
   kArrayUninitialized
 };
@@ -131,6 +136,13 @@ public:
   /// Returns true on success, false otherwise.
   bool replaceByValue(SILValue V);
 
+  /// Replace a call to append(contentsOf: ) with a series of
+  /// append(element: ) calls.
+  bool replaceByAppendingValues(SILModule &M, SILFunction *AppendFn,
+                                SILFunction *ReserveFn,
+                                const llvm::SmallVectorImpl<SILValue> &Vals,
+                                ArrayRef<Substitution> Subs);
+
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {
     hoistOrCopy(InsertBefore, DT, false);
@@ -152,6 +164,9 @@ public:
 
   /// Could this array be backed by an NSArray.
   bool mayHaveBridgedObjectElementType() const;
+  
+  /// Can this function be inlined by the early inliner.
+  bool canInlineEarly() const;
 
 protected:
   /// Validate the signature of this call.

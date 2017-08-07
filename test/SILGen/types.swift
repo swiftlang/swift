@@ -20,16 +20,19 @@ class C {
 struct S {
   var member: Int
 
-  // CHECK-LABEL: sil hidden  @{{.*}}1SV3foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
+  // CHECK-LABEL: sil hidden @{{.*}}1SV3foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
   mutating
   func foo(x x: Int) {
     var x = x
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
-    // CHECK: [[X:%[0-9]+]] = project_box [[XADDR]]
-    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS]] : $*S, #S.member
-    // CHECK: copy_addr [[X]] to [[MEMBER]]
+    // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
+    // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
+    // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[XADDR]] : $*Int
+    // CHECK: [[X:%.*]] = load [trivial] [[READ]] : $*Int
+    // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[THIS]] : $*S
+    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[WRITE]] : $*S, #S.member
+    // CHECK: assign [[X]] to [[MEMBER]] : $*Int
   }
 
   class SC {
@@ -101,6 +104,6 @@ func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
   }
 }
 
-// CHECK-LABEL: sil shared @_T05types1fyyF2FCL_C3zimyyF
-// CHECK-LABEL: sil shared @_T05types1gySb1b_tF2FCL_C3zimyyF
-// CHECK-LABEL: sil shared @_T05types1gySb1b_tF2FCL0_C3zimyyF
+// CHECK-LABEL: sil private @_T05types1fyyF2FCL_C3zimyyF
+// CHECK-LABEL: sil private @_T05types1gySb1b_tF2FCL_C3zimyyF
+// CHECK-LABEL: sil private @_T05types1gySb1b_tF2FCL0_C3zimyyF

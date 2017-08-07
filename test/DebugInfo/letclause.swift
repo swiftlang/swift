@@ -7,7 +7,7 @@ func peek() -> Symbol? { return Symbol() }
 func foo() {
 // CHECK: define {{.*}}foo
 // CHECK: call void @llvm.dbg.value(metadata i{{.*}} 0,
-// CHECK-SAME:                        metadata ![[S:.*]], metadata !{{[0-9]+}})
+// CHECK-SAME:                      metadata ![[S:.*]], metadata !{{[0-9]+}})
 // CHECK: ![[S]] = !DILocalVariable(name: "s"
 // CHECK-SAME:                      line: [[@LINE+1]],
   while let s = peek() {

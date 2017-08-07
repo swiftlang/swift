@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Program.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/type_traits.h"
@@ -92,7 +93,8 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
                          bool SaveTemps,
-                         bool ShowDriverTimeCompilation)
+                         bool ShowDriverTimeCompilation,
+                         std::unique_ptr<UnifiedStatsReporter> StatsReporter)
   : Diags(Diags), Level(Level), RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), 
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
@@ -101,7 +103,8 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
     SaveTemps(SaveTemps),
-    ShowDriverTimeCompilation(ShowDriverTimeCompilation) {
+    ShowDriverTimeCompilation(ShowDriverTimeCompilation),
+    Stats(std::move(StatsReporter)) {
 };
 
 static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags);
@@ -161,6 +164,9 @@ namespace driver {
 
     /// Cumulative result of PerformJobs(), accumulated from subprocesses.
     int Result = EXIT_SUCCESS;
+
+    /// True if any Job crashed.
+    bool AnyAbnormalExit = false;
 
     /// Timers for monitoring execution time of subprocesses.
     llvm::TimerGroup DriverTimerGroup {"driver", "Driver Compilation Time"};
@@ -229,7 +235,13 @@ namespace driver {
                      << ": " << LogJob(Cmd) << "\n";
       }
       FinishedCommands.insert(Cmd);
-
+      if (Comp.Stats) {
+          auto &D = Comp.Stats->getDriverCounters();
+          if (Skipped)
+            D.NumDriverJobsSkipped++;
+          else
+            D.NumDriverJobsRun++;
+      }
       auto BlockedIter = BlockingCommands.find(Cmd);
       if (BlockedIter != BlockingCommands.end()) {
         auto AllBlocked = std::move(BlockedIter->second);
@@ -461,17 +473,20 @@ namespace driver {
 
       // Since the task signalled, unconditionally set result to -2.
       Result = -2;
+      AnyAbnormalExit = true;
 
       return TaskFinishedResponse::StopExecution;
     }
 
   public:
-    PerformJobsState(Compilation &Comp) : Comp(Comp) {
+    PerformJobsState(Compilation &Comp)
+      : Comp(Comp),
+        ActualIncrementalTracer(Comp.Stats.get()) {
       if (Comp.SkipTaskExecution)
         TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
       else
         TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
-      if (Comp.ShowIncrementalBuildDecisions)
+      if (Comp.ShowIncrementalBuildDecisions || Comp.Stats)
         IncrementalTracer = &ActualIncrementalTracer;
     }
 
@@ -678,9 +693,13 @@ namespace driver {
         Result = Comp.Diags.hadAnyError();
       return Result;
     }
+
+    bool hadAnyAbnormalExit() {
+      return AnyAbnormalExit;
+    }
   };
-} // driver
-} // swift
+} // namespace driver
+} // namespace swift
 
 Compilation::~Compilation() = default;
 
@@ -805,8 +824,7 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
   return true;
 }
 
-int Compilation::performJobsImpl() {
-
+int Compilation::performJobsImpl(bool &abnormalExit) {
   PerformJobsState State(*this);
 
   State.scheduleInitialJobs();
@@ -822,6 +840,7 @@ int Compilation::performJobsImpl() {
                            InputInfo);
   }
 
+  abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();
 }
 
@@ -906,15 +925,14 @@ int Compilation::performJobs() {
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
-  
-  int result = performJobsImpl();
+
+  bool abnormalExit;
+  int result = performJobsImpl(abnormalExit);
 
   if (!SaveTemps) {
-    // FIXME: Do we want to be deleting temporaries even when a child process
-    // crashes?
-    for (auto &path : TempFilePaths) {
-      // Ignore the error code for removing temporary files.
-      (void)llvm::sys::fs::remove(path);
+    for (const auto &pathPair : TempFilePaths) {
+      if (!abnormalExit || pathPair.getValue() == PreserveOnSignal::No)
+        (void)llvm::sys::fs::remove(pathPair.getKey());
     }
   }
 
@@ -934,7 +952,7 @@ const char *Compilation::getAllSourcesPath() const {
       llvm::report_fatal_error("unable to create list of input sources");
     }
     auto *mutableThis = const_cast<Compilation *>(this);
-    mutableThis->addTemporaryFile(Buffer.str());
+    mutableThis->addTemporaryFile(Buffer.str(), PreserveOnSignal::Yes);
     mutableThis->AllSourceFilesPath = getArgs().MakeArgString(Buffer);
   }
   return AllSourceFilesPath;

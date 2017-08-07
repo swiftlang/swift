@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ArgumentSource.h"
+#include "Conversion.h"
 #include "Initialization.h"
 
 using namespace swift;
@@ -25,32 +26,49 @@ RValue &ArgumentSource::forceAndPeekRValue(SILGenFunction &SGF) & {
     return peekRValue();
   }
 
-  auto expr = asKnownExpr();
+  // Extract an r-value.
+  SILLocation loc = getLocation();
+  RValue value = std::move(*this).getAsRValue(SGF);
+
+  // Destroy the current state.
+  Storage.destruct(StoredKind);
+
+  // Emplace the r-value back into the source.
   StoredKind = Kind::RValue;
-  new (&Storage.TheRV.Value) RValue(SGF.emitRValue(expr));
-  Storage.TheRV.Loc = expr;
-  return Storage.TheRV.Value;
+  Storage.emplaceAggregate<RValueStorage>(StoredKind, std::move(value), loc);
+
+  return peekRValue();
 }
 
 RValue &ArgumentSource::peekRValue() & {
   assert(isRValue() && "Undefined behavior to call this method without the "
          "ArgumentSource actually being an RValue");
-  return Storage.TheRV.Value;
+  return Storage.get<RValueStorage>(StoredKind).Value;
 }
 
 void ArgumentSource::rewriteType(CanType newType) & {
-  assert(!isLValue());
-  if (isRValue()) {
-    Storage.TheRV.Value.rewriteType(newType);
-  } else {
-    Expr *expr = Storage.TheExpr;
+  switch (StoredKind) {
+  case Kind::Invalid:
+    llvm_unreachable("argument source is invalid");
+  case Kind::LValue:
+    llvm_unreachable("cannot rewrite type of l-value");
+  case Kind::Tuple:
+    llvm_unreachable("cannot rewrite type of tuple");
+  case Kind::RValue:
+    Storage.get<RValueStorage>(StoredKind).Value.rewriteType(newType);
+    return;
+  case Kind::Expr:
+    Expr *expr = Storage.get<Expr*>(StoredKind);
     if (expr->getType()->isEqual(newType)) return;
     llvm_unreachable("unimplemented! hope it doesn't happen");
   }
+  llvm_unreachable("bad kind");
 }
 
-bool ArgumentSource::requiresCalleeToEvaluate() {
+bool ArgumentSource::requiresCalleeToEvaluate() const {
   switch (StoredKind) {
+  case Kind::Invalid:
+    llvm_unreachable("argument source is invalid");
   case Kind::RValue:
   case Kind::LValue:
     return false;
@@ -84,73 +102,169 @@ bool ArgumentSource::requiresCalleeToEvaluate() {
       }
     }
     return false;
+  case Kind::Tuple:
+    for (auto &source : Storage.get<TupleStorage>(StoredKind).Elements) {
+      if (source.requiresCalleeToEvaluate())
+        return true;
+    }
+    return false;
   }
-
-  llvm_unreachable("Unhandled Kind in switch.");
+  llvm_unreachable("bad kind");
 }
 
 RValue ArgumentSource::getAsRValue(SILGenFunction &SGF, SGFContext C) && {
-  assert(!isLValue());
-  if (isRValue())
+  switch (StoredKind) {
+  case Kind::Invalid:
+    llvm_unreachable("argument source is invalid");
+  case Kind::LValue:
+    llvm_unreachable("cannot get l-value as r-value");
+  case Kind::RValue:
     return std::move(*this).asKnownRValue();
+  case Kind::Expr:
+    return SGF.emitRValue(std::move(*this).asKnownExpr(), C);
+  case Kind::Tuple:
+    return std::move(*this).getKnownTupleAsRValue(SGF, C);
+  }
+  llvm_unreachable("bad kind");
+}
 
-  return SGF.emitRValue(std::move(*this).asKnownExpr(), C);
+RValue
+ArgumentSource::getKnownTupleAsRValue(SILGenFunction &SGF, SGFContext C) && {
+
+  return std::move(*this).withKnownTupleElementSources<RValue>(
+                            [&](SILLocation loc, CanTupleType type,
+                                MutableArrayRef<ArgumentSource> elements) {
+    // If there's a target initialization, and we can split it, do so.
+    if (auto init = C.getEmitInto()) {
+      if (init->canSplitIntoTupleElements()) {
+        // Split the tuple.
+        SmallVector<InitializationPtr, 4> scratch;
+        auto eltInits = init->splitIntoTupleElements(SGF, loc, type, scratch);
+
+        // Emit each element into the corresponding element initialization.
+        for (auto i : indices(eltInits)) {
+          std::move(elements[i]).forwardInto(SGF, eltInits[i].get());
+        }
+
+        // Finish initialization.
+        init->finishInitialization(SGF);
+
+        return RValue::forInContext();
+      }
+    }
+
+    // Otherwise, emit all of the elements into a single big r-value.
+    RValue result(type);
+    for (auto &element : elements) {
+      result.addElement(std::move(element).getAsRValue(SGF));
+    }
+    return result;
+  });
 }
 
 ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
                                               SGFContext C) && {
-  if (isRValue()) {
-    auto loc = getKnownRValueLocation();
-    return std::move(*this).asKnownRValue().getAsSingleValue(SGF, loc);
-  }
-  if (isLValue()) {
+  switch (StoredKind) {
+  case Kind::Invalid:
+    llvm_unreachable("argument source is invalid");
+  case Kind::LValue: {
     auto loc = getKnownLValueLocation();
     return SGF.emitAddressOfLValue(loc, std::move(*this).asKnownLValue(),
                                    AccessKind::ReadWrite);
   }
-
-  auto e = std::move(*this).asKnownExpr();
-  if (e->getType()->is<InOutType>()) {
-    return SGF.emitAddressOfLValue(e, SGF.emitLValue(e, AccessKind::ReadWrite),
-                                   AccessKind::ReadWrite);
-  } else {
-    return SGF.emitRValueAsSingleValue(e, C);
+  case Kind::RValue: {
+    auto loc = getKnownRValueLocation();
+    if (auto init = C.getEmitInto()) {
+      std::move(*this).asKnownRValue().forwardInto(SGF, loc, init);
+      return ManagedValue::forInContext();
+    } else {
+      return std::move(*this).asKnownRValue().getAsSingleValue(SGF, loc);
+    }
   }
+  case Kind::Expr: {
+    auto e = std::move(*this).asKnownExpr();
+    if (e->isSemanticallyInOutExpr()) {
+      return SGF.emitAddressOfLValue(e, SGF.emitLValue(e, AccessKind::ReadWrite),
+                                     AccessKind::ReadWrite);
+    } else {
+      return SGF.emitRValueAsSingleValue(e, C);
+    }
+  }
+  case Kind::Tuple: {
+    auto loc = getKnownTupleLocation();
+    auto rvalue = std::move(*this).getKnownTupleAsRValue(SGF, C);
+    if (rvalue.isInContext())
+      return ManagedValue::forInContext();
+    return std::move(rvalue).getAsSingleValue(SGF, loc);
+  }
+  }
+  llvm_unreachable("bad kind");
 }
 
 
 ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
                                               AbstractionPattern origFormalType,
                                               SGFContext C) && {
-  auto loc = getLocation();
   auto substFormalType = getSubstType();
-  ManagedValue outputValue = std::move(*this).getAsSingleValue(SGF);
-  return SGF.emitSubstToOrigValue(loc,
-                                  outputValue, origFormalType,
-                                  substFormalType, C);
+  auto conversion = Conversion::getSubstToOrig(origFormalType, substFormalType);
+  return std::move(*this).getConverted(SGF, conversion, C);
+}
+
+ManagedValue ArgumentSource::getConverted(SILGenFunction &SGF,
+                                          const Conversion &conversion,
+                                          SGFContext C) && {
+  switch (StoredKind) {
+  case Kind::Invalid:
+    llvm_unreachable("argument source is invalid");
+  case Kind::LValue:
+    llvm_unreachable("cannot get converted l-value");
+  case Kind::RValue:
+  case Kind::Expr:
+  case Kind::Tuple:
+    return SGF.emitConvertedRValue(getLocation(), conversion, C,
+                [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
+      return std::move(*this).getAsSingleValue(SGF, C);
+    });
+  }
+  llvm_unreachable("bad kind");
 }
 
 void ArgumentSource::forwardInto(SILGenFunction &SGF, Initialization *dest) && {
-  assert(!isLValue());
-  if (isRValue()) {
+  switch (StoredKind) {
+  case Kind::Invalid:
+    llvm_unreachable("argument source is invalid");
+  case Kind::LValue:
+    llvm_unreachable("cannot forward an l-value");
+  case Kind::RValue: {
     auto loc = getKnownRValueLocation();
-    return std::move(*this).asKnownRValue().forwardInto(SGF, loc, dest);
+    std::move(*this).asKnownRValue().forwardInto(SGF, loc, dest);
+    return;
   }
-
-  auto e = std::move(*this).asKnownExpr();
-  return SGF.emitExprInto(e, dest);
+  case Kind::Expr: {
+    auto e = std::move(*this).asKnownExpr();
+    SGF.emitExprInto(e, dest);
+    return;
+  }
+  case Kind::Tuple: {
+    auto loc = getKnownTupleLocation();
+    auto rvalue = std::move(*this).getKnownTupleAsRValue(SGF, SGFContext(dest));
+    if (!rvalue.isInContext())
+      std::move(rvalue).forwardInto(SGF, loc, dest);
+    return;
+  }
+  }
+  llvm_unreachable("bad kind");
 }
 
 ManagedValue ArgumentSource::materialize(SILGenFunction &SGF) && {
-  assert(!isLValue());
   if (isRValue()) {
     auto loc = getKnownRValueLocation();
     return std::move(*this).asKnownRValue().materialize(SGF, loc);
   }
 
-  auto expr = std::move(*this).asKnownExpr();
-  auto temp = SGF.emitTemporary(expr, SGF.getTypeLowering(expr->getType()));
-  SGF.emitExprInto(expr, temp.get());
+  auto loc = getLocation();
+  auto temp = SGF.emitTemporary(loc, SGF.getTypeLowering(getSubstType()));
+  std::move(*this).forwardInto(SGF, temp.get());
   return temp->getManagedAddress();
 }
 
@@ -230,4 +344,39 @@ SILType ArgumentSource::getSILSubstType(SILGenFunction &SGF) const & {
   CanType substType = getSubstType();
   AbstractionPattern origType(funcType->getGenericSignature(), substType);
   return SGF.getLoweredType(origType, substType);
+}
+
+void ArgumentSource::dump() const {
+  dump(llvm::errs());
+}
+void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
+  out.indent(indent) << "ArgumentSource::";
+  switch (StoredKind) {
+  case Kind::Invalid:
+    out << "Invalid\n";
+    return;
+  case Kind::LValue:
+    out << "LValue\n";
+    Storage.get<LValueStorage>(StoredKind).Value.dump(out, indent + 2);
+    return;
+  case Kind::Tuple: {
+    out << "Tuple\n";
+    auto &storage = Storage.get<TupleStorage>(StoredKind);
+    storage.SubstType.dump(out, indent + 2);
+    for (auto &elt : storage.Elements) {
+      elt.dump(out, indent + 2);
+      out << '\n';
+    }
+    return;
+  }
+  case Kind::RValue:
+    out << "RValue\n";
+    Storage.get<RValueStorage>(StoredKind).Value.dump(out, indent + 2);
+    return;
+  case Kind::Expr:
+    out << "Expr\n";
+    Storage.get<Expr*>(StoredKind)->dump(out); // FIXME: indent
+    return;
+  }
+  llvm_unreachable("bad kind");
 }

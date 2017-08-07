@@ -1,10 +1,11 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-testing
 
 @_versioned private func privateVersioned() {}
-// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'privateVersioned' is private}}
+// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'privateVersioned()' is private}}
 
 @_versioned fileprivate func fileprivateVersioned() {}
-// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'fileprivateVersioned' is fileprivate}}
+// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'fileprivateVersioned()' is fileprivate}}
 
 @_versioned internal func internalVersioned() {}
 // OK
@@ -13,11 +14,11 @@
 // OK
 
 @_versioned public func publicVersioned() {}
-// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned' is public}}
+// expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
 
 internal class internalClass {
   @_versioned public func publicVersioned() {}
-  // expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned' is public}}
+  // expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
 }
 
 fileprivate class filePrivateClass {

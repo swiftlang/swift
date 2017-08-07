@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -suppress-warnings -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_while %s | %FileCheck %s
 
-// CHECK-LABEL: // coverage_while.eoo () -> ()
+// CHECK-LABEL: // coverage_while.eoo() -> ()
 func eoo() {
   // CHECK: int_instrprof_increment
   var x : Int32 = 0

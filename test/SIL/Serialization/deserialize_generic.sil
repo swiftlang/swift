@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -sil-serialize-all -o %t %S/Inputs/def_generic.swift
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -linker -I %t %s | %FileCheck %s
 

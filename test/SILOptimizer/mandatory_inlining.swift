@@ -108,7 +108,7 @@ func test_chained_short_circuit(_ x: Bool, y: Bool, z: Bool) -> Bool {
 // recursively inlined properly)
 
 // CHECK-LABEL: sil hidden @_T018mandatory_inlining26test_chained_short_circuit{{[_0-9a-zA-Z]*}}F
-  // CHECK-NOT = apply [transparent]
+  // CHECK-NOT: = apply [transparent]
   // CHECK: return
 
 
@@ -122,7 +122,7 @@ func testInlineUnionElement() -> X {
   return X.onetransp
   // CHECK-LABEL: sil hidden @_T018mandatory_inlining22testInlineUnionElementAA1XOyF
   // CHECK: enum $X, #X.onetransp!enumelt
-  // CHECK-NOT = apply
+  // CHECK-NOT: = apply
   // CHECK: return
 }
 

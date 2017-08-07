@@ -27,6 +27,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
@@ -35,11 +36,26 @@
 
 using namespace swift;
 
+std::string CompilerInvocation::getPCHHash() const {
+  using llvm::hash_code;
+  using llvm::hash_value;
+  using llvm::hash_combine;
+
+  auto Code = hash_value(LangOpts.getPCHHashComponents());
+  Code = hash_combine(Code, FrontendOpts.getPCHHashComponents());
+  Code = hash_combine(Code, ClangImporterOpts.getPCHHashComponents());
+  Code = hash_combine(Code, SearchPathOpts.getPCHHashComponents());
+  Code = hash_combine(Code, DiagnosticOpts.getPCHHashComponents());
+  Code = hash_combine(Code, SILOpts.getPCHHashComponents());
+  Code = hash_combine(Code, IRGenOpts.getPCHHashComponents());
+
+  return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
+}
+
 void CompilerInstance::createSILModule(bool WholeModule) {
   assert(MainModule && "main module not created yet");
-  TheSILModule = SILModule::createEmptyModule(getMainModule(),
-                                              Invocation.getSILOptions(),
-                                              WholeModule);
+  TheSILModule = SILModule::createEmptyModule(
+    getMainModule(), Invocation.getSILOptions(), WholeModule);
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
@@ -81,6 +97,12 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (!Invocation.getFrontendOptions().ModuleDocOutputPath.empty())
     Invocation.getLangOptions().AttachCommentsToDecls = true;
 
+  // If we are doing index-while-building, configure lexing and parsing to
+  // remember comments.
+  if (!Invocation.getFrontendOptions().IndexStorePath.empty()) {
+    Invocation.getLangOptions().AttachCommentsToDecls = true;
+  }
+
   Context.reset(new ASTContext(Invocation.getLangOptions(),
                                Invocation.getSearchPathOptions(),
                                SourceMgr, Diagnostics));
@@ -103,6 +125,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   // knowledge.
   auto clangImporter =
     ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
+                          Invocation.getPCHHash(),
                           DepTracker);
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
@@ -232,7 +255,7 @@ ModuleDecl *CompilerInstance::getMainModule() {
 
     if (Invocation.getFrontendOptions().EnableResilience)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-    else if (Invocation.getFrontendOptions().SILSerializeAll)
+    else if (Invocation.getSILOptions().SILSerializeAll)
       MainModule->setResilienceStrategy(ResilienceStrategy::Fragile);
   }
   return MainModule;
@@ -501,7 +524,9 @@ void CompilerInstance::performSema() {
       if (mainIsPrimary) {
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                             TypeCheckOptions, CurTUElem,
-                            options.WarnLongFunctionBodies);
+                            options.WarnLongFunctionBodies,
+                            options.WarnLongExpressionTypeChecking,
+                            options.SolverExpressionTimeThreshold);
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
@@ -528,8 +553,10 @@ void CompilerInstance::performSema() {
     if (auto SF = dyn_cast<SourceFile>(File))
       if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
         performTypeChecking(*SF, PersistentState.getTopLevelContext(),
-                            TypeCheckOptions, /*curElem*/0,
-                            options.WarnLongFunctionBodies);
+                            TypeCheckOptions, /*curElem*/ 0,
+                            options.WarnLongFunctionBodies,
+                            options.WarnLongExpressionTypeChecking,
+                            options.SolverExpressionTimeThreshold);
 
   // Even if there were no source files, we should still record known
   // protocols.
@@ -562,6 +589,7 @@ void CompilerInstance::performParseOnly() {
   assert((Kind == InputFileKind::IFK_Swift ||
           Kind == InputFileKind::IFK_Swift_Library) &&
          "only supports parsing .swift files");
+  (void)Kind;
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::None;
 
@@ -614,4 +642,12 @@ void CompilerInstance::performParseOnly() {
 
   assert(Context->LoadedModules.size() == 1 &&
          "Loaded a module during parse-only");
+}
+
+void CompilerInstance::freeContextAndSIL() {
+  Context.reset();
+  TheSILModule.reset();
+  MainModule = nullptr;
+  SML = nullptr;
+  PrimarySourceFile = nullptr;
 }

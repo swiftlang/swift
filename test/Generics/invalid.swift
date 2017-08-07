@@ -3,13 +3,15 @@
 func bet() where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
 
 typealias gimel where A : B // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
-// expected-error@-1 {{expected '=' in typealias declaration}}
+// expected-error@-1 {{expected '=' in type alias declaration}}
 
 class dalet where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
 
-protocol he where A : B { // expected-error {{where clauses on protocols are fragile; use '-swift-version 4' to experiment.}}
+protocol he where A : B { // expected-error 2 {{use of undeclared type 'A'}}
+  // expected-error@-1 {{use of undeclared type 'B'}}
 
-  associatedtype vav where A : B // expected-error {{where clauses on associated types are fragile; use '-swift-version 4' to experiment.}}
+  associatedtype vav where A : B // expected-error{{use of undeclared type 'A'}}
+  // expected-error@-1 {{use of undeclared type 'B'}}
 }
 
 
@@ -51,8 +53,8 @@ func eatDinnerConcrete(d: Pizzas<Pepper>.DeepDish,
 
 func badDiagnostic1() {
 
-  _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>( // expected-error {{expression type 'Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>' is ambiguous without more context}}
-      leftovers: Pizzas<ChiliFlakes>.NewYork(),
+  _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>(
+      leftovers: Pizzas<ChiliFlakes>.NewYork(),  // expected-error {{cannot convert value of type 'Pizzas<ChiliFlakes>.NewYork' to expected argument type 'Pizzas<Pepper>.NewYork'}}
       transformation: { _ in HotDog() })
 }
 
@@ -88,4 +90,23 @@ class OuterGeneric<T> {
       _ = method
     }
   }
+}
+
+// Crash with missing types in requirements.
+protocol P1 {
+  associatedtype A where A == ThisTypeDoesNotExist
+  // expected-error@-1{{use of undeclared type 'ThisTypeDoesNotExist'}}
+  associatedtype B where ThisTypeDoesNotExist == B
+  // expected-error@-1{{use of undeclared type 'ThisTypeDoesNotExist'}}
+  associatedtype C where ThisTypeDoesNotExist == ThisTypeDoesNotExist
+  // expected-error@-1 2{{use of undeclared type 'ThisTypeDoesNotExist'}}
+}
+
+// Diagnostic referred to the wrong type - <rdar://problem/33604221>
+
+protocol E { associatedtype XYZ }
+
+class P<N> {
+  func q<A>(b:A) where A:E, N : A.XYZ { return }
+  // expected-error@-1 {{type 'N' constrained to non-protocol, non-class type 'A.XYZ'}}
 }

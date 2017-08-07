@@ -16,6 +16,20 @@
 
 using namespace swift;
 
+// HACK: Allow support for many newer emoji by overriding behavior of ZWJ and
+// emoji modifiers. This does not make the breaks correct for any version of
+// Unicode, but shifts the ways in which it is incorrect to be less harmful.
+//
+// TODO: Remove this hack and reevaluate whether we should have any static
+// notion of what a grapheme is.
+//
+// Returns true if lhs and rhs shouldn't be considered as having a grapheme
+// break between them. That is, whether we're overriding the behavior of the
+// hard coded Unicode 8 rules surrounding ZWJ and emoji modifiers.
+static inline bool graphemeBreakOverride(llvm::UTF32 lhs, llvm::UTF32 rhs) {
+  return lhs == 0x200D || (rhs >= 0x1F3FB && rhs <= 0x1F3FF);
+}
+
 StringRef swift::unicode::extractFirstExtendedGraphemeCluster(StringRef S) {
   // Extended grapheme cluster segmentation algorithm as described in Unicode
   // Standard Annex #29.
@@ -53,7 +67,8 @@ StringRef swift::unicode::extractFirstExtendedGraphemeCluster(StringRef S) {
 
     GraphemeClusterBreakProperty GCBForC1 =
         getGraphemeClusterBreakProperty(C[1]);
-    if (isExtendedGraphemeClusterBoundary(GCBForC0, GCBForC1))
+    if (isExtendedGraphemeClusterBoundary(GCBForC0, GCBForC1) &&
+        !graphemeBreakOverride(C[0], C[1]))
       return S.slice(0, C1Offset);
 
     C[0] = C[1];

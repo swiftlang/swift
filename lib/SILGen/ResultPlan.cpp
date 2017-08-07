@@ -12,6 +12,7 @@
 
 #include "ResultPlan.h"
 #include "Callee.h"
+#include "Conversion.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -37,11 +38,12 @@ public:
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
     init->finishInitialization(SGF);
-    return RValue();
+    return RValue::forInContext();
   }
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
-    outList.emplace_back(init->getAddressForInPlaceInitialization());
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
+    outList.emplace_back(init->getAddressForInPlaceInitialization(SGF, loc));
   }
 };
 
@@ -91,21 +93,37 @@ public:
 
     // Reabstract the value if the types don't match.  This can happen
     // due to either substitution reabstractions or bridging.
-    if (value.getType().hasAbstractionDifference(rep,
-                                                 substTL.getLoweredType())) {
-      // Assume that a C-language API doesn't have substitution
-      // reabstractions.  This shouldn't be necessary, but
-      // emitOrigToSubstValue can get upset.
-      if (getSILFunctionLanguage(rep) == SILFunctionLanguage::C) {
-        value = SGF.emitBridgedToNativeValue(loc, value, rep, substType);
+    SILType loweredResultTy = substTL.getLoweredType();
+    if (value.getType().hasAbstractionDifference(rep, loweredResultTy)) {
+      Conversion conversion = [&] {
+        // Assume that a C-language API doesn't have substitution
+        // reabstractions.  This shouldn't be necessary, but
+        // emitOrigToSubstValue can get upset.
+        if (getSILFunctionLanguage(rep) == SILFunctionLanguage::C) {
+          return Conversion::getBridging(Conversion::BridgeResultFromObjC,
+                                         origType.getType(), substType,
+                                         loweredResultTy);
+        } else {
+          return Conversion::getOrigToSubst(origType, substType);
+        }
+      }();
 
-      } else {
-        value = SGF.emitOrigToSubstValue(loc, value, origType, substType,
-                                         SGFContext(init));
+      // Attempt to peephole this conversion into the context.
+      if (init) {
+        if (auto outerConversion = init->getAsConversion()) {
+          if (outerConversion->tryPeephole(SGF, loc, value, conversion)) {
+            outerConversion->finishInitialization(SGF);
+            return RValue::forInContext();
+          }
+        }
+      }
 
-        // If that successfully emitted into the initialization, we're done.
-        if (value.isInContext())
-          return RValue();
+      // If that wasn't possible, just apply the conversion.
+      value = conversion.emit(SGF, loc, value, SGFContext(init));
+
+      // If that successfully emitted into the initialization, we're done.
+      if (value.isInContext()) {
+        return RValue::forInContext();
       }
     }
 
@@ -113,7 +131,7 @@ public:
     if (init) {
       init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
       init->finishInitialization(SGF);
-      return RValue();
+      return RValue::forInContext();
 
       // Otherwise, we've got the r-value we want.
     } else {
@@ -122,7 +140,8 @@ public:
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
     if (!temporary)
       return;
     outList.emplace_back(temporary->getAddress());
@@ -146,19 +165,20 @@ public:
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
     RValue subResult = subPlan->finish(SGF, loc, substType, directResults);
-    assert(subResult.isUsed() && "sub-plan didn't emit into context?");
+    assert(subResult.isInContext() && "sub-plan didn't emit into context?");
     (void)subResult;
 
     ManagedValue value = temporary->getManagedAddress();
     init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
     init->finishInitialization(SGF);
 
-    return RValue();
+    return RValue::forInContext();
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
-    subPlan->gatherIndirectResultAddrs(outList);
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
   }
 };
 
@@ -180,12 +200,13 @@ public:
     init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
     init->finishInitialization(SGF);
 
-    return RValue();
+    return RValue::forInContext();
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
-    subPlan->gatherIndirectResultAddrs(outList);
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
   }
 };
 
@@ -223,9 +244,10 @@ public:
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
     for (const auto &eltPlan : eltPlans) {
-      eltPlan->gatherIndirectResultAddrs(outList);
+      eltPlan->gatherIndirectResultAddrs(SGF, loc, outList);
     }
   }
 };
@@ -266,18 +288,19 @@ public:
     for (auto i : indices(substTupleType.getElementTypes())) {
       auto eltType = substTupleType.getElementType(i);
       RValue eltRV = eltPlans[i]->finish(SGF, loc, eltType, directResults);
-      assert(eltRV.isUsed());
+      assert(eltRV.isInContext());
       (void)eltRV;
     }
     tupleInit->finishInitialization(SGF);
 
-    return RValue();
+    return RValue::forInContext();
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
     for (const auto &eltPlan : eltPlans) {
-      eltPlan->gatherIndirectResultAddrs(outList);
+      eltPlan->gatherIndirectResultAddrs(SGF, loc, outList);
     }
   }
 };
@@ -324,6 +347,7 @@ public:
 
     // Create the appropriate pointer type.
     lvalue = LValue::forAddress(ManagedValue::forLValue(errorTemp),
+                                /*TODO: enforcement*/ None,
                                 AbstractionPattern(errorType), errorType);
   }
 
@@ -333,15 +357,18 @@ public:
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
-    subPlan->gatherIndirectResultAddrs(outList);
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
   }
 
   Optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
+    SILGenFunction::PointerAccessInfo pointerInfo = {
+      unwrappedPtrType, ptrKind, AccessKind::ReadWrite
+    };
     auto pointerValue =
-        SGF.emitLValueToPointer(loc, std::move(lvalue), unwrappedPtrType,
-                                ptrKind, AccessKind::ReadWrite);
+        SGF.emitLValueToPointer(loc, std::move(lvalue), pointerInfo);
 
     // Wrap up in an Optional if called for.
     if (optKind != OTK_None) {
@@ -421,17 +448,13 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   // Otherwise, grab the next result.
   auto result = allResults.pop_back_val();
 
-  SILValue initAddr;
-  if (init) {
-    initAddr = init->getAddressForInPlaceInitialization();
-
-    // If the result is indirect, and we have an address to emit into, and
-    // there are no abstraction differences, then just do it.
-    if (initAddr && SGF.silConv.isSILIndirect(result) &&
-        !initAddr->getType().hasAbstractionDifference(
+  // If the result is indirect, and we have an address to emit into, and
+  // there are no abstraction differences, then just do it.
+  if (init && init->canPerformInPlaceInitialization() &&
+      SGF.silConv.isSILIndirect(result) &&
+      !SGF.getLoweredType(substType).getAddressType().hasAbstractionDifference(
             calleeTypeInfo.getOverrideRep(), result.getSILStorageType())) {
-      return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
-    }
+    return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
   }
 
   // Otherwise, we need to:

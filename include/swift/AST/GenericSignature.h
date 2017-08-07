@@ -134,8 +134,6 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   /// Retrieve the generic signature builder for the given generic signature.
   GenericSignatureBuilder *getGenericSignatureBuilder(ModuleDecl &mod);
 
-  void populateParentMap(SubstitutionMap &subMap) const;
-
   friend class ArchetypeType;
 
 public:
@@ -202,17 +200,6 @@ public:
   /// parameters which have conformance constraints on them.
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType depTy, ProtocolDecl *proto) const;
-
-  using GenericFunction = auto(CanType canType, Type conformingReplacementType,
-    ProtocolType *conformedProtocol)
-    ->Optional<ProtocolConformanceRef>;
-  using LookupConformanceFn = llvm::function_ref<GenericFunction>;
-
-  /// Build an array of substitutions from an interface type substitution map,
-  /// using the given function to look up conformances.
-  void getSubstitutions(TypeSubstitutionFn substitution,
-                        LookupConformanceFn lookupConformance,
-                        SmallVectorImpl<Substitution> &result) const;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
@@ -286,6 +273,9 @@ public:
   /// Determine the set of protocols to which the given dependent type
   /// must conform.
   ConformsToArray getConformsTo(Type type, ModuleDecl &mod);
+
+  /// Determine whether the given dependent type conforms to this protocol.
+  bool conformsToProtocol(Type type, ProtocolDecl *proto, ModuleDecl &mod);
 
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type, ModuleDecl &mod);

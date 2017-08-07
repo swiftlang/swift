@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=NEGATIVE
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main
@@ -58,10 +59,10 @@ func autocloseFile(x: @autoclosure () -> String = #file,
                    y: @autoclosure () -> Int = #line) { }
 // CHECK-LABEL: sil hidden @_T017default_arguments17testAutocloseFileyyF
 func testAutocloseFile() {
-  // CHECK-LABEL: sil shared [transparent] @_T017default_arguments17testAutocloseFileyyFSSyXKfu_ : $@convention(thin) () -> @owned String
+  // CHECK-LABEL: sil private [transparent] @_T017default_arguments17testAutocloseFileyyFSSyXKfu_ : $@convention(thin) () -> @owned String
   // CHECK: string_literal utf16{{.*}}default_arguments.swift
 
-  // CHECK-LABEL: sil shared [transparent] @_T017default_arguments17testAutocloseFileyyFSiyXKfu0_ : $@convention(thin) () -> Int
+  // CHECK-LABEL: sil private [transparent] @_T017default_arguments17testAutocloseFileyyFSiyXKfu0_ : $@convention(thin) () -> Int
   // CHECK: integer_literal $Builtin.Int2048, [[@LINE+1]]
   autocloseFile()
 }
@@ -74,17 +75,13 @@ func testMagicLiterals(file: String = #file,
 // Check that default argument generator functions don't leak information about
 // user's source.
 //
-// CHECK-LABEL: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA_
-// CHECK: string_literal utf16 ""
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA_
 //
-// CHECK-LABEL: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA0_
-// CHECK: string_literal utf16 ""
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA0_
 //
-// CHECK-LABEL: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA1_
-// CHECK: integer_literal $Builtin.Int2048, 0
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA1_
 //
-// CHECK-LABEL: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA2_
-// CHECK: integer_literal $Builtin.Int2048, 0
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA2_
 
 func closure(_: () -> ()) {}
 func autoclosure(_: @autoclosure () -> ()) {}
@@ -92,9 +89,9 @@ func autoclosure(_: @autoclosure () -> ()) {}
 // CHECK-LABEL: sil hidden @_T017default_arguments25testCallWithMagicLiteralsyyF
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
-// CHECK-LABEL: sil shared @_T017default_arguments25testCallWithMagicLiteralsyyFyycfU_
+// CHECK-LABEL: sil private @_T017default_arguments25testCallWithMagicLiteralsyyFyycfU_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
-// CHECK-LABEL: sil shared [transparent] @_T017default_arguments25testCallWithMagicLiteralsyyFyyXKfu_
+// CHECK-LABEL: sil private [transparent] @_T017default_arguments25testCallWithMagicLiteralsyyFyyXKfu_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 func testCallWithMagicLiterals() {
   testMagicLiterals()
@@ -262,5 +259,5 @@ func localFunctionWithDefaultArg() {
   }
   bar()
 }
-// CHECK-LABEL: sil shared @_T017default_arguments27localFunctionWithDefaultArgyyF3barL_ySiSgFfA_
+// CHECK-LABEL: sil private @_T017default_arguments27localFunctionWithDefaultArgyyF3barL_ySiSgFfA_
 // CHECK-SAME: $@convention(thin) () -> Optional<Int>

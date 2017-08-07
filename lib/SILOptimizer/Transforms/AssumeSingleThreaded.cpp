@@ -50,7 +50,6 @@ class AssumeSingleThreaded : public swift::SILFunctionTransform {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
-  StringRef getName() override { return "Assume single threaded"; }
 };
 } // end anonymous namespace
 

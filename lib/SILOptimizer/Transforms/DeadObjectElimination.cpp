@@ -35,7 +35,9 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Utils/IndexTrie.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -276,50 +278,6 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
 //===----------------------------------------------------------------------===//
 //                     NonTrivial DeadObject Elimination
 //===----------------------------------------------------------------------===//
-
-namespace {
-// Trie node representing a sequence of unsigned integer indices.
-class IndexTrieNode {
-  static const unsigned RootIdx = ~0U;
-  unsigned Index;
-  llvm::SmallVector<IndexTrieNode*, 8> Children;
-
-public:
-  IndexTrieNode(): Index(RootIdx) {}
-
-  explicit IndexTrieNode(unsigned V): Index(V) {}
-
-  IndexTrieNode(IndexTrieNode &) =delete;
-  IndexTrieNode &operator=(const IndexTrieNode&) =delete;
-
-  ~IndexTrieNode() {
-    for (auto *N : Children)
-      delete N;
-  }
-
-  bool isRoot() const { return Index == RootIdx; }
-
-  bool isLeaf() const { return Children.empty(); }
-
-  unsigned getIndex() const { return Index; }
-
-  IndexTrieNode *getChild(unsigned Idx) {
-    assert(Idx != RootIdx);
-
-    auto I = std::lower_bound(Children.begin(), Children.end(), Idx,
-                              [](IndexTrieNode *a, unsigned i) {
-                                return a->Index < i;
-                              });
-    if (I != Children.end() && (*I)->Index == Idx)
-      return *I;
-    auto *N = new IndexTrieNode(Idx);
-    Children.insert(I, N);
-    return N;
-  }
-
-  ArrayRef<IndexTrieNode*> getChildren() const { return Children; }
-};
-} // end anonymous namespace
 
 namespace {
 /// Determine if an object is dead. Compute its original lifetime. Find the
@@ -574,7 +532,8 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
 // TODO: This relies on the lowest level array.uninitialized not being
 // inlined. To do better we could either run this pass before semantic inlining,
 // or we could also handle calls to array.init.
-static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
+static bool removeAndReleaseArray(SILInstruction *NewArrayValue,
+                                  DeadEndBlocks &DEBlocks) {
   TupleExtractInst *ArrayDef = nullptr;
   TupleExtractInst *StorageAddress = nullptr;
   for (auto *Op : NewArrayValue->getUses()) {
@@ -629,12 +588,15 @@ static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
       return false;
   }
   // For each store location, insert releases.
-  // This makes a strong assumption that the allocated object is released on all
-  // paths in which some object initialization occurs.
   SILSSAUpdater SSAUp;
   ValueLifetimeAnalysis::Frontier ArrayFrontier;
-  CFGChanged |= !VLA.computeFrontier(ArrayFrontier,
-                                     ValueLifetimeAnalysis::IgnoreExitEdges);
+  if (!VLA.computeFrontier(ArrayFrontier,
+                           ValueLifetimeAnalysis::UsersMustPostDomDef,
+                           &DEBlocks)) {
+    // In theory the allocated object must be released on all paths in which
+    // some object initialization occurs. If not (for some reason) we bail.
+    return false;
+  }
 
   DeadStorage.visitStoreLocations([&] (ArrayRef<StoreInst*> Stores) {
       insertReleases(Stores, ArrayFrontier, SSAUp);
@@ -662,7 +624,6 @@ namespace {
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
   llvm::SmallVector<SILInstruction*, 16> Allocations;
-  bool CFGChanged = false;
 
   void collectAllocations(SILFunction &Fn) {
     for (auto &BB : Fn)
@@ -677,9 +638,10 @@ class DeadObjectElimination : public SILFunctionTransform {
   bool processAllocRef(AllocRefInst *ARI);
   bool processAllocStack(AllocStackInst *ASI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
-  bool processAllocApply(ApplyInst *AI);
+  bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
 
   bool processFunction(SILFunction &Fn) {
+    DeadEndBlocks DEBlocks(&Fn);
     Allocations.clear();
     DestructorAnalysisCache.clear();
     bool Changed = false;
@@ -692,21 +654,17 @@ class DeadObjectElimination : public SILFunctionTransform {
       else if (auto *A = dyn_cast<AllocBoxInst>(II))
         Changed |= processAllocBox(A);
       else if (auto *A = dyn_cast<ApplyInst>(II))
-        Changed |= processAllocApply(A);
+        Changed |= processAllocApply(A, DEBlocks);
     }
     return Changed;
   }
 
   void run() override {
-    CFGChanged = false;
     if (processFunction(*getFunction())) {
-      invalidateAnalysis(CFGChanged ?
-                         SILAnalysis::InvalidationKind::FunctionBody :
-                         SILAnalysis::InvalidationKind::CallsAndInstructions);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
 
-  StringRef getName() override { return "Dead Object Elimination"; }
 };
 } // end anonymous namespace
 
@@ -774,7 +732,8 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   return true;
 }
 
-bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
+bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
+                                              DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
   if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
     return false;
@@ -790,7 +749,7 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
       return false;
   }
 
-  if (!removeAndReleaseArray(AI, CFGChanged))
+  if (!removeAndReleaseArray(AI, DEBlocks))
     return false;
 
   DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");

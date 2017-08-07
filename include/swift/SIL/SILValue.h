@@ -36,7 +36,7 @@ class SILFunction;
 class SILInstruction;
 class SILLocation;
 class SILModule;
-class TransitivelyUnreachableBlocksInfo;
+class DeadEndBlocks;
 class ValueBaseUseIterator;
 class ValueUseIterator;
 
@@ -163,10 +163,15 @@ public:
   }
 
   /// Replace every use of a result of this instruction with the corresponding
-  /// result from RHS. The method assumes that both instructions have the same
-  /// number of results. To replace just one result use
-  /// SILValue::replaceAllUsesWith.
+  /// result from RHS.
+  ///
+  /// The method assumes that both instructions have the same number of
+  /// results. To replace just one result use SILValue::replaceAllUsesWith.
   void replaceAllUsesWith(ValueBase *RHS);
+
+  /// \brief Replace all uses of this instruction with an undef value of the
+  /// same type as the result of this instruction.
+  void replaceAllUsesWithUndef();
 
   /// Returns true if this value has no uses.
   /// To ignore debug-info instructions use swift::onlyHaveDebugUses instead
@@ -174,6 +179,7 @@ public:
   bool use_empty() const { return FirstUse == nullptr; }
 
   using use_iterator = ValueBaseUseIterator;
+  using use_range = iterator_range<use_iterator>;
 
   inline use_iterator use_begin() const;
   inline use_iterator use_end() const;
@@ -181,12 +187,19 @@ public:
   /// Returns a range of all uses, which is useful for iterating over all uses.
   /// To ignore debug-info instructions use swift::getNonDebugUses instead
   /// (see comment in DebugUtils.h).
-  inline iterator_range<use_iterator> getUses() const;
+  inline use_range getUses() const;
 
   /// Returns true if this value has exactly one use.
   /// To ignore debug-info instructions use swift::hasOneNonDebugUse instead
   /// (see comment in DebugUtils.h).
   inline bool hasOneUse() const;
+
+  /// Returns .some(single user) if this value has a single user. Returns .none
+  /// otherwise.
+  inline Operand *getSingleUse() const;
+
+  template <class T>
+  inline T *getSingleUserOfType();
 
   /// Pretty-print the value.
   void dump() const;
@@ -291,7 +304,7 @@ public:
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(SILModule &Mod,
-                       TransitivelyUnreachableBlocksInfo *TUB = nullptr) const;
+                       DeadEndBlocks *DEBlocks = nullptr) const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored
@@ -498,6 +511,36 @@ inline bool ValueBase::hasOneUse() const {
   auto I = use_begin(), E = use_end();
   if (I == E) return false;
   return ++I == E;
+}
+inline Operand *ValueBase::getSingleUse() const {
+  auto I = use_begin(), E = use_end();
+
+  // If we have no elements, return nullptr.
+  if (I == E) return nullptr;
+
+  // Otherwise, grab the first element and then increment.
+  Operand *Op = *I;
+  ++I;
+
+  // If the next element is not the end list, then return nullptr. We do not
+  // have one user.
+  if (I != E) return nullptr;
+
+  // Otherwise, the element that we accessed.
+  return Op;
+}
+
+template <class T>
+inline T *ValueBase::getSingleUserOfType() {
+  T *Result = nullptr;
+  for (auto *Op : getUses()) {
+    if (auto *Tmp = dyn_cast<T>(Op->getUser())) {
+      if (Result)
+        return nullptr;
+      Result = Tmp;
+    }
+  }
+  return Result;
 }
 
 /// A constant-size list of the operands of an instruction.

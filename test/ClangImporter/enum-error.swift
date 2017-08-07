@@ -1,14 +1,15 @@
 // REQUIRES: OS=macosx
 
-// RUN: %target-swift-frontend -DVALUE -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=VALUE
-// RUN: %target-swift-frontend -DEMPTYCATCH -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=EMPTYCATCH
-// RUN: %target-swift-frontend -DASQEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASQEXPR
-// RUN: %target-swift-frontend -DASBANGEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASBANGEXPR
-// RUN: %target-swift-frontend -DCATCHIS -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHIS
-// RUN: %target-swift-frontend -DCATCHAS -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHAS
-// RUN: %target-swift-frontend -DGENERICONLY -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=GENERICONLY
+// RUN: %target-swift-frontend -DVALUE -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=VALUE
+// RUN: %target-swift-frontend -DEMPTYCATCH -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=EMPTYCATCH
+// RUN: %target-swift-frontend -DASQEXPR -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASQEXPR
+// RUN: %target-swift-frontend -DASBANGEXPR -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASBANGEXPR
+// RUN: %target-swift-frontend -DCATCHIS -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHIS
+// RUN: %target-swift-frontend -DCATCHAS -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHAS
+// RUN: %target-swift-frontend -DGENERICONLY -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=GENERICONLY
 
-// RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/enum-error.h -verify
+// RUN: not %target-swift-frontend -DEXHAUSTIVE -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h 2>&1 | %FileCheck %s -check-prefix=EXHAUSTIVE
+// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-error.h -DERRORS -verify
 
 // RUN: echo '#include "enum-error.h"' > %t.m
 // RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h -print-regular-comments --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
@@ -76,14 +77,14 @@ func testError() {
   }
   let _ : TestError = dyncast(testErrorNSError)
 
-#else
+#elseif EXHAUSTIVE
 // CHECK: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
 
   switch (terr) { case .TENone, .TEOne: break }
-    // expected-error@-1 {{switch must be exhaustive, consider adding missing cases}}
-
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.TETwo'
   let _ = TestError.Code(rawValue: 2)!
 
   do {
@@ -95,20 +96,19 @@ func testError() {
 
 }
 
-// HEADER: struct TestError : _BridgedStoredNSError {
-// HEADER:   let _nsError: NSError
-// HEADER:   init(_nsError: NSError)
-// HEADER:   static var _nsErrorDomain: String { get }
-// HEADER:   enum Code : Int32, _ErrorCodeProtocol {
-// HEADER:     init?(rawValue: Int32)
-// HEADER:     var rawValue: Int32 { get }
-// HEADER:     typealias _ErrorType = TestError
-// HEADER:     case TENone
-// HEADER:     case TEOne
-// HEADER:     case TETwo
-// HEADER:   }
-// HEADER:   static var TENone: TestError.Code { get }
-// HEADER:   static var TEOne: TestError.Code { get }
-// HEADER:   static var TETwo: TestError.Code { get }
+#if ERRORS
+class ObjCTest {
+  @objc func foo() -> TestError {} // expected-error {{method cannot be marked @objc because its result type cannot be represented in Objective-C}} expected-note {{Swift structs cannot be represented in Objective-C}}
+  @objc func bar() -> TestError.Code {} // okay
+}
+#endif
+
+// HEADER: enum Code : Int32, _ErrorCodeProtocol {
+// HEADER:   init?(rawValue: Int32)
+// HEADER:   var rawValue: Int32 { get }
+// HEADER:   typealias _ErrorType = TestError
+// HEADER:   case TENone
+// HEADER:   case TEOne
+// HEADER:   case TETwo
 // HEADER: }
 // HEADER: func getErr() -> TestError.Code

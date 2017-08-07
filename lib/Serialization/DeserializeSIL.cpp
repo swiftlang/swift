@@ -47,6 +47,18 @@ fromStableStringEncoding(unsigned value) {
   }
 }
 
+static Optional<ConstStringLiteralInst::Encoding>
+fromStableConstStringEncoding(unsigned value) {
+  switch (value) {
+  case SIL_UTF8:
+    return ConstStringLiteralInst::Encoding::UTF8;
+  case SIL_UTF16:
+    return ConstStringLiteralInst::Encoding::UTF16;
+  default:
+    return None;
+  }
+}
+
 static Optional<SILLinkage>
 fromStableSILLinkage(unsigned value) {
   switch (value) {
@@ -296,7 +308,7 @@ static SILFunction *createBogusSILFunction(SILModule &M,
   return M.createFunction(
       SILLinkage::Private, name, type.castTo<SILFunctionType>(), nullptr,
       RegularLocation(loc), IsNotBare, IsNotTransparent, IsNotSerialized,
-      IsNotThunk, SILFunction::NotRelevant);
+      IsNotThunk, SubclassScope::NotApplicable);
 }
 
 /// Helper function to find a SILFunction, given its name and type.
@@ -449,7 +461,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         linkage.getValue(), name, ty.castTo<SILFunctionType>(), nullptr, loc,
         IsNotBare, IsTransparent_t(isTransparent == 1),
         IsSerialized_t(isSerialized), IsThunk_t(isThunk),
-        SILFunction::NotRelevant, (Inline_t)inlineStrategy);
+        SubclassScope::NotApplicable, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
     if (clangNodeOwner)
@@ -686,7 +698,9 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
   SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx])),
                   (SILDeclRef::Kind)ListOfValues[NextIdx+1],
                   (ResilienceExpansion)ListOfValues[NextIdx+2],
-                  ListOfValues[NextIdx+3], ListOfValues[NextIdx+4] > 0);
+                  /*isCurried=*/false, ListOfValues[NextIdx+4] > 0);
+  if (ListOfValues[NextIdx+3] < DRef.getUncurryLevel())
+    DRef = DRef.asCurried();
   NextIdx += 5;
   return DRef;
 }
@@ -874,7 +888,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   ONEOPERAND_ONETYPE_INST(OpenExistentialMetatype)
   ONEOPERAND_ONETYPE_INST(OpenExistentialBox)
-  ONEOPERAND_ONETYPE_INST(OpenExistentialOpaque)
+  ONEOPERAND_ONETYPE_INST(OpenExistentialValue)
+  ONEOPERAND_ONETYPE_INST(OpenExistentialBoxValue)
   // Conversion instructions.
   ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
@@ -955,7 +970,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
 
   case ValueKind::InitExistentialAddrInst:
-  case ValueKind::InitExistentialOpaqueInst:
+  case ValueKind::InitExistentialValueInst:
   case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::AllocExistentialBoxInst: {
@@ -986,8 +1001,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                 Ty,
                                                 ctxConformances);
       break;
-    case ValueKind::InitExistentialOpaqueInst:
-      ResultVal = Builder.createInitExistentialOpaque(Loc, Ty, ConcreteTy,
+    case ValueKind::InitExistentialValueInst:
+      ResultVal = Builder.createInitExistentialValue(Loc, Ty, ConcreteTy,
                                                       operand, ctxConformances);
       break;
     case ValueKind::InitExistentialMetatypeInst:
@@ -1069,10 +1084,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal =
-        Builder.createApply(Loc, getLocalValue(ValID, FnTy), SubstFnTy,
-                            substConventions.getSILResultType(), Substitutions,
-                            Args, IsNonThrowingApply != 0);
+    ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
+                                    Substitutions, Args,
+                                    IsNonThrowingApply != 0);
     break;
   }
   case ValueKind::TryApplyInst: {
@@ -1107,10 +1121,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal = Builder.createTryApply(Loc,
-                                       getLocalValue(ValID, FnTy),
-                                       SubstFnTy, Substitutions, Args,
-                                       normalBB, errorBB);
+    ResultVal = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
+                                       Substitutions, Args, normalBB, errorBB);
     break;
   }
   case ValueKind::PartialApplyInst: {
@@ -1145,9 +1157,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
           ListOfValues[I], fnConv.getSILArgumentType(I + unappliedArgs)));
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,
-                                           Substitutions, Args,
-                                           closureTy);
+    ResultVal = Builder.createPartialApply(
+        Loc, FnVal, Substitutions, Args,
+        closureTy.getAs<SILFunctionType>()->getCalleeConvention());
     break;
   }
   case ValueKind::BuiltinInst: {
@@ -1308,6 +1320,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                             encoding.getValue());
     break;
   }
+  case ValueKind::ConstStringLiteralInst: {
+    Identifier StringVal = MF->getIdentifier(ValID);
+    auto encoding = fromStableConstStringEncoding(Attr);
+    if (!encoding)
+      return true;
+    ResultVal = Builder.createConstStringLiteral(Loc, StringVal.str(),
+                                                 encoding.getValue());
+    break;
+  }
   case ValueKind::MarkFunctionEscapeInst: {
     // Format: a list of typed values. A typed value is expressed by 4 IDs:
     // TypeID, TypeCategory, ValueID, ValueResultNumber.
@@ -1351,17 +1372,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
   UNARY_INSTRUCTION(CondFail)
   REFCOUNTING_INSTRUCTION(RetainValue)
+  REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
   UNARY_INSTRUCTION(CopyValue)
   UNARY_INSTRUCTION(CopyUnownedValue)
   UNARY_INSTRUCTION(DestroyValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
+  REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
   REFCOUNTING_INSTRUCTION(AutoreleaseValue)
   REFCOUNTING_INSTRUCTION(UnmanagedAutoreleaseValue)
   REFCOUNTING_INSTRUCTION(SetDeallocating)
   UNARY_INSTRUCTION(DeinitExistentialAddr)
-  UNARY_INSTRUCTION(DeinitExistentialOpaque)
+  UNARY_INSTRUCTION(DeinitExistentialValue)
   UNARY_INSTRUCTION(EndBorrowArgument)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
@@ -1456,8 +1479,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::BeginAccessInst: {
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
-    auto accessKind = SILAccessKind(Attr & 0x7);
-    auto enforcement = SILAccessEnforcement(Attr >> 3);
+    auto accessKind = SILAccessKind(Attr & 0x3);
+    auto enforcement = SILAccessEnforcement(Attr >> 2);
     ResultVal = Builder.createBeginAccess(Loc, op, accessKind, enforcement);
     break;
   }
@@ -1466,6 +1489,25 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
     bool aborted = Attr & 0x1;
     ResultVal = Builder.createEndAccess(Loc, op, aborted);
+    break;
+  }
+  case ValueKind::BeginUnpairedAccessInst: {
+    SILValue source = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    SILValue buffer = getLocalValue(
+        ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
+    auto accessKind = SILAccessKind(Attr & 0x3);
+    auto enforcement = SILAccessEnforcement(Attr >> 2);
+    ResultVal = Builder.createBeginUnpairedAccess(Loc, source, buffer,
+                                                  accessKind, enforcement);
+    break;
+  }
+  case ValueKind::EndUnpairedAccessInst: {
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    bool aborted = Attr & 0x1;
+    auto enforcement = SILAccessEnforcement(Attr >> 1);
+    ResultVal = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted);
     break;
   }
   case ValueKind::StoreUnownedInst: {
@@ -2027,6 +2069,117 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case ValueKind::UnreachableInst: {
     ResultVal = Builder.createUnreachable(Loc);
+    break;
+  }
+  case ValueKind::KeyPathInst: {
+    unsigned nextValue = 0;
+    SILType kpTy
+      = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+
+    auto rootTy = MF->getType(ListOfValues[nextValue++]);
+    auto valueTy = MF->getType(ListOfValues[nextValue++]);
+    auto numComponents = ListOfValues[nextValue++];
+    auto numOperands = ListOfValues[nextValue++];
+    assert(numOperands == 0 && "operands not implemented yet");
+    auto numSubstitutions = ListOfValues[nextValue++];
+    auto objcString = MF->getIdentifier(ListOfValues[nextValue++]).str();
+    auto numGenericParams = ListOfValues[nextValue++];
+    
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    while (numGenericParams-- > 0) {
+      genericParams.push_back(MF->getType(ListOfValues[nextValue++])
+                                ->castTo<GenericTypeParamType>());
+    }
+    
+    SmallVector<KeyPathPatternComponent, 4> components;
+    while (numComponents-- > 0) {
+      auto kind =
+        (KeyPathComponentKindEncoding)ListOfValues[nextValue++];
+      auto type = MF->getType(ListOfValues[nextValue++])
+        ->getCanonicalType();
+      
+      auto handleComputedId =
+      [&]() -> KeyPathPatternComponent::ComputedPropertyId {
+        auto kind =
+          (KeyPathComputedComponentIdKindEncoding)ListOfValues[nextValue++];
+        switch (kind) {
+        case KeyPathComputedComponentIdKindEncoding::Property:
+          return cast<VarDecl>(MF->getDecl(ListOfValues[nextValue++]));
+        case KeyPathComputedComponentIdKindEncoding::Function: {
+          auto name = MF->getIdentifier(ListOfValues[nextValue++]);
+          return getFuncForReference(name.str());
+        }
+        case KeyPathComputedComponentIdKindEncoding::DeclRef: {
+          // read SILDeclRef
+          return getSILDeclRef(MF, ListOfValues, nextValue);
+        }
+        }
+      };
+      
+      switch (kind) {
+      case KeyPathComponentKindEncoding::StoredProperty: {
+        auto decl = cast<VarDecl>(MF->getDecl(ListOfValues[nextValue++]));
+        components.push_back(
+          KeyPathPatternComponent::forStoredProperty(decl, type));
+        break;
+      }
+      case KeyPathComponentKindEncoding::GettableProperty: {
+        auto id = handleComputedId();
+        auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
+        auto getter = getFuncForReference(getterName.str());
+        components.push_back(
+          KeyPathPatternComponent::forComputedGettableProperty(id, getter, {},
+                                                               type));
+        break;
+      }
+      case KeyPathComponentKindEncoding::SettableProperty: {
+        auto id = handleComputedId();
+        auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
+        auto getter = getFuncForReference(getterName.str());
+        auto setterName = MF->getIdentifier(ListOfValues[nextValue++]);
+        auto setter = getFuncForReference(setterName.str());
+        components.push_back(
+          KeyPathPatternComponent::forComputedSettableProperty(id,
+                                                               getter, setter,
+                                                               {}, type));
+        break;
+      }
+      case KeyPathComponentKindEncoding::OptionalChain:
+        components.push_back(KeyPathPatternComponent::forOptional(
+            KeyPathPatternComponent::Kind::OptionalChain, type));
+        break;
+      case KeyPathComponentKindEncoding::OptionalForce:
+        components.push_back(KeyPathPatternComponent::forOptional(
+            KeyPathPatternComponent::Kind::OptionalForce, type));
+        break;
+      case KeyPathComponentKindEncoding::OptionalWrap:
+        components.push_back(KeyPathPatternComponent::forOptional(
+            KeyPathPatternComponent::Kind::OptionalWrap, type));
+        break;
+      }
+    }
+    
+    SmallVector<Requirement, 4> requirements;
+    MF->readGenericRequirements(requirements, SILCursor);
+    
+    SmallVector<Substitution, 4> substitutions;
+    while (numSubstitutions-- > 0) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      substitutions.push_back(*sub);
+    }
+    
+    CanGenericSignature sig = nullptr;
+    if (!genericParams.empty() || !requirements.empty())
+      sig = GenericSignature::get(genericParams, requirements)
+         ->getCanonicalSignature();
+    
+    auto pattern = KeyPathPattern::get(SILMod, sig,
+                                       rootTy->getCanonicalType(),
+                                       valueTy->getCanonicalType(),
+                                       components,
+                                       objcString);
+    
+    ResultVal = Builder.createKeyPath(Loc, pattern, substitutions, kpTy);
     break;
   }
   case ValueKind::MarkUninitializedBehaviorInst:
