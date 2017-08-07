@@ -1329,7 +1329,9 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
 
-  if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
+  // Only link in libFuzzer for executables.
+  if (job.getKind() == LinkKind::Executable &&
+      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
     addLinkFuzzerLibArgsForDarwin(context.Args, Arguments, *this);
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
