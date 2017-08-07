@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that presents a mathematical set interface to a bit mask.
+/// A type that presents a mathematical set interface to a bit set.
 ///
-/// You use the `OptionSet` protocol to represent bit mask types, where
-/// individual bits represent members of the set. Adopting this protocol in
+/// You use the `OptionSet` protocol to represent bitset types, where
+/// individual bits represent members of a set. Adopting this protocol in
 /// your custom types lets you perform set-related operations such as
 /// membership tests, unions, and intersections on those types. What's more,
 /// when implemented using specific criteria, adoption of this protocol
@@ -30,8 +30,8 @@
 /// For example, consider a custom type called `ShippingOptions` that is an
 /// option set of the possible ways to ship a customer's purchase.
 /// `ShippingOptions` includes a `rawValue` property of type `Int` that stores
-/// the bit mask of available shipping options. The static members `NextDay`,
-/// `SecondDay`, `Priority`, and `Standard` are unique, individual options.
+/// the bit mask of available shipping options. The static members `nextDay`,
+/// `secondDay`, `priority`, and `standard` are unique, individual options.
 ///
 ///     struct ShippingOptions: OptionSet {
 ///         let rawValue: Int
@@ -82,8 +82,6 @@
 ///         print("Add more to your cart for free priority shipping!")
 ///     }
 ///     // Prints "You've earned free priority shipping!"
-///
-/// - SeeAlso: `FixedWidthInteger`, `SetAlgebra`
 public protocol OptionSet : SetAlgebra, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a

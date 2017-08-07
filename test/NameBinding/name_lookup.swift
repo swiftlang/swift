@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -typo-correction-limit 100
 
 class ThisBase1 {
   init() { }
@@ -528,7 +528,7 @@ class r21677702 {
 // <rdar://problem/16954496> lazy properties must use "self." in their body, and can weirdly refer to class variables directly
 class r16954496 {
   func bar() {}
-  lazy var x: Array<(r16954496) -> () -> Void> = [bar]
+  lazy var x: Array<() -> Void> = [bar] // expected-error {{cannot convert value of type '(r16954496) -> () -> ()' to expected element type '() -> Void'}}
 }
 
 

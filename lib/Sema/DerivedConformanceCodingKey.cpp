@@ -74,7 +74,7 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
                                              DeclNameLoc(), /*Implicit=*/true);
 
   // rawValue param to init(rawValue:)
-  auto *rawValueDecl = new (C) ParamDecl(/*IsLet=*/true, SourceLoc(),
+  auto *rawValueDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
                                          SourceLoc(), C.Id_rawValue,
                                          SourceLoc(), C.Id_rawValue,
                                          valueParam->getType(), parentDC);
@@ -124,7 +124,7 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   auto *parentDC = cast<DeclContext>(parentDecl);
 
   // rawValue
-  auto *rawDecl = new (C) ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(),
+  auto *rawDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                     paramName, SourceLoc(), paramName,
                                     paramType, parentDC);
   rawDecl->setInterfaceType(paramType);
@@ -159,26 +159,25 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   Type retInterfaceType =
       OptionalType::get(parentDC->getDeclaredInterfaceType());
   Type interfaceType = FunctionType::get(interfaceArgType, retInterfaceType);
-  Type selfInterfaceType = initDecl->computeInterfaceSelfType();
-  Type selfInitializerInterfaceType =
-      initDecl->computeInterfaceSelfType(/*init*/ true);
+  auto selfParam = computeSelfParam(initDecl);
+  auto initSelfParam = computeSelfParam(initDecl, /*init*/ true);
 
   Type allocIfaceType;
   Type initIfaceType;
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     initDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
 
-    allocIfaceType = GenericFunctionType::get(sig, selfInterfaceType,
+    allocIfaceType = GenericFunctionType::get(sig, {selfParam},
                                               interfaceType,
                                               FunctionType::ExtInfo());
-    initIfaceType = GenericFunctionType::get(sig, selfInitializerInterfaceType,
+    initIfaceType = GenericFunctionType::get(sig, {initSelfParam},
                                              interfaceType,
                                              FunctionType::ExtInfo());
   } else {
-    allocIfaceType = FunctionType::get(selfInterfaceType,
-                                       interfaceType);
-    initIfaceType = FunctionType::get(selfInitializerInterfaceType,
-                                      interfaceType);
+    allocIfaceType = FunctionType::get({selfParam},
+                                       interfaceType, FunctionType::ExtInfo());
+    initIfaceType = FunctionType::get({initSelfParam},
+                                      interfaceType, FunctionType::ExtInfo());
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
@@ -271,7 +270,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
     body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                              SourceLoc());
   } else {
-    SmallVector<CaseStmt *, 4> cases;
+    SmallVector<ASTNode, 4> cases;
     for (auto *elt : elements) {
       auto *pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                              SourceLoc(), SourceLoc(),
@@ -336,7 +335,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
   }
 
   auto *selfRef = createSelfDeclRef(initDecl);
-  SmallVector<CaseStmt *, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   for (auto *elt : elements) {
     auto *litExpr = new (C) StringLiteralExpr(elt->getNameStr(), SourceRange(),
                                               /*Implicit=*/true);
@@ -393,6 +392,9 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
 /// \param enumDecl The enum to check.
 static bool canSynthesizeCodingKey(TypeChecker &tc, Decl *parentDecl,
                                    EnumDecl *enumDecl) {
+  // Validate the enum and its raw type.
+  tc.validateDecl(enumDecl);
+
   // If the enum has a raw type (optional), it must be String or Int.
   Type rawType = enumDecl->getRawType();
   if (rawType) {
@@ -405,8 +407,9 @@ static bool canSynthesizeCodingKey(TypeChecker &tc, Decl *parentDecl,
       return false;
   }
 
-  if (!enumDecl->getInherited().empty() &&
-      enumDecl->getInherited().front().isError())
+  auto inherited = enumDecl->getInherited();
+  if (!inherited.empty() && inherited.front().wasValidated() &&
+      inherited.front().isError())
     return false;
 
   // If it meets all of those requirements, we can synthesize CodingKey
@@ -430,7 +433,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
 
   auto &C = tc.Context;
   auto rawType = enumDecl->getRawType();
-  auto name = requirement->getName();
+  auto name = requirement->getBaseName();
   if (name == C.Id_stringValue) {
     // Synthesize `var stringValue: String { get }`
     auto stringType = C.getStringDecl()->getDeclaredType();

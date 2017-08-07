@@ -23,6 +23,13 @@ struct NSRect {
   } size;
 };
 
+struct Fob {
+  unsigned long a;
+  unsigned b;
+  unsigned c;
+  unsigned long d;
+} Fob;
+
 typedef long NSInteger;
 
 @interface Gizmo : NSObject
@@ -37,6 +44,7 @@ typedef long NSInteger;
 - (struct NSRect) frame;
 - (void) setFrame: (struct NSRect) rect;
 - (void) frob;
+- (void) test: (struct Fob) fob;
 + (void) runce;
 @end
 

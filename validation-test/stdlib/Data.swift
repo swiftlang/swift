@@ -28,10 +28,7 @@ DataTestSuite.test("Data.Iterator semantics") {
       ptr[i] = UInt8(i % 23)
     }
   }
-  // SR-4724: Should not need to be split out but if it is not it
-  // is considered ambiguous.
-  let temp = (0..<65535).lazy.map({ UInt8($0 % 23) })
-  checkSequence(temp, data)
+  checkSequence((0..<65535).lazy.map({ UInt8($0 % 23) }), data)
 }
 
 DataTestSuite.test("associated types") {
@@ -49,10 +46,7 @@ DataTestSuite.test("Data SubSequence") {
   let array: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7]
   var data = Data(bytes: array)
 
-  // FIXME: Iteration over Data slices is currently broken:
-  // [SR-4292] Foundation.Data.copyBytes is zero-based.
-  //           Data.Iterator assumes it is not.
-  // checkRandomAccessCollection(array, data)
+  checkRandomAccessCollection(array, data)
 
   for i in 0..<data.count {
     for j in i..<data.count {
@@ -62,10 +56,7 @@ DataTestSuite.test("Data SubSequence") {
         expectEqual(dataSlice.startIndex, i)
         expectEqual(dataSlice.endIndex, j)
         
-        // FIXME: Iteration over Data slices is currently broken:
-        // [SR-4292] Foundation.Data.copyBytes is zero-based.
-        //           Data.Iterator assumes it is not.
-        // expectEqual(dataSlice[i], arraySlice[i])
+        expectEqual(dataSlice[i], arraySlice[i])
 
         dataSlice[i] = 0xFF
         

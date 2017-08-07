@@ -59,7 +59,9 @@ class E {
 // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[INIT]]() : $@convention(thin) () -> Int64
 // CHECK-NEXT: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $E, #E.i
-// CHECK-NEXT: assign [[VALUE]] to [[IREF]] : $*Int64
+// CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[IREF]] : $*Int64
+// CHECK-NEXT: assign [[VALUE]] to [[WRITE]] : $*Int64
+// CHECK-NEXT: end_access [[WRITE]] : $*Int64
 // CHECK-NEXT: end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK-NEXT: destroy_value [[SELF]]

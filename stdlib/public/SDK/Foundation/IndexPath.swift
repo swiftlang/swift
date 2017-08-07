@@ -257,7 +257,8 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     }
                 case .single(let index):
                     switch (range.lowerBound, range.upperBound) {
-                    case (0, 0):
+                    case (0, 0): fallthrough
+                    case (1, 1):
                         return .empty
                     case (0, 1):
                         return .single(index)
@@ -289,9 +290,9 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     case 0:
                         return .empty
                     case 1:
-                        return .single(slice[0])
+                        return .single(slice.first!)
                     case 2:
-                        return .pair(slice[0], slice[1])
+                        return .pair(slice.first!, slice.last!)
                     default:
                         return .array(Array<Int>(slice))
                     }
@@ -448,6 +449,15 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         
         var endIndex: Int {
             return count
+        }
+
+        var allValues: [Int] {
+            switch self {
+            case .empty: return []
+            case .single(let index): return [index]
+            case .pair(let first, let second): return [first, second]
+            case .array(let indexes): return indexes
+            }
         }
         
         func index(before i: Int) -> Int {
@@ -658,7 +668,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
             let totalBits = MemoryLayout<Int>.size * 8
             let lengthBits = 8
             let firstIndexBits = (totalBits - lengthBits) / 2
-            return count + (first << lengthBits) + (last << (lengthBits + firstIndexBits))
+            return count &+ (first << lengthBits) &+ (last << (lengthBits + firstIndexBits))
         }
 
         switch _indexes {
@@ -781,5 +791,44 @@ extension NSIndexPath : _HasCustomAnyHashableRepresentation {
     @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
         return AnyHashable(self as IndexPath)
+    }
+}
+
+extension IndexPath : Codable {
+    private enum CodingKeys : Int, CodingKey {
+        case indexes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        var indexesContainer = try container.nestedUnkeyedContainer(forKey: .indexes)
+
+        var indexes = [Int]()
+        if let count = indexesContainer.count {
+            indexes.reserveCapacity(count)
+        }
+
+        while !indexesContainer.isAtEnd {
+            let index = try indexesContainer.decode(Int.self)
+            indexes.append(index)
+        }
+
+        self.init(indexes: indexes)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        var indexesContainer = container.nestedUnkeyedContainer(forKey: .indexes)
+        switch self._indexes {
+        case .empty:
+            break
+        case .single(let index):
+            try indexesContainer.encode(index)
+        case .pair(let first, let second):
+            try indexesContainer.encode(first)
+            try indexesContainer.encode(second)
+        case .array(let indexes):
+            try indexesContainer.encode(contentsOf: indexes)
+        }
     }
 }

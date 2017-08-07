@@ -105,8 +105,11 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
     STRINGS FALSE "NOT-MERGED" "MERGED")
 
-set(SWIFT_VERSION "4.0" CACHE STRING
-    "The user-visible version of the Swift compiler")
+# SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
+# can be reused when a new version of Swift comes out (assuming the user hasn't
+# manually set it as part of their own CMake configuration).
+set(SWIFT_VERSION "4.0")
+
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
 set(SWIFT_COMPILER_VERSION "" CACHE STRING
@@ -249,6 +252,10 @@ option(SWIFT_CHECK_INCREMENTAL_COMPILATION
     "Check if incremental compilation works when compiling the Swift libraries"
     FALSE)
 
+option(SWIFT_REPORT_STATISTICS
+    "Create json files which contain internal compilation statistics"
+    FALSE)
+
 #
 # User-configurable experimental options.  Do not use in production builds.
 #
@@ -269,10 +276,6 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
-
-option(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
-    "Build the runtime with a copy-on-write implementation for opaque existentials"
-    TRUE)
 
 option(SWIFT_STDLIB_USE_NONATOMIC_RC
     "Build the standard libraries and overlays with nonatomic reference count operations enabled"
@@ -416,7 +419,6 @@ include(AddSwift)
 include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
-include(AddSwiftRuntime)
 
 # Configure swift include, install, build components.
 swift_configure_components()
@@ -781,21 +783,10 @@ if(SWIFT_PARALLEL_LINK_JOBS)
 endif()
 
 # Set the CMAKE_OSX_* variables in a way that minimizes conflicts.
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
   set(CMAKE_OSX_ARCHITECTURES "")
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
-endif()
-
-swift_runtime_enable_backtrace_reporting(SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING_default)
-set(SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
-    ${SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING_default}
-    CACHE BOOL "Enable simple backtrace printing using dladdr")
-set(SWIFT_RUNTIME_DLADDR_ALLOWED
-    ${SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING_default}
-    CACHE BOOL "Is dladdr allowed to be used in the code base. Must be TRUE if SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING is set to TRUE")
-if ("${SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING}" AND NOT "${SWIFT_RUNTIME_DLADDR_ALLOWED}")
-  message(FATAL "Can not enable backtrace reporting without allowing dladdr to be used by the runtime")
 endif()
 
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
@@ -811,8 +802,6 @@ message(STATUS "")
 
 message(STATUS "Building Swift runtime with:")
 message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
-message(STATUS "  Backtraces:                         ${SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING}")
-message(STATUS "  DLAddr Allowed:                     ${SWIFT_RUNTIME_DLADDR_ALLOWED}")
 message(STATUS "")
 
 #

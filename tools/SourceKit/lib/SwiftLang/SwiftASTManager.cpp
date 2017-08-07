@@ -419,6 +419,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     FrontendOpts.PlaygroundTransform = false;
   }
 
+  // Disable the index-store functionality for the sourcekitd requests.
+  FrontendOpts.IndexStorePath.clear();
+  ImporterOpts.IndexStorePath.clear();
+
   if (!PrimaryFile.empty()) {
     Optional<unsigned> PrimaryIndex;
     for (auto i : indices(Invocation.getFrontendOptions().InputFilenames)) {
@@ -835,7 +839,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     // don't block any other AST processing for the same SwiftInvocation.
 
     if (auto SF = CompIns.getPrimarySourceFile()) {
-      SILOptions SILOpts;
+      SILOptions SILOpts = Invocation.getSILOptions();
       std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, SILOpts);
       runSILDiagnosticPasses(*SILMod);
     }

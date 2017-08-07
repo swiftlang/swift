@@ -1,14 +1,17 @@
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -emit-module -o %t -module-name Lib -I %S/Inputs/custom-modules %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module %s | %FileCheck -check-prefix CHECK-VTABLE %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
-// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -enable-experimental-deserialization-recovery > %t.txt
+// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD > %t.txt
 // RUN: %FileCheck -check-prefix CHECK-RECOVERY %s < %t.txt
 // RUN: %FileCheck -check-prefix CHECK-RECOVERY-NEGATIVE %s < %t.txt
 
-// RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -enable-experimental-deserialization-recovery -DVERIFY %s -verify
-// RUN: %target-swift-frontend -emit-silgen -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -enable-experimental-deserialization-recovery %s | %FileCheck -check-prefix CHECK-SIL %s
+// RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -DVERIFY %s -verify
+// RUN: %target-swift-frontend -emit-silgen -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck -check-prefix CHECK-SIL %s
+
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
 
 #if TEST
 
@@ -24,12 +27,22 @@ func testSymbols() {
   _ = Lib.usesAssoc
 } // CHECK-SIL: end sil function '_T08typedefs11testSymbolsyyF'
 
+// CHECK-IR-LABEL: define{{.*}} void @_T08typedefs18testVTableBuildingy3Lib4UserC4user_tF
+public func testVTableBuilding(user: User) {
+  // The important thing in this CHECK line is the "i64 24", which is the offset
+  // for the vtable slot for 'lastMethod()'. If the layout here
+  // changes, please check that offset 24 is still correct.
+  // CHECK-IR-NOT: ret
+  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 24|i32 27}}
+  _ = user.lastMethod()
+} // CHECK-IR: ret void
+
 #if VERIFY
-let _: String = useAssoc(ImportedType.self) // expected-error {{cannot convert call result type '_.Assoc?' to expected type 'String'}}
+let _: String = useAssoc(ImportedType.self) // expected-error {{cannot convert value of type 'Int32?' to specified type 'String'}}
 let _: Bool? = useAssoc(ImportedType.self) // expected-error {{cannot convert value of type 'Int32?' to specified type 'Bool?'}}
 let _: Int32? = useAssoc(ImportedType.self)
 
-let _: String = useAssoc(AnotherType.self) // expected-error {{cannot convert call result type '_.Assoc?' to expected type 'String'}}
+let _: String = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'String'}}
 let _: Bool? = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'Bool?'}}
 let _: Int32? = useAssoc(AnotherType.self)
 
@@ -39,23 +52,61 @@ let _ = unwrapped // okay
 _ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
 _ = usesUnwrapped(nil) // expected-error {{nil is not compatible with expected argument type 'Int32'}}
 
-public class UserSub: User {
+func testExtensions(wrapped: WrappedInt, unwrapped: UnwrappedInt) {
+  wrapped.wrappedMethod() // expected-error {{value of type 'WrappedInt' (aka 'Int32') has no member 'wrappedMethod'}}
+  unwrapped.unwrappedMethod() // expected-error {{value of type 'UnwrappedInt' has no member 'unwrappedMethod'}}
+
+  ***wrapped // This one works because of the UnwrappedInt extension.
+  ***unwrapped // expected-error {{cannot convert value of type 'UnwrappedInt' to expected argument type 'Int32'}}
+
+  let _: WrappedProto = wrapped // expected-error {{value of type 'WrappedInt' (aka 'Int32') does not conform to specified type 'WrappedProto'}}
+  let _: UnwrappedProto = unwrapped // expected-error {{value of type 'UnwrappedInt' does not conform to specified type 'UnwrappedProto'}}
+}
+
+public class UserDynamicSub: UserDynamic {
   override init() {}
 }
 // FIXME: Bad error message; really it's that the convenience init hasn't been
 // inherited.
-_ = UserSub(conveniently: 0) // expected-error {{argument passed to call that takes no arguments}}
+_ = UserDynamicSub(conveniently: 0) // expected-error {{argument passed to call that takes no arguments}}
 
-public class UserConvenienceSub: UserConvenience {
+public class UserDynamicConvenienceSub: UserDynamicConvenience {
   override init() {}
 }
-_ = UserConvenienceSub(conveniently: 0)
+_ = UserDynamicConvenienceSub(conveniently: 0)
+
+public class UserSub : User {} // expected-error {{cannot inherit from class 'User' because it has overridable members that could not be loaded}}
 
 #endif // VERIFY
 
 #else // TEST
 
 import Typedefs
+
+prefix operator ***
+
+// CHECK-LABEL: extension WrappedInt : WrappedProto {
+// CHECK-NEXT: func wrappedMethod()
+// CHECK-NEXT: prefix static func ***(x: WrappedInt)
+// CHECK-NEXT: }
+// CHECK-RECOVERY-NEGATIVE-NOT: extension WrappedInt
+extension WrappedInt: WrappedProto {
+  public func wrappedMethod() {}
+  public static prefix func ***(x: WrappedInt) {}
+}
+// CHECK-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-NEXT: func unwrappedMethod()
+// CHECK-NEXT: prefix static func ***(x: UnwrappedInt)
+// CHECK-NEXT: }
+// CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-RECOVERY-NEXT: func unwrappedMethod()
+// CHECK-RECOVERY-NEXT: prefix static func ***(x: Int32)
+// CHECK-RECOVERY-NEXT: }
+// CHECK-RECOVERY-NEGATIVE-NOT: extension UnwrappedInt
+extension UnwrappedInt: UnwrappedProto {
+  public func unwrappedMethod() {}
+  public static prefix func ***(x: UnwrappedInt) {}
+}
 
 // CHECK-LABEL: class User {
 // CHECK-RECOVERY-LABEL: class User {
@@ -64,18 +115,20 @@ open class User {
   // CHECK-RECOVERY: var unwrappedProp: Int32?
   public var unwrappedProp: UnwrappedInt?
   // CHECK: var wrappedProp: WrappedInt?
-  // CHECK-RECOVERY-NEGATIVE-NOT: var wrappedProp:
+  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for _ */
   public var wrappedProp: WrappedInt?
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
   // CHECK-RECOVERY: func returnsUnwrappedMethod() -> Int32
   public func returnsUnwrappedMethod() -> UnwrappedInt { fatalError() }
   // CHECK: func returnsWrappedMethod() -> WrappedInt
-  // CHECK-RECOVERY-NEGATIVE-NOT: func returnsWrappedMethod(
+  // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() */
   public func returnsWrappedMethod() -> WrappedInt { fatalError() }
 
   // CHECK: subscript(_: WrappedInt) -> () { get }
-  // CHECK-RECOVERY-NEGATIVE-NOT: subscript(
+  // CHECK-RECOVERY: /* placeholder for _ */
   public subscript(_: WrappedInt) -> () { return () }
 
   // CHECK: init()
@@ -83,15 +136,43 @@ open class User {
   public init() {}
 
   // CHECK: init(wrapped: WrappedInt)
-  // CHECK-RECOVERY-NEGATIVE-NOT: init(wrapped:
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
   public init(wrapped: WrappedInt) {}
 
   // CHECK: convenience init(conveniently: Int)
   // CHECK-RECOVERY: convenience init(conveniently: Int)
   public convenience init(conveniently: Int) { self.init() }
+
+  // CHECK: required init(wrappedRequired: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  public required init(wrappedRequired: WrappedInt) {}
+
+  public func lastMethod() {}
 }
 // CHECK: {{^}$}}
 // CHECK-RECOVERY: {{^}$}}
+
+// This is mostly to check when changes are necessary for the CHECK-IR lines
+// above.
+// CHECK-VTABLE-LABEL: sil_vtable User {
+// (10 words of normal class metadata on 64-bit platforms, 13 on 32-bit)
+// 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
+// 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
+// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!materializeForSet.1:
+// 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter.1:
+// 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter.1:
+// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!materializeForSet.1:
+// 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
+// 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
+// 18 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
+// 19 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 20 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 21 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 22 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 23 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 24 CHECK-VTABLE-NEXT: #User.lastMethod!1:
+// CHECK-VTABLE: }
+
 
 // CHECK-LABEL: class UserConvenience
 // CHECK-RECOVERY-LABEL: class UserConvenience
@@ -101,7 +182,7 @@ open class UserConvenience {
   public init() {}
 
   // CHECK: convenience init(wrapped: WrappedInt)
-  // CHECK-RECOVERY-NEGATIVE-NOT: init(wrapped:
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
   public convenience init(wrapped: WrappedInt) { self.init() }
 
   // CHECK: convenience init(conveniently: Int)
@@ -110,6 +191,58 @@ open class UserConvenience {
 }
 // CHECK: {{^}$}}
 // CHECK-RECOVERY: {{^}$}}
+
+// CHECK-LABEL: class UserDynamic
+// CHECK-RECOVERY-LABEL: class UserDynamic
+open class UserDynamic {
+  // CHECK: init()
+  // CHECK-RECOVERY: init()
+  @objc public dynamic init() {}
+
+  // CHECK: init(wrapped: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  @objc public dynamic init(wrapped: WrappedInt) {}
+
+  // CHECK: convenience init(conveniently: Int)
+  // CHECK-RECOVERY: convenience init(conveniently: Int)
+  @objc public dynamic convenience init(conveniently: Int) { self.init() }
+}
+// CHECK: {{^}$}}
+// CHECK-RECOVERY: {{^}$}}
+
+// CHECK-LABEL: class UserDynamicConvenience
+// CHECK-RECOVERY-LABEL: class UserDynamicConvenience
+open class UserDynamicConvenience {
+  // CHECK: init()
+  // CHECK-RECOVERY: init()
+  @objc public dynamic init() {}
+
+  // CHECK: convenience init(wrapped: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  @objc public dynamic convenience init(wrapped: WrappedInt) { self.init() }
+
+  // CHECK: convenience init(conveniently: Int)
+  // CHECK-RECOVERY: convenience init(conveniently: Int)
+  @objc public dynamic convenience init(conveniently: Int) { self.init() }
+}
+// CHECK: {{^}$}}
+// CHECK-RECOVERY: {{^}$}}
+
+
+// CHECK-LABEL: class UserSub
+// CHECK-RECOVERY-LABEL: class UserSub
+open class UserSub : User {
+  // CHECK: init(wrapped: WrappedInt?)
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  public override init(wrapped: WrappedInt?) { super.init() }
+
+  // CHECK: required init(wrappedRequired: WrappedInt?)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  public required init(wrappedRequired: WrappedInt?) { super.init() }
+}
+// CHECK: {{^}$}}
+// CHECK-RECOVERY: {{^}$}}
+
 
 // CHECK-DAG: let x: MysteryTypedef
 // CHECK-RECOVERY-DAG: let x: Int32
@@ -207,5 +340,8 @@ public func returnsWrapped() -> WrappedInt { fatalError() }
 // CHECK-DAG: func returnsWrappedGeneric<T>(_: T.Type) -> WrappedInt
 // CHECK-RECOVERY-NEGATIVE-NOT: func returnsWrappedGeneric<
 public func returnsWrappedGeneric<T>(_: T.Type) -> WrappedInt { fatalError() }
+
+public protocol WrappedProto {}
+public protocol UnwrappedProto {}
 
 #endif // TEST

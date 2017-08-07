@@ -676,13 +676,21 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
   if (SILValue Val = getProjectBoxMappedVal(SEAI->getOperand())) {
     // Loads of a struct_element_addr of an argument get replaced with a
     // struct_extract of the new passed in value. The value should be borrowed
-    // already.
+    // already, so we can just extract the value.
     SILBuilderWithPostProcess<ClosureCloner, 1> B(this, LI);
     assert(B.getFunction().hasUnqualifiedOwnership() ||
            Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed));
-    SILValue V =
+    Val =
         B.emitStructExtract(LI->getLoc(), Val, SEAI->getField(), LI->getType());
-    ValueMap.insert(std::make_pair(LI, V));
+
+    // If we were performing a load [copy], then we need to a perform a copy
+    // here since when cloning, we do not eliminate the destroy on the copied
+    // value.
+    if (LI->getFunction()->hasQualifiedOwnership()
+        && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      Val = getBuilder().createCopyValue(LI->getLoc(), Val);
+    }
+    ValueMap.insert(std::make_pair(LI, Val));
     return;
   }
   SILCloner<ClosureCloner>::visitLoadInst(LI);
@@ -694,6 +702,13 @@ static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
   return Entry.getArgument(Index);
 }
 
+static bool isNonMutatingLoad(SILInstruction *I) {
+  auto *LI = dyn_cast<LoadInst>(I);
+  if (!LI)
+    return false;
+  return LI->getOwnershipQualifier() != LoadOwnershipQualifier::Take;
+}
+
 /// \brief Given a partial_apply instruction and the argument index into its
 /// callee's argument list of a box argument (which is followed by an argument
 /// for the address of the box's contents), return true if the closure is known
@@ -701,7 +716,7 @@ static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
 static bool
 isNonMutatingCapture(SILArgument *BoxArg) {
   SmallVector<ProjectBoxInst*, 2> Projections;
-  
+
   // Conservatively do not allow any use of the box argument other than a
   // strong_release or projection, since this is the pattern expected from
   // SILGen.
@@ -724,27 +739,30 @@ isNonMutatingCapture(SILArgument *BoxArg) {
   // TODO: This seems overly limited.  Why not projections of tuples and other
   // stuff?  Also, why not recursive struct elements?  This should be a helper
   // function that mirrors isNonEscapingUse.
-  auto checkAddrUse = [](SILInstruction *AddrInst) {
+  auto isAddrUseMutating = [](SILInstruction *AddrInst) {
     if (auto *SEAI = dyn_cast<StructElementAddrInst>(AddrInst)) {
-      for (auto *UseOper : SEAI->getUses()) {
-        if (isa<LoadInst>(UseOper->getUser()))
-          return true;
-      }
-    } else if (isa<LoadInst>(AddrInst) || isa<DebugValueAddrInst>(AddrInst)
-               || isa<MarkFunctionEscapeInst>(AddrInst)
-               || isa<EndAccessInst>(AddrInst)) {
-      return true;
+      return all_of(SEAI->getUses(),
+                    [](Operand *Op) -> bool {
+                      return isNonMutatingLoad(Op->getUser());
+                    });
     }
-    return false;
+
+    return isNonMutatingLoad(AddrInst) || isa<DebugValueAddrInst>(AddrInst)
+           || isa<MarkFunctionEscapeInst>(AddrInst)
+           || isa<EndAccessInst>(AddrInst);
   };
+
   for (auto *Projection : Projections) {
     for (auto *UseOper : Projection->getUses()) {
       if (auto *Access = dyn_cast<BeginAccessInst>(UseOper->getUser())) {
         for (auto *AccessUseOper : Access->getUses()) {
-          if (!checkAddrUse(AccessUseOper->getUser()))
+          if (!isAddrUseMutating(AccessUseOper->getUser()))
             return false;
         }
-      } else if (!checkAddrUse(UseOper->getUser()))
+        continue;
+      }
+
+      if (!isAddrUseMutating(UseOper->getUser()))
         return false;
     }
   }
@@ -1192,7 +1210,6 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // closure.
   SILBuilderWithScope B(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
-  SILType FnTy = FnVal->getType();
 
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
@@ -1237,12 +1254,10 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     ++NumCapturesPromoted;
   }
 
-  auto SubstFnTy = FnTy.substGenericArgs(M, PAI->getSubstitutions());
-
   // Create a new partial apply with the new arguments.
-  auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, SubstFnTy,
-                                      PAI->getSubstitutions(), Args,
-                                      PAI->getType());
+  auto *NewPAI = B.createPartialApply(
+      PAI->getLoc(), FnVal, PAI->getSubstitutions(), Args,
+      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
   PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
   if (FRI->use_empty()) {

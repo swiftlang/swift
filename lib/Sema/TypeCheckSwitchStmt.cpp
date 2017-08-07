@@ -19,6 +19,9 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Pattern.h"
 
+#include <llvm/ADT/APInt.h>
+#include <llvm/ADT/APFloat.h>
+
 #include <numeric>
 #include <forward_list>
 
@@ -27,11 +30,42 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckSwitchStmt"
 
 namespace {
+  struct DenseMapAPIntKeyInfo {
+    static inline APInt getEmptyKey() { return APInt(); }
+
+    static inline APInt getTombstoneKey() {
+      return APInt::getAllOnesValue(/*bitwidth*/1);
+    }
+
+    static unsigned getHashValue(const APInt &Key) {
+      return static_cast<unsigned>(hash_value(Key));
+    }
+
+    static bool isEqual(const APInt &LHS, const APInt &RHS) {
+      return LHS.getBitWidth() == RHS.getBitWidth() && LHS == RHS;
+    }
+  };
+
+  struct DenseMapAPFloatKeyInfo {
+    static inline APFloat getEmptyKey() { return APFloat(APFloat::Bogus(), 1); }
+    static inline APFloat getTombstoneKey() { return APFloat(APFloat::Bogus(), 2); }
+    
+    static unsigned getHashValue(const APFloat &Key) {
+      return static_cast<unsigned>(hash_value(Key));
+    }
+    
+    static bool isEqual(const APFloat &LHS, const APFloat &RHS) {
+      return LHS.bitwiseIsEqual(RHS);
+    }
+  };
+}
+
+namespace {
 
   /// The SpaceEngine encapsulates an algorithm for computing the exhaustiveness
   /// of a switch statement using an algebra of spaces described by Fengyun Liu
   /// and an algorithm for computing warnings for pattern matching by
-  //  Luc Maranget.
+  /// Luc Maranget.
   ///
   /// The main algorithm centers around the computation of the difference and
   /// the intersection of the "Spaces" given in each case, which reduces the
@@ -71,20 +105,82 @@ namespace {
     };
 
   #define PAIRCASE(XS, YS) case PairSwitch(XS, YS)
-
+    
     class Space final {
     private:
       SpaceKind Kind;
       llvm::PointerIntPair<Type, 1, bool> TypeAndVal;
+
+      // In type space, we reuse HEAD to help us print meaningful name, e.g.,
+      // tuple element name in fixits.
       Identifier Head;
       std::forward_list<Space> Spaces;
 
+      // NB: This constant is arbitrary.  Anecdotally, the Space Engine is
+      // capable of efficiently handling Spaces of around size 200, but it would
+      // potentially push an enormous fixit on the user.
+      static const size_t MAX_SPACE_SIZE = 128;
+
+      size_t computeSize(TypeChecker &TC,
+                         SmallPtrSetImpl<TypeBase *> &cache) const {
+        switch (getKind()) {
+        case SpaceKind::Empty:
+          return 0;
+        case SpaceKind::BooleanConstant:
+          return 1;
+        case SpaceKind::Type: {
+          if (!canDecompose(getType())) {
+            return 1;
+          }
+          cache.insert(getType().getPointer());
+
+          SmallVector<Space, 4> spaces;
+          decompose(TC, getType(), spaces);
+          size_t acc = 0;
+          for (auto &sp : spaces) {
+            // Decomposed pattern spaces grow with the sum of the subspaces.
+            acc += sp.computeSize(TC, cache);
+          }
+          
+          cache.erase(getType().getPointer());
+          return acc;
+        }
+        case SpaceKind::Constructor: {
+          size_t acc = 1;
+          for (auto &sp : getSpaces()) {
+            // Break self-recursive references among enum arguments.
+            if (sp.getKind() == SpaceKind::Type
+                  && cache.count(sp.getType().getPointer())) {
+              continue;
+            }
+            
+            // Constructor spaces grow with the product of their arguments.
+            acc *= sp.computeSize(TC, cache);
+          }
+          return acc;
+        }
+        case SpaceKind::Disjunct: {
+          size_t acc = 0;
+          for (auto &sp : getSpaces()) {
+            // Disjoint grow with the sum of the subspaces.
+            acc += sp.computeSize(TC, cache);
+          }
+          return acc;
+        }
+        }
+      }
+      
     public:
-      explicit Space(Type T)
-        : Kind(SpaceKind::Type), TypeAndVal(T, false), Head(Identifier()),
+      explicit Space(Type T, Identifier NameForPrinting)
+        : Kind(SpaceKind::Type), TypeAndVal(T, false), Head(NameForPrinting),
           Spaces({}){}
-      explicit Space(Type T, Identifier H, SmallVectorImpl<Space> &SP)
-        : Kind(SpaceKind::Constructor), TypeAndVal(T, false), Head(H),
+      explicit Space(Type T, Identifier H, bool downgrade,
+                     SmallVectorImpl<Space> &SP)
+        : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
+          Spaces(SP.begin(), SP.end()) {}
+      explicit Space(Type T, Identifier H, bool downgrade,
+                     const std::forward_list<Space> &SP)
+        : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
           Spaces(SP.begin(), SP.end()) {}
       explicit Space(SmallVectorImpl<Space> &SP)
         : Kind(SpaceKind::Disjunct), TypeAndVal(Type(), false),
@@ -100,7 +196,22 @@ namespace {
 
       void dump() const LLVM_ATTRIBUTE_USED;
 
+      size_t getSize(TypeChecker &TC) const {
+        SmallPtrSet<TypeBase *, 4> cache;
+        return computeSize(TC, cache);
+      }
+
+      static size_t getMaximumSize() {
+        return MAX_SPACE_SIZE;
+      }
+
       bool isEmpty() const { return getKind() == SpaceKind::Empty; }
+      
+      bool canDowngrade() const {
+        assert(getKind() == SpaceKind::Constructor
+               && "Wrong kind of space tried to access downgrade");
+        return TypeAndVal.getInt();
+      }
 
       Type getType() const {
         assert((getKind() == SpaceKind::Type
@@ -112,6 +223,12 @@ namespace {
       Identifier getHead() const {
         assert(getKind() == SpaceKind::Constructor
                && "Wrong kind of space tried to access head");
+        return Head;
+      }
+
+      Identifier getPrintingName() const {
+        assert(getKind() == SpaceKind::Type
+               && "Wrong kind of space tried to access printing name");
         return Head;
       }
 
@@ -248,9 +365,9 @@ namespace {
           if (this->Head.compare(other.Head) != 0) {
             return false;
           }
-
-          // Special Case: A constructor pattern may include the head but not
-          // the payload patterns.  In that case the space is covered.
+          
+          // Special Case: Short-circuit comparisons with payload-less
+          // constructors.
           if (other.getSpaces().empty()) {
             return true;
           }
@@ -310,145 +427,144 @@ namespace {
         };
 
         switch (PairSwitch(getKind(), other.getKind())) {
-          PAIRCASE (SpaceKind::Empty, SpaceKind::Disjunct):
-          PAIRCASE (SpaceKind::Type, SpaceKind::Disjunct):
-          PAIRCASE (SpaceKind::Constructor, SpaceKind::Disjunct):
-          PAIRCASE (SpaceKind::Disjunct, SpaceKind::Disjunct):
-          PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Disjunct): {
-            // S & (S1 || ... || Sn) iff (S & S1) && ... && (S & Sn)
-            SmallVector<Space, 4> intersectedCases;
-            std::transform(other.getSpaces().begin(), other.getSpaces().end(),
-                           std::back_inserter(intersectedCases),
-                           [&](const Space &s) {
-              return this->intersect(s, TC);
-            });
-            // Optimization: Remove all empty spaces.
-            SmallVector<Space, 4> filteredCases;
-            std::copy_if(intersectedCases.begin(), intersectedCases.end(),
-                         std::back_inserter(filteredCases),
+        PAIRCASE (SpaceKind::Empty, SpaceKind::Disjunct):
+        PAIRCASE (SpaceKind::Type, SpaceKind::Disjunct):
+        PAIRCASE (SpaceKind::Constructor, SpaceKind::Disjunct):
+        PAIRCASE (SpaceKind::Disjunct, SpaceKind::Disjunct):
+        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Disjunct): {
+          // S & (S1 || ... || Sn) iff (S & S1) && ... && (S & Sn)
+          SmallVector<Space, 4> intersectedCases;
+          std::transform(other.getSpaces().begin(), other.getSpaces().end(),
+                         std::back_inserter(intersectedCases),
                          [&](const Space &s) {
-              return !s.isEmpty();
-            });
-            return examineDecomp(filteredCases);
-          }
+            return this->intersect(s, TC);
+          });
+          // Optimization: Remove all empty spaces.
+          SmallVector<Space, 4> filteredCases;
+          std::copy_if(intersectedCases.begin(), intersectedCases.end(),
+                       std::back_inserter(filteredCases),
+                       [&](const Space &s) {
+            return !s.isEmpty();
+          });
+          return examineDecomp(filteredCases);
+        }
 
-          PAIRCASE (SpaceKind::Disjunct, SpaceKind::Empty):
-          PAIRCASE (SpaceKind::Disjunct, SpaceKind::Type):
-          PAIRCASE (SpaceKind::Disjunct, SpaceKind::Constructor):
-          PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant): {
-            // (S1 || ... || Sn) & S iff (S & S1) && ... && (S & Sn)
-            SmallVector<Space, 4> intersectedCases;
-            std::transform(this->getSpaces().begin(), this->getSpaces().end(),
-                           std::back_inserter(intersectedCases),
-                           [&](const Space &s) {
-              return s.intersect(other, TC);
-            });
-            // Optimization: Remove all empty spaces.
-            SmallVector<Space, 4> filteredCases;
-            std::copy_if(intersectedCases.begin(), intersectedCases.end(),
-                         std::back_inserter(filteredCases),
+        PAIRCASE (SpaceKind::Disjunct, SpaceKind::Empty):
+        PAIRCASE (SpaceKind::Disjunct, SpaceKind::Type):
+        PAIRCASE (SpaceKind::Disjunct, SpaceKind::Constructor):
+        PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant): {
+          // (S1 || ... || Sn) & S iff (S & S1) && ... && (S & Sn)
+          SmallVector<Space, 4> intersectedCases;
+          std::transform(this->getSpaces().begin(), this->getSpaces().end(),
+                         std::back_inserter(intersectedCases),
                          [&](const Space &s) {
-              return !s.isEmpty();
-            });
-            return examineDecomp(filteredCases);
+            return s.intersect(other, TC);
+          });
+          // Optimization: Remove all empty spaces.
+          SmallVector<Space, 4> filteredCases;
+          std::copy_if(intersectedCases.begin(), intersectedCases.end(),
+                       std::back_inserter(filteredCases),
+                       [&](const Space &s) {
+            return !s.isEmpty();
+          });
+          return examineDecomp(filteredCases);
+        }
+        PAIRCASE (SpaceKind::Type, SpaceKind::Type): {
+          // Optimization: The intersection of equal types is that type.
+          if (this->getType()->isEqual(other.getType())) {
+            return other;
+          } else if (canDecompose(this->getType())) {
+            SmallVector<Space, 4> spaces;
+            decompose(TC, this->getType(), spaces);
+            auto decomposition = examineDecomp(spaces);
+            return decomposition.intersect(other, TC);
+          } else if (canDecompose(other.getType())) {
+            SmallVector<Space, 4> spaces;
+            decompose(TC, other.getType(), spaces);
+            auto disjunctSp = examineDecomp(spaces);
+            return this->intersect(disjunctSp, TC);
+          } else {
+            return other;
           }
-          PAIRCASE (SpaceKind::Type, SpaceKind::Type): {
-            // Optimization: The intersection of equal types is that type.
-            if (this->getType()->isEqual(other.getType())) {
-              return other;
-            } else if (canDecompose(this->getType())) {
-              SmallVector<Space, 4> spaces;
-              decompose(TC, this->getType(), spaces);
-              auto decomposition = examineDecomp(spaces);
-              return decomposition.intersect(other, TC);
-            } else if (canDecompose(other.getType())) {
-              SmallVector<Space, 4> spaces;
-              decompose(TC, other.getType(), spaces);
-              auto disjunctSp = examineDecomp(spaces);
-              return this->intersect(disjunctSp, TC);
-            } else {
-              return other;
-            }
+        }
+        PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
+          if (canDecompose(this->getType())) {
+            SmallVector<Space, 4> spaces;
+            decompose(TC, this->getType(), spaces);
+            auto decomposition = examineDecomp(spaces);
+            return decomposition.intersect(other, TC);
+          } else {
+            return other;
           }
-          PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
-            if (canDecompose(this->getType())) {
-              SmallVector<Space, 4> spaces;
-              decompose(TC, this->getType(), spaces);
-              auto decomposition = examineDecomp(spaces);
-              return decomposition.intersect(other, TC);
-            } else {
-              return other;
-            }
-          }
-          PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
-            return *this;
+        }
+        PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
+          return *this;
             
-          PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
-            // Optimization: If the heads don't match, the intersection of
-            // the constructor spaces is empty.
-            if (this->getHead().compare(other.Head) != 0) {
+        PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
+          // Optimization: If the heads don't match, the intersection of
+          // the constructor spaces is empty.
+          if (this->getHead().compare(other.Head) != 0) {
+            return Space();
+          }
+          
+          // Special Case: Short circuit patterns without payloads.  Their
+          // intersection is the whole space.
+          if (other.getSpaces().empty()) {
+            return *this;
+          }
+
+          SmallVector<Space, 4> paramSpace;
+          auto i = this->getSpaces().begin();
+          auto j = other.getSpaces().begin();
+          for (; i != this->getSpaces().end() && j != other.getSpaces().end();
+               ++i, ++j) {
+            auto intersection = (*i).intersect(*j, TC);
+            if (intersection.simplify(TC).isEmpty()) {
               return Space();
             }
-
-            // Special Case: A constructor pattern may include the head but not
-            // the payload patterns.  In that case, the intersection is the
-            // whole original space.
-            if (other.getSpaces().empty()) {
-              return *this;
-            }
-
-            SmallVector<Space, 4> paramSpace;
-            auto i = this->getSpaces().begin();
-            auto j = other.getSpaces().begin();
-            for (; i != this->getSpaces().end() && j != other.getSpaces().end();
-                 ++i, ++j) {
-              auto intersection = (*i).intersect(*j, TC);
-              if (intersection.simplify(TC).isEmpty()) {
-                return Space();
-              }
-              paramSpace.push_back(intersection);
-            }
-
-            return examineDecomp(paramSpace);
+            paramSpace.push_back(intersection);
           }
 
-          PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::BooleanConstant):
-            return this->getBoolValue() == other.getBoolValue() ? *this : Space();
+          return examineDecomp(paramSpace);
+        }
 
-          PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Type): {
-            if (other.getType()->isBool()) {
-              return this->getKind() == SpaceKind::BooleanConstant ? *this : Space();
-            }
+        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::BooleanConstant):
+          return this->getBoolValue() == other.getBoolValue() ? *this : Space();
 
-            if (canDecompose(other.getType())) {
-              SmallVector<Space, 4> spaces;
-              decompose(TC, other.getType(), spaces);
-              auto disjunctSp = examineDecomp(spaces);
-              return this->intersect(disjunctSp, TC);
-            }
-            return Space();
-          }
-          PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Empty):
-          PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Constructor):
-            return Space();
-
-          PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
-            if (canDecompose(this->getType())) {
-              SmallVector<Space, 4> spaces;
-              decompose(TC, this->getType(), spaces);
-              auto disjunctSp = examineDecomp(spaces);
-              return disjunctSp.intersect(other, TC);
-            } else {
-              return Space();
-            }
+        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Type): {
+          if (other.getType()->isBool()) {
+            return this->getKind() == SpaceKind::BooleanConstant ? *this : Space();
           }
 
-          PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
-          PAIRCASE (SpaceKind::Constructor, SpaceKind::BooleanConstant):
-            return Space();
+          if (canDecompose(other.getType())) {
+            SmallVector<Space, 4> spaces;
+            decompose(TC, other.getType(), spaces);
+            auto disjunctSp = examineDecomp(spaces);
+            return this->intersect(disjunctSp, TC);
+          }
+          return Space();
+        }
+        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Empty):
+        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Constructor):
+          return Space();
 
-          default:
-            llvm_unreachable("Uncovered pair found while computing intersect?");
+        PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
+          if (canDecompose(this->getType())) {
+            SmallVector<Space, 4> spaces;
+            decompose(TC, this->getType(), spaces);
+            auto disjunctSp = examineDecomp(spaces);
+            return disjunctSp.intersect(other, TC);
+          } else {
+            return Space();
+          }
+        }
+
+        PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
+        PAIRCASE (SpaceKind::Constructor, SpaceKind::BooleanConstant):
+          return Space();
+
+        default:
+          llvm_unreachable("Uncovered pair found while computing intersect?");
         }
       }
 
@@ -537,13 +653,12 @@ namespace {
             return *this;
           }
 
-          // Special Case: A constructor pattern may include the head but not
-          // the payload patterns.  In that case, because the heads match, it
-          // covers the whole space.
+          // Special Case: Short circuit patterns without payloads.  Their
+          // difference is empty.
           if (other.getSpaces().empty()) {
             return Space();
           }
-
+          
           SmallVector<Space, 4> constrSpaces;
           bool foundBad = false;
           auto i = this->getSpaces().begin();
@@ -570,7 +685,8 @@ namespace {
             SmallVector<Space, 4> copyParams(this->getSpaces().begin(),
                                              this->getSpaces().end());
             copyParams[idx] = s1.minus(s2, TC);
-            Space CS(this->getType(), this->Head, copyParams);
+            Space CS(this->getType(), this->getHead(), this->canDowngrade(),
+                     copyParams);
             constrSpaces.push_back(CS);
           }
 
@@ -677,7 +793,11 @@ namespace {
           if (!forDisplay) {
             getType()->print(buffer);
           }
-          buffer << "_";
+          Identifier Name = getPrintingName();
+          if (Name.empty())
+            buffer << "_";
+          else
+            buffer << tok::kw_let << " " << Name.str();
           break;
         }
       }
@@ -706,7 +826,7 @@ namespace {
               return Space();
             }
           }
-          return Space(getType(), Head, simplifiedSpaces);
+          return Space(getType(), Head, canDowngrade(), simplifiedSpaces);
         }
         case SpaceKind::Type: {
           // If the decomposition of a space is empty, the space is empty.
@@ -792,13 +912,17 @@ namespace {
                                TTy->getElements().end(),
                                std::back_inserter(constElemSpaces),
                                [&](TupleTypeElt ty){
-                                 return Space(ty.getType());
+                                 return Space(ty.getType(), ty.getName());
                                });
               } else if (auto *TTy = dyn_cast<ParenType>(eedTy.getPointer())) {
-                constElemSpaces.push_back(Space(TTy->getUnderlyingType()));
+                constElemSpaces.push_back(Space(TTy->getUnderlyingType(),
+                                                Identifier()));
               }
             }
-            return Space(tp, eed->getName(), constElemSpaces);
+            return Space(tp, eed->getName(),
+                         eed->getAttrs()
+                          .getAttribute<DowngradeExhaustivityCheckAttr>(),
+                         constElemSpaces);
           });
         } else if (auto *TTy = tp->castTo<TupleType>()) {
           // Decompose each of the elements into its component type space.
@@ -806,10 +930,11 @@ namespace {
           std::transform(TTy->getElements().begin(), TTy->getElements().end(),
                          std::back_inserter(constElemSpaces),
                          [&](TupleTypeElt ty){
-            return Space(ty.getType());
+            return Space(ty.getType(), ty.getName());
           });
           // Create an empty constructor head for the tuple space.
-          arr.push_back(Space(tp, Identifier(), constElemSpaces));
+          arr.push_back(Space(tp, Identifier(), /*canDowngrade*/false,
+                              constElemSpaces));
         } else {
           llvm_unreachable("Can't decompose type?");
         }
@@ -823,22 +948,84 @@ namespace {
 
     TypeChecker &TC;
     SwitchStmt *Switch;
-
+    llvm::DenseMap<APInt, Expr *, ::DenseMapAPIntKeyInfo> IntLiteralCache;
+    llvm::DenseMap<APFloat, Expr *, ::DenseMapAPFloatKeyInfo> FloatLiteralCache;
+    llvm::DenseMap<StringRef, Expr *> StringLiteralCache;
+    
     SpaceEngine(TypeChecker &C, SwitchStmt *SS) : TC(C), Switch(SS) {}
 
+    bool checkRedundantLiteral(const Pattern *Pat, Expr *&PrevPattern) {
+      if (Pat->getKind() != PatternKind::Expr) {
+          return false;
+      }
+      auto *ExprPat = cast<ExprPattern>(Pat);
+      auto *MatchExpr = ExprPat->getSubExpr();
+      if (!MatchExpr || !isa<LiteralExpr>(MatchExpr)) {
+          return false;
+      }
+      auto *EL = cast<LiteralExpr>(MatchExpr);
+      switch (EL->getKind()) {
+      case ExprKind::StringLiteral: {
+        auto *SLE = cast<StringLiteralExpr>(EL);
+        auto cacheVal =
+            StringLiteralCache.insert({SLE->getValue(), SLE});
+        PrevPattern = (cacheVal.first != StringLiteralCache.end())
+                    ? cacheVal.first->getSecond()
+                    : nullptr;
+        return !cacheVal.second;
+      }
+      case ExprKind::IntegerLiteral: {
+        // FIXME: The magic number 128 is bad and we should actually figure out
+        // the bitwidth.  But it's too early in Sema to get it.
+        auto *ILE = cast<IntegerLiteralExpr>(EL);
+        auto cacheVal =
+            IntLiteralCache.insert(
+                {ILE->getValue(ILE->getDigitsText(), 128, ILE->isNegative()), ILE});
+        PrevPattern = (cacheVal.first != IntLiteralCache.end())
+                    ? cacheVal.first->getSecond()
+                    : nullptr;
+        return !cacheVal.second;
+      }
+      case ExprKind::FloatLiteral: {
+        // FIXME: Pessimistically using IEEEquad here is bad and we should
+        // actually figure out the bitwidth.  But it's too early in Sema.
+        auto *FLE = cast<FloatLiteralExpr>(EL);
+        auto cacheVal =
+            FloatLiteralCache.insert(
+                   {FLE->getValue(FLE->getDigitsText(),
+                                  APFloat::IEEEquad(), FLE->isNegative()), FLE});
+        PrevPattern = (cacheVal.first != FloatLiteralCache.end())
+                    ? cacheVal.first->getSecond()
+                    : nullptr;
+        return !cacheVal.second;
+      }
+      default:
+        return false;
+      }
+    }
+    
     void checkExhaustiveness(bool limitedChecking) {
+      // If the type of the scrutinee is uninhabited, we're already dead.
+      // Allow any well-typed patterns through.
+      auto subjectType = Switch->getSubjectExpr()->getType();
+      if (subjectType && subjectType->isStructurallyUninhabited()) {
+        return;
+      }
+      
       if (limitedChecking) {
         // Reject switch statements with empty blocks.
-        if (Switch->getCases().empty())
+        if (Switch->getCases().empty()) {
           SpaceEngine::diagnoseMissingCases(TC, Switch,
                                             /*justNeedsDefault*/true,
                                             SpaceEngine::Space());
+        }
         return;
       }
 
+      bool sawDowngradablePattern = false;
+      bool sawRedundantPattern = false;
       SmallVector<Space, 4> spaces;
-      for (unsigned i = 0, e = Switch->getCases().size(); i < e; ++i) {
-        auto *caseBlock = Switch->getCases()[i];
+      for (auto *caseBlock : Switch->getCases()) {
         for (auto &caseItem : caseBlock->getCaseLabelItems()) {
           // 'where'-clauses on cases mean the case does not contribute to
           // the exhaustiveness of the pattern.
@@ -849,19 +1036,50 @@ namespace {
           if (caseItem.isDefault())
             return;
 
-          auto projection = projectPattern(TC, caseItem.getPattern());
+          auto projection = projectPattern(TC, caseItem.getPattern(),
+                                           sawDowngradablePattern);
           if (projection.isUseful()
                 && projection.isSubspace(Space(spaces), TC)) {
+            sawRedundantPattern |= true;
+
             TC.diagnose(caseItem.getStartLoc(),
                           diag::redundant_particular_case)
               .highlight(caseItem.getSourceRange());
+          } else {
+            Expr *cachedExpr = nullptr;
+            if (checkRedundantLiteral(caseItem.getPattern(), cachedExpr)) {
+              assert(cachedExpr && "Cache found hit but no expr?");
+              TC.diagnose(caseItem.getStartLoc(),
+                          diag::redundant_particular_literal_case)
+                .highlight(caseItem.getSourceRange());
+              TC.diagnose(cachedExpr->getLoc(),
+                          diag::redundant_particular_literal_case_here)
+                .highlight(cachedExpr->getSourceRange());
+            }
           }
           spaces.push_back(projection);
         }
       }
-
-      Space totalSpace(Switch->getSubjectExpr()->getType());
+      
+      Space totalSpace(subjectType, Identifier());
       Space coveredSpace(spaces);
+      size_t totalSpaceSize = totalSpace.getSize(TC);
+      if (totalSpaceSize > Space::getMaximumSize()) {
+        // Because the space is large, we have to extend the size
+        // heuristic to compensate for actually exhaustively pattern matching
+        // over enormous spaces.  In this case, if the covered space covers
+        // as much as the total space, and there were no duplicates, then we
+        // can assume the user did the right thing and that they don't need
+        // a 'default' to be inserted.
+        if (!sawRedundantPattern
+            && coveredSpace.getSize(TC) >= totalSpaceSize) {
+          return;
+        }
+
+        diagnoseMissingCases(TC, Switch, /*justNeedsDefault*/true, Space());
+        return;
+      }
+      
       auto uncovered = totalSpace.minus(coveredSpace, TC).simplify(TC);
       if (uncovered.isEmpty()) {
         return;
@@ -889,43 +1107,81 @@ namespace {
         uncovered = Space(spaces);
       }
 
-      diagnoseMissingCases(TC, Switch, /*justNeedsDefault*/ false, uncovered);
+      diagnoseMissingCases(TC, Switch, /*justNeedsDefault*/ false, uncovered,
+                           sawDowngradablePattern);
+    }
+    
+    // HACK: Search the space for any remaining cases that were labelled
+    // @_downgrade_exhaustivity_check.
+    static bool shouldDowngradeToWarning(const Space &masterSpace) {
+      switch (masterSpace.getKind()) {
+      case SpaceKind::Type:
+      case SpaceKind::BooleanConstant:
+      case SpaceKind::Empty:
+        return false;
+      // Traverse the constructor and its subspaces.
+      case SpaceKind::Constructor:
+        return masterSpace.canDowngrade()
+            || std::accumulate(masterSpace.getSpaces().begin(),
+                               masterSpace.getSpaces().end(),
+                              false,
+                              [](bool acc, const Space &space) {
+          return acc || shouldDowngradeToWarning(space);
+        });
+      case SpaceKind::Disjunct:
+        // Traverse the disjunct's subspaces.
+        return std::accumulate(masterSpace.getSpaces().begin(),
+                               masterSpace.getSpaces().end(),
+                               false,
+                               [](bool acc, const Space &space) {
+                                 return acc || shouldDowngradeToWarning(space);
+                               });
+      }
     }
 
-    static void diagnoseMissingCases(TypeChecker &TC, const SwitchStmt *Switch,
-                                     bool JustNeedsDefault,
-                                     SpaceEngine::Space uncovered) {
-      bool Empty = Switch->getCases().empty();
-      SourceLoc StartLoc = Switch->getStartLoc();
-      SourceLoc EndLoc = Switch->getEndLoc();
-      StringRef Placeholder = getCodePlaceholder();
-      llvm::SmallString<128> Buffer;
-      llvm::raw_svector_ostream OS(Buffer);
+    static void diagnoseMissingCases(TypeChecker &TC, const SwitchStmt *SS,
+                                     bool justNeedsDefault,
+                                     Space uncovered,
+                                     bool sawDowngradablePattern = false) {
+      SourceLoc startLoc = SS->getStartLoc();
+      SourceLoc endLoc = SS->getEndLoc();
+      StringRef placeholder = getCodePlaceholder();
+      llvm::SmallString<128> buffer;
+      llvm::raw_svector_ostream OS(buffer);
 
       bool InEditor = TC.Context.LangOpts.DiagnosticsEditorMode;
 
-      if (JustNeedsDefault) {
-        OS << tok::kw_default << ": " << Placeholder << "\n";
-        if (Empty) {
-          TC.Context.Diags.diagnose(StartLoc, diag::empty_switch_stmt)
-             .fixItInsert(EndLoc, Buffer.str());
+      if (justNeedsDefault) {
+        OS << tok::kw_default << ":\n" << placeholder << "\n";
+        if (SS->getCases().empty()) {
+          TC.Context.Diags.diagnose(startLoc, diag::empty_switch_stmt)
+             .fixItInsert(endLoc, buffer.str());
         } else {
-          TC.Context.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
-          TC.Context.Diags.diagnose(StartLoc, diag::missing_several_cases,
-                                    uncovered.isEmpty()).fixItInsert(EndLoc,
-                                                              Buffer.str());
+          TC.Context.Diags.diagnose(startLoc, diag::non_exhaustive_switch);
+          TC.Context.Diags.diagnose(startLoc, diag::missing_several_cases,
+                                    uncovered.isEmpty()).fixItInsert(endLoc,
+                                                              buffer.str());
         }
         return;
       }
 
       // If there's nothing else to diagnose, bail.
       if (uncovered.isEmpty()) return;
-
+      
+      auto mainDiagType = diag::non_exhaustive_switch;
+      if (TC.Context.isSwiftVersion3()) {
+        if (!sawDowngradablePattern && shouldDowngradeToWarning(uncovered)) {
+          mainDiagType = diag::non_exhaustive_switch_warn_swift3;
+        }
+      }
+      
       // If editing is enabled, emit a formatted error of the form:
       //
       // switch must be exhaustive, do you want to add missing cases?
-      //     case (.none, .some(_)): <#code#>
-      //     case (.some(_), .none): <#code#>
+      //     case (.none, .some(_)):
+      //       <#code#>
+      //     case (.some(_), .none):
+      //       <#code#>
       //
       // else:
       //
@@ -934,31 +1190,44 @@ namespace {
       // missing case '(.none, .some(_))'
       // missing case '(.some(_), .none)'
       if (InEditor) {
-        Buffer.clear();
+        buffer.clear();
+        SmallVector<Space, 8> emittedSpaces;
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
           SmallVector<Space, 4> flats;
           flatten(uncoveredSpace, flats);
           for (auto &flat : flats) {
+            if (flat.isSubspace(Space(emittedSpaces), TC)) {
+              continue;
+            }
+            
             OS << tok::kw_case << " ";
             flat.show(OS);
-            OS << ": " << Placeholder << "\n";
+            OS << ":\n" << placeholder << "\n";
+            
+            emittedSpaces.push_back(flat);
           }
         }
 
-        TC.Context.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
-        TC.Context.Diags.diagnose(StartLoc, diag::missing_several_cases, false)
-          .fixItInsert(EndLoc, Buffer.str());
+        TC.diagnose(startLoc, mainDiagType);
+        TC.diagnose(startLoc, diag::missing_several_cases, false)
+          .fixItInsert(endLoc, buffer.str());
       } else {
-        TC.Context.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
+        TC.Context.Diags.diagnose(startLoc, mainDiagType);
 
+        SmallVector<Space, 8> emittedSpaces;
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
           SmallVector<Space, 4> flats;
           flatten(uncoveredSpace, flats);
           for (auto &flat : flats) {
-            Buffer.clear();
+            if (flat.isSubspace(Space(emittedSpaces), TC)) {
+              continue;
+            }
+            
+            buffer.clear();
             flat.show(OS);
-            TC.Context.Diags.diagnose(StartLoc, diag::missing_particular_case,
-                               Buffer.str());
+            TC.diagnose(startLoc, diag::missing_particular_case, buffer.str());
+            
+            emittedSpaces.push_back(flat);
           }
         }
       }
@@ -978,7 +1247,7 @@ namespace {
           flats.push_back(space);
           return;
         }
-
+        
         // To recursively recover a pattern matrix from a bunch of disjuncts:
         // 1) Unpack the arguments to the constructor under scrutiny.
         // 2) Traverse each argument in turn.
@@ -994,17 +1263,13 @@ namespace {
           SmallVector<Space, 4> columnVect;
           flatten(subspace, columnVect);
 
-          // Pattern matrices grow quasi-factorially in the size of the
-          // input space.
-          multiplier *= columnVect.size();
-
           size_t startSize = matrix.size();
           if (!matrix.empty() && columnVect.size() > 1) {
             size_t oldCount = matrix.size();
-            matrix.reserve(multiplier * oldCount);
+            matrix.reserve(oldCount * columnVect.size());
             // Indexing starts at 1, we already have 'startSize'-many elements
             // in the matrix; multiplies by 1 are no-ops.
-            for (size_t i = 1; i < multiplier; ++i) {
+            for (size_t i = 1; i < columnVect.size(); ++i) {
               std::copy_n(matrix.begin(), oldCount, std::back_inserter(matrix));
             }
           }
@@ -1039,11 +1304,16 @@ namespace {
               matrix[rowIdx].push_back(columnVect[colIdx]);
             }
           }
+          
+          // Pattern matrices grow quasi-factorially in the size of the
+          // input space.
+          multiplier *= columnVect.size();
         }
 
         // Wrap the matrix rows into this constructor.
         for (auto &row : matrix) {
-          flats.push_back(Space(space.getType(), space.getHead(), row));
+          flats.push_back(Space(space.getType(), space.getHead(),
+                                space.canDowngrade(), row));
         }
       }
         break;
@@ -1062,14 +1332,15 @@ namespace {
     }
 
     // Recursively project a pattern into a Space.
-    static Space projectPattern(TypeChecker &TC, const Pattern *item) {
+    static Space projectPattern(TypeChecker &TC, const Pattern *item,
+                                bool &sawDowngradablePattern) {
       switch (item->getKind()) {
       case PatternKind::Any:
+        return Space(item->getType(), Identifier());
       case PatternKind::Named:
-        return Space(item->getType());
+        return Space(item->getType(), cast<NamedPattern>(item)->getBoundName());
       case PatternKind::Bool: {
-        auto *BP = cast<BoolPattern>(item);
-        return Space(BP->getValue());
+        return Space(cast<BoolPattern>(item)->getValue());
       }
       case PatternKind::Is: {
         auto *IP = cast<IsPattern>(item);
@@ -1079,7 +1350,7 @@ namespace {
           // These coercions are irrefutable.  Project with the original type
           // instead of the cast's target type to maintain consistency with the
           // scrutinee's type.
-          return Space(IP->getType());
+          return Space(IP->getType(), Identifier());
         case CheckedCastKind::Unresolved:
         case CheckedCastKind::ValueCast:
         case CheckedCastKind::ArrayDowncast:
@@ -1094,28 +1365,48 @@ namespace {
         return Space();
       case PatternKind::Var: {
         auto *VP = cast<VarPattern>(item);
-        return projectPattern(TC, VP->getSubPattern());
+        return projectPattern(TC, VP->getSubPattern(), sawDowngradablePattern);
       }
       case PatternKind::Paren: {
         auto *PP = cast<ParenPattern>(item);
-        return projectPattern(TC, PP->getSubPattern());
+        return projectPattern(TC, PP->getSubPattern(), sawDowngradablePattern);
       }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
+        auto subSpace = projectPattern(TC, OSP->getSubPattern(),
+                                       sawDowngradablePattern);
+        // To match patterns like (_, _, ...)?, we must rewrite the underlying
+        // tuple pattern to .some(_, _, ...) first.
+        if (subSpace.getKind() == SpaceKind::Constructor
+            && subSpace.getHead().empty()) {
+          return Space(item->getType(), TC.Context.getIdentifier("some"),
+                       /*canDowngrade*/false, subSpace.getSpaces());
+        }
         SmallVector<Space, 1> payload = {
-          projectPattern(TC, OSP->getSubPattern())
+          projectPattern(TC, OSP->getSubPattern(), sawDowngradablePattern)
         };
-        return Space(item->getType(), TC.Context.getIdentifier("some"), payload);
+        return Space(item->getType(), TC.Context.getIdentifier("some"),
+                     /*canDowngrade*/false, payload);
       }
       case PatternKind::EnumElement: {
         auto *VP = cast<EnumElementPattern>(item);
         TC.validateDecl(item->getType()->getEnumOrBoundGenericEnum());
+        
+        bool canDowngrade = false;
+        if (auto *eed = VP->getElementDecl()) {
+          if (eed->getAttrs().getAttribute<DowngradeExhaustivityCheckAttr>()) {
+            canDowngrade |= true;
+            sawDowngradablePattern |= true;
+          }
+        }
+        
         SmallVector<Space, 4> conArgSpace;
         auto *SP = VP->getSubPattern();
         if (!SP) {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
-          return Space(item->getType(), VP->getName(), conArgSpace);
+          return Space(item->getType(), VP->getName(), canDowngrade,
+                       conArgSpace);
         }
 
         switch (SP->getKind()) {
@@ -1124,9 +1415,11 @@ namespace {
           std::transform(TP->getElements().begin(), TP->getElements().end(),
                          std::back_inserter(conArgSpace),
                          [&](TuplePatternElt pate) {
-                           return projectPattern(TC, pate.getPattern());
+                           return projectPattern(TC, pate.getPattern(),
+                                                 sawDowngradablePattern);
                          });
-          return Space(item->getType(), VP->getName(), conArgSpace);
+          return Space(item->getType(), VP->getName(), /*canDowngrade*/false,
+                       conArgSpace);
         }
         case PatternKind::Paren: {
           auto *PP = dyn_cast<ParenPattern>(SP);
@@ -1135,23 +1428,31 @@ namespace {
           // Special Case: A constructor pattern may have all of its payload
           // matched by a single var pattern.  Project it like the tuple it
           // really is.
+          //
+          // FIXME: SE-0155 makes this case unreachable.
           if (SP->getKind() == PatternKind::Named
               || SP->getKind() == PatternKind::Any
               || SP->getKind() == PatternKind::Tuple) {
             if (auto *TTy = SP->getType()->getAs<TupleType>()) {
               for (auto ty : TTy->getElements()) {
-                conArgSpace.push_back(Space(ty.getType()));
+                conArgSpace.push_back(Space(ty.getType(), ty.getName()));
               }
             } else {
-              conArgSpace.push_back(projectPattern(TC, SP));
+              conArgSpace.push_back(projectPattern(TC, SP,
+                                                   sawDowngradablePattern));
             }
           } else {
-            conArgSpace.push_back(projectPattern(TC, SP));
+            conArgSpace.push_back(projectPattern(TC, SP,
+                                                 sawDowngradablePattern));
           }
-          return Space(item->getType(), VP->getName(), conArgSpace);
+          // FIXME: This isn't *technically* correct, but we only use the
+          // downgradability of the master space, not the projected space,
+          // when reconstructing the missing pattern matrix.
+          return Space(item->getType(), VP->getName(), /*canDowngrade*/false,
+                       conArgSpace);
         }
         default:
-          return projectPattern(TC, SP);
+          return projectPattern(TC, SP, sawDowngradablePattern);
         }
       }
       case PatternKind::Tuple: {
@@ -1160,9 +1461,10 @@ namespace {
         std::transform(TP->getElements().begin(), TP->getElements().end(),
                        std::back_inserter(conArgSpace),
                        [&](TuplePatternElt pate) {
-          return projectPattern(TC, pate.getPattern());
+          return projectPattern(TC, pate.getPattern(), sawDowngradablePattern);
         });
-        return Space(item->getType(), Identifier(), conArgSpace);
+        return Space(item->getType(), Identifier(), /*canDowngrade*/false,
+                     conArgSpace);
       }
       }
     }

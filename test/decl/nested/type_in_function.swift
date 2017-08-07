@@ -96,7 +96,7 @@ class OuterGenericClass<T> {
 
 // Name lookup within local classes.
 func f5<T, U>(x: T, y: U) {
-  struct Local { // expected-error {{type 'Local' cannot be nested in generic function 'f5'}}
+  struct Local { // expected-error {{type 'Local' cannot be nested in generic function 'f5(x:y:)'}}
     func f() {
       _ = 17 as T // expected-error{{'Int' is not convertible to 'T'}} {{14-16=as!}}
       _ = 17 as U // okay: refers to 'U' declared within the local class
@@ -110,7 +110,7 @@ struct OuterGenericStruct<A> {
   class MiddleNonGenericClass {
     func nonGenericFunction() {
       class InnerGenericClass<T> : MiddleNonGenericClass {
-      // expected-error@-1 {{type 'InnerGenericClass' cannot be nested in generic function 'nonGenericFunction'}}
+      // expected-error@-1 {{type 'InnerGenericClass' cannot be nested in generic function 'nonGenericFunction()'}}
         override init() { super.init() }
       }
     }
@@ -118,7 +118,7 @@ struct OuterGenericStruct<A> {
 
   func middleFunction() {
     struct ConformingType : Racoon {
-    // expected-error@-1 {{type 'ConformingType' cannot be nested in generic function 'middleFunction'}}
+    // expected-error@-1 {{type 'ConformingType' cannot be nested in generic function 'middleFunction()'}}
       typealias Stripes = A
     }
   }
@@ -127,9 +127,9 @@ struct OuterGenericStruct<A> {
 // Issue with diagnoseUnknownType().
 func genericFunction<T>(t: T) {
   class First : Second<T>.UnknownType { }
-  // expected-error@-1 {{type 'First' cannot be nested in generic function 'genericFunction'}}
+  // expected-error@-1 {{type 'First' cannot be nested in generic function 'genericFunction(t:)'}}
   class Second<T> : Second { }
-  // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction'}}
+  // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction(t:)'}}
   // expected-error@-2 2 {{circular class inheritance Second}}
 }
 

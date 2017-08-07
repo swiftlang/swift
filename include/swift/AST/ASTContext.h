@@ -425,6 +425,10 @@ public:
 
   /// Retrieve the declaration of Foundation.NSError.
   ClassDecl *getNSErrorDecl() const;
+  /// Retrieve the declaration of Foundation.NSNumber.
+  ClassDecl *getNSNumberDecl() const;
+  /// Retrieve the declaration of Foundation.NSValue.
+  ClassDecl *getNSValueDecl() const;
 
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \
@@ -486,6 +490,11 @@ public:
   /// library or Cocoa framework types that is known to be bridged by another
   /// module's overlay, for layering or implementation detail reasons.
   bool isTypeBridgedInExternalModule(NominalTypeDecl *nominal) const;
+
+  /// True if the given type is an Objective-C class that serves as the bridged
+  /// object type for many Swift value types, meaning that the conversion from
+  /// an object to a value is a conditional cast.
+  bool isObjCClassWithMultipleSwiftBridgedTypes(Type t);
 
   /// Get the Objective-C type that a Swift type bridges to, if any.
   /// 
@@ -837,8 +846,9 @@ public:
   /// Retrieve or create the canonical generic environment of a canonical
   /// generic signature builder.
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                                     GenericSignatureBuilder *builder,
-                                                     ModuleDecl &module);
+                                       GenericSignatureBuilder *builder,
+                                       GenericSignature *sig,
+                                       ModuleDecl &module);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,

@@ -6,7 +6,7 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
-// CHECK: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
 // CHECK: inject_enum_addr
 // CHECK-NOT: select_enum_addr
 // CHECK-NOT: bb1
@@ -42,7 +42,7 @@ bb2:
 
 
 // CHECK-LABEL: sil  @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
-// CHECK: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
 // CHECK: inject_enum_addr
 // CHECK-NOT: switch_enum_addr
 // CHECK-NOT: bb1

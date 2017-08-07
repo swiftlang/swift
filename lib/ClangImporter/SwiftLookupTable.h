@@ -39,9 +39,108 @@ namespace clang {
 class NamedDecl;
 class DeclContext;
 class MacroInfo;
+class ModuleMacro;
 class ObjCCategoryDecl;
 class TypedefNameDecl;
 }
+
+namespace swift {
+
+/// A name from a SwiftLookupTable that has not been deserialized into a
+/// DeclBaseName yet.
+struct SerializedSwiftName {
+  /// The kind of the name if it is a special name
+  DeclBaseName::Kind Kind;
+  /// The name of the identifier if it is not a special name
+  StringRef Name;
+
+  SerializedSwiftName() : Kind(DeclBaseName::Kind::Normal), Name(StringRef()) {}
+
+  explicit SerializedSwiftName(DeclBaseName::Kind Kind)
+      : Kind(Kind), Name(StringRef()) {}
+
+  explicit SerializedSwiftName(StringRef Name)
+      : Kind(DeclBaseName::Kind::Normal), Name(Name) {}
+
+  SerializedSwiftName(DeclBaseName BaseName) {
+    Kind = BaseName.getKind();
+    if (BaseName.getKind() == DeclBaseName::Kind::Normal) {
+      Name = BaseName.getIdentifier().str();
+    }
+  }
+
+  /// Deserialize the name, adding it to the context's identifier table
+  DeclBaseName toDeclBaseName(ASTContext &Context) const;
+
+  bool empty() const {
+    return Kind == DeclBaseName::Kind::Normal && Name.empty();
+  }
+
+  /// Return a string representation of the name that can be used for sorting
+  StringRef userFacingName() const {
+    switch (Kind) {
+    case DeclBaseName::Kind::Normal:
+      return Name;
+    case DeclBaseName::Kind::Subscript:
+      return "subscript";
+    case DeclBaseName::Kind::Destructor:
+      return "deinit";
+    }
+  }
+
+  bool operator<(SerializedSwiftName RHS) const {
+    return userFacingName() < RHS.userFacingName();
+  }
+
+  bool operator==(SerializedSwiftName RHS) const {
+    if (Kind != RHS.Kind)
+      return false;
+
+    if (Kind == DeclBaseName::Kind::Normal) {
+      assert(RHS.Kind == DeclBaseName::Kind::Normal);
+      return Name == RHS.Name;
+    } else {
+      return true;
+    }
+  }
+};
+
+} // end namespace swift
+
+namespace llvm {
+
+using swift::SerializedSwiftName;
+
+// Inherit the DenseMapInfo from StringRef but add a few special cases for
+// special names
+template<> struct DenseMapInfo<SerializedSwiftName> {
+  static SerializedSwiftName getEmptyKey() {
+    return SerializedSwiftName(DenseMapInfo<StringRef>::getEmptyKey());
+  }
+  static SerializedSwiftName getTombstoneKey() {
+    return SerializedSwiftName(DenseMapInfo<StringRef>::getTombstoneKey());
+  }
+  static unsigned getHashValue(SerializedSwiftName Val) {
+    if (Val.Kind == swift::DeclBaseName::Kind::Normal) {
+      return DenseMapInfo<StringRef>::getHashValue(Val.Name);
+    } else {
+      return (unsigned)Val.Kind;
+    }
+  }
+  static bool isEqual(SerializedSwiftName LHS, SerializedSwiftName RHS) {
+    if (LHS.Kind != RHS.Kind)
+      return false;
+
+    if (LHS.Kind == swift::DeclBaseName::Kind::Normal) {
+      assert(RHS.Kind == swift::DeclBaseName::Kind::Normal);
+      return DenseMapInfo<StringRef>::isEqual(LHS.Name, RHS.Name);
+    } else {
+      return LHS.Kind == RHS.Kind;
+    }
+  }
+};
+
+} // end namespace llvm
 
 namespace swift {
 
@@ -56,10 +155,10 @@ namespace swift {
 /// Swift name, this will be recorded as
 class EffectiveClangContext {
 public:
-  enum Kind {
+  enum Kind : uint8_t {
     DeclContext,
     TypedefContext,
-    UnresolvedContext,
+    UnresolvedContext, // must be last
   };
 
 private:
@@ -70,15 +169,19 @@ private:
       const char *Data;
     } Unresolved;
   };
-  Kind TheKind;
-  unsigned UnresolvedLength;
-  
+
+  /// If KindOrBiasedLength < Kind::UnresolvedContext, this represents a Kind.
+  /// Otherwise it's (uintptr_t)Kind::UnresolvedContext plus the length of
+  /// Unresolved.Data.
+  uintptr_t KindOrBiasedLength;
+
 public:
-  EffectiveClangContext() : TheKind(DeclContext) {
+  EffectiveClangContext() : KindOrBiasedLength(DeclContext) {
     DC = nullptr;
   }
 
-  EffectiveClangContext(const clang::DeclContext *dc) : TheKind(DeclContext) {
+  EffectiveClangContext(const clang::DeclContext *dc)
+      : KindOrBiasedLength(DeclContext) {
     assert(dc != nullptr && "use null constructor instead");
     if (auto tagDecl = dyn_cast<clang::TagDecl>(dc)) {
       DC = tagDecl->getCanonicalDecl();
@@ -99,14 +202,13 @@ public:
   }
 
   EffectiveClangContext(const clang::TypedefNameDecl *typedefName)
-    : TheKind(TypedefContext)
-  {
+    : KindOrBiasedLength(TypedefContext) {
     Typedef = typedefName->getCanonicalDecl();
   }
 
-  EffectiveClangContext(StringRef unresolved) : TheKind(UnresolvedContext) {
+  EffectiveClangContext(StringRef unresolved)
+      : KindOrBiasedLength(UnresolvedContext + unresolved.size()) {
     Unresolved.Data = unresolved.data();
-    UnresolvedLength = unresolved.size();
   }
 
   /// Determine whether this effective Clang context was set.
@@ -115,7 +217,12 @@ public:
   }
 
   /// Determine the kind of effective Clang context.
-  Kind getKind() const { return TheKind; }
+  Kind getKind() const {
+    if (KindOrBiasedLength >= UnresolvedContext)
+      return UnresolvedContext;
+    return static_cast<Kind>(KindOrBiasedLength);
+
+  }
 
   /// Retrieve the declaration context.
   const clang::DeclContext *getAsDeclContext() const {
@@ -131,17 +238,26 @@ public:
   /// Retrieve the unresolved context name.
   StringRef getUnresolvedName() const {
     assert(getKind() == UnresolvedContext);
-    return StringRef(Unresolved.Data, UnresolvedLength);
+    return StringRef(Unresolved.Data, KindOrBiasedLength - UnresolvedContext);
+  }
+
+  /// Compares two EffectiveClangContexts without resolving unresolved names.
+  bool equalsWithoutResolving(const EffectiveClangContext &other) const {
+    if (getKind() != other.getKind())
+      return false;
+    switch (getKind()) {
+    case DeclContext:
+      return DC == other.DC;
+    case TypedefContext:
+      return Typedef == other.Typedef;
+    case UnresolvedContext:
+      return getUnresolvedName() == other.getUnresolvedName();
+    }
   }
 };
 
-#if LLVM_PTR_SIZE == 4
-static_assert(sizeof(EffectiveClangContext) <= 4 * sizeof(void *),
-              "should fit in four pointers");
-#else
 static_assert(sizeof(EffectiveClangContext) <= 2 * sizeof(void *),
-              "should fit in a couple pointers");
-#endif
+              "should be small");
 
 class SwiftLookupTableReader;
 class SwiftLookupTableWriter;
@@ -153,7 +269,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 14; // Swift 2 names
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 15; // Special names
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -187,7 +303,8 @@ public:
   static bool contextRequiresName(ContextKind kind);
 
   /// A single entry referencing either a named declaration or a macro.
-  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *>
+  typedef llvm::PointerUnion3<clang::NamedDecl *, clang::MacroInfo *, 
+                              clang::ModuleMacro *>
     SingleEntry;
 
   /// A stored version of the context of an entity, which is Clang
@@ -207,73 +324,64 @@ public:
     /// The low bit indicates whether we have a declaration or macro
     /// (declaration = unset, macro = set) and the second lowest bit
     /// indicates whether we have a serialization ID (set = DeclID or
-    /// MacroID, as appropriate) vs. a pointer (unset,
-    /// clang::NamedDecl * or clang::MacroInfo *). In the ID case, the
-    /// upper N-2 bits are the ID value; in the pointer case, the
-    /// lower two bits will always be clear due to the alignment of
+    /// {IdentifierID,SubmoduleID}, as appropriate) vs. a pointer (unset,
+    /// clang::NamedDecl *, clang::MacroInfo *, clang::ModuleMacro *).
+    /// In the ID case, the upper N-2 bits are the ID value; in the pointer
+    /// case, the lower two bits will always be clear due to the alignment of
     /// the Clang pointers.
-    llvm::SmallVector<uintptr_t, 2> DeclsOrMacros;
+    llvm::SmallVector<uint64_t, 2> DeclsOrMacros;
   };
 
   /// Whether the given entry is a macro entry.
-  static bool isMacroEntry(uintptr_t entry) { return entry & 0x01; }
+  static bool isMacroEntry(uint64_t entry) { return entry & 0x01; }
 
   /// Whether the given entry is a declaration entry.
-  static bool isDeclEntry(uintptr_t entry) { return !isMacroEntry(entry); }
+  static bool isDeclEntry(uint64_t entry) { return !isMacroEntry(entry); }
 
   /// Whether the given entry is a serialization ID.
-  static bool isSerializationIDEntry(uintptr_t entry) { return (entry & 0x02); }
+  static bool isSerializationIDEntry(uint64_t entry) { return (entry & 0x02); }
 
   /// Whether the given entry is an AST node.
-  static bool isASTNodeEntry(uintptr_t entry) {
+  static bool isASTNodeEntry(uint64_t entry) {
     return !isSerializationIDEntry(entry);
   }
 
-  /// Retrieve the serialization ID for an entry.
-  static uint32_t getSerializationID(uintptr_t entry) {
-    assert(isSerializationIDEntry(entry) && "Not a serialization entry");
-    return entry >> 2;
-  }
-
   /// Retrieve the pointer for an entry.
-  static void *getPointerFromEntry(uintptr_t entry) {
+  static void *getPointerFromEntry(uint64_t entry) {
     assert(isASTNodeEntry(entry) && "Not an AST node entry");
-    const uintptr_t mask = ~static_cast<uintptr_t>(0x03);
+    const uint64_t mask = ~static_cast<uint64_t>(0x03);
     return reinterpret_cast<void *>(entry & mask);
   }
 
   /// Encode a Clang named declaration as an entry in the table.
-  static uintptr_t encodeEntry(clang::NamedDecl *decl) {
+  static uint64_t encodeEntry(clang::NamedDecl *decl) {
+    assert(decl);
     auto bits = reinterpret_cast<uintptr_t>(decl);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits;
   }
 
   // Encode a Clang macro as an entry in the table.
-  static uintptr_t encodeEntry(clang::MacroInfo *macro) {
+  static uint64_t encodeEntry(clang::MacroInfo *macro) {
+    assert(macro);
     auto bits = reinterpret_cast<uintptr_t>(macro);
     assert((bits & 0x03) == 0 && "low bits set?");
     return bits | 0x01;
   }
 
-  /// Encode a declaration ID as an entry in the table.
-  static uintptr_t encodeDeclID(clang::serialization::DeclID id) {
-    auto upper = static_cast<uintptr_t>(id) << 2;
-    assert(upper >> 2 == id);
-    return upper | 0x02;
-  }
-
-  /// Encode a macro ID as an entry in the table.
-  static uintptr_t encodeMacroID(clang::serialization::MacroID id) {
-    auto upper = static_cast<uintptr_t>(id) << 2;
-    assert(upper >> 2 == id);
-    return upper | 0x02 | 0x01;
+  // Encode a Clang macro as an entry in the table.
+  static uint64_t encodeEntry(clang::ModuleMacro *macro) {
+    assert(macro);
+    auto bits = reinterpret_cast<uintptr_t>(macro);
+    assert((bits & 0x03) == 0 && "low bits set?");
+    return bits | 0x01;
   }
 
 private:
   /// A table mapping from the base name of Swift entities to all of
   /// the C entities that have that name, in all contexts.
-  llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>> LookupTable;
+  llvm::DenseMap<SerializedSwiftName, SmallVector<FullTableEntry, 2>>
+      LookupTable;
 
   /// The list of Objective-C categories and extensions.
   llvm::SmallVector<clang::ObjCCategoryDecl *, 4> Categories;
@@ -283,7 +391,7 @@ private:
   ///
   /// The values use the same representation as
   /// FullTableEntry::DeclsOrMacros.
-  llvm::DenseMap<StoredContext, SmallVector<uintptr_t, 2>> GlobalsAsMembers;
+  llvm::DenseMap<StoredContext, SmallVector<uint64_t, 2>> GlobalsAsMembers;
 
   /// The reader responsible for lazily loading the contents of this table.
   SwiftLookupTableReader *Reader;
@@ -296,28 +404,27 @@ private:
   friend class SwiftLookupTableReader;
   friend class SwiftLookupTableWriter;
 
-  /// Find or create the table entry for the given base name. 
-  llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator
-  findOrCreate(StringRef baseName);
+  /// Find or create the table entry for the given base name.
+  llvm::DenseMap<SerializedSwiftName, SmallVector<FullTableEntry, 2>>::iterator
+  findOrCreate(SerializedSwiftName baseName);
 
   /// Add the given entry to the list of entries, if it's not already
   /// present.
   ///
   /// \returns true if the entry was added, false otherwise.
-  bool addLocalEntry(SingleEntry newEntry, SmallVectorImpl<uintptr_t> &entries,
-                     const clang::Preprocessor *PP);
+  bool addLocalEntry(SingleEntry newEntry, SmallVectorImpl<uint64_t> &entries);
 
 public:
   explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
 
   /// Maps a stored declaration entry to an actual Clang declaration.
-  clang::NamedDecl *mapStoredDecl(uintptr_t &entry);
+  clang::NamedDecl *mapStoredDecl(uint64_t &entry);
 
   /// Maps a stored macro entry to an actual Clang macro.
-  clang::MacroInfo *mapStoredMacro(uintptr_t &entry);
+  SingleEntry mapStoredMacro(uint64_t &entry, bool assumeModule = false);
 
   /// Maps a stored entry to an actual Clang AST node.
-  SingleEntry mapStored(uintptr_t &entry);
+  SingleEntry mapStored(uint64_t &entry, bool assumeModule = false);
 
   /// Translate a Clang DeclContext into a context kind and name.
   static llvm::Optional<StoredContext> translateDeclContext(
@@ -332,8 +439,7 @@ public:
   /// \param newEntry The Clang declaration or macro.
   /// \param effectiveContext The effective context in which name lookup occurs.
   void addEntry(DeclName name, SingleEntry newEntry,
-                EffectiveClangContext effectiveContext,
-                const clang::Preprocessor *PP = nullptr);
+                EffectiveClangContext effectiveContext);
 
   /// Add an Objective-C category or extension to the table.
   void addCategory(clang::ObjCCategoryDecl *category);
@@ -357,7 +463,8 @@ private:
   /// entities should reside. This may be None to indicate that
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
-  lookup(StringRef baseName, llvm::Optional<StoredContext> searchContext);
+  lookup(SerializedSwiftName baseName,
+         llvm::Optional<StoredContext> searchContext);
 
   /// Retrieve the set of global declarations that are going to be
   /// imported as members into the given context.
@@ -376,15 +483,16 @@ public:
   /// \param searchContext The context in which the resulting set of
   /// entities should reside. This may be None to indicate that
   /// all results from all contexts should be produced.
-  SmallVector<SingleEntry, 4>
-  lookup(StringRef baseName, EffectiveClangContext searchContext);
+  SmallVector<SingleEntry, 4> lookup(SerializedSwiftName baseName,
+                                     EffectiveClangContext searchContext);
 
   /// Retrieve the set of base names that are stored in the lookup table.
-  SmallVector<StringRef, 4> allBaseNames();
+  SmallVector<SerializedSwiftName, 4> allBaseNames();
 
   /// Lookup Objective-C members with the given base name, regardless
   /// of context.
-  SmallVector<clang::NamedDecl *, 4> lookupObjCMembers(StringRef baseName);
+  SmallVector<clang::NamedDecl *, 4>
+  lookupObjCMembers(SerializedSwiftName baseName);
 
   /// Retrieve the set of Objective-C categories and extensions.
   ArrayRef<clang::ObjCCategoryDecl *> categories();

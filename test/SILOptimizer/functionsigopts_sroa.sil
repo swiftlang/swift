@@ -908,14 +908,14 @@ bb0(%0 : $SingleFieldLvl1):
 
 // Check Statements for generated code.
 
-// CHECK-LABEL: sil [serialized] @_T029single_level_dead_root_calleeTfq4x_n : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil shared [serialized] @_T029single_level_dead_root_calleeTfq4x_n : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN:%.*]] : $Builtin.Int32):
 // CHECK: [[UN:%.*]] = struct $S1 (undef : $Builtin.Int16, [[IN]] : $Builtin.Int32)
 // CHECK: struct_extract [[UN]] : $S1, #S1.f2
 // CHECK: return [[IN]] : $Builtin.Int32
 
 
-// CHECK-LABEL: sil [serialized] @_T029single_level_live_root_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil shared [serialized] @_T029single_level_live_root_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32)
@@ -925,7 +925,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: return [[IN2]]
 
 
-// CHECK-LABEL: sil [serialized] @_T042multiple_level_all_root_fields_used_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil shared [serialized] @_T042multiple_level_all_root_fields_used_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int64):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, undef : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S2 (%2 : $S1, [[IN2]] : $Builtin.Int64)
@@ -936,7 +936,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: return [[OUT]]
 
 
-// CHECK-LABEL: sil [serialized] @_T053multiple_level_no_root_fields_have_direct_uses_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil shared [serialized] @_T053multiple_level_no_root_fields_have_direct_uses_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int64):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, undef : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S2 ([[STRUCT1]] : $S1, [[IN2]] : $Builtin.Int64)
@@ -946,7 +946,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: return [[OUT]]
 
 
-// CHECK-LABEL: sil [serialized] @_T043multiple_level_root_must_be_reformed_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int32, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil shared [serialized] @_T043multiple_level_root_must_be_reformed_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int32, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32, [[IN3:%.*]] : $Builtin.Int64):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32)
 // CHECK: [[STRUCT3:%.*]] = struct $S2 ([[STRUCT1]] : $S1, [[IN3]] : $Builtin.Int64)
@@ -960,7 +960,7 @@ bb0(%0 : $SingleFieldLvl1):
 
 
 
-// CHECK-LABEL: sil [serialized] @_T021owned_struct_1_calleeTfq4dgX_n : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
+// CHECK-LABEL: sil shared [serialized] @_T021owned_struct_1_calleeTfq4dgX_n : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
 // CHECK: bb0([[IN1:%.*]] : $S4, [[IN2:%.*]] : $Builtin.Int16, [[IN3:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int32)
 // CHECK: [[STRUCT3:%.*]] = struct $S5 ([[IN1]] : $S4, [[STRUCT1]] : $S1)
@@ -970,7 +970,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: [[OUT:%.*]] = tuple ([[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int32, [[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int32)
 // CHECK: return [[OUT]] : $(Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
 
-// CHECK-LABEL: sil [serialized] @_T021owned_struct_2_calleeTfq4ndgXdn_n : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
+// CHECK-LABEL: sil shared [serialized] @_T021owned_struct_2_calleeTfq4ndgXdn_n : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $S4, [[IN3:%.*]] : $Builtin.Int16, [[IN4:%.*]] : $Builtin.Int32, [[IN5:%.*]] : $Builtin.Int128):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN3]] : $Builtin.Int16, [[IN4]] : $Builtin.Int32)
 // CHECK: [[STRUCT3:%.*]] = struct $S5 ([[IN2]] : $S4, [[STRUCT1]] : $S1)
@@ -983,7 +983,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: [[OUT]] : $(Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
 
 
-// CHECK-LABEL: sil [serialized] @_T018ignore_ptrs_calleeTfq4nxx_n : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16) {
+// CHECK-LABEL: sil shared [serialized] @_T018ignore_ptrs_calleeTfq4nxx_n : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16) {
 // CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $Builtin.Int16, [[IN3:%.*]] : $Builtin.Int16):
 // CHECK: [[STRUCT2:%.*]] = struct $S1 ([[IN2]] : $Builtin.Int16, undef : $Builtin.Int32)
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN3]] : $Builtin.Int16, undef : $Builtin.Int32)
@@ -996,7 +996,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: [[OUT:%.*]] = tuple ([[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int16)
 // CHECK: return [[OUT]] : $(Builtin.Int16, Builtin.Int16)
 
-// CHECK-LABEL: sil [serialized] @_T030check_out_of_order_uses_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> () {
+// CHECK-LABEL: sil shared [serialized] @_T030check_out_of_order_uses_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> () {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT0:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32)
 // CHECK: debug_value [[STRUCT0]]
@@ -1008,6 +1008,6 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: apply [[FN2]]([[IN1]]) : $@convention(thin) (Builtin.Int16) -> ()
 
 
-// CHECK-LABEL: sil [serialized] @_T014class_callee_1Tfq4gn_n : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil shared [serialized] @_T014class_callee_1Tfq4gn_n : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0({{%.*}} : $C1, [[IN:%.*]] : $Builtin.Int32):
 // CHECK: return [[IN]] : $Builtin.Int32

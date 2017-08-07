@@ -8,6 +8,7 @@ import AVFoundation
 import Newtype
 import objc_ext
 import TestProtocols
+import TypeAndValue
 
 import ObjCParseExtras
 import ObjCParseExtrasToo
@@ -44,7 +45,7 @@ func instanceMethods(_ b: B) {
   }
 
   // Renaming of redundant parameters.
-  b.performAdd(1, withValue:2, withValue2:3, withValue:4) // expected-error{{argument 'withValue' must precede argument 'withValue2'}}
+  b.performAdd(1, withValue:2, withValue2:3, withValue:4) // expected-error{{argument 'withValue' must precede argument 'withValue2'}} {{32-32=withValue:4, }} {{44-57=}}
   b.performAdd(1, withValue:2, withValue:4, withValue2: 3)
 
   b.performAdd(1, 2, 3, 4) // expected-error{{missing argument labels 'withValue:withValue:withValue2:' in call}} {{19-19=withValue: }} {{22-22=withValue: }} {{25-25=withValue2: }}
@@ -174,7 +175,7 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{ambiguous reference}}
+  dict[nil] = a // expected-error {{cannot assign value of type 'A' to type 'Any?'}}
   let q = dict[nil]  // expected-error {{ambiguous subscript}}
   _ = q
 }
@@ -492,7 +493,7 @@ class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-e
 
 func testNullarySelectorPieces(_ obj: AnyObject) {
   obj.foo(1, bar: 2, 3) // no-warning
-  obj.foo(1, 2, bar: 3) // expected-error{{cannot call value of non-function type 'Any?!'}}
+  obj.foo(1, 2, bar: 3) // expected-error{{cannot invoke 'foo' with an argument list of type '(Int, Int, bar: Int)'}}
 }
 
 func testFactoryMethodAvailability() {
@@ -628,4 +629,12 @@ class NewtypeUser {
   @objc func stringNewtypeOptional(a: SNTErrorDomain?) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{39-53=ErrorDomain}}
   @objc func intNewtype(a: MyInt) {}
   @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+}
+
+func testTypeAndValue() {
+  _ = testStruct()
+  _ = testStruct(value: 0)
+  let _: (testStruct) -> Void = testStruct
+  let _: () -> testStruct = testStruct.init
+  let _: (CInt) -> testStruct = testStruct.init
 }

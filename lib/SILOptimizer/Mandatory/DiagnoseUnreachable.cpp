@@ -541,13 +541,17 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     }
   }
 
+  auto *Scope = NoReturnCall->getDebugScope();
   recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
   NumInstructionsRemoved += ToBeDeleted.size();
 
   // Add an unreachable terminator. The terminator has an invalid source
   // location to signal to the DataflowDiagnostic pass that this code does
   // not correspond to user code.
+  // Share the scope with the preceding BB. This causes the debug info to be
+  // much smaller and easier to read, but otherwise has no effect.
   SILBuilder B(&BB);
+  B.setCurrentDebugScope(Scope);
   B.createUnreachable(ArtificialUnreachableLocation());
 
   return true;

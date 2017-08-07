@@ -20,10 +20,16 @@ class SwiftGizmo : Gizmo {
   // CHECK-LABEL: sil hidden @_T012objc_dealloc10SwiftGizmoC{{[_0-9a-zA-Z]*}}fc
   // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
   override init() {
-    // CHECK:   [[SELF_UNINIT:%[0-9]+]] = mark_uninitialized [derivedselfonly]
+    // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var SwiftGizmo }, let, name "self"
+    // CHECK:   [[SELF_UNINIT:%.*]] = mark_uninitialized [derivedselfonly] [[SELF_BOX]] : ${ var SwiftGizmo }
+    // CHECK:   [[SELF_ADDR:%.*]] = project_box [[SELF_UNINIT]]
     // CHECK-NOT: ref_element_addr
-    // CHECK:   upcast
-    // CHECK-NEXT:   super_method
+    // CHECK:   [[SELF:%.*]] = load [take] [[SELF_ADDR]]
+    // CHECK-NEXT:   [[UPCAST_SELF:%.*]] = upcast [[SELF]] : $SwiftGizmo to $Gizmo
+    // CHECK-NEXT:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF]]
+    // CHECK-NEXT:   [[DOWNCAST_BORROWED_UPCAST_SELF:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF]] : $Gizmo to $SwiftGizmo
+    // CHECK-NEXT:   super_method [volatile] [[DOWNCAST_BORROWED_UPCAST_SELF]] : $SwiftGizmo
+    // CHECK-NEXT:   end_borrow [[BORROWED_UPCAST_SELF]] from [[UPCAST_SELF]]
     // CHECK:   return
     super.init()
   }
@@ -65,7 +71,9 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XINIT]]() : $@convention(thin) () -> @owned X
   // CHECK-NEXT:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
   // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $SwiftGizmo, #SwiftGizmo.x
-  // CHECK-NEXT:   assign [[XOBJ]] to [[X]] : $*X
+  // CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X]] : $*X
+  // CHECK-NEXT:   assign [[XOBJ]] to [[WRITE]] : $*X
+  // CHECK-NEXT:   end_access [[WRITE]] : $*X
   // CHECK-NEXT:   end_borrow [[BORROWED_SELF]] from [[SELF]]
   // CHECK-NEXT:   return [[SELF]] : $SwiftGizmo
 

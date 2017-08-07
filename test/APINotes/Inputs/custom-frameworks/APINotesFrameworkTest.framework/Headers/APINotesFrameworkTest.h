@@ -4,6 +4,9 @@ void acceptDoublePointer(double* _Nonnull ptr) __attribute__((swift_name("accept
 
 void oldAcceptDoublePointer(double* _Nonnull ptr) __attribute__((availability(swift, unavailable, replacement="acceptDoublePointer")));
 
+void normallyUnchanged(void);
+void normallyChangedOriginal(void) __attribute__((swift_name("normallyChanged()")));
+
 #ifdef __OBJC__
 
 __attribute__((objc_root_class))
@@ -19,9 +22,16 @@ __attribute__((objc_root_class))
 @interface Base
 @end
 
+@interface B : A
+@end
+
+@interface C : B
+@end
+
 #endif // __OBJC__
 
 #import <APINotesFrameworkTest/Classes.h>
+#import <APINotesFrameworkTest/Enums.h>
 #import <APINotesFrameworkTest/ImportAsMember.h>
 #import <APINotesFrameworkTest/Properties.h>
 #import <APINotesFrameworkTest/Protocols.h>

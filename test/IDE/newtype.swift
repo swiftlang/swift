@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype -skip-unavailable > %t.printed.A.txt
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
@@ -150,6 +149,54 @@
 // PRINT-NEXT:  extension NSSomeContext.Name {
 // PRINT-NEXT:    static let myContextName: NSSomeContext.Name
 // PRINT-NEXT:  }
+//
+// PRINT-NEXT: struct TRef : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
+// PRINT-NEXT:   init(_ rawValue: OpaquePointer)
+// PRINT-NEXT:   init(rawValue: OpaquePointer)
+// PRINT-NEXT:   let rawValue: OpaquePointer
+// PRINT-NEXT:   typealias RawValue = OpaquePointer
+// PRINT-NEXT: }
+// PRINT-NEXT: struct ConstTRef : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
+// PRINT-NEXT:   init(_ rawValue: OpaquePointer)
+// PRINT-NEXT:   init(rawValue: OpaquePointer)
+// PRINT-NEXT:   let rawValue: OpaquePointer
+// PRINT-NEXT:   typealias RawValue = OpaquePointer
+// PRINT-NEXT: }
+// PRINT-NEXT: func create_T() -> TRef
+// PRINT-NEXT: func create_ConstT() -> ConstTRef
+// PRINT-NEXT: func destroy_T(_: TRef!)
+// PRINT-NEXT: func destroy_ConstT(_: ConstTRef!)
+// PRINT-NEXT: extension TRef {
+// PRINT-NEXT:   func mutatePointee()
+// PRINT-NEXT:   mutating func mutate()
+// PRINT-NEXT: }
+// PRINT-NEXT: extension ConstTRef {
+// PRINT-NEXT:   func use()
+// PRINT-NEXT: }
+//
+// PRINT-NEXT: struct TRefRef : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
+// PRINT-NEXT:   init(_ rawValue: UnsafeMutablePointer<OpaquePointer>)
+// PRINT-NEXT:   init(rawValue: UnsafeMutablePointer<OpaquePointer>)
+// PRINT-NEXT:   let rawValue: UnsafeMutablePointer<OpaquePointer>
+// PRINT-NEXT:   typealias RawValue = UnsafeMutablePointer<OpaquePointer>
+// PRINT-NEXT: }
+// PRINT-NEXT: struct ConstTRefRef : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
+// PRINT-NEXT:   init(_ rawValue: UnsafePointer<OpaquePointer>)
+// PRINT-NEXT:   init(rawValue: UnsafePointer<OpaquePointer>)
+// PRINT-NEXT:   let rawValue: UnsafePointer<OpaquePointer>
+// PRINT-NEXT:   typealias RawValue = UnsafePointer<OpaquePointer>
+// PRINT-NEXT: }
+// PRINT-NEXT: func create_TRef() -> TRefRef
+// PRINT-NEXT: func create_ConstTRef() -> ConstTRefRef
+// PRINT-NEXT: func destroy_TRef(_: TRefRef!)
+// PRINT-NEXT: func destroy_ConstTRef(_: ConstTRefRef!)
+// PRINT-NEXT: extension TRefRef {
+// PRINT-NEXT:   func mutatePointee()
+// PRINT-NEXT:   mutating func mutate()
+// PRINT-NEXT: }
+// PRINT-NEXT: extension ConstTRefRef {
+// PRINT-NEXT:   func use()
+// PRINT-NEXT: }
 
 import Newtype
 

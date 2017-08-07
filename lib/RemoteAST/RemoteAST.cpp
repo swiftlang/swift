@@ -135,7 +135,7 @@ public:
 
   Type createNominalType(NominalTypeDecl *decl, Type parent) {
     // If the declaration is generic, fail.
-    if (decl->getGenericSignature())
+    if (decl->getGenericParams())
       return Type();
 
     // Validate the parent type.
@@ -148,7 +148,7 @@ public:
   Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args,
                               Type parent) {
     // If the declaration isn't generic, fail.
-    if (!decl->getGenericSignature())
+    if (!decl->getGenericParams())
       return Type();
 
     // Validate the parent type.
@@ -159,7 +159,8 @@ public:
     TypeReprList genericArgReprs(args);
     GenericIdentTypeRepr genericRepr(SourceLoc(), decl->getName(),
                                      genericArgReprs.getList(), SourceRange());
-    genericRepr.setValue(decl);
+    // FIXME
+    genericRepr.setValue(decl, nullptr);
 
     Type genericType;
 
@@ -182,7 +183,8 @@ public:
           : GenericArgs(type->getGenericArgs()),
             Ident(SourceLoc(), type->getDecl()->getName(),
                   GenericArgs.getList(), SourceRange()) {
-          Ident.setValue(type->getDecl());
+          // FIXME
+          Ident.setValue(type->getDecl(), nullptr);
         }
 
         // SmallVector::emplace_back will never need to call this because
@@ -212,9 +214,12 @@ public:
           auto nominal = p->castTo<NominalType>();
           simpleComponents.emplace_back(SourceLoc(),
                                         nominal->getDecl()->getName());
+          // FIXME
+          simpleComponents.back().setValue(nominal->getDecl(), nullptr);
           componentReprs.push_back(&simpleComponents.back());
         }
       }
+      componentReprs.push_back(&genericRepr);
 
       CompoundIdentTypeRepr compoundRepr(componentReprs);
       genericType = checkTypeRepr(&compoundRepr);

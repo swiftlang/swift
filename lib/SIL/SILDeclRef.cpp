@@ -236,7 +236,7 @@ unsigned swift::getNaturalUncurryLevel(ValueDecl *vd) {
   } else if (isa<ConstructorDecl>(vd)) {
     return 1;
   } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
-    return ed->getArgumentInterfaceType() ? 1 : 0;
+    return ed->hasAssociatedValues() ? 1 : 0;
   } else if (isa<DestructorDecl>(vd)) {
     return 0;
   } else if (isa<ClassDecl>(vd)) {
@@ -371,6 +371,12 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Private;
   }
 
+  // Add External to the linkage (e.g. Public -> PublicExternal) if this is a
+  // declaration not a definition.
+  auto maybeAddExternal = [&](SILLinkage linkage) {
+    return forDefinition ? linkage : addExternalToLinkage(linkage);
+  };
+
   // Native function-local declarations have shared linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
   // of marking them "used" other than making them external. 
@@ -392,12 +398,22 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     switch (d->getEffectiveAccess()) {
     case Accessibility::Private:
     case Accessibility::FilePrivate:
-      return (forDefinition
-              ? SILLinkage::Private
-              : SILLinkage::PrivateExternal);
+      return maybeAddExternal(SILLinkage::Private);
 
     default:
       return SILLinkage::Shared;
+    }
+  }
+
+  // ivar initializers and destroyers are completely contained within the class
+  // from which they come, and never get seen externally.
+  if (isIVarInitializerOrDestroyer()) {
+    switch (d->getEffectiveAccess()) {
+    case Accessibility::Private:
+    case Accessibility::FilePrivate:
+      return maybeAddExternal(SILLinkage::Private);
+    default:
+      return maybeAddExternal(SILLinkage::Hidden);
     }
   }
 
@@ -414,17 +430,44 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isClangImported())
     return SILLinkage::Shared;
 
+  // Stored property initializers get the linkage of their containing type.
+  if (isStoredPropertyInitializer()) {
+    // If the property is public, the initializer needs to be public, because
+    // it might be referenced from an inlineable initializer.
+    //
+    // Note that we don't serialize the presence of an initializer, so there's
+    // no way to reference one from another module except for this case.
+    //
+    // This is silly, and we need a proper resilience story here.
+    if (d->getEffectiveAccess() == Accessibility::Public)
+      return maybeAddExternal(SILLinkage::Public);
+
+    d = cast<NominalTypeDecl>(d->getDeclContext());
+
+    // Otherwise, use the visibility of the type itself, because even if the
+    // property is private, we might reference the initializer from another
+    // file.
+    switch (d->getEffectiveAccess()) {
+    case Accessibility::Private:
+    case Accessibility::FilePrivate:
+      return maybeAddExternal(SILLinkage::Private);
+
+    default:
+      return maybeAddExternal(SILLinkage::Hidden);
+    }
+  }
+
   // Otherwise, we have external linkage.
   switch (d->getEffectiveAccess()) {
     case Accessibility::Private:
     case Accessibility::FilePrivate:
-      return (forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+      return maybeAddExternal(SILLinkage::Private);
 
     case Accessibility::Internal:
-      return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
+      return maybeAddExternal(SILLinkage::Hidden);
 
     default:
-      return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
+      return maybeAddExternal(SILLinkage::Public);
   }
 }
 
@@ -754,8 +797,16 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // @NSManaged property, then it won't be in the vtable.
     if (overridden.getDecl()->hasClangNode())
       return SILDeclRef();
-    if (overridden.getDecl()->isDynamic())
+
+    // If we overrode a non-required initializer, there won't be a vtable
+    // slot for the allocator.
+    if (overridden.kind == SILDeclRef::Kind::Allocator) {
+      if (!cast<ConstructorDecl>(overridden.getDecl())->isRequired())
+        return SILDeclRef();
+    } else if (overridden.getDecl()->isDynamic()) {
       return SILDeclRef();
+    }
+    
     if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
       if (auto *asd = ovFD->getAccessorStorageDecl()) {
         if (asd->hasClangNode())
@@ -768,13 +819,6 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // either. This can occur for extensions to ObjC classes.
     if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
       return SILDeclRef();
-
-    // If we overrode a non-required initializer, there won't be a vtable
-    // slot for the allocator.
-    if (overridden.kind == SILDeclRef::Kind::Allocator &&
-        !cast<ConstructorDecl>(overridden.getDecl())->isRequired()) {
-      return SILDeclRef();
-    }
 
     return overridden;
   }

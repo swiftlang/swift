@@ -45,15 +45,15 @@ static const char *skipParenExpression(const char *p, const char *End) {
       case ')':
         done = --ParenCount == 0;
         break;
-                  
+
       case '(':
         ++ParenCount;
         break;
-              
+
       case '"':
         e = skipStringInCode (e, End);
         break;
-              
+
       default:
         break;
       }
@@ -76,7 +76,7 @@ static const char *skipStringInCode(const char *p, const char *End) {
       case '"':
         done = true;
         break;
-                  
+
       case '\\':
         ++e;
         if (e >= End)
@@ -84,7 +84,7 @@ static const char *skipStringInCode(const char *p, const char *End) {
         else if (*e == '(')
           e = skipParenExpression (e, End);
         break;
-              
+
       default:
         break;
       }
@@ -113,8 +113,8 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
 
   SourceCompleteResult SCR;
   SCR.IsComplete = !P.isInputIncomplete();
-    
-  // Use the same code that was in the REPL code to track the indent level 
+
+  // Use the same code that was in the REPL code to track the indent level
   // for now. In the future we should get this from the Parser if possible.
 
   CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
@@ -167,7 +167,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
       if (!IndentInfos.empty())
         IndentInfos.pop_back();
       break;
-  
+
     default:
       if (LineSourceStart == nullptr && !isspace(*p))
         LineSourceStart = p;
@@ -781,21 +781,30 @@ void ide::collectModuleNames(StringRef SDKPath,
   }
 }
 
-DeclNameViewer::DeclNameViewer(StringRef Text) {
+DeclNameViewer::DeclNameViewer(StringRef Text): IsValid(true), HasParen(false) {
   auto ArgStart = Text.find_first_of('(');
   if (ArgStart == StringRef::npos) {
     BaseName = Text;
     return;
   }
+  HasParen = true;
   BaseName = Text.substr(0, ArgStart);
   auto ArgEnd = Text.find_last_of(')');
-  assert(ArgEnd != StringRef::npos);
+  if (ArgEnd == StringRef::npos) {
+    IsValid = false;
+    return;
+  }
   StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
   AllArgs.split(Labels, ":");
   if (Labels.empty())
     return;
-  assert(Labels.back().empty());
-  Labels.pop_back();
+  if ((IsValid = Labels.back().empty())) {
+    Labels.pop_back();
+    std::transform(Labels.begin(), Labels.end(), Labels.begin(),
+        [](StringRef Label) {
+      return Label == "_" ? StringRef() : Label;
+    });
+  }
 }
 
 unsigned DeclNameViewer::commonPartsCount(DeclNameViewer &Other) const {

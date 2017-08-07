@@ -48,7 +48,7 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "merge-module",
-// CHECK-NEXT:   "command": "{{.*}}/swift{{c?}} -frontend -emit-module {{.*}}/你好-[[OUTPUT]].swiftmodule {{.*}} -o {{.*}}/parseable_output_unicode.swift.tmp.swiftmodule",
+// CHECK-NEXT:   "command": "{{.*}}/swift{{c?}} -frontend -merge-modules -emit-module {{.*}}/你好-[[OUTPUT]].swiftmodule {{.*}} -o {{.*}}/parseable_output_unicode.swift.tmp.swiftmodule",
 // CHECK-NEXT:   "inputs": [
 // CHECK-NEXT:     "{{.*}}/你好-[[OUTPUT]].o"
 // CHECK-NEXT:   ],

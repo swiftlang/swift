@@ -31,8 +31,9 @@ using namespace Lowering;
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
     : SGM(SGM), F(F), silConv(SGM.M), StartOfPostmatter(F.end()),
-      B(*this, createBasicBlock()), OpenedArchetypesTracker(F),
+      B(*this), OpenedArchetypesTracker(F),
       CurrentSILLoc(F.getLocation()), Cleanups(*this) {
+  B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
   B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 }
@@ -367,17 +368,14 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   // Get the lowered AST types:
   //  - the original type
-  auto origLoweredFormalType =
-      AbstractionPattern(constantInfo.LoweredInterfaceType);
+  auto origFormalType = AbstractionPattern(constantInfo.LoweredType);
 
   // - the substituted type
-  auto substFormalType = cast<FunctionType>(expectedType);
-  auto substLoweredFormalType =
-    SGM.Types.getLoweredASTFunctionType(substFormalType, 0, constant);
+  auto substFormalType = expectedType;
 
   // Generalize if necessary.
-  result = emitOrigToSubstValue(loc, result, origLoweredFormalType,
-                                substLoweredFormalType);
+  result = emitOrigToSubstValue(loc, result, origFormalType,
+                                substFormalType);
 
   return result;
 }
@@ -506,7 +504,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       managedName = emitOptionalToOptional(
           mainClass, managedName,
           SILType::getPrimitiveObjectType(IUOptNSStringTy),
-          [](SILGenFunction &, SILLocation, ManagedValue input, SILType) {
+          [](SILGenFunction &, SILLocation, ManagedValue input, SILType,
+             SGFContext) {
         return input;
       });
     }

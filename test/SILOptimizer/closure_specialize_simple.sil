@@ -190,7 +190,7 @@ bb2:
 // CHECK: [[INLINEDCLOSURE_CALLER1:%.*]] = function_ref @_T040indirect_parameter_partial_apply_caller10a1_b1_c1_D4_funTf1c_n
 // CHECK-NOT: partial_apply [[CLOSUREFUN]]()
 
-// We don't handle captured indirect parameters yet.
+// We don't handle captured indirect @in and @in_guaranteed parameters yet.
 // CHECK: [[CLOSURE2:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
 // CHECK: [[CLOSURE3:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
 // CHECK: [[CLOSURE4:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})

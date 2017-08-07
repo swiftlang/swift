@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -gdwarf-types -o - | %FileCheck %s --check-prefix=DWARF
 
+// UNSUPPORTED: OS=watchos
+
 protocol P {}
 
 enum Either {

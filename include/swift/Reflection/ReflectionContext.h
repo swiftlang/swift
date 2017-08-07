@@ -244,16 +244,12 @@ public:
         if (!getReader().readInteger(ExistentialAddress, &BoxAddress))
           return false;
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
         // Address = BoxAddress + (sizeof(HeapObject) + alignMask) & ~alignMask)
         auto Alignment = InstanceTI->getAlignment();
         auto StartOfValue = BoxAddress + getSizeOfHeapObject();
         // Align.
         StartOfValue += Alignment - StartOfValue % Alignment;
         *OutInstanceAddress = RemoteAddress(StartOfValue);
-#else
-        *OutInstanceAddress = RemoteAddress(BoxAddress);
-#endif
       }
       return true;
     }

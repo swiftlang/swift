@@ -23,6 +23,7 @@ bool FrontendOptions::actionHasOutput() const {
   case Typecheck:
   case DumpParse:
   case DumpAST:
+  case EmitSyntax:
   case DumpInterfaceHash:
   case PrintAST:
   case DumpScopeMaps:
@@ -34,6 +35,7 @@ bool FrontendOptions::actionHasOutput() const {
   case EmitSIBGen:
   case EmitSIB:
   case EmitModuleOnly:
+  case MergeModules:
     return true;
   case Immediate:
   case REPL:
@@ -43,7 +45,6 @@ bool FrontendOptions::actionHasOutput() const {
   case EmitBC:
   case EmitObject:
   case EmitImportedModules:
-  case EmitTBD:
     return true;
   }
   llvm_unreachable("Unknown ActionType");
@@ -56,6 +57,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case Typecheck:
   case DumpParse:
   case DumpAST:
+  case EmitSyntax:
   case DumpInterfaceHash:
   case PrintAST:
   case DumpScopeMaps:
@@ -66,6 +68,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case EmitSIBGen:
   case EmitSIB:
   case EmitModuleOnly:
+  case MergeModules:
     return false;
   case Immediate:
   case REPL:
@@ -75,7 +78,6 @@ bool FrontendOptions::actionIsImmediate() const {
   case EmitBC:
   case EmitObject:
   case EmitImportedModules:
-  case EmitTBD:
     return false;
   }
   llvm_unreachable("Unknown ActionType");
@@ -83,7 +85,8 @@ bool FrontendOptions::actionIsImmediate() const {
 
 void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
-  if (RequestedAction != FrontendOptions::EmitModuleOnly) {
+  if (RequestedAction != FrontendOptions::EmitModuleOnly &&
+      RequestedAction != FrontendOptions::MergeModules) {
     for (const std::string &OutputFileName : OutputFilenames) {
       fn(OutputFileName);
     }

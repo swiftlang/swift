@@ -55,15 +55,16 @@ public protocol ${Self} : ${Conformance} {
 
 % end
 
-/// Compare two `Strideable`s.
-@_inlineable
-public func < <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distance(to: y) > 0
-}
+extension Strideable {
+  @_inlineable
+  public static func < (x: Self, y: Self) -> Bool {
+    return x.distance(to: y) > 0
+  }
 
-@_inlineable
-public func == <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distance(to: y) == 0
+  @_inlineable
+  public static func == (x: Self, y: Self) -> Bool {
+    return x.distance(to: y) == 0
+  }
 }
 
 //===----------------------------------------------------------------------===//

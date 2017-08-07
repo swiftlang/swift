@@ -88,14 +88,14 @@ public struct _StringBuffer {
 
     self.usedEnd = start + (initialSize &<< elementShift)
     _storage.value.capacityAndElementShift
-      = ((_storage._capacity() - capacityBump) &<< 1) + elementShift
+      = ((_storage.capacity - capacityBump) &<< 1) + elementShift
   }
 
-  static func fromCodeUnits<Input : Sequence, Encoding : UnicodeEncoding>(
+  static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(
     _ input: Input, encoding: Encoding.Type, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
   ) -> (_StringBuffer?, hadError: Bool)
-    where Input.Iterator.Element == Encoding.CodeUnit {
+    where Input.Element == Encoding.CodeUnit {
     // Determine how many UTF-16 code units we'll need
     let inputStream = input.makeIterator()
     guard let (utf16Count, isAscii) = UTF16.transcodedLength(
@@ -194,65 +194,8 @@ public struct _StringBuffer {
     return cap + offset <= capacity
   }
 
-
-  /// Attempt to claim unused capacity in the buffer.
-  ///
-  /// Operation succeeds if there is sufficient capacity, and either:
-  /// - the buffer is uniquely-referenced, or
-  /// - `oldUsedEnd` points to the end of the currently used capacity.
-  ///
-  /// - parameter bounds: Range of the substring that the caller tries
-  ///   to extend.
-  /// - parameter newUsedCount: The desired size of the substring.
-  @inline(__always)
-  @discardableResult
-  mutating func grow(
-    oldBounds bounds: Range<UnsafeRawPointer>, newUsedCount: Int
-  ) -> Bool {
-    var newUsedCount = newUsedCount
-    // The substring to be grown could be pointing in the middle of this
-    // _StringBuffer.  Adjust the size so that it covers the imaginary
-    // substring from the start of the buffer to `oldUsedEnd`.
-    newUsedCount
-      += (bounds.lowerBound - UnsafeRawPointer(start)) &>> elementShift
-
-    if _slowPath(newUsedCount > capacity) {
-      return false
-    }
-
-    let newUsedEnd = start + (newUsedCount &<< elementShift)
-
-    if _fastPath(self._storage.isUniquelyReferenced()) {
-      usedEnd = newUsedEnd
-      return true
-    }
-
-    // Optimization: even if the buffer is shared, but the substring we are
-    // trying to grow is located at the end of the buffer, it can be grown in
-    // place.  The operation should be implemented in a thread-safe way,
-    // though.
-    //
-    // if usedEnd == bounds.upperBound {
-    //  usedEnd = newUsedEnd
-    //  return true
-    // }
-
-    // &StringBufferIVars.usedEnd
-    let usedEndPhysicalPtr = UnsafeMutableRawPointer(_storage._value)
-      .assumingMemoryBound(to: Optional<UnsafeRawPointer>.self)
-    // Create a temp var to hold the exchanged `expected` value.
-    var expected : UnsafeRawPointer? = bounds.upperBound
-    if _stdlib_atomicCompareExchangeStrongPtr(
-      object: usedEndPhysicalPtr, expected: &expected,
-      desired: UnsafeRawPointer(newUsedEnd)) {
-      return true
-    }
-
-    return false
-  }
-
   var _anyObject: AnyObject? {
-    return _storage.storage != nil ? _storage.storage! : nil
+    return _storage.storage
   }
 
   var _storage: _Storage

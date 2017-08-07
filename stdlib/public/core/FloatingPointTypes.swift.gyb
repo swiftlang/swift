@@ -64,7 +64,7 @@ else:
 }%
 
 % if bits == 80:
-#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
 ${SelfDocComment}
@@ -107,12 +107,43 @@ extension ${Self}: BinaryFloatingPoint {
   public typealias Exponent = Int
   public typealias RawSignificand = ${RawSignificand}
 
+  /// The number of bits used to represent the type's exponent.
+  ///
+  /// A binary floating-point type's `exponentBitCount` imposes a limit on the
+  /// range of the exponent for normal, finite values. The *exponent bias* of
+  /// a type `F` can be calculated as the following, where `**` is
+  /// exponentiation:
+  ///
+  ///     let bias = 2 ** (F.exponentBitCount - 1) - 1
+  ///
+  /// The least normal exponent for values of the type `F` is `1 - bias`, and
+  /// the largest finite exponent is `bias`. An all-zeros exponent is reserved
+  /// for subnormals and zeros, and an all-ones exponent is reserved for
+  /// infinity and NaN.
+  ///
+  /// For example, the `Float` type has an `exponentBitCount` of 8, which gives
+  /// an exponent bias of `127` by the calculation above.
+  ///
+  ///     let bias = 2 ** (Float.exponentBitCount - 1) - 1
+  ///     // bias == 127
+  ///     print(Float.greatestFiniteMagnitude.exponent)
+  ///     // Prints "127"
+  ///     print(Float.leastNormalMagnitude.exponent)
+  ///     // Prints "-126"
   public static var exponentBitCount: Int {
     return ${ExponentBitCount}
   }
 
-%if bits == 80:
   /// The available number of fractional significand bits.
+  ///
+  /// For fixed-width floating-point types, this is the actual number of
+  /// fractional significand bits.
+  ///
+  /// For extensible floating-point types, `significandBitCount` should be the
+  /// maximum allowed significand width (without counting any leading integral
+  /// bit of the significand). If there is no upper limit, then
+  /// `significandBitCount` should be `Int.max`.
+%if bits == 80:
   ///
   /// `Float80.significandBitCount` is 63, even though 64 bits are used to
   /// store the significand in the memory representation of a `Float80`
@@ -160,8 +191,6 @@ extension ${Self}: BinaryFloatingPoint {
   /// [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - SeeAlso: `init(bitPattern:)`
   public var bitPattern: UInt${bits} {
     return UInt${bits}(Builtin.bitcast_FPIEEE${bits}_Int${bits}(_value))
   }
@@ -174,12 +203,23 @@ extension ${Self}: BinaryFloatingPoint {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter bitPattern: The integer encoding of a `${Self}` instance.
-  ///
-  /// - SeeAlso: `bitPattern`
   public init(bitPattern: UInt${bits}) {
     self.init(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bitPattern._value))
   }
 
+  /// The sign of the floating-point value.
+  ///
+  /// The `sign` property is `.minus` if the value's signbit is set, and
+  /// `.plus` otherwise. For example:
+  ///
+  ///     let x = -33.375
+  ///     // x.sign == .minus
+  ///
+  /// Do not use this property to check whether a floating point value is
+  /// negative. For a value `x`, the comparison `x.sign == .minus` is not
+  /// necessarily the same as `x < 0`. In particular, `x.sign == .minus` if
+  /// `x` is -0, and while `x < 0` is always `false` if `x` is NaN, `x.sign`
+  /// could be either `.plus` or `.minus`.
   public var sign: FloatingPointSign {
     let shift = ${Self}.significandBitCount + ${Self}.exponentBitCount
     return FloatingPointSign(rawValue: Int(bitPattern &>> ${RawSignificand}(shift)))!
@@ -188,15 +228,37 @@ extension ${Self}: BinaryFloatingPoint {
   @available(*, unavailable, renamed: "sign")
   public var isSignMinus: Bool { Builtin.unreachable() }
 
+  /// The raw encoding of the value's exponent field.
+  ///
+  /// This value is unadjusted by the type's exponent bias.
   public var exponentBitPattern: UInt {
     return UInt(bitPattern &>> UInt${bits}(${Self}.significandBitCount)) &
       ${Self}._infinityExponent
   }
 
+  /// The raw encoding of the value's significand field.
+  ///
+  /// The `significandBitPattern` property does not include the leading
+  /// integral bit of the significand, even for types like `Float80` that
+  /// store it explicitly.
   public var significandBitPattern: ${RawSignificand} {
     return ${RawSignificand}(bitPattern) & ${Self}._significandMask
   }
 
+  /// Creates a new instance from the specified sign and bit patterns.
+  ///
+  /// The values passed as `exponentBitPattern` and `significandBitPattern` are
+  /// interpreted in the binary interchange format defined by the [IEEE 754
+  /// specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - sign: The sign of the new value.
+  ///   - exponentBitPattern: The bit pattern to use for the exponent field of
+  ///     the new value.
+  ///   - significandBitPattern: The bit pattern to use for the significand
+  ///     field of the new value.
   public init(sign: FloatingPointSign,
               exponentBitPattern: UInt,
               significandBitPattern: ${RawSignificand}) {
@@ -212,6 +274,16 @@ extension ${Self}: BinaryFloatingPoint {
       significand)
   }
 
+  /// A Boolean value indicating whether the instance's representation is in
+  /// the canonical form.
+  ///
+  /// The [IEEE 754 specification][spec] defines a *canonical*, or preferred,
+  /// encoding of a floating-point value's representation. Every `Float` or
+  /// `Double` value is canonical, but noncanonical values of the `Float80`
+  /// type exist, and noncanonical values may exist for other types that
+  /// conform to the `FloatingPoint` protocol.
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   public var isCanonical: Bool {
     return true
   }
@@ -235,6 +307,19 @@ extension ${Self}: BinaryFloatingPoint {
     return unsafeBitCast(self, to: _Float80Representation.self)
   }
 
+  /// The sign of the floating-point value.
+  ///
+  /// The `sign` property is `.minus` if the value's signbit is set, and
+  /// `.plus` otherwise. For example:
+  ///
+  ///     let x = -33.375
+  ///     // x.sign == .minus
+  ///
+  /// Do not use this property to check whether a floating point value is
+  /// negative. For a value `x`, the comparison `x.sign == .minus` is not
+  /// necessarily the same as `x < 0`. In particular, `x.sign == .minus` if
+  /// `x` is -0, and while `x < 0` is always `false` if `x` is NaN, `x.sign`
+  /// could be either `.plus` or `.minus`.
   public var sign: FloatingPointSign {
     return _representation.sign
   }
@@ -243,6 +328,9 @@ extension ${Self}: BinaryFloatingPoint {
     @inline(__always) get { return 1 &<< 63 }
   }
 
+  /// The raw encoding of the value's exponent field.
+  ///
+  /// This value is unadjusted by the type's exponent bias.
   public var exponentBitPattern: UInt {
     let provisional = _representation.exponentBitPattern
     if provisional == 0 {
@@ -266,6 +354,11 @@ extension ${Self}: BinaryFloatingPoint {
     return provisional
   }
 
+  /// The raw encoding of the value's significand field.
+  ///
+  /// The `significandBitPattern` property does not include the leading
+  /// integral bit of the significand, even for types like `Float80` that
+  /// store it explicitly.
   public var significandBitPattern: UInt64 {
     if _representation.exponentBitPattern > 0 &&
       _representation.explicitSignificand < Float80._explicitBitMask {
@@ -279,6 +372,20 @@ extension ${Self}: BinaryFloatingPoint {
     return _representation.explicitSignificand & Float80._significandMask
   }
 
+  /// Creates a new instance from the specified sign and bit patterns.
+  ///
+  /// The values passed as `exponentBitPattern` and `significandBitPattern` are
+  /// interpreted in the binary interchange format defined by the [IEEE 754
+  /// specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - sign: The sign of the new value.
+  ///   - exponentBitPattern: The bit pattern to use for the exponent field of
+  ///     the new value.
+  ///   - significandBitPattern: The bit pattern to use for the significand
+  ///     field of the new value.
   public init(sign: FloatingPointSign,
               exponentBitPattern: UInt,
               significandBitPattern: UInt64) {
@@ -291,6 +398,16 @@ extension ${Self}: BinaryFloatingPoint {
     self = unsafeBitCast(rep, to: Float80.self)
   }
 
+  /// A Boolean value indicating whether the instance's representation is in
+  /// the canonical form.
+  ///
+  /// The [IEEE 754 specification][spec] defines a *canonical*, or preferred,
+  /// encoding of a floating-point value's representation. Every `Float` or
+  /// `Double` value is canonical, but noncanonical values of the `Float80`
+  /// type exist, and noncanonical values may exist for other types that
+  /// conform to the `FloatingPoint` protocol.
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   public var isCanonical: Bool {
     if exponentBitPattern == 0 {
       // If exponent field is zero, canonical numbers have the explicit
@@ -303,16 +420,60 @@ extension ${Self}: BinaryFloatingPoint {
   }
 %end
 
+  /// Positive infinity.
+  ///
+  /// Infinity compares greater than all finite numbers and equal to other
+  /// infinite values.
+  ///
+  ///     let x = Double.greatestFiniteMagnitude
+  ///     let y = x * 2
+  ///     // y == Double.infinity
+  ///     // y > x
   public static var infinity: ${Self} {
     return ${Self}(sign: .plus,
       exponentBitPattern: _infinityExponent,
       significandBitPattern: 0)
   }
 
+  /// A quiet NaN ("not a number").
+  ///
+  /// A NaN compares not equal, not greater than, and not less than every
+  /// value, including itself. Passing a NaN to an operation generally results
+  /// in NaN.
+  ///
+  ///     let x = 1.21
+  ///     // x > Double.nan == false
+  ///     // x < Double.nan == false
+  ///     // x == Double.nan == false
+  ///
+  /// Because a NaN always compares not equal to itself, to test whether a
+  /// floating-point value is NaN, use its `isNaN` property instead of the
+  /// equal-to operator (`==`). In the following example, `y` is NaN.
+  ///
+  ///     let y = x + Double.nan
+  ///     print(y == Double.nan)
+  ///     // Prints "false"
+  ///     print(y.isNaN)
+  ///     // Prints "true"
   public static var nan: ${Self} {
     return ${Self}(nan: 0, signaling: false)
   }
 
+  /// A signaling NaN ("not a number").
+  ///
+  /// The default IEEE 754 behavior of operations involving a signaling NaN is
+  /// to raise the Invalid flag in the floating-point environment and return a
+  /// quiet NaN.
+  ///
+  /// Operations on types conforming to the `FloatingPoint` protocol should
+  /// support this behavior, but they might also support other options. For
+  /// example, it would be reasonable to implement alternative operations in
+  /// which operating on a signaling NaN triggers a runtime error or results
+  /// in a diagnostic for debugging purposes. Types that implement alternative
+  /// behaviors for a signaling NaN must document the departure.
+  ///
+  /// Other than these signaling operations, a signaling NaN behaves in the
+  /// same manner as a quiet NaN.
   public static var signalingNaN: ${Self} {
     return ${Self}(nan: 0, signaling: true)
   }
@@ -320,12 +481,29 @@ extension ${Self}: BinaryFloatingPoint {
   @available(*, unavailable, renamed: "nan")
   public static var quietNaN: ${Self} { Builtin.unreachable()}
 
+  /// The greatest finite number representable by this type.
+  ///
+  /// This value compares greater than or equal to all finite numbers, but less
+  /// than `infinity`.
+  ///
+  /// This value corresponds to type-specific C macros such as `FLT_MAX` and
+  /// `DBL_MAX`. The naming of those macros is slightly misleading, because
+  /// `infinity` is greater than this value.
   public static var greatestFiniteMagnitude: ${Self} {
     return ${Self}(sign: .plus,
       exponentBitPattern: _infinityExponent - 1,
       significandBitPattern: _significandMask)
   }
 
+  /// The mathematical constant pi.
+  ///
+  /// This value should be rounded toward zero to keep user computations with
+  /// angles from inadvertently ending up in the wrong quadrant. A type that
+  /// conforms to the `FloatingPoint` protocol provides the value for `pi` at
+  /// its best possible precision.
+  ///
+  ///     print(Double.pi)
+  ///     // Prints "3.14159265358979"
   public static var pi: ${Self} {
 %if bits == 32:
     // Note: this is not the correctly rounded (to nearest) value of pi,
@@ -341,6 +519,25 @@ extension ${Self}: BinaryFloatingPoint {
 %end
   }
 
+  /// The unit in the last place of this value.
+  ///
+  /// This is the unit of the least significant digit in this value's
+  /// significand. For most numbers `x`, this is the difference between `x`
+  /// and the next greater (in magnitude) representable number. There are some
+  /// edge cases to be aware of:
+  ///
+  /// - If `x` is not a finite number, then `x.ulp` is NaN.
+  /// - If `x` is very small in magnitude, then `x.ulp` may be a subnormal
+  ///   number. If a type does not support subnormals, `x.ulp` may be rounded
+  ///   to zero.
+  /// - `greatestFiniteMagnitude.ulp` is a finite number, even though the next
+  ///   greater representable value is `infinity`.
+  ///
+  /// This quantity, or a related quantity, is sometimes called *epsilon* or
+  /// *machine epsilon.* Avoid that name because it has different meanings in
+  /// different languages, which can lead to confusion, and because it
+  /// suggests that it is a good tolerance to use for comparisons, which it
+  /// almost never is.
   public var ulp: ${Self} {
     if !isFinite { return ${Self}.nan }
     if exponentBitPattern > UInt(${Self}.significandBitCount) {
@@ -364,12 +561,27 @@ extension ${Self}: BinaryFloatingPoint {
       significandBitPattern: 1)
   }
 
+  /// The least positive normal number.
+  ///
+  /// This value compares less than or equal to all positive normal numbers.
+  /// There may be smaller positive numbers, but they are *subnormal*, meaning
+  /// that they are represented with less precision than normal numbers.
+  ///
+  /// This value corresponds to type-specific C macros such as `FLT_MIN` and
+  /// `DBL_MIN`. The naming of those macros is slightly misleading, because
+  /// subnormals, zeros, and negative numbers are smaller than this value.
   public static var leastNormalMagnitude: ${Self} {
     return ${Self}(sign: .plus,
       exponentBitPattern: 1,
       significandBitPattern: 0)
   }
 
+  /// The least positive number.
+  ///
+  /// This value compares less than or equal to all positive numbers, but
+  /// greater than zero. If the type supports subnormal values,
+  /// `leastNonzeroMagnitude` is smaller than `leastNormalMagnitude`;
+  /// otherwise they are equal.
   public static var leastNonzeroMagnitude: ${Self} {
 #if arch(arm)
     return leastNormalMagnitude
@@ -380,6 +592,32 @@ extension ${Self}: BinaryFloatingPoint {
 #endif
   }
 
+  /// The exponent of the floating-point value.
+  ///
+  /// The *exponent* of a floating-point value is the integer part of the
+  /// logarithm of the value's magnitude. For a value `x` of a floating-point
+  /// type `F`, the magnitude can be calculated as the following, where `**`
+  /// is exponentiation:
+  ///
+  ///     let magnitude = x.significand * F.radix ** x.exponent
+  ///
+  /// In the next example, `y` has a value of `21.5`, which is encoded as
+  /// `1.34375 * 2 ** 4`. The significand of `y` is therefore 1.34375.
+  ///
+  ///     let y: Double = 21.5
+  ///     // y.significand == 1.34375
+  ///     // y.exponent == 4
+  ///     // Double.radix == 2
+  ///
+  /// The `exponent` property has the following edge cases:
+  ///
+  /// - If `x` is zero, then `x.exponent` is `Int.min`.
+  /// - If `x` is +/-infinity or NaN, then `x.exponent` is `Int.max`
+  ///
+  /// This property implements the `logB` operation defined by the [IEEE 754
+  /// specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   public var exponent: Int {
     if !isFinite { return .max }
     if isZero { return .min }
@@ -389,6 +627,34 @@ extension ${Self}: BinaryFloatingPoint {
     return provisional + 1 - Int(shift)
   }
 
+  /// The significand of the floating-point value.
+  ///
+  /// The magnitude of a floating-point value `x` of type `F` can be calculated
+  /// by using the following formula, where `**` is exponentiation:
+  ///
+  ///     let magnitude = x.significand * F.radix ** x.exponent
+  ///
+  /// In the next example, `y` has a value of `21.5`, which is encoded as
+  /// `1.34375 * 2 ** 4`. The significand of `y` is therefore 1.34375.
+  ///
+  ///     let y: Double = 21.5
+  ///     // y.significand == 1.34375
+  ///     // y.exponent == 4
+  ///     // Double.radix == 2
+  ///
+  /// If a type's radix is 2, then for finite nonzero numbers, the significand
+  /// is in the range `1.0 ..< 2.0`. For other values of `x`, `x.significand`
+  /// is defined as follows:
+  ///
+  /// - If `x` is zero, then `x.significand` is 0.0.
+  /// - If `x` is infinity, then `x.significand` is 1.0.
+  /// - If `x` is NaN, then `x.significand` is NaN.
+  /// - Note: The significand is frequently also called the *mantissa*, but
+  ///   significand is the preferred terminology in the [IEEE 754
+  ///   specification][spec], to allay confusion with the use of mantissa for
+  ///   the fractional part of a logarithm.
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   public var significand: ${Self} {
     if isNaN { return self }
     if isNormal {
@@ -408,6 +674,49 @@ extension ${Self}: BinaryFloatingPoint {
       significandBitPattern: 0)
   }
 
+  /// Creates a new value from the given sign, exponent, and significand.
+  ///
+  /// The following example uses this initializer to create a new `Double`
+  /// instance. `Double` is a binary floating-point type that has a radix of
+  /// `2`.
+  ///
+  ///     let x = Double(sign: .plus, exponent: -2, significand: 1.5)
+  ///     // x == 0.375
+  ///
+  /// This initializer is equivalent to the following calculation, where `**`
+  /// is exponentiation, computed as if by a single, correctly rounded,
+  /// floating-point operation:
+  ///
+  ///     let sign: FloatingPointSign = .plus
+  ///     let exponent = -2
+  ///     let significand = 1.5
+  ///     let y = (sign == .minus ? -1 : 1) * significand * Double.radix ** exponent
+  ///     // y == 0.375
+  ///
+  /// As with any basic operation, if this value is outside the representable
+  /// range of the type, overflow or underflow occurs, and zero, a subnormal
+  /// value, or infinity may result. In addition, there are two other edge
+  /// cases:
+  ///
+  /// - If the value you pass to `significand` is zero or infinite, the result
+  ///   is zero or infinite, regardless of the value of `exponent`.
+  /// - If the value you pass to `significand` is NaN, the result is NaN.
+  ///
+  /// For any floating-point value `x` of type `F`, the result of the following
+  /// is equal to `x`, with the distinction that the result is canonicalized
+  /// if `x` is in a noncanonical encoding:
+  ///
+  ///     let x0 = F(sign: x.sign, exponent: x.exponent, significand: x.significand)
+  ///
+  /// This initializer implements the `scaleB` operation defined by the [IEEE
+  /// 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - sign: The sign to use for the new value.
+  ///   - exponent: The new value's exponent.
+  ///   - significand: The new value's significand.
   public init(sign: FloatingPointSign, exponent: Int, significand: ${Self}) {
     var result = significand
     if sign == .minus { result = -result }
@@ -468,6 +777,16 @@ extension ${Self}: BinaryFloatingPoint {
               significandBitPattern: significand)
   }
 
+  /// The least representable value that compares greater than this value.
+  ///
+  /// For any finite value `x`, `x.nextUp` is greater than `x`. For `nan` or
+  /// `infinity`, `x.nextUp` is `x` itself. The following special cases also
+  /// apply:
+  ///
+  /// - If `x` is `-infinity`, then `x.nextUp` is `-greatestFiniteMagnitude`.
+  /// - If `x` is `-leastNonzeroMagnitude`, then `x.nextUp` is `-0.0`.
+  /// - If `x` is zero, then `x.nextUp` is `leastNonzeroMagnitude`.
+  /// - If `x` is `greatestFiniteMagnitude`, then `x.nextUp` is `infinity`.
   public var nextUp: ${Self} {
     if isNaN { return self }
     if sign == .minus {
@@ -509,6 +828,40 @@ extension ${Self}: BinaryFloatingPoint {
       significandBitPattern: significandBitPattern + 1)
   }
 
+  /// Rounds the value to an integral value using the specified rounding rule.
+  ///
+  /// The following example rounds a value using four different rounding rules:
+  ///
+  ///     // Equivalent to the C 'round' function:
+  ///     var w = 6.5
+  ///     w.round(.toNearestOrAwayFromZero)
+  ///     // w == 7.0
+  ///
+  ///     // Equivalent to the C 'trunc' function:
+  ///     var x = 6.5
+  ///     x.round(.towardZero)
+  ///     // x == 6.0
+  ///
+  ///     // Equivalent to the C 'ceil' function:
+  ///     var y = 6.5
+  ///     y.round(.up)
+  ///     // y == 7.0
+  ///
+  ///     // Equivalent to the C 'floor' function:
+  ///     var z = 6.5
+  ///     z.round(.down)
+  ///     // z == 6.0
+  ///
+  /// For more information about the available rounding rules, see the
+  /// `FloatingPointRoundingRule` enumeration. To round a value using the
+  /// default "schoolbook rounding", you can use the shorter `round()` method
+  /// instead.
+  ///
+  ///     var w1 = 6.5
+  ///     w1.round()
+  ///     // w1 == 7.0
+  ///
+  /// - Parameter rule: The rounding rule to use.
   @_transparent
   public mutating func round(_ rule: FloatingPointRoundingRule) {
     switch rule {
@@ -532,6 +885,14 @@ extension ${Self}: BinaryFloatingPoint {
     }
   }
 
+  /// Replaces this value with its additive inverse.
+  ///
+  /// The result is always exact. This example uses the `negate()` method to
+  /// negate the value of the variable `x`:
+  ///
+  ///     var x = 21.5
+  ///     x.negate()
+  ///     // x == -21.5
   @_transparent
   public mutating func negate() {
     _value = Builtin.fneg_FPIEEE${bits}(self._value)
@@ -567,11 +928,42 @@ extension ${Self}: BinaryFloatingPoint {
 %end
   }
 
+  /// Replaces this value with the remainder of itself divided by the given
+  /// value using truncating division.
+  ///
+  /// Performing truncating division with floating-point values results in a
+  /// truncated integer quotient and a remainder. For values `x` and `y` and
+  /// their truncated integer quotient `q`, the remainder `r` satisfies
+  /// `x == y * q + r`.
+  ///
+  /// The following example calculates the truncating remainder of dividing
+  /// 8.625 by 0.75:
+  ///
+  ///     var x = 8.625
+  ///     print(x / 0.75)
+  ///     // Prints "11.5"
+  ///
+  ///     let q = (x / 0.75).rounded(.towardZero)
+  ///     // q == 11.0
+  ///     x.formTruncatingRemainder(dividingBy: 0.75)
+  ///     // x == 0.375
+  ///
+  ///     let x1 = 0.75 * q + x
+  ///     // x1 == 8.625
+  ///
+  /// If this value and `other` are both finite numbers, the truncating
+  /// remainder has the same sign as this value and is strictly smaller in
+  /// magnitude than `other`. The `formTruncatingRemainder(dividingBy:)`
+  /// method is always exact.
+  ///
+  /// - Parameter other: The value to use when dividing this value.
   @_transparent
   public mutating func formTruncatingRemainder(dividingBy other: ${Self}) {
     _value = Builtin.frem_FPIEEE${bits}(self._value, other._value)
   }
 
+  /// Replaces this value with its square root, rounded to a representable
+  /// value.
   @_transparent
   public mutating func formSquareRoot( ) {
 %if bits == 80:
@@ -581,61 +973,222 @@ extension ${Self}: BinaryFloatingPoint {
 %end
   }
 
+  /// Adds the product of the two given values to this value in place, computed
+  /// without intermediate rounding.
+  ///
+  /// - Parameters:
+  ///   - lhs: One of the values to multiply before adding to this value.
+  ///   - rhs: The other value to multiply.
   @_transparent
   public mutating func addProduct(_ lhs: ${Self}, _ rhs: ${Self}) {
     _value = Builtin.int_fma_FPIEEE${bits}(lhs._value, rhs._value, _value)
   }
 
+  /// Returns a Boolean value indicating whether this instance is equal to the
+  /// given value.
+  ///
+  /// This method serves as the basis for the equal-to operator (`==`) for
+  /// floating-point values. When comparing two values with this method, `-0`
+  /// is equal to `+0`. NaN is not equal to any value, including itself. For
+  /// example:
+  ///
+  ///     let x = 15.0
+  ///     x.isEqual(to: 15.0)
+  ///     // true
+  ///     x.isEqual(to: .nan)
+  ///     // false
+  ///     Double.nan.isEqual(to: .nan)
+  ///     // false
+  ///
+  /// The `isEqual(to:)` method implements the equality predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameter other: The value to compare with this value.
+  /// - Returns: `true` if `other` has the same value as this instance;
+  ///   otherwise, `false`.
   @_transparent
   public func isEqual(to other: ${Self}) -> Bool {
     return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(self._value, other._value))
   }
 
+  /// Returns a Boolean value indicating whether this instance is less than the
+  /// given value.
+  ///
+  /// This method serves as the basis for the less-than operator (`<`) for
+  /// floating-point values. Some special cases apply:
+  ///
+  /// - Because NaN compares not less than nor greater than any value, this
+  ///   method returns `false` when called on NaN or when NaN is passed as
+  ///   `other`.
+  /// - `-infinity` compares less than all values except for itself and NaN.
+  /// - Every value except for NaN and `+infinity` compares less than
+  ///   `+infinity`.
+  ///
+  ///     let x = 15.0
+  ///     x.isLess(than: 20.0)
+  ///     // true
+  ///     x.isLess(than: .nan)
+  ///     // false
+  ///     Double.nan.isLess(than: x)
+  ///     // false
+  ///
+  /// The `isLess(than:)` method implements the less-than predicate defined by
+  /// the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameter other: The value to compare with this value.
+  /// - Returns: `true` if `other` is less than this value; otherwise, `false`.
   @_transparent
   public func isLess(than other: ${Self}) -> Bool {
     return Bool(Builtin.fcmp_olt_FPIEEE${bits}(self._value, other._value))
   }
 
+  /// Returns a Boolean value indicating whether this instance is less than or
+  /// equal to the given value.
+  ///
+  /// This method serves as the basis for the less-than-or-equal-to operator
+  /// (`<=`) for floating-point values. Some special cases apply:
+  ///
+  /// - Because NaN is incomparable with any value, this method returns `false`
+  ///   when called on NaN or when NaN is passed as `other`.
+  /// - `-infinity` compares less than or equal to all values except NaN.
+  /// - Every value except NaN compares less than or equal to `+infinity`.
+  ///
+  ///     let x = 15.0
+  ///     x.isLessThanOrEqualTo(20.0)
+  ///     // true
+  ///     x.isLessThanOrEqualTo(.nan)
+  ///     // false
+  ///     Double.nan.isLessThanOrEqualTo(x)
+  ///     // false
+  ///
+  /// The `isLessThanOrEqualTo(_:)` method implements the less-than-or-equal
+  /// predicate defined by the [IEEE 754 specification][spec].
+  ///
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameter other: The value to compare with this value.
+  /// - Returns: `true` if `other` is less than this value; otherwise, `false`.
   @_transparent
   public func isLessThanOrEqualTo(_ other: ${Self}) -> Bool {
     return Bool(Builtin.fcmp_ole_FPIEEE${bits}(self._value, other._value))
   }
 
+  /// A Boolean value indicating whether this instance is normal.
+  ///
+  /// A *normal* value is a finite number that uses the full precision
+  /// available to values of a type. Zero is neither a normal nor a subnormal
+  /// number.
   @_transparent
   public var isNormal: Bool {
     return exponentBitPattern > 0 && isFinite
   }
 
+  /// A Boolean value indicating whether this instance is finite.
+  ///
+  /// All values other than NaN and infinity are considered finite, whether
+  /// normal or subnormal.
   @_transparent
   public var isFinite: Bool {
     return exponentBitPattern < ${Self}._infinityExponent
   }
 
+  /// A Boolean value indicating whether the instance is equal to zero.
+  ///
+  /// The `isZero` property of a value `x` is `true` when `x` represents either
+  /// `-0.0` or `+0.0`. `x.isZero` is equivalent to the following comparison:
+  /// `x == 0.0`.
+  ///
+  ///     let x = -0.0
+  ///     x.isZero        // true
+  ///     x == 0.0        // true
   @_transparent
   public var isZero: Bool {
     return exponentBitPattern == 0 && significandBitPattern == 0
   }
 
+  /// A Boolean value indicating whether the instance is subnormal.
+  ///
+  /// A *subnormal* value is a nonzero number that has a lesser magnitude than
+  /// the smallest normal number. Subnormal values do not use the full
+  /// precision available to values of a type.
+  ///
+  /// Zero is neither a normal nor a subnormal number. Subnormal numbers are
+  /// often called *denormal* or *denormalized*---these are different names
+  /// for the same concept.
   @_transparent
   public var isSubnormal:  Bool {
     return exponentBitPattern == 0 && significandBitPattern != 0
   }
 
+  /// A Boolean value indicating whether the instance is infinite.
+  ///
+  /// Note that `isFinite` and `isInfinite` do not form a dichotomy, because
+  /// they are not total: If `x` is `NaN`, then both properties are `false`.
   @_transparent
   public var isInfinite:  Bool {
     return !isFinite && significandBitPattern == 0
   }
 
+  /// A Boolean value indicating whether the instance is NaN ("not a number").
+  ///
+  /// Because NaN is not equal to any value, including NaN, use this property
+  /// instead of the equal-to operator (`==`) or not-equal-to operator (`!=`)
+  /// to test whether a value is or is not NaN. For example:
+  ///
+  ///     let x = 0.0
+  ///     let y = x * .infinity
+  ///     // y is a NaN
+  ///
+  ///     // Comparing with the equal-to operator never returns 'true'
+  ///     print(x == Double.nan)
+  ///     // Prints "false"
+  ///     print(y == Double.nan)
+  ///     // Prints "false"
+  ///
+  ///     // Test with the 'isNaN' property instead
+  ///     print(x.isNaN)
+  ///     // Prints "false"
+  ///     print(y.isNaN)
+  ///     // Prints "true"
+  ///
+  /// This property is `true` for both quiet and signaling NaNs.
   @_transparent
   public var isNaN:  Bool {
     return !isFinite && significandBitPattern != 0
   }
 
+  /// A Boolean value indicating whether the instance is a signaling NaN.
+  ///
+  /// Signaling NaNs typically raise the Invalid flag when used in general
+  /// computing operations.
   @_transparent
   public var isSignalingNaN: Bool {
     return isNaN && (significandBitPattern & ${Self}._quietNaNMask) == 0
   }
 
+  /// The floating-point value with the same sign and exponent as this value,
+  /// but with a significand of 1.0.
+  ///
+  /// A *binade* is a set of binary floating-point values that all have the
+  /// same sign and exponent. The `binade` property is a member of the same
+  /// binade as this value, but with a unit significand.
+  ///
+  /// In this example, `x` has a value of `21.5`, which is stored as
+  /// `1.34375 * 2**4`, where `**` is exponentiation. Therefore, `x.binade` is
+  /// equal to `1.0 * 2**4`, or `16.0`.
+  ///
+  ///     let x = 21.5
+  ///     // x.significand == 1.34375
+  ///     // x.exponent == 4
+  ///
+  ///     let y = x.binade
+  ///     // y == 16.0
+  ///     // y.significand == 1.0
+  ///     // y.exponent == 4
   public var binade: ${Self} {
     if !isFinite { return .nan }
     if exponentBitPattern != 0 {
@@ -649,6 +1202,20 @@ extension ${Self}: BinaryFloatingPoint {
       significandBitPattern: 1 &<< RawSignificand(index))
   }
 
+  /// The number of bits required to represent the value's significand.
+  ///
+  /// If this value is a finite nonzero number, `significandWidth` is the
+  /// number of fractional bits required to represent the value of
+  /// `significand`; otherwise, `significandWidth` is -1. The value of
+  /// `significandWidth` is always -1 or between zero and
+  /// `significandBitCount`. For example:
+  ///
+  /// - For any representable power of two, `significandWidth` is zero, because
+  ///   `significand` is `1.0`.
+  /// - If `x` is 10, `x.significand` is `1.01` in binary, so
+  ///   `x.significandWidth` is 2.
+  /// - If `x` is Float.pi, `x.significand` is `1.10010010000111111011011` in
+  ///   binary, and `x.significandWidth` is 23.
   public var significandWidth: Int {
     let trailingZeroBits = significandBitPattern.trailingZeroBitCount
     if isNormal {
@@ -706,7 +1273,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
   }
 }
 
-#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 
 % builtinFloatLiteralBits = 80
 extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
@@ -758,11 +1325,11 @@ extension ${Self} : Hashable {
     %if bits <= word_bits:
       return Int(bitPattern: UInt(bitPattern))
     %elif bits == 64: # Double -> 32-bit Int
-      return Int(extendingOrTruncating: bitPattern &>> 32) ^
-             Int(extendingOrTruncating: bitPattern)
+      return Int(truncatingIfNeeded: bitPattern &>> 32) ^
+             Int(truncatingIfNeeded: bitPattern)
     %elif word_bits == 32: # Float80 -> 32-bit Int
-      return Int(extendingOrTruncating: significandBitPattern &>> 32) ^
-             Int(extendingOrTruncating: significandBitPattern) ^
+      return Int(truncatingIfNeeded: significandBitPattern &>> 32) ^
+             Int(truncatingIfNeeded: significandBitPattern) ^
              Int(_representation.signAndExponent)
     %else: # Float80 -> 64-bit Int
       return Int(bitPattern: UInt(significandBitPattern)) ^
@@ -793,13 +1360,14 @@ extension ${Self} {
   ///     // Use 'abs(_:)' instead of 'magnitude'
   ///     print("Missed the target by \(abs(margin)) meters.")
   ///     // Prints "Missed the target by 0.25 meters."
-  ///
-  /// - SeeAlso: `abs(_:)`
   @_transparent
   public var magnitude: ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))
   }
 
+  /// Creates the closest representable value to the given integer.
+  ///
+  /// - Parameter value: The integer to represent as a floating-point value.
   // FIXME(integers): implement properly
   public init?<T : BinaryInteger>(exactly source: T) {
     fatalError()
@@ -825,11 +1393,20 @@ extension ${Self} {
 %   ThatBuiltinName = self_ty.builtin_name
 %   srcBits = self_ty.bits
 %   sign = 's' if self_ty.is_signed else 'u'
+  /// Creates the closest representable value to the given integer.
+  ///
+  /// - Parameter value: The integer to represent as a floating-point value.
   @_transparent
   public init(_ v: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
   
+  /// Creates a value that exactly represents the given integer.
+  ///
+  /// If the given integer is outside the representable range of this type or
+  /// can't be represented exactly, the result is `nil`.
+  ///
+  /// - Parameter value: The integer to represent as a floating-point value.
 %   if srcBits < SignificandBitCount:
   @available(*, message: "Converting ${That} to ${Self} will always succeed.")
 %   end
@@ -853,7 +1430,7 @@ extension ${Self} {
 %   That = src_type.stdlib_name
 
 %   if srcBits == 80:
-#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 %   end
 
 %   if srcBits == bits:

@@ -23,7 +23,7 @@ using namespace swift;
 using namespace Lowering;
 
 /// Emit a copy of this value with independent ownership.
-ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) {
+ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
   auto &lowering = SGF.getTypeLowering(getType());
   if (lowering.isTrivial())
     return *this;
@@ -126,6 +126,12 @@ void ManagedValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                         IsNotInitialization);
 }
 
+void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
+                               Initialization *dest) {
+  dest->copyOrInitValueInto(SGF, loc, *this, /*isInit*/ true);
+  dest->finishInitialization(SGF);
+}
+
 ManagedValue ManagedValue::borrow(SILGenFunction &SGF, SILLocation loc) const {
   assert(getValue() && "cannot borrow an invalid or in-context value");
   if (isLValue())
@@ -172,7 +178,20 @@ void ManagedValue::print(raw_ostream &os) const {
 }
 
 void ManagedValue::dump() const {
-#ifndef NDEBUG
-  print(llvm::dbgs());
-#endif
+  dump(llvm::errs());
+}
+
+void ManagedValue::dump(raw_ostream &os, unsigned indent) const {
+  os.indent(indent);
+  if (isInContext()) {
+    os << "InContext\n";
+    return;
+  }
+  if (isLValue()) os << "[lvalue] ";
+  if (hasCleanup()) os << "[cleanup] ";
+  if (SILValue v = getValue()) {
+    v->print(os);
+  } else {
+    os << "<null>\n";
+  }
 }

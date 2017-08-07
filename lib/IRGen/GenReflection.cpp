@@ -340,7 +340,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
-      auto fieldName = IGM.getAddrOfFieldName(value->getNameStr());
+      auto name = value->getBaseName().getIdentifier().str();
+      auto fieldName = IGM.getAddrOfFieldName(name);
       B.addRelativeAddress(fieldName);
     } else {
       B.addInt32(0);
@@ -927,8 +928,7 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     // extra inhabitants as these. But maybe it's best not to codify
     // that in the ABI anyway.
     CanType thinFunction = CanFunctionType::get(
-      TupleType::getEmpty(Context),
-      TupleType::getEmpty(Context),
+      AnyFunctionType::CanParamArrayRef({}), Context.TheEmptyTupleType,
       AnyFunctionType::ExtInfo().withRepresentation(
           FunctionTypeRepresentation::Thin));
     BuiltinTypes.insert(thinFunction);
@@ -960,6 +960,14 @@ void IRGenerator::emitBuiltinReflectionMetadata() {
 void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
+
+  // @objc enums never have generic parameters or payloads,
+  // and lower as their raw type.
+  if (auto *ED = dyn_cast<EnumDecl>(Decl))
+    if (ED->isObjC()) {
+      emitOpaqueTypeMetadataRecord(ED);
+      return;
+    }
 
   FieldTypeMetadataBuilder builder(*this, Decl);
   builder.emit();

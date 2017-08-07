@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -O | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-inline-generics -enable-sil-verify-all %s -O | %FileCheck %s
 
 // Check some corner cases related to tracking of opened archetypes.
 // For example, the compiler used to crash compiling the "process" function (rdar://28024272)
@@ -209,8 +209,8 @@ sil hidden_external @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 // It should contain alloc_ref and alloc_stack instructions using opened archetypes.
 // CHECK-LABEL: sil @bar
 // CHECK: open_existential{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
-// CHECK: alloc_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
 // CHECK: alloc_stack{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK: alloc_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
 // CHECK-NOT: function_ref @use
 // CHECK: function_ref @use 
 // CHECK-NOT: function_ref
@@ -228,4 +228,37 @@ bb0(%0 : $*P):
   %6 = tuple ()
   return %6 : $()
 } // end sil function 'bar'
+
+// A helper function that does not use its arguments at all
+sil @dont_use_arguments: $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// Check that dont_use_arguments is inlined into check_removal_of_unregistered_archetype_def
+// and this does not lead to an "Opened archetype definition is not registered in
+// SILFunction" assertion failure, that used to happen because the apply instruction
+// was not aware of the opened archetype definition that becomes unused and gets removed
+// after the inlining.
+//
+// CHECK-LABEL: sil @check_removal_of_unregistered_archetype_def
+// CHECK-NOT: init_existential
+// CHECK-NOT: open_existential
+// CHECK-NOT: function_ref
+// CHECK-NOT: apply
+// CHECK: strong_release
+// CHECK: end sil function 'check_removal_of_unregistered_archetype_def'
+sil @check_removal_of_unregistered_archetype_def : $@convention(thin) (AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = struct $Int32(%2 : $Builtin.Int32)
+  %4 = mark_dependence %3 : $Int32 on %1 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %5 = function_ref @dont_use_arguments : $@convention(thin) (Int32) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (Int32) -> ()
+  strong_release %0 : $AnyObject
+  %8 = tuple ()
+  return %8 : $()
+} // end sil function 'check_removal_of_unregistered_archetype_def'
 

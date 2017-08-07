@@ -18,27 +18,6 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
-  list(APPEND swift_runtime_compile_flags
-    "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
-endif()
-
-if(SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING)
-  list(APPEND swift_runtime_compile_flags
-    "-DSWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING=1")
-else()
-  list(APPEND swift_runtime_compile_flags
-    "-DSWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING=0")
-endif()
-
-if(SWIFT_RUNTIME_DLADDR_ALLOWED)
-  list(APPEND swift_runtime_compile_flags
-    "-DSWIFT_RUNTIME_DLADDR_ALLOW=1")
-else()
-  list(APPEND swift_runtime_compile_flags
-    "-DSWIFT_RUNTIME_DLADDR_ALLOW=0")
-endif()
-
 set(section_magic_compile_flags ${swift_runtime_compile_flags})
 
 list(APPEND swift_runtime_compile_flags

@@ -161,7 +161,7 @@ class subject_class1 { // no-error
 class subject_class2 : Protocol_Class1, PlainProtocol { // no-error
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{1-7=}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{1-7=}}
 class subject_genericClass<T> {
   @objc
   var subject_instanceVar: Int // no-error
@@ -173,7 +173,7 @@ class subject_genericClass<T> {
   func subject_instanceFunc() {} // no_error
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{1-7=}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{1-7=}}
 class subject_genericClass2<T> : Class_ObjC1 {
   @objc
   var subject_instanceVar: Int // no-error
@@ -359,10 +359,10 @@ class ConcreteContext3 {
 }
 
 func genericContext1<T>(_: T) {
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{3-9=}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{3-9=}}
   class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' cannot be nested in generic function 'genericContext1'}}
 
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{3-9=}}
   class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{type 'subject_inGenericContext2' cannot be nested in generic function 'genericContext1'}}
 
   class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' cannot be nested in generic function 'genericContext1'}}
@@ -382,10 +382,10 @@ func genericContext1<T>(_: T) {
 }
 
 class GenericContext2<T> {
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{3-9=}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{3-9=}}
   class subject_inGenericContext {}
 
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{3-9=}}
   class subject_inGenericContext2 : Class_ObjC1 {}
 
   @objc
@@ -394,10 +394,10 @@ class GenericContext2<T> {
 
 class GenericContext3<T> {
   class MoreNested {
-    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{5-11=}}
+    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{5-11=}}
     class subject_inGenericContext {}
 
-    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{5-11=}}
+    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{5-11=}}
     class subject_inGenericContext2 : Class_ObjC1 {}
 
     @objc
@@ -405,17 +405,24 @@ class GenericContext3<T> {
   }
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{1-7=}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{1-7=}}
 class ConcreteSubclassOfGeneric : GenericContext3<Int> {}
 
 extension ConcreteSubclassOfGeneric {
   @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{1-7=}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{1-7=}}
 class ConcreteSubclassOfGeneric2 : subject_genericClass2<Int> {}
 
 extension ConcreteSubclassOfGeneric2 {
+  @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
+}
+
+@objc(CustomNameForSubclassOfGeneric) // okay
+class ConcreteSubclassOfGeneric3 : GenericContext3<Int> {}
+
+extension ConcreteSubclassOfGeneric3 {
   @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
 }
 
@@ -860,8 +867,8 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_Float: Float
 // CHECK-LABEL: @objc var var_Double: Double
 
-  var var_Char: UnicodeScalar
-// CHECK-LABEL: @objc var var_Char: UnicodeScalar
+  var var_Char: Unicode.Scalar
+// CHECK-LABEL: @objc var var_Char: Unicode.Scalar
 
   //===--- Tuples.
 
@@ -2254,4 +2261,24 @@ extension SubclassInfersFromProtocol2 {
 
 @objc class NeverReturningMethod {
   @objc func doesNotReturn() -> Never {}
+}
+
+// SR-5025
+class User: NSObject {
+}
+
+@objc extension User {
+	var name: String {
+		get {
+			return "No name"
+		}
+		set {
+			// Nothing
+		}
+	}
+
+	var other: String {
+    unsafeAddress { // expected-error{{addressors are not allowed to be marked @objc}}
+    }
+  }
 }

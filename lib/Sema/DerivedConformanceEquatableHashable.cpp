@@ -70,7 +70,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   Type enumType = enumVarDecl->getType();
   Type intType = C.getIntDecl()->getDeclaredType();
 
-  auto indexVar = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
                                   /*IsCaptureList*/false, SourceLoc(),
                                   C.getIdentifier(indexName), intType,
                                   funcDecl);
@@ -88,7 +88,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                               indexPat, nullptr, funcDecl);
 
   unsigned index = 0;
-  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     // generate: case .<Case>:
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
@@ -217,7 +217,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl* {
-    auto *param = new (C) ParamDecl(/*isLet*/true, SourceLoc(), SourceLoc(),
+    auto *param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                     Identifier(), SourceLoc(), C.getIdentifier(s),
                                     enumTy, parentDC);
     param->setInterfaceType(enumIfaceTy);
@@ -277,7 +277,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
 
   // Compute the interface type.
   Type interfaceTy;
-  Type selfIfaceTy = eqDecl->computeInterfaceSelfType();
+  auto selfParam = computeSelfParam(eqDecl);
   if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
     eqDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
 
@@ -288,11 +288,12 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
     auto ifaceParamsTy = TupleType::get(ifaceParamElts, C);
     interfaceTy = FunctionType::get(ifaceParamsTy, boolTy,
                                     AnyFunctionType::ExtInfo());
-    interfaceTy = GenericFunctionType::get(genericSig, selfIfaceTy, interfaceTy,
+    interfaceTy = GenericFunctionType::get(genericSig, {selfParam}, interfaceTy,
                                            AnyFunctionType::ExtInfo());
   } else {
     interfaceTy = FunctionType::get(paramsTy, boolTy);
-    interfaceTy = FunctionType::get(selfIfaceTy, interfaceTy);
+    interfaceTy = FunctionType::get({selfParam}, interfaceTy,
+                                    FunctionType::ExtInfo());
   }
   eqDecl->setInterfaceType(interfaceTy);
 
@@ -322,7 +323,7 @@ ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
     return nullptr;
 
   // Build the necessary decl.
-  if (requirement->getName().str() == "==") {
+  if (requirement->getBaseName() == "==") {
     if (auto theEnum = dyn_cast<EnumDecl>(type))
       return deriveEquatable_enum_eq(tc, parentDecl, theEnum);
     else
@@ -419,13 +420,14 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
 
   // Compute the interface type of hashValue().
   Type interfaceType;
-  Type selfIfaceType = getterDecl->computeInterfaceSelfType();
+  auto selfParam = computeSelfParam(getterDecl);
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     getterDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, selfIfaceType, methodType,
+    interfaceType = GenericFunctionType::get(sig, {selfParam}, methodType,
                                              AnyFunctionType::ExtInfo());
   } else
-    interfaceType = FunctionType::get(selfIfaceType, methodType);
+    interfaceType = FunctionType::get({selfParam}, methodType,
+                                      AnyFunctionType::ExtInfo());
   
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(std::max(Accessibility::Internal,
@@ -438,7 +440,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     tc.Context.addExternalDecl(getterDecl);
 
   // Create the property.
-  VarDecl *hashValueDecl = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/false,
+  VarDecl *hashValueDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
                                            /*IsCaptureList*/false, SourceLoc(),
                                            C.Id_hashValue, intType, parentDC);
   hashValueDecl->setImplicit();
@@ -476,7 +478,7 @@ ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
     return nullptr;
   
   // Build the necessary decl.
-  if (requirement->getName().str() == "hashValue") {
+  if (requirement->getBaseName() == "hashValue") {
     if (auto theEnum = dyn_cast<EnumDecl>(type))
       return deriveHashable_enum_hashValue(tc, parentDecl, theEnum);
     else

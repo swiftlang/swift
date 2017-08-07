@@ -653,6 +653,10 @@ void Remangler::manglePartialApplyObjCForwarder(Node *node) {
   mangleSingleChildNode(node); // global
 }
 
+void Remangler::mangleMergedFunction(Node *node) {
+  Out << "Tm";
+}
+
 void Remangler::mangleDirectness(Node *node) {
   auto getChar = [](Directness d) -> char {
     switch (d) {
@@ -1243,6 +1247,11 @@ void Remangler::mangleUnmanaged(Node *node) {
 
 void Remangler::mangleWeak(Node *node) {
   Out << "Xw";
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleShared(Node *node) {
+  Out << 'h';
   mangleSingleChildNode(node); // type
 }
 

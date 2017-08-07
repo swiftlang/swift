@@ -37,6 +37,8 @@ sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 
 sil @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 
+sil @unknown : $@convention(thin) () -> ()
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -1755,7 +1757,6 @@ sil [readonly] @read_only_in : $@convention(thin) (@in SSS) -> ()
 struct MyError : Error {
 }
 
-sil @unknown : $@convention(thin) () -> ()
 sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
 
 sil [readonly] @readonly_owned : $@convention(thin) (@owned B) -> @owned B
@@ -2266,36 +2267,6 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer):
   return %13 : $()
 }
 
-// Make sure that we handle partial_apply captured arguments correctly.
-sil @sil_combine_partial_apply_callee : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
-
-// CHECK-LABEL: sil @sil_combine_partial_apply_caller : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG1:%.*]] : $*Builtin.NativeObject, [[ARG2:%.*]] : $*Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $Builtin.NativeObject, [[ARG5:%.*]] : $Builtin.NativeObject):
-// CHECK-NEXT: strong_retain [[ARG3]]
-// CHECK-NEXT: strong_retain [[ARG4]]
-// CHECK-NEXT: strong_retain [[ARG5]]
-// CHECK-NEXT: strong_release [[ARG3]]
-// CHECK-NEXT: strong_release [[ARG4]]
-// CHECK-NEXT: strong_release [[ARG5]]
-// CHECK-NEXT: strong_release [[ARG4]]
-// CHECK-NEXT: destroy_addr [[ARG1]]
-sil @sil_combine_partial_apply_caller : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject):
-  %100 = function_ref @sil_combine_partial_apply_callee : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
-  %101 = alloc_stack $Builtin.NativeObject
-  copy_addr %0 to [initialization] %101 : $*Builtin.NativeObject
-  strong_retain %2 : $Builtin.NativeObject
-  strong_retain %3 : $Builtin.NativeObject
-  strong_retain %4 : $Builtin.NativeObject
-  %102 = partial_apply %100(%101, %1, %2, %3, %4) : $@convention(thin) (@in Builtin.NativeObject, @inout Builtin.NativeObject, Builtin.NativeObject, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
-  strong_release %102 : $@callee_owned () -> ()
-  strong_release %3 : $Builtin.NativeObject
-  destroy_addr %0 : $*Builtin.NativeObject
-  dealloc_stack %101 : $*Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 // CHECK-LABEL: sil @cmp_zext_peephole
 // CHECK: bb0([[Arg1:%.*]] : $Builtin.Word, [[Arg2:%.*]] : $Builtin.Word):
 // CHECK:   [[ZA1:%.*]] = builtin "zextOrBitCast_Word_Int64"([[Arg1]] : $Builtin.Word) : $Builtin.Int64
@@ -2438,6 +2409,20 @@ bb0(%0 : $*B):
   copy_addr %0 to [initialization] %1 : $*B
   destroy_addr %1 : $*B
   dealloc_stack %1 : $*B
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @delete_dead_alloc_ref
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @delete_dead_alloc_ref : $() -> () {
+bb0:
+  %1 = alloc_ref $B
+  set_deallocating %1 : $B
+  fix_lifetime %1 : $B
+  dealloc_ref %1 : $B
   %2 = tuple()
   return %2 : $()
 }
@@ -2907,8 +2892,8 @@ bb2:
 // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $T
 // CHECK: [[FN:%.*]] = function_ref @generic_callee
 // CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[TMP]] : $*T
-// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
 // CHECK-NEXT: destroy_addr [[ARG1]]
+// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
 // CHECK-NEXT: destroy_addr [[TMP]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: dealloc_stack [[TMP]]

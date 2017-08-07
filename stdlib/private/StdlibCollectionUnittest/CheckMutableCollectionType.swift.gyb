@@ -121,6 +121,8 @@ extension TestSuite {
     isFixedLengthCollection: Bool,
     collectionIsBidirectional: Bool = false
   ) where
+    C.SubSequence : MutableCollection,
+    C.Indices : Collection,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Iterator.Element : Comparable {
 
@@ -258,8 +260,7 @@ self.test("\(testNamePrefix).subscript(_: Range)/Set/semantics") {
 
       let newElements = makeWrappedCollection(
         test.expected.map { OpaqueValue($0.value + 90000) })
-      c[test.bounds(in: c)] =
-        newElements[newElements.startIndex..<newElements.endIndex]
+      c[test.bounds(in: c)] = newElements[...]
 
       // FIXME: improve checkForwardCollection to check the SubSequence type.
       /*
@@ -301,8 +302,7 @@ if isFixedLengthCollection {
     let newElements = makeWrappedCollection([ 91010, 92020, 93030, 94040 ].map(OpaqueValue.init))
 
     expectCrashLater()
-    c[c.startIndex..<c.endIndex] =
-      newElements[newElements.startIndex..<newElements.endIndex]
+    c[...] = newElements[...]
   }
 
   self.test("\(testNamePrefix).subscript(_: Range)/Set/SmallerRange") {
@@ -310,8 +310,7 @@ if isFixedLengthCollection {
     let newElements = makeWrappedCollection([ 91010, 92020 ].map(OpaqueValue.init))
 
     expectCrashLater()
-    c[c.startIndex..<c.endIndex] =
-      newElements[newElements.startIndex..<newElements.endIndex]
+    c[...] = newElements[...]
   }
 } else {
   self.test("\(testNamePrefix).subscript(_: Range)/Set/DifferentlySizedRange") {
@@ -320,8 +319,7 @@ if isFixedLengthCollection {
       let newElements = makeWrappedCollection(test.newElements)
       let rangeToReplace = test.rangeSelection.range(in: c)
 
-      c[rangeToReplace] =
-        newElements[newElements.startIndex..<newElements.endIndex]
+      c[rangeToReplace] = newElements[...]
 
       expectEqualSequence(
         test.expected,
@@ -365,8 +363,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
             let newValues = makeWrappedCollection(
               elements[i..<j].map { OpaqueValue($0.value + 90000) }
             )
-            slice[subSliceStartIndex..<subSliceEndIndex]
-              = newValues[newValues.startIndex..<newValues.endIndex]
+            slice[subSliceStartIndex..<subSliceEndIndex] = newValues[...]
             let subSlice = slice[subSliceStartIndex..<subSliceEndIndex]
             for (k, index) in subSlice.indices.enumerated() {
               expectEqual(
@@ -380,8 +377,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
                 extractValue(subSlice[index]).value)
             }
             let oldValues = makeWrappedCollection(Array(elements[i..<j]))
-            slice[subSliceStartIndex..<subSliceEndIndex]
-              = oldValues[oldValues.startIndex..<oldValues.endIndex]
+            slice[subSliceStartIndex..<subSliceEndIndex] = oldValues[...]
           }
         }
       }
@@ -435,7 +431,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     let count: Int = numericCast(
       base.distance(from: bounds.lowerBound, to: bounds.upperBound))
     let newValues = makeWrappedCollection(Array(elements[0..<count]))
-    let newSlice = newValues[newValues.startIndex..<newValues.endIndex]
+    let newSlice = newValues[...]
 
     expectCrashLater()
     slice[bounds] = newSlice
@@ -781,6 +777,8 @@ self.test("\(testNamePrefix).partition/InvalidOrderings") {
     withUnsafeMutableBufferPointerIsSupported: Bool,
     isFixedLengthCollection: Bool
   ) where
+    C.SubSequence : BidirectionalCollection & MutableCollection,
+    C.Indices : BidirectionalCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Iterator.Element : Comparable {
 
@@ -925,6 +923,8 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
     withUnsafeMutableBufferPointerIsSupported: Bool,
     isFixedLengthCollection: Bool
   ) where
+    C.SubSequence : RandomAccessCollection & MutableCollection,
+    C.Indices : RandomAccessCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Iterator.Element : Comparable {
 

@@ -16,9 +16,10 @@ set(sources
   Visibility.h
 
   DispatchOverlayShims.h
-  ObjectiveCOverlayShims.h
   OSOverlayShims.h
+  ObjectiveCOverlayShims.h
   SafariServicesOverlayShims.h
+  UIKitOverlayShims.h
   XCTestOverlayShims.h
   XPCOverlayShims.h
 
@@ -29,6 +30,7 @@ set(sources
   FoundationOverlayShims.h
   FoundationShimSupport.h
   NSCalendarShims.h
+  NSCharacterSetShims.h
   NSCoderShims.h
   NSDataShims.h
   NSDictionaryShims.h

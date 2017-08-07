@@ -25,9 +25,14 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SaveAndRestore.h"
+
+#define DEBUG_TYPE "AST"
+
+STATISTIC(NumConformanceLookupTables, "# of conformance lookup tables built");
 
 using namespace swift;
 
@@ -227,6 +232,12 @@ Type ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
   return getTypeWitnessAndDecl(assocType, resolver, options).first;
 }
 
+ConcreteDeclRef
+ProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
+                                       LazyResolver *resolver) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getWitnessDeclRef, (requirement, resolver))
+}
+
 ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement,
                                                LazyResolver *resolver) const {
   switch (getKind()) {
@@ -250,18 +261,6 @@ ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement,
 bool ProtocolConformance::
 usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
-}
-
-bool ProtocolConformance::hasFixedLayout() const {
-  // A conformance/witness table has fixed layout if type has a fixed layout in
-  // all resilience domains, and the conformance is externally visible.
-  if (auto nominal = getType()->getAnyNominal())
-    if (nominal->hasFixedLayout() &&
-        getProtocol()->getEffectiveAccess() >= Accessibility::Public &&
-        nominal->getEffectiveAccess() >= Accessibility::Public)
-      return true;
-
-  return false;
 }
 
 GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
@@ -317,7 +316,7 @@ void NormalProtocolConformance::setSignatureConformances(
 
 #if !NDEBUG
   unsigned idx = 0;
-  for (auto req : getProtocol()->getRequirementSignature()->getRequirements()) {
+  for (const auto &req : getProtocol()->getRequirementSignature()) {
     if (req.getKind() == RequirementKind::Conformance) {
       assert(idx < conformances.size());
       assert(conformances[idx].getRequirement() ==
@@ -602,8 +601,7 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
          "signature conformances not yet computed");
 
   unsigned conformanceIndex = 0;
-  for (auto &reqt :
-         getProtocol()->getRequirementSignature()->getRequirements()) {
+  for (const auto &reqt : getProtocol()->getRequirementSignature()) {
     if (reqt.getKind() == RequirementKind::Conformance) {
       // Is this the conformance we're looking for?
       if (reqt.getFirstType()->isEqual(assocType) &&
@@ -618,7 +616,7 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
     "requested conformance was not a direct requirement of the protocol");
 }
 
-  /// Retrieve the value witness corresponding to the given requirement.
+/// Retrieve the value witness corresponding to the given requirement.
 Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
                                               LazyResolver *resolver) const {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
@@ -640,6 +638,14 @@ Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
            "Resolver did not resolve requirement");
     return Witness();
   }
+}
+
+ConcreteDeclRef
+NormalProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
+                                             LazyResolver *resolver) const {
+  if (auto witness = getWitness(requirement, resolver))
+    return witness.getDeclRef();
+  return ConcreteDeclRef();
 }
 
 void NormalProtocolConformance::setWitness(ValueDecl *requirement,
@@ -748,6 +754,35 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
                            LookUpConformanceInSubstitutionMap(subMap));
 }
 
+ConcreteDeclRef
+SpecializedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
+                                                  LazyResolver *resolver) const {
+  auto baseWitness = GenericConformance->getWitnessDeclRef(requirement, resolver);
+  if (!baseWitness || !baseWitness.isSpecialized())
+    return baseWitness;
+
+  auto genericSig = GenericConformance->getGenericSignature();
+  auto specializationMap =
+    genericSig->getSubstitutionMap(GenericSubstitutions);
+
+  auto witnessDecl = baseWitness.getDecl();
+  auto witnessSig =
+    witnessDecl->getInnermostDeclContext()->getGenericSignatureOfContext();
+  auto witnessMap =
+    witnessSig->getSubstitutionMap(baseWitness.getSubstitutions());
+
+  auto combinedMap = witnessMap.subst(specializationMap);
+
+  SmallVector<Substitution, 4> substSubs;
+  witnessSig->getSubstitutions(combinedMap, substSubs);
+
+  // Fast path if the substitutions didn't change.
+  if (SubstitutionList(substSubs) == baseWitness.getSubstitutions())
+    return baseWitness;
+
+  return ConcreteDeclRef(witnessDecl->getASTContext(), witnessDecl, substSubs);
+}
+
 ProtocolConformanceRef
 InheritedProtocolConformance::getAssociatedConformance(Type assocType,
                          ProtocolDecl *protocol,
@@ -768,6 +803,13 @@ InheritedProtocolConformance::getAssociatedConformance(Type assocType,
   }
 
   return underlying;
+}
+
+ConcreteDeclRef
+InheritedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
+                                                LazyResolver *resolver) const {
+  // FIXME: substitutions?
+  return InheritedConformance->getWitnessDeclRef(requirement, resolver);
 }
 
 const NormalProtocolConformance *
@@ -880,6 +922,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
   auto resolver = ctx.getLazyResolver();
   ConformanceTable = new (ctx) ConformanceLookupTable(ctx, mutableThis,
                                                       resolver);
+  ++NumConformanceLookupTables;
 
   // If this type declaration was not parsed from source code or introduced
   // via the Clang importer, don't add any synthesized conformances.

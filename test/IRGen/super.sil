@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_struct -o %t %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_class -o %t %S/../Inputs/resilient_class.swift
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
@@ -207,7 +206,6 @@ sil_vtable Derived {
 // CHECK: [[BASEMETADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to void (%T5super4BaseC*)**
 // CHECK: [[GEP:%[0-9]+]] = getelementptr inbounds void (%T5super4BaseC*)*, void (%T5super4BaseC*)** [[BASEMETADATA]]
 // CHECK: [[SUPERMT:%[0-9]+]] = load void (%T5super4BaseC*)*, void (%T5super4BaseC*)** [[GEP]]
-// CHECK: bitcast void (%T5super4BaseC*)* [[SUPERMT]] to i8*
 // CHECK: ret void
 sil @test_super_method_of_generic_base : $@convention(method) (@guaranteed Derived) -> () {
 bb0(%0 : $Derived):

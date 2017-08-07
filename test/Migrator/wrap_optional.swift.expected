@@ -1,7 +1,7 @@
 // REQUIRES: objc_interop
-// RUN: rm -rf %t.mod && mkdir -p %t.mod
-// RUN: %target-swift-frontend -emit-module -o %t.mod/cities.swiftmodule %S/Inputs/cities.swift -module-name Cities -parse-as-library
-// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -c -update-code -disable-migrator-fixits -primary-file %s  -I %t.mod -api-diff-data-file %S/API.json -emit-migrated-file-path %t/wrap_optional.swift.result -o %t/wrap_optional.swift.remap -o /dev/null
+// RUN: %empty-directory(%t.mod)
+// RUN: %target-swift-frontend -emit-module -o %t.mod/Cities.swiftmodule %S/Inputs/Cities.swift -module-name Cities -parse-as-library
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -disable-migrator-fixits -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/API.json -emit-migrated-file-path %t/wrap_optional.swift.result -o %t/wrap_optional.swift.remap -o /dev/null
 // RUN: diff -u %S/wrap_optional.swift.expected %t/wrap_optional.swift.result
 
 import Cities

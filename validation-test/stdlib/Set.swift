@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/main.swift
 // RUN: if [ %target-runtime == "objc" ]; then \
@@ -130,8 +129,10 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
   switch s._variantBuffer {
   case .native:
     return true
+#if _runtime(_ObjC)
   case .cocoa:
     return false
+#endif
   }
 }
 
@@ -451,7 +452,10 @@ SetTestSuite.test("COW.Fast.ContainsDoesNotReallocate") {
   }
 }
 
-SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate") {
+SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   var s = getCOWSlowSet()
   var identity1 = s._rawIdentifier()
 
@@ -663,7 +667,10 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
   }
 }
 
-SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
+SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var s = getCOWFastSet()
     var identity1 = s._rawIdentifier()
@@ -702,7 +709,10 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
   }
 }
 
-SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
+SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var s = getCOWSlowSet()
     var identity1 = s._rawIdentifier()
@@ -741,7 +751,10 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
   }
 }
 
-SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate") {
+SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var s1 = getCOWFastSet()
     var identity1 = s1._rawIdentifier()
@@ -779,7 +792,10 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate") {
   }
 }
 
-SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate") {
+SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var s1 = getCOWSlowSet()
     var identity1 = s1._rawIdentifier()
@@ -1235,7 +1251,6 @@ class CustomImmutableNSSet : NSSet {
   static var timesCountWasCalled = 0
 }
 
-
 SetTestSuite.test("BridgedFromObjC.Verbatim.SetIsCopied") {
   var (s, nss) = getBridgedVerbatimSetAndNSMutableSet()
   expectTrue(isCocoaSet(s))
@@ -1650,7 +1665,10 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   expectNil(s.index(of: TestObjCKeyTy(1010)))
 }
 
-SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
+SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   var s = getBridgedNonverbatimSet()
   let identity1 = s._rawIdentifier()
   expectTrue(isNativeSet(s))
@@ -1727,7 +1745,11 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
   }
 }
 
-SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove") {
+SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
   do {
     var s = getBridgedNonverbatimSet()
     var identity1 = s._rawIdentifier()
@@ -3142,7 +3164,10 @@ SetTestSuite.test("∪=") {
   expectEqual(identity1, s1._rawIdentifier())
 }
 
-SetTestSuite.test("subtract") {
+SetTestSuite.test("subtract")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   let s1 = Set([1010, 2020, 3030])
   let s2 = Set([4040, 5050, 6060])
   let s3 = Set([1010, 2020, 3030, 4040, 5050, 6060])
@@ -3194,7 +3219,10 @@ SetTestSuite.test("∖") {
   expectEqual(identity1, s1._rawIdentifier())
 }
 
-SetTestSuite.test("subtract") {
+SetTestSuite.test("subtract")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
   let s3 = Set([4040, 5050, 6060])
@@ -3211,7 +3239,11 @@ SetTestSuite.test("subtract") {
   expectEqual(identity1, s1._rawIdentifier())
 }
 
-SetTestSuite.test("∖=") {
+SetTestSuite.test("∖=")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
   let s3 = Set([4040, 5050, 6060])
@@ -3372,7 +3404,10 @@ SetTestSuite.test("⨁") {
   expectTrue((s1 ⨁ s1).isEmpty)
 }
 
-SetTestSuite.test("formSymmetricDifference") {
+SetTestSuite.test("formSymmetricDifference")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   // Overlap with 4040, 5050, 6060
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010])
@@ -3395,7 +3430,11 @@ SetTestSuite.test("formSymmetricDifference") {
   expectNotEqual(identity1, s1._rawIdentifier())
 }
 
-SetTestSuite.test("⨁=") {
+SetTestSuite.test("⨁=")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
   // Overlap with 4040, 5050, 6060
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010])
@@ -3430,7 +3469,11 @@ SetTestSuite.test("removeFirst") {
   expectNil(empty.first)
 }
 
-SetTestSuite.test("remove(member)") {
+SetTestSuite.test("remove(member)")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
   let s1 : Set<TestKeyTy> = [1010, 2020, 3030]
   var s2 = Set<TestKeyTy>(minimumCapacity: 10)
   for i in [1010, 2020, 3030] {

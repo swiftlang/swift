@@ -613,8 +613,6 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   SILType ResultTy = substConv.getSILResultType();
 
-  SILType SubstCalleeSILType =
-    SILType::getPrimitiveObjectType(SubstCalleeType);
   FullApplySite NewAI;
 
   SILBasicBlock *ResultBB = nullptr;
@@ -624,8 +622,8 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   SmallVector<Operand *, 4> OriginalResultUses;
 
   if (!isa<TryApplyInst>(AI)) {
-    NewAI = B.createApply(AI.getLoc(), FRI, SubstCalleeSILType, ResultTy,
-                          Subs, NewArgs, cast<ApplyInst>(AI)->isNonThrowing());
+    NewAI = B.createApply(AI.getLoc(), FRI, Subs, NewArgs,
+                          cast<ApplyInst>(AI)->isNonThrowing());
     ResultValue = NewAI.getInstruction();
   } else {
     auto *TAI = cast<TryApplyInst>(AI);
@@ -651,9 +649,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
                                  ValueOwnershipKind::Owned);
     }
 
-    NewAI = B.createTryApply(AI.getLoc(), FRI, SubstCalleeSILType,
-                             Subs, NewArgs,
-                             ResultBB, ErrorBB);
+    NewAI = B.createTryApply(AI.getLoc(), FRI, Subs, NewArgs, ResultBB, ErrorBB);
     if (ErrorBB != TAI->getErrorBB()) {
       B.setInsertionPoint(ErrorBB);
       B.createBranch(TAI->getLoc(), TAI->getErrorBB(),
@@ -882,8 +878,6 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   SILLocation Loc = AI.getLoc();
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
-  auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
-  auto ResultSILType = substConv.getSILResultType();
   ApplySite SAI;
 
   SmallVector<Substitution, 4> NewSubs;
@@ -892,28 +886,23 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
 
   SILValue ResultValue;
   if (auto *A = dyn_cast<ApplyInst>(AI)) {
-    auto *NewAI =
-        Builder.createApply(Loc, FRI, SubstCalleeSILType, ResultSILType,
-                            NewSubs, Arguments, A->isNonThrowing());
+    auto *NewAI = Builder.createApply(Loc, FRI, NewSubs, Arguments,
+                                      A->isNonThrowing());
     // Check if any casting is required for the return value.
     ResultValue = castValueToABICompatibleType(&Builder, Loc, NewAI,
                                                NewAI->getType(), AI.getType());
     SAI = ApplySite::isa(NewAI);
   }
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    SAI = Builder.createTryApply(Loc, FRI, SubstCalleeSILType,
-                                 NewSubs, Arguments,
+    SAI = Builder.createTryApply(Loc, FRI, NewSubs, Arguments,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
     auto PartialApplyConvention = PAI->getType()
                                       .getSwiftRValueType()
                                       ->getAs<SILFunctionType>()
                                       ->getCalleeConvention();
-    auto PAIResultType = SILBuilder::getPartialApplyResultType(
-        SubstCalleeSILType, Arguments.size(), Module, {},
-        PartialApplyConvention);
     auto *NewPAI = Builder.createPartialApply(
-        Loc, FRI, SubstCalleeSILType, NewSubs, Arguments, PAIResultType);
+        Loc, FRI, NewSubs, Arguments, PartialApplyConvention);
     // Check if any casting is required for the return value.
     ResultValue = castValueToABICompatibleType(
         &Builder, Loc, NewPAI, NewPAI->getType(), PAI->getType());

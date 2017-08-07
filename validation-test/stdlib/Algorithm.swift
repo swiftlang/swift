@@ -229,7 +229,7 @@ Algorithm.test("sort3/simple")
     [1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]
   ]) {
     var input = $0
-    _sort3(&input, 0, 1, 2, by: <)
+    _sort3(&input, 0, 1, 2)
     expectEqual([1, 2, 3], input)
 }
 

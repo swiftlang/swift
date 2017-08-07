@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILOpenedArchetypesTracker.h"
 
 using namespace swift;
@@ -17,11 +18,15 @@ using namespace swift;
 void SILOpenedArchetypesTracker::addOpenedArchetypeDef(CanArchetypeType archetype,
                                                        SILValue Def) {
   auto OldDef = getOpenedArchetypeDef(archetype);
-  if (OldDef && isa<GlobalAddrInst>(OldDef)) {
-    // It is a forward definition created during deserialization.
-    // Replace it with the real definition now.
-    OldDef->replaceAllUsesWith(Def);
-    OldDef = SILValue();
+  if (OldDef) {
+    if (auto *OldI = dyn_cast<GlobalAddrInst>(OldDef)) {
+      // It is a forward definition created during deserialization.
+      // Replace it with the real definition now.
+      OldDef->replaceAllUsesWith(Def);
+      // Remove the placeholder instruction.
+      OldI->eraseFromParent();
+      OldDef = SILValue();
+    }
   }
   assert(!OldDef &&
          "There can be only one definition of an opened archetype");
@@ -56,11 +61,22 @@ bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
     if (getOpenedArchetypeDef(archetypeTy))
       return;
 
-    auto &SILMod = this->getFunction().getModule();
+    auto *CurF = const_cast<SILFunction *>(&this->getFunction());
+    auto &SILMod = CurF->getModule();
     // Create a placeholder representing a forward definition.
-    auto Placeholder = new (SILMod)
-        GlobalAddrInst(SILDebugLocation(),
-                       SILMod.Types.getLoweredType(archetypeTy));
+    // Add the placeholder at the beginning of the entry block.
+    SILValue Placeholder;
+    if (!CurF->getEntryBlock()->empty()) {
+      SILBuilder B(CurF->getEntryBlock()->begin());
+      Placeholder =
+          B.createGlobalAddr(ArtificialUnreachableLocation(),
+                             SILMod.Types.getLoweredType(archetypeTy));
+    } else {
+      SILBuilder B(CurF->getEntryBlock());
+      Placeholder =
+          B.createGlobalAddr(ArtificialUnreachableLocation(),
+                             SILMod.Types.getLoweredType(archetypeTy));
+    }
     // Make it available to SILBuilder, so that instructions using this
     // archetype can be constructed.
     addOpenedArchetypeDef(archetypeTy, Placeholder);
@@ -107,7 +123,12 @@ void SILOpenedArchetypesTracker::unregisterOpenedArchetypes(
   assert(I->getFunction() == &F &&
          "Instruction does not belong to a proper SILFunction");
   auto Archetype = getOpenedArchetypeOf(I);
-  if (Archetype)
+  // Remove the archetype definition if it was registered before.
+  // It may happen that this archetype was not registered in the
+  // SILOpenedArchetypesTracker, because the tracker was created
+  // without scanning the whole function and thus may not aware
+  // of all opened archetypes of the function.
+  if (Archetype && getOpenedArchetypeDef(Archetype))
     removeOpenedArchetypeDef(Archetype, I);
 }
 
@@ -122,8 +143,8 @@ void SILOpenedArchetypesTracker::handleDeleteNotification(
 /// \returns The found archetype or empty type otherwise.
 CanArchetypeType swift::getOpenedArchetypeOf(const SILInstruction *I) {
   if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
-      isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialMetatypeInst>(I) ||
-      isa<OpenExistentialOpaqueInst>(I)) {
+      isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialBoxValueInst>(I) ||
+      isa<OpenExistentialMetatypeInst>(I) || isa<OpenExistentialValueInst>(I)) {
     auto Ty = getOpenedArchetypeOf(I->getType().getSwiftRValueType());
     assert(Ty && Ty->isOpenedExistential() &&
            "Type should be an opened archetype");
@@ -159,7 +180,8 @@ SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(
   // First perform a quick check.
   for (auto &Op : OpenedArchetypeOperands) {
     auto Def = Op.get();
-    if (getOpenedArchetypeOf(cast<SILInstruction>(Def)) == archetypeTy)
+    if (isa<SILInstruction>(Def) &&
+        getOpenedArchetypeOf(cast<SILInstruction>(Def)) == archetypeTy)
       return Def;
   }
   // Then use a regular lookup.

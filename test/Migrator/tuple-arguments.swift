@@ -29,10 +29,33 @@ test6({ (_, _) in })
 test6({ (x:Int, y:Int) in })
 test6({ (_, _) ->() in })
 
+func test8(_: ((Int, Int)) -> Int) {}
+test8 { (_, _) -> Int in 2 }
+test8 { (x, y) in x }
+
+func isEven(_ x: Int) -> Bool { return x % 2 == 0 }
+let items = Array(zip(0..<10, 0..<10))
+_ = items.filter { (_, x) in isEven(x) }
+_ = items.filter { _ in true }
+
 func toString(indexes: Int?...) -> String {
   let _ = indexes.enumerated().flatMap({ (i: Int, index: Int?) -> String? in
     let _: Int = i
     if index != nil {}
     return ""
   })
+  let _ = indexes.reduce(0) { print($0); return $0.0 + ($0.1 ?? 0)}
+  let _ = indexes.reduce(0) { (true ? $0 : (1, 2)).0 + ($0.1 ?? 0) }
+  let _ = [(1, 2)].contains { $0 != $1 }
+  _ = ["Hello", "Foo"].sorted { print($0); return $0.0.characters.count > ($0).1.characters.count }
+  _ = ["Hello" : 2].map { ($0, ($1)) }
 }
+
+extension Dictionary {
+  public mutating func merge(with dictionary: Dictionary) {
+    dictionary.forEach { updateValue($1, forKey: $0) }
+  }
+}
+
+let dictionary: [String: String] = [:]
+_ = dictionary.first { (column, value) in true }!.value

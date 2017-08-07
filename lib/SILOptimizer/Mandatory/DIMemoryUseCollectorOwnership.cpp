@@ -276,7 +276,7 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
     Result = "self";
   else if (ValueDecl *VD =
                dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
-    Result = VD->getName().str();
+    Result = VD->getBaseName().getIdentifier().str();
   else
     Result = "<unknown>";
 
@@ -1155,13 +1155,37 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
     // (derived_to_base_expr implicit type='C'
     //   (declref_expr type='D' decl='self'))
     if (auto *DTB = dyn_cast<DerivedToBaseExpr>(LocExpr->getArg()))
-      if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr()))
+      if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr())) {
+          ASTContext &Ctx = DRE->getDecl()->getASTContext();
         if (DRE->getDecl()->isImplicit() &&
-            DRE->getDecl()->getName().str() == "self")
+            DRE->getDecl()->getBaseName() == Ctx.Id_self)
           return User;
+      }
   }
 
   return nullptr;
+}
+
+static bool isUninitializedMetatypeInst(SILInstruction *I) {
+  // A simple reference to "type(of:)" is always fine,
+  // even if self is uninitialized.
+  if (isa<ValueMetatypeInst>(I))
+    return true;
+
+  // Sometimes we get an upcast whose sole usage is a value_metatype_inst,
+  // for example when calling a convenience initializer from a superclass.
+  if (auto *UCI = dyn_cast<UpcastInst>(I)) {
+    for (auto *UI : UCI->getUses()) {
+      auto *User = UI->getUser();
+      if (isa<ValueMetatypeInst>(User))
+        continue;
+      return false;
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 /// isSelfInitUse - Return true if this apply_inst is a call to self.init.
@@ -1352,11 +1376,8 @@ void ElementUseCollector::collectClassSelfUses(
       Kind = DIUseKind::SelfInit;
       UseInfo.trackFailableInitCall(TheMemory, User);
     }
-
-    // If this is a ValueMetatypeInst, this is a simple reference
-    // to "type(of:)", which is always fine, even if self is
-    // uninitialized.
-    if (isa<ValueMetatypeInst>(User))
+    
+    if (isUninitializedMetatypeInst(User))
       continue;
 
     // If this is a partial application of self, then this is an escape point
@@ -1628,11 +1649,8 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
       }
     }
 
-    // A simple reference to "type(of:)" is always fine,
-    // even if self is uninitialized.
-    if (isa<ValueMetatypeInst>(User)) {
+    if (isUninitializedMetatypeInst(User))
       continue;
-    }
 
     UseInfo.trackUse(DIMemoryUse(User, Kind, 0, 1));
   }

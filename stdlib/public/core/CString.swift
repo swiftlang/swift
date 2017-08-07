@@ -143,9 +143,7 @@ extension String {
   /// - Returns: A tuple with the new string and a Boolean value that indicates
   ///   whether any repairs were made. If `isRepairing` is `false` and an
   ///   ill-formed sequence is detected, this method returns `nil`.
-  ///
-  /// - SeeAlso: `UnicodeCodec`
-  public static func decodeCString<Encoding : UnicodeEncoding>(
+  public static func decodeCString<Encoding : _UnicodeEncoding>(
     _ cString: UnsafePointer<Encoding.CodeUnit>?,
     as encoding: Encoding.Type,
     repairingInvalidCodeUnits isRepairing: Bool = true)
@@ -183,7 +181,7 @@ public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
 /// the given pointer using the specified encoding.
 ///
 /// This internal helper takes the string length as an argument.
-func _decodeCString<Encoding : UnicodeEncoding>(
+func _decodeCString<Encoding : _UnicodeEncoding>(
   _ cString: UnsafePointer<Encoding.CodeUnit>,
   as encoding: Encoding.Type, length: Int,
   repairingInvalidCodeUnits isRepairing: Bool = true)

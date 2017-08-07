@@ -353,6 +353,11 @@ public:
   /// Returns true if this instruction only contains a branch instruction.
   bool isTrampoline() const;
 
+  /// Returns true if it is legal to hoist instructions into this block.
+  ///
+  /// Used by llvm::LoopInfo.
+  bool isLegalToHoistInto() const;
+
   //===--------------------------------------------------------------------===//
   // Debugging
   //===--------------------------------------------------------------------===//
@@ -425,11 +430,8 @@ private:
 public:
   static void deleteNode(SILBasicBlock *BB) { BB->~SILBasicBlock(); }
 
-  void addNodeToList(SILBasicBlock *BB) {}
-
   void transferNodesFromList(ilist_traits<SILBasicBlock> &SrcTraits,
                              block_iterator First, block_iterator Last);
-
 private:
   static void createNode(const SILBasicBlock &);
 };

@@ -1,6 +1,5 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABILITY1 | %FileCheck %s -check-prefix=AVAILABILITY1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABILITY2 | %FileCheck %s -check-prefix=AVAILABILITY2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD1 | %FileCheck %s -check-prefix=KEYWORD1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD2 | %FileCheck %s -check-prefix=KEYWORD2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD3 | %FileCheck %s -check-prefix=KEYWORD3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD4 | %FileCheck %s -check-prefix=KEYWORD4
@@ -31,15 +30,6 @@
 // AVAILABILITY2-NEXT:        Keyword/None:                       deprecated: [#Specify version number#]; name=deprecated{{$}}
 // AVAILABILITY2-NEXT:        End completions
 
-
-
-func method(@#^KEYWORD1^#) {}
-
-// KEYWORD1:                  Begin completions, 2 items
-// KEYWORD1-NEXT:             Keyword/None:                       autoclosure[#Param Attribute#]; name=autoclosure{{$}}
-// KEYWORD1-NEXT:             Keyword/None:                       noescape[#Param Attribute#]; name=noescape{{$}}
-// KEYWORD1-NEXT:             End completions
-
 @#^KEYWORD2^#
 func method(){}
 
@@ -58,7 +48,7 @@ func method(){}
 @#^KEYWORD3^#
 class C {}
 
-// KEYWORD3:                  Begin completions, 10 items
+// KEYWORD3:                  Begin completions, 8 items
 // KEYWORD3-NEXT:             Keyword/None:                       available[#Class Attribute#]; name=available{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc[#Class Attribute#]; name=objc{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       IBDesignable[#Class Attribute#]; name=IBDesignable{{$}}
@@ -67,8 +57,6 @@ class C {}
 // KEYWORD3-NEXT:             Keyword/None:                       objcMembers[#Class Attribute#]; name=objcMembers{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       NSApplicationMain[#Class Attribute#]; name=NSApplicationMain{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Class Attribute#]; name=objc_non_lazy_realization{{$}}
-// KEYWORD3-NEXT:             Keyword/None:                       NSKeyedArchiveLegacy[#Class Attribute#]; name=NSKeyedArchiveLegacy{{$}}
-// KEYWORD3-NEXT:             Keyword/None:                       NSKeyedArchiveSubclassesOnly[#Class Attribute#]; name=NSKeyedArchiveSubclassesOnly{{$}}
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD4^#
@@ -88,7 +76,7 @@ struct S{}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 23 items
+// KEYWORD_LAST:                  Begin completions, 19 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
@@ -101,8 +89,6 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       UIApplicationMain[#Declaration Attribute#]; name=UIApplicationMain{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       inline[#Declaration Attribute#]; name=inline{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       requires_stored_property_inits[#Declaration Attribute#]; name=requires_stored_property_inits{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       autoclosure[#Declaration Attribute#]; name=autoclosure{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       noescape[#Declaration Attribute#]; name=noescape{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       nonobjc[#Declaration Attribute#]; name=nonobjc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objcMembers[#Declaration Attribute#]; name=objcMembers{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
@@ -110,6 +96,4 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       NSKeyedArchiveLegacy[#Declaration Attribute#]; name=NSKeyedArchiveLegacy{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       NSKeyedArchiveSubclassesOnly[#Declaration Attribute#]; name=NSKeyedArchiveSubclassesOnly{{$}}
 // KEYWORD_LAST-NEXT:             End completions

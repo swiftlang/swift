@@ -5,28 +5,23 @@
 // a simple literal for character literals.
 
 // CHECK-LABEL: define {{.*}}charArray
-// CHECK-NOT: {{^}}[^ ]
-// CHECK:       store i64 9223372036854775649, i64*
-// CHECK-NOT: {{^}}[^ ]
-// CHECK:       store i64 9223372036854775650, i64*
-// CHECK-NOT: {{^}}[^ ]
-// CHECK:       store i64 9223372036854775651, i64*
-// CHECK-NOT: {{^}}[^ ]
-// CHECK:       store i64 9223372036854775652, i64*
-// CHECK-NOT: {{^}}[^ ]
-// CHECK:       ret
+// CHECK:  store <2 x i64> <i64 97, i64 98>
+// CHECK:  store <2 x i64> <i64 99, i64 100>
+// CHECK:  ret
 public func charArray(_ i: Int) -> [Character] {
   return [ "a", "b", "c", "d" ]
 }
 
 // CHECK-LABEL: define {{.*}}singleChar
-// CHECK: ret {{.*}} 9223372036854775649
+// CHECK: ret {{.*}} 97
 public func singleChar() -> Character {
   return "a"
 }
 
+// FIXME: The following part of this test is temporarily disabled.
+
 // CHECK-LABEL: define {{.*}}singleNonAsciiChar
-// CHECK: ret {{.*}} 9223372036848850918
+// CHECK: ret {{.*}} 26085
 public func singleNonAsciiChar() -> Character {
   return "日"
 }

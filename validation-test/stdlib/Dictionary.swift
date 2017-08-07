@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/main.swift
 // RUN: if [ %target-runtime == "objc" ]; then \
@@ -216,7 +215,10 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
 }
 
 
-DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   var d = getCOWFastDictionary()
   var identity1 = d._rawIdentifier()
 
@@ -270,7 +272,11 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
   var d = getCOWSlowDictionary()
   var identity1 = d._rawIdentifier()
 
@@ -478,7 +484,11 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Fast.MergeDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = d1._rawIdentifier()
@@ -502,6 +512,13 @@ DictionaryTestSuite.test("COW.Fast.MergeDoesNotReallocate") {
     assert(d1.count == 7)
     assert(d1[30]! == 1030)
     assert(d1[70]! == 2070)
+
+    let d2 = d1.merging([(40, 3040), (80, 3080)]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+    assert(d2.count == 8)
+    assert(d2[40]! == 3040)
+    assert(d2[80]! == 3080)
   }
 
   do {
@@ -573,6 +590,131 @@ DictionaryTestSuite.test("COW.Fast.MergeDoesNotReallocate") {
 
     // Merge, keeping existing values.
     d2.merge([(10, 2010)]) { x, _ in x }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+
+    assert(d2.count == 3)
+    assert(d2[10]! == 1010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+}
+
+DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    // Merge some new values.
+    d1.merge([40: 2040, 50: 2050]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1.count == 5)
+    assert(d1[50]! == 2050)
+
+    // Merge and overwrite some existing values.
+    d1.merge([10: 2010, 60: 2060]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1.count == 6)
+    assert(d1[10]! == 2010)
+    assert(d1[60]! == 2060)
+
+    // Merge, keeping existing values.
+    d1.merge([30: 2030, 70: 2070]) { x, _ in x }
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1.count == 7)
+    assert(d1[30]! == 1030)
+    assert(d1[70]! == 2070)
+
+    let d2 = d1.merging([40: 3040, 80: 3080]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+    assert(d2.count == 8)
+    assert(d2[40]! == 3040)
+    assert(d2[80]! == 3080)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Merge some new values.
+    d2.merge([40: 2040, 50: 2050]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+    assert(d1[40] == nil)
+
+    assert(d2.count == 5)
+    assert(d2[10]! == 1010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+    assert(d2[40]! == 2040)
+    assert(d2[50]! == 2050)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Merge and overwrite some existing values.
+    d2.merge([10: 2010]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+
+    assert(d2.count == 3)
+    assert(d2[10]! == 2010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Merge, keeping existing values.
+    d2.merge([10: 2010]) { x, _ in x }
     assert(identity1 == d1._rawIdentifier())
     assert(identity1 != d2._rawIdentifier())
 
@@ -738,7 +880,10 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
 }
 
 
-DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d = getCOWFastDictionary()
     var identity1 = d._rawIdentifier()
@@ -781,7 +926,10 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d = getCOWSlowDictionary()
     var identity1 = d._rawIdentifier()
@@ -823,7 +971,10 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
 }
 
 
-DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = d1._rawIdentifier()
@@ -861,7 +1012,10 @@ DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d1 = getCOWSlowDictionary()
     var identity1 = d1._rawIdentifier()
@@ -1180,10 +1334,12 @@ DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
   assert(d1.values[i] == 1010)
   assert(d1[i] == (10, 1010))
   
+#if swift(>=4.0)
   d2.values[i] += 1
   assert(d2.values[i] == 1011)
   assert(d2[10]! == 1011)
   assert(identity1 != d2._rawIdentifier())
+#endif
   
   assert(d1[10]! == 1010)
   assert(identity1 == d1._rawIdentifier())
@@ -1242,8 +1398,10 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
     // keys.index(of:) - O(1) bucket + linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     let l = d2.keys.index(of: lastKey)!
+#if swift(>=4.0)
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
-    
+#endif
+
     expectEqual(j, k)
     expectEqual(k, l)
   }
@@ -2283,7 +2441,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   assert(d.index(forKey: TestObjCKeyTy(10)) == nil)
 }
 
-DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
@@ -2362,7 +2523,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
   }
 }
 
-DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
+  .xfail(.custom({ _isStdlibDebugConfiguration() },
+                 reason: "rdar://33358110"))
+  .code {
   do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = d._rawIdentifier()

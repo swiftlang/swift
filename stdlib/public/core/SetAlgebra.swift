@@ -50,8 +50,6 @@
 /// - `x.isStrictSuperset(of: y)` if and only if
 ///   `x.isSuperset(of: y) && x != y`
 /// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
-/// 
-/// - SeeAlso: `OptionSet`, `Set`
 public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   // FIXME: write tests for SetAlgebra
   
@@ -278,15 +276,14 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   /// In the following example, the elements of the `employees` set that are
   /// also members of `neighbors` are removed from `employees`, while the
   /// elements of `neighbors` that are not members of `employees` are added to
-  /// `employees`. In particular, the names `"Alicia"`, `"Chris"`, and
-  /// `"Diana"` are removed from `employees` while the names `"Forlani"` and
-  /// `"Greta"` are added.
+  /// `employees`. In particular, the names `"Bethany"` and `"Eric"` are
+  /// removed from `employees` while the name `"Forlani"` is added.
   ///
-  ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
-  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
+  ///     var employees: Set = ["Alicia", "Bethany", "Diana", "Eric"]
+  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani"]
   ///     employees.formSymmetricDifference(neighbors)
   ///     print(employees)
-  ///     // Prints "["Diana", "Chris", "Forlani", "Alicia", "Greta"]"
+  ///     // Prints "["Diana", "Forlani", "Alicia"]"
   ///
   /// - Parameter other: A set of the same type.
   mutating func formSymmetricDifference(_ other: Self)
@@ -368,7 +365,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   ///     // Prints "[6, 0, 1, 3]"
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
-  init<S : Sequence>(_ sequence: S) where S.Iterator.Element == Element
+  init<S : Sequence>(_ sequence: S) where S.Element == Element
 
   /// Removes the elements of the given set from this set.
   ///
@@ -404,31 +401,9 @@ extension SetAlgebra {
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
   public init<S : Sequence>(_ sequence: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     self.init()
     for e in sequence { insert(e) }
-  }
-
-  /// Creates a set containing the elements of the given array literal.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// you use an array literal. Instead, create a new set using an array
-  /// literal as its value by enclosing a comma-separated list of values in
-  /// square brackets. You can use an array literal anywhere a set is expected
-  /// by the type context.
-  ///
-  /// Here, a set of strings is created from an array literal holding only
-  /// strings:
-  ///
-  ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
-  ///     if ingredients.isSuperset(of: ["sugar", "salt"]) {
-  ///         print("Whatever it is, it's bound to be delicious!")
-  ///     }
-  ///     // Prints "Whatever it is, it's bound to be delicious!"
-  ///
-  /// - Parameter arrayLiteral: A list of elements of the new set.
-  public init(arrayLiteral: Element...) {
-    self.init(arrayLiteral)
   }
 
   /// Removes the elements of the given set from this set.
@@ -569,6 +544,30 @@ extension SetAlgebra {
   public func isStrictSubset(of other: Self) -> Bool {
     return other.isStrictSuperset(of: self)
   }
+}
+
+extension SetAlgebra where Element == ArrayLiteralElement {
+  /// Creates a set containing the elements of the given array literal.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you use an array literal. Instead, create a new set using an array
+  /// literal as its value by enclosing a comma-separated list of values in
+  /// square brackets. You can use an array literal anywhere a set is expected
+  /// by the type context.
+  ///
+  /// Here, a set of strings is created from an array literal holding only
+  /// strings:
+  ///
+  ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
+  ///     if ingredients.isSuperset(of: ["sugar", "salt"]) {
+  ///         print("Whatever it is, it's bound to be delicious!")
+  ///     }
+  ///     // Prints "Whatever it is, it's bound to be delicious!"
+  ///
+  /// - Parameter arrayLiteral: A list of elements of the new set.
+  public init(arrayLiteral: Element...) {
+    self.init(arrayLiteral)
+  }  
 }
 
 @available(*, unavailable, renamed: "SetAlgebra")

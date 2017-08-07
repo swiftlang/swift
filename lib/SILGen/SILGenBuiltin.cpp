@@ -67,7 +67,6 @@ static ManagedValue emitBuiltinRetain(SILGenFunction &gen,
                                        SILLocation loc,
                                        SubstitutionList substitutions,
                                        ArrayRef<ManagedValue> args,
-                                       CanFunctionType formalApplyType,
                                        SGFContext C) {
   // The value was produced at +1; we can produce an unbalanced retain simply by
   // disabling the cleanup. But this would violate ownership semantics. Instead,
@@ -81,7 +80,6 @@ static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
                                        SILLocation loc,
                                        SubstitutionList substitutions,
                                        ArrayRef<ManagedValue> args,
-                                       CanFunctionType formalApplyType,
                                        SGFContext C) {
   // The value was produced at +1, so to produce an unbalanced
   // release we need to leave the cleanup intact and then do a *second*
@@ -95,7 +93,6 @@ static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
                                            SILLocation loc,
                                            SubstitutionList substitutions,
                                            ArrayRef<ManagedValue> args,
-                                           CanFunctionType formalApplyType,
                                            SGFContext C) {
   gen.B.createUnmanagedAutoreleaseValue(loc, args[0].getValue(),
                                         gen.B.getDefaultAtomicity());
@@ -118,7 +115,6 @@ static ManagedValue emitBuiltinTryPin(SILGenFunction &gen,
                                       SILLocation loc,
                                       SubstitutionList subs,
                                       ArrayRef<ManagedValue> args,
-                                      CanFunctionType formalApplyType,
                                       SGFContext C) {
   assert(args.size() == 1);
 
@@ -140,7 +136,6 @@ static ManagedValue emitBuiltinUnpin(SILGenFunction &gen,
                                      SILLocation loc,
                                      SubstitutionList subs,
                                      ArrayRef<ManagedValue> args,
-                                     CanFunctionType formalApplyType,
                                      SGFContext C) {
   assert(args.size() == 1);
 
@@ -157,7 +152,6 @@ static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &gen,
                                           SILLocation loc,
                                           SubstitutionList substitutions,
                                           ArrayRef<ManagedValue> args,
-                                          CanFunctionType formalApplyType,
                                           SGFContext C,
                                           IsTake_t isTake,
                                           bool isStrict,
@@ -183,10 +177,9 @@ static ManagedValue emitBuiltinLoad(SILGenFunction &gen,
                                     SILLocation loc,
                                     SubstitutionList substitutions,
                                     ArrayRef<ManagedValue> args,
-                                    CanFunctionType formalApplyType,
                                     SGFContext C) {
   return emitBuiltinLoadOrTake(gen, loc, substitutions, args,
-                               formalApplyType, C, IsNotTake,
+                               C, IsNotTake,
                                /*isStrict*/ true, /*isInvariant*/ false);
 }
 
@@ -194,20 +187,18 @@ static ManagedValue emitBuiltinLoadRaw(SILGenFunction &gen,
                                        SILLocation loc,
                                        SubstitutionList substitutions,
                                        ArrayRef<ManagedValue> args,
-                                       CanFunctionType formalApplyType,
                                        SGFContext C) {
   return emitBuiltinLoadOrTake(gen, loc, substitutions, args,
-                               formalApplyType, C, IsNotTake,
+                               C, IsNotTake,
                                /*isStrict*/ false, /*isInvariant*/ false);
 }
 static ManagedValue emitBuiltinLoadInvariant(SILGenFunction &gen,
                                              SILLocation loc,
                                              SubstitutionList substitutions,
                                              ArrayRef<ManagedValue> args,
-                                             CanFunctionType formalApplyType,
                                              SGFContext C) {
   return emitBuiltinLoadOrTake(gen, loc, substitutions, args,
-                               formalApplyType, C, IsNotTake,
+                               C, IsNotTake,
                                /*isStrict*/ false, /*isInvariant*/ true);
 }
 
@@ -215,10 +206,9 @@ static ManagedValue emitBuiltinTake(SILGenFunction &gen,
                                     SILLocation loc,
                                     SubstitutionList substitutions,
                                     ArrayRef<ManagedValue> args,
-                                    CanFunctionType formalApplyType,
                                     SGFContext C) {
   return emitBuiltinLoadOrTake(gen, loc, substitutions, args,
-                               formalApplyType, C, IsTake,
+                               C, IsTake,
                                /*isStrict*/ true, /*isInvariant*/ false);
 }
 
@@ -227,7 +217,6 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
                                        SILLocation loc,
                                        SubstitutionList substitutions,
                                        ArrayRef<ManagedValue> args,
-                                       CanFunctionType formalApplyType,
                                        SGFContext C) {
   assert(args.size() == 2 && "destroy should have two arguments");
   assert(substitutions.size() == 1 &&
@@ -259,7 +248,6 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
                                       SILLocation loc,
                                       SubstitutionList substitutions,
                                       ArrayRef<ManagedValue> args,
-                                      CanFunctionType formalApplyType,
                                       SGFContext C) {
   assert(args.size() >= 2 && "assign should have two arguments");
   assert(substitutions.size() == 1 &&
@@ -291,7 +279,6 @@ static ManagedValue emitBuiltinInit(SILGenFunction &gen,
                                     SILLocation loc,
                                     SubstitutionList substitutions,
                                     Expr *tuple,
-                                    CanFunctionType formalApplyType,
                                     SGFContext C) {
   auto args = decomposeArguments(gen, tuple, 2);
 
@@ -315,7 +302,6 @@ static ManagedValue emitBuiltinFixLifetime(SILGenFunction &gen,
                                            SILLocation loc,
                                            SubstitutionList substitutions,
                                            ArrayRef<ManagedValue> args,
-                                           CanFunctionType formalApplyType,
                                            SGFContext C) {
   for (auto arg : args) {
     gen.B.createFixLifetime(loc, arg.getValue());
@@ -350,7 +336,6 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &gen,
       = ArchetypeType::getOpened(substitutions[0].getReplacement());
     SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
     arg = gen.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
-    gen.setArchetypeOpeningSite(openedTy, arg.getValue());
   }
 
   // Return the cast result.
@@ -362,7 +347,6 @@ static ManagedValue emitBuiltinUnsafeCastToNativeObject(SILGenFunction &gen,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
                                          ArrayRef<ManagedValue> args,
-                                         CanFunctionType formalApplyType,
                                          SGFContext C) {
   return emitCastToReferenceType(gen, loc, substitutions, args, C,
                         SILType::getNativeObjectType(gen.F.getASTContext()));
@@ -374,7 +358,6 @@ static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &gen,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
                                          ArrayRef<ManagedValue> args,
-                                         CanFunctionType formalApplyType,
                                          SGFContext C) {
   CanType ty = args[0].getType().getSwiftRValueType();
   (void)ty;
@@ -382,8 +365,7 @@ static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &gen,
          "Can only cast types that use native reference counting to native "
          "object");
   return emitBuiltinUnsafeCastToNativeObject(gen, loc, substitutions,
-                                             args, formalApplyType,
-                                             C);
+                                             args, C);
 }
 
 
@@ -392,7 +374,6 @@ static ManagedValue emitBuiltinCastToUnknownObject(SILGenFunction &gen,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
                                          ArrayRef<ManagedValue> args,
-                                         CanFunctionType formalApplyType,
                                          SGFContext C) {
   return emitCastToReferenceType(gen, loc, substitutions, args, C,
                         SILType::getUnknownObjectType(gen.F.getASTContext()));
@@ -436,7 +417,6 @@ static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &gen,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
                                          ArrayRef<ManagedValue> args,
-                                         CanFunctionType formalApplyType,
                                          SGFContext C) {
   return emitCastFromReferenceType(gen, loc, substitutions, args, C);
 }
@@ -446,7 +426,6 @@ static ManagedValue emitBuiltinCastFromUnknownObject(SILGenFunction &gen,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
                                          ArrayRef<ManagedValue> args,
-                                         CanFunctionType formalApplyType,
                                          SGFContext C) {
   return emitCastFromReferenceType(gen, loc, substitutions, args, C);
 }
@@ -456,7 +435,6 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &gen,
                                         SILLocation loc,
                                         SubstitutionList substitutions,
                                         ArrayRef<ManagedValue> args,
-                                        CanFunctionType formalApplyType,
                                         SGFContext C) {
   assert(args.size() == 1 && "bridge should have a single argument");
   
@@ -474,7 +452,6 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &gen,
                                         SILLocation loc,
                                         SubstitutionList substitutions,
                                         ArrayRef<ManagedValue> args,
-                                        CanFunctionType formalApplyType,
                                         SGFContext C) {
   assert(substitutions.size() == 1 &&
          "bridge should have a single substitution");
@@ -498,7 +475,6 @@ static ManagedValue emitBuiltinAddressOf(SILGenFunction &gen,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
                                          ArrayRef<ManagedValue> args,
-                                         CanFunctionType formalApplyType,
                                          SGFContext C) {
   assert(args.size() == 1 && "addressof should have a single argument");
   
@@ -515,7 +491,6 @@ static ManagedValue emitBuiltinGepRaw(SILGenFunction &gen,
                                       SILLocation loc,
                                       SubstitutionList substitutions,
                                       ArrayRef<ManagedValue> args,
-                                      CanFunctionType formalApplyType,
                                       SGFContext C) {
   assert(args.size() == 2 && "gepRaw should be given two arguments");
   
@@ -530,7 +505,6 @@ static ManagedValue emitBuiltinGep(SILGenFunction &gen,
                                    SILLocation loc,
                                    SubstitutionList substitutions,
                                    ArrayRef<ManagedValue> args,
-                                   CanFunctionType formalApplyType,
                                    SGFContext C) {
   assert(substitutions.size() == 1 && "gep should have two substitutions");
   assert(args.size() == 3 && "gep should be given three arguments");
@@ -552,7 +526,6 @@ static ManagedValue emitBuiltinGetTailAddr(SILGenFunction &gen,
                                            SILLocation loc,
                                            SubstitutionList substitutions,
                                            ArrayRef<ManagedValue> args,
-                                           CanFunctionType formalApplyType,
                                            SGFContext C) {
   assert(substitutions.size() == 2 && "getTailAddr should have two substitutions");
   assert(args.size() == 4 && "gep should be given four arguments");
@@ -576,7 +549,6 @@ static ManagedValue emitBuiltinCondFail(SILGenFunction &gen,
                                         SILLocation loc,
                                         SubstitutionList substitutions,
                                         ArrayRef<ManagedValue> args,
-                                        CanFunctionType formalApplyType,
                                         SGFContext C) {
   assert(args.size() == 1 && "condfail should be given one argument");
   
@@ -590,7 +562,6 @@ emitBuiltinCastReference(SILGenFunction &gen,
                          SILLocation loc,
                          SubstitutionList substitutions,
                          ArrayRef<ManagedValue> args,
-                         CanFunctionType formalApplyType,
                          SGFContext C) {
   assert(args.size() == 1 && "castReference should be given one argument");
   assert(substitutions.size() == 2 && "castReference should have two subs");
@@ -601,7 +572,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
   auto &toTL = gen.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
-  if (fromTL.isLoadable() || toTL.isLoadable()) { 
+  if (!fromTL.isAddress() || !toTL.isAddress()) { 
     if (auto refCast = gen.B.tryCreateUncheckedRefCast(loc, args[0].getValue(),
                                                        toTL.getLoweredType())) {
       // Create a reference cast, forwarding the cleanup.
@@ -622,7 +593,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
   // more information to the optimizer.
   SILValue srcVal = args[0].forward(gen);
   SILValue fromAddr;
-  if (fromTL.isLoadable()) {
+  if (!fromTL.isAddress()) {
     // Move the loadable value into a "source temp".  Since the source and
     // dest are RC identical, store the reference into the source temp without
     // a retain. The cast will load the reference from the source temp and
@@ -639,7 +610,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
   gen.B.createUncheckedRefCastAddr(loc, fromAddr, fromTy->getCanonicalType(),
                                    toAddr, toTy->getCanonicalType());
   // Forward it along and register a cleanup.
-  if (toTL.isAddressOnly())
+  if (toTL.isAddress())
     return gen.emitManagedBufferWithCleanup(toAddr);
 
   // Load the destination value.
@@ -652,7 +623,6 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
                                          ArrayRef<ManagedValue> args,
-                                         CanFunctionType formalApplyType,
                                          SGFContext C) {
   assert(args.size() == 1 && "reinterpretCast should be given one argument");
   assert(substitutions.size() == 2 && "reinterpretCast should have two subs");
@@ -660,12 +630,12 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
   auto &fromTL = gen.getTypeLowering(substitutions[0].getReplacement());
   auto &toTL = gen.getTypeLowering(substitutions[1].getReplacement());
   
-  // If casting between address-only types, cast the address.
-  if (!fromTL.isLoadable() || !toTL.isLoadable()) {
+  // If casting between address types, cast the address.
+  if (fromTL.isAddress() || toTL.isAddress()) {
     SILValue fromAddr;
 
-    // If the from value is loadable, move it to a buffer.
-    if (fromTL.isLoadable()) {
+    // If the from value is not an address, move it to a buffer.
+    if (!fromTL.isAddress()) {
       fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue()->getType());
       fromTL.emitStore(gen.B, loc, args[0].getValue(), fromAddr,
                        StoreOwnershipQualifier::Init);
@@ -677,7 +647,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     
     // Load and retain the destination value if it's loadable. Leave the cleanup
     // on the original value since we don't know anything about it's type.
-    if (toTL.isLoadable()) {
+    if (!toTL.isAddress()) {
       return gen.emitManagedLoadCopy(loc, toAddr, toTL);
     }
     // Leave the cleanup on the original value.
@@ -712,7 +682,6 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
                                                   SILLocation loc,
                                                   SubstitutionList subs,
                                                   ArrayRef<ManagedValue> args,
-                                                  CanFunctionType formalApplyType,
                                                   SGFContext C) {
   assert(args.size() == 2 && "cast should have two arguments");
   assert(subs.size() == 1 && "cast should have a type substitution");
@@ -741,7 +710,6 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
       = ArchetypeType::getOpened(subs[0].getReplacement());
     SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
     ref = gen.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
-    gen.setArchetypeOpeningSite(openedTy, ref);
   }
   
   SILValue result = gen.B.createRefToBridgeObject(loc, ref, bits);
@@ -754,7 +722,6 @@ static ManagedValue emitBuiltinCastReferenceFromBridgeObject(
                                                   SILLocation loc,
                                                   SubstitutionList subs,
                                                   ArrayRef<ManagedValue> args,
-                                                  CanFunctionType formalApplyType,
                                                   SGFContext C) {
   assert(args.size() == 1 && "cast should have one argument");
   assert(subs.size() == 1 && "cast should have a type substitution");
@@ -781,7 +748,6 @@ static ManagedValue emitBuiltinCastBitPatternFromBridgeObject(
                                                   SILLocation loc,
                                                   SubstitutionList subs,
                                                   ArrayRef<ManagedValue> args,
-                                                  CanFunctionType formalApplyType,
                                                   SGFContext C) {
   assert(args.size() == 1 && "cast should have one argument");
   assert(subs.empty() && "cast should not have subs");
@@ -800,7 +766,6 @@ static ManagedValue emitBuiltinIsUnique(SILGenFunction &gen,
                                         SILLocation loc,
                                         SubstitutionList subs,
                                         ArrayRef<ManagedValue> args,
-                                        CanFunctionType formalApplyType,
                                         SGFContext C) {
 
   assert(subs.size() == 1 && "isUnique should have a single substitution");
@@ -817,7 +782,6 @@ emitBuiltinIsUniqueOrPinned(SILGenFunction &gen,
                                SILLocation loc,
                                SubstitutionList subs,
                                ArrayRef<ManagedValue> args,
-                               CanFunctionType formalApplyType,
                                SGFContext C) {
   assert(subs.size() == 1 && "isUnique should have a single substitution");
   assert(args.size() == 1 && "isUnique should have a single argument");
@@ -836,7 +800,6 @@ emitBuiltinIsUnique_native(SILGenFunction &gen,
                            SILLocation loc,
                            SubstitutionList subs,
                            ArrayRef<ManagedValue> args,
-                           CanFunctionType formalApplyType,
                            SGFContext C) {
 
   assert(subs.size() == 1 && "isUnique_native should have one sub.");
@@ -854,7 +817,6 @@ emitBuiltinIsUniqueOrPinned_native(SILGenFunction &gen,
                                    SILLocation loc,
                                    SubstitutionList subs,
                                    ArrayRef<ManagedValue> args,
-                                   CanFunctionType formalApplyType,
                                    SGFContext C) {
 
   assert(subs.size() == 1 && "isUniqueOrPinned_native should have one sub.");
@@ -871,7 +833,6 @@ static ManagedValue emitBuiltinBindMemory(SILGenFunction &gen,
                                           SILLocation loc,
                                           SubstitutionList subs,
                                           ArrayRef<ManagedValue> args,
-                                          CanFunctionType formalApplyType,
                                           SGFContext C) {
   assert(subs.size() == 1 && "bindMemory should have a single substitution");
   assert(args.size() == 3 && "bindMemory should have three argument");
@@ -890,7 +851,6 @@ static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &gen,
                                               SILLocation loc,
                                               SubstitutionList subs,
                                               ArrayRef<ManagedValue> args,
-                                              CanFunctionType formalApplyType,
                                               SGFContext C) {
   unsigned NumTailTypes = subs.size() - 1;
   assert(args.size() == NumTailTypes * 2 + 1 &&
@@ -923,7 +883,6 @@ static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &gen,
                                                 SILLocation loc,
                                                 SubstitutionList subs,
                                                 ArrayRef<ManagedValue> args,
-                                                CanFunctionType formalApplyType,
                                                 SGFContext C) {
   assert(subs.size() == 2 &&
          "allocWithTailElems should have two substitutions");
@@ -948,7 +907,6 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &gen,
                                         SILLocation loc,
                                         SubstitutionList substitutions,
                                         ArrayRef<ManagedValue> args,
-                                        CanFunctionType formalApplyType,
                                         SGFContext C) {
   assert(substitutions.size() == 1
          && "type trait should take a single type parameter");
@@ -1000,7 +958,8 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
     return None;
 
-  const BuiltinInfo &builtin = SGM.M.getBuiltinInfo(decl->getName());
+  auto name = decl->getBaseName().getIdentifier();
+  const BuiltinInfo &builtin = SGM.M.getBuiltinInfo(name);
   switch (builtin.ID) {
   // All the non-SIL, non-type-trait builtins should use the
   // named-builtin logic, which just emits the builtin as a call to a
@@ -1016,7 +975,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
 #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name)
 #include "swift/AST/Builtins.def"
   case BuiltinValueKind::None:
-    return SpecializedEmitter(decl->getName());
+    return SpecializedEmitter(name);
 
   // Do a second pass over Builtins.def, ignoring all the cases for
   // which we emitted something above.

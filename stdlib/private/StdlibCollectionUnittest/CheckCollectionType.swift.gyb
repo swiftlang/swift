@@ -471,9 +471,16 @@ internal enum _SubSequenceSubscriptOnRangeMode {
 %{
   from gyb_stdlib_support import collectionForTraversal
   def testConstraints(protocol):
+    if protocol == 'Collection':
+      subseq_as_collection = 'CollectionWithEquatableElement.SubSequence : Collection,'
+    else:
+      subseq_as_collection=''
     return '''
     C : %(protocol)s,
     CollectionWithEquatableElement : %(protocol)s,
+    %(subseq_as_collection)s
+    C.SubSequence : %(protocol)s,
+    C.Indices : %(protocol)s,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   ''' % locals()
 
@@ -486,7 +493,6 @@ internal enum _SubSequenceSubscriptOnRangeMode {
     makeCollectionOfEquatable: @escaping (
       [CollectionWithEquatableElement.Iterator.Element]
     ) -> CollectionWithEquatableElement,
-
 
     wrapValueIntoEquatable: @escaping (
       MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
@@ -1035,7 +1041,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).removeFirst()/slice/semantics") {
       for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-        var slice = c[c.startIndex..<c.endIndex]
+        var slice = c[...]
         let survivingIndices = _allIndices(
           into: slice,
           in: slice.index(after: slice.startIndex)..<slice.endIndex)
@@ -1075,7 +1081,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).removeFirst(n: Int)/slice/semantics") {
       for test in removeFirstTests {
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-        var slice = c[c.startIndex..<c.endIndex]
+        var slice = c[...]
         let survivingIndices = _allIndices(
           into: slice,
           in: slice.index(
@@ -1134,7 +1140,7 @@ extension TestSuite {
       // This can just reuse the test data for removeFirst()
       for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-        var slice = c[c.startIndex..<c.endIndex]
+        var slice = c[...]
         let survivingIndices = _allIndices(
           into: slice,
           in: slice.index(after: slice.startIndex)..<slice.endIndex)
@@ -1230,7 +1236,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).removeLast()/slice/semantics") {
       for test in removeLastTests.filter({ $0.numberToRemove == 1 }) {
         let c = makeWrappedCollection(test.collection)
-        var slice = c[c.startIndex..<c.endIndex]
+        var slice = c[...]
         let survivingIndices = _allIndices(
             into: slice,
           in: slice.startIndex
@@ -1275,7 +1281,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).removeLast(n: Int)/slice/semantics") {
       for test in removeLastTests {
         let c = makeWrappedCollection(test.collection)
-        var slice = c[c.startIndex..<c.endIndex]
+        var slice = c[...]
         let survivingIndices = _allIndices(
           into: slice,
           in: slice.startIndex
@@ -1336,7 +1342,7 @@ extension TestSuite {
       // This can just reuse the test data for removeLast()
       for test in removeLastTests.filter({ $0.numberToRemove == 1 }) {
         let c = makeWrappedCollection(test.collection)
-        var slice = c[c.startIndex..<c.endIndex]
+        var slice = c[...]
         let survivingIndices = _allIndices(
           into: slice,
           in: slice.startIndex

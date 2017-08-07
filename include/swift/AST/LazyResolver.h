@@ -82,9 +82,6 @@ public:
   /// Bind an extension to its extended type.
   virtual void bindExtension(ExtensionDecl *ext) = 0;
 
-  /// Introduce the accessors for a 'lazy' variable.
-  virtual void introduceLazyVarAccessors(VarDecl *var) = 0;
-
   /// Resolve the type of an extension.
   ///
   /// This can be called to ensure that the members of an extension can be
@@ -93,6 +90,9 @@ public:
 
   /// Resolve any implicitly-declared constructors within the given nominal.
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
+
+  /// Resolve an implicitly-generated member with the given name.
+  virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
 
   /// Resolve any implicitly-generated members and conformances for generated
   /// external decls.
@@ -151,16 +151,16 @@ public:
     Principal.bindExtension(ext);
   }
 
-  void introduceLazyVarAccessors(VarDecl *var) override {
-    Principal.introduceLazyVarAccessors(var);
-  }
-
   void resolveExtension(ExtensionDecl *ext) override {
     Principal.resolveExtension(ext);
   }
 
   void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     Principal.resolveImplicitConstructors(nominal);
+  }
+
+  void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
+    Principal.resolveImplicitMember(nominal, member);
   }
 
   void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {

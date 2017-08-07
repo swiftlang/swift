@@ -429,9 +429,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
     break;
 
   case DiagnosticArgumentKind::ValueDecl:
-    Out << '\'';
+    Out << FormatOpts.OpeningQuotationMark;
     Arg.getAsValueDecl()->getFullName().printPretty(Out);
-    Out << '\'';
+    Out << FormatOpts.ClosingQuotationMark;
     break;
 
   case DiagnosticArgumentKind::Type: {
@@ -752,7 +752,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
           }
 
           if (auto value = dyn_cast<ValueDecl>(ppDecl)) {
-            bufferName += value->getNameStr();
+            bufferName += value->getBaseName().userFacingName();
           } else if (auto ext = dyn_cast<ExtensionDecl>(ppDecl)) {
             bufferName += ext->getExtendedType().getString();
           }

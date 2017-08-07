@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -I %t %s -emit-ir | %FileCheck %s
 
@@ -45,7 +45,7 @@ bb0(%0 : $*Any, %1 : $*Any):
 // CHECK-NEXT: [[CAST:%.*]] = bitcast %swift.type* [[TYPE]] to i8***
 // CHECK-NEXT: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], i64 -1
 // CHECK-NEXT: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK-NEXT: [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 12
+// CHECK-NEXT: [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
 // CHECK-NEXT: [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK-NEXT: [[INITWITHTAKEBUFFER:%.*]] = bitcast i8* [[VW]]
 // CHECK-NEXT: call %swift.opaque* [[INITWITHTAKEBUFFER]]({{.*}} [[TO_BUFFER_ADDR]], {{.*}} [[FROM_BUFFER_ADDR]], %swift.type* [[TYPE]])

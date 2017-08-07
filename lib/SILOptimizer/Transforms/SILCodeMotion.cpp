@@ -49,7 +49,7 @@ namespace {
 static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
                                        EnumElementDecl *EnumDecl,
                                        SILValue DefOfEnum = SILValue()) {
-  assert(EnumDecl->getArgumentInterfaceType() &&
+  assert(EnumDecl->hasAssociatedValues() &&
          "We assume enumdecl has an argument type");
 
   SILModule &Mod = I->getModule();
@@ -755,7 +755,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
     EnumElementDecl *Enum = Case.first;
     SILBasicBlock *Succ = Case.second;
     Builder.setInsertionPoint(&*Succ->begin());
-    if (Enum->getArgumentInterfaceType())
+    if (Enum->hasAssociatedValues())
       createRefCountOpForPayload(Builder, &*RV, Enum, Switch->getOperand());
   }
 
@@ -841,7 +841,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
     EnumElementDecl *Enum = Elts[i];
     SILBasicBlock *Succ = i == 0 ? CondBr->getTrueBB() : CondBr->getFalseBB();
     Builder.setInsertionPoint(&*Succ->begin());
-    if (Enum->getArgumentInterfaceType())
+    if (Enum->hasAssociatedValues())
       createRefCountOpForPayload(Builder, &*I, Enum, SEI->getEnumOperand());
   }
 
@@ -1304,7 +1304,7 @@ bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
     return false;
 
   // If we do not have any argument, kill the retain_value.
-  if (!(*FindResult)->second->getArgumentInterfaceType()) {
+  if (!(*FindResult)->second->hasAssociatedValues()) {
     RVI->eraseFromParent();
     return true;
   }
@@ -1324,7 +1324,7 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
     return false;
 
   // If we do not have any argument, just delete the release value.
-  if (!(*FindResult)->second->getArgumentInterfaceType()) {
+  if (!(*FindResult)->second->hasAssociatedValues()) {
     RVI->eraseFromParent();
     return true;
   }
@@ -1415,7 +1415,7 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
     for (auto P : EnumBBCaseList) {
       // If we don't have an argument for this case, there is nothing to
       // do... continue...
-      if (!P.second->getArgumentInterfaceType())
+      if (!P.second->hasAssociatedValues())
         continue;
 
       // Otherwise create the release_value before the terminator of the
@@ -1480,7 +1480,7 @@ findRetainsSinkableFromSwitchRegionForEnum(
 
     // If the case does not have an argument type, skip the predecessor since
     // there will not be a retain to sink.
-    if (!Decl->getArgumentInterfaceType())
+    if (!Decl->hasAssociatedValues())
       continue;
 
     // Ok, we found a payloaded predecessor. Look backwards through the

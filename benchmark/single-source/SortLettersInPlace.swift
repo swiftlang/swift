@@ -42,4 +42,3 @@ public func run_SortLettersInPlace(_ N: Int) {
     CheckResults(letters[0].value <= letters[letters.count/2].value)
   }
 }
-

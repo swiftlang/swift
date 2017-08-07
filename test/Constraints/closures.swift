@@ -29,6 +29,25 @@ struct X2 {
 
 _ = f0(X2(), {$0.g()})
 
+// Closures with inout arguments and '__shared' conversions.
+
+func inoutToSharedConversions() {
+  func fooOW<T, U>(_ f : (__owned T) -> U) {}
+  fooOW({ (x : Int) in return Int(5) }) // '__owned'-to-'__owned' allowed
+  fooOW({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__owned' allowed
+  fooOW({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(_) -> _'}}
+  
+  func fooIO<T, U>(_ f : (inout T) -> U) {}
+  fooIO({ (x : inout Int) in return Int(5) }) // 'inout'-to-'inout' allowed
+  fooIO({ (x : __shared Int) in return Int(5) }) // expected-error {{cannot convert value of type '(__shared Int) -> Int' to expected argument type '(inout _) -> _'}}
+  fooIO({ (x : Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(inout _) -> _'}}
+
+  func fooSH<T, U>(_ f : (__shared T) -> U) {}
+  fooSH({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__shared' allowed
+  fooSH({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(__shared _) -> _'}}
+  fooSH({ (x : Int) in return Int(5) }) // '__owned'-to-'__shared' allowed
+}
+
 // Autoclosure
 func f1(f: @autoclosure () -> Int) { }
 func f2() -> Int { }
@@ -164,7 +183,7 @@ func testMap() {
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
-[].reduce { $0 + $1 }  // expected-error {{missing argument for parameter #1 in call}}
+[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '((_, _) -> _)'}}
 
 
 
@@ -366,8 +385,7 @@ func rdar20868864(_ s: String) {
 func r22058555() {
   var firstChar: UInt8 = 0
   "abc".withCString { chars in
-    // FIXME https://bugs.swift.org/browse/SR-4836: was {{cannot assign value of type 'Int8' to type 'UInt8'}}
-    firstChar = chars[0]  // expected-error {{cannot subscript a value of incorrect or ambiguous type}}
+    firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
   }
 }
 
@@ -517,3 +535,42 @@ returnsArray().flatMap { $0 }.flatMap { }
 
 // rdar://problem/30271695
 _ = ["hi"].flatMap { $0.isEmpty ? nil : $0 }
+
+// rdar://problem/32432145 - compiler should emit fixit to remove "_ in" in closures if 0 parameters is expected
+
+func r32432145(_ a: () -> ()) {}
+r32432145 { _ in let _ = 42 } // Ok in Swift 3
+r32432145 { _ in // Ok in Swift 3
+  print("answer is 42")
+}
+r32432145 { _,_ in
+  // expected-error@-1 {{contextual closure type '() -> ()' expects 0 arguments, but 2 were used in closure body}} {{13-19=}}
+  print("answer is 42")
+}
+
+// rdar://problem/30106822 - Swift ignores type error in closure and presents a bogus error about the caller
+[1, 2].first { $0.foo = 3 }
+// expected-error@-1 {{value of type 'Int' has no member 'foo'}}
+
+// rdar://problem/32433193, SR-5030 - Higher-order function diagnostic mentions the wrong contextual type conversion problem
+protocol A_SR_5030 {
+  associatedtype Value
+  func map<U>(_ t : @escaping (Self.Value) -> U) -> B_SR_5030<U>
+}
+
+struct B_SR_5030<T> : A_SR_5030 {
+  typealias Value = T
+  func map<U>(_ t : @escaping (T) -> U) -> B_SR_5030<U> { fatalError() }
+}
+
+func sr5030_exFalso<T>() -> T {
+  fatalError()
+}
+
+extension A_SR_5030 {
+  func foo() -> B_SR_5030<Int> {
+    let tt : B_SR_5030<Int> = sr5030_exFalso()
+    return tt.map { x in (idx: x) }
+    // expected-error@-1 {{cannot convert value of type '(idx: (Int))' to closure result type 'Int'}}
+  }
+}

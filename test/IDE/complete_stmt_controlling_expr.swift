@@ -1,17 +1,21 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_1 | %FileCheck %s -check-prefix=COND_COMMON
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_2 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_GUARD_1 | %FileCheck %s -check-prefix=COND-WITH-RELATION
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_1 | %FileCheck %s -check-prefix=COND-WITH-RELATION
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_2 | %FileCheck %s -check-prefix=COND-WITH-RELATION
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_2B | %FileCheck %s -check-prefix=COND-WITH-RELATION
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_3 | %FileCheck %s -check-prefix=COND_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_4 | %FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_1 | %FileCheck %s -check-prefix=COND_COMMON
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_2 | %FileCheck %s -check-prefix=COND_COMMON
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_3 | %FileCheck %s -check-prefix=COND_COMMON
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_4 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_1 | %FileCheck %s -check-prefix=COND-WITH-RELATION
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_2 | %FileCheck %s -check-prefix=COND-WITH-RELATION
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_3 | %FileCheck %s -check-prefix=COND-WITH-RELATION
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_4 | %FileCheck %s -check-prefix=COND-WITH-RELATION
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_5 | %FileCheck %s -check-prefix=COND_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_IF_ELSE_IF_6 | %FileCheck %s -check-prefix=COND_COMMON
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_1 | %FileCheck %s -check-prefix=COND_COMMON
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_2 | %FileCheck %s -check-prefix=COND_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_1 | %FileCheck %s -check-prefix=COND-WITH-RELATION
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_2 | %FileCheck %s -check-prefix=COND-WITH-RELATION
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_2B | %FileCheck %s -check-prefix=COND-WITH-RELATION
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_3 | %FileCheck %s -check-prefix=COND_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COND_WHILE_4 | %FileCheck %s -check-prefix=COND_COMMON
 
@@ -132,12 +136,27 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_GUARD_6 | %FileCheck %s -check-prefix=UNRESOLVED_B
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_GUARD_7 | %FileCheck %s -check-prefix=UNRESOLVED_B
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IF_LET_BIND_1 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IF_LET_BIND_2 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IF_LET_BIND_3 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_1 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_2 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_3 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_4 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_5 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT
+
 
 struct FooStruct {
   var instanceVar : Int
   init(_: Int = 0) { }
   func boolGen() -> Bool { return false }
   func intGen() -> Int { return 1 }
+}
+
+func testGuard1(_ fooObject: FooStruct) {
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  guard #^COND_GUARD_1^#
 }
 
 func testIf1(_ fooObject: FooStruct) {
@@ -150,6 +169,13 @@ func testIf2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if #^COND_IF_2^# {
+  }
+}
+
+func testIf2b(_ fooObject: FooStruct) {
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  if true, #^COND_IF_2B^# {
   }
 }
 
@@ -225,6 +251,13 @@ func testWhile2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   while #^COND_WHILE_2^# {
+  }
+}
+
+func testWhile2b(_ fooObject: FooStruct) {
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  while true, #^COND_WHILE_2B^# {
   }
 }
 
@@ -572,3 +605,40 @@ func testUnresolvedGuard6(x: BB) {
 func testUnresolvedGuard7(x: BB) {
   guard let x.takeEnum(.#^UNRESOLVED_GUARD_7^#) else {}
 }
+
+func testIfLetBinding1(x: FooStruct?) {
+  if let y = x, y.#^IF_LET_BIND_1^# {}
+}
+func testIfLetBinding2(x: FooStruct?) {
+  if let y = x, y.#^IF_LET_BIND_2^#
+}
+func testIfLetBinding3(x: FooStruct?) {
+  if let y = x, let z = y.#^IF_LET_BIND_3^# {}
+}
+func testGuardLetBinding1(x: FooStruct?) {
+  guard let y = x, y.#^GUARD_LET_BIND_1^# else {}
+}
+func testGuardLetBinding2(x: FooStruct?) {
+  guard let y = x, y.#^GUARD_LET_BIND_2^#
+}
+func testGuardLetBinding3(x: FooStruct?) {
+  guard let y = x, y.#^GUARD_LET_BIND_3^# else
+}
+func testGuardLetBinding4(x: FooStruct?) {
+  guard let y = x, y.#^GUARD_LET_BIND_4^# {}
+}
+func testGuardLetBinding5(x: FooStruct?) {
+  guard let y = x, let z = y.#^GUARD_LET_BIND_5^# else {}
+}
+
+// FOOSTRUCT_DOT: Begin completions
+// FOOSTRUCT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#];
+// FOOSTRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   boolGen()[#Bool#];
+// FOOSTRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   intGen()[#Int#];
+// FOOSTRUCT_DOT: End completions
+
+// FOOSTRUCT_DOT_BOOL: Begin completions
+// FOOSTRUCT_DOT_BOOL-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#];
+// FOOSTRUCT_DOT_BOOL-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: boolGen()[#Bool#];
+// FOOSTRUCT_DOT_BOOL-DAG: Decl[InstanceMethod]/CurrNominal:   intGen()[#Int#];
+// FOOSTRUCT_DOT_BOOL: End completions

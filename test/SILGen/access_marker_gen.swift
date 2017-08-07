@@ -118,7 +118,7 @@ class D {
   var x: Int = 0
 }
 //   materializeForSet callback
-// CHECK-LABEL: sil hidden [transparent] @_T017access_marker_gen1DC1xSifmytfU_
+// CHECK-LABEL: sil private [transparent] @_T017access_marker_gen1DC1xSifmytfU_
 // CHECK:       end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
 
 //   materializeForSet

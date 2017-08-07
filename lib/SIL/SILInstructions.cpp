@@ -407,16 +407,25 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
 }
 
 ApplyInst *ApplyInst::create(SILDebugLocation Loc, SILValue Callee,
-                             SILType SubstCalleeTy, SILType Result,
-                             SubstitutionList Subs,
-                             ArrayRef<SILValue> Args, bool isNonThrowing,
+                             SubstitutionList Subs, ArrayRef<SILValue> Args,
+                             bool isNonThrowing,
+                             Optional<SILModuleConventions> ModuleConventions,
                              SILFunction &F,
                              SILOpenedArchetypesState &OpenedArchetypes) {
+  SILType SubstCalleeSILTy =
+      Callee->getType().substGenericArgs(F.getModule(), Subs);
+  auto SubstCalleeTy = SubstCalleeSILTy.getAs<SILFunctionType>();
+  SILFunctionConventions Conv(SubstCalleeTy,
+                              ModuleConventions.hasValue()
+                                  ? ModuleConventions.getValue()
+                                  : SILModuleConventions(F.getModule()));
+  SILType Result = Conv.getSILResultType();
+
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               SubstCalleeTy.getSwiftRValueType(), Subs);
+                               SubstCalleeSILTy.getSwiftRValueType(), Subs);
   void *Buffer = allocate(F, Subs, TypeDependentOperands, Args);
-  return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeTy,
+  return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeSILTy,
                                  Result, Subs, Args,
                                  TypeDependentOperands, isNonThrowing);
 }
@@ -447,10 +456,14 @@ PartialApplyInst::PartialApplyInst(SILDebugLocation Loc, SILValue Callee,
 
 PartialApplyInst *
 PartialApplyInst::create(SILDebugLocation Loc, SILValue Callee,
-                         SILType SubstCalleeTy, SubstitutionList Subs,
-                         ArrayRef<SILValue> Args, SILType ClosureType,
-                         SILFunction &F,
+                         ArrayRef<SILValue> Args, SubstitutionList Subs,
+                         ParameterConvention CalleeConvention, SILFunction &F,
                          SILOpenedArchetypesState &OpenedArchetypes) {
+  SILType SubstCalleeTy =
+      Callee->getType().substGenericArgs(F.getModule(), Subs);
+  SILType ClosureType = SILBuilder::getPartialApplyResultType(
+      SubstCalleeTy, Args.size(), F.getModule(), {}, CalleeConvention);
+
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                SubstCalleeTy.getSwiftRValueType(), Subs);
@@ -473,14 +486,15 @@ TryApplyInst::TryApplyInst(SILDebugLocation Loc, SILValue callee,
     : ApplyInstBase(ValueKind::TryApplyInst, Loc, callee, substCalleeTy, subs,
                     args, TypeDependentOperands, normalBB, errorBB) {}
 
-
 TryApplyInst *TryApplyInst::create(SILDebugLocation Loc, SILValue callee,
-                                   SILType substCalleeTy,
                                    SubstitutionList subs,
                                    ArrayRef<SILValue> args,
                                    SILBasicBlock *normalBB,
                                    SILBasicBlock *errorBB, SILFunction &F,
-                                SILOpenedArchetypesState &OpenedArchetypes) {
+                                   SILOpenedArchetypesState &OpenedArchetypes) {
+  SILType substCalleeTy =
+      callee->getType().substGenericArgs(F.getModule(), subs);
+
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                substCalleeTy.getSwiftRValueType(), subs);
@@ -533,7 +547,8 @@ const BuiltinInfo &BuiltinInst::getBuiltinInfo() const {
 }
 
 static unsigned getWordsForBitWidth(unsigned bits) {
-  return (bits + llvm::integerPartWidth - 1)/llvm::integerPartWidth;
+  return ((bits + llvm::APInt::APINT_BITS_PER_WORD - 1)
+          / llvm::APInt::APINT_BITS_PER_WORD);
 }
 
 template<typename INST>
@@ -545,7 +560,7 @@ template<typename INST>
 static void *allocateLiteralInstWithBitSize(SILFunction &F, unsigned bits) {
   unsigned words = getWordsForBitWidth(bits);
   return F.getModule().allocateInst(
-      sizeof(INST) + sizeof(llvm::integerPart)*words, alignof(INST));
+      sizeof(INST) + sizeof(llvm::APInt::WordType)*words, alignof(INST));
 }
 
 IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
@@ -553,7 +568,7 @@ IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
     : LiteralInst(ValueKind::IntegerLiteralInst, Loc, Ty),
       numBits(Value.getBitWidth()) {
   std::uninitialized_copy_n(Value.getRawData(), Value.getNumWords(),
-                            getTrailingObjects<llvm::integerPart>());
+                            getTrailingObjects<llvm::APInt::WordType>());
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
@@ -589,7 +604,7 @@ IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
-  return APInt(numBits, {getTrailingObjects<llvm::integerPart>(),
+  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
 
@@ -598,7 +613,7 @@ FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
     : LiteralInst(ValueKind::FloatLiteralInst, Loc, Ty),
       numBits(Bits.getBitWidth()) {
         std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
-                                  getTrailingObjects<llvm::integerPart>());
+                                  getTrailingObjects<llvm::APInt::WordType>());
 }
 
 FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
@@ -628,7 +643,7 @@ FloatLiteralInst *FloatLiteralInst::create(FloatLiteralExpr *E,
 }
 
 APInt FloatLiteralInst::getBits() const {
-  return APInt(numBits, {getTrailingObjects<llvm::integerPart>(),
+  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
 
@@ -1604,7 +1619,7 @@ InitExistentialAddrInst *InitExistentialAddrInst::create(
                                                 Conformances);
 }
 
-InitExistentialOpaqueInst *InitExistentialOpaqueInst::create(
+InitExistentialValueInst *InitExistentialValueInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F, SILOpenedArchetypesState &OpenedArchetypes) {
@@ -1620,7 +1635,7 @@ InitExistentialOpaqueInst *InitExistentialOpaqueInst::create(
     declareWitnessTable(Mod, C);
 
   return ::new (Buffer)
-      InitExistentialOpaqueInst(Loc, ExistentialType, ConcreteType, Instance,
+      InitExistentialValueInst(Loc, ExistentialType, ConcreteType, Instance,
                                 TypeDependentOperands, Conformances);
 }
 
@@ -1763,7 +1778,12 @@ OpenExistentialBoxInst::OpenExistentialBoxInst(
     : UnaryInstructionBase(DebugLoc, operand, ty) {
 }
 
-OpenExistentialOpaqueInst::OpenExistentialOpaqueInst(SILDebugLocation DebugLoc,
+OpenExistentialBoxValueInst::OpenExistentialBoxValueInst(
+    SILDebugLocation DebugLoc, SILValue operand, SILType ty)
+    : UnaryInstructionBase(DebugLoc, operand, ty) {
+}
+
+OpenExistentialValueInst::OpenExistentialValueInst(SILDebugLocation DebugLoc,
                                                      SILValue Operand,
                                                      SILType SelfTy)
     : UnaryInstructionBase(DebugLoc, Operand, SelfTy) {}
@@ -1969,6 +1989,9 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   switch (getKind()) {
   case Kind::StoredProperty:
   case Kind::GettableProperty:
+  case Kind::OptionalChain:
+  case Kind::OptionalWrap:
+  case Kind::OptionalForce:
     llvm_unreachable("not a settable computed property");
   case Kind::SettableProperty: {
     auto setter = getComputedPropertySetter();
@@ -1983,6 +2006,9 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
                          llvm::function_ref<void (SILFunction*)> forFunction) {
   switch (component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty:
+  case KeyPathPatternComponent::Kind::OptionalChain:
+  case KeyPathPatternComponent::Kind::OptionalWrap:
+  case KeyPathPatternComponent::Kind::OptionalForce:
     return;
   case KeyPathPatternComponent::Kind::SettableProperty:
     forFunction(component.getComputedPropertySetter());
@@ -2029,6 +2055,9 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
   for (auto component : components) {
     switch (component.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty:
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+    case KeyPathPatternComponent::Kind::OptionalForce:
       break;
       
     case KeyPathPatternComponent::Kind::GettableProperty:
@@ -2090,6 +2119,11 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
   for (auto &component : components) {
     ID.AddInteger((unsigned)component.getKind());
     switch (component.getKind()) {
+    case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+    case KeyPathPatternComponent::Kind::OptionalChain:
+      break;
+      
     case KeyPathPatternComponent::Kind::StoredProperty:
       ID.AddPointer(component.getStoredPropertyDecl());
       break;

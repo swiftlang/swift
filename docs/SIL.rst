@@ -549,9 +549,9 @@ the caller.  A non-autoreleased ``apply`` of a function that is defined
 with an autoreleased result has the effect of performing an
 autorelease in the callee.
 
-- The @noescape declaration attribute on Swift parameters (which is valid only
-  on parameters of function type, and is implied by the @autoclosure attribute)
-  is turned into a @noescape type attribute on SIL arguments.  @noescape
+- The ``@noescape`` declaration attribute on Swift parameters (which is valid only
+  on parameters of function type, and is implied by the ``@autoclosure`` attribute)
+  is turned into a ``@noescape`` type attribute on SIL arguments.  ``@noescape``
   indicates that the lifetime of the closure parameter will not be extended by
   the callee (e.g. the pointer will not be stored in a global variable).  It
   corresponds to the LLVM "nocapture" attribute in terms of semantics (but is
@@ -2456,7 +2456,7 @@ index_raw_pointer
   %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int<n>
   // %0 must be of $Builtin.RawPointer type
   // %1 must be of a builtin integer type
-  // %2 will be of type $*T
+  // %2 will be of type $Builtin.RawPointer
 
 Given a ``Builtin.RawPointer`` value ``%0``, returns a pointer value at the
 byte offset ``%1`` relative to ``%0``.
@@ -3828,9 +3828,9 @@ container may use one of several representations:
   before IR generation.
   The following instructions manipulate "loadable" opaque existential containers:
   
-  * `init_existential_opaque`_
-  * `open_existential_opaque`_
-  * `deinit_existential_opaque`_
+  * `init_existential_value`_
+  * `open_existential_value`_
+  * `deinit_existential_value`_
 
 - **Class existential containers**: If a protocol type is constrained by one or
   more class protocols, then the existential container for that type is
@@ -3859,6 +3859,7 @@ container may use one of several representations:
   * `alloc_existential_box`_
   * `project_existential_box`_
   * `open_existential_box`_
+  * `open_existential_box_value`_
   * `dealloc_existential_box`_
 
 Some existential types may additionally support specialized representations
@@ -3904,14 +3905,14 @@ initialized existential container can be destroyed with ``destroy_addr`` as
 usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
 existential container.
 
-init_existential_opaque
-```````````````````````
+init_existential_value
+``````````````````````
 ::
 
-  sil-instruction ::= 'init_existential_opaque' sil-operand ':' sil-type ','
+  sil-instruction ::= 'init_existential_value' sil-operand ':' sil-type ','
                                              sil-type
 
-  %1 = init_existential_opaque %0 : $L' : $C, $P
+  %1 = init_existential_value %0 : $L' : $C, $P
   // %0 must be of loadable type $L', lowered from AST type $L, conforming to
   //    protocol(s) $P
   // %1 will be of type $P
@@ -3935,20 +3936,20 @@ existential containers that have been partially initialized by
 ``init_existential_addr`` but haven't had their contained value initialized.
 A fully initialized existential must be destroyed with ``destroy_addr``.
 
-deinit_existential_opaque
-`````````````````````````
+deinit_existential_value
+````````````````````````
 ::
 
-  sil-instruction ::= 'deinit_existential_opaque' sil-operand
+  sil-instruction ::= 'deinit_existential_value' sil-operand
 
-  deinit_existential_opaque %0 : $P
+  deinit_existential_value %0 : $P
   // %0 must be of a $P opaque type for non-class protocol or protocol
   // composition type P
 
 Undoes the partial initialization performed by
-``init_existential_opaque``.  ``deinit_existential_opaque`` is only valid for
+``init_existential_value``.  ``deinit_existential_value`` is only valid for
 existential containers that have been partially initialized by
-``init_existential_opaque`` but haven't had their contained value initialized.
+``init_existential_value`` but haven't had their contained value initialized.
 A fully initialized existential must be destroyed with ``destroy_value``.
 
 open_existential_addr
@@ -3976,13 +3977,13 @@ access constraint: The returned address can either allow ``mutable_access`` or
 (e.g ``destroy_addr`` or ``copy_addr [take]``) or mutate the value at the
 address if they have ``mutable_access``.
 
-open_existential_opaque
-```````````````````````
+open_existential_value
+``````````````````````
 ::
 
-  sil-instruction ::= 'open_existential_opaque' sil-operand 'to' sil-type
+  sil-instruction ::= 'open_existential_value' sil-operand 'to' sil-type
 
-  %1 = open_existential_opaque %0 : $P to $@opened P
+  %1 = open_existential_value %0 : $P to $@opened P
   // %0 must be of a $P type for non-class protocol or protocol composition
   //   type P
   // $@opened P must be a unique archetype that refers to an opened
@@ -4117,6 +4118,22 @@ opened archetype ``$@opened P``. The result address is dependent on both
 the owning box and the enclosing function; in order to "open" a boxed
 existential that has directly adopted a class reference, temporary scratch
 space may need to have been allocated.
+
+open_existential_box_value
+``````````````````````````
+::
+
+  sil-instruction ::= 'open_existential_box_value' sil-operand 'to' sil-type
+
+  %1 = open_existential_box_value %0 : $P to $@opened P
+  // %0 must be a value of boxed protocol or protocol composition type $P
+  // %@opened P must be a unique archetype that refers to an opened
+  //   existential type P
+  // %1 will be of type $@opened P
+
+Projects the value inside a boxed existential container, and uses the enclosed
+type and protocol conformance metadata to bind the opened archetype ``$@opened
+P``.
 
 dealloc_existential_box
 ```````````````````````

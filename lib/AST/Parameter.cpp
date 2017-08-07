@@ -124,9 +124,11 @@ Type ParameterList::getType(const ASTContext &C) const {
   SmallVector<TupleTypeElt, 8> argumentInfo;
   
   for (auto P : *this) {
+    auto type = P->getType();
+    
     argumentInfo.emplace_back(
-        P->getType(), P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(P->getType(), P->isVariadic()));
+        type->getInOutObjectType(), P->getArgumentName(),
+        ParameterTypeFlags::fromParameterType(type, P->isVariadic(), P->isShared()).withInOut(P->isInOut()));
   }
 
   return TupleType::get(argumentInfo, C);
@@ -145,8 +147,8 @@ Type ParameterList::getInterfaceType(const ASTContext &C) const {
     assert(!type->hasArchetype());
 
     argumentInfo.emplace_back(
-        type, P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(type, P->isVariadic()));
+        type->getInOutObjectType(), P->getArgumentName(),
+        ParameterTypeFlags::fromParameterType(type, P->isVariadic(), P->isShared()).withInOut(P->isInOut()));
   }
 
   return TupleType::get(argumentInfo, C);

@@ -56,7 +56,7 @@ extension String {
   ///
   ///     let favemoji = "My favorite emoji is 🎉"
   ///     if let i = favemoji.utf16.index(where: { $0 >= 128 }) {
-  ///         let asciiPrefix = String(favemoji.utf16.prefix(upTo: i))
+  ///         let asciiPrefix = String(favemoji.utf16[..<i])
   ///         print(asciiPrefix)
   ///     }
   ///     // Prints "My favorite emoji is "
@@ -115,37 +115,13 @@ extension String {
     CustomStringConvertible,
     CustomDebugStringConvertible {
 
-    /// A position in a string's collection of UTF-16 code units.
-    ///
-    /// You can convert between indices of the different string views by using
-    /// conversion initializers and the `samePosition(in:)` method overloads.
-    /// For example, the following code sample finds the index of the first
-    /// space in the string's character view and then converts that to the same
-    /// position in the UTF-16 view.
-    ///
-    ///     let hearts = "Hearts <3 ♥︎ 💘"
-    ///     if let i = hearts.characters.index(of: " ") {
-    ///         let j = i.samePosition(in: hearts.utf16)
-    ///         print(Array(hearts.utf16.suffix(from: j)))
-    ///         print(hearts.utf16.suffix(from: j))
-    ///     }
-    ///     // Prints "[32, 60, 51, 32, 9829, 65038, 32, 55357, 56472]"
-    ///     // Prints " <3 ♥︎ 💘"
-    public struct Index {
-      // Foundation needs access to these fields so it can expose
-      // random access
-      public // SPI(Foundation)
-      init(_offset: Int) { self._offset = _offset }
-
-      public let _offset: Int
-    }
-
+    public typealias Index = String.Index
     public typealias IndexDistance = Int
 
     /// The position of the first code unit if the `String` is
     /// nonempty; identical to `endIndex` otherwise.
     public var startIndex: Index {
-      return Index(_offset: _offset)
+      return Index(encodedOffset: _offset)
     }
 
     /// The "past the end" position---that is, the position one greater than
@@ -153,7 +129,7 @@ extension String {
     ///
     /// In an empty UTF-16 view, `endIndex` is equal to `startIndex`.
     public var endIndex: Index {
-      return Index(_offset: _offset + _length)
+      return Index(encodedOffset: _offset + _length)
     }
 
     public struct Indices {
@@ -170,19 +146,19 @@ extension String {
     // TODO: swift-3-indexing-model - add docs
     public func index(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
-      return Index(_offset: _unsafePlus(i._offset, 1))
+      return Index(encodedOffset: _unsafePlus(i.encodedOffset, 1))
     }
 
     // TODO: swift-3-indexing-model - add docs
     public func index(before i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
-      return Index(_offset: _unsafeMinus(i._offset, 1))
+      return Index(encodedOffset: _unsafeMinus(i.encodedOffset, 1))
     }
 
     // TODO: swift-3-indexing-model - add docs
     public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
-      return Index(_offset: i._offset.advanced(by: n))
+      return Index(encodedOffset: i.encodedOffset.advanced(by: n))
     }
 
     // TODO: swift-3-indexing-model - add docs
@@ -190,17 +166,17 @@ extension String {
       _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
     ) -> Index? {
       // FIXME: swift-3-indexing-model: range check i?
-      let d = i._offset.distance(to: limit._offset)
+      let d = i.encodedOffset.distance(to: limit.encodedOffset)
       if (d > 0) ? (d < n) : (d > n) {
         return nil
       }
-      return Index(_offset: i._offset.advanced(by: n))
+      return Index(encodedOffset: i.encodedOffset.advanced(by: n))
     }
 
     // TODO: swift-3-indexing-model - add docs
     public func distance(from start: Index, to end: Index) -> IndexDistance {
       // FIXME: swift-3-indexing-model: range check start and end?
-      return start._offset.distance(to: end._offset)
+      return start.encodedOffset.distance(to: end.encodedOffset)
     }
 
     func _internalIndex(at i: Int) -> Int {
@@ -223,7 +199,7 @@ extension String {
       _precondition(i >= startIndex && i < endIndex,
           "out-of-range access on a UTF16View")
 
-      let index = _internalIndex(at: i._offset)
+      let index = _internalIndex(at: i.encodedOffset)
       let u = _core[index]
       if _fastPath((u &>> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
@@ -267,18 +243,6 @@ extension String {
       Builtin.unreachable()
     }
 #endif
-
-    /// Accesses the contiguous subrange of elements enclosed by the specified
-    /// range.
-    ///
-    /// - Complexity: O(*n*) if the underlying string is bridged from
-    ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-    public subscript(bounds: Range<Index>) -> UTF16View {
-      return UTF16View(
-        _core,
-        offset: _internalIndex(at: bounds.lowerBound._offset),
-        length: bounds.upperBound._offset - bounds.lowerBound._offset)
-    }
 
     internal init(_ _core: _StringCore) {
       self.init(_core, offset: 0, length: _core.count)
@@ -324,7 +288,7 @@ extension String {
   ///
   ///     let picnicGuest = "Deserving porcupine"
   ///     if let i = picnicGuest.utf16.index(of: 32) {
-  ///         let adjective = String(picnicGuest.utf16.prefix(upTo: i))
+  ///         let adjective = String(picnicGuest.utf16[..<i])
   ///         print(adjective)
   ///     }
   ///     // Prints "Optional(Deserving)"
@@ -333,8 +297,15 @@ extension String {
   /// slice of the `picnicGuest.utf16` view.
   ///
   /// - Parameter utf16: A UTF-16 code sequence.
+  @available(swift, deprecated: 3.2, obsoleted: 4.0)
   public init?(_ utf16: UTF16View) {
-    let wholeString = String(utf16._core)
+    // Attempt to recover the whole string, the better to implement the actual
+    // Swift 3.1 semantics, which are not as documented above!  Full Swift 3.1
+    // semantics may be impossible to preserve in the case of string literals,
+    // since we no longer have access to the length of the original string when
+    // there is no owner and elements are dropped from the end.
+    let wholeString = utf16._core.nativeBuffer.map { String(_StringCore($0)) }
+       ?? String(utf16._core)
 
     guard
       let start = UTF16Index(_offset: utf16._offset)
@@ -346,147 +317,56 @@ extension String {
         return nil
     }
     self = wholeString[start..<end]
+
+  }
+
+  /// Creates a string corresponding to the given sequence of UTF-16 code units.
+  @available(swift, introduced: 4.0)
+  public init(_ utf16: UTF16View) {
+    self = String(utf16._core)
   }
 
   /// The index type for subscripting a string's `utf16` view.
   public typealias UTF16Index = UTF16View.Index
 }
 
-extension String.UTF16View.Index : Comparable {
-  // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
-  //        assuming String.UTF8View.Index continues to exist
-  public static func == (
-    lhs: String.UTF16View.Index,
-    rhs: String.UTF16View.Index
-  ) -> Bool {
-    return lhs._offset == rhs._offset
-  }
-
-  public static func < (
-    lhs: String.UTF16View.Index,
-    rhs: String.UTF16View.Index
-  ) -> Bool {
-    return lhs._offset < rhs._offset
-  }
+extension String.UTF16View : _SwiftStringView {
+  var _ephemeralContent : String { return _persistentContent }
+  var _persistentContent : String { return String(self._core) }
 }
 
 // Index conversions
 extension String.UTF16View.Index {
   /// Creates an index in the given UTF-16 view that corresponds exactly to the
-  /// specified `UTF8View` position.
+  /// specified string position.
   ///
-  /// The following example finds the position of a space in a string's `utf8`
-  /// view and then converts that position to an index in the string's
-  /// `utf16` view.
+  /// If the index passed as `sourcePosition` represents either the start of a
+  /// Unicode scalar value or the position of a UTF-16 trailing surrogate,
+  /// then the initializer succeeds. If `sourcePosition` does not have an
+  /// exact corresponding position in `target`, then the result is `nil`. For
+  /// example, an attempt to convert the position of a UTF-8 continuation byte
+  /// results in `nil`.
+  ///
+  /// The following example finds the position of a space in a string and then
+  /// converts that position to an index in the string's `utf16` view.
   ///
   ///     let cafe = "Café 🍵"
   ///
-  ///     let utf8Index = cafe.utf8.index(of: 32)!
-  ///     let utf16Index = String.UTF16View.Index(utf8Index, within: cafe.utf16)!
+  ///     let stringIndex = cafe.index(of: "é")!
+  ///     let utf16Index = String.Index(stringIndex, within: cafe.utf16)!
   ///
-  ///     print(cafe.utf16.prefix(upTo: utf16Index))
+  ///     print(cafe.utf16[...utf16Index])
   ///     // Prints "Café"
   ///
-  /// If the position passed as `utf8Index` doesn't have an exact corresponding
-  /// position in `utf16`, the result of the initializer is `nil`. For
-  /// example, because UTF-8 and UTF-16 represent high Unicode code points
-  /// differently, an attempt to convert the position of a UTF-8 continuation
-  /// byte fails.
-  ///
   /// - Parameters:
-  ///   - utf8Index: A position in a `UTF8View` instance. `utf8Index` must be
-  ///     an element in `String(utf16).utf8.indices`.
-  ///   - utf16: The `UTF16View` in which to find the new position.
+  ///   - sourcePosition: A position in at least one of the views of the string
+  ///     shared by `target`.
+  ///   - target: The `UTF16View` in which to find the new position.
   public init?(
-    _ utf8Index: String.UTF8Index, within utf16: String.UTF16View
+    _ sourcePosition: String.Index, within target: String.UTF16View
   ) {
-    let core = utf16._core
-
-    _precondition(
-      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
-      "Invalid String.UTF8Index for this UTF-16 view")
-
-    // Detect positions that have no corresponding index.
-    if !utf8Index._isOnUnicodeScalarBoundary(in: core) {
-      return nil
-    }
-    _offset = utf8Index._coreIndex
-  }
-
-  /// Creates an index in the given UTF-16 view that corresponds exactly to the
-  /// specified `UnicodeScalarView` position.
-  ///
-  /// The following example finds the position of a space in a string's `utf8`
-  /// view and then converts that position to an index in the string's
-  /// `utf16` view.
-  ///
-  ///     let cafe = "Café 🍵"
-  ///
-  ///     let scalarIndex = cafe.unicodeScalars.index(of: "é")!
-  ///     let utf16Index = String.UTF16View.Index(scalarIndex, within: cafe.utf16)
-  ///
-  ///     print(cafe.utf16.prefix(through: utf16Index))
-  ///     // Prints "Café"
-  ///
-  /// - Parameters:
-  ///   - unicodeScalarIndex: A position in a `UnicodeScalarView` instance.
-  ///     `unicodeScalarIndex` must be an element in
-  ///     `String(utf16).unicodeScalarIndex.indices`.
-  ///   - utf16: The `UTF16View` in which to find the new position.
-  public init(
-    _ unicodeScalarIndex: String.UnicodeScalarIndex,
-    within utf16: String.UTF16View) {
-    _offset = unicodeScalarIndex._position
-  }
-
-  /// Creates an index in the given UTF-16 view that corresponds exactly to the
-  /// specified `CharacterView` position.
-  ///
-  /// The following example finds the position of a space in a string's `characters`
-  /// view and then converts that position to an index in the string's
-  /// `utf16` view.
-  ///
-  ///     let cafe = "Café 🍵"
-  ///
-  ///     let characterIndex = cafe.characters.index(of: "é")!
-  ///     let utf16Index = String.UTF16View.Index(characterIndex, within: cafe.utf16)
-  ///
-  ///     print(cafe.utf16.prefix(through: utf16Index))
-  ///     // Prints "Café"
-  ///
-  /// - Parameters:
-  ///   - characterIndex: A position in a `CharacterView` instance.
-  ///     `characterIndex` must be an element in
-  ///     `String(utf16).characters.indices`.
-  ///   - utf16: The `UTF16View` in which to find the new position.
-  public init(_ characterIndex: String.Index, within utf16: String.UTF16View) {
-    _offset = characterIndex._utf16Index
-  }
-
-  /// Returns the position in the given UTF-8 view that corresponds exactly to
-  /// this index.
-  ///
-  /// The index must be a valid index of `String(utf8).utf16`.
-  ///
-  /// This example first finds the position of a space (UTF-16 code point `32`)
-  /// in a string's `utf16` view and then uses this method to find the same
-  /// position in the string's `utf8` view.
-  ///
-  ///     let cafe = "Café 🍵"
-  ///     let i = cafe.utf16.index(of: 32)!
-  ///     let j = i.samePosition(in: cafe.utf8)!
-  ///     print(Array(cafe.utf8.prefix(upTo: j)))
-  ///     // Prints "[67, 97, 102, 195, 169]"
-  ///
-  /// - Parameter utf8: The view to use for the index conversion.
-  /// - Returns: The position in `utf8` that corresponds exactly to this index.
-  ///   If this index does not have an exact corresponding position in `utf8`,
-  ///   this method returns `nil`. For example, an attempt to convert the
-  ///   position of a UTF-16 trailing surrogate returns `nil`.
-  public func samePosition(
-    in utf8: String.UTF8View
-  ) -> String.UTF8View.Index? {
-    return String.UTF8View.Index(self, within: utf8)
+    guard sourcePosition._transcodedOffset == 0 else { return nil }
+    self.init(encodedOffset: sourcePosition.encodedOffset)
   }
 
   /// Returns the position in the given view of Unicode scalars that
@@ -501,10 +381,12 @@ extension String.UTF16View.Index {
   ///     let cafe = "Café 🍵"
   ///     let i = cafe.utf16.index(of: 32)!
   ///     let j = i.samePosition(in: cafe.unicodeScalars)!
-  ///     print(cafe.unicodeScalars.prefix(upTo: j))
+  ///     print(cafe.unicodeScalars[..<j])
   ///     // Prints "Café"
   ///
   /// - Parameter unicodeScalars: The view to use for the index conversion.
+  ///   This index must be a valid index of at least one view of the string
+  ///   shared by `unicodeScalars`.
   /// - Returns: The position in `unicodeScalars` that corresponds exactly to
   ///   this index. If this index does not have an exact corresponding
   ///   position in `unicodeScalars`, this method returns `nil`. For example,
@@ -514,32 +396,6 @@ extension String.UTF16View.Index {
     in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
     return String.UnicodeScalarIndex(self, within: unicodeScalars)
-  }
-
-  /// Returns the position in the given string that corresponds exactly to this
-  /// index.
-  ///
-  /// This index must be a valid index of `characters.utf16`.
-  ///
-  /// This example first finds the position of a space (UTF-16 code point `32`)
-  /// in a string's `utf16` view and then uses this method find the same position
-  /// in the string.
-  ///
-  ///     let cafe = "Café 🍵"
-  ///     let i = cafe.utf16.index(of: 32)!
-  ///     let j = i.samePosition(in: cafe)!
-  ///     print(cafe[cafe.startIndex ..< j])
-  ///     // Prints "Café"
-  ///
-  /// - Parameter characters: The string to use for the index conversion.
-  /// - Returns: The position in `characters` that corresponds exactly to this
-  ///   index. If this index does not have an exact corresponding position in
-  ///   `characters`, this method returns `nil`. For example, an attempt to
-  ///   convert the position of a UTF-16 trailing surrogate returns `nil`.
-  public func samePosition(
-    in characters: String
-  ) -> String.Index? {
-    return String.Index(self, within: characters)
   }
 }
 
@@ -637,3 +493,61 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   }
 }
 
+// backward compatibility for index interchange.  
+extension String.UTF16View {
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
+  public func index(after i: Index?) -> Index {
+    return index(after: i!)
+  }
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
+  public func index(
+    _ i: Index?, offsetBy n: IndexDistance) -> Index {
+    return index(i!, offsetBy: n)
+  }
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
+  public func distance(from i: Index?, to j: Index?) -> IndexDistance {
+    return distance(from: i!, to: j!)
+  }
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
+  public subscript(i: Index?) -> Unicode.UTF16.CodeUnit {
+    return self[i!]
+  }
+}
+
+//===--- Slicing Support --------------------------------------------------===//
+/// In Swift 3.2, in the absence of type context,
+///
+///   someString.utf16[someString.utf16.startIndex..<someString.utf16.endIndex]
+///
+/// was deduced to be of type `String.UTF16View`.  Provide a more-specific
+/// Swift-3-only `subscript` overload that continues to produce
+/// `String.UTF16View`.
+extension String.UTF16View {
+  public typealias SubSequence = Substring.UTF16View
+
+  @available(swift, introduced: 4)
+  public subscript(r: Range<Index>) -> String.UTF16View.SubSequence {
+    return String.UTF16View.SubSequence(self, _bounds: r)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<Index>) -> String.UTF16View {
+    return String.UTF16View(
+      _core,
+      offset: _internalIndex(at: bounds.lowerBound.encodedOffset),
+      length: bounds.upperBound.encodedOffset - bounds.lowerBound.encodedOffset)
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: ClosedRange<Index>) -> String.UTF16View {
+    return self[bounds.relative(to: self)]
+  }
+}

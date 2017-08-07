@@ -20,13 +20,26 @@ import SwiftPrivateLibcExtras
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
 import Glibc
 #endif
 
 #if _runtime(_ObjC)
 import ObjectiveC
 #endif
+
+extension String {
+  /// Returns the lines in `self`.
+  public var _lines : [String] {
+    return _split(separator: "\n")
+  }
+
+  /// Splits `self` at occurrences of `separator`.
+  public func _split(separator: Unicode.Scalar) -> [String] {
+    let scalarSlices = unicodeScalars.split { $0 == separator }
+    return scalarSlices.map { String(String.UnicodeScalarView($0)) }
+  }
+}
 
 public struct SourceLoc {
   public let file: String
@@ -376,7 +389,14 @@ public func expectSequenceType<X : Sequence>(_ x: X) -> X
 % for Mutable in ['', 'Mutable']:
 public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
   _ x: X.Type
-) { }
+) where
+  // FIXME(ABI)#2 (Associated Types with where clauses): there should be no constraints in
+  // the 'where' clause, all of these should be required by the protocol.
+%   if Mutable == '':
+  X.SubSequence : Collection,
+%   end
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#3 (Recursive Protocol Constraints): can't have this constraint now.
+  X.Indices : Collection {}
 % end
 
 /// A slice is a `Collection` that when sliced returns an instance of
@@ -414,7 +434,12 @@ public func expectCollectionAssociatedTypes<X : Collection>(
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) { }
+) where
+  // FIXME(ABI)#6 (Associated Types with where clauses): there should be no constraints in
+  // the 'where' clause, all of these should be required by the protocol.
+  X.SubSequence : Collection,
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#7 (Recursive Protocol Constraints): can't have this constraint now.
+  X.Indices : Collection {}
 
 /// Check that all associated types of a `BidirectionalCollection` are what we
 /// expect them to be.
@@ -425,7 +450,12 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) { }
+) where
+  // FIXME(ABI)#8 (Associated Types with where clauses): there should be no constraints in
+  // the 'where' clause, all of these should be required by the protocol.
+  X.SubSequence : BidirectionalCollection,
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#9 (Recursive Protocol Constraints): can't have this constraint now.
+  X.Indices : BidirectionalCollection {}
 
 /// Check that all associated types of a `RandomAccessCollection` are what we
 /// expect them to be.
@@ -436,7 +466,12 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) { }
+) where
+  // FIXME(ABI)#10 (Associated Types with where clauses): there should be no constraints in
+  // the 'where' clause, all of these should be required by the protocol.
+  X.SubSequence : RandomAccessCollection,
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#11 (Recursive Protocol Constraints): can't have this constraint now.
+  X.Indices : RandomAccessCollection {}
 
 public struct AssertionResult : CustomStringConvertible {
   init(isPass: Bool) {
@@ -567,7 +602,7 @@ func _stdlib_getline() -> String? {
       }
       return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
     }
-    if c == CInt(UnicodeScalar("\n").value) {
+    if c == CInt(Unicode.Scalar("\n").value) {
       return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
     }
     result.append(UInt8(c))
@@ -602,6 +637,8 @@ func _stdlib_installTrapInterceptor()
 }
 #endif
 
+// Avoid serializing references to objc_setUncaughtExceptionHandler in SIL.
+@inline(never) @_semantics("stdlib_binary_only")
 func _childProcess() {
   _stdlib_installTrapInterceptor()
 
@@ -742,7 +779,7 @@ struct _ParentProcess {
     parameter: Int?
   ) -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
         status: ProcessTerminationStatus?,
-        crashStdout: [String], crashStderr: [String]) {
+        crashStdout: [Substring], crashStderr: [Substring]) {
     if _pid == nil {
       _spawnChild()
     }
@@ -766,15 +803,15 @@ struct _ParentProcess {
     var stderrSeenCrashDelimiter = false
     var stdoutEnd = false
     var stderrEnd = false
-    var capturedCrashStdout: [String] = []
-    var capturedCrashStderr: [String] = []
+    var capturedCrashStdout: [Substring] = []
+    var capturedCrashStderr: [Substring] = []
     var anyExpectFailedInChild = false
 
     func processLine(_ line: String, isStdout: Bool) -> (done: Bool, Void) {
-      var line = line
+      var line = line[...]
       if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
         let controlMessage =
-            line[index..<line.endIndex]._split(separator: ";")
+            line[index..<line.endIndex].split(separator: ";")
         switch controlMessage[1] {
         case "expectCrash":
           if isStdout {
@@ -806,7 +843,7 @@ struct _ParentProcess {
         if stderrSeenCrashDelimiter {
           capturedCrashStderr.append(line)
           if findSubstring(line, _crashedPrefix) != nil {
-            line = "OK: saw expected \"\(line.lowercased())\""
+            line = "OK: saw expected \"\(line.lowercased())\""[...]
           }
         }
       }
@@ -913,8 +950,8 @@ struct _ParentProcess {
 
     var expectCrash = false
     var childTerminationStatus: ProcessTerminationStatus?
-    var crashStdout: [String] = []
-    var crashStderr: [String] = []
+    var crashStdout: [Substring] = []
+    var crashStderr: [Substring] = []
     if _runTestsInProcess {
       if t.stdinText != nil {
         print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
@@ -1473,7 +1510,7 @@ func _getOSVersion() -> OSVersion {
   return .ps4
 #elseif os(Android)
   return .android
-#elseif os(Windows) && CYGWIN
+#elseif os(Cygwin)
   return .windowsCygnus
 #elseif os(Windows)
   return .windows
@@ -2356,11 +2393,11 @@ public func expectEqualsUnordered<
   Expected.Iterator.Element == Actual.Iterator.Element {
 
   let x: [Expected.Iterator.Element] =
-    expected.sorted(by: compose(compare, { $0.isLT() }))
+    expected.sorted { compare($0, $1).isLT() }
   let y: [Actual.Iterator.Element] =
-    actual.sorted(by: compose(compare, { $0.isLT() }))
+    actual.sorted { compare($0, $1).isLT() }
   expectEqualSequence(
-    x, y, ${trace}, sameValue: compose(compare, { $0.isEQ() }))
+    x, y, ${trace}, sameValue: { compare($0, $1).isEQ() })
 }
 
 public func expectEqualsUnordered<
@@ -2507,12 +2544,6 @@ public func expectEqualUnicodeScalars(
       "expected elements: \"\(asHex(expected))\"\n"
       + "actual: \"\(asHex(actualUnicodeScalars))\"",
       trace: ${trace})
-  }
-}
-
-func compose<A, B, C>(_ f: @escaping (A) -> B, _ g: @escaping (B) -> C) -> (A) -> C {
-  return { a in
-    return g(f(a))
   }
 }
 

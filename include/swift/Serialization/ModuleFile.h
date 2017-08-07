@@ -84,17 +84,6 @@ class ModuleFile : public LazyMemberLoader {
   /// The number of entities that are currently being deserialized.
   unsigned NumCurrentDeserializingEntities = 0;
 
-  /// Declaration contexts with delayed generic environments, which will be
-  /// completed as a pending action.
-  ///
-  /// This should only be used on the module returned by
-  /// getModuleFileForDelayedActions().
-  ///
-  /// FIXME: This is needed because completing a generic environment can
-  /// require the type checker, which might be gone if we delay generic
-  /// environments too far. It is a hack.
-  std::vector<DeclContext *> DelayedGenericEnvironments;
-
   /// RAII class to be used when deserializing an entity.
   class DeserializingEntityRAII {
     ModuleFile &MF;
@@ -614,7 +603,7 @@ public:
 
   /// Searches the module's nested type decls table for the given member of
   /// the given type.
-  TypeDecl *lookupNestedType(Identifier name, const ValueDecl *parent);
+  TypeDecl *lookupNestedType(Identifier name, const NominalTypeDecl *parent);
 
   /// Searches the module's operators for one with the given name and fixity.
   ///
@@ -751,7 +740,11 @@ public:
   /// Returns the type with the given ID, deserializing it if needed.
   llvm::Expected<Type> getTypeChecked(serialization::TypeID TID);
 
-  /// Returns the identifier with the given ID, deserializing it if needed.
+  /// Returns the base name with the given ID, deserializing it if needed.
+  DeclBaseName getDeclBaseName(serialization::IdentifierID IID);
+
+  /// Convenience method to retrieve the identifier backing the name with
+  /// given ID. Asserts that the name with this ID is not special.
   Identifier getIdentifier(serialization::IdentifierID IID);
 
   /// Returns the decl with the given ID, deserializing it if needed.

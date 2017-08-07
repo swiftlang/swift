@@ -18,9 +18,11 @@ public func importAsUnaryInit() {
 public func foo(_ x: Double) {
 // CHECK: bb0([[X:%.*]] : $Double):
   // CHECK: [[GLOBALVAR:%.*]] = global_addr @IAMStruct1GlobalVar
-  // CHECK: [[ZZ:%.*]] = load [trivial] [[GLOBALVAR]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBALVAR]] : $*Double
+  // CHECK: [[ZZ:%.*]] = load [trivial] [[READ]]
   let zz = Struct1.globalVar
-  // CHECK: assign [[ZZ]] to [[GLOBALVAR]]
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[GLOBALVAR]] : $*Double
+  // CHECK: assign [[ZZ]] to [[WRITE]]
   Struct1.globalVar = zz
 
   // CHECK: [[Z:%.*]] = project_box
@@ -129,8 +131,8 @@ public func foo(_ x: Double) {
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetAltitude : $@convention(c) (Struct1) -> Double
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.altitude
-  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
   // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
   // CHECK: apply [[SET]]([[WRITE]], [[X]])
   z.altitude = x
   

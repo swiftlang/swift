@@ -450,7 +450,7 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
 protocol ProtoConstraintsSelfToClass where Self : Base<Int> {}
 
 protocol ProtoRefinesClass : Base<Int> {} // FIXME expected-error {{}}
-protocol ProtoRefinesClassAndProtocolAlias : BaseIntAndP2 {} // FIXME expected-error {{}}
+protocol ProtoRefinesClassAndProtocolAlias : BaseIntAndP2 {}
 protocol ProtoRefinesClassAndProtocolDirect : Base<Int> & P2 {} // FIXME expected-error 2 {{}}
 protocol ProtoRefinesClassAndProtocolExpanded : Base<Int>, P2 {} // FIXME expected-error {{}}
 
@@ -459,7 +459,9 @@ class ClassConformsToClassProtocolBad1 : ProtoConstraintsSelfToClass {}
 // expected-note@-2 {{requirement specified as 'Self' : 'Base<Int>' [with Self = ClassConformsToClassProtocolBad1]}}
 class ClassConformsToClassProtocolGood1 : Derived, ProtoConstraintsSelfToClass {}
 
-class ClassConformsToClassProtocolBad2 : ProtoRefinesClass {} // FIXME
+class ClassConformsToClassProtocolBad2 : ProtoRefinesClass {}
+// expected-error@-1 {{'ProtoRefinesClass' requires that 'ClassConformsToClassProtocolBad2' inherit from 'Base<Int>'}}
+// expected-note@-2 {{requirement specified as 'Self' : 'Base<Int>' [with Self = ClassConformsToClassProtocolBad2]}}
 class ClassConformsToClassProtocolGood2 : Derived, ProtoRefinesClass {}
 
 // Subclass existentials inside inheritance clauses
@@ -494,7 +496,6 @@ class CompositionInClassInheritanceClauseDirect : Base<Int> & P2 {
 
 protocol CompositionInAssociatedTypeInheritanceClause {
   associatedtype A : BaseIntAndP2
-  // FIXME expected-error@-1 {{}}
 }
 
 // Members of metatypes and existential metatypes
@@ -530,3 +531,20 @@ func staticMembers(
   _ = m2.instanceProtocolMember // expected-error {{instance member 'instanceProtocolMember' cannot be used on type 'ClassWithStaticMember & ProtocolWithStaticMember'}}
   _ = m2.instanceClassMember // expected-error {{instance member 'instanceClassMember' cannot be used on type 'ClassWithStaticMember & ProtocolWithStaticMember'}}
 }
+
+// Make sure we correctly form subclass existentials in expression context.
+func takesBaseIntAndPArray(_: [Base<Int> & P2]) {}
+
+func passesBaseIntAndPArray() {
+  takesBaseIntAndPArray([Base<Int> & P2]())
+}
+
+//
+// Superclass constrained generic parameters
+//
+
+struct DerivedBox<T : Derived> {}
+// expected-note@-1 {{requirement specified as 'T' : 'Derived' [with T = Derived & P3]}}
+
+func takesBoxWithP3(_: DerivedBox<Derived & P3>) {}
+// expected-error@-1 {{'DerivedBox' requires that 'Derived & P3' inherit from 'Derived'}}

@@ -98,8 +98,6 @@
 ///     // Prints "false"
 ///     print(allowedMoves.rawValue & Directions.right.rawValue)
 ///     // Prints "0"
-///
-/// - SeeAlso: `OptionSet`, `FixedWidthInteger`
 public protocol RawRepresentable {
   /// The raw type that can be used to represent all values of the conforming
   /// type.
@@ -183,8 +181,6 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
 /// `Optional` type conforms to `ExpressibleByNilLiteral`.
 /// `ExpressibleByNilLiteral` conformance for types that use `nil` for other
 /// purposes is discouraged.
-///
-/// - SeeAlso: `Optional`
 public protocol ExpressibleByNilLiteral {
   /// Creates an instance initialized with `nil`.
   init(nilLiteral: ())
@@ -320,12 +316,12 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 /// A type that can be initialized with a string literal containing a single
 /// Unicode scalar value.
 ///
-/// The `String`, `StaticString`, `Character`, and `UnicodeScalar` types all
+/// The `String`, `StaticString`, `Character`, and `Unicode.Scalar` types all
 /// conform to the `ExpressibleByUnicodeScalarLiteral` protocol. You can
 /// initialize a variable of any of these types using a string literal that
 /// holds a single Unicode scalar.
 ///
-///     let ñ: UnicodeScalar = "ñ"
+///     let ñ: Unicode.Scalar = "ñ"
 ///     print(ñ)
 ///     // Prints "ñ"
 ///
@@ -337,7 +333,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 public protocol ExpressibleByUnicodeScalarLiteral {
   /// A type that represents a Unicode scalar literal.
   ///
-  /// Valid types for `UnicodeScalarLiteralType` are `UnicodeScalar`,
+  /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,
   /// `Character`, `String`, and `StaticString`.
   associatedtype UnicodeScalarLiteralType : _ExpressibleByBuiltinUnicodeScalarLiteral
 
@@ -345,6 +341,14 @@ public protocol ExpressibleByUnicodeScalarLiteral {
   ///
   /// - Parameter value: The value of the new instance.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
+}
+
+public protocol _ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral
+  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+
+  init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    utf16CodeUnitCount: Builtin.Word)
 }
 
 public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
@@ -580,9 +584,9 @@ extension ExpressibleByStringLiteral
 ///     }
 public protocol ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
-  associatedtype Element
+  associatedtype ArrayLiteralElement
   /// Creates an instance initialized with the given elements.
-  init(arrayLiteral elements: Element...)
+  init(arrayLiteral elements: ArrayLiteralElement...)
 }
 
 /// A type that can be initialized using a dictionary literal.
@@ -669,30 +673,8 @@ public protocol ExpressibleByDictionaryLiteral {
 /// Conforming to the ExpressibleByStringInterpolation Protocol
 /// ===========================================================
 ///
-/// To use string interpolation to initialize instances of your custom type,
-/// implement the required initializers for `ExpressibleByStringInterpolation`
-/// conformance. String interpolation is a multiple-step initialization
-/// process. When you use string interpolation, the following steps occur:
-///
-/// 1. The string literal is broken into pieces. Each segment of the string
-///    literal before, between, and after any included expressions, along with
-///    the individual expressions themselves, are passed to the
-///    `init(stringInterpolationSegment:)` initializer.
-/// 2. The results of those calls are passed to the
-///    `init(stringInterpolation:)` initializer in the order in which they
-///    appear in the string literal.
-///
-/// In other words, initializing the `message` constant in the example above
-/// using string interpolation is equivalent to the following code:
-///
-///     let message = String(stringInterpolation:
-///           String(stringInterpolationSegment: "One cookie: $"),
-///           String(stringInterpolationSegment: price),
-///           String(stringInterpolationSegment: ", "),
-///           String(stringInterpolationSegment: number),
-///           String(stringInterpolationSegment: " cookies: $"),
-///           String(stringInterpolationSegment: price * number),
-///           String(stringInterpolationSegment: "."))
+/// The `ExpressibleByStringInterpolation` protocol is deprecated. Do not add
+/// new conformances to the protocol.
 @available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
 public typealias ExpressibleByStringInterpolation = _ExpressibleByStringInterpolation
 public protocol _ExpressibleByStringInterpolation {
@@ -740,7 +722,18 @@ public protocol _ExpressibleByColorLiteral {
   ///
   /// Do not call this initializer directly. Instead, initialize a variable or
   /// constant using a color literal.
-  init(colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
+  init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
+}
+
+extension _ExpressibleByColorLiteral {
+  @available(swift, deprecated: 3.2, obsoleted: 4.0,
+    message: "This initializer is only meant to be used by color literals")
+  public init(
+    colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float
+  ) {
+    self.init(
+      _colorLiteralRed: red, green: green, blue: blue, alpha: alpha)
+  }
 }
 
 /// A type that can be initialized using an image literal (e.g.

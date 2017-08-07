@@ -455,7 +455,7 @@ template <typename FnTy>
 void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
   ++NamesSeen[VD->getFullName()];
-  SmallVector<UnqualifiedLookupResult, 8> RelatedDecls;
+  SmallVector<LookupResultEntry, 8> RelatedDecls;
 
   if (isa<ParamDecl>(VD))
     return; // Parameters don't have interesting related declarations.
@@ -465,7 +465,8 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   // For now we use UnqualifiedLookup to fetch other declarations with the same
   // base name.
   auto TypeResolver = VD->getASTContext().getLazyResolver();
-  UnqualifiedLookup Lookup(VD->getName(), VD->getDeclContext(), TypeResolver);
+  UnqualifiedLookup Lookup(VD->getBaseName(), VD->getDeclContext(),
+                           TypeResolver);
   for (auto result : Lookup.Results) {
     ValueDecl *RelatedVD = result.getValueDecl();
     if (RelatedVD->getAttrs().isUnavailable(VD->getASTContext()))
@@ -663,7 +664,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   if (BaseType) {
     if (auto Target = BaseType->getAnyNominal()) {
       SynthesizedExtensionAnalyzer Analyzer(Target,
-                                            PrintOptions::printInterface());
+                                          PrintOptions::printModuleInterface());
       InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
     }
   }
@@ -900,17 +901,10 @@ getClangDeclarationName(const clang::NamedDecl *ND, NameTranslatingInfo &Info) {
   if (!Info.BaseName.empty()) {
     return clang::DeclarationName(&Ctx.Idents.get(Info.BaseName));
   } else {
-    StringRef last = Info.ArgNames.back();
-
     switch (OrigName.getNameKind()) {
     case clang::DeclarationName::ObjCZeroArgSelector:
-      if (last.endswith(":"))
-        return clang::DeclarationName();
-      break;
     case clang::DeclarationName::ObjCOneArgSelector:
     case clang::DeclarationName::ObjCMultiArgSelector:
-      if (!last.empty() && !last.endswith(":"))
-        return clang::DeclarationName();
       break;
     default:
       return clang::DeclarationName();
@@ -941,9 +935,9 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
   auto &Ctx = VD->getDeclContext()->getASTContext();
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
   DeclName OrigName = VD->getFullName();
-  Identifier BaseName = Info.BaseName.empty()
-                            ? OrigName.getBaseName()
-                            : Ctx.getIdentifier(Info.BaseName);
+  DeclBaseName BaseName = Info.BaseName.empty()
+                              ? OrigName.getBaseName()
+                              : DeclBaseName(Ctx.getIdentifier(Info.BaseName));
   auto OrigArgs = OrigName.getArgumentNames();
   SmallVector<Identifier, 8> Args(OrigArgs.begin(), OrigArgs.end());
   if (Info.ArgNames.size() > OrigArgs.size())
@@ -958,8 +952,18 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
 }
 
 /// Returns true for failure to resolve.
-static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
+static bool passNameInfoForDecl(SemaToken SemaTok, NameTranslatingInfo &Info,
                     std::function<void(const NameTranslatingInfo &)> Receiver) {
+  auto *VD = SemaTok.ValueD;
+
+  // If the given name is not a function name, and the cursor points to
+  // a contructor call, we use the type declaration instead of the init
+  // declaration to translate the name.
+  if (Info.ArgNames.empty() && !Info.IsZeroArgSelector) {
+    if (auto *TD = SemaTok.CtorTyRef) {
+      VD = TD;
+    }
+  }
   switch (SwiftLangSupport::getNameKindForUID(Info.NameKind)) {
   case NameKind::Swift: {
     NameTranslatingInfo Result;
@@ -982,8 +986,8 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
       if (Selector.getNumArgs()) {
         assert(Pieces.back().empty());
         Pieces.pop_back();
-        std::transform(Pieces.begin(), Pieces.end(), Pieces.begin(),
-          [](StringRef P) { return StringRef(P.data(), P.size() + 1); });
+      } else {
+        Result.IsZeroArgSelector = true;
       }
       Result.ArgNames.insert(Result.ArgNames.begin(), Pieces.begin(), Pieces.end());
       Receiver(Result);
@@ -997,23 +1001,30 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
     ClangImporter *Importer = static_cast<ClangImporter *>(VD->getDeclContext()->
       getASTContext().getClangModuleLoader());
 
-    if (auto *Named = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
-      auto ObjCName = getClangDeclarationName(Named, Info);
-      if (!ObjCName)
-        return true;
+    const clang::NamedDecl *Named = nullptr;
+    auto *BaseDecl = VD;
 
-      DeclName Name = Importer->importName(Named, ObjCName);
-      NameTranslatingInfo Result;
-      Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
-      Result.BaseName = Name.getBaseName().str();
-      std::transform(Name.getArgumentNames().begin(),
-                     Name.getArgumentNames().end(),
-                     std::back_inserter(Result.ArgNames),
-                     [](Identifier Id) { return Id.str(); });
-      Receiver(Result);
-      return false;
+    while (!Named && BaseDecl) {
+      Named = dyn_cast_or_null<clang::NamedDecl>(BaseDecl->getClangDecl());
+      BaseDecl = BaseDecl->getOverriddenDecl();
     }
-    return true;
+    if (!Named)
+      return true;
+
+    auto ObjCName = getClangDeclarationName(Named, Info);
+    if (!ObjCName)
+      return true;
+
+    DeclName Name = Importer->importName(Named, ObjCName);
+    NameTranslatingInfo Result;
+    Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
+    Result.BaseName = Name.getBaseIdentifier().str();
+    std::transform(Name.getArgumentNames().begin(),
+                   Name.getArgumentNames().end(),
+                   std::back_inserter(Result.ArgNames),
+                   [](Identifier Id) { return Id.str(); });
+    Receiver(Result);
+    return false;
   }
   }
 }
@@ -1181,6 +1192,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
         }
         return;
       }
+      case SemaTokenKind::ExprStart:
       case SemaTokenKind::StmtStart: {
         Receiver({});
         return;
@@ -1273,7 +1285,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         return;
 
       case SemaTokenKind::ValueRef: {
-        bool Failed = passNameInfoForDecl(SemaTok.ValueD, Input, Receiver);
+        bool Failed = passNameInfoForDecl(SemaTok, Input, Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
@@ -1285,6 +1297,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         }
         return;
       }
+      case SemaTokenKind::ExprStart:
       case SemaTokenKind::StmtStart: {
         Receiver({});
         return;
@@ -1342,12 +1355,12 @@ static void resolveRange(SwiftLangSupport &Lang,
       ASTInvok->applyTo(CompInvok);
       RangeInfo Result;
       Result.RangeKind = Lang.getUIDForRangeKind(Info.Kind);
-      Result.RangeContent = Info.Content;
+      Result.RangeContent = Info.ContentRange.str();
       switch (Info.Kind) {
       case RangeKind::SingleExpression: {
         SmallString<64> SS;
         llvm::raw_svector_ostream OS(SS);
-        Info.ExitInfo.getPointer()->print(OS);
+        Info.ExitInfo.ReturnType->print(OS);
         Result.ExprType = OS.str();
         Receiver(Result);
         return;
@@ -1358,6 +1371,7 @@ static void resolveRange(SwiftLangSupport &Lang,
         Receiver(Result);
         return;
       }
+      case RangeKind::PartOfExpression:
       case RangeKind::Invalid:
         if (!getPreviousASTSnaps().empty()) {
           // Attempt again using the up-to-date AST.
@@ -1501,10 +1515,8 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
         if (Entity.Mod) {
           // Module is ignored
         } else {
-          NameTranslatingInfo NewInput = Input;
           // FIXME: Should pass the main module for the interface but currently
           // it's not necessary.
-          passNameInfoForDecl(Entity.Dcl, NewInput, Receiver);
         }
       } else {
         Receiver({});

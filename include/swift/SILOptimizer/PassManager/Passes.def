@@ -56,10 +56,10 @@ PASS(ABCOpt, "abcopts",
      "Array Bounds Check Optimization")
 PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
-PASS(InactiveAccessMarkerElimination, "inactive-access-marker-elim",
-     "Inactive Access Marker Elimination.")
-PASS(FullAccessMarkerElimination, "full-access-marker-elim",
-     "Full Access Marker Elimination.")
+PASS(AccessSummaryDumper, "access-summary-dump",
+     "Dump Address Parameter Access Summary")
+PASS(AccessMarkerElimination, "access-marker-elim",
+     "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
      "SIL Address Lowering")
 PASS(AllocBoxToStack, "allocbox-to-stack",
@@ -222,8 +222,12 @@ PASS(ReleaseHoisting, "release-hoisting",
      "SIL release Hoisting")
 PASS(LateReleaseHoisting, "late-release-hoisting",
      "Late SIL release Hoisting Preserving Epilogues")
+IRGEN_PASS(LoadableByAddress, "loadable-address",
+     "SIL Large Loadable type by-address lowering.")
 PASS(RemovePins, "remove-pins",
      "Remove SIL pin/unpin pairs")
+PASS(TempRValueOpt, "temp-rvalue-opt",
+     "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
 PASS(SILCleanup, "cleanup",
@@ -265,6 +269,8 @@ PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",
      "Temporary pass for staging in mark_uninitialized changes.")
+PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
+     "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)

@@ -346,7 +346,7 @@ void SourceLookupCache::invalidate() {
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   : TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
     DeclContext(DeclContextKind::Module, nullptr),
-    Flags({0, 0, 0}), DSOHandle(nullptr) {
+    Flags({0, 0, 0}) {
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
@@ -478,7 +478,7 @@ void ModuleDecl::lookupObjCMethods(
 void BuiltinUnit::lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
                               NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
-  getCache().lookupValue(name.getBaseName(), lookupKind, *this, result);
+  getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
 
 void BuiltinUnit::lookupObjCMethods(
@@ -599,6 +599,10 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
+    // FIXME: Recursion break.
+    if (!protocol->hasValidSignature())
+      return None;
+
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
     if (!protocol->existentialConformsToSelf() ||

@@ -593,6 +593,61 @@ bool EmitPolymorphicParameters::isClassPointerSource(unsigned paramIndex) {
   return false;
 }
 
+namespace {
+
+/// A class for binding type parameters of a generic function.
+class BindPolymorphicParameter : public PolymorphicConvention {
+  IRGenFunction &IGF;
+  CanSILFunctionType &SubstFnType;
+
+public:
+  BindPolymorphicParameter(IRGenFunction &IGF, CanSILFunctionType &origFnType,
+                           CanSILFunctionType &SubstFnType)
+      : PolymorphicConvention(IGF.IGM, origFnType), IGF(IGF),
+        SubstFnType(SubstFnType) {}
+
+  void emit(Explosion &in, unsigned paramIndex);
+
+private:
+  // Did the convention decide that the parameter at the given index
+  // was a class-pointer source?
+  bool isClassPointerSource(unsigned paramIndex);
+};
+
+} // end anonymous namespace
+
+bool BindPolymorphicParameter::isClassPointerSource(unsigned paramIndex) {
+  for (auto &source : getSources()) {
+    if (source.getKind() == MetadataSource::Kind::ClassPointer &&
+        source.getParamIndex() == paramIndex) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void BindPolymorphicParameter::emit(Explosion &nativeParam, unsigned paramIndex) {
+  if (!isClassPointerSource(paramIndex))
+    return;
+
+  assert(nativeParam.size() == 1);
+  auto paramType = SubstFnType->getParameters()[paramIndex].getType();
+  llvm::Value *instanceRef = nativeParam.getAll()[0];
+  SILType instanceType = SILType::getPrimitiveObjectType(paramType);
+  llvm::Value *metadata =
+    emitDynamicTypeOfHeapObject(IGF, instanceRef, instanceType);
+  IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata);
+}
+
+void irgen::bindPolymorphicParameter(IRGenFunction &IGF,
+                                     CanSILFunctionType &OrigFnType,
+                                     CanSILFunctionType &SubstFnType,
+                                     Explosion &nativeParam,
+                                     unsigned paramIndex) {
+  BindPolymorphicParameter(IGF, OrigFnType, SubstFnType)
+      .emit(nativeParam, paramIndex);
+}
+
 static bool shouldSetName(IRGenModule &IGM, llvm::Value *value, CanType type) {
   // If value names are globally disabled, honor that.
   if (!IGM.EnableValueNames) return false;
@@ -660,6 +715,13 @@ namespace {
 
     void addConstructor(ConstructorDecl *ctor) {
       Entries.push_back(WitnessTableEntry::forFunction(ctor));
+    }
+
+    void addPlaceholder(MissingMemberDecl *placeholder) {
+      for (auto i : range(placeholder->getNumberOfVTableEntries())) {
+        (void)i;
+        Entries.push_back(WitnessTableEntry());
+      }
     }
 
     void addAssociatedType(AssociatedTypeDecl *ty) {
@@ -1115,6 +1177,10 @@ public:
 
     void addConstructor(ConstructorDecl *requirement) {
       return addMethodFromSILWitnessTable(requirement);
+    }
+
+    void addPlaceholder(MissingMemberDecl *placeholder) {
+      llvm_unreachable("cannot emit a witness table with placeholders in it");
     }
 
     void addAssociatedType(AssociatedTypeDecl *requirement) {
@@ -1919,14 +1985,15 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
 
   // Cast the witness to the appropriate function type.
-  auto witnessTy = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionTy();
+  auto sig = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionSignature();
+  auto witnessTy = sig.getType();
   witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
 
+  FunctionPointer witnessFnPtr(witness, sig);
+
   // Call the accessor.
-  auto call = IGF.Builder.CreateCall(witness,
+  auto call = IGF.Builder.CreateCall(witnessFnPtr,
                             { associatedTypeMetadata, parentMetadata, wtable });
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.DefaultCC);
 
   return call;
 }
@@ -2358,7 +2425,7 @@ namespace {
                              CanSILFunctionType polyFn)
       : PolymorphicConvention(IGF.IGM, polyFn), IGF(IGF) {}
 
-    void emit(CanSILFunctionType substFnType, const SubstitutionMap &subs,
+    void emit(const SubstitutionMap &subs,
               WitnessMetadata *witnessMetadata, Explosion &out);
 
   private:
@@ -2391,16 +2458,13 @@ namespace {
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
                                      CanSILFunctionType origFnType,
-                                     CanSILFunctionType substFnType,
                                      const SubstitutionMap &subs,
                                      WitnessMetadata *witnessMetadata,
                                      Explosion &out) {
-  EmitPolymorphicArguments(IGF, origFnType).emit(substFnType, subs,
-                                                 witnessMetadata, out);
+  EmitPolymorphicArguments(IGF, origFnType).emit(subs, witnessMetadata, out);
 }
 
-void EmitPolymorphicArguments::emit(CanSILFunctionType substFnType,
-                                    const SubstitutionMap &subs,
+void EmitPolymorphicArguments::emit(const SubstitutionMap &subs,
                                     WitnessMetadata *witnessMetadata,
                                     Explosion &out) {
   // Add all the early sources.
@@ -2738,13 +2802,13 @@ void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
   out.push_back(IGM.WitnessTablePtrTy);
 }
 
-void
+FunctionPointer
 irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                               CanType baseTy,
                               llvm::Value **baseMetadataCache,
                               SILDeclRef member,
                               ProtocolConformanceRef conformance,
-                              Explosion &out) {
+                              CanSILFunctionType fnType) {
   auto fn = cast<AbstractFunctionDecl>(member.getDecl());
   auto fnProto = cast<ProtocolDecl>(fn->getDeclContext());
   
@@ -2758,25 +2822,30 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   // Find the witness we're interested in.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(conformance.getRequirement());
   auto index = fnProtoInfo.getFunctionIndex(fn);
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
-  
-  // Cast the witness pointer to i8*.
-  witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
-  
-  // Build the value.
-  out.add(witness);
+  llvm::Value *witnessFnPtr =
+    emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+
+  Signature signature = IGF.IGM.getSignature(fnType);
+  witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
+                                         signature.getType()->getPointerTo());
+
+  return FunctionPointer(witnessFnPtr, signature);
 }
 
-llvm::FunctionType *IRGenModule::getAssociatedTypeMetadataAccessFunctionTy() {
-  if (AssociatedTypeMetadataAccessFunctionTy)
-    return AssociatedTypeMetadataAccessFunctionTy;
+Signature IRGenModule::getAssociatedTypeMetadataAccessFunctionSignature() {
+  auto &fnType = AssociatedTypeMetadataAccessFunctionTy;
+  if (!fnType) {
+    fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
+                                     { TypeMetadataPtrTy,
+                                       WitnessTablePtrTy },
+                                     /*varargs*/ false);
+  }
 
-  auto accessorTy = llvm::FunctionType::get(TypeMetadataPtrTy,
-                                            { TypeMetadataPtrTy,
-                                              WitnessTablePtrTy },
-                                            /*varargs*/ false);
-  AssociatedTypeMetadataAccessFunctionTy = accessorTy;
-  return accessorTy;
+  auto attrs = llvm::AttributeList::get(getLLVMContext(),
+                                        llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
+
+  return Signature(fnType, attrs, DefaultCC);
 }
 
 llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
@@ -2788,31 +2857,37 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
 
   // Cast the witness to the appropriate function type.
-  auto witnessTy = IGF.IGM.getAssociatedTypeMetadataAccessFunctionTy();
+  auto sig = IGF.IGM.getAssociatedTypeMetadataAccessFunctionSignature();
+  auto witnessTy = sig.getType();
   witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
+
+  FunctionPointer witnessFnPtr(witness, sig);
 
   // Call the accessor.
   assert((!IGF.IGM.DebugInfo || IGF.Builder.getCurrentDebugLocation()) &&
          "creating a function call without a debug location");
-  auto call = IGF.Builder.CreateCall(witness, { parentMetadata, wtable });
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.DefaultCC);
+  auto call = IGF.Builder.CreateCall(witnessFnPtr,
+                                     { parentMetadata, wtable });
 
   return call;
 }
 
-llvm::FunctionType *
-IRGenModule::getAssociatedTypeWitnessTableAccessFunctionTy() {
-  if (AssociatedTypeWitnessTableAccessFunctionTy)
-    return AssociatedTypeWitnessTableAccessFunctionTy;
+Signature
+IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
+  auto &fnType = AssociatedTypeWitnessTableAccessFunctionTy;
+  if (!fnType) {
+    // The associated type metadata is passed first so that this function is
+    // CC-compatible with a conformance's witness table access function.
+    fnType = llvm::FunctionType::get(WitnessTablePtrTy,
+                                     { TypeMetadataPtrTy,
+                                       TypeMetadataPtrTy,
+                                       WitnessTablePtrTy },
+                                     /*varargs*/ false);
+  }
 
-  // The associated type metadata is passed first so that this function is
-  // CC-compatible with a conformance's witness table access function.
-  auto accessorTy = llvm::FunctionType::get(WitnessTablePtrTy,
-                                            { TypeMetadataPtrTy,
-                                              TypeMetadataPtrTy,
-                                              WitnessTablePtrTy },
-                                            /*varargs*/ false);
-  AssociatedTypeWitnessTableAccessFunctionTy = accessorTy;
-  return accessorTy;
+  auto attrs = llvm::AttributeList::get(getLLVMContext(),
+                                       llvm::AttributeList::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+
+  return Signature(fnType, attrs, DefaultCC);
 }

@@ -3,6 +3,7 @@ set(datafiles
   ios.json
   tvos.json
   watchos.json
+  overlay.json
 )
 set(SWIFTLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")

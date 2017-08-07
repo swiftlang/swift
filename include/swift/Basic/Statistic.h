@@ -67,6 +67,8 @@ public:
     size_t DriverDepNominal;
     size_t DriverDepMember;
     size_t DriverDepExternal;
+
+    size_t ChildrenMaxRSS;
   };
 
   struct AlwaysOnFrontendCounters
@@ -124,6 +126,8 @@ public:
     size_t NumIRComdatSymbols;
     size_t NumIRBasicBlocks;
     size_t NumIRInsts;
+
+    size_t NumLLVMBytesOutput;
   };
 
 private:
@@ -136,9 +140,16 @@ private:
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(llvm::raw_ostream &OS);
 
+  UnifiedStatsReporter(StringRef ProgramName,
+                       StringRef AuxName,
+                       StringRef Directory);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
-                       StringRef TargetName,
+                       StringRef ModuleName,
+                       StringRef InputName,
+                       StringRef TripleName,
+                       StringRef OutputType,
+                       StringRef OptType,
                        StringRef Directory);
   ~UnifiedStatsReporter();
 

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t -I %S/../Inputs/ObjCBridging %S/../Inputs/ObjCBridging/Appliances.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %S/../Inputs/ObjCBridging -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
@@ -88,25 +88,11 @@ func setFoo(_ f: Foo, s: String) {
 // CHECK: bb0([[ARG0:%.*]] : $Foo, {{%.*}} : $String):
 // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
 // CHECK:   [[SET_FOO:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.setFoo!1.foreign
-// CHECK:   [[NV:%.*]] = load
-// CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NV]]
-// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
-//
-// CHECK: [[SOME_BB]]([[NATIVE:%.*]] : $String):
-// CHECK-NOT: unchecked_enum_data
+// CHECK:   [[NATIVE:%.*]] = load
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
 // CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
-// CHECK:   end_borrow [[BORROWED_NATIVE]] from [[NATIVE]]
-// CHECK:   destroy_value [[NATIVE]]
-// CHECK:   br [[CONT_BB:bb[0-9]+]]([[OPT_BRIDGED]] : $Optional<NSString>)
-//
-// CHECK: [[NONE_BB]]:
-// CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.none!enumelt
-// CHECK:   br [[CONT_BB]]([[OPT_BRIDGED]] : $Optional<NSString>)
-//
-// CHECK: [[CONT_BB]]([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Optional<NSString>, Foo) -> ()
 // CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
@@ -273,18 +259,12 @@ func callSetBar(_ s: String) {
 // CHECK-LABEL: sil hidden @_T013objc_bridging10callSetBar{{.*}}F
 // CHECK: bb0({{%.*}} : $String):
 // CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
-// CHECK:   [[NV:%.*]] = load
-// CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NV]]
-// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
-
-// CHECK: [[SOME_BB]]([[NATIVE:%.*]] : $String):
-// CHECK-NOT: unchecked_enum_data
+// CHECK:   [[NATIVE:%.*]] = load
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
-// CHECK:    = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
+// CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   end_borrow [[BORROWED_NATIVE]] from [[NATIVE]]
-// CHECK: bb3([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK: }
@@ -343,7 +323,8 @@ class Bas : NSObject {
 
   // CHECK-LABEL: sil hidden @_T013objc_bridging3BasC11strRealPropSSfg
   // CHECK:   [[PROP_ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Bas.strRealProp
-  // CHECK:   [[PROP:%.*]] = load [copy] [[PROP_ADDR]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[PROP_ADDR]] : $*String
+  // CHECK:   [[PROP:%.*]] = load [copy] [[READ]]
 
 
   // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strRealPropSSfsTo : $@convention(objc_method) (NSString, Bas) -> () {
@@ -365,7 +346,8 @@ class Bas : NSObject {
   // CHECK: bb0(%0 : $String, %1 : $Bas):
 
   // CHECK:   [[STR_ADDR:%.*]] = ref_element_addr %1 : {{.*}}, #Bas.strRealProp
-  // CHECK:   assign {{.*}} to [[STR_ADDR]]
+  // CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[STR_ADDR]] : $*String
+  // CHECK:   assign {{.*}} to [[WRITE]]
   // CHECK: }
 
   var strFakeProp: String {
@@ -648,4 +630,43 @@ func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // XCHECK: end_borrow [[BORROWED_HOME]] from [[HOME]]
   // XCHECK: destroy_value [[HOME]]
   home.fridge.temperature += delta
+}
+
+// CHECK-LABEL: sil hidden @_T013objc_bridging20callNonStandardBlockySi5value_tF
+func callNonStandardBlock(value: Int) {
+  // CHECK: enum $Optional<@convention(block) () -> @owned Optional<AnyObject>>
+  takesNonStandardBlock { return value }
+}
+
+func takeTwoAnys(_ lhs: Any, _ rhs: Any) -> Any { return lhs }
+
+// CHECK-LABEL: sil hidden @_T013objc_bridging22defineNonStandardBlockyyp1x_tF
+func defineNonStandardBlock(x: Any) {
+  // CHECK: function_ref @_T013objc_bridging22defineNonStandardBlockyyp1x_tFypypcfU_
+  // CHECK: function_ref @_T0ypypIxir_yXlyXlIyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+
+  let fn : @convention(block) (Any) -> Any = { y in takeTwoAnys(x, y) }
+}
+
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypypIxir_yXlyXlIyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+// CHECK: bb0(%0 : $*@block_storage @callee_owned (@in Any) -> @out Any, %1 : $AnyObject):
+// CHECK:   [[T0:%.*]] = copy_value %1 : $AnyObject
+// CHECK:   [[T1:%.*]] = open_existential_ref [[T0]] : $AnyObject
+// CHECK:   [[ARG:%.*]] = alloc_stack $Any
+// CHECK:   [[T2:%.*]] = init_existential_addr [[ARG]]
+// CHECK:   store [[T1]] to [init] [[T2]]
+// CHECK:   [[RESULT:%.*]] = alloc_stack $Any
+// CHECK:   apply {{.*}}([[RESULT]], [[ARG]])
+
+// CHECK-LABEL: sil hidden @_T013objc_bridging15castToCFunctionySV3ptr_tF : $@convention(thin) (UnsafeRawPointer) -> () {
+func castToCFunction(ptr: UnsafeRawPointer) {
+  // CHECK: [[CASTFN:%.*]] = function_ref @_T0s13unsafeBitCastq_x_q_m2totr0_lF
+  // CHECK: [[OUT:%.*]] = alloc_stack $@convention(c) (Optional<AnyObject>) -> ()
+  // CHECK: [[IN:%.]] = alloc_stack $UnsafeRawPointer
+  // CHECK: store %0 to [trivial] [[IN]] : $*UnsafeRawPointer
+  // CHECK: [[META:%.*]] = metatype $@thick (@convention(c) (Optional<AnyObject>) -> ()).Type
+  // CHECK: apply [[CASTFN]]<UnsafeRawPointer, @convention(c) (AnyObject?) -> ()>([[OUT]], [[IN]], [[META]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @thick τ_0_1.Type) -> @out τ_0_1
+  // CHECK: [[RESULT:%.*]] = load [trivial] %3 : $*@convention(c) (Optional<AnyObject>) -> ()
+  typealias Fn = @convention(c) (AnyObject?) -> Void
+  unsafeBitCast(ptr, to: Fn.self)(nil)
 }

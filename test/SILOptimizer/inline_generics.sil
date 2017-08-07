@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=true | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=false | %FileCheck --check-prefix=DISABLED-GENERIC-INLINING-CHECK %s
 
 sil_stage canonical
 
@@ -111,6 +112,68 @@ bb0(%0 : $T, %1 : $@callee_owned (@owned P) -> Bool):
   %3 = apply %1(%2) : $@callee_owned (@owned P) -> Bool
   return %3 : $Bool
 } // end sil function 'thunk2'
+
+
+sil [always_inline] @alwaysInlineGenericCallee : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %4 = tuple ()
+  return %4 : $()
+} // end sil function 'alwaysInlineGenericCallee'
+
+sil [transparent] @transparentGenericCallee : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %4 = tuple ()
+  return %4 : $()
+} // end sil function 'transparentInlineGenericCallee'
+
+
+// Check that [always_inline] and [transparent] functions are inlined even if
+// inlining of generics is disabled. Regular generic functions should not be
+// inlined.
+// DISABLED-GENERIC-INLINING-CHECK-LABEL: sil @testComplexInliningOfGenerics
+// DISABLED-GENERIC-INLINING-CHECK-NOT: function_ref @{{.*}} 
+// DISABLED-GENERIC-INLINING-CHECK-NOT: apply 
+// DISABLED-GENERIC-INLINING-CHECK: [[FUNC:%[0-9]+]] = function_ref @genericFoo
+// DISABLED-GENERIC-INLINING-CHECK: apply [[FUNC]]
+// DISABLED-GENERIC-INLINING-CHECK-NOT: function_ref 
+// DISABLED-GENERIC-INLINING-CHECK-NOT: apply
+// DISABLED-GENERIC-INLINING-CHECK: end sil function 'testComplexInliningOfGenerics'
+
+// Check that all callees are inlined if inlining of generics is enabled.
+// CHECK-LABEL: sil @testComplexInliningOfGenerics
+// CHECK-NOT: apply
+// CHECK: end sil function 'testComplexInliningOfGenerics'
+sil @testComplexInliningOfGenerics : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+
+  // Call an [always_inline] function.
+  %3 = function_ref @alwaysInlineGenericCallee : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %4 = alloc_stack $T
+  copy_addr %1 to [initialization] %4 : $*T
+  %6 = apply %3<T>(%0, %4) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  dealloc_stack %4 : $*T
+
+  // Call a [transparent] function.
+  %8 = function_ref @transparentGenericCallee : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %9 = alloc_stack $T
+  copy_addr %1 to [initialization] %9 : $*T
+  %10 = apply %8<T>(%0, %9) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  dealloc_stack %9 : $*T
+
+  // Call a regular function.
+  // function_ref genericFoo<A> (A) -> A
+  %12 = function_ref @genericFoo : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %13 = alloc_stack $T
+  copy_addr %1 to [initialization] %13 : $*T
+  %15 = apply %12<T>(%0, %13) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  dealloc_stack %13 : $*T
+
+  destroy_addr %1 : $*T
+  %18 = tuple ()
+  return %18 : $()
+} // end sil function 'testComplexInliningOfGenerics'
 
 sil_default_witness_table P {
   no_default

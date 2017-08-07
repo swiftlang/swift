@@ -572,8 +572,6 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createApply(getOpLocation(Inst->getLoc()),
                              getOpValue(Inst->getCallee()),
-                             getOpType(Inst->getSubstCalleeSILType()),
-                             getOpType(Inst->getType()),
                              getOpSubstitutions(Inst->getSubstitutions()),
                              Args,
                              Inst->isNonThrowing()));
@@ -587,7 +585,6 @@ SILCloner<ImplClass>::visitTryApplyInst(TryApplyInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createTryApply(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getCallee()),
-                                getOpType(Inst->getSubstCalleeSILType()),
                                 getOpSubstitutions(Inst->getSubstitutions()),
                                 Args,
                                 getOpBasicBlock(Inst->getNormalBB()),
@@ -600,12 +597,14 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
   auto Args = getOpValueArray<8>(Inst->getArguments());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
-    getBuilder().createPartialApply(getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getCallee()),
-                                    getOpType(Inst->getSubstCalleeSILType()),
-                                    getOpSubstitutions(Inst->getSubstitutions()),
-                                    Args,
-                                    getOpType(Inst->getType())));
+                getBuilder().createPartialApply(
+                    getOpLocation(Inst->getLoc()),
+                    getOpValue(Inst->getCallee()),
+                    getOpSubstitutions(Inst->getSubstitutions()), Args,
+                    Inst->getType()
+                        .getSwiftRValueType()
+                        ->getAs<SILFunctionType>()
+                        ->getCalleeConvention()));
 }
 
 template<typename ImplClass>
@@ -1587,8 +1586,8 @@ SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitOpenExistentialOpaqueInst(
-    OpenExistentialOpaqueInst *Inst) {
+void SILCloner<ImplClass>::visitOpenExistentialValueInst(
+    OpenExistentialValueInst *Inst) {
   // Create a new archetype for this opened existential type.
   auto archetypeTy =
       Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
@@ -1597,7 +1596,7 @@ void SILCloner<ImplClass>::visitOpenExistentialOpaqueInst(
       ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createOpenExistentialOpaque(
+  doPostProcess(Inst, getBuilder().createOpenExistentialValue(
                           getOpLocation(Inst->getLoc()),
                           getOpValue(Inst->getOperand()),
                           getOpType(Inst->getType())));
@@ -1674,6 +1673,24 @@ visitOpenExistentialBoxInst(OpenExistentialBoxInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::
+visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *Inst) {
+  // Create a new archetype for this opened existential type.
+  auto archetypeTy
+    = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  registerOpenedExistentialRemapping(
+      archetypeTy,
+      ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
+
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createOpenExistentialBoxValue(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getOperand()),
+                                               getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitInitExistentialAddrInst(InitExistentialAddrInst *Inst) {
   CanType origFormalType = Inst->getFormalConcreteType();
 
@@ -1690,8 +1707,8 @@ SILCloner<ImplClass>::visitInitExistentialAddrInst(InitExistentialAddrInst *Inst
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitInitExistentialOpaqueInst(
-    InitExistentialOpaqueInst *Inst) {
+void SILCloner<ImplClass>::visitInitExistentialValueInst(
+    InitExistentialValueInst *Inst) {
   CanType origFormalType = Inst->getFormalConcreteType();
 
   auto conformances = getOpConformances(origFormalType,
@@ -1699,7 +1716,7 @@ void SILCloner<ImplClass>::visitInitExistentialOpaqueInst(
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
-                getBuilder().createInitExistentialOpaque(
+                getBuilder().createInitExistentialValue(
                     getOpLocation(Inst->getLoc()), getOpType(Inst->getType()),
                     getOpASTType(origFormalType),
                     getOpValue(Inst->getOperand()), conformances));
@@ -1748,11 +1765,11 @@ SILCloner<ImplClass>::visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitDeinitExistentialOpaqueInst(
-    DeinitExistentialOpaqueInst *Inst) {
+void SILCloner<ImplClass>::visitDeinitExistentialValueInst(
+    DeinitExistentialValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(
-      Inst, getBuilder().createDeinitExistentialOpaque(
+      Inst, getBuilder().createDeinitExistentialValue(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 

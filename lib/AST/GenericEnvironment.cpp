@@ -33,17 +33,6 @@ GenericEnvironment::GenericEnvironment(GenericSignature *signature,
                           Type());
 }
 
-/// Compute the depth of the \c DeclContext chain.
-static unsigned declContextDepth(const DeclContext *dc) {
-  unsigned depth = 0;
-  while (auto parentDC = dc->getParent()) {
-    ++depth;
-    dc = parentDC;
-  }
-
-  return depth;
-}
-
 void GenericEnvironment::setOwningDeclContext(DeclContext *newOwningDC) {
   if (!OwningDC) {
     OwningDC = newOwningDC;
@@ -54,8 +43,8 @@ void GenericEnvironment::setOwningDeclContext(DeclContext *newOwningDC) {
     return;
 
   // Find the least common ancestor context to be the owner.
-  unsigned oldDepth = declContextDepth(OwningDC);
-  unsigned newDepth = declContextDepth(newOwningDC);
+  unsigned oldDepth = OwningDC->getSyntacticDepth();
+  unsigned newDepth = newOwningDC->getSyntacticDepth();
 
   while (oldDepth > newDepth) {
     OwningDC = OwningDC->getParent();

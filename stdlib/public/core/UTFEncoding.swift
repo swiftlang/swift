@@ -17,21 +17,21 @@
 
 
 public protocol _UTFParser {
-  associatedtype Encoding : _UnicodeEncoding
+  associatedtype Encoding : _UnicodeEncoding_
 
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
-  func _bufferedScalar(bitCount: UInt8) -> _UIntBuffer<UInt32, Encoding.CodeUnit>
+  func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar
   
   var _buffer: _UIntBuffer<UInt32, Encoding.CodeUnit> { get set }
 }
 
 extension _UTFParser
-where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
+where Encoding.EncodedScalar : RangeReplaceableCollection {
 
   @inline(__always)
   public mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I
-  ) -> _Unicode.ParseResult<Encoding.EncodedScalar>
+  ) -> Unicode.ParseResult<Encoding.EncodedScalar>
     where I.Element == Encoding.CodeUnit {
 
     // Bufferless single-scalar fastpath.
@@ -39,18 +39,18 @@ where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
       guard let codeUnit = input.next() else { return .emptyInput }
       // ASCII, return immediately.
       if Encoding._isScalar(codeUnit) {
-        return .valid(Encoding.EncodedScalar(containing: codeUnit))
+        return .valid(Encoding.EncodedScalar(CollectionOfOne(codeUnit)))
       }
       // Non-ASCII, proceed to buffering mode.
       _buffer.append(codeUnit)
     } else if Encoding._isScalar(
-      Encoding.CodeUnit(extendingOrTruncating: _buffer._storage)
+      Encoding.CodeUnit(truncatingIfNeeded: _buffer._storage)
     ) {
       // ASCII in _buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
-      let codeUnit = Encoding.CodeUnit(extendingOrTruncating: _buffer._storage)
+      let codeUnit = Encoding.CodeUnit(truncatingIfNeeded: _buffer._storage)
       _buffer.remove(at: _buffer.startIndex)
-      return .valid(Encoding.EncodedScalar(containing: codeUnit))
+      return .valid(Encoding.EncodedScalar(CollectionOfOne(codeUnit)))
     }
     // Buffering mode.
     // Fill buffer back to 4 bytes (or as many as are left in the iterator).
@@ -74,7 +74,7 @@ where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
     
     _buffer._storage = UInt32(
       // widen to 64 bits so that we can empty the buffer in the 4-byte case
-      extendingOrTruncating: UInt64(_buffer._storage) &>> scalarBitCount)
+      truncatingIfNeeded: UInt64(_buffer._storage) &>> scalarBitCount)
       
     _buffer._bitCount = _buffer._bitCount &- scalarBitCount
 

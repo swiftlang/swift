@@ -40,6 +40,7 @@ add_swift_library(swiftIRGen STATIC
   Linking.cpp
   LoadableByAddress.cpp
   LocalTypeData.cpp
+  MetadataLayout.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
   TypeLayoutVerifier.cpp

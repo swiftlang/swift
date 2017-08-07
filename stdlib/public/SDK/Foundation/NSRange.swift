@@ -22,17 +22,23 @@ extension NSRange : Hashable {
     }
 
     public static func==(_ lhs: NSRange, _ rhs: NSRange) -> Bool {
-        return lhs.location == rhs.location && rhs.length == rhs.length
+        return lhs.location == rhs.location && lhs.length == rhs.length
     }
 }
 
 extension NSRange : CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { return "{\(location), \(length)}" }
-    public var debugDescription: String { return "{\(location), \(length)}" }
+    public var debugDescription: String {
+        guard location != NSNotFound else {
+            return "{NSNotFound, \(length)}"     
+        }
+        return "{\(location), \(length)}" 
+    }
 }
 
 extension NSRange {
     public init?(_ string: String) {
+        var savedLocation = 0
         if string.isEmpty {
             // fail early if the string is empty
             return nil
@@ -45,6 +51,7 @@ extension NSRange {
             return nil
         }
         var location = 0
+        savedLocation = scanner.scanLocation
         guard scanner.scanInt(&location) else {
             return nil
         }
@@ -52,15 +59,43 @@ extension NSRange {
             // return early if there are no more characters after the first int in the string
             return nil
         }
+        if scanner.scanString(".", into: nil) {
+            scanner.scanLocation = savedLocation
+            var double = 0.0
+            guard scanner.scanDouble(&double) else {
+                return nil
+            }
+            guard let integral = Int(exactly: double) else {
+                return nil
+            }
+            location = integral
+        }
+        
         let _ = scanner.scanUpToCharacters(from: digitSet, into: nil)
         if scanner.isAtEnd {
             // return early if there are no integer characters after the first int in the string
             return nil
         }
         var length = 0
+        savedLocation = scanner.scanLocation
         guard scanner.scanInt(&length) else {
             return nil
         }
+        
+        if !scanner.isAtEnd {
+            if scanner.scanString(".", into: nil) {
+                scanner.scanLocation = savedLocation
+                var double = 0.0
+                guard scanner.scanDouble(&double) else {
+                    return nil
+                }
+                guard let integral = Int(exactly: double) else {
+                    return nil
+                }
+                length = integral
+            }
+        }
+        
         
         self.location = location
         self.length = length
@@ -105,18 +140,57 @@ extension NSRange {
 //===----------------------------------------------------------------------===//
 
 extension NSRange {
-    public init(_ x: Range<Int>) {
-        location = x.lowerBound
-        length = x.count
-    }
+  public init<R: RangeExpression>(_ region: R)
+  where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
+    let r = region.relative(to: 0..<R.Bound.max)
+    location = numericCast(r.lowerBound)
+    length = numericCast(r.count)
+  }
+  
+  public init<R: RangeExpression, S: StringProtocol>(_ region: R, in target: S)
+  where R.Bound == S.Index, S.Index == String.Index {
+    let r = region.relative(to: target)
+    self = NSRange(
+      location: r.lowerBound.encodedOffset - target.startIndex.encodedOffset,
+      length: r.upperBound.encodedOffset - r.lowerBound.encodedOffset
+    )
+  }
 
-    // FIXME(ABI)#75 (Conditional Conformance): this API should be an extension on Range.
-    // Can't express it now because the compiler does not support conditional
-    // extensions with type equality constraints.
-    public func toRange() -> Range<Int>? {
-        if location == NSNotFound { return nil }
-        return location..<(location+length)
-    }
+  @available(swift, deprecated: 4, renamed: "Range.init(_:)")
+  public func toRange() -> Range<Int>? {
+      if location == NSNotFound { return nil }
+      return location..<(location+length)
+  }
+}
+
+extension Range where Bound: BinaryInteger {
+  public init?(_ range: NSRange) {
+    guard range.location != NSNotFound else { return nil }
+    self.init(uncheckedBounds: (numericCast(range.lowerBound), numericCast(range.upperBound)))
+  }
+}
+
+// This additional overload will mean Range.init(_:) defaults to Range<Int> when
+// no additional type context is provided:
+extension Range where Bound == Int {
+  public init?(_ range: NSRange) {
+    guard range.location != NSNotFound else { return nil }
+    self.init(uncheckedBounds: (range.lowerBound, range.upperBound))
+  }
+}
+
+extension Range where Bound == String.Index {
+  public init?(_ range: NSRange, in string: String) {
+    let u = string.utf16
+    guard range.location != NSNotFound,
+      let start = u.index(u.startIndex, offsetBy: range.location, limitedBy: u.endIndex),
+      let end = u.index(u.startIndex, offsetBy: range.location + range.length, limitedBy: u.endIndex),
+      let lowerBound = String.Index(start, within: string),
+      let upperBound = String.Index(end, within: string)
+    else { return nil }
+    
+    self = lowerBound..<upperBound
+  }
 }
 
 extension NSRange : CustomReflectable {
@@ -128,5 +202,20 @@ extension NSRange : CustomReflectable {
 extension NSRange : CustomPlaygroundQuickLookable {
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
         return .range(Int64(location), Int64(length))
+    }
+}
+
+extension NSRange : Codable {
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        let location = try container.decode(Int.self)
+        let length = try container.decode(Int.self)
+        self.init(location: location, length: length)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        try container.encode(self.location)
+        try container.encode(self.length)
     }
 }

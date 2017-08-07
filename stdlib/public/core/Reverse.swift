@@ -17,7 +17,7 @@ extension MutableCollection where Self : BidirectionalCollection {
   ///
   ///     var characters: [Character] = ["C", "a", "f", "é"]
   ///     characters.reverse()
-  ///     print(cafe.characters)
+  ///     print(characters)
   ///     // Prints "["é", "f", "a", "C"]
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the
@@ -52,7 +52,7 @@ public struct _ReverseIndexingIterator<
   
   @_inlineable
   @inline(__always)
-  public mutating func next() -> Elements._Element? {
+  public mutating func next() -> Elements.Element? {
     guard _fastPath(_position != _elements.startIndex) else { return nil }
     _position = _elements.index(before: _position)
     return _elements[_position]
@@ -86,12 +86,12 @@ public struct ReversedIndex<Base : Collection> : Comparable {
   /// `"a"` character in a string's character view.
   ///
   ///     let name = "Horatio"
-  ///     let aIndex = name.characters.index(of: "a")!
-  ///     // name.characters[aIndex] == "a"
+  ///     let aIndex = name.index(of: "a")!
+  ///     // name[aIndex] == "a"
   ///
-  ///     let reversedCharacters = name.characters.reversed()
-  ///     let i = ReversedIndex<String.CharacterView>(aIndex)
-  ///     // reversedCharacters[i] == "r"
+  ///     let reversedName = name.reversed()
+  ///     let i = ReversedIndex<String>(aIndex)
+  ///     // reversedName[i] == "r"
   ///
   /// The element at the position created using `ReversedIndex<...>(aIndex)` is
   /// `"r"`, the character before `"a"` in the `name` string.
@@ -255,10 +255,8 @@ public struct ReversedCollection<
     return _base.distance(from: end.base, to: start.base)
   }
 
-  public typealias _Element = Base.Iterator.Element
-
   @_inlineable
-  public subscript(position: Index) -> Base.Iterator.Element {
+  public subscript(position: Index) -> Base.Element {
     return _base[_base.index(before: position.base)]
   }
 
@@ -286,12 +284,12 @@ public struct ReversedRandomAccessIndex<
   /// index of the `"a"` character in a string's character view.
   ///
   ///     let name = "Horatio"
-  ///     let aIndex = name.characters.index(of: "a")!
-  ///     // name.characters[aIndex] == "a"
+  ///     let aIndex = name.index(of: "a")!
+  ///     // name[aIndex] == "a"
   ///
-  ///     let reversedCharacters = name.characters.reversed()
-  ///     let i = ReversedIndex<String.CharacterView>(aIndex)
-  ///     // reversedCharacters[i] == "r"
+  ///     let reversedName = name.reversed()
+  ///     let i = ReversedIndex<String>(aIndex)
+  ///     // reversedName[i] == "r"
   ///
   /// The element at the position created using `ReversedIndex<...>(aIndex)` is
   /// `"r"`, the character before `"a"` in the `name` string. Viewed from the
@@ -429,11 +427,8 @@ public struct ReversedRandomAccessCollection<
     return _base.distance(from: end.base, to: start.base)
   }
 
-  public typealias _Element = Base.Iterator.Element
-  // FIXME(compiler limitation): this typealias should be inferred.
-
   @_inlineable
-  public subscript(position: Index) -> Base.Iterator.Element {
+  public subscript(position: Index) -> Base.Element {
     return _base[_base.index(before: position.base)]
   }
 
@@ -453,8 +448,8 @@ extension BidirectionalCollection {
   /// string in reverse order:
   ///
   ///     let word = "Backwards"
-  ///     for char in word.characters.reversed() {
-  ///         print(char, terminator="")
+  ///     for char in word.reversed() {
+  ///         print(char, terminator: "")
   ///     }
   ///     // Prints "sdrawkcaB"
   ///
@@ -463,7 +458,7 @@ extension BidirectionalCollection {
   /// example, to get the reversed version of a string, reverse its
   /// characters and initialize a new `String` instance from the result.
   ///
-  ///     let reversedWord = String(word.characters.reversed())
+  ///     let reversedWord = String(word.reversed())
   ///     print(reversedWord)
   ///     // Prints "sdrawkcaB"
   ///

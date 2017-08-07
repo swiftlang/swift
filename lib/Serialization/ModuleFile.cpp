@@ -27,7 +27,6 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
-#include "llvm/Support/PrettyStackTrace.h"
 
 using namespace swift;
 using namespace swift::serialization;
@@ -297,34 +296,29 @@ std::string ModuleFile::Dependency::getPrettyPrintedPath() const {
   return output;
 }
 
-namespace {
-  class PrettyModuleFileDeserialization : public llvm::PrettyStackTraceEntry {
-    const ModuleFile &File;
-  public:
-    explicit PrettyModuleFileDeserialization(const ModuleFile &file)
-        : File(file) {}
-
-    void print(raw_ostream &os) const override {
-      os << "While reading from " << File.getModuleFilename() << "\n";
-    }
-  };
-} // end anonymous namespace
-
 /// Used to deserialize entries in the on-disk decl hash table.
 class ModuleFile::DeclTableInfo {
 public:
-  using internal_key_type = StringRef;
-  using external_key_type = Identifier;
+  using internal_key_type = std::pair<DeclBaseName::Kind, StringRef>;
+  using external_key_type = DeclBaseName;
   using data_type = SmallVector<std::pair<uint8_t, DeclID>, 8>;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
   internal_key_type GetInternalKey(external_key_type ID) {
-    return ID.str();
+    if (ID.getKind() == DeclBaseName::Kind::Normal) {
+      return {DeclBaseName::Kind::Normal, ID.getIdentifier().str()};
+    } else {
+      return {ID.getKind(), StringRef()};
+    }
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    if (key.first == DeclBaseName::Kind::Normal) {
+      return llvm::HashString(key.second);
+    } else {
+      return (hash_value_type)key.first;
+    }
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -338,7 +332,20 @@ public:
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-    return StringRef(reinterpret_cast<const char *>(data), length);
+    uint8_t kind = endian::readNext<uint8_t, little, unaligned>(data);
+    switch (kind) {
+    case static_cast<uint8_t>(DeclNameKind::Normal): {
+      StringRef str(reinterpret_cast<const char *>(data),
+                    length - sizeof(uint8_t));
+      return {DeclBaseName::Kind::Normal, str};
+    }
+    case static_cast<uint8_t>(DeclNameKind::Subscript):
+      return {DeclBaseName::Kind::Subscript, StringRef()};
+    case static_cast<uint8_t>(DeclNameKind::Destructor):
+      return {DeclBaseName::Kind::Destructor, StringRef()};
+    default:
+      llvm_unreachable("Unknown DeclNameKind");
+    }
   }
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
@@ -916,7 +923,7 @@ ModuleFile::ModuleFile(
   assert(getStatus() == Status::Valid);
   Bits.IsFramework = isFramework;
 
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
 
   llvm::BitstreamCursor cursor{ModuleInputBuffer->getMemBufferRef()};
 
@@ -1186,7 +1193,7 @@ ModuleFile::ModuleFile(
 
 Status ModuleFile::associateWithFileContext(FileUnit *file,
                                             SourceLoc diagLoc) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
 
   assert(getStatus() == Status::Valid && "invalid module file");
   assert(!FileContext && "already associated with an AST module");
@@ -1297,15 +1304,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   return getStatus();
 }
 
-ModuleFile::~ModuleFile() {
-  assert(DelayedGenericEnvironments.empty() &&
-         "either finishPendingActions() was never called, or someone forgot "
-         "to use getModuleFileForDelayedActions()");
-}
+ModuleFile::~ModuleFile() { }
 
 void ModuleFile::lookupValue(DeclName name,
                              SmallVectorImpl<ValueDecl*> &results) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
 
   if (TopLevelDecls) {
     // Find top-level declarations with the given name.
@@ -1334,7 +1337,14 @@ void ModuleFile::lookupValue(DeclName name,
     auto iter = OperatorMethodDecls->find(name.getBaseName());
     if (iter != OperatorMethodDecls->end()) {
       for (auto item : *iter) {
-        auto VD = cast<ValueDecl>(getDecl(item.second));
+        Expected<Decl *> declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          llvm::consumeError(declOrError.takeError());
+          continue;
+        }
+        auto VD = cast<ValueDecl>(declOrError.get());
         results.push_back(VD);
       }
     }
@@ -1342,7 +1352,7 @@ void ModuleFile::lookupValue(DeclName name,
 }
 
 TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
 
   if (!LocalTypeDecls)
     return nullptr;
@@ -1355,8 +1365,8 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
 }
 
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
-                                       const ValueDecl *parent) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+                                       const NominalTypeDecl *parent) {
+  PrettyStackTraceModuleFile stackEntry(*this);
 
   if (!NestedTypeDecls)
     return nullptr;
@@ -1382,7 +1392,7 @@ TypeDecl *ModuleFile::lookupNestedType(Identifier name,
 }
 
 OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
 
   if (!OperatorDecls)
     return nullptr;
@@ -1402,7 +1412,7 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
 }
 
 PrecedenceGroupDecl *ModuleFile::lookupPrecedenceGroup(Identifier name) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
 
   if (!PrecedenceGroupDecls)
     return nullptr;
@@ -1419,7 +1429,7 @@ PrecedenceGroupDecl *ModuleFile::lookupPrecedenceGroup(Identifier name) {
 void ModuleFile::getImportedModules(
     SmallVectorImpl<ModuleDecl::ImportedModule> &results,
     ModuleDecl::ImportFilter filter) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {
     if (filter != ModuleDecl::ImportFilter::All &&
@@ -1501,7 +1511,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 void ModuleFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                     VisibleDeclConsumer &consumer,
                                     NLKind lookupKind) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!TopLevelDecls)
@@ -1537,7 +1547,7 @@ void ModuleFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
 }
 
 void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
   if (!ExtensionDecls)
     return;
 
@@ -1554,15 +1564,27 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   if (nominal->getParent()->isModuleScopeContext()) {
     Identifier moduleName = nominal->getParentModule()->getName();
     for (auto item : *iter) {
-      if (item.first == moduleName.str())
-        (void)getDecl(item.second);
+      if (item.first != moduleName.str())
+        continue;
+      Expected<Decl *> declOrError = getDeclChecked(item.second);
+      if (!declOrError) {
+        if (!getContext().LangOpts.EnableDeserializationRecovery)
+          fatal(declOrError.takeError());
+        llvm::consumeError(declOrError.takeError());
+      }
     }
   } else {
     std::string mangledName =
         Mangle::ASTMangler().mangleNominalType(nominal);
     for (auto item : *iter) {
-      if (item.first == mangledName)
-        (void)getDecl(item.second);
+      if (item.first != mangledName)
+        continue;
+      Expected<Decl *> declOrError = getDeclChecked(item.second);
+      if (!declOrError) {
+        if (!getContext().LangOpts.EnableDeserializationRecovery)
+          fatal(declOrError.takeError());
+        llvm::consumeError(declOrError.takeError());
+      }
     }
   }
 }
@@ -1604,7 +1626,7 @@ void ModuleFile::loadObjCMethods(
 void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!ClassMembersByName)
@@ -1653,7 +1675,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
 
 void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
                                     VisibleDeclConsumer &consumer) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!ClassMembersByName)
@@ -1709,7 +1731,7 @@ ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 }
 
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
   if (PrecedenceGroupDecls) {
     for (auto entry : PrecedenceGroupDecls->data()) {
       for (auto item : entry)
@@ -1741,15 +1763,23 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
 
   if (ExtensionDecls) {
     for (auto entry : ExtensionDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+      for (auto item : entry) {
+        Expected<Decl *> declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          llvm::consumeError(declOrError.takeError());
+          continue;
+        }
+        results.push_back(declOrError.get());
+      }
     }
   }
 }
 
 void
 ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
   if (!LocalTypeDecls)
     return;
 
@@ -1765,7 +1795,7 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
   if (ShadowedModule)
     ShadowedModule->getDisplayDecls(results);
 
-  PrettyModuleFileDeserialization stackEntry(*this);
+  PrettyStackTraceModuleFile stackEntry(*this);
   getImportDecls(results);
   getTopLevelDecls(results);
 }
@@ -1924,4 +1954,8 @@ bool SerializedASTFile::hasEntryPoint() const {
 ClassDecl *SerializedASTFile::getMainClass() const {
   assert(hasEntryPoint());
   return cast_or_null<ClassDecl>(File.getDecl(File.Bits.EntryPointDeclID));
+}
+
+const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {
+  return File.CompatibilityVersion;
 }

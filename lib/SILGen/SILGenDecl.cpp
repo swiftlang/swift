@@ -666,7 +666,7 @@ public:
   void bindVariable(SILLocation loc, VarDecl *var, ManagedValue value,
                     CanType formalValueType, SILGenFunction &SGF) {
     // Initialize the variable value.
-    InitializationPtr init = SGF.emitInitializationForVarDecl(var);
+    InitializationPtr init = SGF.emitInitializationForVarDecl(var, var->isLet());
     RValue(SGF, loc, formalValueType, value).forwardInto(SGF, loc, init.get());
   }
 
@@ -792,7 +792,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
       [&SGF, &loc, &eltDecl, &subInit, &value](ManagedValue mv,
                                                SwitchCaseFullExpr &expr) {
         // If the enum case has no bound value, we're done.
-        if (!eltDecl->getArgumentInterfaceType()) {
+        if (!eltDecl->hasAssociatedValues()) {
           assert(
               subInit == nullptr &&
               "Cannot have a subinit when there is no value to match against");
@@ -1008,7 +1008,7 @@ struct InitializationForPattern
       return InitializationPtr(new BlackHoleInitialization());
     }
 
-    return SGF.emitInitializationForVarDecl(P->getDecl());
+    return SGF.emitInitializationForVarDecl(P->getDecl(), P->getDecl()->isLet());
   }
 
   // Bind a tuple pattern by aggregating the component variables into a
@@ -1053,7 +1053,8 @@ struct InitializationForPattern
 
 } // end anonymous namespace
 
-InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
+InitializationPtr
+SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
   // If this is a computed variable, we don't need to do anything here.
   // We'll generate the getter and setter when we see their FuncDecls.
   if (!vd->hasStorage())
@@ -1076,7 +1077,7 @@ InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
 
   // If this is a 'let' initialization for a non-global, set up a
   // let binding, which stores the initialization value into VarLocs directly.
-  if (vd->isLet() && vd->getDeclContext()->isLocalContext() &&
+  if (forceImmutable && vd->getDeclContext()->isLocalContext() &&
       !isa<ReferenceStorageType>(varType))
     return InitializationPtr(new LetValueInitialization(vd, *this));
 
@@ -1291,7 +1292,7 @@ namespace {
         if (gen.silConv.useLoweredAddresses()) {
           gen.B.createDeinitExistentialAddr(l, existentialAddr);
         } else {
-          gen.B.createDeinitExistentialOpaque(l, existentialAddr);
+          gen.B.createDeinitExistentialValue(l, existentialAddr);
         }
         break;
       case ExistentialRepresentation::Boxed:
@@ -1393,6 +1394,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Module:
+  case DeclKind::MissingMember:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
 }

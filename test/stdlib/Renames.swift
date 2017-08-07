@@ -536,7 +536,7 @@ func _Unicode<I : IteratorProtocol, E : UnicodeCodec>(i: I, e: E.Type) where I.E
 }
 
 func _UnicodeScalar(s: UnicodeScalar) {
-  _ = UnicodeScalar() // expected-error {{'init()' is unavailable: use 'UnicodeScalar(0)'}} {{none}}
+  _ = UnicodeScalar() // expected-error {{'init()' is unavailable: use 'Unicode.Scalar(0)'}} {{none}}
   _ = s.escape(asASCII: true) // expected-error {{'escape(asASCII:)' has been renamed to 'escaped(asASCII:)'}} {{9-15=escaped}} {{none}}
 }
 

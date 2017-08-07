@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out_Debug
 // RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
@@ -25,8 +24,8 @@ CharacterTraps.test("CharacterFromEmptyString")
 
 CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
   .skip(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+    { !_isDebugAssertConfiguration() },
+    reason: "this trap is only guaranteed to happen in Debug builds"))
   .code {
   var s = "ab"
   expectCrashLater()

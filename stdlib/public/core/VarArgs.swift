@@ -59,6 +59,19 @@ protocol _CVarArgAligned : CVarArg {
 #if arch(x86_64)
 @_versioned
 let _x86_64CountGPRegisters = 6
+// Note to future visitors concerning the following SSE register count.
+//
+// AMD64-ABI section 3.5.7 says -- as recently as v0.99.7, Nov 2014 -- to make
+// room in the va_list register-save area for 16 SSE registers (XMM0..15). This
+// may seem surprising, because the calling convention of that ABI only uses the
+// first 8 SSE registers for argument-passing; why save the other 8?
+//
+// According to a comment in X86_64ABIInfo::EmitVAArg, in clang's TargetInfo,
+// the AMD64-ABI spec is itself in error on this point ("NOTE: 304 is a typo").
+// This comment (and calculation) in clang has been there since varargs support
+// was added in 2009, in rev be9eb093; so if you're about to change this value
+// from 8 to 16 based on reading the spec, probably the bug you're looking for
+// is elsewhere.
 @_versioned
 let _x86_64CountSSERegisters = 8
 @_versioned
@@ -70,18 +83,18 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 /// Invokes the given closure with a C `va_list` argument derived from the
 /// given array of arguments.
 ///
-/// The pointer passed as an argument to `body` is valid only for the lifetime
-/// of the closure. Do not escape it from the closure for later use.
+/// The pointer passed as an argument to `body` is valid only during the
+/// execution of `withVaList(_:_:)`. Do not store or return the pointer for
+/// later use.
 ///
 /// - Parameters:
 ///   - args: An array of arguments to convert to a C `va_list` pointer.
 ///   - body: A closure with a `CVaListPointer` parameter that references the
-///     arguments passed as `args`. If `body` has a return value, it is used
-///     as the return value for the `withVaList(_:)` function. The pointer
-///     argument is valid only for the duration of the closure's execution.
-/// - Returns: The return value of the `body` closure parameter, if any.
-///
-/// - SeeAlso: `getVaList(_:)`
+///     arguments passed as `args`. If `body` has a return value, that value
+///     is also used as the return value for the `withVaList(_:)` function.
+///     The pointer argument is valid only for the duration of the function's
+///     execution.
+/// - Returns: The return value, if any, of the `body` closure parameter.
 public func withVaList<R>(_ args: [CVarArg],
   _ body: (CVaListPointer) -> R) -> R {
   let builder = _VaListBuilder()
@@ -110,14 +123,13 @@ internal func _withVaList<R>(
 /// from the given array of arguments.
 ///
 /// You should prefer `withVaList(_:_:)` instead of this function. In some
-/// uses, such as in a `class` initializer, you may find that the
-/// language rules do not allow you to use `withVaList(_:_:)` as intended.
+/// uses, such as in a `class` initializer, you may find that the language
+/// rules do not allow you to use `withVaList(_:_:)` as intended.
 ///
-/// - Parameters args: An array of arguments to convert to a C `va_list`
+/// - Parameter args: An array of arguments to convert to a C `va_list`
 ///   pointer.
-/// - Returns: The return value of the `body` closure parameter, if any.
-///
-/// - SeeAlso: `withVaList(_:_:)`
+/// - Returns: A pointer that can be used with C functions that take a
+///   `va_list` argument.
 public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
   let builder = _VaListBuilder()
   for a in args {
@@ -438,7 +450,9 @@ final internal class _VaListBuilder {
       }
       sseRegistersUsed += 1
     }
-    else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
+    else if encoded.count == 1
+      && !(arg is _CVarArgPassedAsDouble)
+      && gpRegistersUsed < _x86_64CountGPRegisters {
       storage[gpRegistersUsed] = encoded[0]
       gpRegistersUsed += 1
     }

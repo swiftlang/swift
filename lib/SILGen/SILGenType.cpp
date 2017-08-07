@@ -45,7 +45,8 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // If the member is dynamic, reference its dynamic dispatch thunk so that
   // it will be redispatched, funneling the method call through the runtime
   // hook point.
-  if (derived.getDecl()->isDynamic()) {
+  if (derived.getDecl()->isDynamic()
+      && derived.kind != SILDeclRef::Kind::Allocator) {
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived));
     implLinkage = SILLinkage::Public;
   } else {
@@ -61,7 +62,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // abstraction pattern of the base.
   auto baseInfo = Types.getConstantInfo(base);
   auto derivedInfo = Types.getConstantInfo(derived);
-  auto basePattern = AbstractionPattern(baseInfo.LoweredInterfaceType);
+  auto basePattern = AbstractionPattern(baseInfo.LoweredType);
   
   auto overrideInfo = M.Types.getConstantOverrideInfo(derived, base);
 
@@ -105,8 +106,8 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
 
   SILGenFunction(*this, *thunk)
     .emitVTableThunk(derived, implFn, basePattern,
-                     overrideInfo.LoweredInterfaceType,
-                     derivedInfo.LoweredInterfaceType);
+                     overrideInfo.LoweredType,
+                     derivedInfo.LoweredType);
 
   return {base, thunk, implLinkage};
 }
@@ -203,6 +204,8 @@ public:
     assert(result.second);
     (void) result;
   }
+
+  void addPlaceholder(MissingMemberDecl *) {}
 };
 
 } // end anonymous namespace
@@ -312,8 +315,14 @@ public:
     Serialized = IsNotSerialized;
 
     // Serialize the witness table if we're serializing everything with
-    // -sil-serialize-all, or if the conformance itself thinks it should be.
-    if (SGM.makeModuleFragile || Conformance->hasFixedLayout())
+    // -sil-serialize-all....
+    if (SGM.isMakeModuleFragile())
+      Serialized = IsSerialized;
+
+    // ... or if the conformance itself thinks it should be.
+    if (SILWitnessTable::conformanceIsSerialized(
+            Conformance, SGM.M.getSwiftModule()->getResilienceStrategy(),
+            SGM.M.getOptions().SILSerializeWitnessTables))
       Serialized = IsSerialized;
 
     // Not all protocols use witness tables; in this case we just skip
@@ -391,6 +400,10 @@ public:
     super::addConstructor(cd, witness);
   }
 
+  void addPlaceholder(MissingMemberDecl *placeholder) {
+    llvm_unreachable("generating a witness table with placeholders in it");
+  }
+
   void addMethod(SILDeclRef requirementRef,
                  SILDeclRef witnessRef,
                  IsFreeFunctionWitness_t isFree,
@@ -409,17 +422,9 @@ public:
     auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
     auto witnessSerialized = Serialized;
     if (witnessSerialized &&
-        !hasPublicVisibility(witnessLinkage) &&
-        !hasSharedVisibility(witnessLinkage)) {
-      // FIXME: This should not happen, but it looks like visibility rules
-      // for extension members are slightly bogus.
-      //
-      // We allow a 'public' member of an extension to witness a public
-      // protocol requirement, even if the extended type is not public;
-      // then SILGen gives the member private linkage, ignoring the more
-      // visible accessibility it was given in the AST.
+        fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
       witnessLinkage = SILLinkage::Public;
-      witnessSerialized = (SGM.makeModuleFragile
+      witnessSerialized = (SGM.isMakeModuleFragile()
                            ? IsSerialized
                            : IsNotSerialized);
     } else {
@@ -553,8 +558,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   GenericEnvironment *genericEnv = nullptr;
 
   // Work out the lowered function type of the SIL witness thunk.
-  auto reqtOrigTy
-    = cast<GenericFunctionType>(requirementInfo.LoweredInterfaceType);
+  auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
   CanAnyFunctionType reqtSubstTy;
   SubstitutionList witnessSubs;
   if (witness.requiresSubstitution()) {
@@ -610,10 +614,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   }
 
   // Lower the witness thunk type with the requirement's abstraction level.
-  auto witnessSILFnType = getNativeSILFunctionType(M,
-                                                   AbstractionPattern(reqtOrigTy),
-                                                   reqtSubstTy,
-                                                   witnessRef);
+  auto witnessSILFnType =
+    getNativeSILFunctionType(M, AbstractionPattern(reqtOrigTy),
+                             reqtSubstTy, witnessRef);
 
   // Mangle the name of the witness thunk.
   Mangle::ASTMangler NewMangler;
@@ -725,6 +728,10 @@ public:
     super::addConstructor(cd, witness);
   }
 
+  void addPlaceholder(MissingMemberDecl *placeholder) {
+    llvm_unreachable("generating a witness table with placeholders in it");
+  }
+
   void addMethod(SILDeclRef requirementRef,
                  SILDeclRef witnessRef,
                  IsFreeFunctionWitness_t isFree,
@@ -823,6 +830,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -922,6 +930,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }

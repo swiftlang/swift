@@ -134,3 +134,49 @@ sil hidden @copyBox : $@convention(thin) () -> () {
   %98 = tuple ()
   %99 = return %98 : $()
 }
+
+sil @closure : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+bb0(%0 : ${var Builtin.Int64}):
+  %empty = tuple ()
+  return %empty : $()
+}
+
+// An access that escapes on an unreachable path must be dynamic.
+//
+// CHECK-LABEL: sil @partialUnreachable : $@convention(thin) () -> () {
+// CHECK: %[[ACCESS:.*]] = begin_access [modify] [dynamic] %{{.*}} : $*Builtin.Int64
+// CHECK: bb1:
+// CHECK: end_access %[[ACCESS]] : $*Builtin.Int64
+// CHECK: return
+// CHECK: bb2:
+// CHECK: partial_apply
+// CHECK: unreachable
+sil @partialUnreachable : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %addr = project_box %box : ${ var Builtin.Int64 }, 0
+  %write = begin_access [modify] [unknown] %addr : $*Builtin.Int64
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_access %write : $*Builtin.Int64
+  %empty = tuple ()
+  return %empty : $()
+
+bb2:
+  %f = function_ref @closure : $@convention(thin) (@owned { var Builtin.Int64 }) -> ()
+  %closure = partial_apply %f(%box) : $@convention(thin) (@owned { var Builtin.Int64 }) -> ()
+  unreachable
+}
+
+// An access that refers to mark_uninitialized.
+//
+// CHECK-LABEL: sil @markUninitSource : $@convention(thin) () -> () {
+sil @markUninitSource : $@convention(thin) () -> () {
+bb0:
+  %stk = alloc_stack $Builtin.Int64, let, name "x"
+  %var = mark_uninitialized [var] %stk : $*Builtin.Int64
+  %f = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %closure = partial_apply %f(%var) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  unreachable
+}

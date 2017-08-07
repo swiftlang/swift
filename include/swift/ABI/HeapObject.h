@@ -1,4 +1,4 @@
-//===--- HeapObject.h - ABI constants for heap objects -----------*- C++ *-===//
+//===--- HeapObject.h - ABI constants for heap objects ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

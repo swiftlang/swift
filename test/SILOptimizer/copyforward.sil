@@ -450,7 +450,7 @@ bb0:
 // CHECK-LABEL: sil @nil_comparison
 // CHECK:  alloc_stack
 // CHECK-NOT: copy_addr
-// CHECK-NOT destroy_addr
+// CHECK-NOT: destroy_addr
 // CHECK: switch_enum_addr %0
 // CHECK: [[D:%.*]] = unchecked_take_enum_data_addr %0
 // CHECK: destroy_addr [[D]]

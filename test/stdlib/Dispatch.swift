@@ -40,6 +40,13 @@ DispatchAPI.test("DispatchGroup creation") {
   expectNotNil(group)
 }
 
+DispatchAPI.test("Dispatch sync return value") {
+  let value = 24;
+  let q = DispatchQueue(label: "Test")
+  let result = q.sync() { return 24 }
+  expectEqual(value, result)
+}
+
 DispatchAPI.test("dispatch_block_t conversions") {
   var counter = 0
   let closure = { () -> Void in
@@ -70,7 +77,7 @@ if #available(OSX 10.10, iOS 8.0, *) {
 
 DispatchAPI.test("dispatch_data_t enumeration") {
 	// Ensure we can iterate the empty iterator
-	for x in DispatchData.empty {
+	for _ in DispatchData.empty {
 		_ = 1
 	}
 }
@@ -82,7 +89,7 @@ DispatchAPI.test("dispatch_data_t deallocator") {
 	autoreleasepool {
 		let size = 1024
 		let p = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-		let d = DispatchData(bytesNoCopy: UnsafeRawBufferPointer(start: p, count: size), deallocator: .custom(q, {
+		let _ = DispatchData(bytesNoCopy: UnsafeBufferPointer(start: p, count: size), deallocator: .custom(q, {
 			t = 1
 		}))
 	}
@@ -151,7 +158,7 @@ DispatchAPI.test("DispatchData.copyBytes") {
 	let srcPtr1 = UnsafeBufferPointer(start: source1, count: source1.count)
 
 	var dest: [UInt8] = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
-	var destPtr = UnsafeMutableBufferPointer(start: UnsafeMutablePointer(&dest),
+	let destPtr = UnsafeMutableBufferPointer(start: UnsafeMutablePointer(&dest),
 			count: dest.count)
 
 	var dispatchData = DispatchData(bytes: srcPtr1)
@@ -468,3 +475,52 @@ DispatchAPI.test("DispatchIO.initRelativePath") {
 	chan.setInterval(interval: .seconds(1)) // Dereference of unexpected nil should crash
 #endif
 }
+
+if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+	var block = DispatchWorkItem(qos: .unspecified, flags: .assignCurrentContext) {}
+	DispatchAPI.test("DispatchSource.replace") {
+		let g = DispatchGroup()
+		let q = DispatchQueue(label: "q")
+		let ds = DispatchSource.makeUserDataReplaceSource(queue: q)
+		var lastValue = UInt(0)
+		var nextValue = UInt(1)
+		let maxValue = UInt(1 << 24)
+
+		ds.setEventHandler() {
+			let value = ds.data;
+			expectTrue(value > lastValue)	 // Values must increase
+			expectTrue((value & (value - 1)) == 0) // Must be power of two
+			lastValue = value
+			if value == maxValue {
+				g.leave()
+			}
+		}
+		ds.activate()
+
+		g.enter()
+		block = DispatchWorkItem(qos: .unspecified, flags: .assignCurrentContext) {
+			ds.replace(data: nextValue)
+			nextValue <<= 1
+			if nextValue <= maxValue {
+				q.asyncAfter(
+					deadline: DispatchTime.now() + DispatchTimeInterval.milliseconds(1),
+					execute: block)
+			}
+		}
+		q.asyncAfter(
+			deadline: DispatchTime.now() + DispatchTimeInterval.milliseconds(1),
+			execute: block)
+
+		let result = g.wait(timeout: DispatchTime.now() + .seconds(30))
+		expectTrue(result == .success)
+	}
+}
+
+#if swift(>=4.0)
+DispatchAPI.test("DispatchTimeInterval.never.equals") {
+	expectTrue(DispatchTimeInterval.never == DispatchTimeInterval.never)
+	expectTrue(DispatchTimeInterval.seconds(10) != DispatchTimeInterval.never);
+	expectTrue(DispatchTimeInterval.never != DispatchTimeInterval.seconds(10));
+	expectTrue(DispatchTimeInterval.seconds(10) == DispatchTimeInterval.seconds(10));
+}
+#endif

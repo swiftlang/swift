@@ -7,7 +7,9 @@ public struct S1 {
   public func foo6() -> Void {}
 }
 
-public class C1 {
+public class C0 {}
+
+public class C1: C0 {
 	open class func foo1() {}
 	public weak var Ins : C1?
 	public unowned var Ins2 : C1 = C1()

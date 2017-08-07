@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -7,7 +7,7 @@ import Swift
 
 // CHECK-LABEL: sil @exp1 : $@convention(thin) () -> () {
 // CHECK-NOT: apply
-// Call of specialized intializer: <Int32>
+// Call of specialized initializer: <Int32>
 // CHECK: [[CTOR:%[0-9]+]] = function_ref @_T08XXX_inits5Int32V_Tg5
 // CHECK: apply [[CTOR]]
 // CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @acceptsInt
@@ -614,3 +614,31 @@ bb3:
   %8 = tuple ()
   return %8 : $()
 }
+
+struct YYY<T> {
+}
+
+enum MyOptional<T> {
+  case none
+  case some(T)
+}
+
+// Check that a specialization of a self-recursive function is produced
+// and it is not crashing the compiler.
+// CHECK-LABEL: sil shared @_T025testSelfRecursiveFunction4main10MyOptionalOyAB3YYYVyypGG_Tg5 : $@convention(thin) (MyOptional<YYY<Any>>) -> ()
+sil @testSelfRecursiveFunction : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  %2 = function_ref @testSelfRecursiveFunction : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  %3 = alloc_stack $MyOptional<YYY<Any>>
+  inject_enum_addr %3 : $*MyOptional<YYY<Any>>, #MyOptional.none!enumelt
+  %5 = tuple ()
+  %6 = load %3 : $*MyOptional<YYY<Any>>
+  %7 = alloc_stack $MyOptional<YYY<Any>>
+  store %6 to %7 : $*MyOptional<YYY<Any>>
+  %9 = apply %2<MyOptional<YYY<Any>>>(%7) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %7 : $*MyOptional<YYY<Any>>
+  dealloc_stack %3 : $*MyOptional<YYY<Any>>
+  destroy_addr %0 : $*T
+  %13 = tuple ()
+  return %13 : $()
+} // end sil function 'testSelfRecursiveFunction'

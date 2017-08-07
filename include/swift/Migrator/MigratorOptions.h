@@ -44,7 +44,7 @@ struct MigratorOptions {
   std::string DumpMigrationStatesDir = "";
 
   /// If non-empty, use the api change data serialized to this path.
-  std::string APIDigesterDataStorePath = "";
+  std::vector<std::string> APIDigesterDataStorePaths;
 
   bool shouldRunMigrator() const {
     return !(EmitRemapFilePath.empty() && EmitMigratedFilePath.empty() &&

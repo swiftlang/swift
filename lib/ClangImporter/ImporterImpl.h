@@ -181,6 +181,22 @@ enum class ImportTypeKind {
   Enum
 };
 
+enum class Bridgeability {
+  /// This context does not permit bridging at all.  For example, the
+  /// target of a C pointer.
+  None,
+
+  /// This context permits all kinds of bridging.  For example, the
+  /// imported result of a method declaration.
+  Full
+};
+
+static inline Bridgeability getTypedefBridgeability(clang::QualType type) {
+  return (type->isBlockPointerType() || type->isFunctionType())
+            ? Bridgeability::Full
+            : Bridgeability::None;
+}
+
 /// \brief Describes the kind of the C type that can be mapped to a stdlib
 /// swift type.
 enum class MappedCTypeKind {
@@ -375,7 +391,8 @@ public:
   /// Multiple macro definitions can map to the same declaration if the
   /// macros are identically defined.
   llvm::DenseMap<Identifier,
-                 SmallVector<std::pair<clang::MacroInfo *, ValueDecl *>, 2>>
+                 SmallVector<std::pair<const clang::MacroInfo *, ValueDecl *>,
+                             2>>
     ImportedMacros;
 
   // Mapping from macro to value for macros that expand to constant values.
@@ -496,9 +513,6 @@ private:
   /// External Decls that we have imported but not passed to the ASTContext yet.
   SmallVector<Decl *, 4> RegisteredExternalDecls;
 
-  /// Protocol conformances that may be missing witnesses.
-  SmallVector<NormalProtocolConformance *, 4> DelayedProtocolConformances;
-
   unsigned NumCurrentImportingEntities = 0;
 
   /// Mapping from delayed conformance IDs to the set of delayed
@@ -517,7 +531,6 @@ private:
   void startedImportingEntity();
   void finishedImportingEntity();
   void finishPendingActions();
-  void finishProtocolConformance(NormalProtocolConformance *conformance);
 
   struct ImportingEntityRAII {
     Implementation &Impl;
@@ -567,10 +580,6 @@ public:
     RegisteredExternalDecls.push_back(D);
   }
 
-  void scheduleFinishProtocolConformance(NormalProtocolConformance *C) {
-    DelayedProtocolConformances.push_back(C);
-  }
-
   /// \brief Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
     return Instance->getASTContext();
@@ -606,10 +615,7 @@ public:
   ///
   /// The returned module may be null (but not \c None) if \p MI comes from
   /// an imported header.
-  Optional<clang::Module *>
-  getClangSubmoduleForMacro(const clang::MacroInfo *MI);
-
-  ClangModuleUnit *getClangModuleForMacro(const clang::MacroInfo *MI);
+  const clang::Module *getClangOwningModule(ClangNode Node) const;
 
   /// Whether NSUInteger can be imported as Int in certain contexts. If false,
   /// should always be imported as UInt.
@@ -667,9 +673,11 @@ public:
 
   /// \brief Import the given Clang preprocessor macro as a Swift value decl.
   ///
+  /// \p macroNode must be a MacroInfo or a ModuleMacro.
+  ///
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
-  ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
+  ValueDecl *importMacro(Identifier name, ClangNode macroNode);
 
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
@@ -886,7 +894,7 @@ public:
 
   /// \brief Determines whether the given type matches an implicit type
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
-  bool matchesNSObjectBound(Type type);
+  bool matchesHashableBound(Type type);
 
   /// \brief Look up and attempt to import a Clang declaration with
   /// the given name.
@@ -901,17 +909,19 @@ public:
   /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
   ///        in certain contexts. If false, it will always be imported as UInt.
   ///
-  /// \param canFullyBridgeTypes True if we can bridge types losslessly.
-  ///        This is an additional guarantee on top of the ImportTypeKind
-  ///        cases that allow bridging, and applies to the entire type.
+  /// \param bridgeability Whether we can bridge types in this context.
+  ///        This may restrict the ability to bridge types even in contexts
+  ///        that otherwise allow bridging, such as function results and
+  ///        parameters.
   ///
   /// \returns The imported type, or null if this type could
   /// not be represented in Swift.
   Type importType(clang::QualType type,
                   ImportTypeKind kind,
                   bool allowNSUIntegerAsInt,
-                  bool canFullyBridgeTypes,
-                  OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional);
+                  Bridgeability bridgeability,
+                  OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
+                  bool resugarNSErrorPointer = true);
 
   /// \brief Import the given function type.
   ///
@@ -1114,6 +1124,9 @@ public:
     const Decl *D, uint64_t contextData,
     SmallVectorImpl<ProtocolConformance *> &Conformances) override;
 
+  void finishNormalConformance(NormalProtocolConformance *conformance,
+                               uint64_t unused) override;
+
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, Accessibility access,
                                   Targs &&... Args) {
@@ -1167,7 +1180,25 @@ public:
                             VisibleDeclConsumer &consumer);
 
   /// Determine the effective Clang context for the given Swift nominal type.
-  EffectiveClangContext getEffectiveClangContext(NominalTypeDecl *nominal);
+  EffectiveClangContext
+  getEffectiveClangContext(const NominalTypeDecl *nominal);
+
+  /// Attempts to import the name of \p decl with each possible
+  /// ImportNameVersion. \p action will be called with each unique name.
+  ///
+  /// In this case, "unique" means either the full name is distinct or the
+  /// effective context is distinct. This method does not attempt to handle
+  /// "unresolved" contexts in any special way---if one name references a
+  /// particular Clang declaration and the other has an unresolved context that
+  /// will eventually reference that declaration, the contexts will still be
+  /// considered distinct.
+  ///
+  /// The names are generated in the same order as
+  /// forEachImportNameVersionFromCurrent. The current name is always first.
+  void forEachDistinctName(
+      const clang::NamedDecl *decl,
+      llvm::function_ref<void(importer::ImportedName,
+                              importer::ImportNameVersion)> action);
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();

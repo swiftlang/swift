@@ -192,6 +192,12 @@ public func testExMetatype() -> Int {
   return type.size
 }
 
+// rdar://32288618
+public func testExMetatypeVar() -> Int {
+  var type: StaticP.Type = HasStatic<Int>.self
+  return type.size
+}
+
 // IRGen used to crash on the testPropagationOfConcreteTypeIntoExistential method.
 // rdar://26286278
 

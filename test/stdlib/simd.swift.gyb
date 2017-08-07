@@ -279,9 +279,6 @@ simdTestSuite.test("matrix init") {
     }
   }
 
-  //  Round-trip through C matrix type.
-  expectEqualTest(${mat}, ${mattype}(${mat}.cmatrix), sameValue: same)
-
 %     end # for rows
 %   end # for cols
 % end # for type

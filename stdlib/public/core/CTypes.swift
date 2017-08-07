@@ -43,14 +43,14 @@ public typealias CShort = Int16
 public typealias CInt = Int32
 
 /// The C 'long' type.
-#if os(Windows) && !CYGWIN && arch(x86_64)
+#if os(Windows) && arch(x86_64)
 public typealias CLong = Int32
 #else
 public typealias CLong = Int
 #endif
 
 /// The C 'long long' type.
-#if os(Windows) && !CYGWIN && arch(x86_64)
+#if os(Windows) && arch(x86_64)
 public typealias CLongLong = Int
 #else
 public typealias CLongLong = Int64
@@ -67,7 +67,7 @@ public typealias CDouble = Double
 // FIXME: Is it actually UTF-32 on Darwin?
 //
 /// The C++ 'wchar_t' type.
-public typealias CWideChar = UnicodeScalar
+public typealias CWideChar = Unicode.Scalar
 
 // FIXME: Swift should probably have a UTF-16 type other than UInt16.
 //
@@ -75,7 +75,7 @@ public typealias CWideChar = UnicodeScalar
 public typealias CChar16 = UInt16
 
 /// The C++11 'char32_t' type, which has UTF-32 encoding.
-public typealias CChar32 = UnicodeScalar
+public typealias CChar32 = Unicode.Scalar
 
 /// The C '_Bool' and C++ 'bool' type.
 public typealias CBool = Bool

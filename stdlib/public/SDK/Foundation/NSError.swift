@@ -602,13 +602,17 @@ public struct CocoaError : _BridgedStoredNSError {
   public static var _nsErrorDomain: String { return NSCocoaErrorDomain }
 
   /// The error code itself.
-  public struct Code : RawRepresentable, _ErrorCodeProtocol {
+  public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
     public typealias _ErrorType = CocoaError
 
     public let rawValue: Int
 
     public init(rawValue: Int) {
       self.rawValue = rawValue
+    }
+    
+    public var hashValue: Int {
+      return self.rawValue
     }
   }
 }
@@ -638,6 +642,16 @@ public extension CocoaError {
   var url: URL? {
     return _nsUserInfo[NSURLErrorKey as NSString] as? URL
   }
+}
+
+public extension CocoaError {
+    public static func error(_ code: CocoaError.Code, userInfo: [AnyHashable : Any]? = nil, url: URL? = nil) -> Error {
+        var info: [AnyHashable : Any] = userInfo ?? [:]
+        if let url = url {
+            info[NSURLErrorKey] = url
+        }
+        return NSError(domain: NSCocoaErrorDomain, code: code.rawValue, userInfo: info)
+    }
 }
 
 extension CocoaError.Code {
@@ -836,19 +850,11 @@ extension CocoaError.Code {
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderReadCorrupt: CocoaError.Code {
-    return _coderReadCorrupt
-  }
-
-  internal static var _coderReadCorrupt: CocoaError.Code {
     return CocoaError.Code(rawValue: 4864)
   }
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderValueNotFound: CocoaError.Code {
-    return _coderValueNotFound
-  }
-
-  internal static var _coderValueNotFound: CocoaError.Code {
     return CocoaError.Code(rawValue: 4865)
   }
 
@@ -1287,19 +1293,11 @@ extension CocoaError {
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderReadCorrupt: CocoaError.Code {
-    return _coderReadCorrupt
-  }
-
-  public static var _coderReadCorrupt: CocoaError.Code {
     return CocoaError.Code(rawValue: 4864)
   }
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderValueNotFound: CocoaError.Code {
-    return _coderValueNotFound
-  }
-
-  internal static var _coderValueNotFound: CocoaError.Code {
     return CocoaError.Code(rawValue: 4865)
   }
 
@@ -1835,13 +1833,17 @@ public struct URLError : _BridgedStoredNSError {
   public static var _nsErrorDomain: String { return NSURLErrorDomain }
 
   /// The error code itself.
-  public struct Code : RawRepresentable, _ErrorCodeProtocol {
+  public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
     public typealias _ErrorType = URLError
 
     public let rawValue: Int
 
     public init(rawValue: Int) {
       self.rawValue = rawValue
+    }
+
+    public var hashValue: Int {
+      return self.rawValue
     }
   }
 }

@@ -32,6 +32,9 @@ def line : Separate<["-"], "line">,
   HelpText<"line">;
 def line_EQ : Joined<["-"], "line=">, Alias<line>;
 
+def using_swift_args : Flag<["-"], "using-swift-args">,
+  HelpText<"Interpret the compiler arguments as Swift compiler arguments">;
+
 def replace : Separate<["-"], "replace">,
   HelpText<"replace text ('text')">;
 def replace_EQ : Joined<["-"], "replace=">, Alias<replace>;

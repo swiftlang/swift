@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -module-name InheritedInitializerBase %S/Inputs/inherited-initializer-base.swift
 // RUN: %target-swift-frontend -emit-silgen -I %t %s | %FileCheck %s
 

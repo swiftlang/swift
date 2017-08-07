@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -sil-serialize-witness-tables %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 protocol Fooable {
   init()
@@ -188,12 +188,16 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop3 nonmutating materializeForSet
-// CHECK-LABEL: sil private [transparent] [thunk] @_T015guaranteed_self1SVAA7FooableA2aDP5prop3SifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil private [transparent] [thunk] @_T015guaranteed_self1SVAA7FooableA2aDP5prop3SifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
-// CHECK:         [[SELF:%.*]] = load [copy] [[SELF_ADDR]]
+// CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
+// CHECK:         [[SELF:%.*]] = load [take] [[SELF_COPY]]
 // CHECK:         destroy_value [[SELF]]
 // CHECK-NOT:     destroy_value [[SELF]]
-// CHECK:       }
+// CHECK-NOT:     destroy_addr [[SELF_COPY]]
+// CHECK-NOT:     destroy_addr [[SELF_ADDR]]
+// CHECK:       } // end sil function '_T015guaranteed_self1SVAA7FooableA2aDP5prop3SifmTW'
 
 //
 // TODO: Expected output for the other cases
@@ -478,12 +482,16 @@ class LetFieldClass {
   // CHECK-LABEL: sil hidden @_T015guaranteed_self13LetFieldClassC10letkMethod{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed LetFieldClass) -> () {
   // CHECK: bb0([[CLS:%.*]] : $LetFieldClass):
   // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load_borrow [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [read] [dynamic] [[KRAKEN_ADDR]] : $*Kraken
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load_borrow [[WRITE]]
+  // CHECK-NEXT: end_access [[WRITE]] : $*Kraken
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
-  // CHECK-NEXT: end_borrow [[KRAKEN]] from [[KRAKEN_ADDR]]
+  // CHECK-NEXT: end_borrow [[KRAKEN]] from [[WRITE]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[KRAKEN_ADDR]] : $*Kraken
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[READ]]
+  // CHECK-NEXT: end_access [[READ]] : $*Kraken
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
   // CHECK-NEXT: [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = copy_value [[BORROWED_KRAKEN]]
@@ -492,7 +500,9 @@ class LetFieldClass {
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN2:%.*]] = load [copy] [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[KRAKEN_ADDR]] : $*Kraken
+  // CHECK-NEXT: [[KRAKEN2:%.*]] = load [copy] [[READ]]
+  // CHECK-NEXT: end_access [[READ]] : $*Kraken
   // CHECK-NEXT: store [[KRAKEN2]] to [init] [[PB]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
   // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Kraken

@@ -440,8 +440,6 @@ internal struct _UnmanagedAnyObjectArray {
 /// unspecified. The instances of `NSSet` and `Set` share buffer using the
 /// same copy-on-write optimization that is used when two instances of `Set`
 /// share buffer.
-///
-/// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Set<Element : Hashable> :
   SetAlgebra, Hashable, Collection, ExpressibleByArrayLiteral {
@@ -759,7 +757,7 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
   public init<Source : Sequence>(_ sequence: Source)
-    where Source.Iterator.Element == Element {
+    where Source.Element == Element {
     self.init(minimumCapacity: sequence.underestimatedCount)
     if let s = sequence as? Set<Element> {
       // If this sequence is actually a native `Set`, then we can quickly
@@ -768,8 +766,10 @@ public struct Set<Element : Hashable> :
       switch s._variantBuffer {
         case .native(let buffer):
           _variantBuffer = .native(buffer)
+#if _runtime(_ObjC)
         case .cocoa(let owner):
           _variantBuffer = .cocoa(owner)
+#endif
       }
     } else {
       for item in sequence {
@@ -785,7 +785,7 @@ public struct Set<Element : Hashable> :
   /// five characters.
   ///
   ///     let cast: Set = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let shortNames = cast.filter { $0.characters.count < 5 }
+  ///     let shortNames = cast.filter { $0.count < 5 }
   ///
   ///     shortNames.isSubset(of: cast)
   ///     // true
@@ -827,7 +827,7 @@ public struct Set<Element : Hashable> :
   ///   otherwise, `false`.
   @_inlineable
   public func isSubset<S : Sequence>(of possibleSuperset: S) -> Bool
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     // FIXME(performance): isEmpty fast path, here and elsewhere.
     let other = Set(possibleSuperset)
     return isSubset(of: other)
@@ -855,7 +855,7 @@ public struct Set<Element : Hashable> :
   ///   `possibleStrictSuperset`; otherwise, `false`.
   @_inlineable
   public func isStrictSubset<S : Sequence>(of possibleStrictSuperset: S) -> Bool
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     // FIXME: code duplication.
     let other = Set(possibleStrictSuperset)
     return isStrictSubset(of: other)
@@ -878,7 +878,7 @@ public struct Set<Element : Hashable> :
   ///   otherwise, `false`.
   @_inlineable
   public func isSuperset<S : Sequence>(of possibleSubset: S) -> Bool
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     // FIXME(performance): Don't build a set; just ask if every element is in
     // `self`.
     let other = Set(possibleSubset)
@@ -904,7 +904,7 @@ public struct Set<Element : Hashable> :
   /// - Returns: `true` if the set is a strict superset of
   ///   `possibleStrictSubset`; otherwise, `false`.
   public func isStrictSuperset<S : Sequence>(of possibleStrictSubset: S) -> Bool
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     let other = Set(possibleStrictSubset)
     return other.isStrictSubset(of: self)
   }
@@ -924,7 +924,7 @@ public struct Set<Element : Hashable> :
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
   public func isDisjoint<S : Sequence>(with other: S) -> Bool
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     // FIXME(performance): Don't need to build a set.
     let otherSet = Set(other)
     return isDisjoint(with: otherSet)
@@ -955,7 +955,7 @@ public struct Set<Element : Hashable> :
   /// - Returns: A new set with the unique elements of this set and `other`.
   @_inlineable
   public func union<S : Sequence>(_ other: S) -> Set<Element>
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     var newSet = self
     newSet.formUnion(other)
     return newSet
@@ -976,7 +976,7 @@ public struct Set<Element : Hashable> :
   /// - Parameter other: A sequence of elements. `other` must be finite.
   @_inlineable
   public mutating func formUnion<S : Sequence>(_ other: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     for item in other {
       insert(item)
     }
@@ -998,13 +998,13 @@ public struct Set<Element : Hashable> :
   /// - Returns: A new set.
   @_inlineable
   public func subtracting<S : Sequence>(_ other: S) -> Set<Element>
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     return self._subtracting(other)
   }
 
   @_versioned
   internal func _subtracting<S : Sequence>(_ other: S) -> Set<Element>
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     var newSet = self
     newSet.subtract(other)
     return newSet
@@ -1024,12 +1024,12 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   public mutating func subtract<S : Sequence>(_ other: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     _subtract(other)
   }
 
   internal mutating func _subtract<S : Sequence>(_ other: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     for item in other {
       remove(item)
     }
@@ -1053,7 +1053,7 @@ public struct Set<Element : Hashable> :
   /// - Returns: A new set.
   @_inlineable
   public func intersection<S : Sequence>(_ other: S) -> Set<Element>
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     let otherSet = Set(other)
     return intersection(otherSet)
   }
@@ -1073,7 +1073,7 @@ public struct Set<Element : Hashable> :
   /// - Parameter other: A sequence of elements. `other` must be finite.
   @_inlineable
   public mutating func formIntersection<S : Sequence>(_ other: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     // Because `intersect` needs to both modify and iterate over
     // the left-hand side, the index may become invalidated during
     // traversal so an intermediate set must be created.
@@ -1108,7 +1108,7 @@ public struct Set<Element : Hashable> :
   /// - Returns: A new set.
   @_inlineable
   public func symmetricDifference<S : Sequence>(_ other: S) -> Set<Element>
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     var newSet = self
     newSet.formSymmetricDifference(other)
     return newSet
@@ -1120,9 +1120,8 @@ public struct Set<Element : Hashable> :
   /// In the following example, the elements of the `employees` set that are
   /// also members of `neighbors` are removed from `employees`, while the
   /// elements of `neighbors` that are not members of `employees` are added to
-  /// `employees`. In particular, the names `"Alicia"`, `"Chris"`, and
-  /// `"Diana"` are removed from `employees` while the name `"Forlani"` is
-  /// added.
+  /// `employees`. In particular, the names `"Bethany"` and `"Eric"` are
+  /// removed from `employees` while the name `"Forlani"` is added.
   ///
   ///     var employees: Set = ["Alicia", "Bethany", "Diana", "Eric"]
   ///     let neighbors = ["Bethany", "Eric", "Forlani"]
@@ -1133,7 +1132,7 @@ public struct Set<Element : Hashable> :
   /// - Parameter other: A sequence of elements. `other` must be finite.
   @_inlineable
   public mutating func formSymmetricDifference<S : Sequence>(_ other: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     let otherSet = Set(other)
     formSymmetricDifference(otherSet)
   }
@@ -1240,17 +1239,13 @@ extension Set {
       }
       return true
 
+  #if _runtime(_ObjC)
     case (_VariantSetBuffer.cocoa(let lhsCocoa),
         _VariantSetBuffer.cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
       return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
-  #else
-        _sanityCheckFailure("internal error: unexpected cocoa set")
-  #endif
 
     case (_VariantSetBuffer.native(let lhsNative),
       _VariantSetBuffer.cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
 
       if lhsNative.count != rhsCocoa.count {
         return false
@@ -1272,15 +1267,9 @@ extension Set {
         return false
       }
       return true
-  #else
-        _sanityCheckFailure("internal error: unexpected cocoa set")
-  #endif
 
     case (_VariantSetBuffer.cocoa, _VariantSetBuffer.native):
-  #if _runtime(_ObjC)
       return rhs == lhs
-  #else
-        _sanityCheckFailure("internal error: unexpected cocoa set")
   #endif
     }
   }
@@ -1676,8 +1665,6 @@ public func _setBridgeFromObjectiveCConditional<
 /// `NSDictionary` and `Dictionary` share buffer using the same copy-on-write
 /// optimization that is used when two instances of `Dictionary` share
 /// buffer.
-///
-/// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
   Collection, ExpressibleByDictionaryLiteral {
@@ -1730,22 +1717,22 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     print(wordToValue)
   ///     // Prints "["three": 3, "four": 4, "five": 5, "one": 1, "two": 2]"
   ///
-  /// - Parameter keysAndValues: A sequence of `(Key, Value)` tuples to use for
+  /// - Parameter keysAndValues: A sequence of key-value pairs to use for
   ///   the new dictionary. Every key in `keysAndValues` must be unique.
   /// - Returns: A new dictionary initialized with the elements of
   ///   `keysAndValues`.
   public init<S: Sequence>(
     uniqueKeysWithValues keysAndValues: S
-  ) where S.Iterator.Element == (Key, Value) {
+  ) where S.Element == (Key, Value) {
     if let d = keysAndValues as? Dictionary<Key, Value> {
       self = d
     } else {
       self = Dictionary(minimumCapacity: keysAndValues.underestimatedCount)
       // '_MergeError.keyCollision' is caught and handled with an appropriate
       // error message one level down, inside _variantBuffer.merge(_:...).
-      try! _variantBuffer.merge(keysAndValues, uniquingKeysWith: { _ in
-        throw _MergeError.keyCollision
-      })
+      try! _variantBuffer.merge(
+        keysAndValues,
+        uniquingKeysWith: { _, _ in throw _MergeError.keyCollision})
     }
   }
 
@@ -1756,8 +1743,9 @@ public struct Dictionary<Key : Hashable, Value> :
   /// of key-value tuples that might have duplicate keys. As the dictionary is
   /// built, the initializer calls the `combine` closure with the current and
   /// new values for any duplicate keys. Pass a closure as `combine` that
-  /// selects which value to use in the returned dictionary, or to combine the
-  /// values as the dictionary is initialized.
+  /// returns the value to use in the resulting dictionary: The closure can
+  /// choose between the two values, combine them to produce a new value, or
+  /// even throw an error.
   ///
   /// The following example shows how to choose the first and last values for
   /// any duplicate keys:
@@ -1773,7 +1761,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     // ["b": 4, "a": 3]
   ///
   /// - Parameters:
-  ///   - keysAndValues: A sequence of `(Key, Value)` tuples to use for the new
+  ///   - keysAndValues: A sequence of key-value pairs to use for the new
   ///     dictionary.
   ///   - combine: A closure that is called with the values for any duplicate
   ///     keys that are encountered. The closure returns the desired value for
@@ -1781,21 +1769,21 @@ public struct Dictionary<Key : Hashable, Value> :
   public init<S: Sequence>(
     _ keysAndValues: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Iterator.Element == (Key, Value) {
+  ) rethrows where S.Element == (Key, Value) {
     self = Dictionary(minimumCapacity: keysAndValues.underestimatedCount)
     try _variantBuffer.merge(keysAndValues, uniquingKeysWith: combine)
   }
 
-  /// Creates a new dictionary where the keys are the groupings returned by the
-  /// given closure and the values are arrays of the elements that returned
-  /// each specific key.
+  /// Creates a new dictionary whose keys are the groupings returned by the
+  /// given closure and whose values are arrays of the elements that returned
+  /// each key.
   ///
   /// The arrays in the "values" position of the new dictionary each contain at
   /// least one element, with the elements in the same order as the source
   /// sequence.
   ///
   /// The following example declares an array of names, and then creates a
-  /// dictionary from that array by grouping the names by their first letter:
+  /// dictionary from that array by grouping the names by first letter:
   ///
   ///     let students = ["Kofi", "Abena", "Efua", "Kweku", "Akosua"]
   ///     let studentsByLetter = Dictionary(grouping: students, by: { $0.first! })
@@ -1810,12 +1798,10 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     `values`.
   public init<S: Sequence>(
     grouping values: S,
-    by keyForValue: (S.Iterator.Element) throws -> Key
-  ) rethrows where Value == [S.Iterator.Element] {
+    by keyForValue: (S.Element) throws -> Key
+  ) rethrows where Value == [S.Element] {
     self = [:]
-    for value in values {
-      self[try keyForValue(value), default: []].append(value)
-    }
+    try _variantBuffer.nativeGroup(values, by: keyForValue)
   }
 
   internal init(_nativeBuffer: _NativeDictionaryBuffer<Key, Value>) {
@@ -2012,12 +1998,12 @@ public struct Dictionary<Key : Hashable, Value> :
   @_inlineable
   @available(swift, introduced: 4.0)
   public func filter(
-    _ isIncluded: (Key, Value) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Key: Value] {
     var result = Dictionary()
-    for (key, value) in self {
-      if try isIncluded(key, value) {
-        result[key] = value
+    for el in self {
+      if try isIncluded(el) {
+        result[el.key] = el.value
       }
     }
     return result
@@ -2081,7 +2067,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Merges the key-value pairs in the given sequence into the dictionary,
   /// using a combining closure to determine the value for any duplicate keys.
   ///
-  /// Use the `combine` closure to select which value to use in the updated
+  /// Use the `combine` closure to select a value to use in the updated
   /// dictionary, or to combine existing and new values. As the key-value
   /// pairs are merged with the dictionary, the `combine` closure is called
   /// with the current and new values for any duplicate keys that are
@@ -2093,32 +2079,65 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     var dictionary = ["a": 1, "b": 2]
   ///
   ///     // Keeping existing value for key "a":
-  ///     dictionary.merge(["a": 3, "c": 4])
-  ///           { (current, _) in current }
+  ///     dictionary.merge(zip(["a", "c"], [3, 4])) { (current, _) in current }
   ///     // ["b": 2, "a": 1, "c": 4]
   ///
   ///     // Taking the new value for key "a":
-  ///     dictionary.merge(["a": 5, "d": 6])
-  ///           { (_, new) in new }
+  ///     dictionary.merge(zip(["a", "d"], [5, 6])) { (_, new) in new }
   ///     // ["b": 2, "a": 5, "c": 4, "d": 6]
   ///
   /// - Parameters:
-  ///   - other:  A sequence of `(Key, Value)` tuples.
+  ///   - other:  A sequence of key-value pairs.
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
   public mutating func merge<S: Sequence>(
     _ other: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Iterator.Element == (Key, Value) {
+  ) rethrows where S.Element == (Key, Value) {
     try _variantBuffer.merge(other, uniquingKeysWith: combine)
   }
 
-  /// Returns a new dictionary created by merging the key-value pairs in the
-  /// given sequence into the dictionary, using a combining closure to
-  /// determine the value for any duplicate keys.
+  /// Merges the given dictionary into this dictionary, using a combining
+  /// closure to determine the value for any duplicate keys.
   ///
-  /// Use the `combine` closure to select which value to use in the returned
+  /// Use the `combine` closure to select a value to use in the updated
+  /// dictionary, or to combine existing and new values. As the key-values
+  /// pairs in `other` are merged with this dictionary, the `combine` closure
+  /// is called with the current and new values for any duplicate keys that
+  /// are encountered.
+  ///
+  /// This example shows how to choose the current or new values for any
+  /// duplicate keys:
+  ///
+  ///     var dictionary = ["a": 1, "b": 2]
+  ///
+  ///     // Keeping existing value for key "a":
+  ///     dictionary.merge(["a": 3, "c": 4]) { (current, _) in current }
+  ///     // ["b": 2, "a": 1, "c": 4]
+  ///
+  ///     // Taking the new value for key "a":
+  ///     dictionary.merge(["a": 5, "d": 6]) { (_, new) in new }
+  ///     // ["b": 2, "a": 5, "c": 4, "d": 6]
+  ///
+  /// - Parameters:
+  ///   - other:  A dictionary to merge.
+  ///   - combine: A closure that takes the current and new values for any
+  ///     duplicate keys. The closure returns the desired value for the final
+  ///     dictionary.
+  public mutating func merge(
+    _ other: [Key: Value],
+    uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows
+  {
+    try _variantBuffer.merge(
+      other.lazy.map { ($0, $1) }, uniquingKeysWith: combine)
+  }
+
+  /// Creates a dictionary by merging key-value pairs in a sequence into the
+  /// dictionary, using a combining closure to determine the value for
+  /// duplicate keys.
+  ///
+  /// Use the `combine` closure to select a value to use in the returned
   /// dictionary, or to combine existing and new values. As the key-value
   /// pairs are merged with the dictionary, the `combine` closure is called
   /// with the current and new values for any duplicate keys that are
@@ -2128,16 +2147,15 @@ public struct Dictionary<Key : Hashable, Value> :
   /// duplicate keys:
   ///
   ///     let dictionary = ["a": 1, "b": 2]
-  ///     let otherDictionary = ["a": 3, "b": 4]
-  ///     let keepingCurrent = dictionary.merging(otherDictionary)
-  ///           { (current, _) in current }
+  ///     let newKeyValues = zip(["a", "b"], [3, 4])
+  ///
+  ///     let keepingCurrent = dictionary.merging(newKeyValues) { (current, _) in current }
   ///     // ["b": 2, "a": 1]
-  ///     let replacingCurrent = dictionary.merging(otherDictionary)
-  ///           { (_, new) in new }
+  ///     let replacingCurrent = dictionary.merging(newKeyValues) { (_, new) in new }
   ///     // ["b": 4, "a": 3]
   ///
   /// - Parameters:
-  ///   - other:  A sequence of `(Key, Value)` tuples.
+  ///   - other:  A sequence of key-value pairs.
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
@@ -2146,7 +2164,46 @@ public struct Dictionary<Key : Hashable, Value> :
   public func merging<S: Sequence>(
     _ other: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> [Key: Value] where S.Iterator.Element == (Key, Value) {
+  ) rethrows -> [Key: Value] where S.Element == (Key, Value) {
+    var result = self
+    try result._variantBuffer.merge(other, uniquingKeysWith: combine)
+    return result
+  }
+
+  /// Creates a dictionary by merging the given dictionary into this
+  /// dictionary, using a combining closure to determine the value for
+  /// duplicate keys.
+  ///
+  /// Use the `combine` closure to select a value to use in the returned
+  /// dictionary, or to combine existing and new values. As the key-value
+  /// pairs in `other` are merged with this dictionary, the `combine` closure
+  /// is called with the current and new values for any duplicate keys that
+  /// are encountered.
+  ///
+  /// This example shows how to choose the current or new values for any
+  /// duplicate keys:
+  ///
+  ///     let dictionary = ["a": 1, "b": 2]
+  ///     let otherDictionary = ["a": 3, "b": 4]
+  ///
+  ///     let keepingCurrent = dictionary.merging(otherDictionary)
+  ///           { (current, _) in current }
+  ///     // ["b": 2, "a": 1]
+  ///     let replacingCurrent = dictionary.merging(otherDictionary)
+  ///           { (_, new) in new }
+  ///     // ["b": 4, "a": 3]
+  ///
+  /// - Parameters:
+  ///   - other:  A dictionary to merge.
+  ///   - combine: A closure that takes the current and new values for any
+  ///     duplicate keys. The closure returns the desired value for the final
+  ///     dictionary.
+  /// - Returns: A new dictionary with the combined keys and values of this
+  ///   dictionary and `other`.
+  public func merging(
+    _ other: [Key: Value],
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) rethrows -> [Key: Value] {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
@@ -2274,8 +2331,6 @@ public struct Dictionary<Key : Hashable, Value> :
   ///
   /// - Parameter elements: The key-value pairs that will make up the new
   ///   dictionary. Each key in `elements` must be unique.
-  ///
-  /// - SeeAlso: `ExpressibleByDictionaryLiteral`
   @effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeBuffer: _NativeDictionaryBuffer.fromArray(elements))
@@ -2291,6 +2346,26 @@ public struct Dictionary<Key : Hashable, Value> :
   // API itself.
   //
 
+  //
+  // Collection conformance
+  //
+  
+  /// A Boolean value that indicates whether the dictionary is empty.
+  ///
+  /// Dictionaries are empty when created with an initializer or an empty
+  /// dictionary literal.
+  ///
+  ///     var frequencies: [String: Int] = [:]
+  ///     print(frequencies.isEmpty)
+  ///     // Prints "true"
+  public var isEmpty: Bool {
+    return count == 0
+  }
+}
+
+// Maintain old `keys` and `values` types in Swift 3 mode.
+
+extension Dictionary {
   /// A collection containing just the keys of the dictionary.
   ///
   /// When iterated over, keys appear in this collection in the same order as
@@ -2307,6 +2382,50 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     // Prints "BR"
   ///     // Prints "JP"
   ///     // Prints "GH"
+  @available(swift, obsoleted: 4.0)
+  public var keys: LazyMapCollection<[Key: Value], Key> {
+    return self.lazy.map { $0.key }
+  }
+  
+  /// A collection containing just the values of the dictionary.
+  ///
+  /// When iterated over, values appear in this collection in the same order as
+  /// they occur in the dictionary's key-value pairs.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     print(countryCodes)
+  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+  ///
+  ///     for v in countryCodes.values {
+  ///         print(v)
+  ///     }
+  ///     // Prints "Brazil"
+  ///     // Prints "Japan"
+  ///     // Prints "Ghana"
+  @available(swift, obsoleted: 4.0)
+  public var values: LazyMapCollection<[Key: Value], Value> {
+    return self.lazy.map { $0.value }
+  }
+}
+
+extension Dictionary {
+  /// A collection containing just the keys of the dictionary.
+  ///
+  /// When iterated over, keys appear in this collection in the same order as
+  /// they occur in the dictionary's key-value pairs. Each key in the keys
+  /// collection has a unique value.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     print(countryCodes)
+  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+  ///
+  ///     for k in countryCodes.keys {
+  ///         print(k)
+  ///     }
+  ///     // Prints "BR"
+  ///     // Prints "JP"
+  ///     // Prints "GH"
+  @available(swift, introduced: 4.0)
   public var keys: Keys {
     return Keys(self)
   }
@@ -2326,6 +2445,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     // Prints "Brazil"
   ///     // Prints "Japan"
   ///     // Prints "Ghana"
+  @available(swift, introduced: 4.0)
   public var values: Values {
     get {
       return Values(self)
@@ -2333,22 +2453,6 @@ public struct Dictionary<Key : Hashable, Value> :
     set {
       self = Dictionary(_variantBuffer: newValue._variantBuffer)
     }
-  }
-
-  //
-  // Collection conformance
-  //
-
-  /// A Boolean value that indicates whether the dictionary is empty.
-  ///
-  /// Dictionaries are empty when created with an initializer or an empty
-  /// dictionary literal.
-  ///
-  ///     var frequencies: [String: Int] = [:]
-  ///     print(frequencies.isEmpty)
-  ///     // Prints "true"
-  public var isEmpty: Bool {
-    return count == 0
   }
 
   /// A view of a dictionary's keys.
@@ -2509,16 +2613,12 @@ extension Dictionary where Value : Equatable {
       }
       return true
 
-    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
   #if _runtime(_ObjC)
+    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       return _stdlib_NSObject_isEqual(
         lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-  #endif
 
     case (.native(let lhsNative), .cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
 
       if lhsNative.count != rhsCocoa.count {
         return false
@@ -2541,15 +2641,9 @@ extension Dictionary where Value : Equatable {
         continue
       }
       return true
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-  #endif
 
     case (.cocoa, .native):
-  #if _runtime(_ObjC)
       return rhs == lhs
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
   #endif
     }
   }
@@ -4323,10 +4417,6 @@ internal struct _Cocoa${Self}Buffer : _HashBuffer {
     _sanityCheckFailure("this function should never be called")
   }
 }
-#else
-@_versioned
-@_fixed_layout
-internal struct _Cocoa${Self}Buffer {}
 #endif
 
 @_versioned
@@ -4335,7 +4425,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
   internal typealias NativeBuffer = _Native${Self}Buffer<${TypeParameters}>
   internal typealias NativeIndex = _Native${Self}Index<${TypeParameters}>
+#if _runtime(_ObjC)
   internal typealias CocoaBuffer = _Cocoa${Self}Buffer
+#endif
   internal typealias SequenceElement = ${Sequence}
   internal typealias SequenceElementWithoutLabels = ${Sequence}
   internal typealias SelfType = _Variant${Self}Buffer
@@ -4346,7 +4438,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 %end
 
   case native(NativeBuffer)
+#if _runtime(_ObjC)
   case cocoa(CocoaBuffer)
+#endif
 
   @_versioned
   @_transparent
@@ -4364,10 +4458,12 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return _isUnique_native(&self)
+#if _runtime(_ObjC)
     case .cocoa:
       // Don't consider Cocoa buffer mutable, even if it is mutable and is
       // uniquely referenced.
       return false
+#endif
     }
   }
 
@@ -4377,8 +4473,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       switch self {
       case .native(let buffer):
         return buffer
+#if _runtime(_ObjC)
       case .cocoa:
         _sanityCheckFailure("internal error: not backed by native buffer")
+#endif
       }
     }
     set {
@@ -4439,8 +4537,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       return (reallocated: true,
               capacityChanged: oldCapacity != newNativeBuffer.capacity)
 
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       let cocoa${Self} = cocoaBuffer.cocoa${Self}
       var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
       let oldCocoaIterator = _Cocoa${Self}Iterator(cocoa${Self})
@@ -4463,8 +4561,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
       self = .native(newNativeBuffer)
       return (reallocated: true, capacityChanged: true)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4503,11 +4599,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     case .native:
       return Int(Double(asNative.capacity) /
         _hashContainerDefaultMaxLoadFactorInverse)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return cocoaBuffer.count
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4526,11 +4620,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return ._native(asNative.startIndex)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return ._cocoa(cocoaBuffer.startIndex)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4543,11 +4635,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return ._native(asNative.endIndex)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return ._cocoa(cocoaBuffer.endIndex)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4561,11 +4651,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return ._native(asNative.index(after: i._nativeIndex))
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return ._cocoa(cocoaBuffer.index(after: i._cocoaIndex))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4591,15 +4679,13 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
         return ._native(nativeIndex)
       }
       return nil
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
       if let cocoaIndex = cocoaBuffer.index(forKey: anyObjectKey) {
         return ._cocoa(cocoaIndex)
       }
       return nil
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4612,8 +4698,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return asNative.assertingGet(i._nativeIndex)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
 %if Self == 'Set':
       let anyObjectValue: AnyObject = cocoaBuffer.assertingGet(i._cocoaIndex)
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
@@ -4625,8 +4711,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
       return (nativeKey, nativeValue)
 %end
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4639,14 +4723,12 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return asNative.assertingGet(key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       // FIXME: This assumes that Key and Value are bridged verbatim.
       let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
       let anyObjectValue: AnyObject = cocoaBuffer.assertingGet(anyObjectKey)
       return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4675,11 +4757,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return asNative.maybeGet(key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return SelfType.maybeGetFromCocoaBuffer(cocoaBuffer, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4733,12 +4813,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativeUpdateValue(value, forKey: key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       migrateDataToNativeBuffer(cocoaBuffer)
       return nativeUpdateValue(value, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4759,8 +4837,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativePointerToValue(at: i)
-    case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaStorage):
       // We have to migrate the data to native storage before we can return a
       // mutable pointer. But after we migrate, the Cocoa index becomes
       // useless, so get the key first.
@@ -4772,8 +4850,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       let nativeIndex = asNative.index(forKey: key)!
 
       return nativePointerToValue(at: ._native(nativeIndex))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4825,12 +4901,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativeInsert(value, forKey: key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       migrateDataToNativeBuffer(cocoaBuffer)
       return nativeInsert(value, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4865,8 +4939,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return try nativeMapValues(transform)
-    case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaStorage):
       var storage: _Variant${Self}Buffer<Key, T> = .native(
         _Native${Self}Buffer<Key, T>(capacity: cocoaStorage.count))
 
@@ -4880,8 +4954,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       }
 
       return storage
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -4889,7 +4961,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func nativeMerge<S: Sequence>(
     _ keysAndValues: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Iterator.Element == (Key, Value) {
+  ) rethrows where S.Element == (Key, Value) {
     for (key, value) in keysAndValues {
       var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
 
@@ -4920,7 +4992,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func merge<S: Sequence>(
     _ keysAndValues: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Iterator.Element == (Key, Value) {
+  ) rethrows where S.Element == (Key, Value) {
     if _fastPath(guaranteedNative) {
       try nativeMerge(keysAndValues, uniquingKeysWith: combine)
       return
@@ -4929,13 +5001,37 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       try nativeMerge(keysAndValues, uniquingKeysWith: combine)
-    case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaStorage):
       migrateDataToNativeBuffer(cocoaStorage)
       try nativeMerge(keysAndValues, uniquingKeysWith: combine)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
+    }
+  }
+
+  internal mutating func nativeGroup<S: Sequence>(
+    _ values: S,
+    by keyForValue: (S.Element) throws -> Key
+  ) rethrows where Value == [S.Element] {
+    defer { _fixLifetime(asNative) }
+    for value in values {
+      let key = try keyForValue(value)
+      var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+      if found {
+        asNative.values[i.offset].append(value)
+      } else {
+        let minCapacity = NativeBuffer.minimumCapacity(
+          minimumCount: asNative.count + 1,
+          maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+
+        let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
+        if capacityChanged {
+          i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+        }
+
+        asNative.initializeKey(key, value: [value], at: i.offset)
+        asNative.count += 1
+      }
     }
   }
 %end
@@ -5064,8 +5160,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativeRemove(at: index._nativeIndex)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       // We have to migrate the data first.  But after we do so, the Cocoa
       // index becomes useless, so get the key first.
       //
@@ -5083,8 +5179,6 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 %elif Self == 'Dictionary':
       return (key, value._unsafelyUnwrappedUnchecked)
 %end
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5098,16 +5192,14 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return nativeRemoveObject(forKey: key)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
       if cocoaBuffer.maybeGet(anyObjectKey) == nil {
         return nil
       }
       migrateDataToNativeBuffer(cocoaBuffer)
       return nativeRemoveObject(forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5148,11 +5240,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       nativeRemoveAll()
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       self = .native(NativeBuffer(minimumCapacity: cocoaBuffer.count))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5165,11 +5255,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     switch self {
     case .native:
       return asNative.count
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return cocoaBuffer.count
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5184,11 +5272,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     case .native(let buffer):
       return ._native(
         start: asNative.startIndex, end: asNative.endIndex, buffer: buffer)
-    case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
       return ._cocoa(_Cocoa${Self}Iterator(cocoaBuffer.cocoa${Self}))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5302,28 +5388,29 @@ extension _Cocoa${Self}Index {
 % end
 
 }
-#else
-internal struct _Cocoa${Self}Index {}
 #endif
 
 internal enum ${Self}IndexRepresentation<${TypeParametersDecl}> {
   typealias _Index = ${Self}Index<${TypeParameters}>
   typealias _NativeIndex = _Index._NativeIndex
+#if _runtime(_ObjC)
   typealias _CocoaIndex = _Index._CocoaIndex
+#endif
 
   case _native(_NativeIndex)
+#if _runtime(_ObjC)
   case _cocoa(_CocoaIndex)
+#endif
 }
 
 extension ${Self} {
 %{
 if Self == 'Set':
   SubscriptingWithIndexDoc = """\
-/// Used to access the members in an instance of `Set<Element>`."""
+/// The position of an element in a set."""
 elif Self == 'Dictionary':
   SubscriptingWithIndexDoc = """\
-/// Used to access the key-value pairs in an instance of
-/// `Dictionary<Key, Value>`.
+/// The position of a key-value pair in a dictionary.
 ///
 /// Dictionary has two subscripting interfaces:
 ///
@@ -5346,7 +5433,9 @@ public struct Index : Comparable {
   // type for bridged NS${Self} in terms of Cocoa enumeration facilities.
 
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
+#if _runtime(_ObjC)
   internal typealias _CocoaIndex = _Cocoa${Self}Index
+#endif
 
 %if Self == 'Set':
   internal typealias Key = ${TypeParameters}
@@ -5377,8 +5466,10 @@ public struct Index : Comparable {
     switch _value {
     case ._native(let nativeIndex):
       return nativeIndex
+#if _runtime(_ObjC)
     case ._cocoa:
       _sanityCheckFailure("internal error: does not contain a native index")
+#endif
     }
   }
 
@@ -5412,14 +5503,12 @@ extension ${Self}.Index {
     switch (lhs._value, rhs._value) {
     case (._native(let lhsNative), ._native(let rhsNative)):
       return lhsNative == rhsNative
-    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
   #if _runtime(_ObjC)
+    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
       return lhsCocoa == rhsCocoa
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-  #endif
     default:
       _preconditionFailure("comparing indexes from different sets")
+  #endif
     }
   }
 
@@ -5434,14 +5523,12 @@ extension ${Self}.Index {
     switch (lhs._value, rhs._value) {
     case (._native(let lhsNative), ._native(let rhsNative)):
       return lhsNative < rhsNative
-    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
   #if _runtime(_ObjC)
+    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
       return lhsCocoa < rhsCocoa
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-  #endif
     default:
       _preconditionFailure("comparing indexes from different sets")
+  #endif
     }
   }
 }
@@ -5527,8 +5614,6 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
 %end
   }
 }
-#else
-final internal class _Cocoa${Self}Iterator {}
 #endif
 
 @_versioned
@@ -5546,7 +5631,9 @@ internal enum ${Self}IteratorRepresentation<${TypeParametersDecl}> {
   // state, so it should keep its own reference to the buffer.
   case _native(
     start: _NativeIndex, end: _NativeIndex, buffer: _NativeBuffer)
+#if _runtime(_ObjC)
   case _cocoa(_Cocoa${Self}Iterator)
+#endif
 }
 
 /// An iterator over the members of a `${Self}<${TypeParameters}>`.
@@ -5605,8 +5692,10 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
       _state =
         ._native(start: buffer.index(after: startIndex), end: endIndex, buffer: buffer)
       return result
+#if _runtime(_ObjC)
     case ._cocoa:
       _sanityCheckFailure("internal error: not backed by NS${Self}")
+#endif
     }
   }
 
@@ -5623,8 +5712,8 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
     switch _state {
     case ._native:
       return _nativeNext()
-    case ._cocoa(let cocoaIterator):
 #if _runtime(_ObjC)
+    case ._cocoa(let cocoaIterator):
 %if Self == 'Set':
       if let anyObjectElement = cocoaIterator.next() {
         return _forceBridgeFromObjectiveC(anyObjectElement, Element.self)
@@ -5637,8 +5726,6 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
       }
 %end
       return nil
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
     }
   }
@@ -5747,7 +5834,7 @@ extension ${Self} {
   @_inlineable
   @available(swift, obsoleted: 4.0)
   public func filter(
-    _ isIncluded: (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
   ) rethrows -> [Element] {
     var result: [Element] = []
     for x in self {

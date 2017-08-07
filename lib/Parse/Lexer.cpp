@@ -650,7 +650,6 @@ void Lexer::lexHash() {
 
   // Map the character sequence onto
   tok Kind = llvm::StringSwitch<tok>(StringRef(CurPtr, tmpPtr-CurPtr))
-#define KEYWORD(kw)
 #define POUND_KEYWORD(id) \
   .Case(#id, tok::pound_##id)
 #include "swift/Syntax/TokenKinds.def"
@@ -738,12 +737,12 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
   return false;
 }
 
-RC<syntax::TokenSyntax> Lexer::fullLex() {
+RC<syntax::RawTokenSyntax> Lexer::fullLex() {
   if (NextToken.isEscapedIdentifier()) {
     LeadingTrivia.push_back(syntax::TriviaPiece::backtick());
     TrailingTrivia.push_front(syntax::TriviaPiece::backtick());
   }
-  auto Result = syntax::TokenSyntax::make(NextToken.getKind(),
+  auto Result = syntax::RawTokenSyntax::make(NextToken.getKind(),
                                         OwnedString(NextToken.getText()).copy(),
                                         syntax::SourcePresence::Present,
                                         {LeadingTrivia}, {TrailingTrivia});
@@ -927,26 +926,41 @@ void Lexer::lexDollarIdent() {
   }
 }
 
+enum class ExpectedDigitKind : unsigned { Binary, Octal, Decimal, Hex };
+
 void Lexer::lexHexNumber() {
   // We assume we're starting from the 'x' in a '0x...' floating-point literal.
   assert(*CurPtr == 'x' && "not a hex literal");
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '0' && "not a hex literal");
 
-  // 0x[0-9a-fA-F][0-9a-fA-F_]*
-  ++CurPtr;
-  if (!isHexDigit(*CurPtr)) {
-    diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+  auto expected_digit = [&]() {
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
     return formToken(tok::unknown, TokStart);
-  }
-    
+  };
+
+  auto expected_hex_digit = [&](const char *loc) {
+    diagnose(loc, diag::lex_invalid_digit_in_int_literal, StringRef(loc, 1),
+             (unsigned)ExpectedDigitKind::Hex);
+    return expected_digit();
+  };
+
+  // 0x[0-9a-fA-F][0-9a-fA-F_]*
+  ++CurPtr;
+  if (!isHexDigit(*CurPtr))
+    return expected_hex_digit(CurPtr);
+
   while (isHexDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
-  
-  if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P')
-    return formToken(tok::integer_literal, TokStart);
-  
+
+  if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P') {
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+      return expected_hex_digit(tmp);
+    else
+      return formToken(tok::integer_literal, TokStart);
+  }
+
   const char *PtrOnDot = nullptr;
 
   // (\.[0-9A-Fa-f][0-9A-Fa-f_]*)?
@@ -963,6 +977,7 @@ void Lexer::lexHexNumber() {
     
     while (isHexDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
+
     if (*CurPtr != 'p' && *CurPtr != 'P') {
       if (!isDigit(PtrOnDot[1])) {
         // e.g: 0xff.description
@@ -991,12 +1006,29 @@ void Lexer::lexHexNumber() {
       return formToken(tok::integer_literal, TokStart);
     }
     // Note: 0xff.fp+otherExpr can be valid expression. But we don't accept it.
-    diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
-    return formToken(tok::unknown, TokStart);
+
+    // There are 3 cases to diagnose if the exponent starts with a non-digit:
+    // identifier (invalid character), underscore (invalid first character),
+    // non-identifier (empty exponent)
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+      diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+               *tmp == '_');
+    else
+      diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
+
+    return expected_digit();
   }
   
   while (isDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
+
+  auto tmp = CurPtr;
+  if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
+    diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+             false);
+    return expected_digit();
+  }
 
   return formToken(tok::floating_literal, TokStart);
 }
@@ -1014,11 +1046,16 @@ void Lexer::lexHexNumber() {
 void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
   assert((isDigit(*TokStart) || *TokStart == '.') && "Unexpected start");
-  
-  auto expected_digit = [&](const char *loc, Diag<> msg) {
-    diagnose(loc, msg);
+
+  auto expected_digit = [&]() {
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
     return formToken(tok::unknown, TokStart);
+  };
+
+  auto expected_int_digit = [&](const char *loc, ExpectedDigitKind kind) {
+    diagnose(loc, diag::lex_invalid_digit_in_int_literal, StringRef(loc, 1),
+             (unsigned)kind);
+    return expected_digit();
   };
 
   if (*TokStart == '0' && *CurPtr == 'x')
@@ -1028,10 +1065,15 @@ void Lexer::lexNumber() {
     // 0o[0-7][0-7_]*
     ++CurPtr;
     if (*CurPtr < '0' || *CurPtr > '7')
-      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
-      
+      return expected_int_digit(CurPtr, ExpectedDigitKind::Octal);
+
     while ((*CurPtr >= '0' && *CurPtr <= '7') || *CurPtr == '_')
       ++CurPtr;
+
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+      return expected_int_digit(tmp, ExpectedDigitKind::Octal);
+
     return formToken(tok::integer_literal, TokStart);
   }
   
@@ -1039,9 +1081,15 @@ void Lexer::lexNumber() {
     // 0b[01][01_]*
     ++CurPtr;
     if (*CurPtr != '0' && *CurPtr != '1')
-      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
+      return expected_int_digit(CurPtr, ExpectedDigitKind::Binary);
+
     while (*CurPtr == '0' || *CurPtr == '1' || *CurPtr == '_')
       ++CurPtr;
+
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+      return expected_int_digit(tmp, ExpectedDigitKind::Binary);
+
     return formToken(tok::integer_literal, TokStart);
   }
 
@@ -1060,9 +1108,9 @@ void Lexer::lexNumber() {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is
     // something else, then this is the end of the token.
     if (*CurPtr != 'e' && *CurPtr != 'E') {
-      char const *tmp = CurPtr;
+      auto tmp = CurPtr;
       if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
-        return expected_digit(tmp, diag::lex_expected_digit_in_int_literal);
+        return expected_int_digit(tmp, ExpectedDigitKind::Decimal);
 
       return formToken(tok::integer_literal, TokStart);
     }
@@ -1082,12 +1130,30 @@ void Lexer::lexNumber() {
     ++CurPtr;  // Eat the 'e'
     if (*CurPtr == '+' || *CurPtr == '-')
       ++CurPtr;  // Eat the sign.
-      
-    if (!isDigit(*CurPtr))
-      return expected_digit(CurPtr, diag::lex_expected_digit_in_fp_exponent);
-    
+
+    if (!isDigit(*CurPtr)) {
+      // There are 3 cases to diagnose if the exponent starts with a non-digit:
+      // identifier (invalid character), underscore (invalid first character),
+      // non-identifier (empty exponent)
+      auto tmp = CurPtr;
+      if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+        diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+                 *tmp == '_');
+      else
+        diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
+
+      return expected_digit();
+    }
+
     while (isDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
+
+    auto tmp = CurPtr;
+    if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
+      diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+               false);
+      return expected_digit();
+    }
   }
   
   return formToken(tok::floating_literal, TokStart);
@@ -1123,6 +1189,27 @@ unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
   return CharValue;
 }
 
+/// maybeConsumeNewlineEscape - Check for valid elided newline escape and
+/// move pointer passed in to the character after the end of the line.
+static bool maybeConsumeNewlineEscape(const char *&CurPtr, ssize_t Offset) {
+  const char *TmpPtr = CurPtr + Offset;
+  while (true) {
+    switch (*TmpPtr++) {
+    case ' ': case '\t':
+      continue;
+    case '\r':
+      if (*TmpPtr == '\n')
+        TmpPtr++;
+      LLVM_FALLTHROUGH;
+    case '\n':
+      CurPtr = TmpPtr;
+      return true;
+    case 0:
+    default:
+      return false;
+    }
+  }
+}
 
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
 /// end of enclosing string/character sequence (i.e. the character is equal to
@@ -1188,6 +1275,10 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   unsigned CharValue = 0;
   // Escape processing.  We already ate the "\".
   switch (*CurPtr) {
+  case ' ': case '\t': case '\n': case '\r':
+    if (MultilineString && maybeConsumeNewlineEscape(CurPtr, 0))
+      return '\n';
+    LLVM_FALLTHROUGH;
   default:  // Invalid escape.
     if (EmitDiagnostics)
       diagnose(CurPtr, diag::lex_invalid_escape);
@@ -1245,6 +1336,9 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
                                                      DiagnosticEngine *Diags,
                                                      bool MultilineString) {
   llvm::SmallVector<char, 4> OpenDelimiters;
+  llvm::SmallVector<bool, 4> AllowNewline;
+  AllowNewline.push_back(MultilineString);
+
   auto inStringLiteral = [&]() {
     return !OpenDelimiters.empty() &&
            (OpenDelimiters.back() == '"' || OpenDelimiters.back() == '\'');
@@ -1263,27 +1357,46 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     // interpolated ones are no exception - unless multiline literals.
     case '\n':
     case '\r':
-      if (MultilineString)
+      if (AllowNewline.back())
         continue;
       // Will be diagnosed as an unterminated string literal.
       return CurPtr-1;
 
     case '"':
-    case '\'':
-      if (inStringLiteral()) {
-        // Is it the closing quote?
+    case '\'': {
+      if (!AllowNewline.back() && inStringLiteral()) {
         if (OpenDelimiters.back() == CurPtr[-1]) {
+          // Closing single line string literal.
           OpenDelimiters.pop_back();
+          AllowNewline.pop_back();
         }
-        // Otherwise it's an ordinary character; treat it normally.
-      } else {
-        OpenDelimiters.push_back(CurPtr[-1]);
+        // Otherwise, it's just a quote in string literal. e.g. "foo's".
+        continue;
       }
-      if (*CurPtr == '"' && *(CurPtr + 1) == '"' && *(CurPtr - 1) == '"') {
-        MultilineString = true;
+
+      bool isMultilineQuote = (
+          *CurPtr == '"' && *(CurPtr + 1) == '"' && *(CurPtr - 1) == '"');
+      if (isMultilineQuote)
         CurPtr += 2;
+
+      if (!inStringLiteral()) {
+        // Open string literal
+        OpenDelimiters.push_back(CurPtr[-1]);
+        AllowNewline.push_back(isMultilineQuote);
+        continue;
       }
+
+      // We are in multiline string literal.
+      assert(AllowNewline.back() && "other cases must be handled above");
+      if (isMultilineQuote) {
+        // Close multiline string literal.
+        OpenDelimiters.pop_back();
+        AllowNewline.pop_back();
+      }
+
+      // Otherwise, it's just a normal character in multiline string.
       continue;
+    }
     case '\\':
       if (inStringLiteral()) {
         char escapedChar = *CurPtr++;
@@ -1292,7 +1405,11 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
           // Entering a recursive interpolated expression
           OpenDelimiters.push_back('(');
           continue;
-        case '\n': case '\r': case 0:
+        case '\n': case '\r':
+          if (AllowNewline.back())
+            continue;
+          LLVM_FALLTHROUGH;
+        case 0:
           // Don't jump over newline/EOF due to preceding backslash!
           return CurPtr-1;
         default:
@@ -1374,13 +1491,28 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       continue;
     case '\n':
     case '\r': {
-      auto bytes = start + 1;
-      auto length = end-(start+1);
-      
-      auto bytesLoc = Lexer::getSourceLoc(bytes);
-      auto string = StringRef(bytes, length);
-      
-      return std::make_tuple(string, bytesLoc);
+      start++;
+      auto startLoc = Lexer::getSourceLoc(start);
+      auto string = StringRef(start, end - start);
+
+      // Disallow escaped newline in the last line.
+      if (Diags) {
+        auto *Ptr = start - 1;
+        if (*Ptr == '\n') --Ptr;
+        if (*Ptr == '\r') --Ptr;
+        auto *LineEnd = Ptr + 1;
+        while (Ptr > begin && (*Ptr == ' ' || *Ptr == '\t')) --Ptr;
+        if (*Ptr == '\\') {
+          auto escapeLoc = Lexer::getSourceLoc(Ptr);
+          bool invalid = true;
+          while (*--Ptr == '\\') invalid = !invalid;
+          if (invalid)
+            Diags->diagnose(escapeLoc, diag::lex_escaped_newline_at_lastline)
+              .fixItRemoveChars(escapeLoc, Lexer::getSourceLoc(LineEnd));
+        }
+      }
+
+      return std::make_tuple(string, startLoc);
     }
     default:
       sawNonWhitespace = true;
@@ -1795,12 +1927,14 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
   // range check subscripting on the StringRef.
   const char *BytesPtr = Bytes.begin();
+  bool IsEscapedNewline = false;
   while (BytesPtr < Bytes.end()) {
     char CurChar = *BytesPtr++;
 
     // Multiline string line ending normalization and indent stripping.
     if (CurChar == '\r' || CurChar == '\n') {
-      bool stripNewline = IsFirstSegment && BytesPtr - 1 == Bytes.begin();
+      bool stripNewline = IsEscapedNewline ||
+        (IsFirstSegment && BytesPtr - 1 == Bytes.begin());
       if (CurChar == '\r' && *BytesPtr == '\n')
         BytesPtr++;
       if (*BytesPtr != '\r' && *BytesPtr != '\n')
@@ -1809,6 +1943,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
         stripNewline = true;
       if (!stripNewline)
         TempString.push_back('\n');
+      IsEscapedNewline = false;
       continue;
     }
 
@@ -1833,6 +1968,12 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case '\'': TempString.push_back('\''); continue;
     case '\\': TempString.push_back('\\'); continue;
 
+    case ' ': case '\t': case '\n': case '\r':
+      if (maybeConsumeNewlineEscape(BytesPtr, -1)) {
+        IsEscapedNewline = true;
+        BytesPtr--;
+      }
+      continue;
 
     // String interpolation.
     case '(':

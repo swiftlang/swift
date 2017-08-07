@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/vtable_symbol_linkage_base.swift -emit-module -emit-module-path=%t/BaseModule.swiftmodule -emit-library -module-name BaseModule -o %t/BaseModule.%target-dylib-extension
 // RUN: %target-build-swift -I %t %s %t/BaseModule.%target-dylib-extension -o %t/a.out
 

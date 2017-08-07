@@ -237,6 +237,8 @@ protocol ConformedProtocol {
 class BaseWithAlias<T> : ConformedProtocol {
   typealias ConcreteAlias = T
 
+  struct NestedNominal {}
+
   func baseMethod(_: T) {}
 }
 
@@ -261,6 +263,8 @@ extension ExtendedProtocol where Self : DerivedWithAlias {
   func f3(x: AbstractConformanceAlias) {
     let _: DerivedWithAlias = x
   }
+
+  func f4(x: NestedNominal) {}
 }
 
 // ----------------------------------------------------------------------------
@@ -921,9 +925,10 @@ extension BadProto1 {
   }
 }
 
+// rdar://problem/20756244
 protocol BadProto3 { }
 typealias BadProto4 = BadProto3
-extension BadProto4 { } // expected-error{{protocol 'BadProto3' in the module being compiled cannot be extended via a type alias}}{{11-20=BadProto3}}
+extension BadProto4 { } // okay
 
 typealias RawRepresentableAlias = RawRepresentable
 extension RawRepresentableAlias { } // okay
@@ -948,6 +953,6 @@ class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conf
 typealias A = BadProto1
 typealias B = BadProto1
 
-extension A & B { // expected-error{{protocol 'BadProto1' in the module being compiled cannot be extended via a type alias}}
+extension A & B { // okay
 
 }

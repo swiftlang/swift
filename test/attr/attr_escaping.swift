@@ -6,7 +6,7 @@ func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attri
 func wrongParamType(a: @escaping Int) {} // expected-error {{@escaping attribute only applies to function types}}
 
 func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
- // expected-warning@-1{{@noescape is the default and is deprecated}} {{29-39=}}
+ // expected-error@-1{{@noescape is the default and has been removed}} {{29-39=}}
 
 func takesEscaping(_ fn: @escaping () -> Int) {} // ok
 
@@ -158,5 +158,62 @@ class FooClass {
   var computedEscaping : (@escaping ()->Int)->Void {
     get { return stored! }
     set(newValue) { stored = newValue } // expected-error{{cannot assign value of type '(@escaping () -> Int) -> Void' to type 'Optional<(() -> Int) -> Void>'}}
+  }
+}
+
+// A call of a closure literal should be non-escaping
+func takesInOut(y: inout Int) {
+  _ = {
+    y += 1 // no-error
+  }()
+
+  _ = ({
+    y += 1 // no-error
+  })()
+
+  _ = { () in
+    y += 1 // no-error
+  }()
+
+  _ = ({ () in
+    y += 1 // no-error
+  })()
+
+  _ = { () -> () in
+    y += 1 // no-error
+  }()
+
+  _ = ({ () -> () in
+    y += 1 // no-error
+  })()
+}
+
+class HasIVarCaptures {
+  var x: Int = 0
+
+  func method() {
+    _ = {
+      x += 1 // no-error
+    }()
+
+    _ = ({
+      x += 1 // no-error
+    })()
+
+    _ = { () in
+      x += 1 // no-error
+    }()
+
+    _ = ({ () in
+      x += 1 // no-error
+    })()
+
+    _ = { () -> () in
+      x += 1 // no-error
+    }()
+
+    _ = ({ () -> () in
+      x += 1 // no-error
+    })()
   }
 }

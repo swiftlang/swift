@@ -66,7 +66,9 @@ public protocol _BidirectionalIndexable : _Indexable {
 /// - If `i > c.startIndex && i <= c.endIndex`
 ///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection : _BidirectionalIndexable, Collection 
-where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
+// FIXME(ABI) (Revert Where Clauses): Restore these 
+// where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection
+{
 
 // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   /// Returns the position immediately before the given index.
@@ -84,11 +86,17 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
 
   /// A sequence that can represent a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence = BidirectionalSlice<Self>
+  associatedtype SubSequence
+  // FIXME(ABI) (Revert Where Clauses): Remove these conformances
+  : _BidirectionalIndexable, Collection
+    = BidirectionalSlice<Self>
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices = DefaultBidirectionalIndices<Self>
+  associatedtype Indices 
+  // FIXME(ABI) (Revert Where Clauses): Remove these conformances
+  : _BidirectionalIndexable, Collection
+    = DefaultBidirectionalIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -121,7 +129,7 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///     // Prints "50"
   ///     
   /// - Complexity: O(1)
-  var last: Iterator.Element? { get }
+  var last: Element? { get }
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
@@ -224,8 +232,7 @@ extension BidirectionalCollection where SubSequence == Self {
   ///   or more elements; otherwise, `nil`.
   ///
   /// - Complexity: O(1).
-  /// - SeeAlso: `removeLast()`
-  public mutating func popLast() -> Iterator.Element? {
+  public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     let element = last!
     self = self[startIndex..<index(before: endIndex)]
@@ -240,9 +247,8 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Returns: The last element of the collection.
   ///
   /// - Complexity: O(1)
-  /// - SeeAlso: `popLast()`
   @discardableResult
-  public mutating func removeLast() -> Iterator.Element {
+  public mutating func removeLast() -> Element {
     let element = last!
     self = self[startIndex..<index(before: endIndex)]
     return element

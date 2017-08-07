@@ -15,23 +15,23 @@ import _SwiftFoundationOverlayShims
 
 extension IndexSet.Index {
     public static func ==(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value == rhs.value && rhs.rangeIndex == rhs.rangeIndex
+        return lhs.value == rhs.value
     }
 
     public static func <(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value < rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+        return lhs.value < rhs.value
     }
 
     public static func <=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value <= rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+        return lhs.value <= rhs.value
     }
 
     public static func >(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value > rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+        return lhs.value > rhs.value
     }
 
     public static func >=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value >= rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+        return lhs.value >= rhs.value
     }
 }
 
@@ -58,42 +58,16 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         
         fileprivate var indexSet: IndexSet
         
-        // Range of element values
-        private var intersectingRange : Range<IndexSet.Element>?
-        
         fileprivate init(indexSet : IndexSet, intersecting range : Range<IndexSet.Element>?) {
-            self.indexSet = indexSet
-            self.intersectingRange = range
-            
             if let r = range {
-                if r.lowerBound == r.upperBound {
-                    startIndex = 0
-                    endIndex = 0
-                } else {
-                    let minIndex = indexSet._indexOfRange(containing: r.lowerBound)
-                    let maxIndex = indexSet._indexOfRange(containing: r.upperBound)
-                    
-                    switch (minIndex, maxIndex) {
-                    case (nil, nil):
-                        startIndex = 0
-                        endIndex = 0
-                    case (nil, .some(let max)):
-                        // Start is before our first range
-                        startIndex = 0
-                        endIndex = max + 1
-                    case (.some(let min), nil):
-                        // End is after our last range
-                        startIndex = min
-                        endIndex = indexSet._rangeCount
-                    case (.some(let min), .some(let max)):
-                        startIndex = min
-                        endIndex = max + 1
-                    }
-                }
+                let otherIndexes = IndexSet(integersIn: r)
+                self.indexSet = indexSet.intersection(otherIndexes)
             } else {
-                startIndex = 0
-                endIndex = indexSet._rangeCount
+                self.indexSet = indexSet
             }
+
+            self.startIndex = 0
+            self.endIndex = self.indexSet._rangeCount
         }
         
         public func makeIterator() -> IndexingIterator<RangeView> {
@@ -102,11 +76,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         
         public subscript(index : Index) -> CountableRange<IndexSet.Element> {
             let indexSetRange = indexSet._range(at: index)
-            if let intersectingRange = intersectingRange {
-                return Swift.max(intersectingRange.lowerBound, indexSetRange.lowerBound)..<Swift.min(intersectingRange.upperBound, indexSetRange.upperBound)
-            } else {
-                return indexSetRange.lowerBound..<indexSetRange.upperBound
-            }
+            return indexSetRange.lowerBound..<indexSetRange.upperBound
         }
         
         public subscript(bounds: Range<Index>) -> BidirectionalSlice<RangeView> {
@@ -237,9 +207,14 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     }
     
     public var startIndex: Index {
-        // If this winds up being NSNotFound, that's ok because then endIndex is also NSNotFound, and empty collections have startIndex == endIndex
-        let extent = _range(at: 0)
-        return Index(value: extent.lowerBound, extent: extent, rangeIndex: 0, rangeCount: _rangeCount)
+        let rangeCount = _rangeCount
+        if rangeCount > 0 {
+            // If this winds up being NSNotFound, that's ok because then endIndex is also NSNotFound, and empty collections have startIndex == endIndex
+            let extent = _range(at: 0)
+            return Index(value: extent.lowerBound, extent: extent, rangeIndex: 0, rangeCount: _rangeCount)
+        } else {
+            return Index(value: 0, extent: 0..<0, rangeIndex: -1, rangeCount: rangeCount)
+        }
     }
 
     public var endIndex: Index {
@@ -914,6 +889,41 @@ private final class _MutablePairHandle<ImmutableType : NSObject, MutableType : N
         case .Mutable(let m):
             // TODO: It should be possible to reflect the constraint that MutableType is a subtype of ImmutableType in the generics for the class, but I haven't figured out how yet. For now, cheat and unsafe bit cast.
             return unsafeDowncast(m, to: ImmutableType.self)
+        }
+    }
+}
+
+extension IndexSet : Codable {
+    private enum CodingKeys : Int, CodingKey {
+        case indexes
+    }
+
+    private enum RangeCodingKeys : Int, CodingKey {
+        case location
+        case length
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        var indexesContainer = try container.nestedUnkeyedContainer(forKey: .indexes)
+        self.init()
+
+        while !indexesContainer.isAtEnd {
+            let rangeContainer = try indexesContainer.nestedContainer(keyedBy: RangeCodingKeys.self)
+            let startIndex = try rangeContainer.decode(Int.self, forKey: .location)
+            let count = try rangeContainer.decode(Int.self, forKey: .length)
+            self.insert(integersIn: startIndex ..< (startIndex + count))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        var indexesContainer = container.nestedUnkeyedContainer(forKey: .indexes)
+
+        for range in self.rangeView {
+            var rangeContainer = indexesContainer.nestedContainer(keyedBy: RangeCodingKeys.self)
+            try rangeContainer.encode(range.startIndex, forKey: .location)
+            try rangeContainer.encode(range.count, forKey: .length)
         }
     }
 }

@@ -79,8 +79,8 @@ namespace swift {
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
-    /// \brief Disable typo correction.
-    bool DisableTypoCorrection = false;
+    /// \brief Maximum number of typo corrections we are allowed to perform.
+    unsigned TypoCorrectionLimit = 10;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
@@ -171,6 +171,10 @@ namespace swift {
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 
+    /// \brief The upper bound to number of sub-expressions unsolved
+    /// before termination of the shrink phrase of the constraint solver.
+    unsigned SolverShrinkUnsolvedThreshold = 5;
+
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
 
@@ -197,8 +201,8 @@ namespace swift {
     /// Whether to attempt to recover from missing cross-references and other
     /// errors when deserializing from a Swift module.
     ///
-    /// This is a staging flag; eventually it will be on by default.
-    bool EnableDeserializationRecovery = false;
+    /// This is a staging flag; eventually it will be removed.
+    bool EnableDeserializationRecovery = true;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
     bool EnableASTScopeLookup = false;
@@ -227,9 +231,12 @@ namespace swift {
     /// of Swift do not.
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
       Swift3ObjCInferenceWarnings::None;
+
+    /// Diagnose uses of NSCoding with classes that have unstable mangled names.
+    bool EnableNSKeyedArchiverDiagnostics = true;
     
-    /// Enable keypaths.
-    bool EnableExperimentalKeyPaths = true;
+    /// Enable keypath components that aren't fully implemented.
+    bool EnableExperimentalKeyPathComponents = false;
 
     /// When a conversion from String to Substring fails, emit a fix-it to append
     /// the void subscript '[]'.

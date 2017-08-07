@@ -61,9 +61,6 @@ namespace {
     unsigned NumTables;
     // If you add anything to the layout computation, you might need
     // to update certain uses;  check the external uses of getNumTables().
-    // For example, getAssignExistentialsFunction relies on being uniqued
-    // for different layout kinds.
-
   public:
     explicit OpaqueExistentialLayout(unsigned numTables)
       : NumTables(numTables) {}
@@ -120,19 +117,6 @@ namespace {
   };
 } // end anonymous namespace
 
-
-/// Given the address of an existential object, destroy it.
-static void emitDestroyExistential(IRGenFunction &IGF, Address addr,
-                                   OpaqueExistentialLayout layout) {
-  llvm::Value *metadata = layout.loadMetadataRef(IGF, addr);
-
-  Address object = layout.projectExistentialBuffer(IGF, addr);
-  emitDestroyBufferCall(IGF, metadata, object);
-}
-
-static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
-                                               llvm::Type *objectPtrTy,
-                                               OpaqueExistentialLayout layout);
 
 static llvm::Constant *getAssignBoxedOpaqueExistentialBufferFunction(
     IRGenModule &IGM, OpaqueExistentialLayout existLayout,
@@ -312,21 +296,13 @@ public:
     auto objPtrTy = dest.getAddress()->getType();
 
     // Use copy-on-write existentials?
-    if (IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
-      auto fn = getAssignBoxedOpaqueExistentialBufferFunction(
-          IGF.IGM, getLayout(), objPtrTy);
-      auto call =
-          IGF.Builder.CreateCall(fn, {dest.getAddress(), src.getAddress()});
-      call->setCallingConv(IGF.IGM.DefaultCC);
-      call->setDoesNotThrow();
-      return;
-    }
-
-    auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy, getLayout());
-    auto call = IGF.Builder.CreateCall(
-        fn, {dest.getAddress(), src.getAddress()});
+    auto fn = getAssignBoxedOpaqueExistentialBufferFunction(
+        IGF.IGM, getLayout(), objPtrTy);
+    auto call =
+        IGF.Builder.CreateCall(fn, {dest.getAddress(), src.getAddress()});
     call->setCallingConv(IGF.IGM.DefaultCC);
     call->setDoesNotThrow();
+    return;
   }
 
   llvm::Value *copyType(IRGenFunction &IGF, Address dest, Address src) const {
@@ -376,16 +352,12 @@ public:
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
 
     // Use copy-on-write existentials?
-    if (IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
-      auto fn = getDestroyBoxedOpaqueExistentialBufferFunction(
-          IGF.IGM, getLayout(), addr.getAddress()->getType());
-      auto call = IGF.Builder.CreateCall(fn, {addr.getAddress()});
-      call->setCallingConv(IGF.IGM.DefaultCC);
-      call->setDoesNotThrow();
-      return;
-    }
-
-    emitDestroyExistential(IGF, addr, getLayout());
+    auto fn = getDestroyBoxedOpaqueExistentialBufferFunction(
+        IGF.IGM, getLayout(), addr.getAddress()->getType());
+    auto call = IGF.Builder.CreateCall(fn, {addr.getAddress()});
+    call->setCallingConv(IGF.IGM.DefaultCC);
+    call->setDoesNotThrow();
+    return;
   }
 };
 
@@ -1531,112 +1503,6 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
                                              align, baseTI);
 }
 
-/// Return a function which performs an assignment operation on two
-/// existentials.
-///
-/// Existential types are nominal, so we potentially need to cast the
-/// function to the appropriate object-pointer type.
-static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
-                                                     llvm::Type *objectPtrTy,
-                                                     OpaqueExistentialLayout layout) {
-  llvm::Type *argTys[] = { objectPtrTy, objectPtrTy };
-
-  // __swift_assign_existentials_N is the well-known function for
-  // assigning existential types with N witness tables.
-  llvm::SmallString<40> fnName;
-  llvm::raw_svector_ostream(fnName)
-    << "__swift_assign_existentials_" << layout.getNumTables();
-
-  return IGM.getOrCreateHelperFunction(fnName, IGM.VoidTy, argTys,
-                                       [&](IRGenFunction &IGF) {
-    auto it = IGF.CurFn->arg_begin();
-    Address dest(&*(it++), getFixedBufferAlignment(IGM));
-    Address src(&*(it++), getFixedBufferAlignment(IGM));
-
-    // If doing a self-assignment, we're done.
-    llvm::BasicBlock *doneBB = IGF.createBasicBlock("done");
-    llvm::BasicBlock *contBB = IGF.createBasicBlock("cont");
-    llvm::Value *isSelfAssign =
-      IGF.Builder.CreateICmpEQ(dest.getAddress(), src.getAddress(),
-                               "isSelfAssign");
-    IGF.Builder.CreateCondBr(isSelfAssign, doneBB, contBB);
-
-    // Project down to the buffers.
-    IGF.Builder.emitBlock(contBB);
-    // We don't need a ConditionalDominanceScope here because (1) there's no
-    // code in the other condition and (2) we immediately return.
-    Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
-    Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
-
-    // Load the metadata tables.
-    Address destMetadataSlot = layout.projectMetadataRef(IGF, dest);
-    llvm::Value *destMetadata = IGF.Builder.CreateLoad(destMetadataSlot);
-    llvm::Value *srcMetadata = layout.loadMetadataRef(IGF, src);
-
-    // Check whether the metadata match.
-    llvm::BasicBlock *matchBB = IGF.createBasicBlock("match");
-    llvm::BasicBlock *noMatchBB = IGF.createBasicBlock("no-match");
-    llvm::Value *sameMetadata =
-      IGF.Builder.CreateICmpEQ(destMetadata, srcMetadata, "sameMetadata");
-    IGF.Builder.CreateCondBr(sameMetadata, matchBB, noMatchBB);
-
-    // If so, do a direct assignment.
-    IGF.Builder.emitBlock(matchBB);
-    {
-      ConditionalDominanceScope matchCondition(IGF);
-
-      llvm::Value *destObject =
-        emitProjectBufferCall(IGF, destMetadata, destBuffer);
-      llvm::Value *srcObject =
-        emitProjectBufferCall(IGF, destMetadata, srcBuffer);
-      emitAssignWithCopyCall(IGF, destMetadata,
-                             Address(destObject, Alignment(1)),
-                             Address(srcObject, Alignment(1)));
-      IGF.Builder.CreateBr(doneBB);
-    }
-
-    // Otherwise, destroy and copy-initialize.
-    // TODO: should we copy-initialize and then destroy?  That's
-    // possible if we copy aside, which is a small expense but
-    // always safe.  Otherwise the destroy (which can invoke user code)
-    // could see invalid memory at this address.  These are basically
-    // the madnesses that boost::variant has to go through, with the
-    // advantage of address-invariance.
-    IGF.Builder.emitBlock(noMatchBB);
-    {
-      ConditionalDominanceScope noMatchCondition(IGF);
-
-      // Store the metadata ref.
-      IGF.Builder.CreateStore(srcMetadata, destMetadataSlot);
-
-      // Store the protocol witness tables.
-      unsigned numTables = layout.getNumTables();
-      for (unsigned i = 0, e = numTables; i != e; ++i) {
-        Address destTableSlot = layout.projectWitnessTable(IGF, dest, i);
-        llvm::Value *srcTable = layout.loadWitnessTable(IGF, src, i);
-
-        // Overwrite the old witness table.
-        IGF.Builder.CreateStore(srcTable, destTableSlot);
-      }
-
-      // Destroy the old value.
-      emitDestroyBufferCall(IGF, destMetadata, destBuffer);
-
-      // Copy-initialize with the new value.  Again, pull a value
-      // witness table from the source metadata if we can't use a
-      // protocol witness table.
-      emitInitializeBufferWithCopyOfBufferCall(IGF, srcMetadata,
-                                               destBuffer,
-                                               srcBuffer);
-      IGF.Builder.CreateBr(doneBB);
-    }
-
-    // All done.
-    IGF.Builder.emitBlock(doneBB);
-    IGF.Builder.CreateRetVoid();
-  }, true /*noinline*/);
-}
-
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(IRGenFunction &IGF,
@@ -1778,21 +1644,6 @@ void irgen::emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
   IGF.Builder.CreateCall(IGF.IGM.getDeallocErrorFn(), {box, srcMetadata});
 }
 
-/// "Deinitialize" an existential container whose contained value is allocated
-/// but uninitialized, by deallocating the buffer owned by the container if any.
-void irgen::emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
-                                                 Address container,
-                                                 SILType type) {
-  assert(type.isExistentialType());
-  assert(!type.isClassExistentialType());
-  auto &ti = IGF.getTypeInfo(type).as<OpaqueExistentialTypeInfo>();
-  auto layout = ti.getLayout();
-
-  llvm::Value *metadata = layout.loadMetadataRef(IGF, container);
-  Address buffer = layout.projectExistentialBuffer(IGF, container);
-  emitDeallocateBufferCall(IGF, metadata, buffer);
-}
-
 /// Emit a class existential container from a class instance value
 /// as an explosion.
 void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
@@ -1910,16 +1761,13 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
   Address buffer = existLayout.projectExistentialBuffer(IGF, addr);
   llvm::Value *object;
 
-  if (IGF.getSILModule().getOptions().UseCOWExistentials) {
-    auto *projectFunc = getProjectBoxedOpaqueExistentialFunction(
-        IGF, OpenedExistentialAccess::Immutable, existLayout);
-    auto *addrOfValue =
-        IGF.Builder.CreateCall(projectFunc, {buffer.getAddress(), metadata});
-    addrOfValue->setCallingConv(IGF.IGM.DefaultCC);
-    addrOfValue->setDoesNotThrow();
-    object = addrOfValue;
-  } else
-    object = emitProjectBufferCall(IGF, metadata, buffer);
+  auto *projectFunc = getProjectBoxedOpaqueExistentialFunction(
+      IGF, OpenedExistentialAccess::Immutable, existLayout);
+  auto *addrOfValue =
+      IGF.Builder.CreateCall(projectFunc, {buffer.getAddress(), metadata});
+  addrOfValue->setCallingConv(IGF.IGM.DefaultCC);
+  addrOfValue->setDoesNotThrow();
+  object = addrOfValue;
 
   llvm::Value *dynamicType =
     IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
@@ -2018,74 +1866,6 @@ void irgen::emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
                     IGF.IGM.getGetMetatypeMetadataFn(), tablesAndValue.second);
   out.add(dynamicType);
   out.add(tablesAndValue.first);
-}
-
-/// Emit a projection from an existential container to its concrete value
-/// buffer with the type metadata for the contained value.
-///
-/// \param _openedArchetype When non-null, the opened archetype
-/// that captures the details of this existential.
-std::pair<Address, llvm::Value*>
-irgen::emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
-                                                     Address base,
-                                                     SILType baseTy,
-                                                     CanType _openedArchetype) {
-  CanArchetypeType openedArchetype;
-  if (_openedArchetype) openedArchetype = cast<ArchetypeType>(_openedArchetype);
-
-  assert(baseTy.isExistentialType());
-  if (baseTy.isClassExistentialType()) {
-    auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
-    auto valueAddr = baseTI.projectValue(IGF, base);
-    auto value = IGF.Builder.CreateLoad(valueAddr);
-    auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value);
-
-    // If we are projecting into an opened archetype, capture the
-    // witness tables.
-    if (openedArchetype) {
-      SmallVector<llvm::Value *, 4> wtables;
-      for (unsigned i = 0, n = baseTI.getNumStoredProtocols(); i != n; ++i) {
-        auto wtableAddr = baseTI.projectWitnessTable(IGF, base, i);
-        wtables.push_back(IGF.Builder.CreateLoad(wtableAddr));
-      }
-
-      IGF.bindArchetype(openedArchetype, metadata, wtables);
-    }
-
-    return {valueAddr, metadata};
-  } else {
-    auto &baseTI = IGF.getTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
-    auto layout = baseTI.getLayout();
-
-    llvm::Value *metadata = layout.loadMetadataRef(IGF, base);
-    Address buffer = layout.projectExistentialBuffer(IGF, base);
-    llvm::Value *object =
-      emitProjectBufferCall(IGF, metadata, buffer);
-
-    // If we are projecting into an opened archetype, capture the
-    // witness tables.
-    if (openedArchetype) {
-      SmallVector<llvm::Value *, 4> wtables;
-      for (unsigned i = 0, n = layout.getNumTables(); i != n; ++i) {
-        wtables.push_back(layout.loadWitnessTable(IGF, base, i));
-      }
-      IGF.bindArchetype(openedArchetype, metadata, wtables);
-    }
-
-    return {Address(object, Alignment(1)), metadata};
-  }
-}
-
-/// Emit a projection from an existential container to its concrete value
-/// buffer.
-Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
-                                               Address base,
-                                               SILType baseTy,
-                                               CanArchetypeType openedArchetype)
-{
-  return emitIndirectExistentialProjectionWithMetadata(IGF, base, baseTy,
-                                                       openedArchetype)
-    .first;
 }
 
 /// Extract the instance pointer from a class existential value.

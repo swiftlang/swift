@@ -346,10 +346,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << "decl ";
       printDecl();
       break;
-    case OverloadChoiceKind::TypeDecl:
-      Out << "type decl ";
-      printDecl();
-      break;
     case OverloadChoiceKind::DeclViaDynamic:
       Out << "decl-via-dynamic ";
       printDecl();

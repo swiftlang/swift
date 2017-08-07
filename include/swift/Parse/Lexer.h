@@ -21,11 +21,17 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Token.h"
-#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/References.h"
+#include "swift/Syntax/Trivia.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 namespace swift {
+
+namespace syntax {
+  struct RawTokenSyntax;
+}
+
   /// Given a pointer to the starting byte of a UTF8 character, validate it and
   /// advance the lexer past it.  This returns the encoded character or ~0U if
   /// the encoding is invalid.
@@ -239,7 +245,7 @@ public:
   }
 
   /// Lex a full token including leading and trailing trivia.
-  RC<syntax::TokenSyntax> fullLex();
+  RC<syntax::RawTokenSyntax> fullLex();
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -typecheck %s -enable-source-import -I %S/Inputs -sdk "" -verify -show-diagnostics-after-fatal
 // RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs -sdk "" -show-diagnostics-after-fatal 2>&1 | %FileCheck %s -check-prefix=CHECK-NO-SOURCE-IMPORT

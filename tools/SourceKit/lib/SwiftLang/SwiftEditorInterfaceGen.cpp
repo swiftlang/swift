@@ -318,7 +318,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
     }
   }
 
-  PrintOptions Options = PrintOptions::printInterface();
+  PrintOptions Options = PrintOptions::printModuleInterface();
   ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
@@ -345,7 +345,7 @@ static bool getHeaderInterfaceInfo(ASTContext &Ctx,
     return true;
   }
 
-  PrintOptions Options = PrintOptions::printInterface();
+  PrintOptions Options = PrintOptions::printModuleInterface();
 
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
@@ -801,6 +801,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                  StringRef Name,
                                                  StringRef HeaderName,
                                                  ArrayRef<const char *> Args,
+                                                 bool UsingSwiftArgs,
                                                  bool SynthesizedExtensions,
                                               Optional<unsigned> swiftVersion) {
   CompilerInstance CI;
@@ -810,13 +811,15 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager().initCompilerInvocation(Invocation, llvm::None, CI.getDiags(),
+
+  ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : llvm::None;
+  if (getASTManager().initCompilerInvocation(Invocation, SwiftArgs, CI.getDiags(),
                                              StringRef(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
 
-  if (initInvocationByClangArguments(Args, Invocation, Error)) {
+  if (!UsingSwiftArgs && initInvocationByClangArguments(Args, Invocation, Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }

@@ -1,19 +1,19 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
 
 // REQUIRES: objc_interop
 
 // CHECK: [[SGIZMO:T13objc_subclass10SwiftGizmoC]] = type
-// CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[INT:%TSi]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
 // CHECK: [[OBJC_CLASS:%objc_class]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type
+// CHECK: [[INT:%TSi]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
+// CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[GIZMO:%TSo5GizmoC]] = type opaque
 // CHECK: [[OBJC:%objc_object]] = type opaque
 
-// CHECK-32: @_T013objc_subclass10SwiftGizmoC1xSivWvd = hidden global i32 12, align [[WORD_SIZE_IN_BYTES:4]]
-// CHECK-64: @_T013objc_subclass10SwiftGizmoC1xSivWvd = hidden global i64 16, align [[WORD_SIZE_IN_BYTES:8]]
+// CHECK-32: @_T013objc_subclass10SwiftGizmoC1xSivWvd = hidden global i32 4, align [[WORD_SIZE_IN_BYTES:4]]
+// CHECK-64: @_T013objc_subclass10SwiftGizmoC1xSivWvd = hidden global i64 8, align [[WORD_SIZE_IN_BYTES:8]]
 // CHECK: @"OBJC_METACLASS_$__TtC13objc_subclass10SwiftGizmo" = hidden global [[OBJC_CLASS]] { [[OBJC_CLASS]]* @"OBJC_METACLASS_$_NSObject", [[OBJC_CLASS]]* @"OBJC_METACLASS_$_Gizmo", [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null, [[LLVM_PTRSIZE_INT]] ptrtoint ({{.*}} @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo to [[LLVM_PTRSIZE_INT]]) }
 
 // CHECK: [[STRING_SWIFTGIZMO:@.*]] = private unnamed_addr constant [32 x i8] c"_TtC13objc_subclass10SwiftGizmo\00"
@@ -183,8 +183,8 @@
 
 // CHECK-32: @_DATA__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}* } {
 // CHECK-32:   i32 132,
-// CHECK-32:   i32 12,
-// CHECK-32:   i32 16,
+// CHECK-32:   i32 4,
+// CHECK-32:   i32 8,
 // CHECK-32:   i8* null,
 // CHECK-32:   i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[STRING_SWIFTGIZMO]], i32 0, i32 0),
 // CHECK-32:   @_INSTANCE_METHODS__TtC13objc_subclass10SwiftGizmo,
@@ -196,8 +196,8 @@
 
 // CHECK-64: @_DATA__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}* } {
 // CHECK-64:    i32 132,
+// CHECK-64:    i32 8,
 // CHECK-64:    i32 16,
-// CHECK-64:    i32 24,
 // CHECK-64:    i32 0,
 // CHECK-64:    i8* null,
 // CHECK-64:    i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[STRING_SWIFTGIZMO]], i64 0, i64 0),

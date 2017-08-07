@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/FloatingPoint.swift
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/FloatingPoint.swift
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib %t/FloatingPoint.swift -o %t/a.out
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
@@ -289,17 +290,6 @@ FloatingPoint.test("${Self}.round") {
     for value in [${Self}(), 1, 1/${Self}.ulpOfOne,
                   .greatestFiniteMagnitude, .infinity] {
       expectBitwiseEqual(value, value.rounded(rule))
-
-      // FIXME: rdar://27347596
-      // Double -0 rounded toNearestOrEven is wrong on watchos armv7k
-% if Self == 'Double':
-#if os(watchOS) && arch(arm)
-      if (value == 0  &&  rule == .toNearestOrEven) {
-        continue
-      }
-#endif
-% end
-
       expectBitwiseEqual(-value, (-value).rounded(rule))
     }
 

@@ -312,6 +312,10 @@ public:
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
 
+  /// Whether the context has a generic environment that will be constructed
+  /// on first access (but has not yet been constructed).
+  bool contextHasLazyGenericEnvironment() const;
+
   /// Map an interface type to a contextual type within this context.
   Type mapTypeIntoContext(Type type) const;
 
@@ -489,6 +493,19 @@ public:
                        SmallVectorImpl<ConformanceDiagnostic> *diagnostics
                          = nullptr,
                        bool sorted = false) const;
+
+  /// Retrieve the syntactic depth of this declaration context, i.e.,
+  /// the number of non-module-scoped contexts.
+  ///
+  /// For an extension of a nested type, the extension is depth 1.
+  unsigned getSyntacticDepth() const;
+
+  /// Retrieve the semantic depth of this declaration context, i.e.,
+  /// the number of non-module-scoped contexts.
+  ///
+  /// For an extension of a nested type, the depth of the nested type itself
+  /// is also included.
+  unsigned getSemanticDepth() const;
 
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);

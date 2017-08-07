@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -837,9 +839,6 @@ TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
     });
 }
 
-static const void *AllocatedBuffer = nullptr;
-static const void *DeallocatedBuffer = nullptr;
-
 namespace swift {
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
 } // namespace swift
@@ -863,33 +862,27 @@ TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {
   installCommonValueWitnesses(&testTable);
 
   // Replace allocateBuffer and destroyBuffer with logging versions.
-  testTable.allocateBuffer =
-    [](ValueBuffer *buf, const Metadata *self) -> OpaqueValue * {
-      void *mem = malloc(self->getValueWitnesses()->size);
-      *reinterpret_cast<void**>(buf) = mem;
-      AllocatedBuffer = mem;
-
-      return reinterpret_cast<OpaqueValue *>(mem);
-    };
-  testTable.destroyBuffer =
-    [](ValueBuffer *buf, const Metadata *self) -> void {
-      void *mem = *reinterpret_cast<void**>(buf);
-      DeallocatedBuffer = mem;
-
-      free(mem);
-    };
   struct {
     ValueBuffer buffer;
     uintptr_t canary;
   } buf1{{}, 0x5A5A5A5AU}, buf2{{}, 0xA5A5A5A5U};
-  testTable.allocateBuffer(&buf1.buffer, &testMetadata);
+  testMetadata.allocateBoxForExistentialIn(&buf1.buffer);
+
   testTable.initializeBufferWithTakeOfBuffer(&buf2.buffer, &buf1.buffer,
                                              &testMetadata);
-  testTable.destroyBuffer(&buf2.buffer, &testMetadata);
 
-  EXPECT_EQ(AllocatedBuffer, DeallocatedBuffer);
+  // The existential's box reference should be copied.
+  EXPECT_EQ(buf1.buffer.PrivateData[0], buf2.buffer.PrivateData[0]);
+
+  // Ownership of the box should have been transferred.
+  auto *reference = reinterpret_cast<HeapObject *>(buf2.buffer.PrivateData[0]);
+  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(reference));
+
   EXPECT_EQ(buf1.canary, (uintptr_t)0x5A5A5A5AU);
   EXPECT_EQ(buf2.canary, (uintptr_t)0xA5A5A5A5U);
+
+  // Release the buffer.
+  swift_release(reference);
 }
 
 // We cannot construct RelativeDirectPointer instances, so define

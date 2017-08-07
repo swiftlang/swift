@@ -11,7 +11,7 @@ SET(SWIFT_SPHINX_PAPER_SIZE "letter"
 
 SET(SPHINX_ARGS
   -W
-  -D latex_paper_size=${SWIFT_SPHINX_PAPER_SIZE}
+  -D latex_elements.papersize=${SWIFT_SPHINX_PAPER_SIZE}
   -d ${CMAKE_BINARY_DIR}/doctrees)
 
 if(SPHINX_EXECUTABLE)

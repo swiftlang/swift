@@ -75,11 +75,11 @@ public struct StaticString
   /// this property when `hasPointerRepresentation` is `true` triggers a
   /// runtime error.
   @_transparent
-  public var unicodeScalar: UnicodeScalar {
+  public var unicodeScalar: Unicode.Scalar {
     _precondition(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
-    return UnicodeScalar(UInt32(UInt(_startPtrOrData)))!
+    return Unicode.Scalar(UInt32(UInt(_startPtrOrData)))!
   }
 
   /// The length in bytes of the static string's ASCII or UTF-8 representation.
@@ -121,15 +121,15 @@ public struct StaticString
   /// This method works regardless of whether the static string stores a
   /// pointer or a single Unicode scalar value.
   ///
-  /// The pointer argument to `body` is valid only for the lifetime of the
-  /// closure. Do not escape it from the closure for later use.
+  /// The pointer argument to `body` is valid only during the execution of
+  /// `withUTF8Buffer(_:)`. Do not store or return the pointer for later use.
   ///
   /// - Parameter body: A closure that takes a buffer pointer to the static
   ///   string's UTF-8 code unit sequence as its sole argument. If the closure
-  ///   has a return value, it is used as the return value of the
+  ///   has a return value, that value is also used as the return value of the
   ///   `withUTF8Buffer(invoke:)` method. The pointer argument is valid only
-  ///   for the duration of the closure's execution.
-  /// - Returns: The return value of the `body` closure, if any.
+  ///   for the duration of the method's execution.
+  /// - Returns: The return value, if any, of the `body` closure.
   public func withUTF8Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
@@ -183,7 +183,7 @@ public struct StaticString
   ) {
     self._startPtrOrData = UInt(UInt32(unicodeScalar))._builtinWordValue
     self._utf8CodeUnitCount = 0._builtinWordValue
-    self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
+    self._flags = Unicode.Scalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
       ? (0x3 as UInt8)._value
       : (0x1 as UInt8)._value
   }

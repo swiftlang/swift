@@ -34,7 +34,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
   Type metatype = ctor->getInterfaceType()->castTo<AnyFunctionType>()->getInput();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = gen.getASTContext();
-  auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$metatype"), SourceLoc(),
                                AC.getIdentifier("$metatype"), Type(),
                                DC);
@@ -61,7 +61,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
     return tuple;
   } else {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$implicit_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$implicit_value"), Type(),
@@ -88,7 +88,8 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   SILValue resultSlot;
   if (selfTy.isAddressOnly(gen.SGM.M) && gen.silConv.useLoweredAddresses()) {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+                                 SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"), Type(),
@@ -369,12 +370,13 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   std::unique_ptr<Initialization> dest;
   if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+                                 SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"), Type(),
                                  element->getDeclContext());
-    VD->setInterfaceType(CanInOutType::get(enumIfaceTy));
+    VD->setInterfaceType(enumIfaceTy);
     auto resultSlot =
         F.begin()->createFunctionArgument(enumTI.getLoweredType(), VD);
     dest = std::unique_ptr<Initialization>(
@@ -385,7 +387,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // Emit the exploded constructor argument.
   ArgumentSource payload;
-  if (element->getArgumentInterfaceType()) {
+  if (element->hasAssociatedValues()) {
     RValue arg = emitImplicitValueConstructorArg
       (*this, Loc, element->getArgumentInterfaceType()->getCanonicalType(),
        element->getDeclContext());
@@ -765,7 +767,7 @@ static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
     ->getInOutObjectType()->getCanonicalType();
   auto self = emitSelfForMemberInit(SGF, loc, selfDecl);
   return SGF.emitPropertyLValue(loc, self, selfFormalType, property,
-                                AccessKind::Write,
+                                LValueOptions(), AccessKind::Write,
                                 AccessSemantics::DirectToStorage);
 }
 
@@ -908,14 +910,13 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Cleanup after this initialization.
         FullExpr scope(Cleanups, entry.getPattern());
 
-        // Get the substitutions for the constructor context.
+        // We want a substitution list written in terms of the generic
+        // signature of the type, with replacement archetypes from the
+        // constructor's context (which might be in an extension of
+        // the type, which adds additional generic requirements).
         SubstitutionList subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
-
-        DeclContext *typeDC = dc;
-        while (!typeDC->isTypeContext())
-          typeDC = typeDC->getParent();
-        auto typeGenericSig = typeDC->getGenericSignatureOfContext();
+        auto typeGenericSig = nominal->getGenericSignatureOfContext();
 
         if (genericEnv && typeGenericSig) {
           // Generate a set of substitutions for the initialization function,

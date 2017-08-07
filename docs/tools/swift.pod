@@ -1,30 +1,106 @@
 =pod
 
+=encoding utf8
+
 =head1 NAME
 
-swift - the amazingly new programming language
+swift -- Safe, fast, and expressive general-purpose programming language
 
 =head1 SYNOPSIS
 
-B<swift> [-help] [I<input-filename> [I<program-arguments>]]
+To invoke the Swift REPL (Read-Eval-Print-Loop):
 
-B<swiftc> [B<-emit-object>|B<-emit-assembly>|B<-emit-library>]
-  [-help]
-  B<-o> I<output-file>
-  I<input-filenames>
+=over
 
-The full list of supported options is available via "swift -help" or "swiftc -help".
+B<swift>
+
+=back
+
+To execute a Swift program:
+
+=over
+
+B<swift> program.swift -- <arguments>
+
+=back
+
+To work with the Swift Package Manager:
+
+=over
+
+B<swift> build|package|run|test [options] <inputs>
+
+=back
+
+To invoke the Swift compiler:
+
+=over
+
+B<swiftc> [options] <inputs>
+
+=back
+
+A list of supported options is available through the "-help" option:
+
+=over
+
+B<swift> -help
+
+B<swift> build -help
+
+B<swiftc> -help
+
+=back
 
 =head1 DESCRIPTION
 
-B<Swift> is a new, high performance systems programming language.  It has a clean
-and modern syntax, and offers seamless access to existing C and Objective-C code
-and frameworks, and is memory safe (by default).
+Swift is a general-purpose programming language built using a modern approach to
+safety, performance, and software design patterns.
 
-Although inspired by Objective-C and many other languages, Swift is not itself a
-C-derived language. As a complete and independent language, Swift packages core
-features like flow control, data structures, and functions, with high-level
-constructs like objects, protocols, closures, and generics.  Swift embraces
-modules, eliminating the need for headers and the code duplication they entail.
+The goal of the Swift project is to create the best available language for uses
+ranging from systems programming, to mobile and desktop apps, scaling up to
+cloud services. Most importantly, Swift is designed to make writing and
+maintaining I<correct> programs easier for the developer. To achieve this goal,
+we believe that the most obvious way to write Swift code must also be:
 
-=cut
+B<Safe.> The most obvious way to write code should also behave in a safe manner.
+Undefined behavior is the enemy of safety, and developer mistakes should be
+caught before software is in production. Opting for safety sometimes means Swift
+will feel strict, but we believe that clarity saves time in the long run.
+
+B<Fast.> Swift is intended as a replacement for C-based languages (C, C++, and
+Objective-C). As such, Swift must be comparable to those languages in
+performance for most tasks. Performance must also be predictable and consistent,
+not just fast in short bursts that require clean-up later. There are lots of
+languages with novel features — being fast is rare.
+
+B<Expressive.> Swift benefits from decades of advancement in computer science to
+offer syntax that is a joy to use, with modern features developers expect. But
+Swift is never done. We will monitor language advancements and embrace what
+works, continually evolving to make Swift even better.
+
+=head1 BUGS
+
+Reporting bugs is a great way for anyone to help improve Swift.
+The bug tracker for Swift, an open-source project, is located at
+L<https://bugs.swift.org>.
+
+If a bug can be reproduced only within an Xcode project or a playground, or if
+the bug is associated with an Apple NDA, please file a report to Apple’s
+bug reporter at L<https://bugreport.apple.com> instead.
+
+=head1 SEE ALSO
+
+=head2 HOME PAGE
+
+L<https://swift.org>
+
+=head2 APPLE DEVELOPER RESOURCES
+
+L<https://developer.apple.com/swift/resources>
+
+=head2 CODE REPOSITORIES
+
+Swift Programming Language at L<https://github.com/apple/swift>
+
+Swift Package Manager at L<https://github.com/apple/swift-package-manager>

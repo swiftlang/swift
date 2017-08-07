@@ -1922,7 +1922,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
     let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
     var wasInvoked = false
     let result = s._preprocessingPass {
-      (sequence) -> OpaqueValue<Int> in
+      () -> OpaqueValue<Int> in
       wasInvoked = true
 
       expectEqualSequence(
@@ -1945,7 +1945,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
     var result: OpaqueValue<Int>?
     do {
       result = try s._preprocessingPass {
-        _ -> OpaqueValue<Int> in
+        () -> OpaqueValue<Int> in
         wasInvoked = true
         throw TestError.error2
       }

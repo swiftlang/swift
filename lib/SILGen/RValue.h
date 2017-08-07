@@ -33,8 +33,10 @@ class Initialization;
 class SILGenFunction;
 
 /// An "exploded" SIL rvalue, in which tuple values are recursively
-/// destructured. (In SILGen we don't try to explode structs, because doing so
-/// would require considering resilience, a job we want to delegate to IRGen).
+/// destructured.
+///
+/// *NOTE* In SILGen we don't try to explode structs, because doing so would
+/// require considering resilience, a job we want to delegate to IRGen.
 class RValue {
   std::vector<ManagedValue> values;
   CanType type;
@@ -42,7 +44,15 @@ class RValue {
   
   /// Flag value used to mark an rvalue as invalid, because it was
   /// consumed or it was default-initialized.
-  enum : unsigned { Used = ~0U };
+  enum : unsigned {
+    Null = ~0U,
+    Used = Null - 1,
+    InContext = Used - 1,
+  };
+
+  bool isInSpecialState() const {
+    return elementsToBeAdded >= InContext;
+  }
   
   // Don't copy.
   RValue(const RValue &) = delete;
@@ -52,31 +62,41 @@ class RValue {
     elementsToBeAdded = Used;
     values = {};
   }
-  
-  /// Private constructor used by copy().
-  RValue(const RValue &copied, SILGenFunction &SGF, SILLocation l);
-  
-  /// Construct an RValue from a pre-exploded set of
-  /// ManagedValues. Used to implement the extractElement* methods.
+
+  /// Private constructor used by copy() and borrow().
+  RValue(std::vector<ManagedValue> &&values, CanType type,
+         unsigned elementsToBeAdded)
+      : values(std::move(values)), type(type),
+        elementsToBeAdded(elementsToBeAdded) {
+    verifyConsistentOwnership();
+  }
+
+  /// Construct an RValue from a pre-exploded set of ManagedValues.
+  ///
+  /// Used to implement the extractElement* methods. *NOTE* This constructor
+  /// assumes that the constructed RValue is fully formed and thus has
+  /// elementsToBeAdded set to zero.
   RValue(ArrayRef<ManagedValue> values, CanType type);
 
+  RValue(unsigned state) : elementsToBeAdded(state) {
+    assert(isInSpecialState());
+  }
+
 public:
-  /// Creates an invalid RValue object, in a "used" state.
-  RValue() : elementsToBeAdded(Used) {}
+  RValue() : elementsToBeAdded(Null) {}
   
-  RValue(RValue &&rv)
-    : values(std::move(rv.values)),
-      type(rv.type),
-      elementsToBeAdded(rv.elementsToBeAdded)
-  {
-    assert((rv.isComplete() || rv.isUsed())
+  RValue(RValue &&rv) : values(std::move(rv.values)),
+                        type(rv.type),
+                        elementsToBeAdded(rv.elementsToBeAdded) {
+    assert((rv.isComplete() || rv.isInSpecialState())
            && "moving rvalue that wasn't complete?!");
     rv.elementsToBeAdded = Used;
   }
+
   RValue &operator=(RValue &&rv) {
-    assert(isUsed() && "reassigning an unused rvalue?!");
+    assert((isNull() || isUsed()) && "reassigning an valid rvalue?!");
     
-    assert((rv.isComplete() || rv.isUsed())
+    assert((rv.isComplete() || rv.isInSpecialState())
            && "moving rvalue that wasn't complete?!");
     values = std::move(rv.values);
     type = rv.type;
@@ -96,10 +116,16 @@ public:
   /// will be exploded.
   RValue(SILGenFunction &SGF, SILLocation l, CanType type, ManagedValue v);
 
-  /// Construct an RValue from a pre-exploded set of
-  /// ManagedValues. Used to implement the extractElement* methods.
+  /// Construct an RValue from a pre-exploded set of ManagedValues.
+  ///
+  /// This is used to implement the extractElement* methods.
   static RValue withPreExplodedElements(ArrayRef<ManagedValue> values,
                                         CanType type);
+
+  /// Creates an invalid RValue object, in an "in-context" state.
+  static RValue forInContext() {
+    return RValue(InContext);
+  }
   
   /// Create an RValue to which values will be subsequently added using
   /// addElement(), with the level of tuple expansion in the input specified
@@ -111,17 +137,19 @@ public:
   /// addElement(). The RValue will not be complete until all the elements have
   /// been added.
   explicit RValue(CanType type);
-  
+
   /// True if the rvalue has been completely initialized by adding all its
   /// elements.
   bool isComplete() const & { return elementsToBeAdded == 0; }
+
+  /// True if the rvalue was null-initialized.
+  bool isNull() const & { return elementsToBeAdded == Null; }
   
   /// True if this rvalue has been used.
   bool isUsed() const & { return elementsToBeAdded == Used; }
-  explicit operator bool() const & { return !isUsed(); }
 
   /// True if this rvalue was emitted into context.
-  bool isInContext() const & { return isUsed(); }
+  bool isInContext() const & { return elementsToBeAdded == InContext; }
   
   /// True if this represents an lvalue.
   bool isLValue() const & {
@@ -176,6 +204,30 @@ public:
     return value;
   }
 
+  /// Returns true if this is an rvalue that can be used safely as a +1 rvalue.
+  ///
+  /// This returns true iff:
+  ///
+  /// 1. All sub-values are trivially typed.
+  /// 2. There exists at least one non-trivial typed sub-value and all such
+  /// sub-values all have cleanups.
+  ///
+  /// *NOTE* Due to 1. isPlusOne and isPlusZero both return true for rvalues
+  /// consisting of only trivial values.
+  bool isPlusOne(SILGenFunction &SGF) const &;
+
+  /// Returns true if this is an rvalue that can be used safely as a +0 rvalue.
+  ///
+  /// Specifically, we return true if:
+  ///
+  /// 1. All sub-values are trivially typed.
+  /// 2. At least 1 subvalue is non-trivial and all such non-trivial values do
+  /// not have a cleanup.
+  ///
+  /// *NOTE* Due to 1. isPlusOne and isPlusZero both return true for rvalues
+  /// consisting of only trivial values.
+  bool isPlusZero(SILGenFunction &SGF) const &;
+
   /// Use this rvalue to initialize an Initialization.
   void forwardInto(SILGenFunction &SGF, SILLocation loc, Initialization *I) &&;
 
@@ -209,21 +261,56 @@ public:
 
   /// Rewrite the type of this r-value.
   void rewriteType(CanType newType) & {
+#ifndef NDEBUG
+    static const auto areSimilarTypes = [](CanType l, CanType r) {
+      if (l == r) return true;
+
+      // Allow function types to disagree about 'noescape'.
+      if (auto lf = dyn_cast<FunctionType>(l)) {
+        if (auto rf = dyn_cast<FunctionType>(r)) {
+          return lf.getInput() == rf.getInput()
+              && lf.getResult() == rf.getResult()
+              && lf->getExtInfo().withNoEscape(false) ==
+                 lf->getExtInfo().withNoEscape(false);
+        }
+      }
+      return false;
+    };
+
+    static const auto isSingleElementTuple = [](CanType type, CanType eltType) {
+      if (auto tupleType = dyn_cast<TupleType>(type)) {
+        return tupleType->getNumElements() == 1 &&
+               areSimilarTypes(tupleType.getElementType(0), eltType);
+      }
+      return false;
+    };
+
     // We only allow a very modest set of changes to a type.
-    assert(newType == type ||
-           (isa<TupleType>(newType) &&
-            cast<TupleType>(newType)->getNumElements() == 1 &&
-            cast<TupleType>(newType).getElementType(0) == type));
+    assert(areSimilarTypes(newType, type) ||
+           isSingleElementTuple(newType, type) ||
+           isSingleElementTuple(type, newType));
+#endif
     type = newType;
   }
   
   /// Emit an equivalent value with independent ownership.
-  RValue copy(SILGenFunction &SGF, SILLocation l) const & {
-    return RValue(*this, SGF, l);
-  }
+  RValue copy(SILGenFunction &SGF, SILLocation loc) const &;
+
+  /// Borrow all subvalues of the rvalue.
+  RValue borrow(SILGenFunction &SGF, SILLocation loc) const &;
 
   static bool areObviouslySameValue(SILValue lhs, SILValue rhs);
   bool isObviouslyEqual(const RValue &rhs) const;
+
+  void dump() const;
+  void dump(raw_ostream &OS, unsigned indent = 0) const;
+
+private:
+  /// Assert that all non-trivial ManagedValues in this RValue either all have a
+  /// cleanup or all do not have a cleanup.
+  ///
+  /// *NOTE* This is a no-op in non-assert builds.
+  void verifyConsistentOwnership() const;
 };
 
 } // end namespace Lowering

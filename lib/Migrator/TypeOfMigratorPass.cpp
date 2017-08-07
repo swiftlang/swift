@@ -1,4 +1,4 @@
-//===--- TypeOfMigratorPass.cpp ------------------------------------------===//
+//===--- TypeOfMigratorPass.cpp -------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -24,8 +24,10 @@ using namespace swift::migrator;
 
 namespace {
 
-struct TypeOfMigratorPass: public ASTMigratorPass,
+class TypeOfMigratorPass: public ASTMigratorPass,
   public SourceEntityWalker {
+
+  std::vector<DeclContext *> ContextStack;
 
   void handleTypeOf(const DynamicTypeExpr *DTE) {
     if (!SF->getASTContext().LangOpts.isSwiftVersion3()) {
@@ -39,12 +41,22 @@ struct TypeOfMigratorPass: public ASTMigratorPass,
 
     UnqualifiedLookup Lookup {
       { SF->getASTContext().getIdentifier("type") },
-      SF->getModuleScopeContext(),
-      /*TypeResolver=*/nullptr,
+      ContextStack.empty() ? SF->getModuleScopeContext() : ContextStack.back(),
+      /*TypeResolver=*/SF->getASTContext().getLazyResolver(),
       /*IsKnownPrivate=*/false,
       DTE->getLoc()
     };
-    if (Lookup.Results.empty()) {
+    auto isShadowing = [&]() -> bool {
+      if (Lookup.Results.empty())
+        return false;
+      if (Lookup.Results.size() != 1)
+        return true;
+      if (auto VD = Lookup.Results.front().getValueDecl()) {
+        return !VD->getModuleContext()->isStdlibModule();
+      }
+      return false;
+    };
+    if (!isShadowing()) {
       // There won't be a name shadowing here in Swift 4, so we don't need to
       // do anything.
       return;
@@ -58,6 +70,19 @@ struct TypeOfMigratorPass: public ASTMigratorPass,
     }
     return true;
   }
+
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    if (auto DC = dyn_cast<DeclContext>(D))
+      ContextStack.push_back(DC);
+    return true;
+  }
+
+  bool walkToDeclPost(Decl *D) override {
+    if (isa<DeclContext>(D))
+      ContextStack.pop_back();
+    return true;
+  }
+
 public:
   TypeOfMigratorPass(EditorAdapter &Editor,
                          SourceFile *SF,

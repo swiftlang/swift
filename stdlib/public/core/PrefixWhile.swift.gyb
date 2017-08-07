@@ -61,13 +61,13 @@ public struct LazyPrefixWhileSequence<Base : Sequence> : LazySequenceProtocol {
       _base: _base.makeIterator(), predicate: _predicate)
   }
 
-  internal init(_base: Base, predicate: @escaping (Base.Iterator.Element) -> Bool) {
+  internal init(_base: Base, predicate: @escaping (Base.Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
 
   internal var _base: Base
-  internal let _predicate: (Base.Iterator.Element) -> Bool
+  internal let _predicate: (Base.Element) -> Bool
 }
 
 extension LazySequenceProtocol {
@@ -79,7 +79,7 @@ extension LazySequenceProtocol {
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   public func prefix(
-    while predicate: @escaping (Elements.Iterator.Element) -> Bool
+    while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyPrefixWhileSequence<Self.Elements> {
     return LazyPrefixWhileSequence(_base: self.elements, predicate: predicate)
   }
@@ -111,33 +111,31 @@ public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
   internal init(endOf: Base) {
     self._value = .pastEnd
   }
-}
 
-public func == <Base>(
-  lhs: LazyPrefixWhileIndex<Base>,
-  rhs: LazyPrefixWhileIndex<Base>
-) -> Bool {
-  switch (lhs._value, rhs._value) {
-  case let (.index(l), .index(r)):
-    return l == r
-  case (.pastEnd, .pastEnd):
-    return true
-  default:
-    return false
+  public static func == (
+    lhs: LazyPrefixWhileIndex, rhs: LazyPrefixWhileIndex
+  ) -> Bool {
+    switch (lhs._value, rhs._value) {
+    case let (.index(l), .index(r)):
+      return l == r
+    case (.pastEnd, .pastEnd):
+      return true
+    default:
+      return false
+    }
   }
-}
 
-public func < <Base>(
-  lhs: LazyPrefixWhileIndex<Base>,
-  rhs: LazyPrefixWhileIndex<Base>
-) -> Bool {
-  switch (lhs._value, rhs._value) {
-  case let (.index(l), .index(r)):
-    return l < r
-  case (.index, .pastEnd):
-    return true
-  default:
-    return false
+  public static func < (
+    lhs: LazyPrefixWhileIndex, rhs: LazyPrefixWhileIndex
+  ) -> Bool {
+    switch (lhs._value, rhs._value) {
+    case let (.index(l), .index(r)):
+      return l < r
+    case (.index, .pastEnd):
+      return true
+    default:
+      return false
+    }
   }
 }
 
@@ -218,7 +216,7 @@ public struct ${Self}<
 
 %   end
 
-  public subscript(position: Index) -> Base.Iterator.Element {
+  public subscript(position: Index) -> Base.Element {
     switch position._value {
     case .index(let i):
       return _base[i]
@@ -232,13 +230,13 @@ public struct ${Self}<
       _base: _base.makeIterator(), predicate: _predicate)
   }
 
-  internal init(_base: Base, predicate: @escaping (Base.Iterator.Element) -> Bool) {
+  internal init(_base: Base, predicate: @escaping (Base.Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
 
   internal var _base: Base
-  internal let _predicate: (Base.Iterator.Element) -> Bool
+  internal let _predicate: (Base.Element) -> Bool
 }
 
 extension LazyCollectionProtocol
@@ -256,7 +254,7 @@ extension LazyCollectionProtocol
   ///   or `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   public func prefix(
-    while predicate: @escaping (Elements.Iterator.Element) -> Bool
+    while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyPrefixWhile${Collection}<Self.Elements> {
     return LazyPrefixWhile${Collection}(
       _base: self.elements, predicate: predicate)

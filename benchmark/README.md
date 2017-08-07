@@ -90,9 +90,17 @@ Using the Benchmark Driver
 
 ### Examples
 
-1. `$ ./Benchmark_O --num-iters=1 --num-samples=1`
-2. `$ ./Benchmark_Onone --list`
-3. `$ ./Benchmark_Ounchecked Ackermann`
+* `$ ./Benchmark_O --num-iters=1 --num-samples=1`
+* `$ ./Benchmark_Onone --list`
+* `$ ./Benchmark_Ounchecked Ackermann`
+
+### Note
+As a shortcut, you can also refer to benchmarks by their ordinal numbers.
+The regular `--list` option does not provide these, but you can run:
+* `$ ./Benchmark_O --list --run-all | tail -n +2 | nl`
+You can use ordinal numbers instead of test names like this:
+* `$ ./Benchmark_O 1 42`
+* `$ ./Benchmark_Driver run 1 42`
 
 Using the Harness Generator
 ---------------------------
@@ -101,7 +109,7 @@ Using the Harness Generator
 `CMakeLists.txt` and `utils/main.swift` from single and multiple file tests
 contained in the directories `single-source` and `multi-source`. It gathers
 information about the tests and then generates the files from templates using
-jinja2. The motivation for creating this script was to eliminate the need to
+`gyb`. The motivation for creating this script was to eliminate the need to
 manually add at least three lines to harness files (one to `CMakeLists.txt` and
 two to `utils/main.swift`) for every new benchmark added.
 
@@ -110,34 +118,23 @@ two to `utils/main.swift`) for every new benchmark added.
 Since `CMakeLists.txt` and `utils/main.swift` are now generated from templates,
 they should not be directly modified. Work may be lost if the harness is
 executed after making changes to derived files. Instead, modifications should
-be made to the template files stored in the `scripts/generate_harness`
-directory.
+be made to the `*.gyb` template files.
 
 ### Generating harness files
-
-Start by installing jinja2 if it isn't already installed:
-
-    $ sudo easy_install -U jinja2
 
 To generate `CMakeLists.txt` and `utils/main.swift` from test sources, run the
 command:
 
     $ scripts/generate_harness/generate_harness.py
 
-**Note:**
-
-Ensure `generate_harness.py` remains in `scripts/generate_harness` as it
-modifies files relative to its location instead of the current working
-directory.
-
 ### Modifying CMakeLists.txt or utils/main.swift
 
 To make changes to `CMakeLists.txt` or `utils/main.swift`, modify the template
-files `CMakeLists.txt_template` and `main.swift_template` stored in the
-`scripts/generate_harness` directory. These are jinja2 templates, rendered by
-jinja2 calls in `generate_harness.py`, so ensure static changes don't interfere
-with the template portions. Test changes by regenerating the harness
-(*Generating harness files*) and rebuilding the repository with `build-script`.
+files `CMakeLists.txt.gyb` and `main.swift.gyb` These are templates, rendered by
+`gyb` in `generate_harness.py`, so ensure static changes don't interfere
+with the template portions. Test changes by
+[regenerating the harness](#generating-harness-files) and rebuilding the
+repository with `build-script`.
 
 Adding New Benchmarks
 ---------------------
@@ -149,7 +146,8 @@ To add a new single file test:
 1.  Add a new Swift file (`YourTestNameHere.swift`), built according to
     the template below, to the `single-source` directory.
 2.  Regenerate harness files by following the directions in
-    *Generating harness files* before committing changes.
+    [Generating harness files](#generating-harness-files) before committing
+    changes.
 
 To add a new multiple file test:
 
@@ -166,7 +164,8 @@ To add a new multiple file test:
     exist in the files.
 
 2.  Regenerate harness files by following the directions in
-    *Generating harness files* before committing changes.
+    [Generating harness files](#generating-harness-files) before committing
+    changes.
 
 **Note:**
 
@@ -204,4 +203,3 @@ public func run_YourTestNameHere(N: Int) {
     # Assert with CheckResults that work was done
 }
 ```
-

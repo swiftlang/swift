@@ -87,15 +87,17 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   /// @{
   llvm::DenseMap<LocalScopeHash, llvm::TrackingMDNodeRef> ScopeCache;
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
-  llvm::DenseMap<llvm::StringRef, llvm::TrackingMDNodeRef> DIFileCache;
   llvm::DenseMap<const void *, SILLocation::DebugLoc> DebugLocCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
-  llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
+  llvm::DenseMap<const void *, llvm::TrackingMDNodeRef> DIModuleCache;
+  llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   TrackingDIRefMap DIRefMap;
   /// @}
 
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
   std::vector<std::pair<TypeBase *, llvm::TrackingMDRef>> ReplaceMap;
+  /// The set of imported modules.
+  llvm::DenseSet<ModuleDecl *> ImportedModules;
 
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;                    /// The current working directory.
@@ -110,8 +112,6 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 
   SILLocation::DebugLoc LastDebugLoc; /// The last location that was emitted.
   const SILDebugScope *LastScope;     /// The scope of that last location.
-  /// The basic block where the location was last changed.
-  llvm::BasicBlock *LastBasicBlock;
 
   /// Used by pushLoc.
   SmallVector<std::pair<SILLocation::DebugLoc, const SILDebugScope *>, 8>
@@ -329,19 +329,6 @@ private:
     }
     return true;
   }
-
-  bool lineNumberIsSane(IRBuilder &Builder, unsigned Line) {
-    if (IGM.IRGen.Opts.Optimize)
-      return true;
-
-    // Assert monotonically increasing line numbers within the same basic block;
-    llvm::BasicBlock *CurBasicBlock = Builder.GetInsertBlock();
-    if (CurBasicBlock == LastBasicBlock) {
-      return Line >= LastDebugLoc.Line;
-    }
-    LastBasicBlock = CurBasicBlock;
-    return true;
-  }
 #endif
 
   llvm::DIFile *getOrCreateFile(StringRef Filename) {
@@ -413,7 +400,8 @@ private:
         }
 
         SmallVector<char, 64> Buf;
-        StringRef Name = (VD->getName().str() + Twine(Kind)).toStringRef(Buf);
+        StringRef Name = (VD->getBaseName().userFacingName() +
+                          Twine(Kind)).toStringRef(Buf);
         return BumpAllocatedString(Name);
       }
 
@@ -567,28 +555,7 @@ private:
            isa<ConstructorDecl>(DeclCtx);
   }
 
-  llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule M) {
-    StringRef Path = getFilenameFromDC(M.second);
-    if (M.first.empty()) {
-      StringRef Name = M.second->getName().str();
-      return getOrCreateModule(Name, TheCU, Name, Path);
-    }
-
-    unsigned I = 0;
-    SmallString<128> AccessPath;
-    llvm::DIScope *Scope = TheCU;
-    llvm::raw_svector_ostream OS(AccessPath);
-    for (auto elt : M.first) {
-      auto Component = elt.first.str();
-      if (++I > 1)
-        OS << '.';
-      OS << Component;
-      Scope = getOrCreateModule(AccessPath, Scope, Component, Path);
-    }
-    return cast<llvm::DIModule>(Scope);
-  }
-
-  llvm::DIModule *getOrCreateModule(StringRef Key, llvm::DIScope *Parent,
+  llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
                                     StringRef ConfigMacros = StringRef()) {
     // Look in the cache first.
@@ -608,18 +575,28 @@ private:
     // Handle Clang modules.
     if (const clang::Module *ClangModule = Desc.getModuleOrNull()) {
       llvm::DIModule *Parent = nullptr;
-      if (ClangModule->Parent) {
-        clang::ExternalASTSource::ASTSourceDescriptor PM(*ClangModule->Parent);
-        Parent = getOrCreateModule(PM);
-      }
-      return getOrCreateModule(ClangModule->getFullModuleName(), Parent,
+      if (ClangModule->Parent)
+        Parent = getOrCreateModule(*ClangModule->Parent);
+
+      return getOrCreateModule(ClangModule, Parent,
                                Desc.getModuleName(), Desc.getPath(),
                                ConfigMacros);
     }
     // Handle PCH.
-    return getOrCreateModule(Desc.getASTFile(), nullptr, Desc.getModuleName(),
-                             Desc.getPath(), ConfigMacros);
+    return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
+                             Desc.getModuleName(), Desc.getPath(),
+                             ConfigMacros);
   };
+
+  llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
+    ModuleDecl *M = IM.second;
+    if (auto *ClangModule = M->findUnderlyingClangModule())
+      return getOrCreateModule(*ClangModule);
+
+    StringRef Path = getFilenameFromDC(M);
+    StringRef Name = M->getName().str();
+    return getOrCreateModule(M, TheCU, Name, Path);
+  }
 
   TypeAliasDecl *getMetadataType() {
     if (!MetadataTypeDecl) {
@@ -1539,9 +1516,9 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   // Create a module for the current compile unit.
   llvm::sys::path::remove_filename(AbsMainFile);
-  MainModule =
-      getOrCreateModule(Opts.ModuleName, TheCU, Opts.ModuleName, AbsMainFile);
-  DBuilder.createImportedModule(MainFile, MainModule, 1);
+  MainModule = getOrCreateModule(IGM.getSwiftModule(), TheCU, Opts.ModuleName,
+                                 AbsMainFile);
+  DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the
   // command line. This does not include any macros defined by ClangImporter.
@@ -1564,6 +1541,16 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
 void IRGenDebugInfoImpl::finalize() {
   assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
+
+  // Get the list of imported modules (which may actually be different
+  // from all ImportDecls).
+  SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
+  IGM.getSwiftModule()->getImportedModules(ModuleWideImports,
+                                           ModuleDecl::ImportFilter::All);
+  for (auto M : ModuleWideImports)
+    if (!ImportedModules.count(M.second))
+      DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
+                                    0);
 
   // Finalize all replaceable forward declarations.
   for (auto &Ty : ReplaceMap) {
@@ -1731,9 +1718,12 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
     assert(M && "Could not find module for import decl.");
     return;
   }
-  auto DIMod = getOrCreateModule({D->getModulePath(), M});
+  ModuleDecl::ImportedModule Imported = {D->getModulePath(), M};
+  auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
-  DBuilder.createImportedModule(getOrCreateFile(L.Filename), DIMod, L.Line);
+  auto *File = getOrCreateFile(L.Filename);
+  DBuilder.createImportedModule(File, DIMod, File, L.Line);
+  ImportedModules.insert(Imported.second);
 }
 
 llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(SILFunction &SILFn,
@@ -2000,8 +1990,13 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   // the variable that is live throughout the function. With SIL
   // optimizations this is not guaranteed and a variable can end up in
   // two allocas (for example, one function inlined twice).
-  if (isa<llvm::AllocaInst>(Storage)) {
-    DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
+  if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
+    auto *ParentBB = Alloca->getParent();
+    auto InsertBefore = std::next(Alloca->getIterator());
+    if (InsertBefore != ParentBB->end())
+      DBuilder.insertDeclare(Alloca, Var, Expr, DL, &*InsertBefore);
+    else
+      DBuilder.insertDeclare(Alloca, Var, Expr, DL, ParentBB);
     return;
   }
 
@@ -2012,13 +2007,13 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     while (InsPt != E && isa<llvm::PHINode>(&*InsPt))
       ++InsPt;
     if (InsPt != E) {
-      DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, &*InsPt);
+      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, &*InsPt);
       return;
     }
   }
 
   // Otherwise just insert it at the current insertion point.
-  DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
+  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
@@ -2081,6 +2076,9 @@ IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(const IRGenOptions &Opts,
                                                      SourceFile *SF) {
   return new IRGenDebugInfoImpl(Opts, CI, IGM, M, SF);
 }
+
+
+IRGenDebugInfo::~IRGenDebugInfo() {}
 
 // Forwarding to the private implementation.
 void IRGenDebugInfo::finalize() {

@@ -51,6 +51,10 @@
 
 using namespace swift;
 
+/// Define this to 1 to enable expensive assertions of the
+/// GenericSignatureBuilder.
+#define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
+
 LazyResolver::~LazyResolver() = default;
 DelegatingLazyResolver::~DelegatingLazyResolver() = default;
 void ModuleLoader::anchor() {}
@@ -82,6 +86,11 @@ namespace {
 using AssociativityCacheType =
   llvm::DenseMap<std::pair<PrecedenceGroupDecl *, PrecedenceGroupDecl *>,
                  Associativity>;
+
+#define FOR_KNOWN_FOUNDATION_TYPES(MACRO) \
+  MACRO(NSError) \
+  MACRO(NSNumber) \
+  MACRO(NSValue)
 
 struct ASTContext::Implementation {
   Implementation();
@@ -153,8 +162,11 @@ struct ASTContext::Implementation {
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
 
-  /// The declaration of Foundation.NSError.
-  ClassDecl *NSErrorDecl = nullptr;
+#define CACHE_FOUNDATION_DECL(NAME) \
+  /** The declaration of Foundation.NAME. */ \
+  ClassDecl *NAME##Decl = nullptr;
+FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
+#undef CACHE_FOUNDATION_DECL
 
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
@@ -689,7 +701,10 @@ CanType ASTContext::getAnyObjectType() const {
 }
 
 CanType ASTContext::getNeverType() const {
-  return getNeverDecl()->getDeclaredType()->getCanonicalType();
+  auto neverDecl = getNeverDecl();
+  if (!neverDecl)
+    return CanType();
+  return neverDecl->getDeclaredType()->getCanonicalType();
 }
 
 TypeAliasDecl *ASTContext::getVoidDecl() const {
@@ -731,25 +746,30 @@ StructDecl *ASTContext::getObjCBoolDecl() const {
   return Impl.ObjCBoolDecl;
 }
 
-ClassDecl *ASTContext::getNSErrorDecl() const {
-  if (!Impl.NSErrorDecl) {
-    if (ModuleDecl *M = getLoadedModule(Id_Foundation)) {
-      // Note: use unqualified lookup so we find NSError regardless of
-      // whether it's defined in the Foundation module or the Clang
-      // Foundation module it imports.
-      UnqualifiedLookup lookup(getIdentifier("NSError"), M, nullptr);
-      if (auto type = lookup.getSingleTypeResult()) {
-        if (auto classDecl = dyn_cast<ClassDecl>(type)) {
-          if (classDecl->getGenericParams() == nullptr) {
-            Impl.NSErrorDecl = classDecl;
-          }
-        }
-      }
-    }
-  }
-
-  return Impl.NSErrorDecl;
+#define GET_FOUNDATION_DECL(NAME) \
+ClassDecl *ASTContext::get##NAME##Decl() const { \
+  if (!Impl.NAME##Decl) { \
+    if (ModuleDecl *M = getLoadedModule(Id_Foundation)) { \
+      /* Note: use unqualified lookup so we find NSError regardless of */ \
+      /* whether it's defined in the Foundation module or the Clang */ \
+      /* Foundation module it imports. */ \
+      UnqualifiedLookup lookup(getIdentifier(#NAME), M, nullptr); \
+      if (auto type = lookup.getSingleTypeResult()) { \
+        if (auto classDecl = dyn_cast<ClassDecl>(type)) { \
+          if (classDecl->getGenericParams() == nullptr) { \
+            Impl.NAME##Decl = classDecl; \
+          } \
+        } \
+      } \
+    } \
+  } \
+  \
+  return Impl.NAME##Decl; \
 }
+
+FOR_KNOWN_FOUNDATION_TYPES(GET_FOUNDATION_DECL)
+#undef GET_FOUNDATION_DECL
+#undef FOR_KNOWN_FOUNDATION_TYPES
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Check whether we've already looked for and cached this protocol.
@@ -868,6 +888,9 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   if (Impl.EqualIntDecl)
     return Impl.EqualIntDecl;
 
+  if (!getIntDecl() || !getBoolDecl())
+    return nullptr;
+
   auto intType = getIntDecl()->getDeclaredType();
   auto boolType = getBoolDecl()->getDeclaredType();
   SmallVector<ValueDecl *, 30> equalFuncs;
@@ -929,14 +952,12 @@ FuncDecl *ASTContext::getArrayAppendElementDecl() const {
         return nullptr;
       if (ParamLists[0]->size() != 1)
         return nullptr;
-
-      InOutType *SelfInOutTy =
-        ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
-      if (!SelfInOutTy)
+      if (!ParamLists[0]->get(0)->isInOut())
         return nullptr;
 
+      auto SelfInOutTy = ParamLists[0]->get(0)->getInterfaceType();
       BoundGenericStructType *SelfGenericStructTy =
-        SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+        SelfInOutTy->getInOutObjectType()->getAs<BoundGenericStructType>();
       if (!SelfGenericStructTy)
         return nullptr;
       if (SelfGenericStructTy->getDecl() != getArrayDecl())
@@ -980,14 +1001,12 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
         return nullptr;
       if (ParamLists[0]->size() != 1)
         return nullptr;
-
-      InOutType *SelfInOutTy =
-        ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
-      if (!SelfInOutTy)
+      if (!ParamLists[0]->get(0)->isInOut())
         return nullptr;
 
+      auto SelfInOutTy = ParamLists[0]->get(0)->getInterfaceType();
       BoundGenericStructType *SelfGenericStructTy =
-        SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+        SelfInOutTy->getInOutObjectType()->getAs<BoundGenericStructType>();
       if (!SelfGenericStructTy)
         return nullptr;
       if (SelfGenericStructTy->getDecl() != getArrayDecl())
@@ -1349,24 +1368,25 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
     return known->second.get();
 
   // Create a new generic signature builder with the given signature.
-  auto builder = new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
+  auto builder =
+    new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
 
   // Store this generic signature builder (no generic environment yet).
   Impl.GenericSignatureBuilders[{sig, mod}] =
     std::unique_ptr<GenericSignatureBuilder>(builder);
 
   builder->addGenericSignature(sig);
-  builder->finalize(SourceLoc(), sig->getGenericParams(),
-                    /*allowConcreteGenericParams=*/true);
 
-#ifndef NDEBUG
-  if (builder->getGenericSignature()->getCanonicalSignature() != sig) {
+#if SWIFT_GSB_EXPENSIVE_ASSERTIONS
+  auto builderSig =
+    builder->computeGenericSignature(SourceLoc(),
+                                     /*allowConcreteGenericParams=*/true);
+  if (builderSig->getCanonicalSignature() != sig) {
     llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
     llvm::errs() << "Original generic signature   : ";
     sig->print(llvm::errs());
     llvm::errs() << "\nReprocessed generic signature: ";
-    auto reprocessedSig =
-    builder->getGenericSignature()->getCanonicalSignature();
+    auto reprocessedSig = builderSig->getCanonicalSignature();
 
     reprocessedSig->print(llvm::errs());
     llvm::errs() << "\n";
@@ -1411,19 +1431,23 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
     llvm_unreachable("idempotency problem with a generic signature");
   }
+#else
+  // FIXME: This should be handled lazily in the future, and therefore not
+  // required.
+  builder->processDelayedRequirements();
 #endif
 
   return builder;
 }
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                                    GenericSignatureBuilder *builder,
-                                                    ModuleDecl &module) {
+                                              GenericSignatureBuilder *builder,
+                                              GenericSignature *sig,
+                                              ModuleDecl &module) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
-  auto sig = builder->getGenericSignature();
   auto env = sig->createGenericEnvironment(module);
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
@@ -1915,7 +1939,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
 
   // Fix the name of the function itself.
   if (name.getBaseName() != targetName.getBaseName()) {
-    diag.fixItReplace(func->getLoc(), targetName.getBaseName().str());
+    diag.fixItReplace(func->getLoc(), targetName.getBaseIdentifier().str());
   }
 
   // Fix the argument names that need fixing.
@@ -2410,7 +2434,7 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
         Diags.diagnose(conflictingDecl, diag::objc_redecl_same,
                        diagInfo.first, diagInfo.second, selector);
         Diags.diagnose(originalDecl, diag::invalid_redecl_prev,
-                       originalDecl->getName());
+                       originalDecl->getBaseName());
       } else {
         Diags.diagnose(conflictingDecl, diag::objc_redecl,
                        diagInfo.first,
@@ -2642,13 +2666,19 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
 }
 
 ParenType *ParenType::get(const ASTContext &C, Type underlying,
-                          ParameterTypeFlags flags) {
+                          ParameterTypeFlags fl) {
+  if (fl.isInOut())
+    assert(!underlying->is<InOutType>() && "caller did not pass a base type");
+  if (underlying->is<InOutType>())
+    assert(fl.isInOut() && "caller did not set flags correctly");
+  
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
   ParenType *&Result =
-      C.Impl.getArena(arena).ParenTypes[{underlying, flags.toRaw()}];
+      C.Impl.getArena(arena).ParenTypes[{underlying, fl.toRaw()}];
   if (Result == nullptr) {
-    Result = new (C, arena) ParenType(underlying, properties, flags);
+    Result = new (C, arena) ParenType(underlying,
+                                      properties, fl);
   }
   return Result;
 }
@@ -2670,13 +2700,26 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
-    return ParenType::get(C, Fields[0].getType(),
+    return ParenType::get(C, Fields[0].getRawType(),
                           Fields[0].getParameterFlags());
 
   RecursiveTypeProperties properties;
+  bool hasInOut = false;
   for (const TupleTypeElt &Elt : Fields) {
-    if (Elt.getType())
-      properties |= Elt.getType()->getRecursiveProperties();
+    auto eltTy = Elt.getType();
+    if (!eltTy) continue;
+    
+    properties |= eltTy->getRecursiveProperties();
+    // Recur into paren types and canonicalized paren types.  'inout' in nested
+    // non-paren tuples are malformed and will be diagnosed later.
+    if (auto *TTy = Elt.getType()->getAs<TupleType>()) {
+      if (TTy->getNumElements() == 1)
+        hasInOut |= TTy->hasInOutElement();
+    } else if (auto *Pty = dyn_cast<ParenType>(Elt.getType().getPointer())) {
+      hasInOut |= Pty->getParameterFlags().isInOut();
+    } else {
+      hasInOut |= Elt.getParameterFlags().isInOut();
+    }
   }
 
   auto arena = getArena(properties);
@@ -2705,9 +2748,101 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
 
   TupleType *New =
-      new (C, arena) TupleType(Fields, IsCanonical ? &C : nullptr, properties);
+      new (C, arena) TupleType(Fields, IsCanonical ? &C : nullptr,
+                               properties, hasInOut);
   C.Impl.getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
+}
+
+TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
+                           ParameterTypeFlags fl)
+  : Name(name), ElementType(ty), Flags(fl) {
+  if (fl.isInOut())
+    assert(!ty->is<InOutType>() && "caller did not pass a base type");
+  if (ty->is<InOutType>())
+    assert(fl.isInOut() && "caller did not set flags correctly");
+}
+
+Type TupleTypeElt::getType() const {
+  if (Flags.isInOut()) return InOutType::get(ElementType);
+  return ElementType;
+}
+
+AnyFunctionType::Param::Param(const TupleTypeElt &tte)
+  : Ty(tte.isVararg() ? tte.getVarargBaseTy() : tte.getRawType()),
+    Label(tte.getName()), Flags(tte.getParameterFlags()) {
+  assert(getType()->is<InOutType>() == Flags.isInOut());
+}
+
+AnyFunctionType::Param::Param(Type t, Identifier l, ParameterTypeFlags f)
+  : Ty(t), Label(l), Flags(f) {
+  if (f.isInOut())
+    assert(!t->is<InOutType>() && "caller did not pass a base type");
+  if (!t.isNull() && t->is<InOutType>())
+    assert(f.isInOut() && "caller did not set flags correctly");
+}
+
+Type AnyFunctionType::Param::getType() const {
+  if (Flags.isInOut()) return InOutType::get(Ty);
+  // FIXME: Callers are inconsistenly setting this flag and retrieving this
+  // type with and without the Array Slice type.
+//  if (Flags.isVariadic()) return ArraySliceType::get(Ty);
+  return Ty;
+}
+
+AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
+                                               bool isInitializingCtor,
+                                               bool wantDynamicSelf) {
+  auto *dc = AFD->getDeclContext();
+  auto &Ctx = dc->getASTContext();
+  
+  // Determine the type of the container.
+  auto containerTy = dc->getDeclaredInterfaceType();
+  if (!containerTy || containerTy->hasError())
+    return AnyFunctionType::Param(ErrorType::get(Ctx), Identifier(),
+                                  ParameterTypeFlags());
+
+  // Determine the type of 'self' inside the container.
+  auto selfTy = dc->getSelfInterfaceType();
+  if (!selfTy || selfTy->hasError())
+    return AnyFunctionType::Param(ErrorType::get(Ctx), Identifier(),
+                                  ParameterTypeFlags());
+
+  bool isStatic = false;
+  bool isMutating = false;
+
+  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+    isStatic = FD->isStatic();
+    isMutating = FD->isMutating();
+
+    if (wantDynamicSelf && FD->hasDynamicSelf())
+      selfTy = DynamicSelfType::get(selfTy, Ctx);
+  } else if (isa<ConstructorDecl>(AFD)) {
+    if (isInitializingCtor) {
+      // initializing constructors of value types always have an implicitly
+      // inout self.
+      isMutating = true;
+    } else {
+      // allocating constructors have metatype 'self'.
+      isStatic = true;
+    }
+  } else if (isa<DestructorDecl>(AFD)) {
+    // destructors of value types always have an implicitly inout self.
+    isMutating = true;
+  }
+
+  // 'static' functions have 'self' of type metatype<T>.
+  if (isStatic)
+    return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx), Identifier(),
+                                  ParameterTypeFlags());
+
+  // Reference types have 'self' of type T.
+  if (containerTy->hasReferenceSemantics())
+    return AnyFunctionType::Param(selfTy, Identifier(),
+                                  ParameterTypeFlags());
+
+  return AnyFunctionType::Param(selfTy, Identifier(),
+                                ParameterTypeFlags().withInOut(isMutating));
 }
 
 void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3058,8 +3193,10 @@ ModuleType *ModuleType::get(ModuleDecl *M) {
 }
 
 DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
+  assert(selfType->isMaterializable()
+         && "non-materializable dynamic self?");
+  
   auto properties = selfType->getRecursiveProperties();
-  assert(properties.isMaterializable() && "non-materializable dynamic self?");
   auto arena = getArena(properties);
 
   auto &dynamicSelfTypes = ctx.Impl.getArena(arena).DynamicSelfTypes;
@@ -3072,23 +3209,14 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
   return result;
 }
 
-static void checkFunctionRecursiveProperties(Type Input,
-                                             Type Result) {
-  // TODO: Would be nice to be able to assert these, but they trip during
-  // constraint solving:
-  //assert(!Input->getRecursiveProperties().isLValue()
-  //       && "function should not take lvalues directly as parameters");
-  //assert(Result->getRecursiveProperties().isMaterializable()
-  //       && "function return should be materializable");
-}
-
 static RecursiveTypeProperties getFunctionRecursiveProperties(Type Input,
                                                               Type Result) {
-  checkFunctionRecursiveProperties(Input, Result);
-
+//  assert(!Input->hasLValueType()
+//         && "function should not take lvalues directly as parameters");
+  
   auto properties = Input->getRecursiveProperties()
                   | Result->getRecursiveProperties();
-  properties &= ~RecursiveTypeProperties::IsNotMaterializable;
+  properties &= ~RecursiveTypeProperties::IsLValue;
   return properties;
 }
 
@@ -3097,8 +3225,9 @@ static RecursiveTypeProperties getFunctionRecursiveProperties(Type Input,
 // always materializable.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(Type Input, Type Result) {
-  checkFunctionRecursiveProperties(Input, Result);
-
+//  assert(!Input->hasLValueType()
+//         && "function should not take lvalues directly as parameters");
+  
   static_assert(RecursiveTypeProperties::BitWidth == 10,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
@@ -3107,6 +3236,17 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   if (Result->getRecursiveProperties().hasError())
     properties |= RecursiveTypeProperties::HasError;
   return properties;
+}
+
+ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getParams();
+  case TypeKind::GenericFunction:
+    return cast<GenericFunctionType>(this)->getParams();
+  default:
+    llvm_unreachable("Undefined function type");
+  }
 }
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
@@ -3123,32 +3263,93 @@ AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   llvm_unreachable("unhandled function type");
 }
 
-FunctionType *FunctionType::get(Type Input, Type Result,
-                                const ExtInfo &Info) {
-  auto properties = getFunctionRecursiveProperties(Input, Result);
-  auto arena = getArena(properties);
-  uint16_t attrKey = Info.getFuncAttrKey();
+void AnyFunctionType::decomposeInput(
+    Type type, SmallVectorImpl<AnyFunctionType::Param> &result) {
+  switch (type->getKind()) {
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(type.getPointer());
+    for (auto &elt : tupleTy->getElements()) {
+      result.push_back(AnyFunctionType::Param(elt));
+    }
+    return;
+  }
+      
+  case TypeKind::Paren: {
+    auto pty = cast<ParenType>(type.getPointer());
+    result.push_back(AnyFunctionType::Param(pty->getUnderlyingType()->getInOutObjectType(),
+                                            Identifier(),
+                                            pty->getParameterFlags()));
+    return;
+  }
+      
+  default:
+//    assert(type->is<InOutType>() && "Found naked inout type");
+    result.push_back(AnyFunctionType::Param(type->getInOutObjectType(),
+                                            Identifier(),
+                                            ParameterTypeFlags::fromParameterType(type, false, false)));
+    return;
+  }
+}
 
-  const ASTContext &C = Input->getASTContext();
+Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
+                                   bool canonicalVararg) {
+  SmallVector<TupleTypeElt, 4> elements;
+  for (const auto &param : params) {
+    Type eltType = param.getPlainType();
+    if (param.isVariadic()) {
+      if (canonicalVararg)
+        eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});
+      else
+        eltType = ArraySliceType::get(eltType);
+    }
+    elements.push_back(TupleTypeElt(eltType, param.getLabel(),
+                                    param.getParameterFlags()));
+  }
+  return TupleType::get(elements, ctx);
+}
+
+FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
+                                Type result, const ExtInfo &info,
+                                bool canonicalVararg) {
+  return get(composeInput(result->getASTContext(), params, canonicalVararg),
+             result, info);
+}
+
+FunctionType *FunctionType::get(Type input, Type result,
+                                const ExtInfo &info) {
+  auto properties = getFunctionRecursiveProperties(input, result);
+  auto arena = getArena(properties);
+  uint16_t attrKey = info.getFuncAttrKey();
+
+  const ASTContext &C = input->getASTContext();
 
   FunctionType *&Entry
-    = C.Impl.getArena(arena).FunctionTypes[{Input, {Result, attrKey} }];
+    = C.Impl.getArena(arena).FunctionTypes[{input, {result, attrKey} }];
   if (Entry) return Entry;
-
-  return Entry = new (C, arena) FunctionType(Input, Result,
-                                             properties,
-                                             Info);
+  
+  SmallVector<AnyFunctionType::Param, 4> params;
+  AnyFunctionType::decomposeInput(input, params);
+  void *mem = C.Allocate(sizeof(FunctionType) +
+                           sizeof(AnyFunctionType::Param) * params.size(),
+                         alignof(FunctionType));
+  return Entry = new (mem) FunctionType(params, input, result,
+                                        properties, info);
 }
 
 // If the input and result types are canonical, then so is the result.
-FunctionType::FunctionType(Type input, Type output,
+FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
+                           Type input, Type output,
                            RecursiveTypeProperties properties,
                            const ExtInfo &Info)
     : AnyFunctionType(TypeKind::Function,
-                      (input->isCanonical() && output->isCanonical())
+                      (isCanonicalFunctionInputType(input) &&
+                       output->isCanonical())
                           ? &input->getASTContext()
                           : nullptr,
-                      input, output, properties, Info) {}
+                      input, output, properties, params.size(), Info) {
+  std::uninitialized_copy(params.begin(), params.end(),
+                          getTrailingObjects<AnyFunctionType::Param>());
+}
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature *sig,
@@ -3159,6 +3360,25 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(input.getPointer());
   ID.AddPointer(result.getPointer());
   ID.AddInteger(info.getFuncAttrKey());
+}
+
+/// If this is a ParenType, unwrap it to produce the underlying type.
+/// Otherwise, return \c type.
+static Type unwrapParenType(Type type) {
+  if (auto parenTy = dyn_cast<ParenType>(type.getPointer()))
+    return parenTy->getUnderlyingType();
+
+  return type;
+}
+
+GenericFunctionType *GenericFunctionType::get(GenericSignature *sig,
+                                              ArrayRef<Param> params,
+                                              Type result,
+                                              const ExtInfo &info,
+                                              bool canonicalVararg) {
+  return get(sig, composeInput(result->getASTContext(), params,
+                               canonicalVararg),
+             result, info);
 }
 
 GenericFunctionType *
@@ -3187,20 +3407,24 @@ GenericFunctionType::get(GenericSignature *sig,
   // point.
   auto &moduleForCanonicality = *ctx.TheBuiltinModule;
   bool isCanonical = sig->isCanonical()
-    && sig->isCanonicalTypeInContext(input, moduleForCanonicality)
+    && isCanonicalFunctionInputType(input)
+    && sig->isCanonicalTypeInContext(unwrapParenType(input),
+                                     moduleForCanonicality)
     && sig->isCanonicalTypeInContext(output, moduleForCanonicality);
 
   if (auto result
         = ctx.Impl.GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos)) {
     return result;
   }
-
-  // Allocate storage for the object.
-  void *mem = ctx.Allocate(sizeof(GenericFunctionType),
+  
+  SmallVector<AnyFunctionType::Param, 4> params;
+  AnyFunctionType::decomposeInput(input, params);
+  void *mem = ctx.Allocate(sizeof(GenericFunctionType) +
+                             sizeof(AnyFunctionType::Param) * params.size(),
                            alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(input, output);
-  auto result = new (mem) GenericFunctionType(sig, input, output, info,
+  auto result = new (mem) GenericFunctionType(sig, params, input, output, info,
                                               isCanonical ? &ctx : nullptr,
                                               properties);
 
@@ -3210,15 +3434,17 @@ GenericFunctionType::get(GenericSignature *sig,
 
 GenericFunctionType::GenericFunctionType(
                        GenericSignature *sig,
+                       ArrayRef<AnyFunctionType::Param> params,
                        Type input,
                        Type result,
                        const ExtInfo &info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)
   : AnyFunctionType(TypeKind::GenericFunction, ctx, input, result,
-                    properties, info),
-    Signature(sig)
-{}
+                    properties, params.size(), info), Signature(sig) {
+  std::uninitialized_copy(params.begin(), params.end(),
+                          getTrailingObjects<AnyFunctionType::Param>());
+}
 
 GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
                                                 const ASTContext &ctx) {
@@ -3381,8 +3607,10 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
 
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
-  if (genericSig)
+  if (genericSig) {
     properties.removeHasTypeParameter();
+    properties.removeHasDependentMember();
+  }
 
   auto fnType =
       new (mem) SILFunctionType(genericSig, ext, callee, params, normalResults,
@@ -3509,8 +3737,7 @@ InOutType *InOutType::get(Type objectTy) {
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
          "cannot have 'inout' or @lvalue wrapped inside an 'inout'");
 
-  auto properties = objectTy->getRecursiveProperties() |
-                     RecursiveTypeProperties::HasInOut;
+  auto properties = objectTy->getRecursiveProperties();
 
   properties &= ~RecursiveTypeProperties::IsLValue;
   auto arena = getArena(properties);
@@ -3527,11 +3754,7 @@ InOutType *InOutType::get(Type objectTy) {
 
 DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
   auto properties = base->getRecursiveProperties();
-  // FIXME: The specific introduction of HasTypeParameter here is due to
-  // type witness inference. See the use of mapErrorTypeToOriginal in
-  // TypeCheckProtocol.cpp.
-  if (!properties.hasTypeVariable() && !properties.hasUnresolvedType())
-    properties |= RecursiveTypeProperties::HasTypeParameter;
+  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
@@ -3549,11 +3772,7 @@ DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
 DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType) {
   auto properties = base->getRecursiveProperties();
-  // FIXME: The specific introduction of HasTypeParameter here is due to
-  // type witness inference. See the use of mapErrorTypeToOriginal in
-  // TypeCheckProtocol.cpp.
-  if (!properties.hasTypeVariable() && !properties.hasUnresolvedType())
-    properties |= RecursiveTypeProperties::HasTypeParameter;
+  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);
@@ -4042,6 +4261,21 @@ bool ASTContext::isTypeBridgedInExternalModule(
           // gets upset if you don't use the NSValue subclasses its factory
           // methods instantiate.
           nominal->getParentModule()->getName() == Id_CoreMedia);
+}
+
+bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
+  auto clas = t->getClassOrBoundGenericClass();
+  if (!clas)
+    return false;
+  
+  if (clas == getNSErrorDecl())
+    return true;
+  if (clas == getNSNumberDecl())
+    return true;
+  if (clas == getNSValueDecl())
+    return true;
+  
+  return false;
 }
 
 Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,

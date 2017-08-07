@@ -39,8 +39,6 @@ extension String : _ExpressibleByStringInterpolation {
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
-  ///
-  /// - SeeAlso: `ExpressibleByStringInterpolation`
   @_inlineable
   public init<T>(stringInterpolationSegment expr: T) {
     self = String(describing: expr)
@@ -50,8 +48,6 @@ extension String : _ExpressibleByStringInterpolation {
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
-  ///
-  /// - SeeAlso: `ExpressibleByStringInterpolation`
   @_inlineable
   public init<T: TextOutputStreamable> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
@@ -61,8 +57,6 @@ extension String : _ExpressibleByStringInterpolation {
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
-  ///
-  /// - SeeAlso: `ExpressibleByStringInterpolation`
   @_inlineable
   public init<T: CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyPrintable(expr)
@@ -72,8 +66,6 @@ extension String : _ExpressibleByStringInterpolation {
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
-  ///
-  /// - SeeAlso: `ExpressibleByStringInterpolation`
   public init<T: TextOutputStreamable & CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
   }

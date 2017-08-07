@@ -312,8 +312,8 @@ class LinkEntity {
                                                 CanType associatedType,
                                                 ProtocolDecl *requirement) {
     unsigned index = 0;
-    for (auto &reqt : conformance->getProtocol()->getRequirementSignature()
-                                                ->getRequirements()) {
+    for (const auto &reqt :
+           conformance->getProtocol()->getRequirementSignature()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
           reqt.getSecondType()->castTo<ProtocolType>()->getDecl() ==
@@ -328,9 +328,7 @@ class LinkEntity {
   static std::pair<CanType, ProtocolDecl*>
   getAssociatedConformanceByIndex(const ProtocolConformance *conformance,
                                   unsigned index) {
-    auto &reqt =
-      conformance->getProtocol()->getRequirementSignature()
-                                ->getRequirements()[index];
+    auto &reqt = conformance->getProtocol()->getRequirementSignature()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
              reqt.getSecondType()->castTo<ProtocolType>()->getDecl() };
@@ -682,6 +680,14 @@ public:
 
   static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
                       ForDefinition_t forDefinition);
+  
+  static LinkInfo get(const UniversalLinkageInfo &linkInfo,
+                      StringRef name,
+                      SILLinkage linkage,
+                      bool isFragile,
+                      bool isSILOnly,
+                      ForDefinition_t isDefinition,
+                      bool isWeakImported);
 
   StringRef getName() const {
     return Name.str();

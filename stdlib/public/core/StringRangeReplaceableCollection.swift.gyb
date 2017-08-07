@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension String : StringProtocol {
-  /// The index type for subscripting a string.
-  public typealias Index = CharacterView.Index
-
+extension String : StringProtocol, RangeReplaceableCollection {  
   /// A type that represents the number of steps between two `String.Index`
   /// values, where one value is reachable from the other.
   ///
@@ -36,16 +33,23 @@ extension String : StringProtocol {
     self.init(repeating: String(repeatedValue), count: count)
   }
 
-  // Now that String conforms to Collection, we need to disambiguate between:
+  // This initializer disambiguates between the following intitializers, now
+  // that String conforms to Collection:
   // - init<T>(_ value: T) where T : LosslessStringConvertible
-  // - init<S>(_ characters: S) where S : Sequence, S.Iterator.Element == Character
-  // Cannot simply do init(_: String) as that would itself be ambiguous with
-  // init?(_ description: String)
-  public init<
-    T : LosslessStringConvertible & Sequence
-  >(_ other: T)
-  where T.Iterator.Element == Character {
-    self = other.description
+  // - init<S>(_ characters: S) where S : Sequence, S.Element == Character
+  public init<S : Sequence & LosslessStringConvertible>(_ other: S)
+  where S.Element == Character {
+    self._core = CharacterView(other)._core
+  }
+  
+  // The defaulted argument prevents this initializer from satisfies the
+  // LosslessStringConvertible conformance.  You can satisfy a protocol 
+  // requirement with something that's not yet available, but not with
+  // something that has become unavailable. Without this, the code won't
+  // compile as Swift 4.
+  @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
+  public init?(_ other: String, obsoletedInSwift4: () = ()) {
+    self.init(other._core)
   }
 
   /// The position of the first character in a nonempty string.
@@ -94,7 +98,6 @@ extension String : StringProtocol {
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:limitedBy:)`
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return characters.index(i, offsetBy: n)
@@ -136,7 +139,6 @@ extension String : StringProtocol {
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:)`
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
@@ -171,16 +173,6 @@ extension String : StringProtocol {
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
   public subscript(i: Index) -> Character { return characters[i] }
-}
-
-extension String.Index {
-  public static func == (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._base == rhs._base
-  }
-
-  public static func < (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._base < rhs._base
-  }
 }
 
 extension String {
@@ -382,6 +374,35 @@ extension String {
     return Swift.min(x,y)
   }
 }
+
+//===----------------------------------------------------------------------===//
+// The following overloads of flatMap are carefully crafted to allow the code
+// like the following:
+//   ["hello"].flatMap { $0 }
+// return an array of strings without any type context in Swift 3 mode, at the
+// same time allowing the following code snippet to compile:
+//   [0, 1].flatMap { x in
+//     if String(x) == "foo" { return "bar" } else { return nil }
+//   }
+// Note that the second overload is declared on a more specific protocol.
+// See: test/stdlib/StringFlatMap.swift for tests.
+extension Sequence {
+  @available(swift, obsoleted: 4)
+  public func flatMap(
+    _ transform: (Element) throws -> String
+  ) rethrows -> [String] {
+    return try map(transform)
+  }
+}
+
+extension Collection {
+  public func flatMap(
+    _ transform: (Element) throws -> String?
+  ) rethrows -> [String] {
+    return try _flatMap(transform)
+  }
+}
+//===----------------------------------------------------------------------===//
 
 extension String {
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")

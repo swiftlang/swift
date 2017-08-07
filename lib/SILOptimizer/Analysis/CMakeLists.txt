@@ -1,5 +1,6 @@
 set(ANALYSIS_SOURCES
   Analysis/ARCAnalysis.cpp
+  Analysis/AccessSummaryAnalysis.cpp
   Analysis/AliasAnalysis.cpp
   Analysis/Analysis.cpp
   Analysis/ArraySemantic.cpp
@@ -7,6 +8,7 @@ set(ANALYSIS_SOURCES
   Analysis/CallerAnalysis.cpp
   Analysis/CFG.cpp
   Analysis/ClassHierarchyAnalysis.cpp
+  Analysis/ClosureScope.cpp
   Analysis/ColdBlockInfo.cpp
   Analysis/DestructorAnalysis.cpp
   Analysis/EscapeAnalysis.cpp

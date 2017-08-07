@@ -13,6 +13,8 @@
 #ifndef SWIFT_FRONTENDTOOL_TBD_H
 #define SWIFT_FRONTENDTOOL_TBD_H
 
+#include "swift/Frontend/FrontendOptions.h"
+
 namespace llvm {
 class StringRef;
 class Module;
@@ -23,11 +25,15 @@ class FileUnit;
 class FrontendOptions;
 
 bool writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
-              llvm::StringRef OutputFilename);
+              bool silSerializeWitnessTables, llvm::StringRef OutputFilename,
+              llvm::StringRef installName);
+bool inputFileKindCanHaveTBDValidated(InputFileKind kind);
 bool validateTBD(ModuleDecl *M, llvm::Module &IRModule,
-                 bool hasMultipleIRGenThreads);
+                 bool hasMultipleIRGenThreads, bool silSerializeWitnessTables,
+                 bool diagnoseExtraSymbolsInTBD);
 bool validateTBD(FileUnit *M, llvm::Module &IRModule,
-                 bool hasMultipleIRGenThreads);
+                 bool hasMultipleIRGenThreads, bool silSerializeWitnessTables,
+                 bool diagnoseExtraSymbolsInTBD);
 }
 
 #endif

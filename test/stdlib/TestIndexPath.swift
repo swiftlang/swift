@@ -226,6 +226,8 @@ class TestIndexPath: TestIndexPathSuper {
         let ip2: IndexPath = [1, 1, 1]
         
         expectNotEqual(ip1.hashValue, ip2.hashValue)
+
+        IndexPath(indexes: [Int.max >> 8, 2, Int.max >> 36]).hashValue // this should not cause an overflow crash
     }
     
     func testEquality() {
@@ -709,6 +711,23 @@ class TestIndexPath: TestIndexPathSuper {
     func test_unconditionallyBridgeFromObjectiveC() {
         expectEqual(IndexPath(), IndexPath._unconditionallyBridgeFromObjectiveC(nil))
     }
+
+    func test_slice_1ary() {
+        let indexPath: IndexPath = [0]
+        let res = indexPath.dropFirst()
+        expectEqual(0, res.count)
+
+        let slice = indexPath[1..<1]
+        expectEqual(0, slice.count)
+    }
+
+    func test_dropFirst() {
+        var pth = IndexPath(indexes:[1,2,3,4])
+        while !pth.isEmpty {
+            // this should not crash 
+            pth = pth.dropFirst()
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -760,5 +779,7 @@ IndexPathTests.test("testObjcBridgeType") { TestIndexPath().testObjcBridgeType()
 IndexPathTests.test("test_AnyHashableContainingIndexPath") { TestIndexPath().test_AnyHashableContainingIndexPath() }
 IndexPathTests.test("test_AnyHashableCreatedFromNSIndexPath") { TestIndexPath().test_AnyHashableCreatedFromNSIndexPath() }
 IndexPathTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexPath().test_unconditionallyBridgeFromObjectiveC() }
+IndexPathTests.test("test_slice_1ary") { TestIndexPath().test_slice_1ary() }
+IndexPathTests.test("test_dropFirst") { TestIndexPath().test_dropFirst() }
 runAllTests()
 #endif

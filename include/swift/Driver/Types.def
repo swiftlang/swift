@@ -61,6 +61,10 @@ TYPE("imported-modules", ImportedModules,   "importedmodules", "")
 TYPE("tbd",             TBD,                "tbd",             "")
 TYPE("module-trace",    ModuleTrace,        "trace.json",      "")
 
+// BEGIN APPLE-ONLY OUTPUT TYPES
+TYPE("index-data",      IndexData,          "",                "")
+// END APPLE-ONLY OUTPUT TYPES
+
 // Misc types
 TYPE("pcm",             ClangModuleFile,    "pcm",             "")
 TYPE("pch",             PCH,                "pch",             "")

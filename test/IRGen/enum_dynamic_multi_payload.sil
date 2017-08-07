@@ -343,7 +343,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[NOOP:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call void %destroy(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call void %destroy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[NOOP]]
   // CHECK:      <label>:[[NOOP]]
   destroy_addr %a : $*EitherOr<T, Builtin.Int64>
@@ -353,7 +353,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[TRIVIAL]]
   // CHECK:        call void @llvm.memcpy
@@ -378,7 +378,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call void %destroy(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call void %destroy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[NOOP]]
   // CHECK:      <label>:[[RIGHT]]
   // CHECK:        call void {{.*}} @swift_rt_swift_release
@@ -390,7 +390,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[TRIVIAL]]
   // CHECK:        call void @llvm.memcpy
@@ -405,7 +405,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
   // CHECK:      <label>:[[LEFT]]
-  // CHECK:        call %swift.opaque* %initializeWithCopy(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        call %swift.opaque* %initializeWithCopy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[RIGHT]]
   // CHECK:        call void @swift_rt_swift_retain
@@ -427,14 +427,14 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
-// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 17
+// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 11
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF0]]
 
 // CHECK:      [[BUF1:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 1
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %U to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
-// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 17
+// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 11
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF1]]
 
 // CHECK:   call void @swift_initEnumMetadataMultiPayload(i8** {{%.*}}, %swift.type* [[METADATA]], {{i(32|64)}} 2, i8*** [[BUF0]])

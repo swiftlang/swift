@@ -888,7 +888,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   ONEOPERAND_ONETYPE_INST(OpenExistentialMetatype)
   ONEOPERAND_ONETYPE_INST(OpenExistentialBox)
-  ONEOPERAND_ONETYPE_INST(OpenExistentialOpaque)
+  ONEOPERAND_ONETYPE_INST(OpenExistentialValue)
+  ONEOPERAND_ONETYPE_INST(OpenExistentialBoxValue)
   // Conversion instructions.
   ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
@@ -969,7 +970,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
 
   case ValueKind::InitExistentialAddrInst:
-  case ValueKind::InitExistentialOpaqueInst:
+  case ValueKind::InitExistentialValueInst:
   case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::AllocExistentialBoxInst: {
@@ -1000,8 +1001,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                 Ty,
                                                 ctxConformances);
       break;
-    case ValueKind::InitExistentialOpaqueInst:
-      ResultVal = Builder.createInitExistentialOpaque(Loc, Ty, ConcreteTy,
+    case ValueKind::InitExistentialValueInst:
+      ResultVal = Builder.createInitExistentialValue(Loc, Ty, ConcreteTy,
                                                       operand, ctxConformances);
       break;
     case ValueKind::InitExistentialMetatypeInst:
@@ -1083,10 +1084,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal =
-        Builder.createApply(Loc, getLocalValue(ValID, FnTy), SubstFnTy,
-                            substConventions.getSILResultType(), Substitutions,
-                            Args, IsNonThrowingApply != 0);
+    ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
+                                    Substitutions, Args,
+                                    IsNonThrowingApply != 0);
     break;
   }
   case ValueKind::TryApplyInst: {
@@ -1121,10 +1121,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal = Builder.createTryApply(Loc,
-                                       getLocalValue(ValID, FnTy),
-                                       SubstFnTy, Substitutions, Args,
-                                       normalBB, errorBB);
+    ResultVal = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
+                                       Substitutions, Args, normalBB, errorBB);
     break;
   }
   case ValueKind::PartialApplyInst: {
@@ -1159,9 +1157,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
           ListOfValues[I], fnConv.getSILArgumentType(I + unappliedArgs)));
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,
-                                           Substitutions, Args,
-                                           closureTy);
+    ResultVal = Builder.createPartialApply(
+        Loc, FnVal, Substitutions, Args,
+        closureTy.getAs<SILFunctionType>()->getCalleeConvention());
     break;
   }
   case ValueKind::BuiltinInst: {
@@ -1386,7 +1384,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(UnmanagedAutoreleaseValue)
   REFCOUNTING_INSTRUCTION(SetDeallocating)
   UNARY_INSTRUCTION(DeinitExistentialAddr)
-  UNARY_INSTRUCTION(DeinitExistentialOpaque)
+  UNARY_INSTRUCTION(DeinitExistentialValue)
   UNARY_INSTRUCTION(EndBorrowArgument)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
@@ -2146,6 +2144,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                                {}, type));
         break;
       }
+      case KeyPathComponentKindEncoding::OptionalChain:
+        components.push_back(KeyPathPatternComponent::forOptional(
+            KeyPathPatternComponent::Kind::OptionalChain, type));
+        break;
+      case KeyPathComponentKindEncoding::OptionalForce:
+        components.push_back(KeyPathPatternComponent::forOptional(
+            KeyPathPatternComponent::Kind::OptionalForce, type));
+        break;
+      case KeyPathComponentKindEncoding::OptionalWrap:
+        components.push_back(KeyPathPatternComponent::forOptional(
+            KeyPathPatternComponent::Kind::OptionalWrap, type));
+        break;
       }
     }
     

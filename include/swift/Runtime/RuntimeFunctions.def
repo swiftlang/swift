@@ -73,6 +73,11 @@ FUNCTION(ProjectBox, swift_projectBox, DefaultCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+FUNCTION(AllocEmptyBox, swift_allocEmptyBox, DefaultCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(),
+         ATTRS(NoUnwind))
+
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocObject, swift_allocObject,
          _swift_allocObject, _swift_allocObject_, RegisterPreservingCC,
@@ -995,7 +1000,7 @@ FUNCTION(DynamicCast, swift_dynamicCast, RegisterPreservingCC,
          RETURNS(Int1Ty),
          ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               SizeTy),
-         ATTRS(NoUnwind, ReadOnly))
+         ATTRS(ZExt, NoUnwind))
 
 // type* swift_dynamicCastTypeToObjCProtocolUnconditional(type* object,
 //                                               size_t numProtocols,
@@ -1059,14 +1064,14 @@ FUNCTION(IsClassType,
          swift_isClassType, DefaultCC,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(ZExt, NoUnwind, ReadNone))
 
 // bool swift_isOptionalType(type*);
 FUNCTION(IsOptionalType,
          swift_isOptionalType, DefaultCC,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(ZExt, NoUnwind, ReadNone))
 
 // void swift_once(swift_once_t *predicate,
 //                 void (*function_code)(RefCounted*),
@@ -1092,7 +1097,7 @@ FUNCTION(RegisterTypeMetadataRecords,
 // void swift_beginAccess(void *pointer, ValueBuffer *scratch, size_t flags);
 FUNCTION(BeginAccess, swift_beginAccess, DefaultCC,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy, getFixedBufferTy()->getPointerTo(), SizeTy),
+         ARGS(Int8PtrTy, getFixedBufferTy()->getPointerTo(), SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 // void swift_endAccess(ValueBuffer *scratch);
@@ -1205,24 +1210,16 @@ FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
          ARGS(ErrorPtrTy, Int8PtrPtrTy, OpenedErrorTriplePtrTy),
          ATTRS(NoUnwind))
 
-// void __tsan_write1(void *addr);
+// void __tsan_external_write(void *addr, void *caller_pc, void *tag);
 // This is a Thread Sanitizer instrumentation entry point in compiler-rt.
-FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
+FUNCTION(TSanInoutAccess, __tsan_external_write, C_CC,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(GetKeyPath, swift_getKeyPath, C_CC,
          RETURNS(RefCountedPtrTy),
          ARGS(Int8PtrTy, Int8PtrTy),
-         ATTRS(NoUnwind))
-
-// func _registerClassNameForArchiving(_ nameOrNull: UnsafePointer<CChar>?,
-//                                     _ c: AnyClass)
-FUNCTION(RegisterClassNameForArchiving, swift_registerClassNameForArchiving,
-         SwiftCC,
-         RETURNS(VoidTy),
-         ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
@@ -1242,7 +1239,7 @@ FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RegisterPreserv
 FUNCTION(Swift3ImplicitObjCEntrypoint, swift_objc_swift3ImplicitObjCEntrypoint,
          DefaultCC,
          RETURNS(VoidTy),
-         ARGS(ObjCPtrTy, ObjCSELTy),
+         ARGS(ObjCPtrTy, ObjCSELTy, Int8PtrTy, SizeTy, SizeTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 #endif

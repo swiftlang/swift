@@ -38,9 +38,9 @@ using namespace Lowering;
 // SILGenModule Class implementation
 //===----------------------------------------------------------------------===//
 
-SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM, bool makeModuleFragile)
+SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
-    Profiler(nullptr), makeModuleFragile(makeModuleFragile) {
+    Profiler(nullptr) {
 }
 
 SILGenModule::~SILGenModule() {
@@ -451,7 +451,7 @@ SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
       if (isAvailableExternally(F->getLinkage())) {
         F->setLinkage(constant.getLinkage(ForDefinition));
       }
-      if (makeModuleFragile) {
+      if (isMakeModuleFragile()) {
         F->setSerialized(IsSerialized);
       }
     }
@@ -498,7 +498,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   assert(F && "SILFunction should have been defined");
 
-  if (makeModuleFragile) {
+  if (isMakeModuleFragile()) {
     SILLinkage linkage = constant.getLinkage(forDefinition);
     if (linkage != SILLinkage::PublicExternal) {
       F->setSerialized(IsSerialized);
@@ -916,15 +916,33 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
 }
 
-void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
+void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
+                                           DefaultArgumentKind kind) {
+  switch (kind) {
+  case DefaultArgumentKind::None:
+    llvm_unreachable("No default argument here?");
+
+  case DefaultArgumentKind::Normal:
+    break;
+
+  case DefaultArgumentKind::Inherited:
+    return;
+
+  case DefaultArgumentKind::Column:
+  case DefaultArgumentKind::File:
+  case DefaultArgumentKind::Line:
+  case DefaultArgumentKind::Function:
+  case DefaultArgumentKind::DSOHandle:
+  case DefaultArgumentKind::Nil:
+  case DefaultArgumentKind::EmptyArray:
+  case DefaultArgumentKind::EmptyDictionary:
+    return;
+  }
+
   emitOrDelayFunction(*this, constant, [this,constant,arg](SILFunction *f) {
     preEmitFunction(constant, arg, f, arg);
     PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
     SILGenFunction SGF(*this, *f);
-    // Override location for #file, #line etc. to an invalid one so that we
-    // don't put extra strings into the default argument generator function that
-    // is not going to be ever used anyway.
-    SGF.overrideLocationForMagicIdentifiers = SourceLoc();
     SGF.emitGeneratorFunction(constant, arg);
     postEmitFunction(constant, f);
   });
@@ -959,7 +977,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
       M.createFunction(SILLinkage::Private,
                        funcName, initSILType, nullptr,
                        SILLocation(binding), IsNotBare, IsNotTransparent,
-                       makeModuleFragile
+                       isMakeModuleFragile()
                            ? IsSerialized
                            : IsNotSerialized);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
@@ -1004,7 +1022,7 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
     for (auto param : *paramList) {
       if (auto defaultArg = param->getDefaultValue())
         emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                                defaultArg);
+                                defaultArg, param->getDefaultArgumentKind());
       ++index;
     }
   }
@@ -1375,7 +1393,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
-                        Optional<unsigned> startElem, bool makeModuleFragile,
+                        Optional<unsigned> startElem,
                         bool isWholeModule) {
   SharedTimer timer("SILGen");
   const DeclContext *DC;
@@ -1391,8 +1409,8 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
   }
 
   std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, isWholeModule, makeModuleFragile));
-  SILGenModule SGM(*M, mod, makeModuleFragile);
+      new SILModule(mod, options, DC, isWholeModule));
+  SILGenModule SGM(*M, mod);
 
   if (SF) {
     if (auto *file = dyn_cast<SourceFile>(SF)) {
@@ -1450,16 +1468,14 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
 std::unique_ptr<SILModule>
 swift::performSILGeneration(ModuleDecl *mod,
                             SILOptions &options,
-                            bool makeModuleFragile,
                             bool wholeModuleCompilation) {
-  return SILModule::constructSIL(mod, options, nullptr, None, makeModuleFragile,
+  return SILModule::constructSIL(mod, options, nullptr, None,
                                  wholeModuleCompilation);
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, SILOptions &options,
-                            Optional<unsigned> startElem,
-                            bool makeModuleFragile) {
+                            Optional<unsigned> startElem) {
   return SILModule::constructSIL(sf.getParentModule(), options, &sf, startElem,
-                                 makeModuleFragile, false);
+                                 false);
 }

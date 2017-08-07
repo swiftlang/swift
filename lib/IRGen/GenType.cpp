@@ -1372,7 +1372,7 @@ namespace {
         return false;
 
       for (auto elt : decl->getAllElements()) {
-        if (elt->getArgumentInterfaceType() &&
+        if (elt->hasAssociatedValues() &&
             !elt->isIndirect() &&
             visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
@@ -1626,6 +1626,14 @@ bool IRGenModule::isPOD(SILType type, ResilienceExpansion expansion) {
   return getTypeInfo(type).isPOD(expansion);
 }
 
+/// Determine whether this type is known to be empty.
+bool IRGenModule::isKnownEmpty(SILType type, ResilienceExpansion expansion) {
+  if (auto tuple = type.getAs<TupleType>()) {
+    if (tuple->getNumElements() == 0)
+      return true;
+  }
+  return getTypeInfo(type).isKnownEmpty(expansion);
+}
 
 SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size) {
   auto it = SpareBitsForTypes.find(scalarTy);
@@ -1765,7 +1773,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
-        && (*theCase)->getArgumentInterfaceType())
+        && (*theCase)->hasAssociatedValues())
       return t.getEnumElementType(*theCase, IGM.getSILModule());
 
     return SILType();

@@ -340,7 +340,7 @@ internal struct _Buffer72 {
 % for bits in [ 32, 64, 80 ]:
 
 % if bits == 80:
-#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
 @_silgen_name("swift_float${bits}ToString")

@@ -37,6 +37,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -366,7 +367,7 @@ private:
 
   /// A work queue of functions that may have been modified and should be
   /// analyzed again.
-  std::vector<WeakVH> Deferred;
+  std::vector<WeakTrackingVH> Deferred;
 
   /// The set of all distinct functions. Use the insert() and remove() methods
   /// to modify it. The map allows efficient lookup and deferring of Functions.
@@ -389,7 +390,7 @@ private:
 
   /// Checks the rules of order relation introduced among functions set.
   /// Returns true, if sanity check has been passed, and false if failed.
-  bool doSanityCheck(std::vector<WeakVH> &Worklist);
+  bool doSanityCheck(std::vector<WeakTrackingVH> &Worklist);
 
   /// Updates the numUnhandledCallees of all user functions of the equivalence
   /// class containing \p FE by \p Delta.
@@ -434,7 +435,7 @@ llvm::ModulePass *swift::createSwiftMergeFunctionsPass() {
   return new SwiftMergeFunctions();
 }
 
-bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakVH> &Worklist) {
+bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakTrackingVH> &Worklist) {
   if (const unsigned Max = NumFunctionsForSanityCheck) {
     unsigned TripleNumber = 0;
     bool Valid = true;
@@ -442,10 +443,12 @@ bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakVH> &Worklist) {
     dbgs() << "MERGEFUNC-SANITY: Started for first " << Max << " functions.\n";
 
     unsigned i = 0;
-    for (std::vector<WeakVH>::iterator I = Worklist.begin(), E = Worklist.end();
+    for (std::vector<WeakTrackingVH>::iterator I = Worklist.begin(),
+                                               E = Worklist.end();
          I != E && i < Max; ++I, ++i) {
       unsigned j = i;
-      for (std::vector<WeakVH>::iterator J = I; J != E && j < Max; ++J, ++j) {
+      for (std::vector<WeakTrackingVH>::iterator J = I; J != E && j < Max;
+           ++J, ++j) {
         Function *F1 = cast<Function>(*I);
         Function *F2 = cast<Function>(*J);
         int Res1 = SwiftFunctionComparator(F1, F2, &GlobalNumbers).
@@ -466,7 +469,7 @@ bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakVH> &Worklist) {
           continue;
 
         unsigned k = j;
-        for (std::vector<WeakVH>::iterator K = J; K != E && k < Max;
+        for (std::vector<WeakTrackingVH>::iterator K = J; K != E && k < Max;
              ++k, ++K, ++TripleNumber) {
           if (K == J)
             continue;
@@ -584,12 +587,12 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     // consider merging it. Otherwise it is dropped and never considered again.
     if ((I != S && std::prev(I)->first == I->first) ||
         (std::next(I) != IE && std::next(I)->first == I->first) ) {
-      Deferred.push_back(WeakVH(F));
+      Deferred.push_back(WeakTrackingVH(F));
     }
   }
 
   do {
-    std::vector<WeakVH> Worklist;
+    std::vector<WeakTrackingVH> Worklist;
     Deferred.swap(Worklist);
 
     DEBUG(dbgs() << "======\nbuild tree: worklist-size=" << Worklist.size() <<
@@ -599,10 +602,10 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     SmallVector<FunctionEntry *, 8> FuncsToMerge;
 
     // Insert all candidates into the Worklist.
-    for (std::vector<WeakVH>::iterator I = Worklist.begin(),
-           E = Worklist.end(); I != E; ++I) {
-      if (!*I) continue;
-      Function *F = cast<Function>(*I);
+    for (WeakTrackingVH &I : Worklist) {
+      if (!I)
+        continue;
+      Function *F = cast<Function>(I);
       FunctionEntry *FE = getEntry(F);
       assert(!isInEquivalenceClass(FE));
 
@@ -861,7 +864,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   // a name which can be demangled in a meaningful way.
   Function *NewFunction = Function::Create(funcType,
                                            FirstF->getLinkage(),
-                                           FirstF->getName() + "_merged");
+                                           FirstF->getName() + "Tm");
   NewFunction->copyAttributesFrom(FirstF);
   // NOTE: this function is not externally available, do ensure that we reset
   // the DLL storage
@@ -1047,14 +1050,11 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
 
   for (CallInst *CI : Callers) {
     auto &Context = New->getContext();
-    auto NewFuncAttrs = New->getAttributes();
-    auto CallSiteAttrs = CI->getAttributes();
-
-    CallSiteAttrs = CallSiteAttrs.addAttributes(
-        Context, AttributeSet::ReturnIndex, NewFuncAttrs.getRetAttributes());
+    auto NewPAL = New->getAttributes();
 
     SmallVector<Type *, 8> OldParamTypes;
     SmallVector<Value *, 16> NewArgs;
+    SmallVector<AttributeSet, 8> NewArgAttrs;
     IRBuilder<> Builder(CI);
 
     FunctionType *NewFuncTy = New->getFunctionType();
@@ -1063,10 +1063,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     
     // Add the existing parameters.
     for (Value *OldArg : CI->arg_operands()) {
-      AttributeSet Attrs = NewFuncAttrs.getParamAttributes(ParamIdx);
-      if (Attrs.getNumSlots())
-        CallSiteAttrs = CallSiteAttrs.addAttributes(Context, ParamIdx, Attrs);
-
+      NewArgAttrs.push_back(NewPAL.getParamAttributes(ParamIdx));
       NewArgs.push_back(OldArg);
       OldParamTypes.push_back(OldArg->getType());
       ++ParamIdx;
@@ -1090,8 +1087,11 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     Value *Callee = ConstantExpr::getBitCast(New, FPtrType);
     CallInst *NewCI = Builder.CreateCall(Callee, NewArgs);
     NewCI->setCallingConv(CI->getCallingConv());
-    NewCI->setAttributes(CallSiteAttrs);
-
+    // Don't transfer attributes from the function to the callee. Function
+    // attributes typically aren't relevant to the calling convention or ABI.
+    NewCI->setAttributes(AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
+                                            NewPAL.getRetAttributes(),
+                                            NewArgAttrs));
     CI->replaceAllUsesWith(NewCI);
     CI->eraseFromParent();
   }

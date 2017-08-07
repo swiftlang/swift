@@ -37,6 +37,9 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                  StringRef FormatString,
                  ArrayRef<DiagnosticArgument> FormatArgs,
                  const DiagnosticInfo &Info) {
+  if (Loc.isInvalid()) {
+    return;
+  }
   auto ThisBufferID = SM.findBufferContainingLoc(Loc);
   auto ThisBufferName = SM.getIdentifierForBuffer(ThisBufferID);
   if (ThisBufferName != BufferName) {
@@ -52,6 +55,13 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc,
     auto Offset = SM.getLocOffsetInBuffer(Fixit.getRange().getStart(),
                                           ThisBufferID);
     auto Length = Fixit.getRange().getByteLength();
+
+    Replacement R { Offset, Length, Fixit.getText() };
+    if (Replacements.count(R)) {
+      return;
+    } else {
+      Replacements.insert(R);
+    }
 
     RewriteBuf.ReplaceText(Offset, Length, Fixit.getText());
     ++NumFixitsApplied;

@@ -1,8 +1,8 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -module-name Lib -I %S/Inputs/custom-modules -swift-version 3 %s
 
-// RUN: not --crash %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -swift-version 3 -Xcc -DBAD 2>&1 | %FileCheck -check-prefix CHECK-CRASH -check-prefix CHECK-CRASH-3 %s
-// RUN: not --crash %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -swift-version 4 -Xcc -DBAD 2>&1 | %FileCheck -check-prefix CHECK-CRASH -check-prefix CHECK-CRASH-4 %s
+// RUN: echo 'import Lib; _ = Sub.disappearingMethod' | not --crash %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -swift-version 3 -disable-deserialization-recovery -Xcc -DBAD - 2>&1 | %FileCheck -check-prefix CHECK-CRASH -check-prefix CHECK-CRASH-3 %s
+// RUN: echo 'import Lib; _ = Sub.disappearingMethod' | not --crash %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -swift-version 4 -disable-deserialization-recovery -Xcc -DBAD - 2>&1 | %FileCheck -check-prefix CHECK-CRASH -check-prefix CHECK-CRASH-4 %s
 
 // REQUIRES: objc_interop
 

@@ -2,6 +2,7 @@ func test() {
   // stmt
   ()
   let foo: // type
+  for x in  { } // foreach.sequence
 }
 
 // ===--- Errors
@@ -61,6 +62,14 @@ func test() {
 // TYPE: key.kind: myuid.customType
 // TYPE-NEXT: key.name: "customType"
 // TYPE-NOT: myuid
+
+// RUN: %sourcekitd-test -json-request-path %S/Inputs/custom-completion/custom.json == \
+// RUN:     -req=complete.open -pos=5:12 %s -- %s | %FileCheck %s -check-prefix=FOREACH
+
+// FOREACH-NOT: myuid
+// FOREACH: myuid.customForEach
+// FOREACH-NEXT: key.name: "customForEach"
+// FOREACH-NOT: myuid
 
 // ===--- Filtering.
 

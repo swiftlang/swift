@@ -95,7 +95,7 @@ internal struct _SliceBuffer<Element>
     _ subrange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
 
     _invariantCheck()
     _sanityCheck(insertCount <= numericCast(newValues.count))

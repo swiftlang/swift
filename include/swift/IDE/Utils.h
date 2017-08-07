@@ -48,6 +48,7 @@ namespace swift {
   class DeclContext;
   class ClangNode;
   class ClangImporter;
+  class Token;
 
 namespace ide {
 struct SourceCompleteResult {
@@ -148,6 +149,7 @@ enum class SemaTokenKind {
   Invalid,
   ValueRef,
   ModuleRef,
+  ExprStart,
   StmtStart,
 };
 
@@ -164,6 +166,7 @@ struct SemaToken {
   DeclContext *DC = nullptr;
   Type ContainerType;
   Stmt *TrailingStmt = nullptr;
+  Expr *TrailingExpr = nullptr;
 
   SemaToken() = default;
   SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
@@ -175,6 +178,8 @@ struct SemaToken {
                                                Mod(Mod), Loc(Loc) { }
   SemaToken(Stmt *TrailingStmt) : Kind(SemaTokenKind::StmtStart),
                                   TrailingStmt(TrailingStmt) {}
+  SemaToken(Expr* TrailingExpr) : Kind(SemaTokenKind::ExprStart),
+                                  TrailingExpr(TrailingExpr) {}
   bool isValid() const { return !isInvalid(); }
   bool isInvalid() const { return Kind == SemaTokenKind::Invalid; }
 };
@@ -184,6 +189,7 @@ class SemaLocResolver : public SourceEntityWalker {
   SourceLoc LocToResolve;
   SemaToken SemaTok;
   Type ContainerType;
+  llvm::SmallVector<Expr*, 4> TrailingExprStack;
 
 public:
   explicit SemaLocResolver(SourceFile &SrcFile) : SrcFile(SrcFile) { }
@@ -191,6 +197,7 @@ public:
   SourceManager &getSourceMgr() const;
 private:
   bool walkToExprPre(Expr *E) override;
+  bool walkToExprPost(Expr *E) override;
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
   bool walkToDeclPost(Decl *D) override;
   bool walkToStmtPre(Stmt *S) override;
@@ -222,6 +229,7 @@ enum class RangeKind : int8_t{
   SingleDecl,
 
   MultiStatement,
+  PartOfExpression,
 };
 
 struct DeclaredDecl {
@@ -245,12 +253,26 @@ enum class OrphanKind : int8_t {
   Continue,
 };
 
-typedef llvm::PointerIntPair<TypeBase*, 1, bool> ReturnTyAndWhetherExit;
+enum class ExitState: int8_t {
+  Positive,
+  Negative,
+  Unsure,
+};
+
+struct ReturnInfo {
+  TypeBase* ReturnType;
+  ExitState Exit;
+  ReturnInfo(): ReturnInfo(nullptr, ExitState::Unsure) {}
+  ReturnInfo(TypeBase* ReturnType, ExitState Exit):
+    ReturnType(ReturnType), Exit(Exit) {}
+  ReturnInfo(ASTContext &Ctx, ArrayRef<ReturnInfo> Branches);
+};
 
 struct ResolvedRangeInfo {
   RangeKind Kind;
-  ReturnTyAndWhetherExit ExitInfo;
-  StringRef Content;
+  ReturnInfo ExitInfo;
+  ArrayRef<Token> TokensInRange;
+  CharSourceRange ContentRange;
   bool HasSingleEntry;
   bool ThrowingUnhandledError;
   OrphanKind Orphan;
@@ -260,31 +282,42 @@ struct ResolvedRangeInfo {
   ArrayRef<DeclaredDecl> DeclaredDecls;
   ArrayRef<ReferencedDecl> ReferencedDecls;
   DeclContext* RangeContext;
-  ResolvedRangeInfo(RangeKind Kind, ReturnTyAndWhetherExit ExitInfo, StringRef Content,
+  Expr* CommonExprParent;
+
+  ResolvedRangeInfo(RangeKind Kind, ReturnInfo ExitInfo,
+                    ArrayRef<Token> TokensInRange,
                     DeclContext* RangeContext,
-                    bool HasSingleEntry, bool ThrowingUnhandledError,
+                    Expr *CommonExprParent, bool HasSingleEntry,
+                    bool ThrowingUnhandledError,
                     OrphanKind Orphan, ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
-                      ExitInfo(ExitInfo), Content(Content),
+                      ExitInfo(ExitInfo),
+                      TokensInRange(TokensInRange),
+                      ContentRange(calculateContentRange(TokensInRange)),
                       HasSingleEntry(HasSingleEntry),
                       ThrowingUnhandledError(ThrowingUnhandledError),
                       Orphan(Orphan), ContainedNodes(ContainedNodes),
                       DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
-                      RangeContext(RangeContext) {}
-  ResolvedRangeInfo(StringRef Content) :
-  ResolvedRangeInfo(RangeKind::Invalid, {nullptr, false}, Content, nullptr,
+                      RangeContext(RangeContext),
+                      CommonExprParent(CommonExprParent) {}
+  ResolvedRangeInfo(ArrayRef<Token> TokensInRange) :
+  ResolvedRangeInfo(RangeKind::Invalid, {nullptr, ExitState::Unsure},
+                    TokensInRange, nullptr, /*Commom Expr Parent*/nullptr,
                     /*Single entry*/true, /*unhandled error*/false,
                     OrphanKind::None, {}, {}, {}) {}
   void print(llvm::raw_ostream &OS);
-  bool exit() const { return ExitInfo.getInt(); }
-  Type getType() const { return ExitInfo.getPointer(); }
+  ExitState exit() const { return ExitInfo.Exit; }
+  Type getType() const { return ExitInfo.ReturnType; }
+
+private:
+  static CharSourceRange calculateContentRange(ArrayRef<Token> Tokens);
 };
 
 class RangeResolver : public SourceEntityWalker {
   struct Implementation;
-  Implementation *Impl;
+  std::unique_ptr<Implementation> Impl;
   bool walkToExprPre(Expr *E) override;
   bool walkToExprPost(Expr *E) override;
   bool walkToStmtPre(Stmt *S) override;
@@ -297,8 +330,8 @@ class RangeResolver : public SourceEntityWalker {
 public:
   RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
   RangeResolver(SourceFile &File, unsigned Offset, unsigned Length);
-  ResolvedRangeInfo resolve();
   ~RangeResolver();
+  ResolvedRangeInfo resolve();
 };
 
 /// This provides a utility to view a printed name by parsing the components
@@ -307,6 +340,8 @@ public:
 class DeclNameViewer {
   StringRef BaseName;
   SmallVector<StringRef, 4> Labels;
+  bool IsValid;
+  bool HasParen;
 public:
   DeclNameViewer(StringRef Text);
   DeclNameViewer() : DeclNameViewer(StringRef()) {}
@@ -316,6 +351,8 @@ public:
   unsigned argSize() const { return Labels.size(); }
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;
+  bool isValid() const { return IsValid; }
+  bool isFunction() const { return HasParen; }
 };
 
 /// This provide a utility for writing to an underlying string buffer multiple
@@ -414,6 +451,15 @@ enum class LabelRangeEndAt: int8_t {
   BeforeElemStart,
   LabelNameOnly,
 };
+
+struct CallArgInfo {
+  Expr *ArgExp;
+  CharSourceRange LabelRange;
+  CharSourceRange getEntireCharRange(const SourceManager &SM) const;
+};
+
+std::vector<CallArgInfo>
+getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
 
 // Get the ranges of argument labels from an Arg, either tuple or paren.
 std::vector<CharSourceRange>

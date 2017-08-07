@@ -23,7 +23,7 @@ func _stdlib_NSStringHashValuePointer(_ str: OpaquePointer, _ isASCII: Bool) -> 
 func _stdlib_CFStringHashCString(_ str: OpaquePointer, _ len: Int) -> Int
 #endif
 
-extension _Unicode {
+extension Unicode {
   internal static func hashASCII(
     _ string: UnsafeBufferPointer<UInt8>
   ) -> Int {
@@ -97,11 +97,11 @@ internal func _hashString(_ string: String) -> Int {
   }
 #else
   if let asciiBuffer = core.asciiBuffer {
-    return _Unicode.hashASCII(UnsafeBufferPointer(
+    return Unicode.hashASCII(UnsafeBufferPointer(
       start: asciiBuffer.baseAddress!,
       count: asciiBuffer.count))
   } else {
-    return _Unicode.hashUTF16(
+    return Unicode.hashUTF16(
       UnsafeBufferPointer(start: core.startUTF16, count: core.count))
   }
 #endif

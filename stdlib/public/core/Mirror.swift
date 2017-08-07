@@ -162,6 +162,8 @@ public struct Mirror {
     return nil
   }
 
+  @_semantics("optimize.sil.specialize.generic.never")
+  @inline(never)
   @_versioned
   internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
@@ -214,7 +216,10 @@ public struct Mirror {
     children: C,
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .generated
-  ) where C.Iterator.Element == Child {
+  ) where C.Element == Child 
+  // FIXME(ABI) (Revert Where Clauses): Remove these 
+  , C.SubSequence : Collection, C.SubSequence.Indices : Collection, C.Indices : Collection
+  {
 
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
@@ -261,7 +266,10 @@ public struct Mirror {
     unlabeledChildren: C,
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .generated
-  ) {
+  ) 
+  // FIXME(ABI) (Revert Where Clauses): Remove these two clauses
+  where C.SubSequence : Collection, C.Indices : Collection
+  {
 
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
@@ -422,7 +430,7 @@ extension Mirror {
       if case let label as String = e {
         position = children.index { $0.label == label } ?? children.endIndex
       }
-      else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
+      else if let offset = (e as? Int).map({ Int64($0) }) ?? (e as? Int64) {
         position = children.index(children.startIndex,
           offsetBy: offset,
           limitedBy: children.endIndex) ?? children.endIndex
@@ -850,8 +858,6 @@ extension String {
   ///
   ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
-  ///
-  /// - SeeAlso: `String.init<Subject>(reflecting: Subject)`
   public init<Subject>(describing instance: Subject) {
     self.init()
     _print_unlocked(instance, &self)
@@ -901,8 +907,6 @@ extension String {
   ///
   ///     print(String(reflecting: p))
   ///     // Prints "Point(x: 21, y: 30)"
-  ///
-  /// - SeeAlso: `String.init<Subject>(Subject)`
   public init<Subject>(reflecting subject: Subject) {
     self.init()
     _debugPrint_unlocked(subject, &self)

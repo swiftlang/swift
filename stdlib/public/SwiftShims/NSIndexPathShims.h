@@ -1,4 +1,4 @@
-//===--- NSIndexPathShims.h - Foundation declarations for IndexPath overlay -===//
+//===--- NSIndexPathShims.h - Found. decl. for IndexPath overl. -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

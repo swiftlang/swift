@@ -1,6 +1,6 @@
 // Tests merging of modules each with their own local types
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // Create separate modules and merge them together
 // RUN: %target-swiftc_driver -swift-version 3 -v -emit-module -module-name LocalTypesMerged -o %t/LocalTypesMerged.swiftmodule %s %S/local_types.swift

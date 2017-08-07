@@ -11,14 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Utils.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/Strings.h"
 
 #include <cstdio>
@@ -695,7 +696,9 @@ static void VisitNodeAddressor(
   // and they bear no connection to their original variable at the interface
   // level
   CanFunctionType swift_can_func_type =
-      CanFunctionType::get(ast->TheEmptyTupleType, ast->TheRawPointerType);
+    CanFunctionType::get(AnyFunctionType::CanParamArrayRef({}),
+                         ast->TheRawPointerType,
+                         AnyFunctionType::ExtInfo());
   result._types.push_back(swift_can_func_type.getPointer());
 }
 

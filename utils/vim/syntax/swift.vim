@@ -22,13 +22,11 @@ syn keyword swiftKeyword
       \ guard
       \ if
       \ in
-      \ let
       \ repeat
       \ return
       \ switch
       \ throw
       \ try
-      \ var
       \ where
       \ while
 syn match swiftMultiwordKeyword
@@ -51,6 +49,10 @@ syn keyword swiftDefinitionModifier
       \ rethrows
       \ static
       \ throws
+      \ weak
+
+syn keyword swiftInOutKeyword skipwhite nextgroup=swiftTypeName
+      \ inout
 
 syn keyword swiftIdentifierKeyword
       \ Self
@@ -80,6 +82,8 @@ syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
       \ protocol
       \ struct
       \ typealias
+syn match swiftMultiwordTypeDefinition nextgroup=swiftTypeName
+      \ "indirect enum"
 
 syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
       \ let
@@ -130,7 +134,7 @@ syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint
 syn keyword swiftConstraint contained
       \ where
 
-syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
+syn match swiftTypeDeclaration skipwhite nextgroup=swiftType,swiftInOutKeyword
       \ /:/
 syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
       \ /->/
@@ -172,12 +176,14 @@ hi def link swiftImportComponent Identifier
 hi def link swiftKeyword Statement
 hi def link swiftMultiwordKeyword Statement
 hi def link swiftTypeDefinition Define
+hi def link swiftMultiwordTypeDefinition Define
 hi def link swiftType Type
 hi def link swiftTypePair Type
 hi def link swiftTypeName Function
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
+hi def link swiftInOutKeyword Define
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncKeywordGeneral Function
 hi def link swiftVarDefinition Define

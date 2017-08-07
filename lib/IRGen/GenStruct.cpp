@@ -39,7 +39,7 @@
 #include "MemberAccessStrategy.h"
 #include "NonFixedTypeInfo.h"
 #include "ResilientTypeInfo.h"
-#include "StructMetadataLayout.h"
+#include "StructMetadataVisitor.h"
 
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
 
@@ -414,6 +414,8 @@ namespace {
     }
     
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
+      // TODO: do this with StructMetadataLayout::getFieldOffset
+
       // Get the field offset vector from the struct metadata.
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       Address fieldVector = emitAddressOfFieldOffsetVector(IGF,
@@ -824,41 +826,6 @@ llvm::Constant *irgen::emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
                                                            SILType baseType,
                                                            VarDecl *field) {
   FOR_STRUCT_IMPL(IGM, baseType, getConstantFieldOffset, field);
-}
-
-llvm::Constant *
-irgen::emitPhysicalStructMemberOffsetOfFieldOffset(IRGenModule &IGM,
-                                                   SILType baseType,
-                                                   VarDecl *field) {
-  class FieldScanner : public StructMetadataScanner<FieldScanner> {
-    VarDecl *Field;
-  public:
-    FieldScanner(IRGenModule &IGM, StructDecl *Target, VarDecl *Field)
-      : StructMetadataScanner(IGM, Target), Field(Field)
-    {}
-    
-    Size OffsetOfFieldOffset = Size::invalid();
-    
-    void noteAddressPoint() {
-      assert(OffsetOfFieldOffset == Size::invalid()
-             && "found field offset before address point?");
-      NextOffset = Size(0);
-    }
-    
-    void addFieldOffset(VarDecl *theField) {
-      if (Field == theField)
-        OffsetOfFieldOffset = NextOffset;
-      StructMetadataScanner::addFieldOffset(theField);
-    }
-  };
-  FieldScanner scanner(IGM, baseType.getStructOrBoundGenericStruct(),
-                       field);
-  scanner.layout();
-  if (scanner.OffsetOfFieldOffset == Size::invalid())
-    return nullptr;
-  
-  return llvm::ConstantInt::get(IGM.SizeTy,
-                                scanner.OffsetOfFieldOffset.getValue());
 }
 
 MemberAccessStrategy

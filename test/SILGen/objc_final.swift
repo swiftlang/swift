@@ -22,9 +22,11 @@ func callFoo(_ x: Foo) {
 
   // Final @objc properties are still accessed directly.
   // CHECK: [[PROP:%.*]] = ref_element_addr {{%.*}} : $Foo, #Foo.prop
-  // CHECK: load [trivial] [[PROP]] : $*Int
+  // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[PROP]] : $*Int
+  // CHECK: load [trivial] [[READ]] : $*Int
   let prop = x.prop
   // CHECK: [[PROP:%.*]] = ref_element_addr {{%.*}} : $Foo, #Foo.prop
-  // CHECK: assign {{%.*}} to [[PROP]] : $*Int
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[PROP]] : $*Int
+  // CHECK: assign {{%.*}} to [[WRITE]] : $*Int
   x.prop = prop
 }

@@ -68,10 +68,10 @@ UIntMax = 'UInt%s' % int_max_bits
 
 // FIXME(integers): remove these two aliases
 /// The largest native signed integer type.
-@available(swift, obsoleted: 4.0)
+@available(swift, obsoleted: 4.0, renamed: "${IntMax}")
 public typealias IntMax = ${IntMax}
 /// The largest native unsigned integer type.
-@available(swift, obsoleted: 4.0)
+@available(swift, obsoleted: 4.0, renamed: "${UIntMax}")
 public typealias UIntMax = ${UIntMax}
 
 infix operator &<< : BitwiseShiftPrecedence
@@ -260,8 +260,6 @@ def operatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  ///
-  /// - SeeAlso: `+`
 """,
         '&-': """\
   /// Returns the difference of the two given values, discarding any overflow.
@@ -279,8 +277,6 @@ def operatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  ///
-  /// - SeeAlso: `-`
 """,
         '&*': """\
   /// Returns the product of the two given values, discarding any overflow.
@@ -375,8 +371,6 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  ///
-  /// - SeeAlso: `>>`, `&<<`
 """,
         '&<<': """\
   /// Returns the result of shifting a value's binary representation the
@@ -406,8 +400,6 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  ///
-  /// - SeeAlso: `<<`, `&>>`
 """,
         '>>': """\
   /// Returns the result of shifting a value's binary representation the
@@ -459,8 +451,6 @@ def operatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the right.
-  ///
-  /// - SeeAlso: `<<`
 """,
         '<<': """\
   /// Returns the result of shifting a value's binary representation the
@@ -501,8 +491,6 @@ def operatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the left.
-  ///
-  /// - SeeAlso: `>>`
 """,
   }
     return comments[operator]
@@ -681,8 +669,6 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  ///
-  /// - SeeAlso: `>>=`, `&<<=`
 """,
         '&<<': """\
   /// Returns the result of shifting a value's binary representation the
@@ -713,8 +699,6 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  ///
-  /// - SeeAlso: `<<=`, `&>>=`
 """,
         '>>': """\
   /// Stores the result of shifting a value's binary representation the
@@ -771,8 +755,6 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the right.
-  ///
-  /// - SeeAlso: `<<=`
 """,
         '<<': """\
   /// Stores the result of shifting a value's binary representation the
@@ -817,8 +799,6 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the left.
-  ///
-  /// - SeeAlso: `>>=`
 """,
   }
     return comments[operator]
@@ -838,11 +818,11 @@ def overflowOperationComment(operator):
   ///
   /// - Parameter rhs: The value to add to this value.
   /// - Returns: A tuple containing the result of the addition along with a
-  ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire sum. If
-  ///   the `overflow` component is `.overflow`, an overflow occurred and the
-  ///   `partialValue` component contains the truncated sum of this value and
-  ///   `rhs`.
+  ///   Boolean value indicating whether overflow occurred. If the `overflow`
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   sum. If the `overflow` component is `true`, an overflow occurred and
+  ///   the `partialValue` component contains the truncated sum of this value
+  ///   and `rhs`.
 """,
         '-': """\
   /// Returns the difference of this value and the given value along with a
@@ -851,8 +831,8 @@ def overflowOperationComment(operator):
   /// - Parameter rhs: The value to subtract from this value.
   /// - Returns: A tuple containing the result of the subtraction along with a
   ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire
-  ///   difference. If the `overflow` component is `.overflow`, an overflow
+  ///   is `false`, the `partialValue` component contains the entire
+  ///   difference. If the `overflow` component is `true`, an overflow
   ///   occurred and the `partialValue` component contains the truncated
   ///   result of `rhs` subtracted from this value.
 """,
@@ -862,46 +842,40 @@ def overflowOperationComment(operator):
   ///
   /// - Parameter rhs: The value to multiply by this value.
   /// - Returns: A tuple containing the result of the multiplication along with
-  ///   a flag indicating whether overflow occurred. If the `overflow`
-  ///   component is `.none`, the `partialValue` component contains the entire
-  ///   product. If the `overflow` component is `.overflow`, an overflow
+  ///   a Boolean value indicating whether overflow occurred. If the `overflow`
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   product. If the `overflow` component is `true`, an overflow
   ///   occurred and the `partialValue` component contains the truncated
   ///   product of this value and `rhs`.
-  ///
-  /// - SeeAlso: `multipliedFullWidth(by:)`
 """,
         '/': """\
   /// Returns the quotient of dividing this value by the given value along with
   /// a flag indicating whether overflow occurred in the operation.
   ///
   /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, .overflow)`.
+  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, true)`.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the division along with a
-  ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire quotient.
-  ///   If the `overflow` component is `.overflow`, an overflow occurred and
-  ///   the `partialValue` component contains the truncated quotient.
-  ///
-  /// - SeeAlso: `doubleWidthDivide(_:_:)`
+  ///   Boolean value indicating whether overflow occurred. If the `overflow`
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   quotient. If the `overflow` component is `true`, an overflow occurred
+  ///   and the `partialValue` component contains the truncated quotient.
 """,
         '%': """\
   // FIXME(integers): the comment is for division instead of remainder
-  /// Returns the remainder of dividing this value by the given value along with
-  /// a flag indicating whether overflow occurred in the operation.
+  /// Returns the remainder of dividing this value by the given value along
+  /// with a flag indicating whether overflow occurred in the operation.
   ///
   /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, .overflow)`.
+  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, true)`.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the division along with a
-  ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire quotient.
-  ///   If the `overflow` component is `.overflow`, an overflow occurred and
-  ///   the `partialValue` component contains the truncated quotient.
-  ///
-  /// - SeeAlso: `doubleWidthDivide(_:_:)`
+  ///   Boolean value indicating whether overflow occurred. If the `overflow`
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   quotient. If the `overflow` component is `true`, an overflow occurred
+  ///   and the `partialValue` component contains the truncated quotient.
 """,
     }
     return comments[operator]
@@ -978,8 +952,8 @@ def unsafeOperationComment(operator):
 /// The following example declares a method that calculates the total of any
 /// sequence with `Numeric` elements.
 ///
-///     extension Sequence where Iterator.Element: Numeric {
-///         func sum() -> Iterator.Element {
+///     extension Sequence where Element: Numeric {
+///         func sum() -> Element {
 ///             return reduce(0, +)
 ///         }
 ///     }
@@ -1016,7 +990,7 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   ///     let y = Int8(exactly: 1_000)
   ///     // y == nil
   ///
-  /// - Parameter source: A floating-point value to convert to an integer.
+  /// - Parameter source: A value to convert to this type.
   init?<T : BinaryInteger>(exactly source: T)
 
   // FIXME(ABI)#44 (Recursive Protocol Constraints): should be just
@@ -1040,8 +1014,6 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   /// to find an absolute value. In addition, because `abs(_:)` always returns
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
-  ///
-  /// - SeeAlso: `abs(_:)`
   var magnitude: Magnitude { get }
 
 % for x in binaryArithmetic['Numeric']:
@@ -1112,8 +1084,6 @@ public protocol SignedNumeric : Numeric {
   ///     // Overflow error
   ///
   /// - Returns: The additive inverse of this value.
-  ///
-  /// - SeeAlso: `negate()`
   static prefix func - (_ operand: Self) -> Self
 
   /// Replaces this value with its additive inverse.
@@ -1124,12 +1094,27 @@ public protocol SignedNumeric : Numeric {
   ///     var x = 21
   ///     x.negate()
   ///     // x == -21
-  ///
-  /// - SeeAlso: The unary minus operator (`-`).
   mutating func negate()
 }
 
 extension SignedNumeric {
+  /// Returns the additive inverse of the specified value.
+  ///
+  /// The negation operator (prefix `-`) returns the additive inverse of its
+  /// argument.
+  ///
+  ///     let x = 21
+  ///     let y = -x
+  ///     // y == -21
+  ///
+  /// The resulting value must be representable in the same type as the
+  /// argument. In particular, negating a signed, fixed-width integer type's
+  /// minimum results in a value that cannot be represented.
+  ///
+  ///     let z = -Int8.min
+  ///     // Overflow error
+  ///
+  /// - Returns: The additive inverse of the argument.
   @_transparent
   public static prefix func - (_ operand: Self) -> Self {
     var result = operand
@@ -1137,6 +1122,14 @@ extension SignedNumeric {
     return result
   }
 
+  /// Replaces this value with its additive inverse.
+  ///
+  /// The following example uses the `negate()` method to negate the value of
+  /// an integer `x`:
+  ///
+  ///     var x = 21
+  ///     x.negate()
+  ///     // x == -21
   @_transparent
   public mutating func negate() {
     self = 0 - self
@@ -1172,6 +1165,17 @@ public func abs<T : SignedNumeric & Comparable>(_ x: T) -> T {
 }
 
 extension Numeric {
+  /// Returns the given number unchanged.
+  ///
+  /// You can use the unary plus operator (`+`) to provide symmetry in your
+  /// code for positive numbers when also using the unary minus operator.
+  ///
+  ///     let x = -21
+  ///     let y = +21
+  ///     // x == -21
+  ///     // y == 21
+  ///
+  /// - Returns: The given argument without any changes.
   @_transparent
   public static prefix func + (x: Self) -> Self {
     return x
@@ -1246,7 +1250,7 @@ extension Numeric {
 /// value is representable in the resulting type.
 ///
 ///     let e = Int8(exactly: 23.0)       // integral value, representable
-///     // e == Optional(127)
+///     // e == Optional(23)
 ///
 ///     let f = Int8(exactly: 23.75)      // fractional value, representable
 ///     // f == nil
@@ -1274,7 +1278,7 @@ extension Numeric {
 /// Bit Pattern Conversion
 /// ----------------------
 ///
-/// Use the `init(extendingOrTruncating:)` initializer to create a new instance
+/// Use the `init(truncatingIfNeeded:)` initializer to create a new instance
 /// with the same bit pattern as the passed value, extending or truncating the
 /// value's representation as necessary. Note that the value may not be
 /// preserved, particularly when converting between signed to unsigned integer
@@ -1285,11 +1289,11 @@ extension Numeric {
 ///     let q: Int16 = 850
 ///     // q == 0b00000011_01010010
 ///
-///     let r = Int8(extendingOrTruncating: q)      // truncate 'q' to fit in 8 bits
+///     let r = Int8(truncatingIfNeeded: q)      // truncate 'q' to fit in 8 bits
 ///     // r == 82
 ///     //   == 0b01010010
 ///
-///     let s = Int16(extendingOrTruncating: s)     // extend 'r' to fill 16 bits
+///     let s = Int16(truncatingIfNeeded: s)     // extend 'r' to fill 16 bits
 ///     // s == 82
 ///     //   == 0b00000000_01010010
 ///
@@ -1304,15 +1308,15 @@ extension Numeric {
 ///     // t == -100
 ///     // t's binary representation == 0b10011100
 ///
-///     let u = UInt8(extendingOrTruncating: t)
+///     let u = UInt8(truncatingIfNeeded: t)
 ///     // u == 156
 ///     // u's binary representation == 0b10011100
 ///
-///     let v = Int16(extendingOrTruncating: t)
+///     let v = Int16(truncatingIfNeeded: t)
 ///     // v == -100
 ///     // v's binary representation == 0b11111111_10011100
 ///
-///     let w = UInt16(extendingOrTruncating: t)
+///     let w = UInt16(truncatingIfNeeded: t)
 ///     // w == 65436
 ///     // w's binary representation == 0b11111111_10011100
 ///
@@ -1339,8 +1343,9 @@ extension Numeric {
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Hashable, Numeric, CustomStringConvertible, Strideable {
-
+  Hashable, Numeric, CustomStringConvertible, Strideable
+  where Magnitude : BinaryInteger, Magnitude.Magnitude == Magnitude
+{
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// *Signed* integer types can represent both positive and negative values.
@@ -1361,28 +1366,29 @@ public protocol BinaryInteger :
   ///     // y == nil
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
-  init?<T : FloatingPoint>(exactly source: T)
+  init?<T : BinaryFloatingPoint>(exactly source: T)
 
-  /// Creates an integer from the given floating-point value, truncating any
-  /// fractional part.
+  /// Creates an integer from the given floating-point value, rounding toward
+  /// zero.
   ///
-  /// Truncating the fractional part of `source` is equivalent to rounding
-  /// toward zero.
+  /// Any fractional part of the value passed as `source` is removed, rounding
+  /// the value toward zero.
   ///
   ///     let x = Int(21.5)
   ///     // x == 21
   ///     let y = Int(-21.5)
   ///     // y == -21
   ///
-  /// If `source` is outside the bounds of this type after truncation, a
-  /// runtime error may occur.
+  /// If `source` is outside the bounds of this type after rounding toward
+  /// zero, a runtime error may occur.
   ///
   ///     let z = UInt(-21.5)
   ///     // Error: ...the result would be less than UInt.min
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
-  ///   `source` must be representable in this type after truncation.
-  init<T : FloatingPoint>(_ source: T)
+  ///   `source` must be representable in this type after rounding toward
+  ///   zero.
+  init<T : BinaryFloatingPoint>(_ source: T)
 
   /// Creates a new instance from the given integer.
   ///
@@ -1412,7 +1418,7 @@ public protocol BinaryInteger :
   ///
   ///     let p: Int16 = -500
   ///     // 'p' has a binary representation of 11111110_00001100
-  ///     let q = Int8(extendingOrTruncating: p)
+  ///     let q = Int8(truncatingIfNeeded: p)
   ///     // q == 12
   ///     // 'q' has a binary representation of 00001100
   ///
@@ -1423,21 +1429,21 @@ public protocol BinaryInteger :
   ///
   ///     let u: Int8 = 21
   ///     // 'u' has a binary representation of 00010101
-  ///     let v = Int16(extendingOrTruncating: u)
+  ///     let v = Int16(truncatingIfNeeded: u)
   ///     // v == 21
   ///     // 'v' has a binary representation of 00000000_00010101
   ///
   ///     let w: Int8 = -21
   ///     // 'w' has a binary representation of 11101011
-  ///     let x = Int16(extendingOrTruncating: w)
+  ///     let x = Int16(truncatingIfNeeded: w)
   ///     // x == -21
   ///     // 'x' has a binary representation of 11111111_11101011
-  ///     let y = UInt16(extendingOrTruncating: w)
+  ///     let y = UInt16(truncatingIfNeeded: w)
   ///     // y == 65515
   ///     // 'y' has a binary representation of 11111111_11101011
   ///
   /// - Parameter source: An integer to convert to this type.
-  init<T : BinaryInteger>(extendingOrTruncating source: T)
+  init<T : BinaryInteger>(truncatingIfNeeded source: T)
 
   /// Creates a new instance with the representable value that's closest to the
   /// given integer.
@@ -1461,26 +1467,23 @@ public protocol BinaryInteger :
   /// - Parameter source: An integer to convert to this type.
   init<T : BinaryInteger>(clamping source: T)
 
-  /// Returns the n-th word, counting from the least significant to most
-  /// significant, of this value's binary representation.
-  ///
-  /// The `_word(at:)` method returns negative values in two's complement
-  /// representation, regardless of a type's underlying implementation. If `n`
-  /// is greater than the number of words in this value's current
-  /// representation, the result is `0` for positive numbers and `~0` for
-  /// negative numbers.
-  ///
-  /// - Parameter n: The word to return, counting from the least significant to
-  ///   most significant. `n` must be greater than or equal to zero.
-  /// - Returns: An word-sized, unsigned integer with the bit pattern of the
-  ///   n-th word of this value.
-  func _word(at n: Int) -> UInt
-
-  // FIXME(integers): add doc comments
-  // FIXME: Should be `Words : Collection where Words.Iterator.Element == UInt`
+  // FIXME: Should be `Words : Collection where Words.Element == UInt`
   // See <rdar://problem/31798916> for why it isn't.
-  associatedtype Words
+  /// A type that represents the words of a binary integer.
+  ///
+  /// The `Words` type must conform to the `Collection` protocol with an
+  /// `Element` type of `UInt`.
+  associatedtype Words : Sequence where Words.Element == UInt
+
+  /// A collection containing the words of this value's binary
+  /// representation, in order from the least significant to most significant.
+  ///
+  /// Negative values are returned in two's complement representation,
+  /// regardless of the type's underlying implementation.
   var words: Words { get }
+
+  /// The least significant word in this value's binary representation.
+  var _lowWord: UInt { get }
 
   /// The number of bits in the current binary representation of this value.
   ///
@@ -1528,7 +1531,7 @@ ${assignmentOperatorComment(x.operator, False)}
   /// - Complexity: O(1).
   static prefix func ~ (_ x: Self) -> Self
 
-% for x in binaryBitwise + maskingShifts:
+% for x in binaryBitwise:
 ${operatorComment(x.operator, False)}
   static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
 
@@ -1536,6 +1539,17 @@ ${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
+% for x in maskingShifts:
+${operatorComment(x.nonMaskingOperator, False)}
+  static func ${x.nonMaskingOperator}<RHS: BinaryInteger>(
+    _ lhs: Self, _ rhs: RHS
+  ) -> Self
+
+${assignmentOperatorComment(x.nonMaskingOperator, False)}
+  static func ${x.nonMaskingOperator}=<RHS: BinaryInteger>(
+    _ lhs: inout Self, _ rhs: RHS)
+% end
+ 
   /// Returns the quotient and remainder of this value divided by the given
   /// value.
   ///
@@ -1567,25 +1581,34 @@ extension BinaryInteger {
     self = 0
   }
 
-  public init?<T : FloatingPoint>(exactly source: T) {
+  /// Creates an integer from the given floating-point value, if it can be
+  /// represented exactly.
+  ///
+  /// If the value passed as `source` is not representable exactly, the result
+  /// is `nil`. In the following example, the constant `x` is successfully
+  /// created from a value of `21.0`, while the attempt to initialize the
+  /// constant `y` from `21.5` fails:
+  ///
+  ///     let x = Int(exactly: 21.0)
+  ///     // x == Optional(21)
+  ///     let y = Int(exactly: 21.5)
+  ///     // y == nil
+  ///
+  /// - Parameter source: A floating-point value to convert to an integer.
+  public init?<T : BinaryFloatingPoint>(exactly source: T) {
     // FIXME(integers): implement
     fatalError()
   }
 
   @_transparent
   public func signum() -> Self {
-    if self < (0 as Self) { return -1 }
-    if self > (0 as Self) { return 1 }
-    return 0
+    return (self > (0 as Self) ? 1 : 0) - (self < (0 as Self) ? 1 : 0)
   }
 
-  /// The number of words used for the current binary representation of this
-  /// value.
-  ///
-  /// This property is a constant for instances of fixed-width integer types.
   @_transparent
-  public var countRepresentedWords: Int {
-    return (self.bitWidth + ${word_bits} - 1) / ${word_bits}
+  public var _lowWord: UInt {
+    var it = words.makeIterator()
+    return it.next() ?? 0
   }
 
   public func quotientAndRemainder(dividingBy rhs: Self)
@@ -1593,8 +1616,9 @@ extension BinaryInteger {
     return (self / rhs, self % rhs)
   }
 
-  % for x in binaryBitwise + maskingShifts:
+  % for x in binaryBitwise:
 
+  // Homogeneous
 ${operatorComment(x.operator, False)}
   @_transparent
   public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
@@ -1605,24 +1629,18 @@ ${operatorComment(x.operator, False)}
 
   % end
 
-  % for x in maskingShifts:
-
-${operatorComment(x.operator, False)}
-  public static func ${x.operator} <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Self {
-    return lhs ${x.operator} Self(extendingOrTruncating: rhs)
+% for x in maskingShifts:
+  // Heterogeneous non-masking shift in terms of shift-assignment
+${operatorComment(x.nonMaskingOperator, False)}
+  public static func ${x.nonMaskingOperator}<RHS: BinaryInteger>(
+    _ lhs: Self, _ rhs: RHS
+  ) -> Self {
+    var r = lhs
+    r ${x.nonMaskingOperator}= rhs
+    return r
   }
+% end
 
-${assignmentOperatorComment(x.operator, False)}
-  @_transparent
-  public static func ${x.operator}= <
-    Other : BinaryInteger
-  >(lhs: inout Self, rhs: Other) {
-    lhs = lhs ${x.operator} rhs
-  }
-
-  % end
 }
 
 // Strideable conformance
@@ -1714,16 +1732,16 @@ extension BinaryInteger {
     //    sign bit. Therefore it is safe to convert to the unsigned type.
 
     if lhs.bitWidth < rhs.bitWidth {
-      return Other(extendingOrTruncating: lhs) == rhs
+      return Other(truncatingIfNeeded: lhs) == rhs
     }
     if lhs.bitWidth > rhs.bitWidth {
-      return lhs == Self(extendingOrTruncating: rhs)
+      return lhs == Self(truncatingIfNeeded: rhs)
     }
 
     if Self.isSigned {
-      return Other(extendingOrTruncating: lhs) == rhs
+      return Other(truncatingIfNeeded: lhs) == rhs
     }
-    return lhs == Self(extendingOrTruncating: rhs)
+    return lhs == Self(truncatingIfNeeded: rhs)
   }
 
   /// Returns a Boolean value indicating whether the two given values are not
@@ -1774,14 +1792,14 @@ extension BinaryInteger {
     // values of the other type. Otherwise, lhs and rhs are positive, and one
     // of Self, Other may be signed and the other unsigned.
 
-    let rhsAsSelf = Self(extendingOrTruncating: rhs)
+    let rhsAsSelf = Self(truncatingIfNeeded: rhs)
     let rhsAsSelfNegative = rhsAsSelf < (0 as Self)
 
 
     // Can we round-trip rhs through Other?
-    if Other(extendingOrTruncating: rhsAsSelf) == rhs &&
+    if Other(truncatingIfNeeded: rhsAsSelf) == rhs &&
       // This additional check covers the `Int8.max < (128 as UInt8)` case.
-      // Since the types are of the same width, init(extendingOrTruncating:)
+      // Since the types are of the same width, init(truncatingIfNeeded:)
       // will result in a simple bitcast, so that rhsAsSelf would be -128, and
       // `lhs < rhsAsSelf` will return false.
       // We basically guard against that bitcast by requiring rhs and rhsAsSelf
@@ -1790,7 +1808,7 @@ extension BinaryInteger {
       return lhs < rhsAsSelf
     }
 
-    return Other(extendingOrTruncating: lhs) < rhs
+    return Other(truncatingIfNeeded: lhs) < rhs
   }
 
   /// Returns a Boolean value indicating whether the value of the first
@@ -1880,87 +1898,8 @@ extension BinaryInteger {
 }
 
 //===----------------------------------------------------------------------===//
-//===--- BinaryInteger smart shifts ---------------------------------------===//
-//===----------------------------------------------------------------------===//
-// FIXME(integers): uncomment once <rdar://problem/29643515> gets fixed
-#if false
-extension BinaryInteger {
-%   for x in maskingShifts:
-  @_transparent
-  public static func ${x.nonMaskingOperator} <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Self {
-    var lhs = lhs
-    lhs ${x.nonMaskingOperator}= rhs
-    return lhs
-  }
-
-  // It is hard to imagine overshift to the left in an arbitrarily sized
-  // integer, but shifting too far to the right and negative shift cases are
-  // supported.
-%     reversedOperator = x.operator.translate(maketrans('<>', '><'))
-%     isRightShift = '>' in x.operator
-  @_transparent
-  public static func ${x.nonMaskingOperator}= <
-    Other : BinaryInteger
-  >(lhs: inout Self, rhs: Other) {
-    if rhs < (0 as Other) {
-      lhs ${reversedOperator}= (0 - rhs)
-      return
-    }
-%     if isRightShift:
-    let overshift = Self.isSigned
-      ? (lhs < (0 as Self) ? ~(0 as Self) : 0 )
-      : 0
-    if rhs >= lhs.bitWidth {
-      lhs = overshift
-      return
-    }
-%     end
-    lhs ${x.operator}= Self(extendingOrTruncating: rhs)
-  }
-%   end
-}
-#endif
-
-extension BinaryInteger {
-  // FIXME(integers): inefficient. Should get rid of _word(at:) and
-  // countRepresentedWords, and make `words` the basic operation.
-  public var words: [UInt] {
-    var result = [UInt]()
-    result.reserveCapacity(countRepresentedWords)
-    for i in 0..<self.countRepresentedWords {
-      result.append(_word(at: i))
-    }
-    return result
-  }
-}
-
-//===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
-
-/// An indicator of whether an arithmetic operation overflowed.
-///
-/// Some arithmetic operations on fixed-width integers return an
-/// `ArithmeticOverflow` instance to indicate whether an overflow has
-/// occurred. For example, adding `UInt8.max` to itself results in a value that
-/// can't be represented by an `UInt8` instance without overflowing.
-///
-///     let x = UInt8.max
-///     // x == 255
-///     let (y, overflow) = x.addingReportingOverflow(x)
-///     // y == 254
-///     // overflow == ArithmeticOverflow.overflow
-@_fixed_layout
-public enum ArithmeticOverflow {
-  @_transparent
-  public init(_ overflow: Bool) { self = overflow ? .overflow : .none }
-  /// An indication that no overflow occurred in the operation.
-  case none
-  /// An indication that an overflow did occur in the operation.
-  case overflow
-}
 
 /// An integer type that uses a fixed size for every instance.
 ///
@@ -1978,12 +1917,12 @@ public enum ArithmeticOverflow {
 ///     extension FixedWidthInteger {
 ///         var binaryString: String {
 ///             var result: [String] = []
-///             for i in Swift.stride(from: 0, to: Self.bitWidth, by: 8) {
-///                 let wordValue = UInt8(extendingOrTruncating: self >> i)
-///                 let word = String(wordValue, radix: 2)
+///             for i in 0..<(Self.bitWidth / 8) {
+///                 let byte = UInt8(truncatingIfNeeded: self >> (i * 8))
+///                 let byteString = String(byte, radix: 2)
 ///                 let padding = String(repeating: "0",
-///                                      count: 8 - word.characters.count)
-///                 result.append(padding + word)
+///                                      count: 8 - byteString.count)
+///                 result.append(padding + byteString)
 ///             }
 ///             return "0b" + result.reversed().joined(separator: "_")
 ///         }
@@ -1998,22 +1937,22 @@ public enum ArithmeticOverflow {
 /// the right shift operator (`<<`), both of which are available to any type
 /// that conforms to the `FixedWidthInteger` protocol.
 ///
-/// The next example declares the generic `squared` function, which accepts an
+/// The next example declares a generic `squared` function, which accepts an
 /// instance `x` of any fixed-width integer type. The function uses the
-/// `multipliedReportingOverflow(by:)` method to multiply `x` by itself and check
-/// whether the result is too large to represent in the same type.
+/// `multipliedReportingOverflow(by:)` method to multiply `x` by itself and
+/// check whether the result is too large to represent in the same type.
 ///
 ///     func squared<T: FixedWidthInteger>(_ x: T) -> T? {
 ///         let (result, overflow) = x.multipliedReportingOverflow(by: x)
-///         guard overflow == .none else {
+///         if overflow {
 ///             return nil
 ///         }
 ///         return result
 ///     }
 ///
-///     let (x, y): (Int8, Int8) = (10, 100)
+///     let (x, y): (Int8, Int8) = (9, 123)
 ///     print(squared(x))
-///     // Prints "Optional(100)"
+///     // Prints "Optional(81)"
 ///     print(squared(y))
 ///     // Prints "nil"
 ///
@@ -2026,7 +1965,10 @@ public enum ArithmeticOverflow {
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-public protocol FixedWidthInteger : BinaryInteger, _BitwiseOperations {
+public protocol FixedWidthInteger :
+  BinaryInteger, LosslessStringConvertible, _BitwiseOperations
+  where Magnitude : FixedWidthInteger
+{
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
   ///
@@ -2056,16 +1998,16 @@ public protocol FixedWidthInteger : BinaryInteger, _BitwiseOperations {
 ${overflowOperationComment(x.operator)}
   func ${x.name}ReportingOverflow(
     ${x.firstArg} rhs: Self
-  ) -> (partialValue: Self, overflow: ArithmeticOverflow)
+  ) -> (partialValue: Self, overflow: Bool)
 % end
 
   /// Returns a tuple containing the high and low parts of the result of
-  /// multiplying its arguments.
+  /// multiplying this value by the given value.
   ///
   /// Use this method to calculate the full result of a product that would
   /// otherwise overflow. Unlike traditional truncating multiplication, the
-  /// `multipliedFullWidth(by:)` method returns an instance of DoubleWith<Self>,
-  /// containing both the `high` and `low` parts of the product of `self` and
+  /// `multipliedFullWidth(by:)` method returns a tuple
+  /// containing both the `high` and `low` parts of the product of this value and
   /// `other`. The following example uses this method to multiply two `UInt8`
   /// values that normally overflow when multiplied:
   ///
@@ -2084,29 +2026,24 @@ ${overflowOperationComment(x.operator)}
   ///     let z = UInt16(result.high) << 8 | UInt16(result.low)
   ///     // z == 2000
   ///
-  /// - Parameters:
-  ///   - other: A value to multiply `self` by.
+  /// - Parameter other: The value to multiply this value by.
   /// - Returns: A tuple containing the high and low parts of the result of
-  ///   multiplying `self` and `other`.
-  ///
-  /// - SeeAlso: `multipliedReportingOverflow(by:)`
-  // FIXME(integers): figure out how to return DoubleWidth<Self> or correct the
-  // doc comment
+  ///   multiplying this value and `other`.
+  // FIXME(integers): figure out how to return DoubleWidth<Self>
   func multipliedFullWidth(by other: Self) -> (high: Self, low: Self.Magnitude)
 
   /// Returns a tuple containing the quotient and remainder of dividing the
-  /// first argument by `self`.
+  /// given value by this value.
   ///
   /// The resulting quotient must be representable within the bounds of the
-  /// type. If the quotient of dividing `dividend` by `self` is too large to
-  /// represent in the type, a runtime error may occur.
+  /// type. If the quotient of dividing `dividend` by this value is too large
+  /// to represent in the type, a runtime error may occur.
   ///
-  /// - Parameters:
-  ///   - dividend: A DoubleWidth<Self> value containing the high and low parts
-  ///     of a double-width integer. The `high` component of the value carries
-  ///     the sign, if the type is signed.
+  /// - Parameter dividend: A tuple containing the high and low parts of a
+  ///   double-width integer. The `high` component of the value carries the
+  ///   sign, if the type is signed.
   /// - Returns: A tuple containing the quotient and remainder of `dividend`
-  ///   divided by `self`.
+  ///   divided by this value.
   func dividingFullWidth(_ dividend: (high: Self, low: Self.Magnitude))
     -> (quotient: Self, remainder: Self)
 
@@ -2115,7 +2052,7 @@ ${overflowOperationComment(x.operator)}
   /// The number of bits equal to 1 in this value's binary representation.
   ///
   /// For example, in a fixed-width integer type with a `bitWidth` value of 8,
-  /// the number 31 has five bits equal to 1.
+  /// the number *31* has five bits equal to *1*.
   ///
   ///     let x: Int8 = 0b0001_1111
   ///     // x == 31
@@ -2125,7 +2062,7 @@ ${overflowOperationComment(x.operator)}
   /// The number of leading zeros in this value's binary representation.
   ///
   /// For example, in a fixed-width integer type with a `bitWidth` value of 8,
-  /// the number 31 has three leading zeros.
+  /// the number *31* has three leading zeros.
   ///
   ///     let x: Int8 = 0b0001_1111
   ///     // x == 31
@@ -2151,8 +2088,6 @@ ${overflowOperationComment(x.operator)}
   /// If necessary, the byte order of this value is reversed from the typical
   /// byte order of this integer type. On a big-endian platform, for any
   /// integer `x`, `x == x.bigEndian`.
-  ///
-  /// - SeeAlso: `littleEndian`
   var bigEndian: Self { get }
 
   /// The little-endian representation of this integer.
@@ -2160,12 +2095,19 @@ ${overflowOperationComment(x.operator)}
   /// If necessary, the byte order of this value is reversed from the typical
   /// byte order of this integer type. On a little-endian platform, for any
   /// integer `x`, `x == x.littleEndian`.
-  ///
-  /// - SeeAlso: `bigEndian`
   var littleEndian: Self { get }
 
   /// A representation of this integer with the byte order swapped.
   var byteSwapped: Self { get }
+
+% for x in maskingShifts:
+${operatorComment(x.operator, False)}
+  static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
+
+${assignmentOperatorComment(x.operator, False)}
+  static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
+% end
+
 }
 
 extension FixedWidthInteger {
@@ -2189,9 +2131,72 @@ extension FixedWidthInteger {
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
 
+  /// The number of bits in the binary representation of this value.
   @_inlineable
   public var bitWidth: Int { return Self.bitWidth }
 
+  public init(littleEndian value: Self) {
+#if _endian(little)
+    self = value
+#else
+    self = value.byteSwapped
+#endif
+  }
+  
+  public init(bigEndian value: Self) {
+#if _endian(big)
+    self = value
+#else
+    self = value.byteSwapped
+#endif
+  }
+  
+  public var littleEndian: Self {
+#if _endian(little)
+    return self
+#else
+    return byteSwapped
+#endif
+  }
+  
+  public var bigEndian: Self {
+#if _endian(big)
+    return self
+#else
+    return byteSwapped
+#endif
+  }
+  
+  % for x in maskingShifts:
+  
+  // Homogeneous masking shift
+${operatorComment(x.operator, False)}
+  @_transparent
+  public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
+  }
+
+
+  // Heterogeneous masking shift
+${operatorComment(x.operator, False)}
+  public static func ${x.operator} <
+    Other : BinaryInteger
+  >(lhs: Self, rhs: Other) -> Self {
+    return lhs ${x.operator} Self(truncatingIfNeeded: rhs)
+  }
+
+  // Heterogeneous masking shift assignment
+${assignmentOperatorComment(x.operator, False)}
+  @_transparent
+  public static func ${x.operator}= <
+    Other : BinaryInteger
+  >(lhs: inout Self, rhs: Other) {
+    lhs = lhs ${x.operator} rhs
+  }
+
+  % end
 }
 
 //===----------------------------------------------------------------------===//
@@ -2199,6 +2204,23 @@ extension FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 extension FixedWidthInteger {
+  /// Returns the inverse of the bits set in the argument.
+  ///
+  /// The bitwise NOT operator (`~`) is a prefix operator that returns a value
+  /// in which all the bits of its argument are flipped: Bits that are `1` in
+  /// the argument are `0` in the result, and bits that are `0` in the argument
+  /// are `1` in the result. This is equivalent to the inverse of a set. For
+  /// example:
+  ///
+  ///     let x: UInt8 = 5        // 0b00000101
+  ///     let notX = ~x           // 0b11111010
+  ///
+  /// Performing a bitwise NOT operation on 0 returns a value with every bit
+  /// set to `1`.
+  ///
+  ///     let allOnes = ~UInt8.min   // 0b11111111
+  ///
+  /// - Complexity: O(1).
   @_transparent
   public static prefix func ~ (x: Self) -> Self {
     return 0 &- x &- 1
@@ -2211,7 +2233,6 @@ extension FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 ${operatorComment(x.nonMaskingOperator, True)}
-  @available(swift, introduced: 4)
   @_transparent
   public static func ${x.nonMaskingOperator} <
     Other : BinaryInteger
@@ -2221,21 +2242,6 @@ ${operatorComment(x.nonMaskingOperator, True)}
     return lhs
   }
 
-// FIXME(integers): uncommenting this overload results in a compiler not being
-// able to typecheck expression like `(int64 >> 8) & 0xFF`.
-#if false
-  @_transparent
-  public static func ${x.nonMaskingOperator} (_ lhs: Self, _ rhs: Int) -> Self {
-    return ${x.helper}(lhs, rhs)
-  }
-
-  @_transparent
-  public static func ${x.nonMaskingOperator}= (_ lhs: inout Self, _ rhs: Int) {
-    lhs = ${x.helper}(lhs, rhs)
-  }
-#endif
-
-  @available(swift, introduced: 4)
   @_transparent
   public static func ${x.nonMaskingOperator}= <
     Other : BinaryInteger
@@ -2261,7 +2267,7 @@ ${operatorComment(x.nonMaskingOperator, True)}
     let overshiftL: Self = 0
     if _fastPath(rhs >= 0) {
       if _fastPath(rhs < Self.bitWidth) {
-        return lhs ${x.operator} Self(extendingOrTruncating: rhs)
+        return lhs ${x.operator} Self(truncatingIfNeeded: rhs)
       }
       return overshift${'LR'[isRightShift]}
     }
@@ -2276,6 +2282,27 @@ ${operatorComment(x.nonMaskingOperator, True)}
 }
 
 extension FixedWidthInteger {
+  /// Creates a new instance with the representable value that's closest to the
+  /// given integer.
+  ///
+  /// If the value passed as `source` is greater than the maximum representable
+  /// value in this type, the result is the type's `max` value. If `source` is
+  /// less than the smallest representable value in this type, the result is
+  /// the type's `min` value.
+  ///
+  /// In this example, `x` is initialized as an `Int8` instance by clamping
+  /// `500` to the range `-128...127`, and `y` is initialized as a `UInt`
+  /// instance by clamping `-500` to the range `0...UInt.max`.
+  ///
+  ///     let x = Int8(clamping: 500)
+  ///     // x == 127
+  ///     // x == Int8.max
+  ///
+  ///     let y = UInt(clamping: -500)
+  ///     // y == 0
+  ///
+  /// - Parameter source: An integer to convert to this type.
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   public init<Other: BinaryInteger>(clamping source: Other) {
     if _slowPath(source < Self.min) {
       self = Self.min
@@ -2283,7 +2310,7 @@ extension FixedWidthInteger {
     else if _slowPath(source > Self.max) {
       self = Self.max
     }
-    else { self = Self(extendingOrTruncating: source) }
+    else { self = Self(truncatingIfNeeded: source) }
   }
 
 % for x in binaryArithmetic['Numeric'] + binaryArithmetic["BinaryInteger"][:1]:
@@ -2298,7 +2325,7 @@ ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self) {
     let (result, overflow) = lhs.${x.name}ReportingOverflow(${callLabel}rhs)
-    _precondition(overflow == .none, "Overflow in ${x.operator}=")
+    _precondition(!overflow, "Overflow in ${x.operator}=")
     lhs = result
   }
 #endif
@@ -2309,7 +2336,7 @@ ${unsafeOperationComment(x.operator)}
   public func unsafe${capitalize(x.name)}(${x.firstArg} other: Self) -> Self {
     let (result, overflow) = self.${x.name}ReportingOverflow(${callLabel}other)
 
-    if (overflow != .none) {
+    if overflow {
       if (_isDebugAssertConfiguration()) {
         _preconditionFailure("overflow in unsafe${capitalize(x.name)}")
       }
@@ -2321,24 +2348,60 @@ ${unsafeOperationComment(x.operator)}
   }
 % end
 
+  /// Creates a new instance from the bit pattern of the given instance by
+  /// sign-extending or truncating to fit this type.
+  ///
+  /// When the bit width of `T` (the type of `source`) is equal to or greater
+  /// than this type's bit width, the result is the truncated
+  /// least-significant bits of `source`. For example, when converting a
+  /// 16-bit value to an 8-bit type, only the lower 8 bits of `source` are
+  /// used.
+  ///
+  ///     let p: Int16 = -500
+  ///     // 'p' has a binary representation of 11111110_00001100
+  ///     let q = Int8(extendingOrTruncating: p)
+  ///     // q == 12
+  ///     // 'q' has a binary representation of 00001100
+  ///
+  /// When the bit width of `T` is less than this type's bit width, the result
+  /// is *sign-extended* to fill the remaining bits. That is, if `source` is
+  /// negative, the result is padded with ones; otherwise, the result is
+  /// padded with zeros.
+  ///
+  ///     let u: Int8 = 21
+  ///     // 'u' has a binary representation of 00010101
+  ///     let v = Int16(extendingOrTruncating: u)
+  ///     // v == 21
+  ///     // 'v' has a binary representation of 00000000_00010101
+  ///
+  ///     let w: Int8 = -21
+  ///     // 'w' has a binary representation of 11101011
+  ///     let x = Int16(extendingOrTruncating: w)
+  ///     // x == -21
+  ///     // 'x' has a binary representation of 11111111_11101011
+  ///     let y = UInt16(extendingOrTruncating: w)
+  ///     // y == 65515
+  ///     // 'y' has a binary representation of 11111111_11101011
+  ///
+  /// - Parameter source: An integer to convert to this type.
   @inline(__always)
-  public init<T : BinaryInteger>(extendingOrTruncating source: T) {
+  public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= ${word_bits} {
-      self = Self.init(_truncatingBits: source._word(at: 0))
+      self = Self.init(_truncatingBits: source._lowWord)
     }
     else {
-      var result: Self = source < (0 as T) ? ~0 : 0
-      // start with the most significant word
-      var n = source.countRepresentedWords
-      while n >= 0 {
-        // masking is OK here because this we have already ensured
-        // that Self.bitWidth > ${word_bits}.  Not masking results in
+      let neg = source < (0 as T)
+      var result: Self = neg ? ~0 : 0
+      var shift: Self = 0
+      let width = Self(_truncatingBits: Self.bitWidth._lowWord)
+      for word in source.words {
+        guard shift < width else { break }
+        // masking shift is OK here because we have already ensured
+        // that shift < Self.bitWidth. Not masking results in
         // infinite recursion.
-        result &<<= (${word_bits} as Self)
-        result |= Self(_truncatingBits: source._word(at: n))
-        n -= 1
+        result ^= Self(_truncatingBits: neg ? ~word : word) &<< shift
+        shift += ${word_bits}
       }
-
       self = result
     }
   }
@@ -2366,8 +2429,7 @@ ${operatorComment('&' + x.operator, True)}
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent only nonnegative values.
-public protocol UnsignedInteger : BinaryInteger
-  where Magnitude : BinaryInteger { }
+public protocol UnsignedInteger : BinaryInteger { }
 
 extension UnsignedInteger {
   /// The magnitude of this value.
@@ -2379,8 +2441,6 @@ extension UnsignedInteger {
   /// to find an absolute value. In addition, because `abs(_:)` always returns
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
-  ///
-  /// - SeeAlso: `abs(_:)`
   @_transparent
   public var magnitude: Self { return self }
 
@@ -2393,7 +2453,7 @@ extension UnsignedInteger {
   /// A textual representation of this value.
   public var description: String {
     if self.bitWidth <= ${word_bits} {
-      return _uint64ToString(UInt64(extendingOrTruncating: self))
+      return _uint64ToString(UInt64(truncatingIfNeeded: self))
     }
     if self == (0 as Self) {
       return "0"
@@ -2405,15 +2465,15 @@ extension UnsignedInteger {
   @_transparent
   internal func renderNonZeroDescription() -> String {
     let ascii0 = 48
-    var buf: [UnicodeScalar] = []
+    var buf: [Unicode.Scalar] = []
 
     var x = self
     repeat {
       let r = x % 10
       x /= 10
       buf.append(
-        UnicodeScalar(
-          ascii0 + Int(UInt(extendingOrTruncating: r)._value))!)
+        Unicode.Scalar(
+          ascii0 + Int(UInt(truncatingIfNeeded: r)._value))!)
     }
     while x != (0 as Self)
     return String(buf.reversed().lazy.map { Character($0) })
@@ -2421,6 +2481,7 @@ extension UnsignedInteger {
 }
 
 extension UnsignedInteger where Self : FixedWidthInteger {
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -2432,9 +2493,25 @@ extension UnsignedInteger where Self : FixedWidthInteger {
       _precondition(source <= Self.max,
         "Not enough bits to represent a signed value")
     }
-    self.init(extendingOrTruncating: source)
+    self.init(truncatingIfNeeded: source)
   }
 
+  /// Creates a new instance from the given integer, if it can be represented
+  /// exactly.
+  ///
+  /// If the value passed as `source` is not representable exactly, the result
+  /// is `nil`. In the following example, the constant `x` is successfully
+  /// created from a value of `100`, while the attempt to initialize the
+  /// constant `y` from `1_000` fails because the `Int8` type can represent
+  /// `127` at maximum:
+  ///
+  ///     let x = Int8(exactly: 100)
+  ///     // x == Optional(100)
+  ///     let y = Int8(exactly: 1_000)
+  ///     // y == nil
+  ///
+  /// - Parameter source: A value to convert to this type of integer.
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
@@ -2446,7 +2523,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
        source > Self.max {
       return nil
     }
-    self.init(extendingOrTruncating: source)
+    self.init(truncatingIfNeeded: source)
   }
 
   /// The maximum representable integer in this type.
@@ -2473,8 +2550,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent both positive and negative values.
-public protocol SignedInteger : BinaryInteger, SignedNumeric
-    where Magnitude : BinaryInteger {
+public protocol SignedInteger : BinaryInteger, SignedNumeric {
   // These requirements are for the source code compatibility with Swift 3
   static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self
   static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self
@@ -2484,7 +2560,7 @@ extension SignedInteger {
   /// A textual representation of this value.
   public var description: String {
     if self.bitWidth <= ${word_bits} {
-      return _int64ToString(Int64(extendingOrTruncating: self))
+      return _int64ToString(Int64(truncatingIfNeeded: self))
     }
 
     let base = magnitude.description
@@ -2499,6 +2575,7 @@ extension SignedInteger {
 }
 
 extension SignedInteger where Self : FixedWidthInteger {
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -2512,9 +2589,25 @@ extension SignedInteger where Self : FixedWidthInteger {
       _precondition(source <= Self.max,
         "Not enough bits to represent a signed value")
     }
-    self.init(extendingOrTruncating: source)
+    self.init(truncatingIfNeeded: source)
   }
 
+  /// Creates a new instance from the given integer, if it can be represented
+  /// exactly.
+  ///
+  /// If the value passed as `source` is not representable exactly, the result
+  /// is `nil`. In the following example, the constant `x` is successfully
+  /// created from a value of `100`, while the attempt to initialize the
+  /// constant `y` from `1_000` fails because the `Int8` type can represent
+  /// `127` at maximum:
+  ///
+  ///     let x = Int8(exactly: 100)
+  ///     // x == Optional(100)
+  ///     let y = Int8(exactly: 1_000)
+  ///     // y == nil
+  ///
+  /// - Parameter source: A value to convert to this type of integer.
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
@@ -2527,7 +2620,7 @@ extension SignedInteger where Self : FixedWidthInteger {
        source > Self.max {
       return nil
     }
-    self.init(extendingOrTruncating: source)
+    self.init(truncatingIfNeeded: source)
   }
 
   /// The maximum representable integer in this type.
@@ -2564,6 +2657,17 @@ extension SignedInteger where Self : FixedWidthInteger {
 %   u = 's' if signed else 'u'
 %   U = 'U' if signed else ''
 %   z = 's' if signed else 'z'
+
+%   Article = 'An' if bits == 8 else 'A'
+%   if self_type.is_word:
+/// ${'A ' if signed else 'An un'}signed integer value type.
+///
+/// On 32-bit platforms, `${Self}` is the same size as `${Self}32`, and
+/// on 64-bit platforms, `${Self}` is the same size as `${Self}64`.
+%   else:
+/// ${Article} ${bits}-bit ${'' if signed else 'un'}signed integer value
+/// type.
+%   end
 @_fixed_layout
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
@@ -2591,9 +2695,10 @@ public struct ${Self}
 
 %   if Self in ['Int32', 'Int64']:
 %     Floating = {32 : 'Float', 64 : 'Double'}[bits]
-  @_transparent
+  @available(*, unavailable,
+    message: "Please use ${Self}(bitPattern: ${OtherSelf}) in combination with ${Floating}.bitPattern property.")
   public init(bitPattern x: ${Floating}) {
-    _value = Builtin.bitcast_FPIEEE${bits}_Int${bits}(x._value)
+    Builtin.unreachable()
   }
 %   end
 
@@ -2605,6 +2710,26 @@ public struct ${Self}
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
+  /// Creates an integer from the given floating-point value, rounding toward
+  /// zero.
+  ///
+  /// Any fractional part of the value passed as `source` is removed, rounding
+  /// the value toward zero.
+  ///
+  ///     let x = Int(21.5)
+  ///     // x == 21
+  ///     let y = Int(-21.5)
+  ///     // y == -21
+  ///
+  /// If `source` is outside the bounds of this type after rounding toward
+  /// zero, a runtime error may occur.
+  ///
+  ///     let z = UInt(-21.5)
+  ///     // Error: ...the result would be less than UInt.min
+  ///
+  /// - Parameter source: A floating-point value to convert to an integer.
+  ///   `source` must be representable in this type after rounding toward
+  ///   zero.
   @_transparent
   public init(_ source: ${FloatType}) {
     _precondition(source.isFinite,
@@ -2616,6 +2741,20 @@ public struct ${Self}
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
   }
 
+  /// Creates an integer from the given floating-point value, if it can be
+  /// represented exactly.
+  ///
+  /// If the value passed as `source` is not representable exactly, the result
+  /// is `nil`. In the following example, the constant `x` is successfully
+  /// created from a value of `21.0`, while the attempt to initialize the
+  /// constant `y` from `21.5` fails:
+  ///
+  ///     let x = Int(exactly: 21.0)
+  ///     // x == Optional(21)
+  ///     let y = Int(exactly: 21.5)
+  ///     // y == nil
+  ///
+  /// - Parameter source: A floating-point value to convert to an integer.
   @_transparent
   public init?(exactly source: ${FloatType}) {
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
@@ -2640,23 +2779,12 @@ public struct ${Self}
     return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
   }
 
-// FIXME(integers): pending compiler improvements.
-// Basically, most simple arithmetic expressions become too complex when `+`
-// gets defined on the protocol rather than on concrete type.
-%       for x in chain(*binaryArithmetic.values()):
-  @_transparent
-  public static func ${x.operator}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-    var lhs = lhs
-    lhs ${x.operator}= rhs
-    return lhs
-  }
-%       end
-
 // FIXME(integers): pending optimizer work on handling the case where the
 // boolean value is wrapped into a two-case enum and then immediately
 // unwrapped. <rdar://problem/29004429>
 // See corresponding definitions in the FixedWidthInteger extension.
 %       for x in binaryArithmetic['Numeric'] + binaryArithmetic["BinaryInteger"][:1]:
+${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
 %   if x.kind == '/':
@@ -2688,10 +2816,11 @@ public struct ${Self}
 
 %       for x in chain(*binaryArithmetic.values()):
 
+${overflowOperationComment(x.operator)}
   @_transparent
   public func ${x.name}ReportingOverflow(
     ${x.firstArg} other: ${Self}
-  ) -> (partialValue: ${Self}, overflow: ArithmeticOverflow) {
+  ) -> (partialValue: ${Self}, overflow: Bool) {
 
 %         if x.kind == '/':
     // No LLVM primitives for checking overflow of division
@@ -2700,7 +2829,7 @@ public struct ${Self}
       other == (0 as ${Self})
       ${'|| self == %s.min && other == (-1 as %s)' % (Self, Self) if signed else ''}
     ) {
-      return (partialValue: self, overflow: .overflow)
+      return (partialValue: self, overflow: true)
     }
 
     let (newStorage, overflow) = (
@@ -2716,10 +2845,11 @@ public struct ${Self}
 
     return (
       partialValue: ${Self}(newStorage),
-      overflow: ArithmeticOverflow(Bool(overflow)))
+      overflow: Bool(overflow))
   }
 %       end
 
+${assignmentOperatorComment('%', True)}
   @_transparent
   public static func %=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
     // No LLVM primitives for checking overflow of division
@@ -2754,6 +2884,7 @@ public struct ${Self}
   }
 
 % for x in binaryBitwise:
+${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
     lhs = ${Self}(Builtin.${x.llvmName}_Int${bits}(lhs._value, rhs._value))
@@ -2761,6 +2892,7 @@ public struct ${Self}
 % end
 
 % for x in maskingShifts:
+
 ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
@@ -2769,65 +2901,120 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.${x.llvmName(signed)}_Int${bits}(lhs._value, rhs_._value))
   }
 
-${operatorComment(x.operator, True)}
-  // FIXME(integers): this overload is not necessary, as there is one in the
-  // protocol extension. But omitting it makes a lot of expressions too complex
-  // to typecheck.
-  @_transparent
-  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
-    var lhs = lhs
-    lhs ${x.operator}= rhs
-    return lhs
-  }
 % end
 
+  /// The number of bits used for the underlying binary representation of
+  /// values of this type.
+  ///
+%   if self_type.is_word:
+  /// The bit width of ${Article.lower()} `${Self}` instance is 32 on 32-bit
+  /// platforms and 64 on 64-bit platforms.
+%   else:
+  /// The bit width of ${Article.lower()} `${Self}` instance is ${bits}.
+%   end
   @_transparent
   public static var bitWidth : Int { return ${bits} }
 
+  /// The number of leading zeros in this value's binary representation.
+  ///
+  /// For example, in an integer type with a `bitWidth` value of 8,
+  /// the number *31* has three leading zeros.
+  ///
+  ///     let x: Int8 = 0b0001_1111
+  ///     // x == 31
+  ///     // x.leadingZeroBitCount == 3
   @_transparent
   public var leadingZeroBitCount: Int {
     return Int(
       ${Self}(
         Builtin.int_ctlz_Int${bits}(self._value, false._value)
-      )._lowUWord._value)
+      )._lowWord._value)
   }
 
+  /// The number of trailing zeros in this value's binary representation.
+  ///
+  /// For example, the number *-8* has three trailing zeros.
+  ///
+  ///     let x = Int8(bitPattern: 0b1111_1000)
+  ///     // x == -8
+  ///     // x.trailingZeroBitCount == 3
   @_transparent
   public var trailingZeroBitCount: Int {
     return Int(
       ${Self}(
         Builtin.int_cttz_Int${bits}(self._value, false._value)
-      )._lowUWord._value)
+      )._lowWord._value)
   }
 
+  /// The number of bits equal to 1 in this value's binary representation.
+  ///
+  /// For example, in a fixed-width integer type with a `bitWidth` value of 8,
+  /// the number *31* has five bits equal to *1*.
+  ///
+  ///     let x: Int8 = 0b0001_1111
+  ///     // x == 31
+  ///     // x.nonzeroBitCount == 5
   @_transparent
   public var nonzeroBitCount: Int {
     return Int(
       ${Self}(
         Builtin.int_ctpop_Int${bits}(self._value)
-      )._lowUWord._value)
+      )._lowWord._value)
   }
 
-  @_transparent
-  public func _word(at n: Int) -> UInt {
-    _precondition(n >= 0, "Negative word index")
-    if _fastPath(n < countRepresentedWords) {
-      let shift = UInt(n._value) &* ${word_bits}
-      let bitWidth = UInt(self.bitWidth._value)
-      _sanityCheck(shift < bitWidth)
-      return (self &>> ${Self}(_truncatingBits: shift))._lowUWord
+  // FIXME should be RandomAccessCollection
+  public struct Words : BidirectionalCollection {
+    public typealias Indices = CountableRange<Int>
+    public typealias SubSequence = BidirectionalSlice<${Self}.Words>
+
+    var _value: ${Self}
+
+    public init(_ value: ${Self}) {
+      self._value = value
     }
-% if signed:
-    return self < (0 as ${Self}) ? ~0 : 0
-% else:
-    return 0
-% end
+
+    public var count: Int {
+      return (${bits} + ${word_bits} - 1) / ${word_bits}
+    }
+
+    public var startIndex: Int { return 0 }
+
+    public var endIndex: Int { return count }
+
+    public var indices: Indices { return startIndex ..< endIndex }
+
+    @_transparent
+    public func index(after i: Int) -> Int { return i + 1 }
+
+    @_transparent
+    public func index(before i: Int) -> Int { return i - 1 }
+
+    public subscript(position: Int) -> UInt {
+      get {
+        _precondition(position >= 0, "Negative word index")
+        _precondition(position < endIndex, "Word index out of range")
+        let shift = UInt(position._value) &* ${word_bits}
+        _sanityCheck(shift < UInt(_value.bitWidth._value))
+        return (_value &>> ${Self}(_truncatingBits: shift))._lowWord
+      }
+    }
   }
 
+  /// A collection containing the words of this value's binary
+  /// representation, in order from the least significant to most significant.
+% if signed:
+  ///
+  /// Negative values are returned in two's complement representation,
+  /// regardless of the type's underlying implementation.
+% end
+  @_transparent
+  public var words: Words {
+    return Words(self)
+  }
 
   @_transparent
   public // transparent
-  var _lowUWord: UInt {
+  var _lowWord: UInt {
     % truncOrExt = z + 'ext' if bits <= word_bits else 'trunc'
     return UInt(
       Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_value)
@@ -2845,6 +3032,21 @@ ${operatorComment(x.operator, True)}
   public typealias Magnitude = ${U}${Self}
 
 % if signed:
+  /// The magnitude of this value.
+  ///
+  /// For any numeric value `x`, `x.magnitude` is the absolute value of `x`.
+  /// You can use the `magnitude` property in operations that are simpler to
+  /// implement in terms of unsigned values, such as printing the value of an
+  /// integer, which is just printing a '-' character in front of an absolute
+  /// value.
+  ///
+  ///     let x = -200
+  ///     // x.magnitude == 200
+  ///
+  /// The global `abs(_:)` function provides more familiar syntax when you need
+  /// to find an absolute value. In addition, because `abs(_:)` always returns
+  /// a value of the same type, even in a generic context, using the function
+  /// instead of the `magnitude` property is encouraged.
   @_transparent
   public var magnitude: U${Self} {
     let base = U${Self}(_value)
@@ -2853,19 +3055,44 @@ ${operatorComment(x.operator, True)}
 % end
 
 %   dbits = bits*2
+  /// Returns a tuple containing the high and low parts of the result of
+  /// multiplying this value by the given value.
+  ///
+  /// Use this method to calculate the full result of a product that would
+  /// otherwise overflow. Unlike traditional truncating multiplication, the
+  /// `multipliedFullWidth(by:)` method returns a tuple
+  /// containing both the `high` and `low` parts of the product of this value and
+  /// `other`. The following example uses this method to multiply two `UInt8`
+  /// values that normally overflow when multiplied:
+  ///
+  ///     let x: UInt8 = 100
+  ///     let y: UInt8 = 20
+  ///     let result = x.multipliedFullWidth(by: y)
+  ///     // result.high == 0b00000111
+  ///     // result.low  == 0b11010000
+  ///
+  /// The product of `x` and `y` is 2000, which is too large to represent in a
+  /// `UInt8` instance. The `high` and `low` properties of the `result` value
+  /// represent 2000 when concatenated to form a double-width integer; that
+  /// is, using `result.high` as the high byte and `result.low` as the low byte
+  /// of a `UInt16` instance.
+  ///
+  ///     let z = UInt16(result.high) << 8 | UInt16(result.low)
+  ///     // z == 2000
+  ///
+  /// - Parameter other: The value to multiply this value by.
+  /// - Returns: A tuple containing the high and low parts of the result of
+  ///   multiplying this value and `other`.
   // FIXME(integers): tests
   public func multipliedFullWidth(by other: ${Self})
   -> (high: ${Self}, low: ${Self}.Magnitude) {
-    // FIXME(integers): properly replace rhs and lhs with self and other
-    let lhs = self
-    let rhs = other
 %   # 128 bit types are not provided by the 32-bit LLVM
 %   if word_bits == 32 and bits == 64:
     // FIXME(integers): implement
     fatalError("Operation is not supported")
 %   else:
-    let lhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(lhs._value)
-    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(rhs._value)
+    let lhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
+    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(other._value)
 
     let res = Builtin.mul_Int${dbits}(lhs_, rhs_)
     let low = ${Self}.Magnitude(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(res))
@@ -2876,27 +3103,40 @@ ${operatorComment(x.operator, True)}
 %   end
   }
 
+  /// Returns a tuple containing the quotient and remainder of dividing the
+  /// given value by this value.
+  ///
+  /// The resulting quotient must be representable within the bounds of the
+  /// type. If the quotient of dividing `dividend` by this value is too large
+  /// to represent in the type, a runtime error may occur.
+  ///
+  /// - Parameter dividend: A tuple containing the high and low parts of a
+  ///   double-width integer. The `high` component of the value carries the
+  ///   sign, if the type is signed.
+  /// - Returns: A tuple containing the quotient and remainder of `dividend`
+  ///   divided by this value.
   // FIXME(integers): tests
   public func dividingFullWidth(
     _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
   ) -> (quotient: ${Self}, remainder: ${Self}) {
-    // FIXME(integers): properly rename lhs to dividend and rhs to self.
-    let lhs = dividend
-    let rhs = self
-
 %   # 128 bit types are not provided by the 32-bit LLVM
-%   if word_bits == 32 and bits == 64:
-    // FIXME(integers): implement
-    fatalError("Operation is not supported")
+%   #if word_bits == 32 and bits == 64:
+%   if bits == 64:
+    let lhs = DoubleWidth<${Self}>(dividend)
+    let rhs = DoubleWidth<${Self}>(self)
+
+    let (quotient, remainder) = lhs.quotientAndRemainder(dividingBy: rhs)
+    // FIXME(integers): check for high words in quotient and remainder
+    return (${Self}(quotient.low), ${Self}(remainder.low))
 %   else:
     // FIXME(integers): handle division by zero and overflows
-    _precondition(rhs != 0, "Division by zero")
-    let lhsHigh = Builtin.${z}ext_Int${bits}_Int${dbits}(lhs.high._value)
+    _precondition(self != 0, "Division by zero")
+    let lhsHigh = Builtin.${z}ext_Int${bits}_Int${dbits}(dividend.high._value)
     let shift = Builtin.zextOrBitCast_Int8_Int${dbits}(UInt8(${bits})._value)
     let lhsHighShifted = Builtin.shl_Int${dbits}(lhsHigh, shift)
-    let lhsLow = Builtin.zext_Int${bits}_Int${dbits}(lhs.low._value)
+    let lhsLow = Builtin.zext_Int${bits}_Int${dbits}(dividend.low._value)
     let lhs_ = Builtin.or_Int${dbits}(lhsHighShifted, lhsLow)
-    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(rhs._value)
+    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
 
     let quotient_ = Builtin.${u}div_Int${dbits}(lhs_, rhs_)
     let remainder_ = Builtin.${u}rem_Int${dbits}(lhs_, rhs_)
@@ -2910,87 +3150,8 @@ ${operatorComment(x.operator, True)}
 %   end
   }
 
-  /// Creates an integer using the specified big-endian representation,
-  /// changing the byte order if necessary.
-  ///
-  /// On a big-endian platform, for any integer `x`,
-  /// `x == ${Self}(bigEndian: x)`.
-  ///
-  /// - Parameter value: A value to use as the big-endian representation of the
-  ///   new integer.
-  @_transparent
-  public init(bigEndian value: ${Self}) {
-%   if bits <= 8:
-    self = value
-%   else:
-#if _endian(big)
-    self = value
-#else
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
-#endif
-%   end
-  }
-
-  /// Creates an integer using the specified little-endian representation,
-  /// changing the byte order if necessary.
-  ///
-  /// On a little-endian platform, for any integer `x`,
-  /// `x == ${Self}(littleEndian: x)`.
-  ///
-  /// - Parameter value: A value to use as the little-endian representation of
-  ///   the new integer.
-  @_transparent
-  public init(littleEndian value: ${Self}) {
-%   if bits <= 8:
-    self = value
-%   else:
-#if _endian(little)
-    self = value
-#else
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
-#endif
-%   end
-  }
-
-  /// The big-endian representation of this integer.
-  ///
-  /// If necessary, the byte order of this value is reversed from the typical
-  /// byte order of this integer type. On a big-endian platform, for any
-  /// integer `x`, `x == x.bigEndian`.
-  ///
-  /// - SeeAlso: `littleEndian`
-  public var bigEndian: ${Self} {
-%   if bits <= 8:
-    return self
-%   else:
-#if _endian(big)
-    return self
-#else
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
-#endif
-%   end
-  }
-
-  /// The little-endian representation of this integer.
-  ///
-  /// If necessary, the byte order of this value is reversed from the typical
-  /// byte order of this integer type. On a little-endian platform, for any
-  /// integer `x`, `x == x.littleEndian`.
-  ///
-  /// - SeeAlso: `bigEndian`
-  public var littleEndian: ${Self} {
-%   if bits <= 8:
-    return self
-%   else:
-#if _endian(little)
-    return self
-#else
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
-#endif
-%   end
-  }
-
   /// A representation of this integer with the byte order swapped.
+  @_transparent
   public var byteSwapped: ${Self} {
 %   if bits <= 8:
     return self
@@ -3026,7 +3187,7 @@ ${operatorComment(x.operator, True)}
 % end
 
   @available(swift, obsoleted: 4.0, message: "Use initializers instead")
-  public func to${U}IntMax() -> ${U}IntMax {
+  public func to${U}IntMax() -> ${U}Int64 {
     return numericCast(self)
   }
 
@@ -3035,12 +3196,44 @@ ${operatorComment(x.operator, True)}
 
   @available(swift, obsoleted: 4)
   public static var _sizeInBytes: ${Self} { return ${bits}/8 }
+
+  /// Returns `-1` if this value is negative and `1` if it's positive;
+  /// otherwise, `0`.
+  ///
+  /// - Returns: The sign of this number, expressed as an integer of the same
+  ///   type.
+  @inline(__always)
+  public func signum() -> ${Self} {
+    let isPositive = ${Self}(Builtin.zext_Int1_Int${bits}(
+      (self > (0 as ${Self}))._value))
+    return isPositive | (self &>> ${bits - 1})
+  }
 }
 %# end of concrete type: ${Self}
 
 extension ${Self} {
+  /// Creates an integer from the given floating-point value, rounding toward
+  /// zero.
+  ///
+  /// Any fractional part of the value passed as `source` is removed, rounding
+  /// the value toward zero.
+  ///
+  ///     let x = Int(21.5)
+  ///     // x == 21
+  ///     let y = Int(-21.5)
+  ///     // y == -21
+  ///
+  /// If `source` is outside the bounds of this type after rounding toward
+  /// zero, a runtime error may occur.
+  ///
+  ///     let z = UInt(-21.5)
+  ///     // Error: ...the result would be less than UInt.min
+  ///
+  /// - Parameter source: A floating-point value to convert to an integer.
+  ///   `source` must be representable in this type after rounding toward
+  ///   zero.
   // FIXME(integers): implement me in a less terrible way
-  public init<T : FloatingPoint>(_ source: T) {
+  public init<T : BinaryFloatingPoint>(_ source: T) {
 %   for (FloatType, FloatBits) in [
 %     ('Float', 32), ('Double', 64), ('Float80', 80)]:
 %     if FloatType == 'Float80':
@@ -3077,8 +3270,8 @@ extension ${Self} : Hashable {
 % elif bits == word_bits * 2:
       // We have twice as many bits as we need to return.
       return
-        Int(extendingOrTruncating: self) ^
-        Int(extendingOrTruncating: self &>> 32)
+        Int(truncatingIfNeeded: self) ^
+        Int(truncatingIfNeeded: self &>> 32)
 % else:
       _Unimplemented()
 % end
@@ -3109,7 +3302,7 @@ extension ${Self} {
   ///
   /// - Parameter source: An integer to use as the source of the new value's
   ///   bit pattern.
-  @available(swift, obsoleted: 4.0, renamed: "init(extendingOrTruncating:)")
+  @available(swift, obsoleted: 4.0, renamed: "init(truncatingIfNeeded:)")
   @_transparent
   public init(truncatingBitPattern source: ${Src}) {
     let src = source._value
@@ -3123,6 +3316,51 @@ extension ${Self} {
 }
 %   end
 % end
+
+
+// FIXME(integers): this section here is to help the typechecker,
+// as it seems to have problems with a pattern where the nonmutating operation
+// is defined on a protocol in terms of a mutating one that is itself defined
+// on concrete types.
+extension ${Self} {
+
+%   for x in binaryBitwise + maskingShifts + list(chain(*binaryArithmetic.values())):
+
+${operatorComment(x.operator, True)}
+  @_transparent
+  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
+  }
+
+%   end
+
+%   for op in maskingShifts:
+
+${operatorComment(x.operator, True)}
+  @available(swift, obsoleted: 4)
+  @_transparent
+  public static func ${op.nonMaskingOperator}(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> ${Self} {
+    var lhs = lhs
+    ${op.helper}Generic(&lhs, rhs)
+    return lhs
+  }
+
+${assignmentOperatorComment(x.operator, True)}
+  @available(swift, obsoleted: 4)
+  @_transparent
+  public static func ${op.nonMaskingOperator}=(
+    lhs: inout ${Self}, rhs: ${Self}
+  ) {
+    ${op.helper}Generic(&lhs, rhs)
+  }
+
+%   end
+}
+
 
 % if signed:
 // TODO: Consider removing the underscore.
@@ -3167,291 +3405,6 @@ public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
   return U(x)
 }
 
-
-//===----------------------------------------------------------------------===//
-//===--- DoubleWidth ------------------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-public struct DoubleWidth<T : FixedWidthInteger>
-  : FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral
-  where
-  T.Magnitude : FixedWidthInteger,
-  T.Magnitude.Magnitude == T.Magnitude {
-
-  public typealias High = T
-  public typealias Low = T.Magnitude
-
-  internal var _storage: (high: T, low: T.Magnitude)
-
-  internal init(_ _value: (High, Low)) {
-    self._storage = (high: _value.0, low: _value.1)
-  }
-
-  public var high: High {
-    return _storage.high
-  }
-
-  public var low: Low {
-    return _storage.low
-  }
-
-  // Numeric
-  //
-  public init() {
-    self.init((High(), Low()))
-  }
-
-  // integer
-  //
-  public var magnitude: DoubleWidth<Low> {
-    if T.isSigned && _storage.high < 0 {
-        return (DoubleWidth<T>() - self).magnitude
-    }
-    return DoubleWidth<Low>((
-      _storage.high.magnitude, _storage.low.magnitude))
-  }
-
-  public func isEqual(to rhs: DoubleWidth<T>) -> Bool {
-    return (_storage.high == rhs._storage.high) &&
-           (_storage.low == rhs._storage.low)
-  }
-
-  public func isLess(than rhs: DoubleWidth<T>) -> Bool {
-    if _storage.high < rhs._storage.high {
-      return true
-    }
-    if (_storage.high > rhs._storage.high) {
-      return false
-    }
-    return _storage.low < rhs._storage.low
-  }
-
-  public init<T : BinaryInteger>(_ source: T) {
-    fatalError()
-  }
-
-  public init?<T : BinaryInteger>(exactly source: T) {
-    fatalError()
-  }
-
-  public init<T : BinaryInteger>(extendingOrTruncating source: T) {
-    fatalError()
-  }
-
-  public init<T : FloatingPoint>(_ source: T) {
-    fatalError()
-  }
-
-  public init?<T : FloatingPoint>(exactly source: T) {
-    fatalError()
-  }
-
-  public func _word(at n: Int) -> UInt {
-    if T.bitWidth < ${word_bits} || T.bitWidth % ${word_bits} != 0 {
-      fatalError("_word(at:) is not supported on this type")
-    }
-    // TODO: move to Int128 just like init(_builtinIntegerLiteral:) ?
-    let wordsInT = T.bitWidth / ${word_bits}
-    return (n < wordsInT) ?
-      _storage.low._word(at: n) :
-      _storage.high._word(at: n - wordsInT)
-  }
-
-  public static var isSigned: Bool {
-    return T.isSigned
-  }
-
-  // fixed width
-  //
-  public static var max: DoubleWidth<T> {
-    return self.init((High.max, Low.max))
-  }
-
-  public static var min: DoubleWidth<T> {
-    return self.init((High.min, Low.min))
-  }
-
-  public static var bitWidth : Int { return 2 * T.bitWidth }
-
-% # This covers + and -
-% for x in binaryArithmetic['Numeric'][:2]:
-%   highAffectedByLowOverflow = 'T.max' if x.operator == '+' else 'T.min'
-  public func ${x.name}ReportingOverflow(_ rhs: DoubleWidth<T>)
-    -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
-    let (low, lowOverflow) =
-      _storage.low.${x.name}ReportingOverflow(rhs._storage.low)
-    let (high, highOverflow) =
-      _storage.high.${x.name}ReportingOverflow(rhs._storage.high)
-    let isLowOverflow = lowOverflow == .overflow
-    let result = (high ${x.operator} (isLowOverflow ? 1 : 0), low)
-    let overflow = ArithmeticOverflow(
-      highOverflow == .overflow ||
-      high == ${highAffectedByLowOverflow} && isLowOverflow
-    )
-    return (partialValue: DoubleWidth<T>(result),
-      overflow: overflow)
-  }
-% end
-
-
-  public func multipliedReportingOverflow(
-    by rhs: DoubleWidth<T>
-  ) -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
-    let isNegative = (self < DoubleWidth<T>()) != (rhs < DoubleWidth<T>())
-
-    func mul(_ x: Low, _ y: Low, _ carry: Low) -> (partial: Low, carry: Low) {
-      let pair = x.multipliedFullWidth(by: y)
-      let t = DoubleWidth<Low>(pair) + DoubleWidth<Low>((0, carry))
-      return (partial: t._storage.low, carry: t._storage.high)
-    }
-
-    var high: Low = 0
-    var low: Low = 0
-
-    func mkResult(_ isOverflow: Bool)
-      -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
-
-      // TODO: High() cast fails
-      let result = DoubleWidth<T>((High(high), low))
-      if isNegative {
-        return DoubleWidth<T>().subtractingReportingOverflow(result)
-      }
-      return (partialValue: result, overflow: ArithmeticOverflow(isOverflow))
-    }
-
-    var carry: Low = 0
-
-    let lhs = self.magnitude
-    let rhs = rhs.magnitude
-
-    // TODO: gyb me!
-    let a = mul(rhs._storage.low, lhs._storage.low, carry)
-    low += a.partial
-    carry = a.carry
-    /*_log("(II) 1 (\(high), \(low)) carry: \(carry)")*/
-
-    let b = mul(rhs._storage.low, lhs._storage.high, carry)
-    high += b.partial
-    carry = b.carry
-    /*_log("(II) 2 (\(high), \(low)) carry: \(carry)")*/
-
-    if carry != 0 {
-      /*_log("(EE) overflow")*/
-      return mkResult(true)
-    }
-
-    let c = mul(rhs._storage.high, lhs._storage.low, carry)
-    low += c.partial
-    carry = c.carry
-    /*_log("(II) 3 (\(high), \(low)) carry: \(carry)")*/
-
-    let d = mul(rhs._storage.high, lhs._storage.high, carry)
-    high += d.partial
-    carry = d.carry
-    /*_log("(II) 4 (\(high), \(low)) carry: \(carry)")*/
-
-    /*if (carry > 0) { _log("(EE) overflow") }*/
-    return mkResult(carry > 0)
-  }
-
-  public func dividedReportingOverflow(by other: DoubleWidth<T>)
-    -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
-    fatalError()
-  }
-
-  public func remainderReportingOverflow(dividingBy other: DoubleWidth<T>)
-    -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
-    fatalError()
-  }
-
-  public func multipliedFullWidth(by other: DoubleWidth<T>)
-    -> (high: DoubleWidth<T>, low: DoubleWidth<T>.Magnitude) {
-    fatalError()
-  }
-
-  public func dividingFullWidth(
-    _ dividend: (high: DoubleWidth<T>, low: DoubleWidth<T>.Magnitude)
-  ) -> (quotient: DoubleWidth<T>, remainder: DoubleWidth<T>) {
-    fatalError()
-  }
-
-% for x in binaryBitwise + maskingShifts:
-  public static func ${x.operator}=(
-    lhs: inout DoubleWidth<T>, rhs: DoubleWidth<T>
-  ) {
-    fatalError()
-  }
-% end
-
-% for x in chain(*binaryArithmetic.values()):
-
-  // FIXME(integers): remove this once the operators are back to Numeric
-  public static func ${x.operator} (
-    lhs: DoubleWidth<T>, rhs: DoubleWidth<T>
-  ) -> DoubleWidth<T> {
-    var lhs = lhs
-    lhs ${x.operator}= rhs
-    return lhs
-  }
-
-  public static func ${x.operator}=(
-    lhs: inout DoubleWidth<T>, rhs: DoubleWidth<T>
-  ) {
-    fatalError()
-  }
-% end
-
-  public init(_truncatingBits bits: UInt) {
-    fatalError()
-  }
-
-  // other
-  //
-  public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    fatalError("Method must be overridden")
-  }
-
-  public var description: String {
-    return "(\(_storage.high), \(_storage.low))"
-  }
-
-  public var leadingZeroBitCount: Int {
-    fatalError()
-  }
-
-  public var trailingZeroBitCount: Int {
-    fatalError()
-  }
-
-  public var nonzeroBitCount: Int {
-    fatalError()
-  }
-
-  public var hashValue: Int {
-    fatalError()
-  }
-
-  public init(littleEndian: DoubleWidth<T>) {
-    fatalError()
-  }
-
-  public init(bigEndian: DoubleWidth<T>) {
-    fatalError()
-  }
-
-  public var littleEndian: DoubleWidth<T> {
-    fatalError()
-  }
-
-  public var bigEndian: DoubleWidth<T> {
-    fatalError()
-  }
-
-  public var byteSwapped: DoubleWidth<T> {
-    fatalError()
-  }
-}
-
 // FIXME(integers): switch to using `FixedWidthInteger.unsafeAdding`
 internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
@@ -3472,23 +3425,23 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 
 // Swift 3 compatibility APIs
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4, renamed: "BinaryInteger")
 public typealias Integer = BinaryInteger
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4, renamed: "BinaryInteger")
 public typealias IntegerArithmetic = BinaryInteger
 
-@available(swift, obsoleted: 4)
-public typealias SignedNumber = SignedNumeric
+@available(swift, obsoleted: 4, message: "Please use 'SignedNumeric & Comparable' instead.")
+public typealias SignedNumber = SignedNumeric & Comparable
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4, message: "Please use 'SignedNumeric & Comparable' instead.")
 public typealias AbsoluteValuable = SignedNumeric & Comparable
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4, renamed: "SignedInteger")
 public typealias _SignedInteger = SignedInteger
 
 extension SignedNumeric where Self : Comparable {
-  @available(swift, obsoleted: 4)
+  @available(swift, obsoleted: 4, message: "Please use the 'abs(_:)' free function.")
   @_transparent
   public static func abs(_ x: Self) -> Self {
     return Swift.abs(x)
@@ -3498,15 +3451,15 @@ extension SignedNumeric where Self : Comparable {
 @available(swift, obsoleted: 4)
 extension BinaryInteger {
   @available(swift, obsoleted: 4)
-  public func toIntMax() -> IntMax {
-    return IntMax(self)
+  public func toIntMax() -> Int64 {
+    return Int64(self)
   }
 }
 
 extension UnsignedInteger {
   @available(swift, obsoleted: 4)
-  public func toUIntMax() -> UIntMax {
-    return UIntMax(self)
+  public func toUIntMax() -> UInt64 {
+    return UInt64(self)
   }
 }
 
@@ -3542,14 +3495,18 @@ extension FixedWidthInteger {
 
 }
 
+%{
+overflowingOps = [
+  ('add', 'adding', ''),
+  ('subtract', 'subtracting', ''),
+  ('multiply', 'multiplied', 'by:'),
+  ('divide', 'divided', 'by:'),
+  ('remainder', 'remainder', 'dividingBy:'),
+]
+}%
+
 extension FixedWidthInteger {
-% for oldPrefix, newPrefix, argLabel in [
-%   ('add', 'adding', ''),
-%   ('subtract', 'subtracting', ''),
-%   ('multiply', 'multiplied', 'by:'),
-%   ('divide', 'divided', 'by:'),
-%   ('remainder', 'remainder', 'dividingBy:'),
-%   ]:
+% for oldPrefix, newPrefix, argLabel in overflowingOps:
   @available(swift, obsoleted: 4, message: "Use ${newPrefix}ReportingOverflow(${argLabel or '_:'}) instead.")
   @_transparent
   public static func ${oldPrefix}WithOverflow(
@@ -3557,9 +3514,21 @@ extension FixedWidthInteger {
   ) -> (Self, overflow: Bool) {
     let (partialValue, overflow) =
       lhs.${newPrefix}ReportingOverflow(${argLabel} rhs)
-    return (partialValue, overflow == .overflow)
+    return (partialValue, overflow: overflow)
   }
 
+% end
+}
+
+extension BinaryInteger {
+% for oldPrefix, newPrefix, argLabel in overflowingOps:
+  @available(swift, obsoleted: 3.2,
+    message: "Please use FixedWidthInteger protocol as a generic constraint and ${newPrefix}ReportingOverflow(${argLabel or '_:'}) method instead.")
+  public static func ${oldPrefix}WithOverflow(
+    _ lhs: Self, _ rhs: Self
+  ) -> (Self, overflow: Bool) {
+    fatalError("Unavailable")
+  }
 % end
 }
 
@@ -3581,7 +3550,8 @@ extension SignedInteger {
     fatalError("Should be overridden in a more specific type")
   }
 
-  @available(swift, obsoleted: 4.0)
+  @available(swift, obsoleted: 4.0,
+      message: "Please use 'FixedWidthInteger' instead of 'SignedInteger' to get '${op}' in generic code.")
   public static func ${op} (lhs: Self, rhs: Self) -> Self {
     return ${helper}(lhs, rhs)
   }

@@ -81,8 +81,12 @@ _TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> {T:_TFC3foo3bar3basfT3zimCS_3zim_T_,C} @
 _TTOFSC3fooFTSdSd_Sd ---> {T:_TFSC3fooFTSdSd_Sd} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
 _T03foo3barC3basyAA3zimCAE_tFTo ---> {T:_T03foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
 _T0SC3fooS2d_SdtFTO ---> {T:_T0SC3fooS2d_SdtF} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
-_S3foo3barC3basyAA3zimCAE_tFTo ---> {T:_S3foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
-_SSC3fooS2d_SdtFTO ---> {T:_SSC3fooS2d_SdtF} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
+__$S3foo3barC3basyAA3zimCAE_tFTo ---> {T:_$S3foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
+__$SSC3fooS2d_SdtFTO ---> {T:_$SSC3fooS2d_SdtF} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
+_$S3foo3barC3basyAA3zimCAE_tFTo ---> {T:_$S3foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
+_$SSC3fooS2d_SdtFTO ---> {T:_$SSC3fooS2d_SdtF} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
+$S3foo3barC3basyAA3zimCAE_tFTo ---> {T:$S3foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
+$SSC3fooS2d_SdtFTO ---> {T:$SSC3fooS2d_SdtF} @nonobjc __C.foo(Swift.Double, Swift.Double) -> Swift.Double
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas(zim: foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix(foo.bar, foo.bas) -> foo.zim
@@ -252,6 +256,13 @@ _T0s13_UnicodeViewsVss22RandomAccessCollectionRzs0A8EncodingR_11SubSequence_5Ind
 _T010Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiSbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __ObjC.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation) -> Swift.Bool
 _T04main1_yyF ---> main._() -> ()
 _T04test6testitSiyt_tF ---> test.testit(()) -> Swift.Int
-_T08_ElementQzSbs5Error_pIxxdzo_ABSbsAC_pIxidzo_s26RangeReplaceableCollectionRzABRLClTR -> reabstraction thunk helper <A where A: Swift.RangeReplaceableCollection, A._Element: AnyObject> from @callee_owned (@owned A._Element) -> (@unowned Swift.Bool, @error @owned Swift.Error) to @callee_owned (@in A._Element) -> (@unowned Swift.Bool, @error @owned Swift.Error)
-
+_T08_ElementQzSbs5Error_pIxxdzo_ABSbsAC_pIxidzo_s26RangeReplaceableCollectionRzABRLClTR ---> {T:} reabstraction thunk helper <A where A: Swift.RangeReplaceableCollection, A._Element: AnyObject> from @callee_owned (@owned A._Element) -> (@unowned Swift.Bool, @error @owned Swift.Error) to @callee_owned (@in A._Element) -> (@unowned Swift.Bool, @error @owned Swift.Error)
+_T0Ix_IyB_Tr ---> {T:} reabstraction thunk from @callee_owned () -> () to @callee_unowned @convention(block) () -> ()
+_T0Rml ---> _T0Rml
+_T0Tk ---> _T0Tk
+_T0A8 ---> _T0A8
+_T0s30ReversedRandomAccessCollectionVyxGTfq3nnpf_nTfq1cn_nTfq4x_n ---> _T0s30ReversedRandomAccessCollectionVyxGTfq3nnpf_nTfq1cn_nTfq4x_n
+_T03abc6testitySiFTm ---> merged abc.testit(Swift.Int) -> ()
+_T04main4TestCACSi1x_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test
+_T0SqWy.17 ---> outlined copy of Swift.Optional with unmangled suffix ".17"
 

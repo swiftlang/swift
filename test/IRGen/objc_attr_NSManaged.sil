@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
 
@@ -27,7 +27,7 @@ sil_vtable X {}
 // The getter/setter should not show up in the Swift metadata.
 /* FIXME: sil_vtable parser picks the wrong 'init' overload. Both vtable entries
    ought to be nonnull here. rdar://problem/19572342 */
-// CHECK: @_T019objc_attr_NSManaged10SwiftGizmoCMf = internal global <{ {{.*}} }> <{ void (%T19objc_attr_NSManaged10SwiftGizmoC*)* @_T019objc_attr_NSManaged10SwiftGizmoCfD, i8** @_T0BOWV, i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* null, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 1), i32 1, i32 0, i32 16, i16 7, i16 0, i32 112, i32 16, {{.*}}* @_T019objc_attr_NSManaged10SwiftGizmoCMn {{.*}}, i8* null, %T19objc_attr_NSManaged10SwiftGizmoC* (i64, %T19objc_attr_NSManaged10SwiftGizmoC*)* @_T019objc_attr_NSManaged10SwiftGizmoCACSi7bellsOn_tcfc, i8* bitcast (void ()* @swift_deletedMethodError to i8*) }>
+// CHECK: @_T019objc_attr_NSManaged10SwiftGizmoCMf = internal global <{ {{.*}} }> <{ void (%T19objc_attr_NSManaged10SwiftGizmoC*)* @_T019objc_attr_NSManaged10SwiftGizmoCfD, i8** @_T0BOWV, i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* null, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 1), i32 1, i32 0, i32 8, i16 7, i16 0, i32 112, i32 16, {{.*}}* @_T019objc_attr_NSManaged10SwiftGizmoCMn {{.*}}, i8* null, %T19objc_attr_NSManaged10SwiftGizmoC* (i64, %T19objc_attr_NSManaged10SwiftGizmoC*)* @_T019objc_attr_NSManaged10SwiftGizmoCACSi7bellsOn_tcfc, i8* bitcast (void ()* @swift_deletedMethodError to i8*) }>
 
 @objc class SwiftGizmo : Gizmo {
   @objc @NSManaged var x: X

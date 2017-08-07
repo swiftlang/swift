@@ -1,23 +1,25 @@
-// RUN: rm -rf %t/APINotes
-// RUN: mkdir -p %t/APINotes
-// RUN: %clang_apinotes -yaml-to-binary %S/Inputs/gizmo.apinotes -o %t/APINotes/gizmo.apinotesc
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | %FileCheck -check-prefix=SILGEN %s
-// RUN: %target-swift-frontend -emit-sil -O -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | %FileCheck -check-prefix=OPT %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -I %S/Inputs/objc_nonnull_lie_hack/ -enable-source-import -primary-file %s | %FileCheck -check-prefix=SILGEN %s
+// RUN: %target-swift-frontend -emit-sil -O -sdk %S/Inputs -I %S/Inputs -I %S/Inputs/objc_nonnull_lie_hack/ -enable-source-import -primary-file %s | %FileCheck -check-prefix=OPT %s
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar28313536
+// REQUIRES: rdar33495516
 
 import Foundation
-import gizmo
+import NonNilTest
 
-// SILGEN-LABEL: sil hidden @_TF21objc_nonnull_lie_hack10makeObjectFT_GSqCSo8NSObject_
-// SILGEN:         [[INIT:%.*]] = function_ref @_TFCSo8NSObjectC
+func checkThatAPINotesAreBeingUsed() {
+  let hopefullyNotOptional = NonNilTest.nonNilObject()
+  let _: NonNilTest = hopefullyNotOptional
+}
+
+// SILGEN-LABEL: sil hidden @_T021objc_nonnull_lie_hack10makeObjectSo8NSObjectCSgyF
+// SILGEN:         [[INIT:%.*]] = function_ref @_T0So8NSObjectCABycfC
 // SILGEN:         [[NONOPTIONAL:%.*]] = apply [[INIT]]
 // SILGEN:         [[OPTIONAL:%.*]] = unchecked_ref_cast [[NONOPTIONAL]]
 
-// OPT-LABEL: sil hidden @_TF21objc_nonnull_lie_hack10makeObjectFT_GSqCSo8NSObject_
+// OPT-LABEL: sil hidden @_T021objc_nonnull_lie_hack10makeObjectSo8NSObjectCSgyF
 // OPT:         [[OPT:%.*]] = unchecked_ref_cast
-// OPT:         switch_enum [[OPT]] : $Optional<NSObject>, case #Optional.none!enumelt: [[NIL:bb[0-9]+]]
+// OPT:         switch_enum [[OPT]] : $Optional<NSObject>, case #Optional.some!enumelt.1:
 func makeObject() -> NSObject? {
   let foo: NSObject? = NSObject()
   if foo == nil {
@@ -26,28 +28,28 @@ func makeObject() -> NSObject? {
   return foo
 }
 
-// OPT-LABEL: sil hidden @_TF21objc_nonnull_lie_hack15callClassMethod
-// OPT: [[METATYPE:%[0-9]+]] = metatype $@thick Gizmo.Type
-// OPT: [[METHOD:%[0-9]+]] = class_method [volatile] [[METATYPE]] : $@thick Gizmo.Type, #Gizmo.nonNilGizmo!1.foreign : (Gizmo.Type) -> () -> Gizmo, $@convention(objc_method) (@objc_metatype Gizmo.Type) -> @autoreleased Gizmo
-// OPT: [[OBJC_METATYPE:%[0-9]+]] = metatype $@objc_metatype Gizmo.Type
-// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJC_METATYPE]]) : $@convention(objc_method) (@objc_metatype Gizmo.Type) -> @autoreleased Gizmo
-// OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
-// OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>
-func callClassMethod() -> Gizmo? {
-  let foo: Gizmo? = Gizmo.nonNilGizmo()
+// OPT-LABEL: sil hidden @_T021objc_nonnull_lie_hack15callClassMethodSo10NonNilTestCSgyF
+// OPT: [[METATYPE:%[0-9]+]] = metatype $@thick NonNilTest.Type
+// OPT: [[METHOD:%[0-9]+]] = class_method [volatile] [[METATYPE]] : $@thick NonNilTest.Type, #NonNilTest.nonNilObject!1.foreign : (NonNilTest.Type) -> () -> NonNilTest, $@convention(objc_method) (@objc_metatype NonNilTest.Type) -> @autoreleased NonNilTest
+// OPT: [[OBJC_METATYPE:%[0-9]+]] = metatype $@objc_metatype NonNilTest.Type
+// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJC_METATYPE]]) : $@convention(objc_method) (@objc_metatype NonNilTest.Type) -> @autoreleased NonNilTest
+// OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $NonNilTest to $Optional<NonNilTest>
+// OPT: switch_enum [[OPTIONAL]] : $Optional<NonNilTest>
+func callClassMethod() -> NonNilTest? {
+  let foo: NonNilTest? = NonNilTest.nonNilObject()
   if foo == nil {
     print("nil")
   }
   return foo  
 }
 
-// OPT-LABEL: sil hidden @_TTSf4g___TF21objc_nonnull_lie_hack18callInstanceMetho
-// OPT: [[METHOD:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.nonNilGizmo!1.foreign : (Gizmo) -> () -> Gizmo, $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
-// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
+// OPT-LABEL: sil shared @_T021objc_nonnull_lie_hack18callInstanceMethodSo10NonNilTestCSgAD3obj_tFTf4g_n
+// OPT: [[METHOD:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $NonNilTest, #NonNilTest.nonNilObject!1.foreign : (NonNilTest) -> () -> NonNilTest, $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
+// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJ]]) : $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]]
-// OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>
-func callInstanceMethod(gizmo: Gizmo) -> Gizmo? {
-  let foo: Gizmo? = gizmo.nonNilGizmo()
+// OPT: switch_enum [[OPTIONAL]] : $Optional<NonNilTest>
+func callInstanceMethod(obj: NonNilTest) -> NonNilTest? {
+  let foo: NonNilTest? = obj.nonNilObject()
 
   if foo == nil {
     print("nil")
@@ -55,26 +57,26 @@ func callInstanceMethod(gizmo: Gizmo) -> Gizmo? {
   return foo
 }
 
-// OPT-LABEL: sil hidden @_TTSf4g___TF21objc_nonnull_lie_hack12loadPropertyFT5gizmoCSo5Gizmo_GSqS0__
-// OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.nonNilGizmoProperty!getter.1.foreign : (Gizmo) -> () -> Gizmo, $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
-// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
-// OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
-// OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>,
-func loadProperty(gizmo: Gizmo) -> Gizmo? {
-  let foo: Gizmo? = gizmo.nonNilGizmoProperty
+// OPT-LABEL: sil shared @_T021objc_nonnull_lie_hack12loadPropertySo10NonNilTestCSgAD3obj_tFTf4g_n
+// OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $NonNilTest, #NonNilTest.nonNilObjectProperty!getter.1.foreign : (NonNilTest) -> () -> NonNilTest, $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
+// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
+// OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $NonNilTest to $Optional<NonNilTest>
+// OPT: switch_enum [[OPTIONAL]] : $Optional<NonNilTest>,
+func loadProperty(obj: NonNilTest) -> NonNilTest? {
+  let foo: NonNilTest? = obj.nonNilObjectProperty
   if foo == nil {
     print("nil")
   }
   return foo  
 }
 
-// OPT-LABEL: sil hidden @_TTSf4g___TF21objc_nonnull_lie_hack19loadUnownedPropertyFT5gizmoCSo5Gizmo_GSqS0__
-// OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.unownedNonNilGizmoProperty!getter.1.foreign : (Gizmo) -> () -> Gizmo, $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
-// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
-// OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
-// OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>
-func loadUnownedProperty(gizmo: Gizmo) -> Gizmo? {
-  let foo: Gizmo? = gizmo.unownedNonNilGizmoProperty
+// OPT-LABEL: sil shared @_T021objc_nonnull_lie_hack19loadUnownedPropertySo10NonNilTestCSgAD3obj_tFTf4g_n
+// OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $NonNilTest, #NonNilTest.unownedNonNilObjectProperty!getter.1.foreign : (NonNilTest) -> () -> NonNilTest, $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
+// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
+// OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $NonNilTest to $Optional<NonNilTest>
+// OPT: switch_enum [[OPTIONAL]] : $Optional<NonNilTest>
+func loadUnownedProperty(obj: NonNilTest) -> NonNilTest? {
+  let foo: NonNilTest? = obj.unownedNonNilObjectProperty
   if foo == nil {
     print("nil")
   }

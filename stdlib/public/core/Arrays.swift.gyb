@@ -95,8 +95,8 @@ if True:
 ///
 ///     let midpoint = absences.count / 2
 ///
-///     let firstHalf = absences.prefix(upTo: midpoint)
-///     let secondHalf = absences.suffix(from: midpoint)
+///     let firstHalf = absences[..<midpoint]
+///     let secondHalf = absences[midpoint...]
 ///
 /// Neither the `firstHalf` nor `secondHalf` slices allocate any new storage
 /// of their own. Instead, each presents a view onto the storage of the
@@ -151,7 +151,7 @@ if True:
 /// Here's an implementation of those steps:
 ///
 ///     if let i = absences.index(where: { $0 > 0 }) {                      // 1
-///         let absencesAfterFirst = absences.suffix(from: i + 1)           // 2
+///         let absencesAfterFirst = absences[(i + 1)...]                   // 2
 ///         if let j = absencesAfterFirst.index(where: { $0 > 0 }) {        // 3
 ///             print("The first day with absences had \(absences[i]).")    // 4
 ///             print("The second day with absences had \(absences[j]).")
@@ -169,7 +169,7 @@ if True:
 ///   specific values.
 """
   elif Self == 'Array':
-    SelfDocComment = '''\
+    SelfDocComment = """\
 /// An ordered, random-access collection.
 ///
 /// Arrays are one of the most commonly used data types in an app. You use
@@ -447,9 +447,7 @@ if True:
 ///
 /// - Note: The `ContiguousArray` and `ArraySlice` types are not bridged;
 ///   instances of those types always have a contiguous block of memory as
-///   their storage.
-/// - SeeAlso: `ContiguousArray`, `ArraySlice`, `Sequence`, `Collection`,
-///   `RangeReplaceableCollection`'''
+///   their storage."""
   # FIXME: Write about Array up/down-casting.
   else:
     raise ValueError('Unhandled case: ' + Self)
@@ -620,8 +618,6 @@ public struct ${Self}<Element>
   /// - Returns: An index offset by `n` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
-  ///
-  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
   @_inlineable
   public func index(
     _ i: Int, offsetBy n: Int, limitedBy limit: Int
@@ -736,10 +732,6 @@ public struct ${Self}<Element>
   ///
   /// - Parameter bounds: A range of integers. The bounds of the range must be
   ///   valid indices of the array.
-%if Self != 'ArraySlice':
-  ///
-  /// - SeeAlso: `ArraySlice`
-%end
   @_inlineable
   public subscript(bounds: Range<Int>) -> ArraySlice<Element> {
     get {
@@ -750,7 +742,10 @@ public struct ${Self}<Element>
     set(rhs) {
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
-      if self[bounds]._buffer.identity != rhs._buffer.identity {
+      // If the replacement buffer has same identity, and the ranges match,
+      // then this was a pinned in-place modification, nothing further needed.
+      if self[bounds]._buffer.identity != rhs._buffer.identity
+      || bounds != rhs.startIndex..<rhs.endIndex {
         self.replaceSubrange(bounds, with: rhs)
       }
     }
@@ -1083,7 +1078,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Parameter s: The sequence of elements to turn into an array.
   @_inlineable
   public init<S : Sequence>(_ s: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
 
     self = ${Self}(
       _buffer: _Buffer(
@@ -1436,7 +1431,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   @_inlineable
   @_semantics("array.append_contentsOf")
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
 
     let newElementsCount = newElements.underestimatedCount
     reserveCapacityForAppend(newElementsCount: newElementsCount)
@@ -1677,18 +1672,16 @@ extension ${Self} {
   ///     }
   ///     // 'sum' == 9
   ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withUnsafeBufferPointer(_:)`. Do not store or return the
+  /// pointer for later use.
   ///
   /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
   ///   points to the contiguous storage for the array. ${contiguousCaveat} If
-  ///   `body` has a return value, it is used as the return value for the
-  ///   `withUnsafeBufferPointer(_:)` method. The pointer argument is valid
-  ///   only for the duration of the closure's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  ///
-  /// - SeeAlso: `withUnsafeMutableBufferPointer`, `UnsafeBufferPointer`
+  ///   `body` has a return value, that value is also used as the return value
+  ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
+  ///   valid only for the duration of the method's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -1716,9 +1709,9 @@ extension ${Self} {
   ///     print(numbers)
   ///     // Prints "[2, 1, 4, 3, 5]"
   ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withUnsafeMutableBufferPointer(_:)`. Do not store or
+  /// return the pointer for later use.
   ///
   /// - Warning: Do not rely on anything about the array that is the target of
   ///   this method during execution of the `body` closure; it might not
@@ -1727,13 +1720,11 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeMutableBufferPointer`
   ///   parameter that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, it is used as the
-  ///   return value for the `withUnsafeMutableBufferPointer(_:)` method. The
-  ///   pointer argument is valid only for the duration of the closure's
-  ///   execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  ///
-  /// - SeeAlso: `withUnsafeBufferPointer`, `UnsafeMutableBufferPointer`
+  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBufferPointer(_:)`
+  ///   method. The pointer argument is valid only for the duration of the
+  ///   method's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
@@ -1779,8 +1770,8 @@ extension ${Self} {
 
   @_inlineable
   public func _copyContents(
-    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
 
     guard !self.isEmpty else { return (makeIterator(),buffer.startIndex) }
 
@@ -1817,7 +1808,7 @@ internal struct _InitializeMemoryFromCollection<
 > : _PointerFunction {
   @_inlineable
   @_versioned
-  func call(_ rawMemory: UnsafeMutablePointer<C.Iterator.Element>, count: Int) {
+  func call(_ rawMemory: UnsafeMutablePointer<C.Element>, count: Int) {
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
@@ -1846,7 +1837,7 @@ extension _ArrayBufferProtocol {
     _ bounds: Range<Int>,
     with newValues: C,
     count insertCount: Int
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
 
     let growth = insertCount - bounds.count
     let newCount = self.count + growth
@@ -1918,7 +1909,7 @@ extension ${Self} {
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
 % if Self in ['Array', 'ContiguousArray']:
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "${Self} replace: subrange start is negative")
@@ -2131,7 +2122,7 @@ extension _ArrayBufferProtocol {
   @_versioned
   internal mutating func _arrayAppendSequence<S : Sequence>(
     _ newItems: S
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     
     // this function is only ever called from append(contentsOf:)
     // which should always have exhausted its capacity before calling
@@ -2260,12 +2251,11 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeMutableRawBufferPointer`
   ///   parameter that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, it is used as the
-  ///   return value for the `withUnsafeMutableBytes(_:)` method. The argument
-  ///   is valid only for the duration of the closure's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  ///
-  /// - SeeAlso: `withUnsafeBytes`, `UnsafeMutableRawBufferPointer`
+  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBytes(_:)` method.
+  ///   The argument is valid only for the duration of the closure's
+  ///   execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
@@ -2296,12 +2286,10 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeRawBufferPointer` parameter
   ///   that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, it is used as the
-  ///   return value for the `withUnsafeBytes(_:)` method. The argument is
-  ///   valid only for the duration of the closure's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  ///
-  /// - SeeAlso: `withUnsafeMutableBytes`, `UnsafeRawBufferPointer`
+  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeBytes(_:)` method. The
+  ///   argument is valid only for the duration of the closure's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
@@ -2360,7 +2348,6 @@ extension Array {
   ///
   /// - Complexity: O(*n*) if the array is bridged, where *n* is the length
   ///   of the array; otherwise, O(1).
-  /// - SeeAlso: `removeLast()`
   @_inlineable
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
@@ -2375,7 +2362,6 @@ extension ContiguousArray {
   ///   otherwise, `nil`.
   ///
   /// - Complexity: O(1)
-  /// - SeeAlso: `removeLast()`
   @_inlineable
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
@@ -2410,13 +2396,13 @@ extension ${Self} {
   public mutating func replaceRange<C>(
     _ subRange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     Builtin.unreachable()
   }
 }

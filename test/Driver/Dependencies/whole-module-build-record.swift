@@ -14,6 +14,6 @@
 
 
 // RUN: touch -t 201401240006 %t/other.swift
-// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path %S/Inputs/fail.py -output-file-map %t/output.json -whole-module-optimization ./main.swift ./other.swift -module-name main -j1 -v 2>&1
+// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path %S/../Inputs/fail.py -output-file-map %t/output.json -whole-module-optimization ./main.swift ./other.swift -module-name main -j1 -v 2>&1
 
 // Just don't crash.

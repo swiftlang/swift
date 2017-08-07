@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-extension _Unicode {
+extension Unicode {
   /// The result of attempting to parse a `T` from some input.
   public enum ParseResult<T> {
   /// A `T` was parsed successfully
@@ -24,14 +24,26 @@ extension _Unicode {
   /// error (the length of the longest prefix of a valid encoding
   /// sequence that could be recognized).
   case error(length: Int)
+
+    @_versioned
+    internal var _valid: T? {
+      if case .valid(let result) = self { return result }
+      return nil
+    }
+
+    @_versioned
+    internal var _error: Int? {
+      if case .error(let result) = self { return result }
+      return nil
+    }
   }
 }
 
 /// Types that separate streams of code units into encoded Unicode
 /// scalar values.
-public protocol UnicodeParser {
+public protocol _UnicodeParser {
   /// The encoding with which this parser is associated
-  associatedtype Encoding : _UnicodeEncoding
+  associatedtype Encoding : _UnicodeEncoding_
 
   /// Constructs an instance that can be used to begin parsing `CodeUnit`s at
   /// any Unicode scalar boundary.
@@ -40,11 +52,11 @@ public protocol UnicodeParser {
   /// Parses a single Unicode scalar value from `input`.
   mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I
-  ) -> _Unicode.ParseResult<Encoding.EncodedScalar>
+  ) -> Unicode.ParseResult<Encoding.EncodedScalar>
   where I.Element == Encoding.CodeUnit
 }
 
-extension UnicodeParser {
+extension _UnicodeParser {
   @_versioned
   @inline(__always)
   @discardableResult
@@ -76,7 +88,7 @@ extension UnicodeParser {
   public static func _decode<I: IteratorProtocol>(
     _ input: inout I,
     repairingIllFormedSequences makeRepairs: Bool,
-    into output: (UnicodeScalar)->Void
+    into output: (Unicode.Scalar)->Void
   ) -> Int
   where I.Element == Encoding.CodeUnit
   {
@@ -86,12 +98,16 @@ extension UnicodeParser {
   }
 }
 
-extension _Unicode {
+extension Unicode {
+  public typealias Parser = _UnicodeParser
+}
+
+extension Unicode {
   @_fixed_layout
   public // @testable
   struct _ParsingIterator<
     CodeUnitIterator : IteratorProtocol, 
-    Parser: UnicodeParser
+    Parser: Unicode.Parser
   > where Parser.Encoding.CodeUnit == CodeUnitIterator.Element {
     @inline(__always)
     @_inlineable
@@ -104,7 +120,7 @@ extension _Unicode {
   }
 }
 
-extension _Unicode._ParsingIterator : IteratorProtocol, Sequence {
+extension Unicode._ParsingIterator : IteratorProtocol, Sequence {
   @inline(__always)
   @_inlineable
   public mutating func next() -> Parser.Encoding.EncodedScalar? {
@@ -116,3 +132,50 @@ extension _Unicode._ParsingIterator : IteratorProtocol, Sequence {
   }
 }
 
+/*
+extension Unicode {
+  @_fixed_layout
+  @_versioned
+  internal struct _TranscodingIterator<
+    SourceCodeUnits : IteratorProtocol,
+    Parser : Unicode.Parser,
+    TargetEncoding : Unicode.Encoding
+  > where Parser.Encoding.CodeUnit == SourceCodeUnits.Element {
+    
+    @inline(__always)
+    @_inlineable
+    public init(source: SourceCodeUnits, parser: Parser) {
+      _scalars = _ParsingIterator(codeUnits: source, parser: parser)
+      let firstScalar_ = _scalars.next()
+      if _fastPath(firstScalar_ != nil), let firstScalar = firstScalar_ {
+        _codeUnits = TargetEncoding._transcode(
+          firstScalar, from: Parser.Encoding.self).makeIterator()
+      }
+      else {
+        _codeUnits = TargetEncoding._encode(
+          UnicodeScalar(_unchecked: 0)).makeIterator()
+        while _codeUnits.next() != nil {  }
+        return
+      }
+    }
+
+    internal var _scalars: _ParsingIterator<SourceCodeUnits, Parser>
+    internal var _codeUnits: TargetEncoding.EncodedScalar.Iterator
+  }
+}
+
+
+extension Unicode._TranscodingIterator : IteratorProtocol, Sequence {
+  @inline(__always)
+  @_inlineable
+  mutating public func next() -> TargetEncoding.CodeUnit? {
+    if let x = _codeUnits.next() { return x }
+    let nextScalar_ = _scalars.next()
+    if _fastPath(nextScalar_ != nil), let nextScalar = nextScalar_ {
+      _codeUnits = TargetEncoding._transcode(
+        nextScalar, from: Parser.Encoding.self).makeIterator()
+    }
+    return _codeUnits.next()
+  }
+}
+*/

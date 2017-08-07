@@ -331,7 +331,7 @@ public:
     ValueDecl *VD = nullptr;
     std::tie(RE, VD) = digForVariable(E);
     if (VD) {
-      return VD->getName().str();
+      return VD->getBaseName().getIdentifier().str();
     } else {
       return std::string("");
     }
@@ -639,7 +639,8 @@ public:
           new (Context) MemberRefExpr(B, SourceLoc(), M, DeclNameLoc(),
                                       true, // implicit
                                       AccessSemantics::Ordinary),
-          MRE->getSourceRange(), M.getDecl()->getName().str().str().c_str());
+          MRE->getSourceRange(),
+          M.getDecl()->getBaseName().getIdentifier().str().str().c_str());
     } else {
       return nullptr;
     }
@@ -668,7 +669,7 @@ public:
           useJustFirst = true;
         } else {
           for (Expr *Arg : TE->getElements()) {
-            if (Arg->getType()->is<InOutType>()) {
+            if (Arg->isSemanticallyInOutExpr()) {
               useJustFirst = true;
               break;
             }
@@ -743,7 +744,7 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               MaybeLoadInitExpr->getType(), TypeCheckDC);

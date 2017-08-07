@@ -33,10 +33,6 @@
 #include <dlfcn.h>
 #endif
 
-#ifndef SWIFT_RUNTIME_DLADDR_ALLOW
-#error "SWIFT_RUNTIME_DLADDR_ALLOW must be defined!"
-#endif
-
 using namespace swift;
 
 /// PE section name for the section that contains protocol conformance records.
@@ -189,9 +185,10 @@ static int _addImageCallback(struct _swift_dl_phdr_info *info,
   if (conformances)
     inspectArgs->fnAddImageBlock(conformances, conformancesSize);
 
-#if defined(_WIN32)
-  FreeLibrary(handle);
-#else
+  // There is no close function or free function for GetModuleHandle(),
+  // especially we should not pass a handle returned by GetModuleHandle to the 
+  // FreeLibrary function.
+#if defined(__CYGWIN__)
   dlclose(handle);
 #endif
   return 0;
@@ -223,7 +220,7 @@ void swift::initializeTypeMetadataRecordLookup() {
 
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
-#if defined(__CYGWIN__) || SWIFT_RUNTIME_DLADDR_ALLOW
+#if defined(__CYGWIN__)
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {
     return 0;

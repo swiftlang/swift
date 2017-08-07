@@ -30,51 +30,56 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ObjectUID> { var τ_0_0 } <T>
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
+  // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
   // -- call x.uid()
+  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X:%.*]] = load [copy] [[READ]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [init] [[X_TMP]]
-  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
   // CHECK: destroy_value [[X2]]
   // -- call set x.clsid
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
-  // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
   // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[WRITE]])
   x.clsid = x.uid()
 
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
   // -- call x.uid()
+  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X:%.*]] = load [copy] [[READ]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [init] [[X_TMP]]
-  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
   // CHECK: destroy_value [[X2]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[WRITE]])
   x.nextCLSID = x.uid()
 
   // -- call x.uid()
-  // CHECK: [[X1:%.*]] = load [copy] [[PB]]
-  // CHECK: [[X:%.*]] = load [copy] [[PB]]
+  // CHECK: [[READ1:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
+  // CHECK: [[X1:%.*]] = load [copy] [[READ1]]
+  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSifs
+  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
+  // CHECK: [[X:%.*]] = load [copy] [[READ]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [init] [[X_TMP]]
-  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
+
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
   // CHECK: destroy_value [[X2]]
   // -- call secondNextCLSID from class-constrained protocol ext
-  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSifs
   // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[X1]])
   // CHECK: destroy_value [[X1]]
   x.secondNextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID, x.secondNextCLSID)
+
+  // CHECK: return
 }
 
 // CHECK-LABEL: sil hidden @_T025protocol_class_refinement16getBaseObjectUID{{[_0-9a-zA-Z]*}}F
@@ -82,34 +87,36 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Base, τ_0_0 : UID> { var τ_0_0 } <T>
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
+  // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
   // -- call x.uid()
+  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X:%.*]] = load [copy] [[READ]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [init] [[X_TMP]]
-  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
   // CHECK: destroy_value [[X2]]
   // -- call set x.clsid
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
-  // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
   // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[WRITE]])
   x.clsid = x.uid()
 
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
   // -- call x.uid()
+  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X:%.*]] = load [copy] [[READ]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
   // CHECK: store [[X]] to [init] [[X_TMP]]
-  // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
   // CHECK: destroy_value [[X2]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[WRITE]])
   x.nextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID)
+
+  // CHECK: return
 }

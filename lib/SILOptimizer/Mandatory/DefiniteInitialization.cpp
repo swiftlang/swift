@@ -525,9 +525,12 @@ namespace {
       return PerBlockInfo.insert({BB,
                      LiveOutBlockState(TheMemory.NumElements)}).first->second;
     }
-    
+
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
                                       unsigned NumElts);
+    AvailabilitySet getLivenessAtNonTupleInst(SILInstruction *Inst,
+                                              SILBasicBlock *InstBB,
+                                              AvailabilitySet &CurrentSet);
     int getAnyUninitializedMemberAtInst(SILInstruction *Inst, unsigned FirstElt,
                                         unsigned NumElts);
 
@@ -1103,9 +1106,9 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     // about the method.  The magic numbers used by the diagnostic are:
     // 0 -> method, 1 -> property, 2 -> subscript, 3 -> operator.
     unsigned Case = ~0;
-    Identifier MethodName;
+    DeclBaseName MethodName;
     if (FD && FD->isAccessor()) {
-      MethodName = FD->getAccessorStorageDecl()->getName();
+      MethodName = FD->getAccessorStorageDecl()->getBaseName();
       Case = isa<SubscriptDecl>(FD->getAccessorStorageDecl()) ? 2 : 1;
     } else if (FD && FD->isOperator()) {
       MethodName = FD->getName();
@@ -1383,9 +1386,9 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
   if (Method) {
     if (!shouldEmitError(Inst)) return true;
 
-    Identifier Name;
+    DeclBaseName Name;
     if (Method->isAccessor())
-      Name = Method->getAccessorStorageDecl()->getName();
+      Name = Method->getAccessorStorageDecl()->getBaseName();
     else
       Name = Method->getName();
 
@@ -2237,8 +2240,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       }
       case DIKind::Yes:
         // super.init() already called, just release the value.
-        Release->removeFromParent();
-        B.getInsertionBB()->insert(B.getInsertionPoint(), Release);
+        Release->moveBefore(&*B.getInsertionPoint());
         continue;
       }
     }
@@ -2416,14 +2418,51 @@ getOutSelfConsumed(SILBasicBlock *BB, Optional<DIKind> &Result) {
     Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfConsumed);
 }
 
+AvailabilitySet
+LifetimeChecker::getLivenessAtNonTupleInst(swift::SILInstruction *Inst,
+                                           swift::SILBasicBlock *InstBB,
+                                           AvailabilitySet &Result) {
+  // If there is a store in the current block, scan the block to see if the
+  // store is before or after the load.  If it is before, it produces the value
+  // we are looking for.
+  if (getBlockInfo(InstBB).HasNonLoadUse) {
+    for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
+      --BBI;
+      SILInstruction *TheInst = &*BBI;
+
+      // If this instruction is unrelated to the memory, ignore it.
+      if (!NonLoadUses.count(TheInst))
+        continue;
+
+      // If we found the allocation itself, then we are loading something that
+      // is not defined at all yet.  Otherwise, we've found a definition, or
+      // something else that will require that the memory is initialized at
+      // this point.
+      Result.set(0, TheInst == TheMemory.MemoryInst ? DIKind::No : DIKind::Yes);
+      return Result;
+    }
+  }
+
+  getOutAvailability(InstBB, Result);
+
+  // If the result element wasn't computed, we must be analyzing code within
+  // an unreachable cycle that is not dominated by "TheMemory".  Just force
+  // the unset element to yes so that clients don't have to handle this.
+  if (!Result.getConditional(0))
+    Result.set(0, DIKind::Yes);
+
+  return Result;
+}
+
 /// getLivenessAtInst - Compute the liveness state for any number of tuple
 /// elements at the specified instruction.  The elements are returned as an
 /// AvailabilitySet.  Elements outside of the range specified may not be
 /// computed correctly.
-AvailabilitySet LifetimeChecker::
-getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
-  DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts <<
-        " at " << *Inst);
+AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
+                                                   unsigned FirstElt,
+                                                   unsigned NumElts) {
+  DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
+                     << " at " << *Inst);
 
   AvailabilitySet Result(TheMemory.NumElements);
 
@@ -2431,44 +2470,13 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   // care about any of the elements.
   if (NumElts == 0)
     return Result;
-  
+
   SILBasicBlock *InstBB = Inst->getParent();
-  
+
   // The vastly most common case is memory allocations that are not tuples,
   // so special case this with a more efficient algorithm.
   if (TheMemory.NumElements == 1) {
-    
-    // If there is a store in the current block, scan the block to see if the
-    // store is before or after the load.  If it is before, it produces the value
-    // we are looking for.
-    if (getBlockInfo(InstBB).HasNonLoadUse) {
-      for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
-        --BBI;
-        SILInstruction *TheInst = &*BBI;
-
-        // If this instruction is unrelated to the memory, ignore it.
-        if (!NonLoadUses.count(TheInst))
-          continue;
-        
-        // If we found the allocation itself, then we are loading something that
-        // is not defined at all yet.  Otherwise, we've found a definition, or
-        // something else that will require that the memory is initialized at
-        // this point.
-        Result.set(0,
-                   TheInst == TheMemory.MemoryInst ? DIKind::No : DIKind::Yes);
-        return Result;
-      }
-    }
-
-    getOutAvailability(InstBB, Result);
-
-    // If the result element wasn't computed, we must be analyzing code within
-    // an unreachable cycle that is not dominated by "TheMemory".  Just force
-    // the unset element to yes so that clients don't have to handle this.
-    if (!Result.getConditional(0))
-      Result.set(0, DIKind::Yes);
-
-    return Result;
+    return getLivenessAtNonTupleInst(Inst, InstBB, Result);
   }
 
   // Check locally to see if any elements are satisfied within the block, and

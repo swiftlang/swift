@@ -42,22 +42,30 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     let s1 = Switch.off
     _testEncodeFailure(of: s1, in: .binary)
     _testEncodeFailure(of: s1, in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(s1), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(s1), in: .xml)
 
     let s2 = Switch.on
     _testEncodeFailure(of: s2, in: .binary)
     _testEncodeFailure(of: s2, in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(s2), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(s2), in: .xml)
   }
 
   func testEncodingTopLevelSingleValueStruct() {
     let t = Timestamp(3141592653)
     _testEncodeFailure(of: t, in: .binary)
     _testEncodeFailure(of: t, in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(t), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(t), in: .xml)
   }
 
   func testEncodingTopLevelSingleValueClass() {
     let c = Counter()
     _testEncodeFailure(of: c, in: .binary)
     _testEncodeFailure(of: c, in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(c), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(c), in: .xml)
   }
 
   // MARK: - Encoding Top-Level Structured Types
@@ -75,11 +83,69 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     _testRoundTrip(of: person, in: .xml)
   }
 
+  func testEncodingTopLevelStructuredSingleStruct() {
+    // Numbers is a struct which encodes as an array through a single value container.
+    let numbers = Numbers.testValue
+    _testRoundTrip(of: numbers, in: .binary)
+    _testRoundTrip(of: numbers, in: .xml)
+  }
+
+  func testEncodingTopLevelStructuredSingleClass() {
+    // Mapping is a class which encodes as a dictionary through a single value container.
+    let mapping = Mapping.testValue
+    _testRoundTrip(of: mapping, in: .binary)
+    _testRoundTrip(of: mapping, in: .xml)
+  }
+
   func testEncodingTopLevelDeepStructuredType() {
     // Company is a type with fields which are Codable themselves.
     let company = Company.testValue
     _testRoundTrip(of: company, in: .binary)
     _testRoundTrip(of: company, in: .xml)
+  }
+
+  func testEncodingClassWhichSharesEncoderWithSuper() {
+    // Employee is a type which shares its encoder & decoder with its superclass, Person.
+    let employee = Employee.testValue
+    _testRoundTrip(of: employee, in: .binary)
+    _testRoundTrip(of: employee, in: .xml)
+  }
+
+  func testEncodingTopLevelNullableType() {
+    // EnhancedBool is a type which encodes either as a Bool or as nil.
+    _testEncodeFailure(of: EnhancedBool.true, in: .binary)
+    _testEncodeFailure(of: EnhancedBool.true, in: .xml)
+    _testEncodeFailure(of: EnhancedBool.false, in: .binary)
+    _testEncodeFailure(of: EnhancedBool.false, in: .xml)
+    _testEncodeFailure(of: EnhancedBool.fileNotFound, in: .binary)
+    _testEncodeFailure(of: EnhancedBool.fileNotFound, in: .xml)
+
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.true), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.true), in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.false), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.false), in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.fileNotFound), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(EnhancedBool.fileNotFound), in: .xml)
+  }
+
+
+  // MARK: - Encoder Features
+  func testNestedContainerCodingPaths() {
+    let encoder = JSONEncoder()
+    do {
+      let _ = try encoder.encode(NestedContainersTestType())
+    } catch let error as NSError {
+      expectUnreachable("Caught error during encoding nested container types: \(error)")
+    }
+  }
+
+  func testSuperEncoderCodingPaths() {
+    let encoder = JSONEncoder()
+    do {
+      let _ = try encoder.encode(NestedContainersTestType(testSuperEncoder: true))
+    } catch let error as NSError {
+      expectUnreachable("Caught error during encoding nested container types: \(error)")
+    }
   }
 
   // MARK: - Helper Functions
@@ -107,7 +173,7 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
       encoder.outputFormat = format
       payload = try encoder.encode(value)
     } catch {
-      expectUnreachable("Failed to encode \(T.self) to plist.")
+      expectUnreachable("Failed to encode \(T.self) to plist: \(error)")
     }
 
     if let expectedPlist = plist {
@@ -120,8 +186,37 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
       expectEqual(format, decodedFormat, "Encountered plist format differed from requested format.")
       expectEqual(decoded, value, "\(T.self) did not round-trip to an equal value.")
     } catch {
-      expectUnreachable("Failed to decode \(T.self) from plist.")
+      expectUnreachable("Failed to decode \(T.self) from plist: \(error)")
     }
+  }
+}
+
+// MARK: - Helper Global Functions
+func expectEqualPaths(_ lhs: [CodingKey], _ rhs: [CodingKey], _ prefix: String) {
+  if lhs.count != rhs.count {
+    expectUnreachable("\(prefix) [CodingKey].count mismatch: \(lhs.count) != \(rhs.count)")
+    return
+  }
+
+  for (key1, key2) in zip(lhs, rhs) {
+    switch (key1.intValue, key2.intValue) {
+    case (.none, .none): break
+    case (.some(let i1), .none):
+      expectUnreachable("\(prefix) CodingKey.intValue mismatch: \(type(of: key1))(\(i1)) != nil")
+      return
+    case (.none, .some(let i2)):
+      expectUnreachable("\(prefix) CodingKey.intValue mismatch: nil != \(type(of: key2))(\(i2))")
+      return
+    case (.some(let i1), .some(let i2)):
+        guard i1 == i2 else {
+            expectUnreachable("\(prefix) CodingKey.intValue mismatch: \(type(of: key1))(\(i1)) != \(type(of: key2))(\(i2))")
+            return
+        }
+
+        break
+    }
+
+    expectEqual(key1.stringValue, key2.stringValue, "\(prefix) CodingKey.stringValue mismatch: \(type(of: key1))('\(key1.stringValue)') != \(type(of: key2))('\(key2.stringValue)')")
   }
 }
 
@@ -165,7 +260,7 @@ fileprivate enum Switch : Codable {
 }
 
 /// A simple timestamp type that encodes as a single Double value.
-fileprivate struct Timestamp : Codable {
+fileprivate struct Timestamp : Codable, Equatable {
   let value: Double
 
   init(_ value: Double) {
@@ -181,10 +276,14 @@ fileprivate struct Timestamp : Codable {
     var container = encoder.singleValueContainer()
     try container.encode(self.value)
   }
+
+  static func ==(_ lhs: Timestamp, _ rhs: Timestamp) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
 /// A simple referential counter type that encodes as a single Int value.
-fileprivate final class Counter : Codable {
+fileprivate final class Counter : Codable, Equatable {
   var count: Int = 0
 
   init() {}
@@ -197,6 +296,10 @@ fileprivate final class Counter : Codable {
   func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.count)
+  }
+
+  static func ==(_ lhs: Counter, _ rhs: Counter) -> Bool {
+    return lhs === rhs || lhs.count == rhs.count
   }
 }
 
@@ -238,27 +341,94 @@ fileprivate struct Address : Codable, Equatable {
 fileprivate class Person : Codable, Equatable {
   let name: String
   let email: String
+  let website: URL?
 
-  init(name: String, email: String) {
+  init(name: String, email: String, website: URL? = nil) {
     self.name = name
     self.email = email
+    self.website = website
+  }
+
+  private enum CodingKeys : String, CodingKey {
+    case name
+    case email
+    case website
+  }
+
+  // FIXME: Remove when subclasses (Employee) are able to override synthesized conformance.
+  required init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decode(String.self, forKey: .name)
+    email = try container.decode(String.self, forKey: .email)
+    website = try container.decodeIfPresent(URL.self, forKey: .website)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(name, forKey: .name)
+    try container.encode(email, forKey: .email)
+    try container.encodeIfPresent(website, forKey: .website)
+  }
+
+  func isEqual(_ other: Person) -> Bool {
+    return self.name == other.name &&
+           self.email == other.email &&
+           self.website == other.website
   }
 
   static func ==(_ lhs: Person, _ rhs: Person) -> Bool {
-    return lhs.name == rhs.name && lhs.email == rhs.email
+    return lhs.isEqual(rhs)
   }
 
-  static var testValue: Person {
+  class var testValue: Person {
     return Person(name: "Johnny Appleseed", email: "appleseed@apple.com")
+  }
+}
+
+/// A class which shares its encoder and decoder with its superclass.
+fileprivate class Employee : Person {
+  let id: Int
+
+  init(name: String, email: String, website: URL? = nil, id: Int) {
+    self.id = id
+    super.init(name: name, email: email, website: website)
+  }
+
+  enum CodingKeys : String, CodingKey {
+    case id
+  }
+
+  required init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(Int.self, forKey: .id)
+    try super.init(from: decoder)
+  }
+
+  override func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(id, forKey: .id)
+    try super.encode(to: encoder)
+  }
+
+  override func isEqual(_ other: Person) -> Bool {
+    if let employee = other as? Employee {
+      guard self.id == employee.id else { return false }
+    }
+
+    return super.isEqual(other)
+  }
+
+  override class var testValue: Employee {
+    return Employee(name: "Johnny Appleseed", email: "appleseed@apple.com", id: 42)
   }
 }
 
 /// A simple company struct which encodes as a dictionary of nested values.
 fileprivate struct Company : Codable, Equatable {
   let address: Address
-  var employees: [Person]
+  var employees: [Employee]
 
-  init(address: Address, employees: [Person]) {
+  init(address: Address, employees: [Employee]) {
     self.address = address
     self.employees = employees
   }
@@ -268,7 +438,216 @@ fileprivate struct Company : Codable, Equatable {
   }
 
   static var testValue: Company {
-    return Company(address: Address.testValue, employees: [Person.testValue])
+    return Company(address: Address.testValue, employees: [Employee.testValue])
+  }
+}
+
+/// An enum type which decodes from Bool?.
+fileprivate enum EnhancedBool : Codable {
+  case `true`
+  case `false`
+  case fileNotFound
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    if container.decodeNil() {
+      self = .fileNotFound
+    } else {
+      let value = try container.decode(Bool.self)
+      self = value ? .true : .false
+    }
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    switch self {
+    case .true: try container.encode(true)
+    case .false: try container.encode(false)
+    case .fileNotFound: try container.encodeNil()
+    }
+  }
+}
+
+/// A type which encodes as an array directly through a single value container.
+struct Numbers : Codable, Equatable {
+  let values = [4, 8, 15, 16, 23, 42]
+
+  init() {}
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let decodedValues = try container.decode([Int].self)
+    guard decodedValues == values else {
+      throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "The Numbers are wrong!"))
+    }
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(values)
+  }
+
+  static func ==(_ lhs: Numbers, _ rhs: Numbers) -> Bool {
+    return lhs.values == rhs.values
+  }
+
+  static var testValue: Numbers {
+    return Numbers()
+  }
+}
+
+/// A type which encodes as a dictionary directly through a single value container.
+fileprivate final class Mapping : Codable, Equatable {
+  let values: [String : URL]
+
+  init(values: [String : URL]) {
+    self.values = values
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    values = try container.decode([String : URL].self)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(values)
+  }
+
+  static func ==(_ lhs: Mapping, _ rhs: Mapping) -> Bool {
+    return lhs === rhs || lhs.values == rhs.values
+  }
+
+  static var testValue: Mapping {
+    return Mapping(values: ["Apple": URL(string: "http://apple.com")!,
+                            "localhost": URL(string: "http://127.0.0.1")!])
+  }
+}
+
+struct NestedContainersTestType : Encodable {
+  let testSuperEncoder: Bool
+
+  init(testSuperEncoder: Bool = false) {
+    self.testSuperEncoder = testSuperEncoder
+  }
+
+  enum TopLevelCodingKeys : Int, CodingKey {
+    case a
+    case b
+    case c
+  }
+
+  enum IntermediateCodingKeys : Int, CodingKey {
+      case one
+      case two
+  }
+
+  func encode(to encoder: Encoder) throws {
+    if self.testSuperEncoder {
+      var topLevelContainer = encoder.container(keyedBy: TopLevelCodingKeys.self)
+      expectEqualPaths(encoder.codingPath, [], "Top-level Encoder's codingPath changed.")
+      expectEqualPaths(topLevelContainer.codingPath, [], "New first-level keyed container has non-empty codingPath.")
+
+      let superEncoder = topLevelContainer.superEncoder(forKey: .a)
+      expectEqualPaths(encoder.codingPath, [], "Top-level Encoder's codingPath changed.")
+      expectEqualPaths(topLevelContainer.codingPath, [], "First-level keyed container's codingPath changed.")
+      expectEqualPaths(superEncoder.codingPath, [TopLevelCodingKeys.a], "New superEncoder had unexpected codingPath.")
+      _testNestedContainers(in: superEncoder, baseCodingPath: [TopLevelCodingKeys.a])
+    } else {
+      _testNestedContainers(in: encoder, baseCodingPath: [])
+    }
+  }
+
+  func _testNestedContainers(in encoder: Encoder, baseCodingPath: [CodingKey]) {
+    expectEqualPaths(encoder.codingPath, baseCodingPath, "New encoder has non-empty codingPath.")
+
+    // codingPath should not change upon fetching a non-nested container.
+    var firstLevelContainer = encoder.container(keyedBy: TopLevelCodingKeys.self)
+    expectEqualPaths(encoder.codingPath, baseCodingPath, "Top-level Encoder's codingPath changed.")
+    expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath, "New first-level keyed container has non-empty codingPath.")
+
+    // Nested Keyed Container
+    do {
+      // Nested container for key should have a new key pushed on.
+      var secondLevelContainer = firstLevelContainer.nestedContainer(keyedBy: IntermediateCodingKeys.self, forKey: .a)
+      expectEqualPaths(encoder.codingPath, baseCodingPath, "Top-level Encoder's codingPath changed.")
+      expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath, "First-level keyed container's codingPath changed.")
+      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.a], "New second-level keyed container had unexpected codingPath.")
+
+      // Inserting a keyed container should not change existing coding paths.
+      let thirdLevelContainerKeyed = secondLevelContainer.nestedContainer(keyedBy: IntermediateCodingKeys.self, forKey: .one)
+      expectEqualPaths(encoder.codingPath, baseCodingPath, "Top-level Encoder's codingPath changed.")
+      expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath, "First-level keyed container's codingPath changed.")
+      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.a], "Second-level keyed container's codingPath changed.")
+      expectEqualPaths(thirdLevelContainerKeyed.codingPath, baseCodingPath + [TopLevelCodingKeys.a, IntermediateCodingKeys.one], "New third-level keyed container had unexpected codingPath.")
+
+      // Inserting an unkeyed container should not change existing coding paths.
+      let thirdLevelContainerUnkeyed = secondLevelContainer.nestedUnkeyedContainer(forKey: .two)
+      expectEqualPaths(encoder.codingPath, baseCodingPath + [], "Top-level Encoder's codingPath changed.")
+      expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath + [], "First-level keyed container's codingPath changed.")
+      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.a], "Second-level keyed container's codingPath changed.")
+      expectEqualPaths(thirdLevelContainerUnkeyed.codingPath, baseCodingPath + [TopLevelCodingKeys.a, IntermediateCodingKeys.two], "New third-level unkeyed container had unexpected codingPath.")
+    }
+
+    // Nested Unkeyed Container
+    do {
+      // Nested container for key should have a new key pushed on.
+      var secondLevelContainer = firstLevelContainer.nestedUnkeyedContainer(forKey: .b)
+      expectEqualPaths(encoder.codingPath, baseCodingPath, "Top-level Encoder's codingPath changed.")
+      expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath, "First-level keyed container's codingPath changed.")
+      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.b], "New second-level keyed container had unexpected codingPath.")
+
+      // Appending a keyed container should not change existing coding paths.
+      let thirdLevelContainerKeyed = secondLevelContainer.nestedContainer(keyedBy: IntermediateCodingKeys.self)
+      expectEqualPaths(encoder.codingPath, baseCodingPath, "Top-level Encoder's codingPath changed.")
+      expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath, "First-level keyed container's codingPath changed.")
+      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.b], "Second-level unkeyed container's codingPath changed.")
+      expectEqualPaths(thirdLevelContainerKeyed.codingPath, baseCodingPath + [TopLevelCodingKeys.b, _TestKey(index: 0)], "New third-level keyed container had unexpected codingPath.")
+
+      // Appending an unkeyed container should not change existing coding paths.
+      let thirdLevelContainerUnkeyed = secondLevelContainer.nestedUnkeyedContainer()
+      expectEqualPaths(encoder.codingPath, baseCodingPath, "Top-level Encoder's codingPath changed.")
+      expectEqualPaths(firstLevelContainer.codingPath, baseCodingPath, "First-level keyed container's codingPath changed.")
+      expectEqualPaths(secondLevelContainer.codingPath, baseCodingPath + [TopLevelCodingKeys.b], "Second-level unkeyed container's codingPath changed.")
+      expectEqualPaths(thirdLevelContainerUnkeyed.codingPath, baseCodingPath + [TopLevelCodingKeys.b, _TestKey(index: 1)], "New third-level unkeyed container had unexpected codingPath.")
+    }
+  }
+}
+
+// MARK: - Helper Types
+
+/// A key type which can take on any string or integer value.
+/// This needs to mirror _PlistKey.
+fileprivate struct _TestKey : CodingKey {
+  var stringValue: String
+  var intValue: Int?
+
+  init?(stringValue: String) {
+    self.stringValue = stringValue
+    self.intValue = nil
+  }
+
+  init?(intValue: Int) {
+    self.stringValue = "\(intValue)"
+    self.intValue = intValue
+  }
+
+  init(index: Int) {
+    self.stringValue = "Index \(index)"
+    self.intValue = index
+  }
+}
+
+/// Wraps a type T so that it can be encoded at the top level of a payload.
+fileprivate struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
+  let value: T
+
+  init(_ value: T) {
+    self.value = value
+  }
+
+  static func ==(_ lhs: TopLevelWrapper<T>, _ rhs: TopLevelWrapper<T>) -> Bool {
+    return lhs.value == rhs.value
   }
 }
 
@@ -276,14 +655,19 @@ fileprivate struct Company : Codable, Equatable {
 
 #if !FOUNDATION_XCTEST
 var PropertyListEncoderTests = TestSuite("TestPropertyListEncoder")
-PropertyListEncoderTests.test("testEncodingTopLevelEmptyStruct")        { TestPropertyListEncoder().testEncodingTopLevelEmptyStruct()        }
-PropertyListEncoderTests.test("testEncodingTopLevelEmptyClass")         { TestPropertyListEncoder().testEncodingTopLevelEmptyClass()         }
-PropertyListEncoderTests.test("testEncodingTopLevelSingleValueEnum")    { TestPropertyListEncoder().testEncodingTopLevelSingleValueEnum()    }
-PropertyListEncoderTests.test("testEncodingTopLevelSingleValueStruct")  { TestPropertyListEncoder().testEncodingTopLevelSingleValueStruct()  }
-PropertyListEncoderTests.test("testEncodingTopLevelSingleValueClass")   { TestPropertyListEncoder().testEncodingTopLevelSingleValueClass()   }
-PropertyListEncoderTests.test("testEncodingTopLevelStructuredStruct")   { TestPropertyListEncoder().testEncodingTopLevelStructuredStruct()   }
-PropertyListEncoderTests.test("testEncodingTopLevelStructuredClass")    { TestPropertyListEncoder().testEncodingTopLevelStructuredClass()    }
-PropertyListEncoderTests.test("testEncodingTopLevelStructuredClass")    { TestPropertyListEncoder().testEncodingTopLevelStructuredClass()    }
+PropertyListEncoderTests.test("testEncodingTopLevelEmptyStruct") { TestPropertyListEncoder().testEncodingTopLevelEmptyStruct() }
+PropertyListEncoderTests.test("testEncodingTopLevelEmptyClass") { TestPropertyListEncoder().testEncodingTopLevelEmptyClass() }
+PropertyListEncoderTests.test("testEncodingTopLevelSingleValueEnum") { TestPropertyListEncoder().testEncodingTopLevelSingleValueEnum() }
+PropertyListEncoderTests.test("testEncodingTopLevelSingleValueStruct") { TestPropertyListEncoder().testEncodingTopLevelSingleValueStruct() }
+PropertyListEncoderTests.test("testEncodingTopLevelSingleValueClass") { TestPropertyListEncoder().testEncodingTopLevelSingleValueClass() }
+PropertyListEncoderTests.test("testEncodingTopLevelStructuredStruct") { TestPropertyListEncoder().testEncodingTopLevelStructuredStruct() }
+PropertyListEncoderTests.test("testEncodingTopLevelStructuredClass") { TestPropertyListEncoder().testEncodingTopLevelStructuredClass() }
+PropertyListEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestPropertyListEncoder().testEncodingTopLevelStructuredSingleStruct() }
+PropertyListEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestPropertyListEncoder().testEncodingTopLevelStructuredSingleClass() }
 PropertyListEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestPropertyListEncoder().testEncodingTopLevelDeepStructuredType() }
+PropertyListEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestPropertyListEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
+PropertyListEncoderTests.test("testEncodingTopLevelNullableType") { TestPropertyListEncoder().testEncodingTopLevelNullableType() }
+PropertyListEncoderTests.test("testNestedContainerCodingPaths") { TestPropertyListEncoder().testNestedContainerCodingPaths() }
+PropertyListEncoderTests.test("testSuperEncoderCodingPaths") { TestPropertyListEncoder().testSuperEncoderCodingPaths() }
 runAllTests()
 #endif

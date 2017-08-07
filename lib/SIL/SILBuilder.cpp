@@ -160,7 +160,7 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
 static bool setAccessToDeinit(BeginAccessInst *beginAccess) {
   // It's possible that AllocBoxToStack could catch some cases that
   // AccessEnforcementSelection does not promote to [static]. Ultimately, this
-  // should be an assert, but only after we the two passes can be fixes to share
+  // should be an assert, but only after we the two passes can be fixed to share
   // a common analysis.
   if (beginAccess->getEnforcement() == SILAccessEnforcement::Dynamic)
     return false;
@@ -175,6 +175,7 @@ SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
   // copy_addr from the specified operand.  If so, we can fold this into the
   // copy_addr as a take.
   BeginAccessInst *beginAccess = nullptr;
+  CopyAddrInst *copyAddrTake = nullptr;
   auto I = getInsertionPoint(), BBStart = getInsertionBB()->begin();
   while (I != BBStart) {
     auto *Inst = &*--I;
@@ -185,10 +186,27 @@ SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
           CA->setIsTakeOfSrc(IsTake);
           return CA;
         }
-        if (CA->getSrc() == beginAccess && setAccessToDeinit(beginAccess)) {
-          CA->setIsTakeOfSrc(IsTake);
-          return CA;
+        // If this copy_addr is accessing the same source, continue searching
+        // backward until we see the begin_access. If any side effects occur
+        // between the `%adr = begin_access %src` and `copy_addr %adr` then we
+        // cannot promote the access to a deinit. `[deinit]` requires exclusive
+        // access, but an instruction with side effects may require shared
+        // access.
+        if (CA->getSrc() == beginAccess) {
+          copyAddrTake = CA;
+          continue;
         }
+      }
+    }
+
+    // If we've already seen a copy_addr that can be convert to `take`, then
+    // stop at the begin_access for the copy's source.
+    if (copyAddrTake && beginAccess == Inst) {
+      // If `setAccessToDeinit()` returns `true` it has modified the access
+      // instruction, so we are committed to the transformation on that path.
+      if (setAccessToDeinit(beginAccess)) {
+        copyAddrTake->setIsTakeOfSrc(IsTake);
+        return copyAddrTake;
       }
     }
 
@@ -346,7 +364,7 @@ SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
     if (metatypeInst->use_empty() &&
         metatypeInst->getParent() == getInsertionBB()) {
       auto origLoc = metatypeInst->getLoc();
-      metatypeInst->removeFromParent();
+      metatypeInst->eraseFromParent();
       return createMetatype(origLoc, Ty);
     }
   }
@@ -364,7 +382,7 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
     if (metatypeInst->use_empty() &&
         metatypeInst->getParent() == getInsertionBB()) {
       auto origLoc = metatypeInst->getLoc();
-      metatypeInst->removeFromParent();
+      metatypeInst->eraseFromParent();
       return createMetatype(origLoc, Ty);
     }
   }
@@ -408,4 +426,16 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
   if (I && I->getNumTypeDependentOperands() > 0) {
     OpenedArchetypes.addOpenedArchetypeOperands(I->getTypeDependentOperands());
   }
+}
+
+ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
+                                                   SILType MetatypeTy,
+                                                   SILValue Base) {
+  assert(
+      Base->getType().isLoweringOf(
+          getModule(), MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
+      "value_metatype result must be formal metatype of the lowered operand "
+      "type");
+  return insert(new (F.getModule()) ValueMetatypeInst(getSILDebugLocation(Loc),
+                                                      MetatypeTy, Base));
 }

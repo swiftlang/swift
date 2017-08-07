@@ -39,7 +39,9 @@ class A {
   init(other : A, x : Int) {
     // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
     // CHECK: [[SELF_A:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $A, #A.prop
-    // CHECK: assign %1 to [[SELF_A]]
+    // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[SELF_A]] : $*Int
+    // CHECK: assign %1 to [[WRITE]]
+    // CHECK: end_access [[WRITE]] : $*Int
     // CHECK: end_borrow [[BORROWED_SELF]] from [[SELF]]
     prop = x
 
@@ -225,3 +227,24 @@ class NonObjCBaseClass : NSObject {
 
 // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12ObjCSubclassC8propertySifgTo
 // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12ObjCSubclassC8propertySifsTo
+
+// Make sure lazy properties that witness @objc protocol requirements are
+// correctly formed
+//
+// <https://bugs.swift.org/browse/SR-1825>
+
+@objc protocol HasProperty {
+    @objc var window: NSObject? { get set }
+}
+
+class HasLazyProperty : NSObject, HasProperty {
+  func instanceMethod() -> NSObject? {
+    return nil
+  }
+
+  lazy var window = self.instanceMethod()
+}
+
+// CHECK-LABEL: sil hidden @_T015objc_properties15HasLazyPropertyC6windowSo8NSObjectCSgfg : $@convention(method) (@guaranteed HasLazyProperty) -> @owned Optional<NSObject> {
+// CHECK: class_method %0 : $HasLazyProperty, #HasLazyProperty.instanceMethod!1 : (HasLazyProperty) -> () -> NSObject?
+// CHECK: return

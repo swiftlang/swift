@@ -13,6 +13,20 @@
 /// This pass eliminates 'unknown' access enforcement by selecting either
 /// static or dynamic enforcement.
 ///
+/// TODO: This is currently a module transform so that closures can be
+/// transformed after their parent scope is analyzed. This isn't a big problem
+/// now because AccessMarkerElimination is also a module pass that follows this
+/// pass. However, we would like to mostly eliminate module transforms. This
+/// could be done by changing the PassManager to follow CloseScopeAnalysis. A
+/// new ClosureTransform type would be pipelined just like FunctionTransform,
+/// but would have an entry point that handled a parent closure scope and all
+/// its children in one invocation. For function pipelining to be upheld, we
+/// would need to verify that BasicCalleeAnalysis never conflicts with
+/// ClosureScopeAnalysis. i.e. we could never create a caller->callee edge when
+/// the callee is passed as a function argument. Normal FunctionTransforms would
+/// then be called on each closure function and its parent scope before calling
+/// the ClosureTransform.
+///
 /// FIXME: handle boxes used by copy_value when neither copy is captured.
 ///
 //===----------------------------------------------------------------------===//
@@ -21,6 +35,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using namespace swift;
@@ -40,7 +55,81 @@ static void setDynamicEnforcement(BeginAccessInst *access) {
 }
 
 namespace {
+// Information about an address-type closure capture.
+// This is only valid for inout_aliasable parameters.
+//
+// TODO: Verify somewhere that we properly handle any non-inout_aliasable
+// partial apply captures or that they never happen. Eventually @inout_aliasable
+// should be simply replaced by @in or @out, once we don't have special aliasing
+// rules.
+struct AddressCapture {
+  ApplySite site;
+  unsigned calleeArgIdx;
+
+  AddressCapture(Operand &oper)
+      : site(oper.getUser()), calleeArgIdx(site.getCalleeArgIndex(oper)) {
+    assert(isa<PartialApplyInst>(site));
+    if (site.getOrigCalleeConv().getSILArgumentConvention(calleeArgIdx)
+        != SILArgumentConvention::Indirect_InoutAliasable) {
+      site = ApplySite();
+      calleeArgIdx = ~0U;
+      return;
+    }
+    assert(oper.get()->getType().isAddress());
+  }
+
+  bool isValid() const { return bool(site); }
+};
+
+raw_ostream &operator<<(raw_ostream &os, const AddressCapture &capture) {
+  os << *capture.site.getInstruction() << " captures Arg #"
+     << capture.calleeArgIdx;
+  auto *F = capture.site.getCalleeFunction();
+  if (F)
+    os << " of " << F->getName();
+  os << '\n';
+  return os;
+}
+
+// For each non-escaping closure, record the indices of arguments that
+// require dynamic enforcement.
+class DynamicCaptures {
+  llvm::DenseMap<SILFunction *, SmallVector<unsigned, 4>> dynamicCaptureMap;
+
+  DynamicCaptures(DynamicCaptures &) = delete;
+
+public:
+  DynamicCaptures() = default;
+
+  void recordCapture(AddressCapture capture) {
+    DEBUG(llvm::dbgs() << "Dynamic Capture: " << capture);
+
+    auto callee = capture.site.getCalleeFunction();
+    assert(callee && "cannot locate function ref for nonescaping closure");
+
+    auto &dynamicArgs = dynamicCaptureMap[callee];
+    if (!llvm::is_contained(dynamicArgs, capture.calleeArgIdx))
+      dynamicArgs.push_back(capture.calleeArgIdx);
+  }
+
+  bool isDynamic(SILFunctionArgument *arg) const {
+    auto pos = dynamicCaptureMap.find(arg->getFunction());
+    if (pos == dynamicCaptureMap.end())
+      return false;
+
+    auto &dynamicArgs = pos->second;
+    return llvm::is_contained(dynamicArgs, arg->getIndex());
+  }
+};
+} // anonymous namespace
+
+namespace {
 class SelectEnforcement {
+  // Reference back to the known dynamically enforced non-escaping closure
+  // arguments in this module. Parent scopes are processed before the closures
+  // they reference.
+  DynamicCaptures &dynamicCaptures;
+
   AllocBoxInst *Box;
 
   /// A state for tracking escape information about a variable.
@@ -67,8 +156,11 @@ class SelectEnforcement {
   };
   llvm::DenseMap<SILBasicBlock*, State> StateMap;
 
-  /// All the accesses in the function.
+  /// All the accesses of Box in the function.
   SmallVector<BeginAccessInst*, 8> Accesses;
+
+  /// All the non-escaping closure captures of the Boxed value in this function.
+  SmallVector<AddressCapture, 8> Captures;
 
   /// All the escapes in the function.
   SmallPtrSet<SILInstruction*, 8> Escapes;
@@ -77,7 +169,8 @@ class SelectEnforcement {
   SmallVector<SILBasicBlock*, 8> Worklist;
 
 public:
-  SelectEnforcement(AllocBoxInst *box) : Box(box) {}
+  SelectEnforcement(DynamicCaptures &dc, AllocBoxInst *box)
+      : dynamicCaptures(dc), Box(box) {}
 
   void run();
 
@@ -102,10 +195,13 @@ private:
 
   void updateAccesses();
   void updateAccess(BeginAccessInst *access);
+  void updateCapture(AddressCapture capture);
 };
 } // end anonymous namespace
 
 void SelectEnforcement::run() {
+  DEBUG(llvm::dbgs() << "  Box: " << *Box);
+
   // Set up the data-flow problem.
   analyzeUsesOfBox(Box);
 
@@ -140,26 +236,33 @@ void SelectEnforcement::analyzeUsesOfBox(SILInstruction *source) {
         isa<DeallocBoxInst>(user))
       continue;
 
-    // Treat everything else as an escape:
+    // Treat everything else as an escape.
+    // A Box typically escapes via copy_value.
     noteEscapingUse(user);
   }
-
-  assert(!Accesses.empty() && "didn't find original access!");
+  // Accesses may still be empty if the user of the Box is a partial apply
+  // capture and, for some reason, the closure is dead.
 }
 
 void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
-  for (auto use : projection->getUses()) {
+  for (auto *use : projection->getUses()) {
     auto user = use->getUser();
 
     // Collect accesses.
-    if (auto access = dyn_cast<BeginAccessInst>(user)) {
+    if (auto *access = dyn_cast<BeginAccessInst>(user)) {
       if (access->getEnforcement() == SILAccessEnforcement::Unknown)
         Accesses.push_back(access);
+
+      continue;
     }
+    if (auto *PAI = dyn_cast<PartialApplyInst>(user))
+      Captures.emplace_back(AddressCapture(*use));
   }
 }
 
 void SelectEnforcement::noteEscapingUse(SILInstruction *inst) {
+  DEBUG(llvm::dbgs() << "    Escape: " << *inst);
+
   // Add it to the escapes set.
   Escapes.insert(inst);
 
@@ -302,8 +405,13 @@ bool SelectEnforcement::hasPotentiallyEscapedAtAnyReachableBlock(
 }
 
 void SelectEnforcement::updateAccesses() {
-  for (auto access : Accesses) {
+  for (auto *access : Accesses) {
+    DEBUG(llvm::dbgs() << "    Access: " << *access);
     updateAccess(access);
+  }
+  for (AddressCapture &capture : Captures) {
+    DEBUG(llvm::dbgs() << "    Capture: " << capture);
+    updateCapture(capture);
   }
 }
 
@@ -326,97 +434,237 @@ void SelectEnforcement::updateAccess(BeginAccessInst *access) {
   // For every path through this access that doesn't reach an end_access, check
   // if any block reachable from that path can see an escaped value.
   if (hasPotentiallyEscapedAtAnyReachableBlock(access, blocksAccessedAcross)) {
-    return setDynamicEnforcement(access);
+    setDynamicEnforcement(access);
+    return;
   }
   // Otherwise, use static enforcement.
   setStaticEnforcement(access);
 }
 
+void SelectEnforcement::updateCapture(AddressCapture capture) {
+  llvm::SmallSetVector<PartialApplyInst *, 8> worklist;
+  auto visitUse = [&](Operand *oper) {
+    if (FullApplySite::isa(oper->getUser())) {
+      // A call is considered a closure access regardless of whether it calls
+      // the closure or accepts the closure as an argument.
+      if (hasPotentiallyEscapedAt(oper->getUser())) {
+        dynamicCaptures.recordCapture(capture);
+        return;
+      }
+    }
+    if (auto *PAI = dyn_cast<PartialApplyInst>(oper->getUser())) {
+      assert(oper->get() != PAI->getCallee() && "cannot re-partially apply");
+      // The closure is capture by another closure. Transitively consider any
+      // calls to the parent closure as an access.
+      worklist.insert(PAI);
+    }
+  };
+  auto *PAI = dyn_cast<PartialApplyInst>(capture.site);
+  while (true) {
+    for (auto *oper : PAI->getUses())
+      visitUse(oper);
+    if (worklist.empty())
+      break;
+    PAI = worklist.pop_back_val();
+  }
+}
+
 namespace {
 
-/// The pass.
-struct AccessEnforcementSelection : SILFunctionTransform {
-  void run() override {
-    DEBUG(llvm::dbgs() << "Access Enforcement Selection in "
-          << getFunction()->getName() << "\n");
+// Model the kind of access needed based on analyzing the access's source.
+// This is either determined to be static or dynamic, or requires further
+// analysis of a boxed variable.
+struct SourceAccess {
+  enum { StaticAccess, DynamicAccess, BoxAccess } kind;
+  AllocBoxInst *allocBox;
 
-    for (auto &bb : *getFunction()) {
-      for (auto ii = bb.begin(), ie = bb.end(); ii != ie; ) {
-        SILInstruction *inst = &*ii;
-        ++ii;
+  static SourceAccess getStaticAccess() { return {StaticAccess, nullptr}; }
+  static SourceAccess getDynamicAccess() { return {DynamicAccess, nullptr}; }
 
-        if (auto access = dyn_cast<BeginAccessInst>(inst))
-          handleAccess(access);
-
-        if (auto access = dyn_cast<BeginUnpairedAccessInst>(inst))
-          assert(access->getEnforcement() == SILAccessEnforcement::Dynamic);
-      }
-    }
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-  }
-
-  void handleAccess(BeginAccessInst *access) {
-    if (access->getEnforcement() != SILAccessEnforcement::Unknown)
-      return;
-
-    auto address = access->getOperand();
-    assert(!isa<MarkUninitializedInst>(address) &&
-           "pass should be run after definite initialization");
-
-    if (auto box = dyn_cast<ProjectBoxInst>(address)) {
-      return handleAccessToBox(access, box);
-    }
-    if (auto arg = dyn_cast<SILFunctionArgument>(address)) {
-      switch (arg->getArgumentConvention()) {
-      case SILArgumentConvention::Indirect_Inout:
-      case SILArgumentConvention::Indirect_InoutAliasable:
-        // `inout` arguments are checked on the caller side, either statically
-        // or dynamically if necessary. The @inout does not alias and cannot
-        // escape within the callee, so static enforcement is always sufficient.
-        //
-        // FIXME: `inout_aliasable` are not currently enforced on the caller
-        // side. Consequenctly, using static enforcement for noescape closures
-        // may fails to diagnose certain violations.
-        setStaticEnforcement(access);
-        break;
-      default:
-        // @in/@in_guaranteed cannot be mutably accessed, mutably captured, or
-        // passed as inout.
-        //
-        // FIXME: When we have borrowed arguments, a "read" needs to be enforced
-        // on the caller side.
-        llvm_unreachable("Expecting an inout argument.");
-      }
-      return;
-    }
-
-    // If we're not accessing a box or argument, we must've lowered to a stack
-    // element. Other sources of access are either outright dynamic (GlobalAddr,
-    // RefElementAddr), or only exposed after mandatory inlining (nested
-    // dependent BeginAccess).
-    //
-    // Running before diagnostic constant propagation requires handling 'undef'.
-    assert(isa<AllocStackInst>(address) || isa<SILUndef>(address));
-    setStaticEnforcement(access);
-  }
-
-  void handleAccessToBox(BeginAccessInst *access, ProjectBoxInst *projection) {
-    SILValue source = projection->getOperand();
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(source))
-      source = MUI->getOperand();
-
-    // If we didn't allocate the box, assume that we need to use
-    // dynamic enforcement.
-    // TODO: use static enforcement in certain provable cases.
-    auto box = dyn_cast<AllocBoxInst>(source);
-    if (!box) {
-      setDynamicEnforcement(access);
-      return;
-    }
-
-    SelectEnforcement(box).run();
+  static SourceAccess getBoxedAccess(AllocBoxInst *inst) {
+    return {BoxAccess, inst};
   }
 };
+
+/// The pass.
+class AccessEnforcementSelection : public SILModuleTransform {
+  // Reference back to the known dynamically enforced non-escaping closure
+  // arguments in this module. Parent scopes are processed before the closures
+  // they reference.
+  DynamicCaptures dynamicCaptures;
+
+  // Per-function book-keeping. A box is processed the first time one of it's
+  // accesses is handled. Don't process it again for subsequent accesses.
+  llvm::DenseSet<AllocBoxInst *> handledBoxes;
+
+#ifndef NDEBUG
+  llvm::DenseSet<SILFunction *> visited;
+#endif
+
+public:
+  void run() override;
+
+protected:
+  void processFunction(SILFunction *F);
+  SourceAccess getAccessKindForBox(ProjectBoxInst *projection);
+  SourceAccess getSourceAccess(SILValue address);
+  void handlePartialApply(PartialApplyInst *PAI);
+  void handleAccess(BeginAccessInst *access);
+};
+
+void AccessEnforcementSelection::run() {
+  auto *CSA = getAnalysis<ClosureScopeAnalysis>();
+  TopDownClosureFunctionOrder closureOrder(CSA);
+  closureOrder.visitFunctions(
+      [this](SILFunction *F) { this->processFunction(F); });
+}
+
+void AccessEnforcementSelection::processFunction(SILFunction *F) {
+  DEBUG(llvm::dbgs() << "Access Enforcement Selection in " << F->getName()
+                     << "\n");
+#ifndef NDEBUG
+  auto *CSA = getAnalysis<ClosureScopeAnalysis>();
+  if (isNonEscapingClosure(F->getLoweredFunctionType())) {
+    for (auto *scopeF : CSA->getClosureScopes(F)) {
+      DEBUG(llvm::dbgs() << "  Parent scope: " << scopeF->getName() << "\n");
+      assert(visited.count(scopeF));
+    }
+  }
+  visited.insert(F);
+#endif
+
+  for (auto &bb : *F) {
+    for (auto ii = bb.begin(), ie = bb.end(); ii != ie;) {
+      SILInstruction *inst = &*ii;
+      ++ii;
+
+      if (auto access = dyn_cast<BeginAccessInst>(inst))
+        handleAccess(access);
+
+      else if (auto access = dyn_cast<BeginUnpairedAccessInst>(inst))
+        assert(access->getEnforcement() == SILAccessEnforcement::Dynamic);
+
+      else if(auto pa = dyn_cast<PartialApplyInst>(inst))
+        handlePartialApply(pa);
+    }
+  }
+  invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
+  // There's no need to track handled boxes across functions.
+  handledBoxes.clear();
+}
+
+SourceAccess
+AccessEnforcementSelection::getAccessKindForBox(ProjectBoxInst *projection) {
+  SILValue source = projection->getOperand();
+  if (auto *MUI = dyn_cast<MarkUninitializedInst>(source))
+    source = MUI->getOperand();
+
+  // If we didn't allocate the box, assume that we need to use
+  // dynamic enforcement.
+  // TODO: use static enforcement in certain provable cases.
+  auto box = dyn_cast<AllocBoxInst>(source);
+  if (!box)
+    return SourceAccess::getDynamicAccess();
+
+  return SourceAccess::getBoxedAccess(box);
+}
+
+SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
+  // Recurse through MarkUninitializedInst.
+  if (auto *MUI = dyn_cast<MarkUninitializedInst>(address))
+    return getSourceAccess(MUI->getOperand());
+
+  if (auto box = dyn_cast<ProjectBoxInst>(address))
+    return getAccessKindForBox(box);
+
+  if (auto arg = dyn_cast<SILFunctionArgument>(address)) {
+    switch (arg->getArgumentConvention()) {
+    case SILArgumentConvention::Indirect_Inout:
+      // `inout` arguments are checked on the caller side, either statically
+      // or dynamically if necessary. The @inout does not alias and cannot
+      // escape within the callee, so static enforcement is always sufficient.
+      return SourceAccess::getStaticAccess();
+
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      if (dynamicCaptures.isDynamic(arg))
+        return SourceAccess::getDynamicAccess();
+
+      return SourceAccess::getStaticAccess();
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      // @in/@in_guaranteed cannot be mutably accessed, mutably captured, or
+      // passed as inout. @in/@in_guaranteed may be captured @inout_aliasable.
+      // (This is fairly horrible, but presumably Sema/SILGen made sure a copy
+      // wasn't needed?)
+      //  
+      // FIXME: When we have borrowed arguments, a "read" needs to be enforced
+      // on the caller side.
+      return SourceAccess::getStaticAccess();
+
+    default:
+      llvm_unreachable("Expecting an inout argument.");
+    }
+  }
+  // If we're not accessing a box or argument, we must've lowered to a stack
+  // element. Other sources of access are either outright dynamic (GlobalAddr,
+  // RefElementAddr), or only exposed after mandatory inlining (nested
+  // dependent BeginAccess).
+  //
+  // Running before diagnostic constant propagation requires handling 'undef'.
+  assert(isa<AllocStackInst>(address) || isa<SILUndef>(address));
+  return SourceAccess::getStaticAccess();
+}
+
+void AccessEnforcementSelection::handlePartialApply(PartialApplyInst *PAI) {
+  ApplySite site(PAI);
+  auto calleeTy = PAI->getOrigCalleeType();
+  SILFunctionConventions calleeConv(calleeTy, *getModule());
+
+  for (Operand &oper : site.getArgumentOperands()) {
+    AddressCapture capture(oper);
+    if (!capture.isValid())
+      continue;
+
+    // This partial apply creates a non-escaping closure. Check if the closure
+    // captures any Boxed variables from this scope. If so, check if the box
+    // escapes before the access just as we do for normal accesses.
+    auto sourceAccess = getSourceAccess(oper.get());
+    switch (sourceAccess.kind) {
+    case SourceAccess::StaticAccess:
+      // If the captured variable does not require dynamic enforcement, then
+      // there's no need to track it.
+      break;
+    case SourceAccess::DynamicAccess: {
+      dynamicCaptures.recordCapture(capture);
+      break;
+    }
+    case SourceAccess::BoxAccess:
+      if (handledBoxes.insert(sourceAccess.allocBox).second)
+        SelectEnforcement(dynamicCaptures, sourceAccess.allocBox).run();
+      break;
+    }
+  }
+}
+
+void AccessEnforcementSelection::handleAccess(BeginAccessInst *access) {
+  if (access->getEnforcement() != SILAccessEnforcement::Unknown)
+    return;
+
+  auto sourceAccess = getSourceAccess(access->getOperand());
+  switch (sourceAccess.kind) {
+  case SourceAccess::StaticAccess:
+    setStaticEnforcement(access);
+    break;
+  case SourceAccess::DynamicAccess:
+    setDynamicEnforcement(access);
+    break;
+  case SourceAccess::BoxAccess:
+    // If this box was handled, the access enforcement would already be set.
+    assert(!handledBoxes.count(sourceAccess.allocBox));
+    SelectEnforcement(dynamicCaptures, sourceAccess.allocBox).run();
+    break;
+  }
+}
 
 } // end anonymous namespace
 

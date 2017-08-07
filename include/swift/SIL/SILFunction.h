@@ -456,6 +456,10 @@ public:
   ///          or is raw SIL (so that the mandatory passes still run).
   bool shouldOptimize() const;
 
+  /// Returns true if this is a function that should have its ownership
+  /// verified.
+  bool shouldVerifyOwnership() const;
+
   /// Check if the function has a location.
   /// FIXME: All functions should have locations, so this method should not be
   /// necessary.
@@ -667,7 +671,17 @@ public:
                           return isa<ThrowInst>(TI);
                         });
   }
-    
+
+  /// Loop over all blocks in this function and add all function exiting blocks
+  /// to output.
+  void findExitingBlocks(llvm::SmallVectorImpl<SILBasicBlock *> &output) const {
+    for (auto &Block : const_cast<SILFunction &>(*this)) {
+      if (Block.getTerminator()->isFunctionExiting()) {
+        output.emplace_back(&Block);
+      }
+    }
+  }
+
   //===--------------------------------------------------------------------===//
   // Argument Helper Methods
   //===--------------------------------------------------------------------===//

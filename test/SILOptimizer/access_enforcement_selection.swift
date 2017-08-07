@@ -65,6 +65,8 @@ public func captureStackWithInoutInProgress() -> Int {
 // CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 
 // Generate an alloc_box that escapes into a closure.
+// FIXME: `x` is eventually promoted to an alloc_stack even though it has dynamic enforcement.
+// We should ensure that alloc_stack variables are statically enforced.
 public func captureBox() -> Int {
   var x = 3
   takeEscapingClosure { x = 4; return x }

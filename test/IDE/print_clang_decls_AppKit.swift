@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // This file deliberately does not use %clang-importer-sdk for most RUN lines.
 // Instead, it generates custom overlay modules itself, and uses -I %t when it
@@ -20,7 +19,11 @@
 // APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility {{{$}}
 // APPKIT-NEXT: init?(coder aDecoder: NSCoder)
 // APPKIT-NEXT: func isDescendant(of aView: NSView) -> Bool
+// APPKIT-NEXT: @available(swift, obsoleted: 3, renamed: "isDescendant(of:)")
+// APPKIT-NEXT: func isDescendantOf(_ aView: NSView) -> Bool
 // APPKIT-NEXT: func ancestorShared(with aView: NSView) -> NSView?
+// APPKIT-NEXT: @available(swift, obsoleted: 3, renamed: "ancestorShared(with:)")
+// APPKIT-NEXT: func ancestorSharedWithView(_ aView: NSView) -> NSView?
 // APPKIT-NEXT: func addSubview(_ aView: NSView)
 // APPKIT-NEXT: func addSubview(_ aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: unowned(unsafe) var superview: @sil_unmanaged NSView? { get }

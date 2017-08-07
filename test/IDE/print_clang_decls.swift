@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // XFAIL: linux
 
@@ -122,6 +121,17 @@
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
 // FOUNDATION-NEXT: @available(*, unavailable, message: "Zone-based memory management is unavailable")
 // FOUNDATION-NEXT: NSSetZoneName(_ zone: NSZone, _ name: String)
+
+// FOUNDATION-LABEL: struct FictionalServerError
+// FOUNDATION:         enum Code
+// FOUNDATION:           case meltedDown
+// FOUNDATION:         static var meltedDown: FictionalServerError.Code
+
+// FOUNDATION-LABEL: extension NSLaundromat {
+// FOUNDATION-NEXT:    struct Error
+// FOUNDATION:           enum Code
+// FOUNDATION:           case tooMuchSoap
+// FOUNDATION:         static var tooMuchSoap: NSLaundromat.Error.Code { get }
 
 // CTYPESBITS-NOT: FooStruct1
 // CTYPESBITS: {{^}}typealias DWORD = Int32{{$}}
