@@ -104,14 +104,13 @@ func takesInner(_: [Outer.Middle.GenericInner<Int>]) {}
 takesInner([Outer.Middle.GenericInner<Int>]())
 takesInner([array.Outer.Middle.GenericInner<Int>]())
 
-// FIXME: We should support this with nested types of generic parameters also
 protocol HasAssocType {
   associatedtype A
 }
 
-func takesAssocType<T : HasAssocType>(_: T, _: [T.A]) {}
+func takesAssocType<T : HasAssocType>(_: T, _: [T.A], _: [T.A?]) {}
 
 func passAssocType<T : HasAssocType>(_ t: T) {
-  takesAssocType(t, [T.A]())
-  // expected-error@-1 {{cannot call value of non-function type '[T.A.Type]'}}
+  takesAssocType(t, [T.A](), [T.A?]())
 }
+
