@@ -242,6 +242,11 @@ public:
   static bool canBeSpecialized(ApplySite Apply, SILFunction *Callee,
                                SubstitutionList ParamSubs);
 
+  /// Returns the apply site for the current generic specialization.
+  ApplySite getApply() const {
+    return Apply;
+  }
+
   void verify() const;
 };
 
