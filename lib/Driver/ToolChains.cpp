@@ -1193,6 +1193,22 @@ addLinkFuzzerLibArgsForDarwin(const ArgList &Args,
   Arguments.push_back(Args.MakeArgString(P));
 }
 
+static void
+addLinkFuzzerLibArgsForLinux(const ArgList &Args,
+                             ArgStringList &Arguments,
+                             const ToolChain &TC) {
+  Arguments.push_back("-lstdc++");
+
+  // Link libfuzzer.
+  SmallString<128> Dir;
+  getRuntimeLibraryPath(Dir, Args, TC);
+  llvm::sys::path::remove_filename(Dir);
+  llvm::sys::path::append(Dir, "llvm", "libLLVMFuzzer.a");
+  SmallString<128> P(Dir);
+
+  Arguments.push_back(Args.MakeArgString(P));
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
                                         const JobContext &context) const {
@@ -1706,6 +1722,9 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
       if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
+
+      if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
+        addLinkFuzzerLibArgsForLinux(context.Args, Arguments, *this);
     }
   }
 
