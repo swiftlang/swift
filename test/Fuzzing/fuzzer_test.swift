@@ -10,7 +10,8 @@ import Glibc
 
 @_cdecl("LLVMFuzzerTestOneInput") public func fuzzOneInput(Data: UnsafePointer<CChar>, Size: CLong) -> CInt {
   if (Size >= 3 && Data[0] == 65 && Data[1] == 66 && Data[2] == 67) {
-    print("Crash!");
+    fputs("Crash!", stdout);
+    fflush(stdout);
     exit(1);
   }
   return 0;

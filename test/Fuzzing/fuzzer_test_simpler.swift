@@ -13,7 +13,8 @@ import Glibc
     if (Data[0] == 65) {
       if (Data[1] == 66) {
         if (Data[2] == 67) {
-          print("Crash!");
+          fputs("Crash!", stdout);
+          fflush(stdout);
           exit(1);
         }
       }
