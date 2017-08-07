@@ -976,6 +976,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                                               SubscriptD->getSourceRange());
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
                                                SubscriptD->getBracesRange());
+    SN.NameRange = charSourceRangeFromSourceRange(SM,
+                                        SubscriptD->getSignatureSourceRange());
     pushStructureNode(SN, SubscriptD);
   }
 
