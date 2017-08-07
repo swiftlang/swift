@@ -28,6 +28,9 @@
 using namespace swift;
 using namespace Lowering;
 
+//===----------------------------------------------------------------------===//
+//                              Helper Routines
+//===----------------------------------------------------------------------===//
 
 static unsigned getTupleSize(CanType t) {
   if (auto tt = dyn_cast<TupleType>(t))
@@ -435,9 +438,47 @@ expectedExplosionSize(CanType type) {
   return total;
 }
 
-RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
-  : values(values.begin(), values.end()), type(type), elementsToBeAdded(0) {
-  
+/// This is separate from the main verification routine, so I can minimize the
+/// amount of places that need to use SILGenFunction &SGF.
+static void verifyHelper(ArrayRef<ManagedValue> values,
+                         NullablePtr<SILGenFunction> SGF = nullptr) {
+// This is a no-op in non-assert builds.
+#ifndef NDEBUG
+  auto result = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
+  Optional<bool> sameHaveCleanups;
+  for (ManagedValue v : values) {
+    assert((!SGF || !v.getType().isLoadable(SGF.get()->getModule()) ||
+            v.getType().isObject()) &&
+           "All loadable values in an RValue must be an object");
+
+    ValueOwnershipKind kind = v.getOwnershipKind();
+    if (kind == ValueOwnershipKind::Trivial)
+      continue;
+
+    // Merge together whether or not the RValue has cleanups.
+    if (!sameHaveCleanups.hasValue()) {
+      sameHaveCleanups = v.hasCleanup();
+    } else {
+      assert(*sameHaveCleanups == v.hasCleanup());
+    }
+
+    // This variable is here so that if the assert below fires, the current
+    // reduction value is still available.
+    auto newResult = result.getValue().merge(kind);
+    assert(newResult.hasValue());
+    result = newResult;
+  }
+#endif
+}
+
+//===----------------------------------------------------------------------===//
+//                           RValue Implementation
+//===----------------------------------------------------------------------===//
+
+// Private helper constructor. Please see RValue.h for more information.
+RValue::RValue(SILGenFunction *SGF, ArrayRef<ManagedValue> values, CanType type)
+    : values(values.begin(), values.end()), type(type), elementsToBeAdded(0) {
+
   assert(values.size() == expectedExplosionSize(type)
          && "creating rvalue with wrong number of pre-exploded elements");
   
@@ -448,12 +489,7 @@ RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
     return;
   }
 
-  verifyConsistentOwnership();
-}
-
-RValue RValue::withPreExplodedElements(ArrayRef<ManagedValue> values,
-                                       CanType type) {
-  return RValue(values, type);
+  verifyHelper(values, SGF);
 }
 
 RValue::RValue(SILGenFunction &SGF, SILLocation l, CanType formalType,
@@ -470,7 +506,7 @@ RValue::RValue(SILGenFunction &SGF, SILLocation l, CanType formalType,
 
   ExplodeTupleValue(values, SGF, l).visit(formalType, v);
   assert(values.size() == getRValueSize(type));
-  verifyConsistentOwnership();
+  verify(SGF);
 }
 
 RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
@@ -485,7 +521,7 @@ RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
   assert(v && "creating r-value with consumed value");
   ExplodeTupleValue(values, SGF, expr).visit(type, v);
   assert(values.size() == getRValueSize(type));
-  verifyConsistentOwnership();
+  verify(SGF);
 }
 
 RValue::RValue(CanType type)
@@ -507,7 +543,11 @@ void RValue::addElement(RValue &&element) & {
   element.makeUsed();
 
   assert(!isComplete() || values.size() == getRValueSize(type));
-  verifyConsistentOwnership();
+  // Call into the verifier helper directly without an SGF since we know that
+  // all of our loadable values are already loaded and thus we do not need to
+  // recheck that. On the other hand, we need to check the consistency of
+  // cleanups and ownership.
+  verifyHelper(values);
 }
 
 void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
@@ -521,7 +561,7 @@ void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
   ExplodeTupleValue(values, SGF, l).visit(formalType, element);
 
   assert(!isComplete() || values.size() == getRValueSize(type));
-  verifyConsistentOwnership();
+  verify(SGF);
 }
 
 SILValue RValue::forwardAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
@@ -658,7 +698,7 @@ RValue RValue::extractElement(unsigned n) && {
     assert(n == 0);
     unsigned to = getRValueSize(type);
     assert(to == values.size());
-    RValue element({llvm::makeArrayRef(values).slice(0, to), type});
+    RValue element(nullptr, llvm::makeArrayRef(values).slice(0, to), type);
     makeUsed();
     return element;
   }
@@ -667,7 +707,7 @@ RValue RValue::extractElement(unsigned n) && {
   unsigned from = range.first, to = range.second;
 
   CanType eltType = cast<TupleType>(type).getElementType(n);
-  RValue element(llvm::makeArrayRef(values).slice(from, to - from), eltType);
+  RValue element(nullptr, llvm::makeArrayRef(values).slice(from, to - from), eltType);
   makeUsed();
   return element;
 }
@@ -679,7 +719,9 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   if (!tupleTy) {
     unsigned to = getRValueSize(type);
     assert(to == values.size());
-    elements.push_back({llvm::makeArrayRef(values).slice(0, to), type});
+    // We use push_back instead of emplace_back since emplace_back can not
+    // invoke the private constructor we are attempting to invoke.
+    elements.push_back({nullptr, llvm::makeArrayRef(values).slice(0, to), type});
     makeUsed();
     return;
   }
@@ -687,7 +729,9 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   unsigned from = 0;
   for (auto eltType : tupleTy.getElementTypes()) {
     unsigned to = from + getRValueSize(eltType);
-    elements.push_back({llvm::makeArrayRef(values).slice(from, to - from),
+    // We use push_back instead of emplace_back since emplace_back can not
+    // invoke the private constructor we are attempting to invoke.
+    elements.push_back({nullptr, llvm::makeArrayRef(values).slice(from, to - from),
                         eltType});
     from = to;
   }
@@ -704,7 +748,7 @@ RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
   for (ManagedValue v : values) {
     copiedValues.emplace_back(v.copy(SGF, loc));
   }
-  return RValue(std::move(copiedValues), type, elementsToBeAdded);
+  return RValue(SGF, std::move(copiedValues), type, elementsToBeAdded);
 }
 
 RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
@@ -715,7 +759,7 @@ RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
   for (ManagedValue v : values) {
     borrowedValues.emplace_back(v.borrow(SGF, loc));
   }
-  return RValue(std::move(borrowedValues), type, elementsToBeAdded);
+  return RValue(SGF, std::move(borrowedValues), type, elementsToBeAdded);
 }
 
 ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
@@ -778,29 +822,10 @@ void RValue::dump(raw_ostream &OS, unsigned indent) const {
   }
 }
 
-void RValue::verifyConsistentOwnership() const {
+void RValue::verify(SILGenFunction &SGF) const & {
 // This is a no-op in non-assert builds.
 #ifndef NDEBUG
-  auto result = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
-  Optional<bool> sameHaveCleanups;
-  for (ManagedValue v : values) {
-    ValueOwnershipKind kind = v.getOwnershipKind();
-    if (kind == ValueOwnershipKind::Trivial)
-      continue;
-
-    // Merge together whether or not the RValue has cleanups.
-    if (!sameHaveCleanups.hasValue()) {
-      sameHaveCleanups = v.hasCleanup();
-    } else {
-      assert(*sameHaveCleanups == v.hasCleanup());
-    }
-
-    // This variable is here so that if the assert below fires, the current
-    // reduction value is still available.
-    auto newResult = result.getValue().merge(kind);
-    assert(newResult.hasValue());
-    result = newResult;
-  }
+  verifyHelper(values, &SGF);
 #endif
 }
 
