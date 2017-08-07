@@ -119,6 +119,9 @@ public:
   /// The path to which we should output a loaded module trace file.
   std::string LoadedModuleTracePath;
 
+  /// The path to which we should output a TBD file.
+  std::string TBDPath;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
@@ -170,7 +173,6 @@ public:
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
 
-    EmitTBD, ///< Emit a TBD file for this module
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH, ///< Emit PCH of imported bridging header
 
@@ -292,6 +294,9 @@ public:
 
   /// Compare the symbols in the IR against the TBD file we would generate.
   TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::None;
+
+  /// The install_name to use in the TBD file.
+  std::string TBDInstallName;
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {

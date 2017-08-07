@@ -209,6 +209,16 @@ def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-pa
 def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-path=">,
   Flags<[FrontendOption, NoInteractiveOption]>, Alias<emit_loaded_module_trace_path>;
 
+def emit_tbd : Flag<["-"], "emit-tbd">,
+  HelpText<"Emit a TBD file">,
+  Flags<[FrontendOption, NoInteractiveOption]>;
+def emit_tbd_path : Separate<["-"], "emit-tbd-path">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit the TBD file to <path>">,
+  MetaVarName<"<path>">;
+def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
+  Flags<[FrontendOption, NoInteractiveOption]>, Alias<emit_tbd_path>;
+
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Serialize diagnostics in a binary format">;
@@ -531,9 +541,6 @@ def emit_sibgen : Flag<["-"], "emit-sibgen">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
   HelpText<"Emit a list of the imported modules">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_tbd : Flag<["-"], "emit-tbd">,
-  HelpText<"Emit a TBD file">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,

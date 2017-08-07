@@ -28,100 +28,16 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 
+#include "TBDGenVisitor.h"
+
 using namespace swift;
 using namespace swift::irgen;
+using namespace swift::tbdgen;
 using StringSet = llvm::StringSet<>;
 
 static bool isPrivateDecl(ValueDecl *VD) {
   return getDeclLinkage(VD) != FormalLinkage::PublicUnique;
 }
-
-namespace {
-class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
-  StringSet &Symbols;
-  const UniversalLinkageInfo &UniversalLinkInfo;
-  ModuleDecl *SwiftModule;
-  bool FileHasEntryPoint;
-  bool SILSerializeWitnessTables;
-
-  bool InsideAbstractStorageDecl = false;
-
-  void addSymbol(StringRef name) {
-    auto isNewValue = Symbols.insert(name).second;
-    (void)isNewValue;
-    assert(isNewValue && "already inserted");
-  }
-
-  void addSymbol(SILDeclRef declRef);
-
-  void addSymbol(LinkEntity entity) {
-    auto linkage =
-        LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
-
-    auto externallyVisible =
-        llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
-        linkage.getVisibility() != llvm::GlobalValue::HiddenVisibility;
-
-    if (externallyVisible)
-      addSymbol(linkage.getName());
-  }
-
-  void addConformances(DeclContext *DC);
-
-public:
-  TBDGenVisitor(StringSet &symbols,
-                const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, bool fileHasEntryPoint,
-                bool silSerializeWitnessTables)
-      : Symbols(symbols), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule), FileHasEntryPoint(fileHasEntryPoint),
-        SILSerializeWitnessTables(silSerializeWitnessTables) {}
-
-  void visitMembers(Decl *D) {
-    SmallVector<Decl *, 4> members;
-    auto addMembers = [&](DeclRange range) {
-      for (auto member : range)
-        members.push_back(member);
-    };
-    if (auto ED = dyn_cast<ExtensionDecl>(D))
-      addMembers(ED->getMembers());
-    else if (auto NTD = dyn_cast<NominalTypeDecl>(D))
-      addMembers(NTD->getMembers());
-    else if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
-      ASD->getAllAccessorFunctions(members);
-
-    for (auto member : members) {
-      ASTVisitor::visit(member);
-    }
-  }
-
-  void visitPatternBindingDecl(PatternBindingDecl *PBD);
-
-  void visitValueDecl(ValueDecl *VD);
-
-  void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
-
-  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    // any information here is encoded elsewhere
-  }
-
-  void visitNominalTypeDecl(NominalTypeDecl *NTD);
-
-  void visitClassDecl(ClassDecl *CD);
-
-  void visitConstructorDecl(ConstructorDecl *CD);
-
-  void visitExtensionDecl(ExtensionDecl *ED);
-
-  void visitProtocolDecl(ProtocolDecl *PD);
-
-  void visitAbstractStorageDecl(AbstractStorageDecl *ASD);
-
-  void visitVarDecl(VarDecl *VD);
-
-  void visitDecl(Decl *D) { visitMembers(D); }
-};
-} // end anonymous namespace
 
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
@@ -410,23 +326,70 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 #endif
 }
 
+static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
+                                           StringSet &symbols,
+                                           bool hasMultipleIRGenThreads,
+                                           bool silSerializeWitnessTables,
+                                           llvm::raw_ostream *os,
+                                           StringRef installName) {
+  auto isWholeModule = singleFile == nullptr;
+  const auto &target = M->getASTContext().LangOpts.Target;
+  UniversalLinkageInfo linkInfo(target, hasMultipleIRGenThreads, isWholeModule);
+
+  TBDGenVisitor visitor(symbols, target, linkInfo, M, silSerializeWitnessTables,
+                        installName);
+
+  auto visitFile = [&](FileUnit *file) {
+    SmallVector<Decl *, 16> decls;
+    file->getTopLevelDecls(decls);
+
+    visitor.setFileHasEntryPoint(file->hasEntryPoint());
+
+    for (auto d : decls)
+      visitor.visit(d);
+  };
+
+  if (singleFile) {
+    assert(M == singleFile->getParentModule() && "mismatched file and module");
+    visitFile(singleFile);
+  } else {
+    for (auto *file : M->getFiles()) {
+      visitFile(file);
+    }
+  }
+
+  if (os) {
+    // The correct TBD formatting code is temporarily non-open source, so this
+    // is just a list of the symbols.
+    std::vector<StringRef> sorted;
+    for (auto &symbol : symbols)
+      sorted.push_back(symbol.getKey());
+    std::sort(sorted.begin(), sorted.end());
+    for (const auto &symbol : sorted) {
+      *os << symbol << "\n";
+    }
+  }
+}
+
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
                                    bool hasMultipleIRGenThreads,
-                                   bool isWholeModule,
                                    bool silSerializeWitnessTables) {
-  UniversalLinkageInfo linkInfo(file->getASTContext().LangOpts.Target,
-                                hasMultipleIRGenThreads, isWholeModule);
-
-  SmallVector<Decl *, 16> decls;
-  file->getTopLevelDecls(decls);
-
-  auto hasEntryPoint = file->hasEntryPoint();
-
-  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule(),
-                        hasEntryPoint, silSerializeWitnessTables);
-  for (auto d : decls)
-    visitor.visit(d);
-
-  if (hasEntryPoint)
-    symbols.insert("main");
+  enumeratePublicSymbolsAndWrite(
+      file->getParentModule(), file, symbols, hasMultipleIRGenThreads,
+      silSerializeWitnessTables, nullptr, StringRef());
+}
+void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
+                                   bool hasMultipleIRGenThreads,
+                                   bool silSerializeWitnessTables) {
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIRGenThreads,
+                                 silSerializeWitnessTables, nullptr,
+                                 StringRef());
+}
+void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
+                         bool hasMultipleIRGenThreads,
+                         bool silSerializeWitnessTables,
+                         StringRef installName) {
+  StringSet symbols;
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIRGenThreads,
+                                 silSerializeWitnessTables, &os, installName);
 }

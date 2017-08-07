@@ -681,12 +681,16 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
-  if (Action == FrontendOptions::EmitTBD) {
+  if (!opts.TBDPath.empty()) {
     const auto &silOpts = Invocation.getSILOptions();
     auto hasMultipleIRGenThreads = silOpts.NumThreads > 1;
-    return writeTBD(Instance.getMainModule(), hasMultipleIRGenThreads,
-                    silOpts.SILSerializeWitnessTables,
-                    opts.getSingleOutputFilename());
+    auto installName = opts.TBDInstallName.empty()
+                           ? "lib" + Invocation.getModuleName().str() + ".dylib"
+                           : opts.TBDInstallName;
+
+    if (writeTBD(Instance.getMainModule(), hasMultipleIRGenThreads,
+                 silOpts.SILSerializeWitnessTables, opts.TBDPath, installName))
+      return true;
   }
 
   assert(Action >= FrontendOptions::EmitSILGen &&
