@@ -137,7 +137,6 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
     } else {
       Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
           A->getOption().getPrefixedName(), A->getValue(i));
-      return sanitizerSet;
     }
   }
 
@@ -148,8 +147,6 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
       (A->getOption().getPrefixedName() +
           StringRef(A->getAsString(Args))).toStringRef(b),
       Triple.getTriple());
-
-    return sanitizerSet;
   }
 
   // Address and thread sanitizers can not be enabled concurrently.
@@ -162,7 +159,6 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
             + toStringRef(SanitizerKind::Address)).toStringRef(b1),
         (A->getOption().getPrefixedName()
             + toStringRef(SanitizerKind::Thread)).toStringRef(b2));
-    return sanitizerSet;
   }
 
   // Thread Sanitizer only works on OS X and the simulators. It's only supported
@@ -174,7 +170,6 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
       (A->getOption().getPrefixedName()
           + toStringRef(SanitizerKind::Thread)).toStringRef(b),
       Triple.getTriple());
-    return sanitizerSet;
   }
 
   return sanitizerSet;
