@@ -73,6 +73,15 @@ swift::_swift_stdlib_CFStringCreateWithSubstring(
   return cast(CFStringCreateWithSubstring(cast(alloc), cast(str), cast(range)));
 }
 
+_swift_shims_CFStringRef
+swift::_swift_stdlib_CFStringCreateWithCharacters(
+                                         _swift_shims_CFAllocatorRef alloc,
+                                         const _swift_shims_UniChar *str,
+                                         _swift_shims_CFIndex length) {
+  return cast(CFStringCreateWithCharacters(
+                cast(alloc), const_cast<UniChar *>(str), length));
+}
+
 _swift_shims_UniChar
 swift::_swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef theString,
                                                  _swift_shims_CFIndex idx) {

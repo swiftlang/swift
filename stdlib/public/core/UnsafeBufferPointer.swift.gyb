@@ -188,12 +188,24 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   public func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+<<<<<<< HEAD
     guard !isEmpty && !destination.isEmpty else { return (makeIterator(), 0) }
     let s = self.baseAddress._unsafelyUnwrappedUnchecked
     let d = destination.baseAddress._unsafelyUnwrappedUnchecked
     let n = Swift.min(destination.count, self.count)
     d.initialize(from: s, count: n)
     return (Iterator(_position: s + n, _end: _end), n)
+=======
+    var r = makeIterator(), n = 0
+    if let s = self._position, let d = destination._position {
+      n = Swift.min(
+        self._end._unsafelyUnwrappedUnchecked - s,
+        destination._end._unsafelyUnwrappedUnchecked - d)
+      d.initialize(from: s, count: n)
+      r._position = UnsafePointer(s) + n
+    }
+    return (r, n)
+>>>>>>> apple/builtin-int128
   }
 
   /// Accesses the element at the specified position.

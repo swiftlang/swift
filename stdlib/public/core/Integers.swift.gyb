@@ -61,18 +61,15 @@ maskingShifts = [
       helper='_nonMaskingLeftShift',
       llvmName=lambda _: 'shl'),
 ]
-
-IntMax = 'Int%s' % int_max_bits
-UIntMax = 'UInt%s' % int_max_bits
 }%
 
 // FIXME(integers): remove these two aliases
 /// The largest native signed integer type.
-@available(swift, obsoleted: 4.0, renamed: "${IntMax}")
-public typealias IntMax = ${IntMax}
+@available(swift, obsoleted: 4.0, renamed: "Int64")
+public typealias IntMax = Int64
 /// The largest native unsigned integer type.
-@available(swift, obsoleted: 4.0, renamed: "${UIntMax}")
-public typealias UIntMax = ${UIntMax}
+@available(swift, obsoleted: 4.0, renamed: "UInt64")
+public typealias UIntMax = UInt64
 
 infix operator &<< : BitwiseShiftPrecedence
 infix operator &<<= : AssignmentPrecedence
@@ -2668,8 +2665,8 @@ extension SignedInteger where Self : FixedWidthInteger {
 /// ${Article} ${bits}-bit ${'' if signed else 'un'}signed integer value
 /// type.
 %   end
-@_fixed_layout
-public struct ${Self}
+${'@_fixed_layout' if self_type.access == 'public' else '@_versioned'}
+${self_type.access} struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
     _ExpressibleByBuiltinIntegerLiteral {
 
@@ -2741,6 +2738,7 @@ public struct ${Self}
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
   }
 
+<<<<<<< HEAD
   /// Creates an integer from the given floating-point value, if it can be
   /// represented exactly.
   ///
@@ -2755,6 +2753,9 @@ public struct ${Self}
   ///     // y == nil
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
+=======
+% if self_type.access == 'public':
+>>>>>>> apple/builtin-int128
   @_transparent
   public init?(exactly source: ${FloatType}) {
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
@@ -2762,7 +2763,8 @@ public struct ${Self}
       return nil
     }
   }
-
+% end
+  
 %     if FloatType == 'Float80':
 #endif
 %     end
@@ -3087,7 +3089,7 @@ ${assignmentOperatorComment(x.operator, True)}
   public func multipliedFullWidth(by other: ${Self})
   -> (high: ${Self}, low: ${Self}.Magnitude) {
 %   # 128 bit types are not provided by the 32-bit LLVM
-%   if word_bits == 32 and bits == 64:
+%   if word_bits == 32 and bits >= 64:
     // FIXME(integers): implement
     fatalError("Operation is not supported")
 %   else:
@@ -3120,8 +3122,8 @@ ${assignmentOperatorComment(x.operator, True)}
     _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
   ) -> (quotient: ${Self}, remainder: ${Self}) {
 %   # 128 bit types are not provided by the 32-bit LLVM
-%   #if word_bits == 32 and bits == 64:
-%   if bits == 64:
+%   #if word_bits == 32 and bits >= 64:
+%   if bits >= 64:
     let lhs = DoubleWidth<${Self}>(dividend)
     let rhs = DoubleWidth<${Self}>(self)
 
@@ -3367,7 +3369,7 @@ ${assignmentOperatorComment(x.operator, True)}
 /// Returns the argument and specifies that the value is not negative.
 /// It has only an effect if the argument is a load or call.
 @_transparent
-public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
+${self_type.access} func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
   _sanityCheck(x >= (0 as ${Self}))
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
