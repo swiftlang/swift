@@ -191,8 +191,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
   }
 
   if (Opts.SanitizeCoverage.CoverageType !=
-      llvm::SanitizerCoverageOptions::SCK_None ||
-      (Opts.Sanitizers & SanitizerKind::Fuzzer)) {
+      llvm::SanitizerCoverageOptions::SCK_None) {
 
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addSanitizerCoveragePass);
