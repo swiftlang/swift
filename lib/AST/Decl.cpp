@@ -4422,6 +4422,18 @@ SourceRange SubscriptDecl::getSourceRange() const {
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
 }
 
+SourceRange SubscriptDecl::getSignatureSourceRange() const {
+  if (isImplicit())
+    return SourceRange();
+  if (auto Indices = getIndices()) {
+    auto End = Indices->getEndLoc();
+    if (End.isValid()) {
+      return SourceRange(getSubscriptLoc(), End);
+    }
+  }
+  return getSubscriptLoc();
+}
+
 DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   if (getFullName())
     return getFullName();

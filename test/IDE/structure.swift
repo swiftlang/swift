@@ -192,7 +192,7 @@ class SubscriptTest {
   subscript(index: Int) -> Int {
     return 0
   }
-  // CHECK: <subscript>subscript(<param>index: Int</param>) -> Int {
+  // CHECK: <subscript><name>subscript(<param>index: Int</param>)</name> -> Int {
   // CHECK:  return 0
   // CHECK: }</subscript>
 
@@ -204,7 +204,7 @@ class SubscriptTest {
       print(value)
     }
   }
-  // CHECK: <subscript>subscript(<param>string: String</param>) -> Int {
+  // CHECK: <subscript><name>subscript(<param>string: String</param>)</name> -> Int {
   // CHECK: get {
   // CHECK:   return 0
   // CHECK: }
