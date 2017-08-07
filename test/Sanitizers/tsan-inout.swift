@@ -7,6 +7,8 @@
 // REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
 
+// REQUIRES: rdar_33757304
+
 // Test ThreadSanitizer execution end-to-end when calling
 // an uninstrumented module with inout parameters
 
