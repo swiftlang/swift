@@ -3867,13 +3867,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool autoClosure, noescape, throws;
+    bool autoClosure, noescape, throws, async;
 
     decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
                                                 rawRepresentation,
                                                 autoClosure,
                                                 noescape,
-                                                throws);
+                                                throws, async);
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
     if (!representation.hasValue()) {
       error();
@@ -3881,7 +3881,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     }
     
     auto info = FunctionType::ExtInfo(*representation, autoClosure, noescape,
-                                      throws);
+                                      throws, async);
 
     auto inputTy = getTypeChecked(inputID);
     if (!inputTy)
@@ -4135,14 +4135,14 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     uint8_t rawRep;
-    bool throws = false;
+    bool throws = false, async = false;
     ArrayRef<uint64_t> genericParamIDs;
 
     decls_block::GenericFunctionTypeLayout::readRecord(scratch,
                                                        inputID,
                                                        resultID,
                                                        rawRep,
-                                                       throws,
+                                                       throws, async,
                                                        genericParamIDs);
     auto rep = getActualFunctionTypeRepresentation(rawRep);
     if (!rep.hasValue()) {
@@ -4166,7 +4166,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     // Read the generic requirements.
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements, DeclTypeCursor);
-    auto info = GenericFunctionType::ExtInfo(*rep, throws);
+    auto info = GenericFunctionType::ExtInfo(*rep, throws, async);
 
     auto sig = GenericSignature::get(genericParams, requirements);
 

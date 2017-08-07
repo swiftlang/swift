@@ -1102,6 +1102,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return SolutionKind::Error;
   }
 
+  // A non-async function can be a subtype of an 'async' function.
+  if (func1->isAsync() != func2->isAsync()) {
+    // Cannot drop 'async'.
+    if (func1->isAsync()|| (func2->isAsync() && kind < ConstraintKind::Subtype))
+      return SolutionKind::Error;
+  }
+  
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
   if (func1->isNoEscape() != func2->isNoEscape() &&

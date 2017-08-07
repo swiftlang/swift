@@ -1254,7 +1254,7 @@ static void VisitNodeFunction(
 static void CreateFunctionType(ASTContext *ast,
                                const VisitNodeResult &arg_type_result,
                                const VisitNodeResult &return_type_result,
-                               bool throws,
+                               bool throws, bool isAsync,
                                VisitNodeResult &result) {
   Type arg_clang_type;
   Type return_clang_type;
@@ -1286,7 +1286,7 @@ static void CreateFunctionType(ASTContext *ast,
   if (arg_clang_type && return_clang_type) {
     result._types.push_back(
         FunctionType::get(arg_clang_type, return_clang_type,
-                          FunctionType::ExtInfo().withThrows(throws)));
+            FunctionType::ExtInfo().withThrows(throws).withAsync(isAsync)));
   }
 }
 
@@ -1296,7 +1296,7 @@ static void VisitNodeFunctionType(
   VisitNodeResult arg_type_result;
   VisitNodeResult return_type_result;
   Demangle::Node::iterator end = cur_node->end();
-  bool throws = false;
+  bool throws = false, isAsync = false;
   for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
     const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind) {
@@ -1306,6 +1306,9 @@ static void VisitNodeFunctionType(
     case Demangle::Node::Kind::ThrowsAnnotation:
       throws = true;
       break;
+    case Demangle::Node::Kind::AsyncAnnotation:
+      isAsync = true;
+      break;
     case Demangle::Node::Kind::ReturnType:
       VisitNode(ast, *pos, return_type_result);
       break;
@@ -1313,7 +1316,8 @@ static void VisitNodeFunctionType(
       break;
     }
   }
-  CreateFunctionType(ast, arg_type_result, return_type_result, throws, result);
+  CreateFunctionType(ast, arg_type_result, return_type_result, throws,
+                     isAsync, result);
 }
 
 static void VisitNodeImplFunctionType(
@@ -1322,7 +1326,7 @@ static void VisitNodeImplFunctionType(
   VisitNodeResult arg_type_result;
   VisitNodeResult return_type_result;
   Demangle::Node::iterator end = cur_node->end();
-  bool throws = false;
+  bool throws = false, isAsync = false;
   for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
     const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind) {
@@ -1335,6 +1339,9 @@ static void VisitNodeImplFunctionType(
     case Demangle::Node::Kind::ThrowsAnnotation:
       throws = true;
       break;
+    case Demangle::Node::Kind::AsyncAnnotation:
+      isAsync = true;
+      break;
     case Demangle::Node::Kind::ImplResult:
       VisitNode(ast, *pos, return_type_result);
       break;
@@ -1342,7 +1349,8 @@ static void VisitNodeImplFunctionType(
       break;
     }
   }
-  CreateFunctionType(ast, arg_type_result, return_type_result, throws, result);
+  CreateFunctionType(ast, arg_type_result, return_type_result, throws, isAsync,
+                     result);
 }
 
 

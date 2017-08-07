@@ -292,6 +292,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     auto funcNode = Dem.createNode(kind);
     if (func->throws())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (func->isAsync())
+      funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
     funcNode->addChild(args, Dem);
     funcNode->addChild(result, Dem);
     return funcNode;

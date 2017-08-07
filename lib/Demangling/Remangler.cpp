@@ -1700,7 +1700,9 @@ void Remangler::mangleCurryThunk(Node *node) {
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }
-
+void Remangler::mangleAsyncAnnotation(Node *node) {
+  Buffer << 'Y';
+}
 void Remangler::mangleEmptyList(Node *node) {
   Buffer << 'y';
 }

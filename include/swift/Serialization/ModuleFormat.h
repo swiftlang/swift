@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 355; // Last change: extension dependencies
+const uint16_t VERSION_MINOR = 356; // Last change: async
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -647,7 +647,8 @@ namespace decls_block {
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noescape?
-    BCFixed<1>   // throws?
+    BCFixed<1>,  // throws?
+    BCFixed<1>   // async?
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -709,6 +710,7 @@ namespace decls_block {
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
+    BCFixed<1>,          // async?
     BCArray<TypeIDField> // generic parameters
                          // followed by requirements
   >;

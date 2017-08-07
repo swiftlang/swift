@@ -693,10 +693,10 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     if (!throwsLoc.isValid())
       return None;
-
-    auto diag = rethrows ? diag::rethrows_in_wrong_position
-                         : diag::throws_in_wrong_position;
-    return diagnose(Tok, diag);
+    
+    if (rethrows)
+      return diagnose(Tok, diag::rethrows_in_wrong_position);
+    return diagnose(Tok, diag::throwsasync_in_wrong_position, true);
   };
 
   // If there's a trailing arrow, parse the rest as the result type.

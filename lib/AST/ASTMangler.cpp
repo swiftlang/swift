@@ -1417,6 +1417,8 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendParams(fn->getInput(), forceSingleParam);
   if (fn->throws())
     appendOperator("K");
+  if (fn->isAsync())
+    appendOperator("Y");
 }
 
 void ASTMangler::appendParams(Type ParamsTy, bool forceSingleParam) {

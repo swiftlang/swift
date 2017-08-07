@@ -425,15 +425,15 @@ class FunctionTypeRepr : public TypeRepr {
   TypeRepr *RetTy;
   SourceLoc ArrowLoc;
   SourceLoc ThrowsLoc;
-
+  SourceLoc AsyncLoc;
+  
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TypeRepr *argsTy,
-                   SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
-    : TypeRepr(TypeReprKind::Function),
-      GenericParams(genericParams),
-      GenericEnv(nullptr),
-      ArgsTy(argsTy), RetTy(retTy),
-      ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
+                   SourceLoc throwsLoc, SourceLoc asyncLoc,
+                   SourceLoc arrowLoc, TypeRepr *retTy)
+    : TypeRepr(TypeReprKind::Function), GenericParams(genericParams),
+      GenericEnv(nullptr), ArgsTy(argsTy), RetTy(retTy),
+      ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc), AsyncLoc(asyncLoc) {
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
@@ -447,10 +447,12 @@ public:
   TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool throws() const { return ThrowsLoc.isValid(); }
-
+  bool isAsync() const { return AsyncLoc.isValid(); }
+  
   SourceLoc getArrowLoc() const { return ArrowLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
-
+  SourceLoc getAsyncLoc() const { return AsyncLoc; }
+  
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Function;
   }

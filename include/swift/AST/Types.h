@@ -2386,14 +2386,15 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |representation|isAutoClosure|noEscape|throws|
-    //   |    0 .. 3    |      4      |    5   |   6  |
+    //   |representation|isAutoClosure|noEscape|throws|async|
+    //   |    0 .. 3    |      4      |    5   |   6  |  7  |
     //
     enum : uint16_t { RepresentationMask     = 0x00F };
     enum : uint16_t { AutoClosureMask        = 0x010 };
     enum : uint16_t { NoEscapeMask           = 0x020 };
     enum : uint16_t { ThrowsMask             = 0x040 };
-
+    enum : uint16_t { AsyncMask              = 0x080 };
+    
     uint16_t Bits;
 
     ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
@@ -2407,15 +2408,15 @@ public:
     }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation Rep, bool Throws) {
-      Bits = ((unsigned) Rep) | (Throws ? ThrowsMask : 0);
+    ExtInfo(Representation Rep, bool Throws, bool Async) {
+      Bits = unsigned(Rep) |
+             (Throws ? ThrowsMask : 0) | (Async ? AsyncMask : 0);
     }
 
     // Constructor with no defaults.
     ExtInfo(Representation Rep,
-            bool IsAutoClosure, bool IsNoEscape,
-            bool Throws)
-      : ExtInfo(Rep, Throws) {
+            bool IsAutoClosure, bool IsNoEscape, bool Throws, bool Async)
+      : ExtInfo(Rep, Throws, Async) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
     }
@@ -2423,6 +2424,7 @@ public:
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
+    bool isAsync() const { return Bits & AsyncMask; }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
       assert(rawRep <= unsigned(Representation::Last)
@@ -2489,7 +2491,13 @@ public:
       else
         return ExtInfo(Bits & ~ThrowsMask);
     }
-
+    ExtInfo withAsync(bool Async = true) const {
+      if (Async)
+        return ExtInfo(Bits | AsyncMask);
+      else
+        return ExtInfo(Bits & ~AsyncMask);
+    }
+    
     uint16_t getFuncAttrKey() const {
       return Bits;
     }
@@ -2573,6 +2581,11 @@ public:
   bool throws() const {
     return getExtInfo().throws();
   }
+  
+  bool isAsync() const {
+    return getExtInfo().isAsync();
+  }
+  
 
   /// Determine whether the given function input type is one of the
   /// canonical forms.

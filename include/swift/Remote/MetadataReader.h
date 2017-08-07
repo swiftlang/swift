@@ -215,17 +215,25 @@ class TypeDecoder {
         flags = flags.withConvention(FunctionMetadataConvention::Thin);
       }
 
-      bool isThrow =
-        Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;
-      flags = flags.withThrows(true);
+      unsigned nextChild = 0;
+      bool isThrow = false, isAsync = false;
+      if (Node->getChild(nextChild)->getKind() == NodeKind::ThrowsAnnotation) {
+        ++nextChild;
+        flags = flags.withThrows(true);
+      }
+      if (Node->getChild(nextChild)->getKind() == NodeKind::AsyncAnnotation) {
+        ++nextChild;
+        flags = flags.withAsync(true);
+      }
+
 
       std::vector<BuiltType> arguments;
       std::vector<bool> argsAreInOut;
-      if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
+      if (!decodeMangledFunctionInputType(Node->getChild(nextChild),
                                           arguments, argsAreInOut, flags))
         return BuiltType();
 
-      auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
+      auto result = decodeMangledType(Node->getChild(nextChild+1));
       if (!result) return BuiltType();
       return Builder.createFunctionType(arguments, argsAreInOut,
                                         result, flags);

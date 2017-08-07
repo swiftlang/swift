@@ -468,6 +468,7 @@ class TargetFunctionTypeFlags {
     ConventionMask   = 0x0F000000U,
     ConventionShift  = 24U,
     ThrowsMask       = 0x10000000U,
+    AsyncMask        = 0x20000000U,
   };
   int_type Data;
   
@@ -491,6 +492,12 @@ public:
                                              (throws ? ThrowsMask : 0));
   }
   
+  constexpr TargetFunctionTypeFlags<int_type>
+  withAsync(bool async) const {
+    return TargetFunctionTypeFlags<int_type>((Data & AsyncMask) |
+                                             (async ? AsyncMask : 0));
+  }
+  
   unsigned getNumArguments() const {
     return Data & NumArgumentsMask;
   }
@@ -501,6 +508,9 @@ public:
   
   bool throws() const {
     return bool(Data & ThrowsMask);
+  }
+  bool isAsync() const {
+    return bool(Data & AsyncMask);
   }
   
   int_type getIntValue() const {

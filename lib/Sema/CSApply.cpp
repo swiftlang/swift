@@ -6238,7 +6238,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // Coercion from one function type to another, this produces a
     // FunctionConversionExpr in its full generality.
     if (auto fromFunc = fromType->getAs<FunctionType>()) {
-      // If toType is a NoEscape or NoReturn function type and the expression is
+      // If toType is a NoEscape or Async function type and the expression is
       // a ClosureExpr, propagate these bits onto the ClosureExpr.  Do not
       // *remove* any bits that are already on the closure though.
       // Note that in this case, we do not want to propagate the 'throws' bit
@@ -6246,11 +6246,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // throwing subexpressions. We also don't want to change the convention
       // of the original closure.
       auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
-      if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
+      if ((toEI.isNoEscape() && !fromEI.isNoEscape()) ||
+          (toEI.isAsync() && !fromEI.isAsync())) {
         swift::AnyFunctionType::ExtInfo newEI(fromEI.getRepresentation(),
-                                        toEI.isAutoClosure(),
+                                              toEI.isAutoClosure(),
                                         toEI.isNoEscape() | fromEI.isNoEscape(),
-                                        toEI.throws() & fromEI.throws());
+                                              toEI.throws() & fromEI.throws(),
+                                            toEI.isAsync()| fromEI.isAsync());
         auto newToType = FunctionType::get(fromFunc->getInput(),
                                            fromFunc->getResult(), newEI);
         if (applyTypeToClosureExpr(cs, expr, newToType)) {

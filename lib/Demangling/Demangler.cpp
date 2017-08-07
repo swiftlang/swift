@@ -395,6 +395,7 @@ NodePointer Demangler::demangleOperator() {
     case 'V': return demangleAnyGenericType(Node::Kind::Structure);
     case 'W': return demangleWitness();
     case 'X': return demangleSpecialType();
+    case 'Y': return createNode(Node::Kind::AsyncAnnotation);
     case 'Z': return createWithChild(Node::Kind::Static, popNode(isEntity));
     case 'a': return demangleAnyGenericType(Node::Kind::TypeAlias);
     case 'c': return popFunctionType(Node::Kind::FunctionType);
@@ -819,6 +820,7 @@ NodePointer Demangler::demanglePlainFunction() {
 NodePointer Demangler::popFunctionType(Node::Kind kind) {
   NodePointer FuncType = createNode(kind);
   addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
+  addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));

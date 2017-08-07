@@ -181,6 +181,8 @@ STMT_KEYWORD(catch)
 
 // Expression keywords.
 EXPR_KEYWORD(as)
+EXPR_KEYWORD(async)
+EXPR_KEYWORD(await)
 EXPR_KEYWORD(Any)
 EXPR_KEYWORD(false)
 EXPR_KEYWORD(is)

@@ -282,7 +282,7 @@ public:
     }
 
     auto einfo = AnyFunctionType::ExtInfo(representation,
-                                          /*throws*/ flags.throws());
+                                          flags.throws(), flags.isAsync());
 
     // The result type must be materializable.
     if (!output->isMaterializable()) return Type();

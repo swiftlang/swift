@@ -48,8 +48,7 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
         auto *newTR =
           new (Context) FunctionTypeRepr(fnTR->getGenericParams(),
               newArgsTR,
-              fnTR->getThrowsLoc(),
-              fnTR->getArrowLoc(),
+              fnTR->getThrowsLoc(), fnTR->getAsyncLoc(), fnTR->getArrowLoc(),
               fnTR->getResultTypeRepr());
         newTR->setGenericEnvironment(fnTR->getGenericEnvironment());
         return newTR;
@@ -376,8 +375,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition '->' type
-///     type-composition 'throws' '->' type
+///     type-composition ('throws' 'async')* '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
@@ -413,12 +411,20 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     return nullptr;
   auto tyR = ty.get();
 
-  // Parse a throws specifier.
-  // Don't consume 'throws', if the next token is not '->', so we can emit a
-  // more useful diagnostic when parsing a function decl.
-  SourceLoc throwsLoc;
-  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw) &&
-      peekToken().is(tok::arrow)) {
+  // Parse any throws/async specifiers.
+  // Don't consume 'throws' or 'async', if the next token is not '->', so we can
+  // emit a more useful diagnostic when parsing a function decl.
+  SourceLoc throwsLoc, asyncLoc;
+  while (Tok.isAny(tok::kw_throws, tok::kw_rethrows,
+                   tok::kw_throw, tok::kw_async) &&
+         peekToken().isAny(tok::arrow, tok::kw_throws, tok::kw_async)) {
+    if (Tok.is(tok::kw_async)) {
+      if (asyncLoc.isValid())
+        diagnose(Tok, diag::func_type_specifier_redundant);
+      asyncLoc = consumeToken(tok::kw_async);
+      continue;
+    }
+        
     if (Tok.isNot(tok::kw_throws)) {
       // 'rethrows' is only allowed on function declarations for now.
       // 'throw' is probably a typo for 'throws'.
@@ -426,7 +432,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         diag::rethrowing_function_type : diag::throw_in_function_type;
       diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
-    }
+    } else if (throwsLoc.isValid())
+      diagnose(Tok, diag::func_type_specifier_redundant);
+    
     throwsLoc = consumeToken();
   }
 
@@ -439,8 +447,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       return makeParserCodeCompletionResult<TypeRepr>();
     if (SecondHalf.isNull())
       return nullptr;
-    tyR = new (Context) FunctionTypeRepr(generics, tyR, throwsLoc, arrowLoc,
-                                         SecondHalf.get());
+    tyR = new (Context) FunctionTypeRepr(generics, tyR, throwsLoc, asyncLoc,
+                                         arrowLoc, SecondHalf.get());
   } else if (generics) {
     // Only function types may be generic.
     auto brackets = generics->getSourceRange();

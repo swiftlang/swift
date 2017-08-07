@@ -3431,7 +3431,7 @@ void Serializer::writeType(Type ty) {
            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
            fnTy->isAutoClosure(),
            fnTy->isNoEscape(),
-           fnTy->throws());
+           fnTy->throws(), fnTy->isAsync());
     break;
   }
 
@@ -3445,7 +3445,7 @@ void Serializer::writeType(Type ty) {
             addTypeRef(fnTy->getInput()),
             addTypeRef(fnTy->getResult()),
             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-            fnTy->throws(),
+            fnTy->throws(), fnTy->isAsync(),
             genericParams);
 
     // Write requirements.

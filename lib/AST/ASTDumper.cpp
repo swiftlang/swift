@@ -2341,7 +2341,8 @@ public:
     printExplicitCastExpr(E, "coerce_expr");
   }
   void visitArrowExpr(ArrowExpr *E) {
-    printCommon(E, "arrow") << '\n';
+    printCommon(E, "arrow throws=") << E->getThrowsLoc().isValid()
+       << " async=" << E->getAsyncLoc().isValid() << '\n';
     printRec(E->getArgsExpr());
     OS << '\n';
     printRec(E->getResultExpr());
@@ -2618,9 +2619,9 @@ public:
 
   void visitFunctionTypeRepr(FunctionTypeRepr *T) {
     printCommon("type_function");
+    if (T->throws()) OS << " throws";
+    if (T->isAsync()) OS << " async";
     OS << '\n'; printRec(T->getArgsTypeRepr());
-    if (T->throws())
-      OS << " throws ";
     OS << '\n'; printRec(T->getResultTypeRepr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -3135,7 +3136,8 @@ namespace {
       printFlag(T->isAutoClosure(), "autoclosure");
       printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->throws(), "throws");
-
+      printFlag(T->isAsync(), "async");
+      
       printRec("input", T->getInput());
       printRec("output", T->getResult());
     }

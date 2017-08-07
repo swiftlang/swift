@@ -688,6 +688,10 @@ void Remangler::mangleThrowsAnnotation(Node *node) {
   Out << "z";
 }
 
+void Remangler::mangleAsyncAnnotation(Node *node) {
+  Out << "Z";
+}
+
 void Remangler::mangleFieldOffset(Node *node) {
   Out << "Wv";
   mangleChildNodes(node); // directness, entity

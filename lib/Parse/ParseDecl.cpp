@@ -1571,7 +1571,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       // If we found '->', or 'throws' after paren, it's likely a parameter
       // of function type.
       if (Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows,
-                    tok::kw_throw))
+                    tok::kw_throw, tok::kw_async))
         backtrackToPosition(LParenPosition);
     }
     return true;

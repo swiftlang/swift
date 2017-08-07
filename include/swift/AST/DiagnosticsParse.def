@@ -693,8 +693,10 @@ ERROR(generic_non_function,PointsToFirstBadToken,
 ERROR(rethrowing_function_type,none,
       "only function declarations may be marked 'rethrows'; "
       "did you mean 'throws'?", ())
-ERROR(throws_in_wrong_position,none,
-      "'throws' may only occur before '->'", ())
+ERROR(func_type_specifier_redundant,none,
+      "redundant function type specifier", ())
+ERROR(throwsasync_in_wrong_position,none,
+      "'%select{async|throws}0' may only occur before '->'", (bool))
 ERROR(rethrows_in_wrong_position,none,
       "'rethrows' may only occur before '->'", ())
 ERROR(throw_in_function_type,none,

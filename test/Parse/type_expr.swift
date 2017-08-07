@@ -254,6 +254,9 @@ func testFunctionCollectionTypes() {
   _ = ((inout Int) -> Void).self
 
   _ = [(Int) throws -> Int]()
+  _ = [(Int) async -> Int]()
+  _ = [(Int) async throws -> Int]()
+  _ = [(Int) throws async -> Int]()
   _ = [@convention(swift) (Int) throws -> Int]().count
   _ = [(inout Int) throws -> (inout () -> Void) -> Void]().count
   _ = [String: (@autoclosure (Int) -> Int32) -> Void]().keys // expected-error {{argument type of @autoclosure parameter must be '()'}}

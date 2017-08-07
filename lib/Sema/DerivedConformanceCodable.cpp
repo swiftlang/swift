@@ -739,7 +739,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
 
   // throws
   auto extInfo = FunctionType::ExtInfo(FunctionTypeRepresentation::Swift,
-                                       /*Throws=*/true);
+                                       /*Throws=*/true, /*async*/ false);
   // ()
   auto returnType = TupleType::getEmpty(C);
 
@@ -1075,7 +1075,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
 
   // throws
   auto extInfo = FunctionType::ExtInfo(FunctionTypeRepresentation::Swift,
-                                       /*Throws=*/true);
+                                       /*Throws=*/true, /*async*/ false);
 
   // (Self)
   auto returnType = target->getDeclaredInterfaceType();

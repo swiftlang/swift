@@ -316,12 +316,13 @@ Types
   FUNCTION-KIND ::= 'B'                      // objc block function type
   FUNCTION-KIND ::= 'C'                      // C function pointer type
 
-  function-signature ::= params-type params-type throws? // results and parameters
+  function-signature ::= params-type params-type throws? async? // results and parameters
 
   params-type := type                        // tuple in case of multiple parameters
   params-type := empty-list                  // shortcut for no parameters
 
   throws ::= 'K'                             // 'throws' annotation on function types
+  async ::= 'Y'                              // 'async' annotation on function types
 
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list

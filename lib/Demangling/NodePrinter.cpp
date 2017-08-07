@@ -405,6 +405,7 @@ private:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
     case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ThrowsAnnotation:
+      case Node::Kind::AsyncAnnotation:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
     case Node::Kind::VariadicMarker:
@@ -525,17 +526,24 @@ private:
   }
 
   void printFunctionType(NodePointer node) {
-    assert(node->getNumChildren() == 2 || node->getNumChildren() == 3);
+    assert(node->getNumChildren() >= 2 && node->getNumChildren() <= 4);
     unsigned startIndex = 0;
-    bool throws = false;
-    if (node->getNumChildren() == 3) {
-      assert(node->getChild(0)->getKind() == Node::Kind::ThrowsAnnotation);
+    bool throws = false, async = false;
+    
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
       startIndex++;
       throws = true;
     }
+
+    if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
+      startIndex++;
+      async = true;
+    }
+  
     if (Options.ShowFunctionArgumentTypes) {
       print(node->getChild(startIndex));
       if (throws) Printer << " throws";
+      if (async) Printer << " async";
       print(node->getChild(startIndex+1));
       return;
     }
@@ -1682,6 +1690,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
   case Node::Kind::ThrowsAnnotation:
     Printer<< " throws ";
+    return nullptr;
+  case Node::Kind::AsyncAnnotation:
+    Printer<< " async ";
     return nullptr;
   case Node::Kind::EmptyList:
     Printer << " empty-list ";

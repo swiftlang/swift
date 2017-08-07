@@ -178,20 +178,20 @@ public extension DispatchQueue {
 	}
 
 	@available(OSX 10.10, iOS 8.0, *)
-	public func async(execute workItem: DispatchWorkItem) {
+	public func `async`(execute workItem: DispatchWorkItem) {
 		// _swift_dispatch_async preserves the @convention(block)
 		// for work item blocks.
 		_swift_dispatch_async(self, workItem._block)
 	}
 
 	@available(OSX 10.10, iOS 8.0, *)
-	public func async(group: DispatchGroup, execute workItem: DispatchWorkItem) {
+	public func `async`(group: DispatchGroup, execute workItem: DispatchWorkItem) {
 		// _swift_dispatch_group_async preserves the @convention(block)
 		// for work item blocks.
 		_swift_dispatch_group_async(group, self, workItem._block)
 	}
 
-	public func async(
+	public func `async`(
 		group: DispatchGroup? = nil,
 		qos: DispatchQoS = .unspecified,
 		flags: DispatchWorkItemFlags = [],

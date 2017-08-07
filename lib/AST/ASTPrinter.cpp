@@ -3614,6 +3614,9 @@ public:
     if (T->throws())
       Printer << " " << tok::kw_throws;
 
+    if (T->isAsync())
+      Printer << " " << tok::kw_async;
+
     Printer << " -> ";
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);

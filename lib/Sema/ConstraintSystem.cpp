@@ -1417,7 +1417,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*autoclosure*/ false,
                               /*noescape*/ true,
-                              /*throws*/ true));
+                              /*throws*/ true,
+                              /*async*/ false));
     TupleTypeElt argTupleElts[] = {
       TupleTypeElt(noescapeClosure),
       TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
@@ -1428,7 +1429,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*autoclosure*/ false,
                             /*noescape*/ false,
-                            /*throws*/ true));
+                            /*throws*/ true,
+                            /*async*/ false));
     openedFullType = refType;
     return true;
   }
@@ -1452,7 +1454,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*autoclosure*/ false,
                               /*noescape*/ true,
-                              /*throws*/ true));
+                              /*throws*/ true,
+                              /*async*/ false));
     TupleTypeElt argTupleElts[] = {
       TupleTypeElt(existentialTy),
       TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
@@ -1462,7 +1465,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*autoclosure*/ false,
                             /*noescape*/ false,
-                            /*throws*/ true));
+                            /*throws*/ true,
+                            /*async*/ false));
     openedFullType = refType;
     return true;
   }

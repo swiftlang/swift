@@ -2023,7 +2023,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     FunctionType::ExtInfo extInfo(rep,
                                   attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
-                                  fnRepr->throws());
+                                  fnRepr->throws(), fnRepr->isAsync());
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
     if (!ty || ty->hasError()) return ty;
@@ -2169,7 +2169,8 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   if (!outputTy || outputTy->hasError()) return outputTy;
 
   extInfo = extInfo.withThrows(repr->throws());
-
+  extInfo = extInfo.withAsync(repr->isAsync());
+  
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
   if (!isa<TupleTypeRepr>(repr->getArgsTypeRepr()) &&

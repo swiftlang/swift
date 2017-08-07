@@ -115,23 +115,36 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// parseExprArrow
 ///
 ///   expr-arrow:
-///     '->'
-///     'throws' '->'
+///     ('throws'|'async')* '->'
 ParserResult<Expr> Parser::parseExprArrow() {
-  SourceLoc throwsLoc, arrowLoc;
-  if (Tok.is(tok::kw_throws)) {
-    throwsLoc = consumeToken(tok::kw_throws);
-    if (!Tok.is(tok::arrow)) {
-      diagnose(throwsLoc, diag::throws_in_wrong_position);
+  SourceLoc throwsLoc, asyncLoc, arrowLoc;
+  SourceLoc startLoc = Tok.getLoc();
+  while (Tok.isNot(tok::arrow)) {
+    if (Tok.is(tok::kw_throws)) {
+      if (throwsLoc.isValid())
+        diagnose(Tok, diag::func_type_specifier_redundant);
+      throwsLoc = consumeToken(tok::kw_throws);
+    } else if (Tok.is(tok::kw_async)) {
+      if (asyncLoc.isValid())
+        diagnose(Tok, diag::func_type_specifier_redundant);
+      asyncLoc = consumeToken(tok::kw_async);
+    }
+    
+    if (Tok.isNot(tok::arrow, tok::kw_throws, tok::kw_async)) {
+      diagnose(startLoc, diag::throwsasync_in_wrong_position,
+               throwsLoc.isValid());
       return nullptr;
     }
   }
   arrowLoc = consumeToken(tok::arrow);
-  if (Tok.is(tok::kw_throws)) {
-    diagnose(Tok.getLoc(), diag::throws_in_wrong_position);
-    throwsLoc = consumeToken(tok::kw_throws);
+  if (Tok.isAny(tok::kw_throws, tok::kw_async)) {
+    diagnose(Tok, diag::throwsasync_in_wrong_position, Tok.is(tok::kw_throws));
+    while (Tok.isAny(tok::kw_throws, tok::kw_async)) {
+      consumeIf(tok::kw_throws, throwsLoc);
+      consumeIf(tok::kw_async, asyncLoc);
+    }
   }
-  auto arrow = new (Context) ArrowExpr(throwsLoc, arrowLoc);
+  auto arrow = new (Context) ArrowExpr(throwsLoc, asyncLoc, arrowLoc);
   return makeParserResult(arrow);
 }
 
@@ -309,7 +322,8 @@ parse_operator:
     }
 
     case tok::arrow:
-    case tok::kw_throws: {
+    case tok::kw_throws:
+    case tok::kw_async: {
       ParserResult<Expr> arrow = parseExprArrow();
       if (arrow.isNull() || arrow.hasCodeCompletion())
         return arrow;

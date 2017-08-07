@@ -1078,7 +1078,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
   auto Thin = FunctionType::ExtInfo(FunctionTypeRepresentation::Thin,
-                                    /*throws*/ false);
+                                    /*throws*/false, /*async*/false);
   if (withContext) {
     auto ContextTy = Context.TheRawPointerType;
     auto ContextArg = ParenType::get(Context, ContextTy);

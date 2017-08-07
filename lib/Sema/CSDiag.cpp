@@ -2939,8 +2939,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
         toType = FunctionType::get(destFT->getInput(),
                                            destFT->getResult(), destExtInfo);
 
-      // If this is a function conversion that discards throwability or
-      // noescape, emit a specific diagnostic about that.
+      // If this is a function conversion that discards throwability,
+      // noescape, or async emit a specific diagnostic about that.
       if (srcFT->throws() && !destFT->throws()) {
         diagnose(expr->getLoc(), diag::throws_functiontype_mismatch,
                  fromType, toType)
@@ -2952,6 +2952,13 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
         diagnose(expr->getLoc(), diag::noescape_functiontype_mismatch,
                  fromType, toType)
         .highlight(expr->getSourceRange());
+        return true;
+      }
+      
+      if (srcFT->isAsync() && !destFT->isAsync()) {
+        diagnose(expr->getLoc(), diag::async_functiontype_removal,
+                 fromType, toType)
+          .highlight(expr->getSourceRange());
         return true;
       }
     }
@@ -4245,12 +4252,14 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
         contextualType = FunctionType::get(destFT->getInput(),
                                            destFT->getResult(), destExtInfo);
 
-      // If this is a function conversion that discards throwability or
-      // noescape, emit a specific diagnostic about that.
+      // If this is a function conversion that discards throwability, noescape,
+      // or async, emit a specific diagnostic about that.
       if (srcFT->throws() && !destFT->throws())
         diagID = diag::throws_functiontype_mismatch;
       else if (srcFT->isNoEscape() && !destFT->isNoEscape())
         diagID = diag::noescape_functiontype_mismatch;
+      else if (srcFT->isAsync() && !destFT->isAsync())
+        diagID = diag::async_functiontype_removal;
     }
 
   InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID,

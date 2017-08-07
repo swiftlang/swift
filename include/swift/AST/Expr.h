@@ -4274,22 +4274,26 @@ public:
 };
 
 /// \brief Represents two expressions joined by the arrow operator '->', which
-/// may be preceded by the 'throws' keyword. Currently this only exists to be
+/// may be followed by the 'throws' keyword. Currently this only exists to be
 /// transformed into a FunctionTypeRepr by simplifyTypeExpr() in Sema.
 class ArrowExpr : public Expr {
   SourceLoc ThrowsLoc;
+  SourceLoc AsyncLoc;
   SourceLoc ArrowLoc;
   Expr *Args;
   Expr *Result;
 public:
-  ArrowExpr(Expr *Args, SourceLoc ThrowsLoc, SourceLoc ArrowLoc, Expr *Result)
+  ArrowExpr(Expr *Args, SourceLoc ThrowsLoc, SourceLoc AsyncLoc,
+            SourceLoc ArrowLoc, Expr *Result)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args), Result(Result)
+      ThrowsLoc(ThrowsLoc), AsyncLoc(AsyncLoc), ArrowLoc(ArrowLoc), Args(Args),
+      Result(Result)
   { }
 
-  ArrowExpr(SourceLoc ThrowsLoc, SourceLoc ArrowLoc)
+  ArrowExpr(SourceLoc ThrowsLoc, SourceLoc AsyncLoc, SourceLoc ArrowLoc)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(nullptr), Result(nullptr)
+      ThrowsLoc(ThrowsLoc), AsyncLoc(AsyncLoc), ArrowLoc(ArrowLoc),
+      Args(nullptr), Result(nullptr)
   { }
 
   Expr *getArgsExpr() const { return Args; }
@@ -4297,13 +4301,16 @@ public:
   Expr *getResultExpr() const { return Result; }
   void setResultExpr(Expr *E) { Result = E; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+  SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getArrowLoc() const { return ArrowLoc; }
   bool isFolded() const { return Args != nullptr && Result != nullptr; }
 
   SourceLoc getSourceLoc() const { return ArrowLoc; }
   SourceLoc getStartLoc() const {
-    return isFolded() ? Args->getStartLoc() :
-           ThrowsLoc.isValid() ? ThrowsLoc : ArrowLoc;
+    if (isFolded()) return Args->getStartLoc();
+    return ThrowsLoc.isValid() ? ThrowsLoc :
+           AsyncLoc.isValid() ? AsyncLoc :
+           ArrowLoc;
   }
   SourceLoc getEndLoc() const {
     return isFolded() ? Result->getEndLoc() : ArrowLoc;
