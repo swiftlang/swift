@@ -1802,8 +1802,8 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   auto *Caller = ReInfo.getApply() ? ReInfo.getApply().getFunction() : nullptr;
   SubstitutionList Subs = Caller ? ReInfo.getApply().getSubstitutions()
                                  : ReInfo.getClonerParamSubstitutions();
-  SpecializedF->setSpecializationInfo(GenericSpecializationInformation::create(
-      M.getASTContext(), Caller, GenericFunc, Subs));
+  SpecializedF->setSpecializationInfo(
+      GenericSpecializationInformation::create(Caller, GenericFunc, Subs));
   return SpecializedF;
 }
 

@@ -1000,8 +1000,7 @@ class GenericSpecializationInformation {
                                    SubstitutionList Subs);
 
 public:
-  static const GenericSpecializationInformation *create(ASTContext &Ctx,
-                                                        SILFunction *Caller,
+  static const GenericSpecializationInformation *create(SILFunction *Caller,
                                                         SILFunction *Parent,
                                                         SubstitutionList Subs);
   static const GenericSpecializationInformation *create(SILInstruction *Inst,

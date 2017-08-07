@@ -2240,12 +2240,13 @@ GenericSpecializationInformation::GenericSpecializationInformation(
 }
 
 const GenericSpecializationInformation *
-GenericSpecializationInformation::create(ASTContext &Ctx, SILFunction *Caller,
+GenericSpecializationInformation::create(SILFunction *Caller,
                                          SILFunction *Parent,
                                          SubstitutionList Subs) {
-  void *Buf = Ctx.Allocate(sizeof(GenericSpecializationInformation),
+  auto &M = Parent->getModule();
+  void *Buf = M.allocate(sizeof(GenericSpecializationInformation),
                            alignof(GenericSpecializationInformation));
-  auto NewSubs = Ctx.AllocateCopy(Subs);
+  auto NewSubs = M.allocateCopy(Subs);
   return new (Buf) GenericSpecializationInformation(Caller, Parent, NewSubs);
 }
 
