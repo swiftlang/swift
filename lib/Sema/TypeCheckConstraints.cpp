@@ -1100,34 +1100,32 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   }
 
   // Fold 'T.U' into a nested type.
-  //
-  // FIXME: Also support this if 'T' is a generic parameter.
   if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
-    // The last component should be bound already.
-    if (auto *D = ITR->getComponentRange().back()->getBoundDecl()) {
-      auto BaseTy = D->getDeclaredInterfaceType();
-      // The last component should be a module, nominal type, or a typealias
-      // whose underlying type is a nominal type, otherwise we cannot perform
-      // a type member lookup, which will be diagnosed later.
-      if (BaseTy->getAnyNominal() ||
-          BaseTy->is<ModuleType>()) {
-        auto lookupOptions = defaultMemberLookupOptions;
-        if (isa<AbstractFunctionDecl>(DC) ||
-            isa<AbstractClosureExpr>(DC))
-          lookupOptions |= NameLookupFlags::KnownPrivate;
+    // Resolve the TypeRepr to get the base type for the lookup.
+    // Disable availability diagnostics here, because the final
+    // TypeRepr will be resolved again when generating constraints.
+    TypeResolutionOptions options = TR_AllowUnboundGenerics;
+    options |= TR_InExpression;
+    options |= TR_AllowUnavailable;
+    auto BaseTy = TC.resolveType(InnerTypeRepr, DC, options);
 
-        // See if there is a member type with this name.
-        auto Result = TC.lookupMemberType(DC,
-                                          BaseTy,
-                                          Name,
-                                          lookupOptions);
+    if (BaseTy && BaseTy->mayHaveMembers()) {
+      auto lookupOptions = defaultMemberLookupOptions;
+      if (isa<AbstractFunctionDecl>(DC) ||
+          isa<AbstractClosureExpr>(DC))
+        lookupOptions |= NameLookupFlags::KnownPrivate;
 
-        // If there is no nested type with this name, we have a lookup of
-        // a non-type member, so leave the expression as-is.
-        if (Result.size() == 1) {
-          return TypeExpr::createForMemberDecl(ITR, NameLoc,
-                                               Result.front().first);
-        }
+      // See if there is a member type with this name.
+      auto Result = TC.lookupMemberType(DC,
+                                        BaseTy,
+                                        Name,
+                                        lookupOptions);
+
+      // If there is no nested type with this name, we have a lookup of
+      // a non-type member, so leave the expression as-is.
+      if (Result.size() == 1) {
+        return TypeExpr::createForMemberDecl(ITR, NameLoc,
+                                             Result.front().first);
       }
     }
   }
