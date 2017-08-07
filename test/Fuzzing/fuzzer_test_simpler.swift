@@ -2,7 +2,11 @@
 // RUN: not %t -only_ascii=1 -max_len=3 | %FileCheck %s
 // CHECK: Crash!
 
-import Foundation
+#if os(OSX) || os(iOS)
+import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
+import Glibc
+#endif
 
 @_cdecl("LLVMFuzzerTestOneInput") public func fuzzOneInput(Data: UnsafePointer<CChar>, Size: CLong) -> CInt {
   if (Size >= 3) {
