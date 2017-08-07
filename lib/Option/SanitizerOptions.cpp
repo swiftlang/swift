@@ -127,7 +127,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
 
   // Find the sanitizer kind.
   for (int i = 0, n = A->getNumValues(); i != n; ++i) {
-    std::string opt = A->getValue(i);
+    StringRef opt = A->getValue(i);
     if (opt == "address") {
       sanitizerSet |= SanitizerKind::Address;
     } else if (opt == "thread") {
