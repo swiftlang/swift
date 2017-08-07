@@ -208,6 +208,7 @@ internal struct _SliceBuffer<Element>
   }
 
   @_versioned
+  @inline(__always)
   @discardableResult
   internal func _copyContents(
     subRange bounds: Range<Int>,
