@@ -37,8 +37,6 @@ static StringRef toStringRef(const SanitizerKind kind) {
     return "thread";
   case SanitizerKind::Fuzzer:
     return "fuzzer";
-  case SanitizerKind::None:
-    llvm_unreachable("Unsupported sanitizer");
   }
   llvm_unreachable("Unsupported sanitizer");
 }
