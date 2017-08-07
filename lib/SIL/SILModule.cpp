@@ -557,8 +557,9 @@ void SILModule::removeFromZombieList(StringRef Name) {
 void SILModule::eraseFunction(SILFunction *F) {
 
   assert(! F->isZombie() && "zombie function is in list of alive functions");
-  if (F->isInlined() || F->isExternallyUsedSymbol()) {
-    
+  if (F->isInlined() || F->isExternallyUsedSymbol() ||
+      F->isReferencedByMetainformation()) {
+
     // The owner of the function's Name is the FunctionTable key. As we remove
     // the function from the table we have to store the name string elsewhere:
     // in zombieFunctionNames.
