@@ -97,13 +97,19 @@ TBD
 
 TBD
 
-#### `@_inline(__always)` and `@inline(never)`
+#### `@inline(__always)` and `@inline(never)`
 
 TBD
 
-#### `@semantics(...)`
+#### `@_semantics(...)`
 
 TBD
+
+#### `@_transparent`
+
+Should only be used if necessary. This has the effect of forcing inlining to occur before any dataflow analysis take place. Unless you specifically need this behavior, use `@_inline(__always)` or some other mechanism. Its primary purpose is to force the compiler's static checks to peer into the body for diagnostic purposes.
+
+Use of this attribute imposes limitations on what can be in the body. For more details, refer to the [documentation](https://github.com/apple/swift/blob/master/docs/TransparentAttr.rst).
 
 ### Versioning and Compatibility
 
