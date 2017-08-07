@@ -141,7 +141,6 @@ set(SWIFTLIB_ESSENTIAL
   UnavailableStringAPIs.swift.gyb
   UnicodeEncoding.swift
   UnicodeParser.swift
-  UnicodeTrie.swift.gyb
   Unmanaged.swift
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
