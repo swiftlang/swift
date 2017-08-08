@@ -3,6 +3,8 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: executable_test
 // XFAIL: OS=ios
+// XFAIL: OS=tvos
+// XFAIL: OS=watchos
 // CHECK: Crash!
 
 #if os(OSX) || os(iOS)

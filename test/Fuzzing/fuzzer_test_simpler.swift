@@ -4,6 +4,8 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: executable_test
 // XFAIL: OS=ios
+// XFAIL: OS=tvos
+// XFAIL: OS=watchos
 
 #if os(OSX) || os(iOS)
 import Darwin
