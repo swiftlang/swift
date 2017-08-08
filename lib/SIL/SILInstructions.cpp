@@ -400,18 +400,19 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy, SILType Result,
                      SubstitutionList Subs,
                      ArrayRef<SILValue> Args, ArrayRef<SILValue> TypeDependentOperands,
-                     bool isNonThrowing)
+                     bool isNonThrowing,
+                     const GenericSpecializationInformation *SpecializationInfo)
     : ApplyInstBase(ValueKind::ApplyInst, Loc, Callee, SubstCalleeTy, Subs,
-                    Args, TypeDependentOperands, Result) {
+                    Args, TypeDependentOperands, SpecializationInfo, Result) {
   setNonThrowing(isNonThrowing);
 }
 
-ApplyInst *ApplyInst::create(SILDebugLocation Loc, SILValue Callee,
-                             SubstitutionList Subs, ArrayRef<SILValue> Args,
-                             bool isNonThrowing,
-                             Optional<SILModuleConventions> ModuleConventions,
-                             SILFunction &F,
-                             SILOpenedArchetypesState &OpenedArchetypes) {
+ApplyInst *
+ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionList Subs,
+                  ArrayRef<SILValue> Args, bool isNonThrowing,
+                  Optional<SILModuleConventions> ModuleConventions,
+                  SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+                  const GenericSpecializationInformation *SpecializationInfo) {
   SILType SubstCalleeSILTy =
       Callee->getType().substGenericArgs(F.getModule(), Subs);
   auto SubstCalleeTy = SubstCalleeSILTy.getAs<SILFunctionType>();
@@ -427,7 +428,8 @@ ApplyInst *ApplyInst::create(SILDebugLocation Loc, SILValue Callee,
   void *Buffer = allocate(F, Subs, TypeDependentOperands, Args);
   return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeSILTy,
                                  Result, Subs, Args,
-                                 TypeDependentOperands, isNonThrowing);
+                                 TypeDependentOperands, isNonThrowing,
+                                 SpecializationInfo);
 }
 
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
@@ -441,24 +443,24 @@ void *swift::allocateApplyInst(SILFunction &F, size_t size, size_t alignment) {
   return F.getModule().allocateInst(size, alignment);
 }
 
-PartialApplyInst::PartialApplyInst(SILDebugLocation Loc, SILValue Callee,
-                                   SILType SubstCalleeTy,
-                                   SubstitutionList Subs,
-                                   ArrayRef<SILValue> Args,
-                                   ArrayRef<SILValue> TypeDependentOperands,
-                                   SILType ClosureType)
+PartialApplyInst::PartialApplyInst(
+    SILDebugLocation Loc, SILValue Callee, SILType SubstCalleeTy,
+    SubstitutionList Subs, ArrayRef<SILValue> Args,
+    ArrayRef<SILValue> TypeDependentOperands, SILType ClosureType,
+    const GenericSpecializationInformation *SpecializationInfo)
     // FIXME: the callee should have a lowered SIL function type, and
     // PartialApplyInst
     // should derive the type of its result by partially applying the callee's
     // type.
     : ApplyInstBase(ValueKind::PartialApplyInst, Loc, Callee, SubstCalleeTy,
-                    Subs, Args, TypeDependentOperands, ClosureType) {}
+                    Subs, Args, TypeDependentOperands, SpecializationInfo,
+                    ClosureType) {}
 
-PartialApplyInst *
-PartialApplyInst::create(SILDebugLocation Loc, SILValue Callee,
-                         ArrayRef<SILValue> Args, SubstitutionList Subs,
-                         ParameterConvention CalleeConvention, SILFunction &F,
-                         SILOpenedArchetypesState &OpenedArchetypes) {
+PartialApplyInst *PartialApplyInst::create(
+    SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
+    SubstitutionList Subs, ParameterConvention CalleeConvention, SILFunction &F,
+    SILOpenedArchetypesState &OpenedArchetypes,
+    const GenericSpecializationInformation *SpecializationInfo) {
   SILType SubstCalleeTy =
       Callee->getType().substGenericArgs(F.getModule(), Subs);
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
@@ -470,7 +472,8 @@ PartialApplyInst::create(SILDebugLocation Loc, SILValue Callee,
   void *Buffer = allocate(F, Subs, TypeDependentOperands, Args);
   return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
                                         Subs, Args,
-                                        TypeDependentOperands, ClosureType);
+                                        TypeDependentOperands, ClosureType,
+                                        SpecializationInfo);
 }
 
 TryApplyInstBase::TryApplyInstBase(ValueKind valueKind, SILDebugLocation Loc,
@@ -478,20 +481,21 @@ TryApplyInstBase::TryApplyInstBase(ValueKind valueKind, SILDebugLocation Loc,
                                    SILBasicBlock *errorBB)
     : TermInst(valueKind, Loc), DestBBs{{this, normalBB}, {this, errorBB}} {}
 
-TryApplyInst::TryApplyInst(SILDebugLocation Loc, SILValue callee,
-                           SILType substCalleeTy, SubstitutionList subs,
-                           ArrayRef<SILValue> args,
-                           ArrayRef<SILValue> TypeDependentOperands,
-                           SILBasicBlock *normalBB, SILBasicBlock *errorBB)
+TryApplyInst::TryApplyInst(
+    SILDebugLocation Loc, SILValue callee, SILType substCalleeTy,
+    SubstitutionList subs, ArrayRef<SILValue> args,
+    ArrayRef<SILValue> TypeDependentOperands, SILBasicBlock *normalBB,
+    SILBasicBlock *errorBB,
+    const GenericSpecializationInformation *SpecializationInfo)
     : ApplyInstBase(ValueKind::TryApplyInst, Loc, callee, substCalleeTy, subs,
-                    args, TypeDependentOperands, normalBB, errorBB) {}
+                    args, TypeDependentOperands, SpecializationInfo, normalBB,
+                    errorBB) {}
 
-TryApplyInst *TryApplyInst::create(SILDebugLocation Loc, SILValue callee,
-                                   SubstitutionList subs,
-                                   ArrayRef<SILValue> args,
-                                   SILBasicBlock *normalBB,
-                                   SILBasicBlock *errorBB, SILFunction &F,
-                                   SILOpenedArchetypesState &OpenedArchetypes) {
+TryApplyInst *TryApplyInst::create(
+    SILDebugLocation Loc, SILValue callee, SubstitutionList subs,
+    ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+    const GenericSpecializationInformation *SpecializationInfo) {
   SILType substCalleeTy =
       callee->getType().substGenericArgs(F.getModule(), subs);
 
@@ -501,7 +505,7 @@ TryApplyInst *TryApplyInst::create(SILDebugLocation Loc, SILValue callee,
   void *buffer = allocate(F, subs, TypeDependentOperands, args);
   return ::new (buffer) TryApplyInst(Loc, callee, substCalleeTy, subs, args,
                                      TypeDependentOperands,
-                                     normalBB, errorBB);
+                                     normalBB, errorBB, SpecializationInfo);
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
@@ -2223,4 +2227,53 @@ void KeyPathInst::dropReferencedPattern() {
     component.decrementRefCounts();
   }
   Pattern = nullptr;
+}
+
+GenericSpecializationInformation::GenericSpecializationInformation(
+    SILFunction *Caller, SILFunction *Parent, SubstitutionList Subs)
+    : Caller(Caller), Parent(Parent), Subs(Subs) {
+  // Specialization information may reference these functions, even
+  // if they are removed by means of e.g. dead function elimination.
+  if (Caller)
+    Caller->setReferencedByMetainformation();
+  Parent->setReferencedByMetainformation();
+}
+
+const GenericSpecializationInformation *
+GenericSpecializationInformation::create(SILFunction *Caller,
+                                         SILFunction *Parent,
+                                         SubstitutionList Subs) {
+  auto &M = Parent->getModule();
+  void *Buf = M.allocate(sizeof(GenericSpecializationInformation),
+                           alignof(GenericSpecializationInformation));
+  auto NewSubs = M.allocateCopy(Subs);
+  return new (Buf) GenericSpecializationInformation(Caller, Parent, NewSubs);
+}
+
+const GenericSpecializationInformation *
+GenericSpecializationInformation::create(SILInstruction *Inst, SILBuilder &B) {
+  auto Apply = ApplySite::isa(Inst);
+  // Preserve history only for apply instructions for now.
+  // NOTE: We may want to preserve history for all instructions in the future,
+  // because it may allow us to track their origins.
+  assert(Apply);
+  auto *F = Inst->getFunction();
+  auto &BuilderF = B.getFunction();
+
+  // If cloning inside the same function, don't change the specialization info.
+  if (F == &BuilderF) {
+    return Apply.getSpecializationInfo();
+  }
+
+  // The following lines are used in case of inlining.
+
+  // If a call-site has a history already, simply preserve it.
+  if (Apply.getSpecializationInfo())
+    return Apply.getSpecializationInfo();
+
+  // If a call-site has no history, use the history of a containing function.
+  if (F->isSpecialization())
+    return F->getSpecializationInfo();
+
+  return nullptr;
 }

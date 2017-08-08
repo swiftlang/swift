@@ -574,7 +574,9 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
                              getOpValue(Inst->getCallee()),
                              getOpSubstitutions(Inst->getSubstitutions()),
                              Args,
-                             Inst->isNonThrowing()));
+                             Inst->isNonThrowing(),
+                             GenericSpecializationInformation::create(
+                               Inst, getBuilder())));
 }
 
 template<typename ImplClass>
@@ -588,7 +590,9 @@ SILCloner<ImplClass>::visitTryApplyInst(TryApplyInst *Inst) {
                                 getOpSubstitutions(Inst->getSubstitutions()),
                                 Args,
                                 getOpBasicBlock(Inst->getNormalBB()),
-                                getOpBasicBlock(Inst->getErrorBB())));
+                                getOpBasicBlock(Inst->getErrorBB()),
+                                GenericSpecializationInformation::create(
+                                  Inst, getBuilder())));
 }
 
 template<typename ImplClass>
@@ -604,7 +608,9 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
                     Inst->getType()
                         .getSwiftRValueType()
                         ->getAs<SILFunctionType>()
-                        ->getCalleeConvention()));
+                      ->getCalleeConvention(),
+                    GenericSpecializationInformation::create(Inst,
+                                                             getBuilder())));
 }
 
 template<typename ImplClass>

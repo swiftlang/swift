@@ -967,6 +967,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
     newCallInst = callBuilder.createApply(
         loc, apply.getCallee(), apply.getSubstitutions(), newCallArgs,
         cast<ApplyInst>(origCallInst)->isNonThrowing(),
+        nullptr,
         SILModuleConventions::getLoweredAddressConventions());
     break;
   case ValueKind::TryApplyInst:

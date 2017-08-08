@@ -189,7 +189,9 @@ protected:
     ApplyInst *N =
         getBuilder().createApply(getOpLocation(Inst->getLoc()),
                                  Helper.getCallee(), Helper.getSubstitutions(),
-                                 Helper.getArguments(), Inst->isNonThrowing());
+                                 Helper.getArguments(), Inst->isNonThrowing(),
+                                 GenericSpecializationInformation::create(
+                                   Inst, getBuilder()));
     doPostProcess(Inst, N);
   }
 
@@ -199,7 +201,9 @@ protected:
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(),
         getOpBasicBlock(Inst->getNormalBB()),
-        getOpBasicBlock(Inst->getErrorBB()));
+        getOpBasicBlock(Inst->getErrorBB()),
+        GenericSpecializationInformation::create(
+          Inst, getBuilder()));
     doPostProcess(Inst, N);
   }
 
@@ -209,7 +213,9 @@ protected:
         Inst->getType().getAs<SILFunctionType>()->getCalleeConvention();
     PartialApplyInst *N = getBuilder().createPartialApply(
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
-        Helper.getSubstitutions(), Helper.getArguments(), ParamConvention);
+        Helper.getSubstitutions(), Helper.getArguments(), ParamConvention,
+        GenericSpecializationInformation::create(
+          Inst, getBuilder()));
     doPostProcess(Inst, N);
   }
 
