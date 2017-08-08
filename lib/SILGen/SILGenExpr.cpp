@@ -165,11 +165,11 @@ struct EndBorrowCleanup : Cleanup {
   EndBorrowCleanup(SILValue originalValue, SILValue borrowedValue)
       : originalValue(originalValue), borrowedValue(borrowedValue) {}
 
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.createEndBorrow(l, borrowedValue, originalValue);
+  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    SGF.B.createEndBorrow(l, borrowedValue, originalValue);
   }
 
-  void dump(SILGenFunction &gen) const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "EndBorrowCleanup "
                  << "State:" << getState() << "\n"
@@ -184,31 +184,31 @@ struct FormalEvaluationEndBorrowCleanup : Cleanup {
 
   FormalEvaluationEndBorrowCleanup() : Depth() {}
 
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    getEvaluation(gen).finish(gen);
+  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    getEvaluation(SGF).finish(SGF);
   }
 
-  void dump(SILGenFunction &gen) const override {
+  void dump(SILGenFunction &SGF) const override {
 #ifndef NDEBUG
     llvm::errs() << "FormalEvaluationEndBorrowCleanup "
                  << "State:" << getState() << "\n"
-                 << "original:" << getOriginalValue(gen) << "\n"
-                 << "borrowed:" << getBorrowedValue(gen) << "\n";
+                 << "original:" << getOriginalValue(SGF) << "\n"
+                 << "borrowed:" << getBorrowedValue(SGF) << "\n";
 #endif
   }
 
-  SharedBorrowFormalAccess &getEvaluation(SILGenFunction &gen) const {
-    auto &evaluation = *gen.FormalEvalContext.find(Depth);
+  SharedBorrowFormalAccess &getEvaluation(SILGenFunction &SGF) const {
+    auto &evaluation = *SGF.FormalEvalContext.find(Depth);
     assert(evaluation.getKind() == FormalAccess::Shared);
     return static_cast<SharedBorrowFormalAccess &>(evaluation);
   }
 
-  SILValue getOriginalValue(SILGenFunction &gen) const {
-    return getEvaluation(gen).getOriginalValue();
+  SILValue getOriginalValue(SILGenFunction &SGF) const {
+    return getEvaluation(SGF).getOriginalValue();
   }
 
-  SILValue getBorrowedValue(SILGenFunction &gen) const {
-    return getEvaluation(gen).getBorrowedValue();
+  SILValue getBorrowedValue(SILGenFunction &SGF) const {
+    return getEvaluation(SGF).getBorrowedValue();
   }
 };
 
@@ -273,11 +273,11 @@ struct EndBorrowArgumentCleanup : Cleanup {
 
   EndBorrowArgumentCleanup(SILPHIArgument *arg) : arg(arg) {}
 
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.createEndBorrowArgument(l, arg);
+  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    SGF.B.createEndBorrowArgument(l, arg);
   }
 
-  void dump(SILGenFunction &gen) const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "EndBorrowArgumentCleanup "
                  << "State:" << getState() << "\n"
@@ -743,7 +743,7 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
                                    SILValue value)
       : loc(loc), lvalueAddress(lvalueAddress), value(value) {}
 
-  void emit(SILGenFunction &gen, CleanupLocation) override {
+  void emit(SILGenFunction &SGF, CleanupLocation) override {
     SILValue valueToStore = value;
     SILType lvalueObjTy = lvalueAddress->getType().getObjectType();
 
@@ -755,16 +755,16 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
         llvm_unreachable("Invalid usage of delegate init self writeback");
       }
 
-      valueToStore = gen.B.createUncheckedRefCast(loc, valueToStore,
+      valueToStore = SGF.B.createUncheckedRefCast(loc, valueToStore,
                                                   lvalueObjTy);
     }
 
-    auto &lowering = gen.B.getTypeLowering(lvalueAddress->getType());
-    lowering.emitStore(gen.B, loc, valueToStore, lvalueAddress,
+    auto &lowering = SGF.B.getTypeLowering(lvalueAddress->getType());
+    lowering.emitStore(SGF.B, loc, valueToStore, lvalueAddress,
                        StoreOwnershipQualifier::Init);
   }
 
-  void dump(SILGenFunction &gen) const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "SimpleWritebackCleanup "
                  << "State:" << getState() << "\n"
@@ -1008,8 +1008,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 }
 
 static AbstractionPattern
-getOrigFormalRValueType(SILGenFunction &gen, VarDecl *field) {
-  auto origType = gen.SGM.Types.getAbstractionPattern(field);
+getOrigFormalRValueType(SILGenFunction &SGF, VarDecl *field) {
+  auto origType = SGF.SGM.Types.getAbstractionPattern(field);
   return origType.getReferenceStorageReferentType();
 }
 
@@ -1710,14 +1710,14 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
 }
 
 static
-ManagedValue emitCFunctionPointer(SILGenFunction &gen,
+ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
                                   FunctionConversionExpr *conversionExpr) {
   auto expr = conversionExpr->getSubExpr();
   
   // Look through base-ignored exprs to get to the function ref.
   auto semanticExpr = expr->getSemanticsProvidingExpr();
   while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(semanticExpr)){
-    gen.emitIgnoredExpr(ignoredBase->getLHS());
+    SGF.emitIgnoredExpr(ignoredBase->getLHS());
     semanticExpr = ignoredBase->getRHS()->getSemanticsProvidingExpr();
   }
 
@@ -1740,7 +1740,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &gen,
   } else if (auto closure = dyn_cast<AbstractClosureExpr>(semanticExpr)) {
     loc = closure;
     // Emit the closure body.
-    gen.SGM.emitClosure(closure);
+    SGF.SGM.emitClosure(closure);
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
@@ -1749,13 +1749,13 @@ ManagedValue emitCFunctionPointer(SILGenFunction &gen,
   SILDeclRef constant(loc, ResilienceExpansion::Minimal,
                       /*uncurryLevel*/ 0,
                       /*foreign*/ true);
-  SILConstantInfo constantInfo = gen.getConstantInfo(constant);
+  SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
 
   return convertCFunctionSignature(
-                    gen, conversionExpr,
+                    SGF, conversionExpr,
                     constantInfo.getSILType(),
                     [&]() -> ManagedValue {
-                      SILValue cRef = gen.emitGlobalFunctionRef(expr, constant);
+                      SILValue cRef = SGF.emitGlobalFunctionRef(expr, constant);
                       return ManagedValue::forUnmanaged(cRef);
                     });
 }
@@ -1945,15 +1945,15 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
   return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
 }
 
-static ManagedValue createUnsafeDowncast(SILGenFunction &gen,
+static ManagedValue createUnsafeDowncast(SILGenFunction &SGF,
                                          SILLocation loc,
                                          ManagedValue input,
                                          SILType resultTy,
                                          SGFContext context) {
-  SILValue result = gen.B.createUncheckedRefCast(loc,
-                                                 input.forward(gen),
+  SILValue result = SGF.B.createUncheckedRefCast(loc,
+                                                 input.forward(SGF),
                                                  resultTy);
-  return gen.emitManagedRValueWithCleanup(result);
+  return SGF.emitManagedRValueWithCleanup(result);
 }
 
 RValue RValueEmitter::visitCovariantReturnConversionExpr(
@@ -2128,35 +2128,35 @@ RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
   return visit(E->getSubExpr(), C);
 }
 
-VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
+VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
                                        unsigned numElements) {
   // Reabstract the base type against the array element type.
   auto baseAbstraction = AbstractionPattern::getOpaque();
 
   // Allocate the array.
-  SILValue numEltsVal = gen.B.createIntegerLiteral(loc,
-                             SILType::getBuiltinWordType(gen.getASTContext()),
+  SILValue numEltsVal = SGF.B.createIntegerLiteral(loc,
+                             SILType::getBuiltinWordType(SGF.getASTContext()),
                              numElements);
   // The first result is the array value.
   ManagedValue array;
   // The second result is a RawPointer to the base address of the array.
   SILValue basePtr;
   std::tie(array, basePtr)
-    = gen.emitUninitializedArrayAllocation(arrayTy, numEltsVal, loc);
+    = SGF.emitUninitializedArrayAllocation(arrayTy, numEltsVal, loc);
 
   // Temporarily deactivate the main array cleanup.
   if (array.hasCleanup())
-    gen.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Dormant);
+    SGF.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Dormant);
 
   // Push a new cleanup to deallocate the array.
   auto abortCleanup =
-    gen.enterDeallocateUninitializedArrayCleanup(array.getValue());
+    SGF.enterDeallocateUninitializedArrayCleanup(array.getValue());
 
-  auto &baseTL = gen.getTypeLowering(baseAbstraction, baseTy);
+  auto &baseTL = SGF.getTypeLowering(baseAbstraction, baseTy);
 
   // Turn the pointer into an address.
-  basePtr = gen.B.createPointerToAddress(
+  basePtr = SGF.B.createPointerToAddress(
     loc, basePtr, baseTL.getLoweredType().getAddressType(),
     /*isStrict*/ true,
     /*isInvariant*/ false);
@@ -2164,19 +2164,19 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
   return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
 }
 
-ManagedValue Lowering::emitEndVarargs(SILGenFunction &gen, SILLocation loc,
+ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
                                       VarargsInfo &&varargs) {
   // Kill the abort cleanup.
-  gen.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
+  SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
   // Reactivate the result cleanup.
   auto result = varargs.getArray();
   if (result.hasCleanup())
-    gen.Cleanups.setCleanupState(result.getCleanup(), CleanupState::Active);
+    SGF.Cleanups.setCleanupState(result.getCleanup(), CleanupState::Active);
   return result;
 }
 
-static ManagedValue emitVarargs(SILGenFunction &gen,
+static ManagedValue emitVarargs(SILGenFunction &SGF,
                                 SILLocation loc,
                                 Type _baseTy,
                                 ArrayRef<ManagedValue> elements,
@@ -2184,7 +2184,7 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
   auto baseTy = _baseTy->getCanonicalType();
   auto arrayTy = _arrayTy->getCanonicalType();
 
-  auto varargs = emitBeginVarargs(gen, loc, baseTy, arrayTy, elements.size());
+  auto varargs = emitBeginVarargs(SGF, loc, baseTy, arrayTy, elements.size());
   AbstractionPattern baseAbstraction = varargs.getBaseAbstractionPattern();
   SILValue basePtr = varargs.getBaseAddress();
   
@@ -2196,16 +2196,16 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
   for (size_t i = 0, size = elements.size(); i < size; ++i) {
     SILValue eltPtr = basePtr;
     if (i != 0) {
-      SILValue index = gen.B.createIntegerLiteral(loc,
-                  SILType::getBuiltinWordType(gen.F.getASTContext()), i);
-      eltPtr = gen.B.createIndexAddr(loc, basePtr, index);
+      SILValue index = SGF.B.createIntegerLiteral(loc,
+                  SILType::getBuiltinWordType(SGF.F.getASTContext()), i);
+      eltPtr = SGF.B.createIndexAddr(loc, basePtr, index);
     }
     ManagedValue v = elements[i];
-    v = gen.emitSubstToOrigValue(loc, v, baseAbstraction, baseTy);
-    v.forwardInto(gen, loc, eltPtr);
+    v = SGF.emitSubstToOrigValue(loc, v, baseAbstraction, baseTy);
+    v.forwardInto(SGF, loc, eltPtr);
   }
 
-  return emitEndVarargs(gen, loc, std::move(varargs));
+  return emitEndVarargs(SGF, loc, std::move(varargs));
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
@@ -4520,45 +4520,45 @@ public:
   {}
   
   std::unique_ptr<LogicalPathComponent>
-  clone(SILGenFunction &gen, SILLocation l) const override {
+  clone(SILGenFunction &SGF, SILLocation l) const override {
     return std::unique_ptr<LogicalPathComponent>(
       new AutoreleasingWritebackComponent(getTypeData()));
   }
 
-  AccessKind getBaseAccessKind(SILGenFunction &gen,
+  AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                AccessKind kind) const override {
     return kind;
   }
   
-  void set(SILGenFunction &gen, SILLocation loc,
+  void set(SILGenFunction &SGF, SILLocation loc,
            ArgumentSource &&value, ManagedValue base) && override {
     // Convert the value back to a +1 strong reference.
-    auto unowned = std::move(value).getAsSingleValue(gen).getUnmanagedValue();
+    auto unowned = std::move(value).getAsSingleValue(SGF).getUnmanagedValue();
     auto strongType = SILType::getPrimitiveObjectType(
               unowned->getType().castTo<UnmanagedStorageType>().getReferentType());
-    auto owned = gen.B.createUnmanagedToRef(loc, unowned, strongType);
-    auto ownedMV = gen.emitManagedRetain(loc, owned);
+    auto owned = SGF.B.createUnmanagedToRef(loc, unowned, strongType);
+    auto ownedMV = SGF.emitManagedRetain(loc, owned);
     
     // Reassign the +1 storage with it.
-    ownedMV.assignInto(gen, loc, base.getUnmanagedValue());
+    ownedMV.assignInto(SGF, loc, base.getUnmanagedValue());
   }
   
-  RValue get(SILGenFunction &gen, SILLocation loc,
+  RValue get(SILGenFunction &SGF, SILLocation loc,
              ManagedValue base, SGFContext c) && override {
-    FullExpr TightBorrowScope(gen.Cleanups, CleanupLocation::get(loc));
+    FullExpr TightBorrowScope(SGF.Cleanups, CleanupLocation::get(loc));
 
     // Load the value at +0.
-    ManagedValue loadedBase = gen.B.createLoadBorrow(loc, base);
+    ManagedValue loadedBase = SGF.B.createLoadBorrow(loc, base);
 
     // Convert it to unowned.
     auto refType = loadedBase.getType().getSwiftRValueType();
     auto unownedType = SILType::getPrimitiveObjectType(
                                         CanUnmanagedStorageType::get(refType));
-    SILValue unowned = gen.B.createRefToUnmanaged(
+    SILValue unowned = SGF.B.createRefToUnmanaged(
         loc, loadedBase.getUnmanagedValue(), unownedType);
 
     // A reference type should never be exploded.
-    return RValue(gen, ManagedValue::forUnmanaged(unowned), refType);
+    return RValue(SGF, ManagedValue::forUnmanaged(unowned), refType);
   }
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
@@ -4567,7 +4567,7 @@ public:
   /// diagnostic.
   void diagnoseWritebackConflict(LogicalPathComponent *RHS,
                                  SILLocation loc1, SILLocation loc2,
-                                 SILGenFunction &gen) override {
+                                 SILGenFunction &SGF) override {
     //      auto &rhs = (GetterSetterComponent&)*RHS;
   }
 
