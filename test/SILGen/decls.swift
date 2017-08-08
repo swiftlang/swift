@@ -189,3 +189,9 @@ func unboundMethodReferences() {
   _ = type(of: Derived.method1)
   _ = type(of: Derived.method2)
 }
+
+// CHECK-LABEL: sil_vtable EscapeKeywordsInDottedPaths
+class EscapeKeywordsInDottedPaths {
+  // CHECK: #EscapeKeywordsInDottedPaths.`switch`!getter.1
+  var `switch`: String = ""
+}
