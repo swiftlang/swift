@@ -872,10 +872,14 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
         initArgTy = argTy;
     }
 
-    // 'throws' only applies to the innermost function.
+    
     AnyFunctionType::ExtInfo info;
-    if (i == 0 && func->hasThrows())
-      info = info.withThrows();
+    if (i == 0) {// 'throws' and 'async' only applies to the innermost function.
+      if (func->hasThrows())
+        info = info.withThrows();
+      if (func->isAsync())
+        info = info.withAsync();
+    }
     
     assert(std::all_of(argTy.begin(), argTy.end(), [](const AnyFunctionType::Param &aty){
       return !aty.getType()->hasArchetype();

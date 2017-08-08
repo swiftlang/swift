@@ -371,6 +371,10 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
     Printer << " ";
     Printer.printKeyword("throws");
   }
+  if (isAsync()) {
+    Printer << " ";
+    Printer.printKeyword("async");
+  }
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   printTypeRepr(RetTy, Printer, Opts);

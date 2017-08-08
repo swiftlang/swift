@@ -2413,10 +2413,13 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
   if (AFD->hasThrows()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
-      Printer << " " << tok::kw_rethrows;
+      Printer << ' ' << tok::kw_rethrows;
     else
-      Printer << " " << tok::kw_throws;
+      Printer << ' ' << tok::kw_throws;
   }
+  
+  if (AFD->isAsync())
+    Printer << ' ' << tok::kw_async;
 }
 
 bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,

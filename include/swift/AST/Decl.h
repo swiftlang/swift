@@ -233,7 +233,7 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 class alignas(1 << DeclAlignInBits) Decl {
   class DeclBitfields {
     friend class Decl;
-    unsigned Kind : 6;
+    unsigned Kind : 5;
 
     /// \brief Whether this declaration is invalid.
     unsigned Invalid : 1;
@@ -262,7 +262,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// DeclContext of an active #if config clause.
     unsigned EscapedFromIfConfig : 1;
   };
-  enum { NumDeclBits = 13 };
+  enum { NumDeclBits = 12 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
 
   class PatternBindingDeclBitfields {
@@ -334,7 +334,6 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
-
   };
   enum { NumVarDeclBits = NumAbstractStorageDeclBits + 6 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
@@ -369,13 +368,16 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the function body throws.
     unsigned Throws : 1;
 
+    /// Whether the function body is async.
+    unsigned IsAsync : 1;
+
     /// Whether this function requires a new vtable entry.
     unsigned NeedsNewVTableEntry : 1;
 
     /// Whether NeedsNewVTableEntry is valid.
     unsigned HasComputedNeedsNewVTableEntry : 1;
   };
-  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 13 };
+  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 14 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
 
   class FuncDeclBitfields {
@@ -659,6 +661,7 @@ protected:
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
     : OpaqueBits(0), Context(context) {
     DeclBits.Kind = unsigned(kind);
+    assert(DeclBits.Kind == unsigned(kind) && "Too few bits for kind");
     DeclBits.Invalid = false;
     DeclBits.Implicit = false;
     DeclBits.FromClang = false;
@@ -4837,23 +4840,25 @@ protected:
 
   CaptureInfo Captures;
 
-  /// Location of the 'throws' token.
-  SourceLoc ThrowsLoc;
+  /// Location of the 'throws' and 'async' tokens (if present).
+  SourceLoc ThrowsLoc, AsyncLoc;
 
   ImportAsMemberStatus IAMStatus;
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
+                       bool isAsync, SourceLoc AsyncLoc,
                        unsigned NumParameterLists,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), ThrowsLoc(ThrowsLoc) {
+        Body(nullptr), ThrowsLoc(ThrowsLoc), AsyncLoc(AsyncLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
     AbstractFunctionDeclBits.Overridden = false;
     AbstractFunctionDeclBits.Throws = Throws;
+    AbstractFunctionDeclBits.IsAsync = isAsync;
     AbstractFunctionDeclBits.NeedsNewVTableEntry = false;
     AbstractFunctionDeclBits.HasComputedNeedsNewVTableEntry = false;
 
@@ -4889,9 +4894,14 @@ public:
 public:
   /// Retrieve the location of the 'throws' keyword, if present.
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+  /// Retrieve the location of the 'async' keyword, if present.
+  SourceLoc getAsyncLoc() const { return AsyncLoc; }
 
   /// Returns true if the function body throws.
   bool hasThrows() const { return AbstractFunctionDeclBits.Throws; }
+
+  /// Returns true if the function body is async.
+  bool isAsync() const { return AbstractFunctionDeclBits.IsAsync; }
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
@@ -5143,12 +5153,13 @@ class FuncDecl final : public AbstractFunctionDecl,
            SourceLoc FuncLoc,
            DeclName Name, SourceLoc NameLoc,
            bool Throws, SourceLoc ThrowsLoc,
+           bool IsAsync, SourceLoc AsyncLoc,
            SourceLoc AccessorKeywordLoc,
            unsigned NumParameterLists,
            GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent,
                            Name, NameLoc,
-                           Throws, ThrowsLoc,
+                           Throws, ThrowsLoc, IsAsync, AsyncLoc,
                            NumParameterLists, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       AccessorKeywordLoc(AccessorKeywordLoc),
@@ -5169,6 +5180,7 @@ class FuncDecl final : public AbstractFunctionDecl,
                               SourceLoc FuncLoc,
                               DeclName Name, SourceLoc NameLoc,
                               bool Throws, SourceLoc ThrowsLoc,
+                              bool IsAsync, SourceLoc AsyncLoc,
                               SourceLoc AccessorKeywordLoc,
                               GenericParamList *GenericParams,
                               unsigned NumParameterLists,
@@ -5182,6 +5194,7 @@ public:
                                       SourceLoc FuncLoc,
                                       DeclName Name, SourceLoc NameLoc,
                                       bool Throws, SourceLoc ThrowsLoc,
+                                      bool IsAsync, SourceLoc AsyncLoc,
                                       SourceLoc AccessorKeywordLoc,
                                       GenericParamList *GenericParams,
                                       unsigned NumParameterLists,
@@ -5192,6 +5205,7 @@ public:
                           SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc,
                           bool Throws, SourceLoc ThrowsLoc,
+                          bool IsAsync, SourceLoc AsyncLoc,
                           SourceLoc AccessorKeywordLoc,
                           GenericParamList *GenericParams,
                           ArrayRef<ParameterList *> ParameterLists,
@@ -5644,6 +5658,7 @@ public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   OptionalTypeKind Failability, SourceLoc FailabilityLoc,
                   bool Throws, SourceLoc ThrowsLoc,
+                  bool IsAsync, SourceLoc AsyncLoc,
                   ParamDecl *SelfParam, ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);

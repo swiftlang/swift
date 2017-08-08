@@ -197,6 +197,9 @@ namespace {
     /// The witness throws, but the requirement does not.
     ThrowsConflict,
 
+    /// The witness and requirement do not match on async.
+    AsyncConflict,
+
     /// \brief The witness did not match due to static/non-static differences.
     StaticNonStaticConflict,
     
@@ -409,6 +412,7 @@ namespace {
       case MatchKind::MutatingConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
+      case MatchKind::AsyncConflict:
       case MatchKind::NonObjC:
         return false;
       }
@@ -434,6 +438,7 @@ namespace {
       case MatchKind::MutatingConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
+      case MatchKind::AsyncConflict:
       case MatchKind::NonObjC:
         return false;
       }
@@ -967,9 +972,15 @@ matchWitness(TypeChecker &tc,
     }
 
     // If the witness is 'throws', the requirement must be.
-    if (witnessFnType->getExtInfo().throws() &&
-        !reqFnType->getExtInfo().throws()) {
+    if (witnessFnType->throws() &&
+        !reqFnType->throws()) {
       return RequirementMatch(witness, MatchKind::ThrowsConflict);
+    }
+
+    // The witness & requirement must match on 'async'.
+    if (witnessFnType->isAsync() !=
+        reqFnType->isAsync()) {
+      return RequirementMatch(witness, MatchKind::AsyncConflict);
     }
 
   } else {
@@ -2349,6 +2360,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
   case MatchKind::ThrowsConflict:
     diags.diagnose(match.Witness, diag::protocol_witness_throws_conflict);
+    break;
+  case MatchKind::AsyncConflict:
+    diags.diagnose(match.Witness, diag::protocol_witness_async_conflict);
     break;
 
   case MatchKind::OptionalityConflict: {

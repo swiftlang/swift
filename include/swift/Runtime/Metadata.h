@@ -2050,6 +2050,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
     return Flags.getConvention();
   }
   bool throws() const { return Flags.throws(); }
+  bool isAsync() const { return Flags.isAsync(); }
 
   static constexpr StoredSize OffsetToFlags = sizeof(TargetMetadata<Runtime>);
 

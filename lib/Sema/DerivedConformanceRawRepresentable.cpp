@@ -281,6 +281,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
                             /*Failability=*/ OTK_Optional,
                             /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                            /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                             selfDecl, paramList,
                             /*GenericParams=*/nullptr, parentDC);
   

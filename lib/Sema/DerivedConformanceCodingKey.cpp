@@ -142,6 +142,7 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
                             /*Failability=*/OTK_Optional,
                             /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                            /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                             selfDecl, paramList,
                             /*GenericParams=*/nullptr, parentDC);
 

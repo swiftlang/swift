@@ -1613,19 +1613,21 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
-  // If we're binding to an init member, the 'throws' need to line up between
-  // the bound and reference types.
+  // If we're binding to an init member, 'throws' and 'async' need to line up
+  // between the bound and reference types.
   if (choice.isDecl()) {
     auto decl = choice.getDecl();
     if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
       auto boundFunctionType = boundType->getAs<AnyFunctionType>();
         
       if (boundFunctionType &&
-          CD->hasThrows() != boundFunctionType->throws()) {
+          (CD->hasThrows() != boundFunctionType->throws() ||
+           CD->isAsync() != boundFunctionType->isAsync())) {
+            auto extInfo = boundFunctionType->getExtInfo()
+              .withThrows(CD->hasThrows())
+              .withAsync(CD->isAsync());
         boundType = FunctionType::get(boundFunctionType->getInput(),
-                                      boundFunctionType->getResult(),
-                                      boundFunctionType->getExtInfo().
-                                                          withThrows());
+                                      boundFunctionType->getResult(), extInfo);
       }
     }
   }

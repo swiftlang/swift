@@ -3462,8 +3462,10 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   // Start the function.
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
                              /*FIXME FuncLoc=*/DeclLoc, Identifier(),
-                             /*NameLoc=*/DeclLoc, /*Throws=*/false,
-                             /*ThrowsLoc=*/SourceLoc(), AccessorKeywordLoc,
+                             /*NameLoc=*/DeclLoc,
+                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                             /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
+                             AccessorKeywordLoc,
                              (GenericParams
                               ? GenericParams->clone(P->CurDeclContext)
                               : nullptr),
@@ -4828,11 +4830,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   DefaultArgumentInfo DefaultArgs(HasContainerType);
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
-  SourceLoc throwsLoc;
+  SourceLoc throwsLoc, asyncLoc;
   bool rethrows;
   ParserStatus SignatureStatus =
       parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
-                             throwsLoc, rethrows, FuncRetTy);
+                             throwsLoc, rethrows, asyncLoc, FuncRetTy);
 
   SignatureHasCodeCompletion |= SignatureStatus.hasCodeCompletion();
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -4874,6 +4876,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                           FuncLoc, FullName, NameLoc,
                           /*Throws=*/throwsLoc.isValid(), throwsLoc,
+                          /*Async=*/asyncLoc.isValid(), asyncLoc,
                           /*AccessorKeywordLoc=*/SourceLoc(),
                           GenericParams, BodyParams, FuncRetTy,
                           CurDeclContext);
@@ -5673,12 +5676,23 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return nullptr;
   }
 
-  // Parse 'throws' or 'rethrows'.
-  SourceLoc throwsLoc;
-  if (consumeIf(tok::kw_throws, throwsLoc)) {
-    // okay
-  } else if (consumeIf(tok::kw_rethrows, throwsLoc)) {
-    Attributes.add(new (Context) RethrowsAttr(throwsLoc));
+  // Parse throws/rethrows and async.
+  SourceLoc throwsLoc, asyncLoc;
+  while (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_async)) {
+    if (Tok.is(tok::kw_async)) {
+      if (asyncLoc.isValid())
+        diagnose(Tok, diag::func_type_specifier_redundant);
+      asyncLoc = consumeToken(tok::kw_async);
+      continue;
+    }
+    if (throwsLoc.isValid())
+      diagnose(Tok, diag::func_type_specifier_redundant);
+
+    if (!consumeIf(tok::kw_throws, throwsLoc)) {
+      assert(Tok.is(tok::kw_rethrows));
+      throwsLoc = consumeToken(tok::kw_rethrows);
+      Attributes.add(new (Context) RethrowsAttr(throwsLoc));
+    }
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -5700,6 +5714,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
                                            throwsLoc.isValid(), throwsLoc,
+                                           asyncLoc.isValid(), asyncLoc,
                                            SelfDecl, Params.get(),
                                            GenericParams,
                                            CurDeclContext);

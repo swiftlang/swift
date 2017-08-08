@@ -6252,7 +6252,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                               toEI.isAutoClosure(),
                                         toEI.isNoEscape() | fromEI.isNoEscape(),
                                               toEI.throws() & fromEI.throws(),
-                                            toEI.isAsync()| fromEI.isAsync());
+                                             toEI.isAsync() & fromEI.isAsync());
         auto newToType = FunctionType::get(fromFunc->getInput(),
                                            fromFunc->getResult(), newEI);
         if (applyTypeToClosureExpr(cs, expr, newToType)) {

@@ -2640,7 +2640,7 @@ public:
       for (unsigned i = 1, e = AFD->getNumParameterLists(); i != e; ++i)
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
 
-      if (AFD->hasThrows() != fnTy->getExtInfo().throws()) {
+      if (AFD->hasThrows() != fnTy->throws()) {
         Out << "function 'throws' flag does not match function type\n";
         AFD->dump(Out);
         abort();
@@ -2653,6 +2653,25 @@ public:
         abort();
       }
 
+      // If a decl has the Async bit set, the AsyncLoc should be valid,
+      // and vice versa, unless the decl was imported, de-serialized, or
+      // implicit.
+      if (!AFD->isImplicit() &&
+          isa<SourceFile>(AFD->getModuleScopeContext()) &&
+          (AFD->getAsyncLoc().isValid() != AFD->isAsync())) {
+        Out << "function 'async' location does not match 'async' flag\n";
+        AFD->dump(Out);
+        abort();
+      }
+      
+      // If a decl has the isAsync bit set, the function type should throw,
+      // and vice versa.
+      if (AFD->isAsync() != fnTy->isAsync()) {
+        Out << "function 'async' flag does not match function type\n";
+        AFD->dump(Out);
+        abort();
+      }
+     
       verifyCheckedBase(AFD);
     }
 

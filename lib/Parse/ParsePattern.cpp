@@ -547,7 +547,8 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
 
     {
       auto diag = diagnose(Tok, diagID);
-      if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
+      if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows,
+                    tok::kw_async))
         diag.fixItInsertAfter(PreviousLoc, "()");
 
       if (skipIdentifier)
@@ -643,7 +644,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
 /// Parse a function definition signature.
 ///   func-signature:
-///     func-arguments func-throws? func-signature-result?
+///     func-arguments ('throws'|'async')* func-signature-result?
 ///   func-signature-result:
 ///     '->' type
 ///
@@ -655,6 +656,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &throwsLoc,
                                bool &rethrows,
+                               SourceLoc &asyncLoc,
                                TypeRepr *&retType) {
   SmallVector<Identifier, 4> NamePieces;
   ParserStatus Status;
@@ -665,29 +667,42 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                    defaultArgs);
   FullName = DeclName(Context, SimpleName, NamePieces);
   
-  // Check for the 'throws' keyword.
+  // Check for the throws/rethrows/async keywords.
   rethrows = false;
-  if (Tok.is(tok::kw_throws)) {
-    throwsLoc = consumeToken();
-  } else if (Tok.is(tok::kw_rethrows)) {
-    throwsLoc = consumeToken();
-    rethrows = true;
-  } else if (Tok.is(tok::kw_throw)) {
-    throwsLoc = consumeToken();
-    diagnose(throwsLoc, diag::throw_in_function_type)
-      .fixItReplace(throwsLoc, "throws");
+  while (Tok.isAny(tok::kw_throws, tok::kw_throw, tok::kw_rethrows,
+                   tok::kw_async)) {
+    if (Tok.is(tok::kw_async)) {
+      if (asyncLoc.isValid())
+        diagnose(Tok, diag::func_type_specifier_redundant);
+      asyncLoc = consumeToken(tok::kw_async);
+      continue;
+    }
+    
+    if (throwsLoc.isValid())
+      diagnose(Tok, diag::func_type_specifier_redundant);
+    
+    if (consumeIf(tok::kw_throws, throwsLoc))
+      ;
+    else if (consumeIf(tok::kw_throw, throwsLoc)) {
+      diagnose(throwsLoc, diag::throw_in_function_type)
+        .fixItReplace(throwsLoc, "throws");
+    } else {
+      throwsLoc = consumeToken(tok::kw_rethrows);
+      rethrows = true;
+    }
   }
 
   SourceLoc arrowLoc;
 
+  // Check for something like "func f() -> Int throws {", rewriting the "throws"
+  // to before the arrow.
   auto diagnoseInvalidThrows = [&]() -> Optional<InFlightDiagnostic> {
     if (throwsLoc.isValid())
       return None;
 
-    if (Tok.is(tok::kw_throws)) {
-      throwsLoc = consumeToken();
-    } else if (Tok.is(tok::kw_rethrows)) {
-      throwsLoc = consumeToken();
+    if (consumeIf(tok::kw_throws, throwsLoc))
+      ;
+    else if (consumeIf(tok::kw_rethrows, throwsLoc)) {
       rethrows = true;
     }
 
@@ -731,7 +746,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     retType = nullptr;
   }
 
-  // Check for 'throws' and 'rethrows' after the type and correct it.
+  // Check for throws/rethrows/async after the type and correct it.
   if (auto diagOpt = diagnoseInvalidThrows()) {
     assert(arrowLoc.isValid());
     assert(retType);

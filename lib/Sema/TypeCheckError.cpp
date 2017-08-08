@@ -872,9 +872,12 @@ private:
   }
 };
 
-/// An error-handling context.
+/// An error-handling context, such as a function, closure, or default value
+/// expression.
 class Context {
 public:
+  /// Classification of the context, used to determine how errors are handled
+  /// and to provide tailored diagnostics for failures.
   enum class Kind : uint8_t {
     /// A context that handles errors.
     Handled,
@@ -930,69 +933,79 @@ private:
       type = fnType->getResult();
     }
   }
-
+  
   Kind TheKind;
+  
+  /// Whether this context is itself async, and therefore allows async calls
+  /// within it.
+  bool AllowsAsync;
   bool DiagnoseErrorOnTry = false;
   DeclContext *RethrowsDC = nullptr;
 
-  explicit Context(Kind kind) : TheKind(kind) {}
+  explicit Context(Kind kind, bool AllowsAsync)
+    : TheKind(kind), AllowsAsync(AllowsAsync) {}
 
 public:
-  static Context getHandled() {
-    return Context(Kind::Handled);
+  bool allowsAsync() const { return AllowsAsync; }
+  
+  static Context getHandled(bool AllowsAsync) {
+    return Context(Kind::Handled, AllowsAsync);
   }
 
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
-    // Top-level code implicitly handles errors.
-    return Context(Kind::Handled);
+    // Top-level code implicitly handles errors.  For now, async calls are not
+    // allowed.
+    return Context(Kind::Handled, /*async*/false);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {
     if (D->getAttrs().hasAttribute<RethrowsAttr>()) {
-      Context result(Kind::RethrowingFunction);
+      Context result(Kind::RethrowingFunction, D->isAsync());
       result.RethrowsDC = D;
       return result;
     }
     return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->getNumParameterLists()));
+        D->getInterfaceType(), D->getNumParameterLists()),
+                   D->isAsync());
   }
 
   static Context forInitializer(Initializer *init) {
     if (isa<DefaultArgumentInitializer>(init)) {
-      return Context(Kind::DefaultArgument);
+      return Context(Kind::DefaultArgument, /*async*/false);
     }
 
     auto binding = cast<PatternBindingInitializer>(init)->getBinding();
     assert(!binding->getDeclContext()->isLocalContext() &&
            "setting up error context for local pattern binding?");
-    if (!binding->isStatic() && binding->getDeclContext()->isTypeContext()) {
-      return Context(Kind::IVarInitializer);
-    } else {
-      return Context(Kind::GlobalVarInitializer);
-    }
+    if (!binding->isStatic() && binding->getDeclContext()->isTypeContext())
+      return Context(Kind::IVarInitializer, /*async*/false);
+  
+    return Context(Kind::GlobalVarInitializer, /*async*/false);
   }
 
   static Context forEnumElementInitializer(EnumElementDecl *elt) {
-    return Context(Kind::EnumElementInitializer);
+    return Context(Kind::EnumElementInitializer, /*async*/false);
   }
 
   static Context forClosure(AbstractClosureExpr *E) {
     auto kind = getKindForFunctionBody(E->getType(), 1);
     if (kind != Kind::Handled && isa<AutoClosureExpr>(E))
       kind = Kind::NonThrowingAutoClosure;
-    return Context(kind);
+    return Context(kind, E->getType() ? /*async*/E->isBodyAsync() : true);
   }
 
-  static Context forNonExhaustiveCatch(DoCatchStmt *S) {
-    return Context(Kind::NonExhaustiveCatch);
+  static Context forNonExhaustiveCatch(DoCatchStmt *S, bool isAsync) {
+    // do/catch bodies allow async because the bit propagates up to their
+    // unclosing context.
+    return Context(Kind::NonExhaustiveCatch, isAsync);
   }
 
   static Context forCatchPattern(CatchStmt *S) {
-    return Context(Kind::CatchPattern);
+    return Context(Kind::CatchPattern, /*async*/false);
   }
 
   static Context forCatchGuard(CatchStmt *S) {
-    return Context(Kind::CatchGuard);
+    return Context(Kind::CatchGuard, /*async*/false);
   }
 
   Kind getKind() const { return TheKind; }
@@ -1209,6 +1222,43 @@ public:
     }
     llvm_unreachable("bad context kind");
   }
+  
+  void diagnoseUnhandledAsync(TypeChecker &TC, AwaitExpr *E) {
+    StringRef description;
+    switch (getKind()) {
+    case Kind::NonExhaustiveCatch:
+    case Kind::Handled:
+      description = "a non-async context";
+      break;
+    case Kind::RethrowingFunction:
+    case Kind::NonThrowingFunction:
+      description = "a non-async function";
+      break;
+    case Kind::NonThrowingAutoClosure:
+      description = "a non-async autoclosure";
+      break;
+    case Kind::EnumElementInitializer:
+      description = "an enum element initializer";
+      break;
+    case Kind::GlobalVarInitializer:
+      description = "a global variable initializer";
+      break;
+    case Kind::IVarInitializer:
+      description = "an instance variable initializer";
+      break;
+    case Kind::DefaultArgument:
+      description = "a default argument";
+      break;
+    case Kind::CatchPattern:
+      description = "a catch pattern";
+      break;
+    case Kind::CatchGuard:
+      description = "a catch guard expression";
+      break;
+    }
+    TC.diagnose(E->getStartLoc(), diag::async_call_in_illegal_context,
+                description);
+  }
 };
 
 /// A class to walk over a local context and validate the correctness
@@ -1409,7 +1459,7 @@ private:
 
   ThrowingKind checkExhaustiveDoBody(DoCatchStmt *S) {
     // This is a handled context.
-    ContextScope scope(*this, Context::getHandled());
+    ContextScope scope(*this, Context::getHandled(CurContext.allowsAsync()));
     assert(!Flags.has(ContextFlags::IsInTry) && "do/catch within try?");
     scope.resetCoverageForDoCatch();
 
@@ -1428,7 +1478,8 @@ private:
     // If the enclosing context doesn't handle anything, use a
     // specialized diagnostic about non-exhaustive catches.
     if (CurContext.handlesNothing()) {
-      scope.refineLocalContext(Context::forNonExhaustiveCatch(S));
+      scope.refineLocalContext(Context::forNonExhaustiveCatch(S,
+                                                CurContext.allowsAsync()));
     }
 
     S->getBody()->walk(*this);
@@ -1466,7 +1517,7 @@ private:
       // If this catch clause is reachable at all, it's because a function
       // parameter throws. So let's temporarily set our context to Handled so
       // the catch body is allowed to throw.
-      CurContext = Context::getHandled();
+      CurContext = Context::getHandled(CurContext.allowsAsync());
     }
 
     // The catch body just happens in the enclosing context.
@@ -1597,7 +1648,6 @@ private:
     llvm_unreachable("bad throwing kind");
   }
   ShouldRecurse_t checkAwait(AwaitExpr *E) {
-
     // Walk the operand.
     ContextScope scope(*this, None);
     scope.enterAwait();
@@ -1607,6 +1657,10 @@ private:
     // Warn about 'await' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasAnyAsyncSite))
       TC.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
+    else if (!CurContext.allowsAsync()) {
+      // If the context we're in doesn't allow async calls, emit an error.
+      CurContext.diagnoseUnhandledAsync(TC, E);
+    }
     
     // Inform the parent of the walk that an 'await' exists here.
     scope.preserveCoverageFromAwaitOperand();
@@ -1637,7 +1691,7 @@ private:
 
   ShouldRecurse_t checkForceTry(ForceTryExpr *E) {
     // Walk the operand.  'try!' handles errors.
-    ContextScope scope(*this, Context::getHandled());
+    ContextScope scope(*this, Context::getHandled(CurContext.allowsAsync()));
     scope.enterTry();
 
     E->getSubExpr()->walk(*this);
@@ -1651,7 +1705,7 @@ private:
 
   ShouldRecurse_t checkOptionalTry(OptionalTryExpr *E) {
     // Walk the operand.  'try?' handles errors.
-    ContextScope scope(*this, Context::getHandled());
+    ContextScope scope(*this, Context::getHandled(CurContext.allowsAsync()));
     scope.enterTry();
 
     E->getSubExpr()->walk(*this);

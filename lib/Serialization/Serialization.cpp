@@ -2956,7 +2956,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isObjC(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
-                           fn->hasThrows(),
+                           fn->hasThrows(), fn->isAsync(),
                            fn->getParameterLists().size(),
                            addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
@@ -3094,7 +3094,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),
-                                  ctor->hasThrows(),
+                                  ctor->hasThrows(), ctor->isAsync(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
                                   addGenericEnvironmentRef(

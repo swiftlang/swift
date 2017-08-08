@@ -400,6 +400,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
     new (C) ConstructorDecl(name, enumDecl->getLoc(),
                             OTK_Optional, /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                            /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                             selfDecl, paramPL,
                             /*GenericParams=*/nullptr, enumDecl);
   ctorDecl->setImplicit();
@@ -462,6 +463,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
                      /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(enumDecl->getRawType()), enumDecl);
@@ -524,6 +526,7 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
                      /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
                      params,
@@ -574,6 +577,7 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/importedFieldDecl->getLoc(),
                      DeclName(), /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
@@ -611,6 +615,7 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
                      /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
@@ -1049,7 +1054,8 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   DeclName name(context, context.Id_init, emptyPL);
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(), OTK_None, /*FailabilityLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), selfDecl, emptyPL,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(), selfDecl, emptyPL,
       /*GenericParams=*/nullptr, structDecl);
 
   // Set the constructor's type.
@@ -1143,7 +1149,8 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   DeclName name(context, context.Id_init, paramLists[1]);
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(), OTK_None, /*FailabilityLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), selfDecl, paramLists[1],
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(), selfDecl, paramLists[1],
       /*GenericParams=*/nullptr, structDecl);
 
   // Set the constructor's type.
@@ -1463,6 +1470,7 @@ static FuncDecl *buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
       C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*FuncLoc=*/loc, /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, getterArgs,
       TypeLoc::withoutLoc(elementTy), dc, getter->getClangNode());
@@ -1525,6 +1533,7 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
       /*FuncLoc=*/setter->getLoc(),
       /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, setterArgs,
       TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc, setter->getClangNode());
@@ -1684,6 +1693,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
                      /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(stringTy), swiftDecl);
@@ -3322,6 +3332,7 @@ namespace {
           Impl.SwiftContext, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
           /*FuncLoc=*/loc, name, nameLoc,
           /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+          /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
           /*AccessorKeywordLoc=*/SourceLoc(),
           /*GenericParams=*/nullptr, bodyParams,
           TypeLoc::withoutLoc(resultTy), dc, decl);
@@ -3775,7 +3786,9 @@ namespace {
           StaticSpellingKind::None, /*FuncLoc=*/SourceLoc(),
           importedName.getDeclName(), /*NameLoc=*/SourceLoc(),
           /*Throws=*/importedName.getErrorInfo().hasValue(),
-          /*ThrowsLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
+          /*ThrowsLoc=*/SourceLoc(),
+          /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
+          /*AccessorKeywordLoc=*/SourceLoc(),
           /*GenericParams=*/nullptr, bodyParams, TypeLoc(), dc, decl);
 
       result->setAccessibility(getOverridableAccessibility(dc));
@@ -5275,7 +5288,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       decl, Accessibility::Public, name, /*NameLoc=*/SourceLoc(),
       initOptionality, /*FailabilityLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), selfParam, parameterList,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(), selfParam, parameterList,
       /*GenericParams=*/nullptr, dc);
   result->setInitKind(initKind);
   result->setImportAsStaticMember();
@@ -5367,6 +5381,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
       FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
                        /*FuncLoc=*/loc, name, nameLoc,
                        /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                        /*AccessorKeywordLoc=*/SourceLoc(),
                        /*GenericParams=*/nullptr, bodyParams,
                        TypeLoc::withoutLoc(swiftResultTy), dc, decl);
@@ -5882,7 +5897,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       objcMethod, Accessibility::Public, importedName.getDeclName(),
       /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
-      /*ThrowsLoc=*/SourceLoc(), selfVar, bodyParams.back(),
+      /*ThrowsLoc=*/SourceLoc(), /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      selfVar, bodyParams.back(),
       /*GenericParams=*/nullptr, dc);
 
   // Make the constructor declaration immediately visible in its
@@ -7814,6 +7830,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      /*FuncLoc=*/SourceLoc(),
                      /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, getterArgs,
                      TypeLoc::withoutLoc(type), dc);

@@ -159,7 +159,8 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = FuncDecl::create(
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*Throws*/false, /*ThrowsLoc*/SourceLoc(),
+      /*IsAsync*/false, /*AsyncLoc*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
       getterParams, TypeLoc::withoutLoc(storageInterfaceType),
       storage->getDeclContext());
@@ -207,6 +208,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   FuncDecl *setter = FuncDecl::create(
       TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
       Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*IsAsync*/false, /*AsyncLoc*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
       params, TypeLoc::withoutLoc(setterRetTy),
       storage->getDeclContext());
@@ -330,10 +332,9 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   auto *materializeForSet = FuncDecl::create(
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
       Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*IsAsync*/false, /*AsyncLoc*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(),
-      (genericParams
-       ? genericParams->clone(DC)
-       : nullptr),
+      (genericParams ? genericParams->clone(DC) : nullptr),
       params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
@@ -1389,11 +1390,12 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   ParamLists.push_back(ParameterList::create(Context, Params));
 
   auto *Parameter =
-    FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-                     /*FuncLoc=*/SourceLoc(),
+    FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None, /*FuncLoc=*/SourceLoc(),
                      DeclName(Context, ParameterBaseName, NameComponents),
                      /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, ParamLists,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
@@ -1949,6 +1951,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
     new (context) ConstructorDecl(name, Loc,
                                   OTK_None, /*FailabilityLoc=*/SourceLoc(),
                                   /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                                  /*IsAsync=*/false, /*AsyncLoc=*/SourceLoc(),
                                   selfParam, paramList,
                                   nullptr, decl);
 
@@ -2089,6 +2092,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                               /*FailabilityLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
+                              /*IsAsync=*/superclassCtor->isAsync(),
+                              /*AsyncLoc=*/SourceLoc(),
                               selfDecl, bodyParams,
                               /*GenericParams=*/nullptr, classDecl);
 
@@ -2167,10 +2172,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     CallExpr::create(ctx, ctorRef, ctorArgs,
                      superclassCtor->getFullName().getArgumentNames(), { },
                      /*hasTrailingClosure=*/false, /*implicit=*/true);
-  if (superclassCtor->hasThrows()) {
+  if (superclassCtor->hasThrows())
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
                                   /*implicit=*/true);
-  }
+  if (superclassCtor->isAsync())
+    superCall = new (ctx) AwaitExpr(SourceLoc(), superCall, Type(),
+                                    /*implicit*/true);
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(superCall),
                                   SourceLoc(),

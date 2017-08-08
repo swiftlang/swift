@@ -1421,7 +1421,9 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
 
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
-
+  if (ctor->isAsync())
+    r = new (Context) AwaitExpr(SourceLoc(), r, Type(), /*implicit*/true);
+  
   auto resultTy =
       typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
                           TypeCheckExprFlags::IsDiscarded |

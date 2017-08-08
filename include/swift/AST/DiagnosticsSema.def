@@ -1590,6 +1590,8 @@ NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
 NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
+NOTE(protocol_witness_async_conflict,none,
+     "candidate and protocol requirement are not both 'async'", ())
 NOTE(protocol_witness_not_objc,none,
      "candidate is explicitly '@nonobjc'", ())
 
@@ -1881,6 +1883,9 @@ ERROR(override_class_declaration_in_extension,none,
 WARNING(override_class_declaration_in_extension_warning,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())
+ERROR(override_async,none,
+      "cannot override %1async %select{method|initializer}0 with "
+      "%2async %select{method|initializer}0", (bool, StringRef, StringRef))
 ERROR(override_throws,none,
       "cannot override non-throwing %select{method|initializer}0 with "
       "throwing %select{method|initializer}0", (bool))
@@ -3038,6 +3043,10 @@ ERROR(async_call_without_await,none,
       "call is 'async' but is not marked with 'await'", ())
 WARNING(no_async_in_await,none,
         "no calls to 'async' functions occur within 'await' expression", ())
+ERROR(async_call_in_illegal_context,none,
+      "async expression is not allowed in %0",
+      (StringRef))
+
 
 WARNING(no_throw_in_try,none,
         "no calls to throwing functions occur within 'try' expression", ())
@@ -3315,6 +3324,9 @@ NOTE(not_objc_function_type_param,none,
      "parameters and returns can be", ())
 NOTE(not_objc_function_type_throwing,none,
       "throwing function types cannot be represented in Objective-C", ())
+NOTE(not_objc_function_type_async,none,
+     "async function types cannot be represented in Objective-C", ())
+
 NOTE(objc_inferring_on_objc_protocol_member,none,
      "inferring '@objc' because the declaration is a member of "
      "an '@objc' protocol", ())
@@ -3349,6 +3361,9 @@ ERROR(objc_invalid_on_func_single_param_type,none,
 ERROR(objc_invalid_on_func_result_type,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because its result type "
       "cannot be represented in Objective-C", (unsigned))
+ERROR(objc_invalid_on_async_func,none,
+      "method cannot be %" OBJC_ATTR_SELECT "0 because it is async",
+      (unsigned))
 ERROR(objc_invalid_on_foreign_class,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because Core Foundation "
       "types are not classes in Objective-C", (unsigned))

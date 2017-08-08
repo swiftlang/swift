@@ -1052,12 +1052,13 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           isAcceptableVersionBasedChange = true;
         }
       }
-      // - one throws and the other does not,
+      // - one throws and the other does not, or async bits differ.
       {
         const auto *currentAFD = dyn_cast<AbstractFunctionDecl>(current);
         const auto *otherAFD = dyn_cast<AbstractFunctionDecl>(other);
         if (currentAFD && otherAFD &&
-            currentAFD->hasThrows() != otherAFD->hasThrows()) {
+            (currentAFD->hasThrows() != otherAFD->hasThrows() ||
+             currentAFD->isAsync() != otherAFD->isAsync())) {
           isAcceptableVersionBasedChange = true;
         }
       }
@@ -2832,7 +2833,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
     attr->setInvalid();
   }
-
+  
   // Make sure we have the appropriate bridging operations.
   if (!isa<DestructorDecl>(D))
     checkBridgedFunctions(TC);
@@ -6466,9 +6467,20 @@ public:
         TC.diagnose(base, diag::overridden_here);
       }
     }
-    // If the overriding declaration is 'throws' but the base is not,
+    // If the overriding declaration is 'throws' or 'async' but the base is not,
     // complain.
     if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
+      // Because there is no subtype relationship between non-async and async
+      // functions, the async bit must exactly match.
+      if (overrideFn->isAsync() !=
+            cast<AbstractFunctionDecl>(base)->isAsync()) {
+        TC.diagnose(override, diag::override_async,
+                    isa<ConstructorDecl>(override),
+                    overrideFn->isAsync() ? "non-" : "",
+                    overrideFn->isAsync() ? "" : "non-");
+        TC.diagnose(base, diag::overridden_here);
+      }
+
       if (overrideFn->hasThrows() &&
           !cast<AbstractFunctionDecl>(base)->hasThrows()) {
         TC.diagnose(override, diag::override_throws,

@@ -3476,7 +3476,18 @@ bool TypeChecker::isRepresentableInObjC(
       return false;
     }
   }
-
+  
+  // @objc functions cannot be async (yet).
+  if (AFD->isAsync()) {
+    if (Diagnose) {
+      SourceLoc loc = AFD->getAsyncLoc();
+      diagnose(loc.isValid() ? loc : AFD->getLoc(),
+               diag::objc_invalid_on_async_func,
+               getObjCDiagnosticAttrKind(Reason));
+    }
+    return false;
+  }
+  
   // Throwing functions must map to a particular error convention.
   if (AFD->hasThrows()) {
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
@@ -3871,12 +3882,16 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   if (auto fnTy = T->getAs<FunctionType>()) {
-    if (fnTy->getExtInfo().throws() ) {
+    if (fnTy->throws()) {
       diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
         .highlight(TypeRange);
       return;
     }
-
+    if (fnTy->isAsync()) {
+      diagnose(TypeRange.Start, diag::not_objc_function_type_async)
+        .highlight(TypeRange);
+      return;
+    }
     diagnose(TypeRange.Start, diag::not_objc_function_type_param)
       .highlight(TypeRange);
     return;

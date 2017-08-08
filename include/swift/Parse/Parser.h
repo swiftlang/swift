@@ -1057,8 +1057,9 @@ public:
                                       DeclName &fullName,
                               SmallVectorImpl<ParameterList *> &bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
-                                      SourceLoc &throws,
+                                      SourceLoc &throwsLoc,
                                       bool &rethrows,
+                                      SourceLoc &asyncLoc,
                                       TypeRepr *&retType);
 
   //===--------------------------------------------------------------------===//

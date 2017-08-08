@@ -216,7 +216,6 @@ class TypeDecoder {
       }
 
       unsigned nextChild = 0;
-      bool isThrow = false, isAsync = false;
       if (Node->getChild(nextChild)->getKind() == NodeKind::ThrowsAnnotation) {
         ++nextChild;
         flags = flags.withThrows(true);

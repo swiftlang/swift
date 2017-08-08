@@ -2058,8 +2058,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   // Function types.
   if (auto functionType = type->getAs<FunctionType>()) {
-    // Cannot handle throwing functions.
-    if (functionType->getExtInfo().throws())
+    // Cannot handle throwing or async functions.
+    if (functionType->throws() || functionType->isAsync())
       return failure();
 
     // Whether we have found any types that are bridged.

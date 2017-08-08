@@ -760,8 +760,9 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   DeclName name(C, C.Id_encode, params[1]);
   auto *encodeDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                       SourceLoc(), name, SourceLoc(),
-                                      /*Throws=*/true, SourceLoc(), SourceLoc(),
-                                      nullptr, params,
+                                      /*Throws=*/true, SourceLoc(),
+                                      /*IsAsync=*/false, SourceLoc(),
+                                      SourceLoc(), nullptr, params,
                                       TypeLoc::withoutLoc(returnType),
                                       target);
   encodeDecl->setImplicit();
@@ -1034,7 +1035,10 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
         if (superInitDecl->hasThrows())
           callExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                      /*Implicit=*/true);
-
+        if (superInitDecl->isAsync())
+          callExpr = new (C) AwaitExpr(SourceLoc(), callExpr, Type(),
+                                       /*Implicit*/true);
+        
         statements.push_back(callExpr);
       }
     }
@@ -1103,8 +1107,10 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   DeclName name(C, C.Id_init, paramList);
 
   auto *initDecl = new (C) ConstructorDecl(name, SourceLoc(), OTK_None,
-                                           SourceLoc(), /*Throws=*/true,
-                                           SourceLoc(), selfDecl, paramList,
+                                           SourceLoc(),
+                                           /*Throws=*/true, SourceLoc(),
+                                           /*Async=*/false, SourceLoc(),
+                                           selfDecl, paramList,
                                            /*GenericParams=*/nullptr, target);
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(deriveBodyDecodable_init);
