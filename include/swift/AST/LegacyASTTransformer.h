@@ -26,6 +26,7 @@
 #include "swift/AST/SyntaxASTMap.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Syntax.h"
+#include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Syntax/TokenSyntax.h"
 
 namespace swift {
@@ -51,6 +52,49 @@ class LegacyASTTransformer : public ASTVisitor<LegacyASTTransformer,
   SourceManager &SourceMgr;
   const unsigned BufferID;
   const TokenPositionList &Tokens;
+
+  std::pair<AttributeListSyntax, ModifierListSyntax>
+  getAttributesFromDecl(Decl *D);
+
+  AttributeSyntax getAttribute(DeclAttribute *attr);
+
+  DeclModifierSyntax getModifier(DeclAttribute *attr);
+
+  /// Convert the provided Syntax node to a StmtSyntax, either by wrapping it in
+  /// an `ExpressionStmt` or a `DeclarationStmt`.
+  StmtSyntax getStmtSyntax(Syntax Node);
+
+  /// Transform a legacy Expr to a full-fidelity `ExprSyntax`.
+  ///
+  /// If an ASTNode's kind isn't covered by the transform, an `UnknownSyntax`
+  /// will be returned containing all of the `TokenSyntax`es that comprise the
+  /// node.
+  ///
+  /// If the node isn't expressible in an `ExprSyntax`, then `None` is returned.
+  Optional<ExprSyntax> transform(Expr *E);
+
+  /// Transform a legacy Decl to a full-fidelity `DeclSyntax`.
+  ///
+  /// If an ASTNode's kind isn't covered by the transform, an `UnknownSyntax`
+  /// will be returned containing all of the `TokenSyntax`es that comprise the
+  /// node.
+  ///
+  /// If the node isn't expressible in a `DeclSyntax`, then `None` is returned.
+  Optional<DeclSyntax> transform(Decl *D);
+
+  /// Transform a legacy Stmt to a full-fidelity `StmtSyntax`.
+  ///
+  /// If an ASTNode's kind isn't covered by the transform, an `UnknownSyntax`
+  /// will be returned containing all of the `TokenSyntax`es that comprise the
+  /// node.
+  ///
+  /// If the node isn't expressible in a `StmtSyntax`, then `None` is returned.
+  Optional<StmtSyntax> transform(Stmt *S);
+
+  /// Do a binary search for a token at the given `Offset`.
+  TokenSyntax findToken(SourceLoc Loc,
+                        Optional<tok> ExpectedKind = None,
+                        OwnedString ExpectedText = OwnedString());
 public:
   LegacyASTTransformer(SyntaxASTMap &ASTMap,
                        SourceManager &SourceMgr,
@@ -66,15 +110,20 @@ public:
   SourceLoc getEndLocForStmt(const Stmt *S) const;
   SourceLoc getEndLocForExpr(const Expr *E) const;
   RC<SyntaxData> getUnknownSyntax(SourceRange SR, SyntaxKind Kind);
-  RC<SyntaxData> getAttributesFromDecl(Decl *D);
   RC<SyntaxData> getUnknownDecl(Decl *D);
   RC<SyntaxData> getUnknownStmt(Stmt *S);
   RC<SyntaxData> getUnknownExpr(Expr *E);
   RC<SyntaxData> visitMembers(DeclRange Members);
 
-//  RC<RawSyntax> visitDecl(Decl *D);
-//  RC<RawSyntax> visitExpr(Expr *E);
-//  RC<RawSyntax> visitStmt(Stmt *S);
+  /// Transform a legacy AST node to a full-fidelity `Syntax`.
+  ///
+  /// If an ASTNode's kind isn't covered by the transform, an `UnknownSyntax`
+  /// will be returned containing all of the `TokenSyntax`es that comprise the
+  /// node.
+  ///
+  /// If the node isn't expressible in a `Syntax`, then `None` is returned.
+  Optional<Syntax> transform(ASTNode Node);
+
 #define DECL(CLASS, PARENT) RC<SyntaxData> \
   visit##CLASS##Decl(CLASS##Decl *, \
     const SyntaxData *Parent = nullptr, \
@@ -107,17 +156,6 @@ transformAST(ASTNode Node,
              SourceManager &SourceMgr,
              const unsigned BufferID,
              const TokenPositionList &Tokens);
-
-/// Do a binary search for a token at the given `Offset`.
-TokenSyntax findTokenSyntax(tok ExpectedKind,
-                                OwnedString ExpectedText,
-                                SourceManager &SourceMgr,
-                                SourceLoc Loc,
-                                unsigned BufferID,
-                                const TokenPositionList &Tokens);
-
-//ArrayRef<TokenSyntax>
-//syntax::tokensInRange(SourceRange Range, const TokenPositionList &Tokens);
 
 } // end namespace syntax
 } // end namespace swift

@@ -18,7 +18,7 @@ class Child(object):
         # a token node. Grab the existing reference to that token from the
         # global list.
         self.token_kind = \
-            self.syntax_kind if "Token" in self.syntax_kind else None
+            self.syntax_kind if self.syntax_kind.endswith('Token') else None
         self.token = SYNTAX_TOKEN_MAP.get(self.token_kind)
 
         self.is_optional = is_optional

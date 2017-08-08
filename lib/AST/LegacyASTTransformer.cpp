@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/LegacyASTTransformer.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Syntax/References.h"
+#include "swift/Syntax/SyntaxBuilders.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/UnknownSyntax.h"
@@ -74,43 +76,154 @@ syntax::transformAST(ASTNode Node,
                      SourceManager &SourceMgr,
                      const unsigned BufferID,
                      const TokenPositionList &Tokens) {
-  LegacyASTTransformer Transformer { ASTMap, SourceMgr, BufferID, Tokens };
+  LegacyASTTransformer transformer = { ASTMap, SourceMgr, BufferID, Tokens };
+  return transformer.transform(Node);
+};
 
+Optional<Syntax> LegacyASTTransformer::transform(ASTNode Node) {
   if (Node.is<Expr *>()) {
-    auto E = Node.get<Expr *>();
-    if (E->isImplicit() || E->getSourceRange().isInvalid()) {
-      return None;
+    if (auto node = transform(Node.get<Expr *>())) {
+      return node.getValue();
     }
-    auto Transformed = Transformer.visit(E);
-    ASTMap.recordSyntaxMapping(Transformed, Node);
-    return Syntax { Transformed, Transformed.get() };
   } else if (Node.is<Decl *>()) {
-    auto D = Node.get<Decl *>();
-    if (auto VD = dyn_cast<VarDecl>(D)) {
-      if (VD->getParentPattern()) {
-        return None;
-      }
-    } else if (auto FD = dyn_cast<FuncDecl>(D)) {
-      if (FD->isGetterOrSetter()) {
-        return None;
-      }
+    if (auto node = transform(Node.get<Decl *>())) {
+      return node.getValue();
     }
-    if (D->isImplicit() || D->getSourceRange().isInvalid()) {
-      return None;
-    }
-    auto Transformed = Transformer.visit(D);
-    ASTMap.recordSyntaxMapping(Transformed, Node);
-    return Syntax { Transformed, Transformed.get() };
   } else if (Node.is<Stmt *>()) {
-    auto S = Node.get<Stmt *>();
-    if (S->isImplicit() || S->getSourceRange().isInvalid()) {
-      return None;
+    if (auto node = transform(Node.get<Stmt *>())) {
+      return node.getValue();
     }
-    auto Transformed = Transformer.visit(S);
-    ASTMap.recordSyntaxMapping(Transformed, Node);
-    return Syntax { Transformed, Transformed.get() };
   }
   return None;
+}
+
+StmtSyntax LegacyASTTransformer::getStmtSyntax(Syntax Node) {
+  if (Node.isDecl())
+    return SyntaxFactory::makeDeclarationStmt(Node.castTo<DeclSyntax>(),
+                                              None);
+  if (Node.isExpr())
+    return SyntaxFactory::makeExpressionStmt(Node.castTo<ExprSyntax>(),
+                                             None);
+  return Node.castTo<StmtSyntax>();
+}
+
+Optional<ExprSyntax> LegacyASTTransformer::transform(Expr *E) {
+  if (E->isImplicit() || E->getSourceRange().isInvalid()) {
+    return None;
+  }
+  auto Transformed = visit(E);
+  ASTMap.recordSyntaxMapping(Transformed, E);
+  return ExprSyntax { Transformed, Transformed.get() };
+}
+
+Optional<DeclSyntax> LegacyASTTransformer::transform(Decl *D) {
+  if (auto VD = dyn_cast<VarDecl>(D)) {
+    if (VD->getParentPattern()) {
+      return None;
+    }
+  } else if (auto FD = dyn_cast<FuncDecl>(D)) {
+    if (FD->isGetterOrSetter()) {
+      return None;
+    }
+  }
+  if (D->isImplicit() || D->getSourceRange().isInvalid()) {
+    return None;
+  }
+  auto Transformed = visit(D);
+  ASTMap.recordSyntaxMapping(Transformed, D);
+  return DeclSyntax { Transformed, Transformed.get() };
+}
+
+Optional<StmtSyntax> LegacyASTTransformer::transform(Stmt *S) {
+  if (S->isImplicit() || S->getSourceRange().isInvalid()) {
+    return None;
+  }
+  auto Transformed = visit(S);
+  ASTMap.recordSyntaxMapping(Transformed, S);
+  return StmtSyntax { Transformed, Transformed.get() };
+}
+
+AttributeSyntax LegacyASTTransformer::getAttribute(DeclAttribute *attr) {
+  AttributeSyntaxBuilder b;
+  b.useAtSignToken(findToken(attr->AtLoc, tok::at_sign, "@"));
+
+  auto name = findToken(attr->getLocation(), tok::identifier);
+  b.useIdentifier(name);
+
+  auto tokens = getRawTokenSyntaxesInRange(attr->getRange(), SourceMgr,
+                                           BufferID, Tokens);
+
+  // Search through the tokens for the leading left paren and right paren.
+  // Any other tokens are added to the attribute directly.
+  bool hasLeftParen = false;
+  for (size_t i = 0; i < tokens.size(); ++i) {
+    auto token = tokens[i];
+    if (token == name.getRawToken()) continue;
+    auto tokenSyntax = make<TokenSyntax>(token);
+
+    // If the 2nd token in the list is a left paren, it's considered
+    // "the left paren"
+    if (i == 1 && token->getTokenKind() == tok::l_paren) {
+      hasLeftParen = true;
+      b.useLeftParen(tokenSyntax);
+      continue;
+    }
+
+    // If the last token in the list is a right paren, it's considered
+    // "the right paren"
+    if (i == tokens.size() - 1 && hasLeftParen &&
+        token->getTokenKind() == tok::r_paren) {
+      b.useRightParen(tokenSyntax);
+      continue;
+    }
+
+    // Otherwise, it's just a token
+    b.addToken(tokenSyntax);
+  }
+
+  return b.build();
+}
+
+DeclModifierSyntax LegacyASTTransformer::getModifier(DeclAttribute *attr) {
+  DeclModifierSyntaxBuilder b;
+
+  auto tokens = getRawTokenSyntaxesInRange(attr->getRange(), SourceMgr,
+                                           BufferID, Tokens);
+
+  // FIXME: This relies on modifiers either being one of two forms:
+  //        - public, private, internal, weak, lazy (1 token)
+  //        - private(set), unsafe(unowned) (4 tokens)
+
+  if (tokens.size() >= 1) {
+    // public, private, weak, lazy, etc.
+    b.useName(make<TokenSyntax>(tokens[0]));
+  }
+  if (tokens.size() == 4) {
+    // private(set), unsafe(unowned), etc.
+    b.useLeftParen(make<TokenSyntax>(tokens[1]));
+    b.useArgument(make<TokenSyntax>(tokens[2]));
+    b.useRightParen(make<TokenSyntax>(tokens[3]));
+  }
+
+  return b.build();
+}
+
+std::pair<AttributeListSyntax, ModifierListSyntax>
+LegacyASTTransformer::getAttributesFromDecl(Decl *D) {
+  std::vector<AttributeSyntax> attrs;
+  std::vector<Syntax> modifiers;
+  for (auto *attr : D->getAttrs()) {
+    if (attr->AtLoc.isValid()) {
+      attrs.push_back(getAttribute(attr));
+    } else {
+      modifiers.push_back(getModifier(attr));
+    }
+  }
+
+  return {
+    SyntaxFactory::makeAttributeList(attrs),
+    SyntaxFactory::makeModifierList(modifiers)
+  };
 }
 
 SourceLoc LegacyASTTransformer::getStartLocForDecl(const Decl *D) const {
@@ -308,39 +421,31 @@ LegacyASTTransformer::visitStructDecl(StructDecl *D,
                                       const CursorIndex IndexInParent) {
   return getUnknownDecl(D);
 
-// TODO
 #if 0
   StructDeclSyntaxBuilder StructBuilder;
   if (D->getStartLoc().isValid()) {
-    auto StructKeyword = findTokenSyntax(tok::kw_struct, "struct", SourceMgr,
-                                       D->getStartLoc(), BufferID, Tokens);
+    auto StructKeyword = findToken(D->getStartLoc(), tok::kw_struct, "struct");
     StructBuilder.useStructKeyword(StructKeyword);
   }
   
   if (D->getNameLoc().isValid()) {
-    auto Identifier = findTokenSyntax(tok::identifier,
-                                    OwnedString(D->getName().str()),
-                                    SourceMgr, D->getNameLoc(), BufferID,
-                                    Tokens);
-    StructBuilder.useIdentifier(Identifier);
+    auto Identifier = findToken(D->getNameLoc(), tok::identifier,
+                                OwnedString(D->getName().str()));
+    StructBuilder.useName(Identifier);
   }
 
   if (D->getBraces().isValid()) {
-    auto LeftBraceToken = findTokenSyntax(tok::l_brace, "{", SourceMgr,
-                                        D->getBraces().Start, BufferID, Tokens);
+    auto LeftBraceToken = findToken(D->getBraces().Start, tok::l_brace, "{");
     StructBuilder.useLeftBrace(LeftBraceToken);
-    auto RightBraceToken = findTokenSyntax(tok::r_brace, "}", SourceMgr,
-                                         D->getBraces().End, BufferID, Tokens);
+    auto RightBraceToken = findToken(D->getBraces().End, tok::r_brace, "}");
     StructBuilder.useRightBrace(RightBraceToken);
   }
 
-  DeclMembersSyntaxBuilder MemberBuilder;
   for (auto Member : D->getMembers()) {
-    auto TransformedMember = transformAST(Member, ASTMap,
-                                          SourceMgr, BufferID, Tokens);
+    auto TransformedMember = transform(Member);
     if (TransformedMember.hasValue()) {
       if (auto MD = TransformedMember.getValue().getAs<DeclSyntax>()) {
-        MemberBuilder.addMember(MD.getValue());
+        StructBuilder.addDecl(MD.getValue());
       } else {
         continue;
         return getUnknownDecl(D);
@@ -350,8 +455,6 @@ LegacyASTTransformer::visitStructDecl(StructDecl *D,
       return getUnknownDecl(D);
     }
   }
-
-  StructBuilder.useMembers(MemberBuilder.build());
 
   return StructBuilder.build().Root;
 #endif
@@ -417,7 +520,62 @@ RC<SyntaxData>
 LegacyASTTransformer::visitFuncDecl(FuncDecl *FD,
                                     const SyntaxData *Parent,
                                     const CursorIndex IndexInParent) {
-  return getUnknownDecl(FD);
+  FunctionDeclSyntaxBuilder b;
+
+  auto funcKW = findToken(FD->getFuncLoc(), tok::kw_func, "func");
+  b.useFuncKeyword(funcKW);
+
+  auto name = findToken(FD->getNameLoc(), tok::identifier);
+  b.useIdentifier(name);
+
+  if (auto body = FD->getBody()) {
+    auto codeBlock = transform(body)->castTo<CodeBlockSyntax>();
+    b.useBody(codeBlock);
+  }
+
+  FunctionSignatureSyntaxBuilder fsb;
+  auto paramList = FD->getParameterList(0);
+  fsb.useLeftParen(findToken(paramList->getLParenLoc(), tok::l_paren, "("));
+  fsb.useRightParen(findToken(paramList->getRParenLoc(), tok::r_paren, ")"));
+  for (auto param : *paramList) {
+    FunctionParameterSyntaxBuilder fpb;
+
+    if (param->getArgumentNameLoc().isValid()) {
+      auto externalName = findToken(param->getArgumentNameLoc(),
+                                    tok::identifier);
+      fpb.useExternalName(externalName);
+
+      auto localName = findToken(param->getNameLoc(),
+                                    tok::identifier);
+      fpb.useLocalName(localName);
+
+      if (param->isDefaultArgument()) {
+        auto defaultExpr = param->getDefaultValue();
+        if (auto defaultValue = transform(defaultExpr)) {
+          fpb.useDefaultValue(defaultValue.getValue());
+        } else {
+          auto data = getUnknownExpr(defaultExpr);
+          fpb.useDefaultValue(ExprSyntax { data, data.get() });
+        }
+      }
+    }
+
+    fsb.addFunctionParameter(fpb.build());
+  }
+
+  b.useSignature(fsb.build());
+
+  auto pair = getAttributesFromDecl(FD);
+
+  for (auto attr : pair.first) {
+    b.addAttribute(attr);
+  }
+
+  for (auto mod : pair.second) {
+    b.addModifier(mod);
+  }
+
+  return b.build().Root;
 }
 
 RC<SyntaxData>
@@ -433,58 +591,44 @@ RC<SyntaxData>
 LegacyASTTransformer::visitBraceStmt(BraceStmt *S,
                                      const SyntaxData *Parent,
                                      const CursorIndex IndexInParent) {
-  auto LeftBrace = S->getLBraceLoc().isValid()
-    ? findTokenSyntax(tok::l_brace, "{", SourceMgr, S->getLBraceLoc(),
-                    BufferID, Tokens)
+
+  CodeBlockSyntaxBuilder b;
+  auto leftBrace = S->getLBraceLoc().isValid()
+    ? findToken(S->getLBraceLoc(), tok::l_brace, "{")
     : TokenSyntax::missingToken(tok::l_brace, "{");
+  b.useOpenBrace(leftBrace);
 
-  /// Because this syntax comes from an ASTNode, we need to handle Decl/Expr
-  /// and convert them into implicit DeclStmtSyntax and ExprStmtSyntaxes.
-  auto getStmtSyntax = [](Syntax Node) -> StmtSyntax {
-    if (Node.isDecl())
-      return SyntaxFactory::makeDeclarationStmt(Node.castTo<DeclSyntax>(),
-                                                None);
-    if (Node.isExpr())
-      return SyntaxFactory::makeExpressionStmt(Node.castTo<ExprSyntax>(),
-                                               None);
-    return Node.castTo<StmtSyntax>();
-  };
-
-  std::vector<StmtSyntax> Stmts;
-  for (auto Node : S->getElements()) {
-    auto Transformed = transformAST(Node, ASTMap, SourceMgr, BufferID, Tokens);
-    if (Transformed.hasValue()) {
-      Stmts.push_back(getStmtSyntax(*Transformed));
+  for (auto node : S->getElements()) {
+    auto transformed = transform(node);
+    if (transformed.hasValue()) {
+      /// Because this syntax comes from an ASTNode, we need to handle Decl/Expr
+      /// and convert them into implicit DeclStmtSyntax and ExprStmtSyntaxes.
+      b.addStmt(getStmtSyntax(*transformed));
     }
   }
 
-  auto RightBrace = S->getLBraceLoc().isValid()
-    ? findTokenSyntax(tok::r_brace, "}", SourceMgr, S->getLBraceLoc(),
-                    BufferID, Tokens)
+  auto rightBrace = S->getLBraceLoc().isValid()
+    ? findToken(S->getLBraceLoc(), tok::r_brace, "}")
     : TokenSyntax::missingToken(tok::r_brace, "}");
+  b.useCloseBrace(rightBrace);
 
-  auto StmtList = SyntaxFactory::makeStmtList(Stmts);
-
-  return SyntaxFactory::makeCodeBlock(LeftBrace, StmtList, RightBrace).Root;
+  return b.build().Root;
 }
 
 RC<SyntaxData>
 LegacyASTTransformer::visitReturnStmt(ReturnStmt *S,
                                       const SyntaxData *Parent,
                                       const CursorIndex IndexInParent) {
-  auto ReturnKW = findTokenSyntax(tok::kw_return, "return", SourceMgr,
-                                  S->getReturnLoc(), BufferID, Tokens);
-  auto Semicolon = findTokenSyntax(tok::semi, ";", SourceMgr,
-                                   S->getEndLoc(), BufferID, Tokens);
-  auto Result = transformAST(S->getResult(), ASTMap, SourceMgr, BufferID,
-                             Tokens);
+  auto ReturnKW = findToken(S->getReturnLoc(), tok::kw_return, "return");
+  auto Semicolon = findToken(S->getEndLoc(), tok::semi, ";");
+  auto Result = transform(S->getResult());
 
   if (!Result.hasValue()) {
     return getUnknownStmt(S);
   }
 
-  return SyntaxFactory::makeReturnStmt(ReturnKW,
-    Result.getValue().castTo<ExprSyntax>(), Semicolon).Root;
+  return SyntaxFactory::makeReturnStmt(ReturnKW, Result.getValue(),
+                                       Semicolon).Root;
 }
 
 RC<SyntaxData>
@@ -593,10 +737,10 @@ LegacyASTTransformer::visitFallthroughStmt(FallthroughStmt *S,
     return SyntaxFactory::makeBlankFallthroughStmt().Root;
   }
 
-  auto FallthroughToken = findTokenSyntax(tok::kw_fallthrough, "fallthrough",
-                                          SourceMgr, S->getLoc(),
-                                          BufferID, Tokens);
-  auto Semicolon = SyntaxFactory::makeToken(tok::semi, ";", SourcePresence::Missing,
+  auto FallthroughToken = findToken(S->getLoc(), tok::kw_fallthrough,
+                                    "fallthrough");
+  auto Semicolon = SyntaxFactory::makeToken(tok::semi, ";",
+                                            SourcePresence::Missing,
                                             {}, {});
   return SyntaxFactory::makeFallthroughStmt(FallthroughToken, Semicolon).Root;
 }
@@ -636,13 +780,9 @@ LegacyASTTransformer::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
                                               const SyntaxData *Parent,
                                               const CursorIndex IndexInParent) {
   auto Sign = E->getMinusLoc().isValid()
-    ? findTokenSyntax(tok::oper_prefix, OwnedString(),
-                      SourceMgr, E->getMinusLoc(),
-                      BufferID, Tokens)
+    ? findToken(E->getMinusLoc(), tok::oper_prefix)
     : TokenSyntax::missingToken(tok::oper_prefix, "");
-  auto Digits = findTokenSyntax(tok::integer_literal, OwnedString(),
-                                SourceMgr, E->getDigitsLoc(),
-                                BufferID, Tokens);
+  auto Digits = findToken(E->getDigitsLoc(), tok::integer_literal);
   return SyntaxFactory::makeIntegerLiteralExpr(Sign, Digits).Root;
 }
 
@@ -1300,12 +1440,9 @@ LegacyASTTransformer::visitKeyPathDotExpr(KeyPathDotExpr *E,
 }
 
 TokenSyntax
-syntax::findTokenSyntax(tok ExpectedKind,
-                        OwnedString ExpectedText,
-                        SourceManager &SourceMgr,
-                        SourceLoc Loc,
-                        unsigned BufferID,
-                        const TokenPositionList &Tokens) {
+LegacyASTTransformer::findToken(SourceLoc Loc,
+                                Optional<tok> ExpectedKind,
+                                OwnedString ExpectedText) {
   auto Offset = SourceMgr.getLocOffsetInBuffer(Loc, BufferID);
 
   size_t Start = 0;
@@ -1319,12 +1456,19 @@ syntax::findTokenSyntax(tok ExpectedKind,
 
     auto TokStart = Pos.getOffset();
 
+    // If we're expecting a specific kind of token, then check here. These
+    // flags will be true if there is no expectation passed-in.
+    auto IsExpectedKind = 
+      !ExpectedKind.hasValue() || Tok->getTokenKind() == *ExpectedKind;
+    auto IsExpectedText = ExpectedText.empty() ||
+      Tok->getText() == ExpectedText.str();
+
     if (Offset == TokStart) {
-      if (Tok->getTokenKind() == ExpectedKind &&
-          (ExpectedText.empty() || Tok->getText() == ExpectedText.str())) {
+      if (IsExpectedKind && IsExpectedText) {
         return make<TokenSyntax>(Tok);
       } else {
-        return TokenSyntax::missingToken(ExpectedKind, ExpectedText);
+        return TokenSyntax::missingToken(ExpectedKind.getValueOr(tok::unknown),
+                                         ExpectedText);
       }
     }
 
@@ -1335,5 +1479,6 @@ syntax::findTokenSyntax(tok ExpectedKind,
     }
   }
 
-  return TokenSyntax::missingToken(ExpectedKind, ExpectedText);
+  return TokenSyntax::missingToken(ExpectedKind.getValueOr(tok::unknown),
+                                   ExpectedText);
 }
