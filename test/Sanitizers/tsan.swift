@@ -1,8 +1,12 @@
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=thread -o %t_tsan-binary
 // RUN: not env %env-TSAN_OPTIONS="abort_on_error=0" %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
+#if os(OSX) || os(iOS)
+import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
+import Glibc
+#endif
 
 // Make sure we can handle swifterror and don't bail during the LLVM
 // threadsanitizer pass.
@@ -25,20 +29,26 @@ public func call_foobar() {
 
 // Test ThreadSanitizer execution end-to-end.
 
-import Darwin
-
-var threads: [pthread_t?] = []
+var threads: [pthread_t] = []
 var racey_x: Int;
 
 for _ in 1...5 {
+#if os(OSX) || os(iOS)
   var t : pthread_t?
+#else
+  var t : pthread_t = 0
+#endif
   pthread_create(&t, nil, { _ in
     print("pthread ran")
     racey_x = 5;
 
     return nil
   }, nil)
+#if os(OSX) || os(iOS)
+  threads.append(t!)
+#else
   threads.append(t)
+#endif
 }
 
 for t in threads {
@@ -46,7 +56,7 @@ for t in threads {
     print("nil thread")
     continue
   }
-  pthread_join(t!, nil)
+  pthread_join(t, nil)
 }
 
 // CHECK: ThreadSanitizer: data race
