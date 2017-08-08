@@ -1,7 +1,9 @@
 // RUN: %target-build-swift -parse-as-library -sanitize=fuzzer %s -o %t
 // RUN: not %t -only_ascii=1 -max_len=3 | %FileCheck %s
+// REQUIRES: CPU=x86_64
+// REQUIRES: executable_test
+// XFAIL: OS=ios
 // CHECK: Crash!
-// REQUIRES: rdar_33778153
 
 #if os(OSX) || os(iOS)
 import Darwin
