@@ -624,26 +624,16 @@
       ]
     },
     {
-      key.kind: source.lang.swift.stmt.for,
+      key.kind: source.lang.swift.stmt.foreach,
       key.offset: 1132,
       key.length: 37,
       key.nameoffset: 0,
       key.namelength: 0,
       key.elements: [
         {
-          key.kind: source.lang.swift.structure.elem.init_expr,
+          key.kind: source.lang.swift.structure.elem.id,
           key.offset: 1136,
-          key.length: 17
-        },
-        {
-          key.kind: source.lang.swift.structure.elem.expr,
-          key.offset: 1155,
-          key.length: 6
-        },
-        {
-          key.kind: source.lang.swift.structure.elem.expr,
-          key.offset: 1163,
-          key.length: 3
+          key.length: 5
         }
       ],
       key.substructure: [
@@ -984,6 +974,20 @@
       key.severity: source.diagnostic.severity.error,
       key.description: "getter/setter can only be defined for a single variable",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
+    },
+    {
+      key.line: 77,
+      key.column: 1,
+      key.filepath: main.swift,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "C-style for statement has been removed in Swift 3",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.ranges: [
+        {
+          key.offset: 1136,
+          key.length: 30
+        }
+      ]
     }
   ]
 }

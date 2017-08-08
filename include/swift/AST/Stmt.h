@@ -706,58 +706,6 @@ public:
   static bool classof(const Stmt *S) {return S->getKind() == StmtKind::RepeatWhile;}
 };
 
-/// ForStmt - for statement.  After type-checking, the condition is of
-/// type Builtin.Int1.  Note that the condition is optional.  If not present,
-/// it always evaluates to true.  The Initializer and Increment are also
-/// optional.
-class ForStmt : public LabeledStmt {
-  SourceLoc ForLoc, Semi1Loc, Semi2Loc;
-  NullablePtr<Expr> Initializer;
-  ArrayRef<Decl*> InitializerVarDecls;
-  NullablePtr<Expr> Cond;
-  NullablePtr<Expr> Increment;
-  Stmt *Body;
-  
-public:
-  ForStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc,
-          NullablePtr<Expr> Initializer,
-          ArrayRef<Decl*> InitializerVarDecls,
-          SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
-          NullablePtr<Expr> Increment,
-          Stmt *Body,
-          Optional<bool> implicit = None)
-  : LabeledStmt(StmtKind::For, getDefaultImplicitFlag(implicit, ForLoc),
-                LabelInfo),
-    ForLoc(ForLoc), Semi1Loc(Semi1Loc),
-    Semi2Loc(Semi2Loc), Initializer(Initializer),
-    InitializerVarDecls(InitializerVarDecls),
-    Cond(Cond), Increment(Increment), Body(Body) {
-  }
-  
-  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
-  SourceLoc getEndLoc() const { return Body->getEndLoc(); }
-
-  SourceLoc getFirstSemicolonLoc() const { return Semi1Loc; }
-  SourceLoc getSecondSemicolonLoc() const { return Semi2Loc; }
-  
-  NullablePtr<Expr> getInitializer() const { return Initializer; }
-  void setInitializer(Expr *V) { Initializer = V; }
-  
-  ArrayRef<Decl*> getInitializerVarDecls() const { return InitializerVarDecls; }
-  void setInitializerVarDecls(ArrayRef<Decl*> D) { InitializerVarDecls = D; }
-
-  NullablePtr<Expr> getCond() const { return Cond; }
-  void setCond(NullablePtr<Expr> C) { Cond = C; }
-
-  NullablePtr<Expr> getIncrement() const { return Increment; }
-  void setIncrement(Expr *V) { Increment = V; }
-
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *s) { Body = s; }
-  
-  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::For; }
-};
-
 /// ForEachStmt - foreach statement that iterates over the elements in a
 /// container.
 ///

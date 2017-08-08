@@ -66,9 +66,11 @@ func ffoo() {}
 
 // CHECK: <foreach>for <elem-id>i</elem-id> in <elem-expr>0...5</elem-expr> <brace>{}</brace></foreach>
 for i in 0...5 {}
-// CHECK: <for>for <elem-initexpr>var i = 0, i2 = 1</elem-initexpr>; <elem-expr>i == 0</elem-expr>; <elem-expr>++i</elem-expr> <brace>{}</brace></for>
+// CHECK: <foreach>for <elem-id>var (i, j)</elem-id> in <elem-expr>array</elem-expr> <brace>{}</brace></foreach>
+for var (i, j) in array {}
+// CHECK: <foreach>for <elem-id>var i</elem-id> = 0, i2 = 1; i == 0; ++i <brace>{}</brace></foreach>
 for var i = 0, i2 = 1; i == 0; ++i {}
-// CHECK: <for>for <elem-initexpr>var (i,i2) = (0,0), i3 = 1</elem-initexpr>; <elem-expr>i == 0</elem-expr>; <elem-expr>++i</elem-expr> <brace>{}</brace></for>
+// CHECK: <foreach>for <elem-id>var (i,i2)</elem-id> = (0,0), i3 = 1; i == 0; ++i <brace>{}</brace></foreach>
 for var (i,i2) = (0,0), i3 = 1; i == 0; ++i {}
 
 for i = 0; i == 0; ++i {}
@@ -105,7 +107,7 @@ let myArray2 = [1]
 // CHECK: <gvar>let <name>myDict2</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>]</dictionary></gvar>
 let myDict2 = [1:1]
 
-// CHECK: <for>for <brace><brace>{}</brace></brace></for>
+// CHECK: <foreach>for <brace>{}</brace></foreach>
 for {}
 
 // CHECK: <class>class <name><#MyCls#></name> : <inherited><elem-typeref><#OtherClass#></elem-typeref></inherited> {}

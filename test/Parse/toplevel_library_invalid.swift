@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library
 // RUN: %target-typecheck-verify-swift -parse-as-library -enable-astscope-lookup
 
-let x = 42 // expected-note{{did you mean 'x'?}}
+let x = 42
 x + x; // expected-error {{expressions are not allowed at the top level}} expected-warning {{result of operator '+' is unused}}
 x + x; // expected-error {{expressions are not allowed at the top level}} expected-warning {{result of operator '+' is unused}}
 // Make sure we don't crash on closures at the top level
@@ -10,9 +10,7 @@ x + x; // expected-error {{expressions are not allowed at the top level}} expect
 // expected-warning @-1 {{result of call is unused}}
 
 
-// FIXME: Too many errors for this.
-for i // expected-error 2 {{expected ';' in 'for' statement}} 
-      // expected-error @-1{{use of unresolved identifier 'i'}}
-      // expected-error @+3{{expected '{' in 'for' statement}}
-      // expected-error @+2{{expected condition in 'for' statement}}
-      // expected-error @+1{{expected expression}}
+// expected-error @+3 {{expected 'in' after for-each pattern}}
+// expected-error @+2 {{expected Sequence expression for for-each loop}}
+// expected-error @+1 {{expected '{' to start the body of for-each loop}}
+for i

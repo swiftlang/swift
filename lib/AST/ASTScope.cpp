@@ -558,30 +558,6 @@ void ASTScope::expand() const {
       addChild(bodyChild);
     break;
 
-  case ASTScopeKind::ForStmt:
-    // The for statement encloses the scope introduced by its initializers.
-    addChild(new (ctx) ASTScope(ASTScopeKind::ForStmtInitializer,
-                                this, forStmt));
-    break;
-
-  case ASTScopeKind::ForStmtInitializer:
-    // Add a child for the condition, if present.
-    if (auto cond = forStmt->getCond()) {
-      if (auto condChild = createIfNeeded(this, cond.get()))
-        addChild(condChild);
-    }
-
-    // Add a child for the increment, if present.
-    if (auto incr = forStmt->getIncrement()) {
-      if (auto incrChild = createIfNeeded(this, incr.get()))
-        addChild(incrChild);
-    }
-
-    // Add a child for the body.
-    if (auto bodyChild = createIfNeeded(this, forStmt->getBody()))
-      addChild(bodyChild);
-    break;
-
   case ASTScopeKind::Accessors: {
     // Add children for all of the explicitly-written accessors.
     SmallVector<ASTScope *, 4> accessors;
@@ -744,8 +720,6 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::CatchStmt:
     case ASTScopeKind::SwitchStmt:
     case ASTScopeKind::CaseStmt:
-    case ASTScopeKind::ForStmt:
-    case ASTScopeKind::ForStmtInitializer:
     case ASTScopeKind::Closure:
     case ASTScopeKind::TopLevelCode:
       // Not a direct descendant.
@@ -792,8 +766,6 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
     case ASTScopeKind::CatchStmt:
     case ASTScopeKind::SwitchStmt:
     case ASTScopeKind::CaseStmt:
-    case ASTScopeKind::ForStmt:
-    case ASTScopeKind::ForStmtInitializer:
     case ASTScopeKind::Closure:
     case ASTScopeKind::TopLevelCode:
       // Not a direct descendant.
@@ -839,8 +811,6 @@ static bool parentDirectDescendedFromTypeDecl(const ASTScope *parent,
     case ASTScopeKind::CatchStmt:
     case ASTScopeKind::SwitchStmt:
     case ASTScopeKind::CaseStmt:
-    case ASTScopeKind::ForStmt:
-    case ASTScopeKind::ForStmtInitializer:
     case ASTScopeKind::Closure:
     case ASTScopeKind::TopLevelCode:
       // Not a direct descendant.
@@ -1112,10 +1082,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
     return new (ctx) ASTScope(ASTScopeKind::ForEachStmt, parent,
                               cast<ForEachStmt>(stmt));
 
-  case StmtKind::For:
-    return new (ctx) ASTScope(ASTScopeKind::ForStmt, parent,
-                              cast<ForStmt>(stmt));
-
   case StmtKind::Do:
     return createIfNeeded(parent, cast<DoStmt>(stmt)->getBody());
 
@@ -1235,8 +1201,6 @@ bool ASTScope::canStealContinuation() const {
   case ASTScopeKind::CatchStmt:
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::CaseStmt:
-  case ASTScopeKind::ForStmt:
-  case ASTScopeKind::ForStmtInitializer:
   case ASTScopeKind::Closure:
   case ASTScopeKind::TypeDecl:
   case ASTScopeKind::AbstractFunctionDecl:
@@ -1366,8 +1330,6 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::CatchStmt:
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::CaseStmt:
-  case ASTScopeKind::ForStmt:
-  case ASTScopeKind::ForStmtInitializer:
   case ASTScopeKind::Closure:
     return getParent()->getASTContext();
 
@@ -1639,12 +1601,6 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     // Otherwise, it covers the body.
     return caseStmt->getBody()->getSourceRange();
 
-  case ASTScopeKind::ForStmt:
-    return forStmt->getSourceRange();
-
-  case ASTScopeKind::ForStmtInitializer:
-    return SourceRange(forStmt->getFirstSemicolonLoc(), forStmt->getEndLoc());
-
   case ASTScopeKind::Accessors:
     return abstractStorageDecl->getBracesRange();
 
@@ -1764,8 +1720,6 @@ DeclContext *ASTScope::getDeclContext() const {
   case ASTScopeKind::CatchStmt:
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::CaseStmt:
-  case ASTScopeKind::ForStmt:
-  case ASTScopeKind::ForStmtInitializer:
   case ASTScopeKind::AbstractFunctionBody:
     return nullptr;
   }
@@ -1805,7 +1759,6 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::ForEachStmt:
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::SwitchStmt:
-  case ASTScopeKind::ForStmt:
   case ASTScopeKind::Accessors:
   case ASTScopeKind::TopLevelCode:
     // No local declarations.
@@ -1874,13 +1827,6 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::CaseStmt:
     for (const auto &item : caseStmt->getCaseLabelItems())
       handlePattern(item.getPattern());
-    break;
-
-  case ASTScopeKind::ForStmtInitializer:
-    for (auto decl : forStmt->getInitializerVarDecls()) {
-      if (auto value = dyn_cast<ValueDecl>(decl))
-        result.push_back(value);
-    }
     break;
 
   case ASTScopeKind::PatternInitializer: {
@@ -2128,18 +2074,6 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::CaseStmt:
     printScopeKind("CaseStmt");
     printAddress(caseStmt);
-    printRange();
-    break;
-
-  case ASTScopeKind::ForStmt:
-    printScopeKind("ForStmt");
-    printAddress(forStmt);
-    printRange();
-    break;
-
-  case ASTScopeKind::ForStmtInitializer:
-    printScopeKind("ForStmtInitializer");
-    printAddress(forStmt);
     printRange();
     break;
 
