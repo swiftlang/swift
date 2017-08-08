@@ -159,7 +159,7 @@ public:
 };
 
 using ValueProducerRef =
-  llvm::function_ref<ManagedValue(SILGenFunction &gen, SILLocation loc,
+  llvm::function_ref<ManagedValue(SILGenFunction &SGF, SILLocation loc,
                                   SGFContext context)>;
 
 } // end namespace Lowering
