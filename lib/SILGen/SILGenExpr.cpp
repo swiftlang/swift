@@ -4558,8 +4558,7 @@ public:
         loc, loadedBase.getUnmanagedValue(), unownedType);
 
     // A reference type should never be exploded.
-    return RValue::withPreExplodedElements(ManagedValue::forUnmanaged(unowned),
-                                           refType);
+    return RValue(gen, ManagedValue::forUnmanaged(unowned), refType);
   }
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
