@@ -5,6 +5,7 @@
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// UNSUPPORTED: CPU=armv7
 
 import Swift
 import StdlibUnittest

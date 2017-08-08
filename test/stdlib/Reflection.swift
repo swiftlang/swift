@@ -3,6 +3,7 @@
 // RUN: %S/timeout.sh 360 %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
+// UNSUPPORTED: CPU=armv7
 
 //
 // DO NOT add more tests to this file.  Add them to test/1_stdlib/Runtime.swift.

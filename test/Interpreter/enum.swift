@@ -2,6 +2,7 @@
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=armv7
 
 enum Singleton {
   case x(Int, UnicodeScalar)

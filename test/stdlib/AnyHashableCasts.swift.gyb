@@ -6,6 +6,7 @@
 // RUN: %target-build-swift -g -O -module-name a %t/AnyHashableCasts.swift -o %t.out.optimized
 // RUN: %target-run %t.out.optimized
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=armv7
 
 import StdlibUnittest
 

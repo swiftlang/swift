@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=armv7
 
 import StdlibUnittest
 

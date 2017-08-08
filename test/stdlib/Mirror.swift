@@ -20,6 +20,7 @@
 // RUN: fi
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=armv7
 
 import StdlibUnittest
 
