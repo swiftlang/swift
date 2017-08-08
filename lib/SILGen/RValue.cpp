@@ -79,6 +79,16 @@ public:
   }
 
   void visitType(CanType formalType, ManagedValue v) {
+    // If we have a loadable type that has not been loaded, actually load it.
+    if (v.getType().isLoadable(SGF.getModule()) &&
+        !v.getType().isObject()) {
+      if (v.hasCleanup()) {
+        v = SGF.B.createLoadTake(loc, v);
+      } else {
+        v = SGF.B.createLoadBorrow(loc, v);
+      }
+    }
+
     values.push_back(v);
   }
 
