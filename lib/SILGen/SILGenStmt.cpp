@@ -730,10 +730,6 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   SGF.BreakContinueDestStack.pop_back();
 }
 
-void StmtEmitter::visitForStmt(ForStmt *S) {
-  llvm_unreachable("c-style for loop is always a semantic error");
-}
-
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));

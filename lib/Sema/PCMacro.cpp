@@ -62,9 +62,6 @@ public:
     case StmtKind::RepeatWhile: {
       return transformRepeatWhileStmt(cast<RepeatWhileStmt>(S));
     }
-    case StmtKind::For: {
-      return transformForStmt(cast<ForStmt>(S));
-    }
     case StmtKind::ForEach: {
       return transformForEachStmt(cast<ForEachStmt>(S));
     }
@@ -185,17 +182,6 @@ public:
     }
 
     return RWS;
-  }
-
-  ForStmt *transformForStmt(ForStmt *FS) {
-    if (Stmt *B = FS->getBody()) {
-      Stmt *NB = transformStmt(B);
-      if (NB != B) {
-        FS->setBody(NB);
-      }
-    }
-
-    return FS;
   }
 
   ForEachStmt *transformForEachStmt(ForEachStmt *FES) {

@@ -383,8 +383,6 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindDeclVarParam;
     case SyntaxStructureKind::ForEachStatement:
       return KindStmtForEach;
-    case SyntaxStructureKind::ForStatement:
-      return KindStmtFor;
     case SyntaxStructureKind::WhileStatement:
       return KindStmtWhile;
     case SyntaxStructureKind::RepeatWhileStatement:

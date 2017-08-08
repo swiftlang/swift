@@ -1369,41 +1369,6 @@ Stmt *Traversal::visitRepeatWhileStmt(RepeatWhileStmt *RWS) {
   return RWS;
 }
 
-Stmt *Traversal::visitForStmt(ForStmt *FS) {
-  // Visit any var decls in the initializer.
-  for (auto D : FS->getInitializerVarDecls())
-    if (doIt(D))
-      return nullptr;
-
-  if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
-    if (Expr *E = doIt(Initializer))
-      FS->setInitializer(E);
-    else
-      return nullptr;
-  }
-
-  if (auto *Cond = FS->getCond().getPtrOrNull()) {
-    if (Expr *E2 = doIt(Cond))
-      FS->setCond(E2);
-    else
-      return nullptr;
-
-  }
-
-  if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
-    if (Expr *E = doIt(Increment))
-      FS->setIncrement(E);
-    else
-      return nullptr;
-  }
-
-  if (Stmt *S = doIt(FS->getBody()))
-    FS->setBody(S);
-  else
-    return nullptr;
-  return FS;
-}
-
 Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
   if (Pattern *P = S->getPattern()) {
     if ((P = doIt(P)))

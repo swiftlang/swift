@@ -2932,19 +2932,6 @@ void PrintAST::visitCatchStmt(CatchStmt *stmt) {
   visit(stmt->getBody());
 }
 
-void PrintAST::visitForStmt(ForStmt *stmt) {
-  Printer << tok::kw_for << " (";
-  // FIXME: print initializer
-  Printer << "; ";
-  if (stmt->getCond().isNonNull()) {
-    // FIXME: print cond
-  }
-  Printer << "; ";
-  // FIXME: print increment
-  Printer << ") ";
-  visit(stmt->getBody());
-}
-
 void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
   Printer << tok::kw_for << " ";
   printPattern(stmt->getPattern());
