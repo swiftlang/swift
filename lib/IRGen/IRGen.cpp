@@ -176,14 +176,14 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                            addSwiftContractPass);
   }
 
-  if (Opts.Sanitize == SanitizerKind::Address) {
+  if (Opts.Sanitizers & SanitizerKind::Address) {
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addAddressSanitizerPasses);
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addAddressSanitizerPasses);
   }
   
-  if (Opts.Sanitize == SanitizerKind::Thread) {
+  if (Opts.Sanitizers & SanitizerKind::Thread) {
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addThreadSanitizerPass);
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
@@ -192,6 +192,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 
   if (Opts.SanitizeCoverage.CoverageType !=
       llvm::SanitizerCoverageOptions::SCK_None) {
+
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addSanitizerCoveragePass);
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
