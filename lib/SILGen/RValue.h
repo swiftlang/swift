@@ -31,7 +31,9 @@ namespace swift {
 namespace Lowering {
 
 class Initialization;
+class Scope;
 class SILGenFunction;
+class TypeLowering;
 
 /// An "exploded" SIL rvalue, in which tuple values are recursively
 /// destructured.
@@ -66,6 +68,8 @@ class SILGenFunction;
 /// *NOTE* In SILGen we don't try to explode structs, because doing so would
 /// require considering resilience, a job we want to delegate to IRGen.
 class RValue {
+  friend class swift::Lowering::Scope;
+
   std::vector<ManagedValue> values;
   CanType type;
   unsigned elementsToBeAdded;
@@ -293,6 +297,12 @@ public:
   void extractElements(SmallVectorImpl<RValue> &elements) &&;
   
   CanType getType() const & { return type; }
+
+  /// Return the lowered type associated with the given CanType's type lowering.
+  SILType getLoweredType(SILGenFunction &SGF) const &;
+
+  /// Return the type lowering of RValue::getType().
+  const Lowering::TypeLowering &getTypeLowering(SILGenFunction &SGF) const &;
 
   /// Rewrite the type of this r-value.
   void rewriteType(CanType newType) & {

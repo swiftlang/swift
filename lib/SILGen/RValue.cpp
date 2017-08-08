@@ -24,6 +24,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -65,6 +66,7 @@ static unsigned getRValueSize(CanType type) {
 }
 
 namespace {
+
 class ExplodeTupleValue
   : public CanTypeVisitor<ExplodeTupleValue,
                           /*RetTy=*/ void,
@@ -266,6 +268,8 @@ public:
   }
 };
 
+} // end anonymous namespace
+
 template<ImplodeKind KIND>
 static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
                                    SILGenFunction &SGF,
@@ -293,66 +297,6 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
   // TupleInsts.
   return ImplodeLoadableTupleValue<KIND>(values, SGF).visit(tupleType, l);
 }
-
-class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
-                                              /*RetTy*/ RValue>
-{
-public:
-  SILGenFunction &SGF;
-  SILBasicBlock *parent;
-  SILLocation loc;
-  bool functionArgs;
-
-  EmitBBArguments(SILGenFunction &SGF, SILBasicBlock *parent,
-                  SILLocation l, bool functionArgs)
-    : SGF(SGF), parent(parent), loc(l), functionArgs(functionArgs) {}
-
-  RValue visitType(CanType t) {
-    SILValue arg;
-    if (functionArgs) {
-      arg = parent->createFunctionArgument(SGF.getLoweredType(t),
-                                           loc.getAsASTNode<ValueDecl>());
-    } else {
-      SILType lty = SGF.getLoweredType(t);
-      ValueOwnershipKind ownershipkind = lty.isAddress()
-                                             ? ValueOwnershipKind::Trivial
-                                             : ValueOwnershipKind::Owned;
-      arg = parent->createPHIArgument(lty, ownershipkind,
-                                      loc.getAsASTNode<ValueDecl>());
-    }
-    ManagedValue mv = isa<InOutType>(t)
-      ? ManagedValue::forLValue(arg)
-      : SGF.emitManagedRValueWithCleanup(arg);
-
-    // If the value is a (possibly optional) ObjC block passed into the entry
-    // point of the function, then copy it so we can treat the value reliably
-    // as a heap object. Escape analysis can eliminate this copy if it's
-    // unneeded during optimization.
-    CanType objectType = t;
-    if (auto theObjTy = t.getAnyOptionalObjectType())
-      objectType = theObjTy;
-    if (functionArgs
-        && isa<FunctionType>(objectType)
-        && cast<FunctionType>(objectType)->getRepresentation()
-              == FunctionType::Representation::Block) {
-      SILValue blockCopy = SGF.B.createCopyBlock(loc, mv.getValue());
-      mv = SGF.emitManagedRValueWithCleanup(blockCopy);
-    }
-    return RValue(SGF, loc, t, mv);
-  }
-
-  RValue visitTupleType(CanTupleType t) {
-    RValue rv{t};
-
-    for (auto fieldType : t.getElementTypes())
-      rv.addElement(visit(fieldType));
-
-    return rv;
-  }
-};
-
-} // end anonymous namespace
-
 
 /// Perform a copy or init operation from an array of ManagedValue (from an
 /// RValue) into an initialization. The RValue will have one scalar ManagedValue
@@ -625,7 +569,7 @@ void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
   assert(srcValues.empty() && "didn't claim all elements!");
 }
 
-ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
+ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation loc) && {
   assert(!isUsed() && "r-value already used");
 
   if (isInContext()) {
@@ -643,9 +587,9 @@ ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
   }
 
   // Forward into a single value, then install a cleanup on the resulting
-  // imploded value.
-  return SGF.emitManagedRValueWithCleanup(
-                                std::move(*this).forwardAsSingleValue(SGF, l));
+  // imploded value if we have a +1 rvalue.
+  CleanupCloner cloner(SGF, *this);
+  return cloner.clone(std::move(*this).forwardAsSingleValue(SGF, loc));
 }
 
 SILValue RValue::getUnmanagedSingleValue(SILGenFunction &SGF,
@@ -844,4 +788,12 @@ bool RValue::isPlusZero(SILGenFunction &SGF) const & {
   return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
     return mv.hasCleanup();
   });
+}
+
+const TypeLowering &RValue::getTypeLowering(SILGenFunction &SGF) const & {
+  return SGF.getTypeLowering(getType());
+}
+
+SILType RValue::getLoweredType(SILGenFunction &SGF) const & {
+  return getTypeLowering(SGF).getLoweredType();
 }
