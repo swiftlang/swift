@@ -198,14 +198,14 @@ func testAsyncFunctionTypeConvertibility() {
   f1 = f2  // expected-error {{invalid removal of 'async' when converting function of type '() async -> ()' to '() -> ()'}}
   f1 = f3  // expected-error {{invalid conversion from throwing function of type}}
   f1 = f4  // expected-error {{invalid conversion from throwing function of type}}
-  f2 = f1  // ok, adding async
+  f2 = f1  // expected-error {{invalid addition of 'async' when converting function of type}}
   f2 = f3  // expected-error {{invalid conversion from throwing function of type}}
   f2 = f4  // expected-error {{invalid conversion from throwing function of type}}
   f3 = f1  // ok, just adding throws
   f3 = f2  // expected-error {{invalid removal of 'async' when converting function of type '() async -> ()' to '() -> ()'}}
   f3 = f4  // expected-error {{invalid removal of 'async' when converting function of type '() throws async -> ()' to '() throws -> ()'}}
-  f4 = f1  // ok, adding async
+  f4 = f1  // expected-error {{invalid addition of 'async' when converting function of type}}
   f4 = f2  // ok, just adding throws
-  f4 = f3  // ok, adding async
+  f4 = f3  // expected-error {{invalid addition of 'async' when converting function of type}}
 }
 

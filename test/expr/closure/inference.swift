@@ -40,7 +40,7 @@ var nestedClosuresWithBrokenInference = { f: Int in {} }
     // expected-error@-4 {{use of unresolved identifier 'f'}}
 
 func takesAsyncClosure(a : () async -> Int) {
-  takesAsyncClosure { return 42 }
+  takesAsyncClosure { () async in return 42 }
 }
 
 

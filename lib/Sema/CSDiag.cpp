@@ -2955,8 +2955,10 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
         return true;
       }
       
-      if (srcFT->isAsync() && !destFT->isAsync()) {
-        diagnose(expr->getLoc(), diag::async_functiontype_removal,
+      if (srcFT->isAsync() != destFT->isAsync()) {
+        diagnose(expr->getLoc(),
+                 srcFT->isAsync() ? diag::async_functiontype_removal
+                                  : diag::async_functiontype_addition,
                  fromType, toType)
           .highlight(expr->getSourceRange());
         return true;
@@ -4258,8 +4260,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
         diagID = diag::throws_functiontype_mismatch;
       else if (srcFT->isNoEscape() && !destFT->isNoEscape())
         diagID = diag::noescape_functiontype_mismatch;
-      else if (srcFT->isAsync() && !destFT->isAsync())
-        diagID = diag::async_functiontype_removal;
+      else if (srcFT->isAsync() != destFT->isAsync())
+        diagID = srcFT->isAsync() ? diag::async_functiontype_removal
+                                  : diag::async_functiontype_addition;
     }
 
   InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID,

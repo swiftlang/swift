@@ -421,6 +421,9 @@ ERROR(throws_functiontype_mismatch,none,
 ERROR(async_functiontype_removal,none,
       "invalid removal of 'async' when converting function of type %0 to %1",
       (Type, Type))
+ERROR(async_functiontype_addition,none,
+      "invalid addition of 'async' when converting function of type %0 to %1",
+      (Type, Type))
 ERROR(noescape_functiontype_mismatch,none,
       "invalid conversion from non-escaping function of type %0 to "
       "potentially escaping function type %1", (Type, Type))
