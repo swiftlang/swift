@@ -24,6 +24,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -568,7 +569,7 @@ void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
   assert(srcValues.empty() && "didn't claim all elements!");
 }
 
-ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
+ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation loc) && {
   assert(!isUsed() && "r-value already used");
 
   if (isInContext()) {
@@ -586,9 +587,9 @@ ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
   }
 
   // Forward into a single value, then install a cleanup on the resulting
-  // imploded value.
-  return SGF.emitManagedRValueWithCleanup(
-                                std::move(*this).forwardAsSingleValue(SGF, l));
+  // imploded value if we have a +1 rvalue.
+  CleanupCloner cloner(SGF, *this);
+  return cloner.clone(std::move(*this).forwardAsSingleValue(SGF, loc));
 }
 
 SILValue RValue::getUnmanagedSingleValue(SILGenFunction &SGF,
@@ -787,4 +788,12 @@ bool RValue::isPlusZero(SILGenFunction &SGF) const & {
   return llvm::none_of(values, [&SGF](ManagedValue mv) -> bool {
     return mv.hasCleanup();
   });
+}
+
+const TypeLowering &RValue::getTypeLowering(SILGenFunction &SGF) const & {
+  return SGF.getTypeLowering(getType());
+}
+
+SILType RValue::getLoweredType(SILGenFunction &SGF) const & {
+  return getTypeLowering(SGF).getLoweredType();
 }
