@@ -1157,22 +1157,22 @@ static void
 addLinkSanitizerLibArgsForLinux(const ArgList &Args,
                                  ArgStringList &Arguments,
                                  StringRef Sanitizer, const ToolChain &TC) {
+  addLinkRuntimeLibForLinux(Args, Arguments,
+      getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
 
-     addLinkRuntimeLibForLinux(Args, Arguments,
-         getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
+  // Code taken from
+  // https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
+  // There's no libpthread or librt on RTEMS.
+  if (TC.getTriple().getOS() != llvm::Triple::RTEMS) {
+    Arguments.push_back("-lpthread");
+    Arguments.push_back("-lrt");
+  }
+  Arguments.push_back("-lm");
 
-	//Code here from https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
-    // There's no libpthread or librt on RTEMS.
-    if (TC.getTriple().getOS() != llvm::Triple::RTEMS) {
-      Arguments.push_back("-lpthread");
-      Arguments.push_back("-lrt");
-    }
-    Arguments.push_back("-lm");
-    // There's no libdl on FreeBSD or RTEMS.
-    if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
-        TC.getTriple().getOS() != llvm::Triple::RTEMS)
-      Arguments.push_back("-ldl");
-	
+  // There's no libdl on FreeBSD or RTEMS.
+  if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
+      TC.getTriple().getOS() != llvm::Triple::RTEMS)
+    Arguments.push_back("-ldl");
 }
 
 ToolChain::InvocationInfo
