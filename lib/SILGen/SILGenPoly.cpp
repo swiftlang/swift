@@ -319,7 +319,7 @@ RValue Transform::transform(RValue &&input,
     return RValue::forInContext();
   }
 
-  return RValue::withPreExplodedElements(outputExpansion, outputTupleType);
+  return RValue(SGF, outputExpansion, outputTupleType);
 }
 
 // Single @objc protocol value metatypes can be converted to the ObjC

@@ -24,6 +24,7 @@
 #define SWIFT_LOWERING_RVALUE_H
 
 #include "ManagedValue.h"
+#include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -91,19 +92,25 @@ class RValue {
   }
 
   /// Private constructor used by copy() and borrow().
-  RValue(std::vector<ManagedValue> &&values, CanType type,
+  RValue(SILGenFunction &SGF, std::vector<ManagedValue> &&values, CanType type,
          unsigned elementsToBeAdded)
       : values(std::move(values)), type(type),
         elementsToBeAdded(elementsToBeAdded) {
-    verifyConsistentOwnership();
+    verify(SGF);
   }
 
-  /// Construct an RValue from a pre-exploded set of ManagedValues.
+  /// Private constructor for RValue::extractElement and pre-exploded element
+  /// constructor.
   ///
-  /// Used to implement the extractElement* methods. *NOTE* This constructor
-  /// assumes that the constructed RValue is fully formed and thus has
-  /// elementsToBeAdded set to zero.
-  RValue(ArrayRef<ManagedValue> values, CanType type);
+  /// If SGF is nullptr, this constructor assumes that it is passed a
+  /// pre-exploded set of ManagedValues that have already been verified as being
+  /// RValue compatible since they once made up an RValue. If SGF is non-null,
+  /// then we verify as well that all objects of loadable type are actually
+  /// loaded (i.e. are objects).
+  ///
+  /// *NOTE* This constructor assumes that the constructed RValue is fully
+  /// formed and thus has elementsToBeAdded set to zero.
+  RValue(SILGenFunction *SGF, ArrayRef<ManagedValue> values, CanType type);
 
   RValue(unsigned state) : elementsToBeAdded(state) {
     assert(isInSpecialState());
@@ -143,11 +150,12 @@ public:
   /// will be exploded.
   RValue(SILGenFunction &SGF, SILLocation l, CanType type, ManagedValue v);
 
-  /// Construct an RValue from a pre-exploded set of ManagedValues.
+  /// Create a complete RValue from a pre-exploded set of elements.
   ///
-  /// This is used to implement the extractElement* methods.
-  static RValue withPreExplodedElements(ArrayRef<ManagedValue> values,
-                                        CanType type);
+  /// Since the RValue is assumed to be complete, no further values can be
+  /// added.
+  RValue(SILGenFunction &SGF, ArrayRef<ManagedValue> values, CanType type)
+      : RValue(&SGF, values, type) {}
 
   /// Creates an invalid RValue object, in an "in-context" state.
   static RValue forInContext() {
@@ -332,12 +340,13 @@ public:
   void dump() const;
   void dump(raw_ostream &OS, unsigned indent = 0) const;
 
-private:
-  /// Assert that all non-trivial ManagedValues in this RValue either all have a
-  /// cleanup or all do not have a cleanup.
+  /// Verify RValue invariants.
+  ///
+  /// This checks ownership invariants and also checks that all sub managed
+  /// values that are loadable are actually objects.
   ///
   /// *NOTE* This is a no-op in non-assert builds.
-  void verifyConsistentOwnership() const;
+  void verify(SILGenFunction &SGF) const &;
 };
 
 } // end namespace Lowering
