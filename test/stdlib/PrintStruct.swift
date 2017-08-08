@@ -3,6 +3,7 @@
 // RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main
 // RUN: %target-run %t/main
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=armv7
 
 import StdlibUnittest
 import PrintTestTypes

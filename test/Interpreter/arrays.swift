@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=armv7
 
 // Create a new array
 var a = [Int](repeating: 0, count: 10)

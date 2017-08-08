@@ -9,6 +9,7 @@
 // RUN: fi
 // RUN: %line-directive %t/main.swift -- %target-run %t/Array
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=armv7
 
 import StdlibUnittest
 import StdlibCollectionUnittest

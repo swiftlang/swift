@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: CPU=armv7
 
 // rdar://problem/19060227
 
