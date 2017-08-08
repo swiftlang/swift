@@ -2464,6 +2464,10 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
       Diag.emplace(diagnose(loc,
                             diag::assoc_type_outside_of_protocol,
                             ATD->getName()));
+    } else if (auto CD = dyn_cast<ConstructorDecl>(member)) {
+      Diag.emplace(diagnose(loc,
+                            diag::construct_protocol_by_name,
+                            metatypeTy->getInstanceType()));
     } else {
       Diag.emplace(diagnose(loc,
                             diag::could_not_use_type_member_on_protocol_metatype,
@@ -5605,8 +5609,9 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
       // is malformed.
       SourceRange initExprRange(fnExpr->getSourceRange().Start,
                                 argExpr->getSourceRange().End);
-      CS.TC
-          .diagnose(fnExpr->getLoc(), diag::non_nominal_no_initializers, instTy)
+      CS.TC.diagnose(fnExpr->getLoc(), instTy->isExistentialType() ?
+                     diag::construct_protocol_by_name :
+                     diag::non_nominal_no_initializers, instTy)
           .highlight(initExprRange);
       return true;
     }
@@ -6597,7 +6602,11 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     
     auto arg = callExpr->getArg();
 
-    {
+    if (fnType->is<ExistentialMetatypeType>()) {
+      auto diag = diagnose(arg->getStartLoc(),
+                           diag::missing_init_on_metatype_initialization);
+      diag.highlight(fnExpr->getSourceRange());
+    } else {
       auto diag = diagnose(arg->getStartLoc(),
                            diag::cannot_call_non_function_value, fnType);
       diag.highlight(fnExpr->getSourceRange());
@@ -6950,6 +6959,13 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
     
     return true;
+  }
+
+  if (auto MTT = fnType->getAs<MetatypeType>()) {
+    if (MTT->getInstanceType()->isExistentialType()) {
+      diagnose(fnExpr->getLoc(), diag::construct_protocol_value, fnType);
+      return true;
+    }
   }
   
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
