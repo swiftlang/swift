@@ -356,5 +356,20 @@ Tests.test("LosslessStringConvertible/force unwrap/\(swift)") {
 }
 #endif
 
+#if !swift(>=4)
+Tests.test("popFirst") {
+  var str = "abcdef"
+  expectEqual("a", str.popFirst()!)
+  expectEqual("bcdef", str)
+  expectEqual("b", str.characters.popFirst()!)
+  expectEqual("cdef", str)
+  expectEqual("c", str.unicodeScalars.popFirst()!)
+  expectEqual("def", str)
+  expectEqual("d", str.popFirst()!)
+  expectEqual("e", str.popFirst()!)
+  expectEqual("f", str.popFirst()!)
+  expectEqual(nil, str.popFirst())
+}
+#endif
 
 runAllTests()
