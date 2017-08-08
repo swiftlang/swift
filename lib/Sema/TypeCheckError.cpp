@@ -1395,10 +1395,14 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
 
     void preserveCoverageFromAwaitOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasTryThrowSite, Self.Flags);
     }
 
     void preserveCoverageFromTryOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasAnyAsyncSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 

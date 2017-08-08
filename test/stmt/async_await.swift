@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
 func asyncThing() async -> Int {}
+func asyncThrowyThing() async throws -> Int {}
 
 func test1(asyncfp : () async -> Int, fp : () -> Int) async {
   _ = await asyncfp()
@@ -14,6 +15,11 @@ func test1(asyncfp : () async -> Int, fp : () -> Int) async {
 
   await test1(asyncfp: { () async in 42},
         fp: { () async in 42})  // expected-error {{invalid removal of 'async' when converting function of type '() async -> Int' to '() -> Int'}}
+  
+  do {
+    _ = try await asyncThrowyThing()
+    _ = await try asyncThrowyThing()
+  } catch {}
 }
 
 func test2(asyncfp : () async -> Int, fp : () -> Int) {

@@ -299,13 +299,11 @@ NodePointer Demangler::demangleType(StringRef MangledName) {
 }
 
 bool Demangler::parseAndPushNodes() {
-  int Idx = 0;
   while (Pos < Text.size()) {
     NodePointer Node = demangleOperator();
     if (!Node)
       return false;
     pushNode(Node);
-    Idx++;
   }
   return true;
 }
@@ -819,8 +817,8 @@ NodePointer Demangler::demanglePlainFunction() {
 
 NodePointer Demangler::popFunctionType(Node::Kind kind) {
   NodePointer FuncType = createNode(kind);
-  addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
+  addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
 
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
