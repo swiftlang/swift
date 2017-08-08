@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements semantic analysis to ensure that errors are
-// caught.
+// caught and that async calls are covered with await.
 //
 //===----------------------------------------------------------------------===//
 
@@ -142,6 +142,8 @@ public:
       // Look through Optional unwraps.
       if (auto conversion = dyn_cast<ForceValueExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();
+      } else if (auto oue = dyn_cast<InjectIntoOptionalExpr>(fn)) {
+        fn = oue->getSubExpr()->getValueProvidingExpr();
       } else if (auto conversion = dyn_cast<BindOptionalExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();
       // Look through function conversions.
