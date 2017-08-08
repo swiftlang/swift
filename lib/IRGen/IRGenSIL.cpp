@@ -1099,9 +1099,9 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
   // Apply sanitizer attributes to the function.
   // TODO: Check if the function is ASan black listed either in the external
   // file or via annotations.
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address)
+  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Address)
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
+  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread) {
     auto declContext = f->getDeclContext();
     if (declContext && isa<DestructorDecl>(declContext))
       // Do not report races in deinit and anything called from it

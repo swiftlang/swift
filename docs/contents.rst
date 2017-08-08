@@ -22,4 +22,3 @@ Contents
    TypeChecker
    DebuggingTheCompiler
    OptimizationTips
-   libFuzzerIntegration

@@ -19,7 +19,6 @@
 #define SWIFT_AST_SILOPTIONS_H
 
 #include "swift/Basic/Sanitizers.h"
-#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
@@ -132,7 +131,7 @@ public:
   bool AssumeSingleThreaded = false;
 
   /// Indicates which sanitizer is turned on.
-  OptionSet<SanitizerKind> Sanitizers;
+  SanitizerKind Sanitize : 2;
 
   /// Emit compile-time diagnostics when the law of exclusivity is violated.
   bool EnforceExclusivityStatic = true;
@@ -157,7 +156,7 @@ public:
   /// User code should never be compiled with this flag set.
   bool SILSerializeWitnessTables = false;
 
-  SILOptions() {}
+  SILOptions() : Sanitize(SanitizerKind::None) {}
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.

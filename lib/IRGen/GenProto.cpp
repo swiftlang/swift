@@ -1522,7 +1522,7 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
   // Load and check whether it was null.
   auto cachedResult = IGF.Builder.CreateLoad(cache);
   // TODO: When LLVM supports Consume, we should use it here.
-  if (IGF.IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+  if (IGF.IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
     cachedResult->setOrdering(llvm::AtomicOrdering::Acquire);
   auto cacheIsEmpty = IGF.Builder.CreateIsNull(cachedResult);
   llvm::BasicBlock *fetchBB = IGF.createBasicBlock("fetch");
