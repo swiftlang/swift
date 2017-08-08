@@ -240,7 +240,8 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
 
   ClosureExpr *CE =
       new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
-                                TypeLoc(), discriminator, newTopLevel);
+                                SourceLoc(), TypeLoc(), discriminator,
+                                newTopLevel);
 
   CE->setType(ParameterList::getFullInterfaceType(
       TupleType::getEmpty(Context), params, Context));

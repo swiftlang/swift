@@ -2114,26 +2114,22 @@ namespace {
       return finder.hasNoResult();
     }
     
-    /// \brief Walk a closure AST to determine if it can throw.
-    bool closureCanThrow(ClosureExpr *expr) {
-      // A walker that looks for 'try' or 'throw' expressions
+    /// \brief Walk a closure AST to determine if it can throw or is async, and
+    /// update the provided extInfo with bits to indicate this.
+    void checkClosureThrowingAsync(ClosureExpr *expr,
+                                   FunctionType::ExtInfo &extInfo) {
+      // A walker that looks for 'try', 'throw', and 'await' expressions
       // that aren't nested within closures, nested declarations,
       // or exhaustive catches.
       class FindInnerThrows : public ASTWalker {
         ConstraintSystem &CS;
         bool FoundThrow = false;
+        bool FoundAsync = false;
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-          // If we've found a 'try', record it and terminate the traversal.
-          if (isa<TryExpr>(expr)) {
-            FoundThrow = true;
-            return { false, nullptr };
-          }
-
-          // Don't walk into a 'try!' or 'try?'.
-          if (isa<ForceTryExpr>(expr) || isa<OptionalTryExpr>(expr)) {
-            return { false, expr };
-          }
+          // If we've found a 'try', record it.
+          FoundThrow |= isa<TryExpr>(expr);
+          FoundAsync |= isa<AwaitExpr>(expr);
           
           // Do not recurse into other closures.
           if (isa<ClosureExpr>(expr))
@@ -2212,17 +2208,22 @@ namespace {
         }
         
         std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-          // If we've found a 'throw', record it and terminate the traversal.
-          if (isa<ThrowStmt>(stmt)) {
+          // If we've found a 'throw', record it.
+          if (isa<ThrowStmt>(stmt))
             FoundThrow = true;
-            return { false, nullptr };
-          }
-
+          
           // Handle do/catch differently.
           if (auto doCatch = dyn_cast<DoCatchStmt>(stmt)) {
-            // Only walk into the 'do' clause of a do/catch statement
-            // if the catch isn't syntactically exhaustive.
-            if (!isSyntacticallyExhaustive(doCatch)) {
+            // If the catch clauses on this 'do' are syntactically exhaustive,
+            // then any throws in the body of the 'do' are ignored for the
+            // purpose of throw computation (but can still affect async
+            // generation).
+            if (isSyntacticallyExhaustive(doCatch)) {
+              llvm::SaveAndRestore<bool> X(FoundThrow);
+              if (!doCatch->getBody()->walk(*this))
+                return { false, nullptr };
+            } else {
+              // If non-exhaustive, walk it normally.
               if (!doCatch->getBody()->walk(*this))
                 return { false, nullptr };
             }
@@ -2244,19 +2245,21 @@ namespace {
         FindInnerThrows(ConstraintSystem &cs) : CS(cs) {}
 
         bool foundThrow() { return FoundThrow; }
+        bool foundAsync() { return FoundAsync; }
       };
-      
-      if (expr->getThrowsLoc().isValid())
-        return true;
-      
-      auto body = expr->getBody();
-      
-      if (!body)
-        return false;
-      
+
       auto tryFinder = FindInnerThrows(CS);
-      body->walk(tryFinder);
-      return tryFinder.foundThrow();
+      if (auto body = expr->getBody())
+        body->walk(tryFinder);
+
+      // Closure throws if explicitly specified or contains a throwing expr.
+      if (expr->getThrowsLoc().isValid() ||
+          tryFinder.foundThrow())
+        extInfo = extInfo.withThrows();
+
+      if (expr->getAsyncLoc().isValid() ||
+          tryFinder.foundAsync())
+        extInfo = extInfo.withAsync();
     }
     
 
@@ -2310,9 +2313,7 @@ namespace {
                          LocatorPathElt::getTupleElement(0)));
 
       auto extInfo = FunctionType::ExtInfo();
-      
-      if (closureCanThrow(expr))
-        extInfo = extInfo.withThrows();
+      checkClosureThrowingAsync(expr, extInfo);
       
       // FIXME: If we want keyword arguments for closures, add them here.
       funcTy = FunctionType::get(paramTy, funcTy, extInfo);

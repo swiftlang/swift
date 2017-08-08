@@ -183,6 +183,7 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
   DeclContext *dc = requirement;
   ClosureExpr closure(/*patterns*/ nullptr,
                       /*throws*/ SourceLoc(),
+                      /*async*/ SourceLoc(),
                       /*arrow*/ SourceLoc(),
                       /*in*/ SourceLoc(),
                       /*result*/ TypeLoc(),

@@ -2206,12 +2206,11 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
 bool Parser::
 parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
                                ParameterList *&params, SourceLoc &throwsLoc,
-                               SourceLoc &arrowLoc,
+                               SourceLoc &asyncLoc, SourceLoc &arrowLoc,
                                TypeRepr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
   params = nullptr;
-  throwsLoc = SourceLoc();
-  arrowLoc = SourceLoc();
+  throwsLoc = asyncLoc = arrowLoc = SourceLoc();
   explicitResultType = nullptr;
   inLoc = SourceLoc();
 
@@ -2236,7 +2235,8 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
       // Consume the ')', if it's there.
       if (consumeIf(tok::r_paren)) {
-        consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
+        while (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_async))
+          consumeToken();
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
           if (!canParseType())
@@ -2257,7 +2257,8 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         return false;
       }
       
-      consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
+      while (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_async))
+        consumeToken();
 
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
@@ -2416,13 +2417,22 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
       params = ParameterList::create(Context, elements);
     }
-    
-    if (Tok.is(tok::kw_throws)) {
-      throwsLoc = consumeToken();
-    } else if (Tok.is(tok::kw_rethrows)) {
-      throwsLoc = consumeToken();
-      diagnose(throwsLoc, diag::rethrowing_function_type)
-        .fixItReplace(throwsLoc, "throws");
+
+    // Eat any throws/rethrows/async specifiers, if present.
+    while (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_async)) {
+      if (Tok.is(tok::kw_throws)) {
+        if (throwsLoc.isValid())
+          diagnose(Tok, diag::func_type_specifier_redundant);
+        throwsLoc = consumeToken(tok::kw_throws);
+      } else if (consumeIf(tok::kw_rethrows, throwsLoc)) {
+        diagnose(throwsLoc, diag::rethrowing_function_type)
+          .fixItReplace(throwsLoc, "throws");
+      } else {
+        assert(Tok.is(tok::kw_async) && "Unknown specifier");
+        if (asyncLoc.isValid())
+          diagnose(Tok, diag::func_type_specifier_redundant);
+        asyncLoc = consumeToken(tok::kw_async);
+      }
     }
 
     // Parse the optional explicit return type.
@@ -2532,13 +2542,12 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Parse the closure-signature, if present.
   ParameterList *params = nullptr;
-  SourceLoc throwsLoc;
-  SourceLoc arrowLoc;
+  SourceLoc throwsLoc, asyncLoc, arrowLoc;
   TypeRepr *explicitResultType;
   SourceLoc inLoc;
   SmallVector<CaptureListEntry, 2> captureList;
-  parseClosureSignatureIfPresent(captureList, params, throwsLoc, arrowLoc,
-                                 explicitResultType, inLoc);
+  parseClosureSignatureIfPresent(captureList, params, throwsLoc, asyncLoc,
+                                 arrowLoc, explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
   // size expression, there will not be a local context. A parse error will
@@ -2553,7 +2562,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(params, throwsLoc, arrowLoc, inLoc,
+  auto *closure = new (Context) ClosureExpr(params, throwsLoc, asyncLoc,
+                                            arrowLoc, inLoc,
                                             explicitResultType,
                                             discriminator, CurDeclContext);
   // The arguments to the func are defined in their own scope.

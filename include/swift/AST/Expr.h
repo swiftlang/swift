@@ -3523,7 +3523,10 @@ class ClosureExpr : public AbstractClosureExpr {
 
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
-  
+
+  /// The location of the "async", if present.
+  SourceLoc AsyncLoc;
+
   /// \brief The location of the '->' denoting an explicit return type,
   /// if present.
   SourceLoc ArrowLoc;
@@ -3539,14 +3542,13 @@ class ClosureExpr : public AbstractClosureExpr {
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
 public:
-  ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
-              SourceLoc inLoc, TypeLoc explicitResultType,
+  ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc asyncLoc,
+              SourceLoc arrowLoc, SourceLoc inLoc, TypeLoc explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultType(explicitResultType),
-      Body(nullptr) {
+      ThrowsLoc(throwsLoc), AsyncLoc(asyncLoc), ArrowLoc(arrowLoc),
+      InLoc(inLoc), ExplicitResultType(explicitResultType), Body(nullptr) {
     setParameterList(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
   }
@@ -3594,6 +3596,11 @@ public:
   /// \brief Retrieve the location of the 'throws' for a closure that has it.
   SourceLoc getThrowsLoc() const {
     return ThrowsLoc;
+  }
+
+  /// \brief Retrieve the location of the 'async' for a closure that has it.
+  SourceLoc getAsyncLoc() const {
+    return AsyncLoc;
   }
 
   /// \brief Retrieve the explicit result type location information.
