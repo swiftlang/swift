@@ -108,36 +108,44 @@ public:
     }
   }
 
-  void visitAddressTupleType(CanTupleType tupleFormalType,
-                             ManagedValue tupleMV) {
-    bool isPlusZero = tupleMV.isPlusZeroRValueOrTrivial();
-    SILValue tuple = tupleMV.forward(SGF);
+  void visitAddressTupleType(CanTupleType tupleFormalType, ManagedValue tuple) {
+    bool isPlusZero = tuple.isPlusZeroRValueOrTrivial();
 
-    for (auto i : indices(tupleFormalType->getElements())) {
+    for (unsigned i : indices(tupleFormalType->getElements())) {
       CanType eltFormalType = tupleFormalType.getElementType(i);
       assert(eltFormalType->isMaterializable());
 
-      auto eltTy = tuple->getType().getTupleElementType(i);
-      assert(eltTy.isAddress() == tuple->getType().isAddress());
+      auto eltTy = tuple.getType().getTupleElementType(i);
+      assert(eltTy.isAddress() == tuple.getType().isAddress());
       auto &eltTI = SGF.getTypeLowering(eltTy);
 
-      // Project the element.
-      SILValue elt = SGF.B.createTupleElementAddr(loc, tuple, i, eltTy);
+      // Project the element. This always returns a +0 handle with independent
+      // lifetime from tuple. We forward tuple when we are done so we can use
+      // ownership APIs.
+      ManagedValue elt = SGF.B.createTupleElementAddr(loc, tuple, i, eltTy);
 
-      // RValue has an invariant that loadable values have been
-      // loaded.  Except it's not really an invariant, because
-      // argument emission likes to lie sometimes.
+      // RValue has an invariant that loadable values have been loaded. Except
+      // it's not really an invariant, because argument emission likes to lie
+      // sometimes.
       if (eltTI.isLoadable()) {
-        elt = eltTI.emitLoad(SGF.B, loc, elt, LoadOwnershipQualifier::Take);
+        if (isPlusZero) {
+          elt = SGF.B.createLoadBorrow(loc, elt);
+        } else {
+          elt = SGF.B.createLoadTake(loc, elt);
+        }
+      } else {
+        // In contrast if we have an address only type, we can not rely on
+        // ownership APIs to help us. So, manually create a cleanup to make up
+        // for the cleanup that we will forward on tuple.
+        if (!isPlusZero)
+          elt = SGF.emitManagedRValueWithCleanup(elt.getValue(), eltTI);
       }
 
-      // If we're returning a +1 value, emit a cleanup for the member
-      // to cover for the cleanup we disabled for the tuple aggregate.
-      auto eltMV = isPlusZero ? ManagedValue::forUnmanaged(elt)
-                              : SGF.emitManagedRValueWithCleanup(elt, eltTI);
-
-      visit(eltFormalType, eltMV);
+      visit(eltFormalType, elt);
     }
+
+    // Forward the cleanup for tuple now that we have finished emitting values.
+    tuple.forward(SGF);
   }
 
   void visitTupleType(CanTupleType tupleFormalType, ManagedValue tuple) {
