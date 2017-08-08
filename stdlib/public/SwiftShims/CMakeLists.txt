@@ -118,7 +118,20 @@ add_custom_command_target(unused_var
     CUSTOM_TARGET_NAME "symlink_clang_headers"
     OUTPUT "${SWIFTLIB_DIR}/clang"
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
-add_dependencies(copy_shim_headers symlink_clang_headers)
+
+# Adding LLVM symlink at compile time.
+add_custom_command_target(unused_var2
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}"
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
+      "${LLVM_LIBRARY_DIR}"
+      "${SWIFTLIB_DIR}/llvm"
+
+    CUSTOM_TARGET_NAME "symlink_llvm_headers"
+    OUTPUT "${SWIFTLIB_DIR}/llvm"
+    COMMENT "Symlinking LLVM resource headers into ${SWIFTLIB_DIR}/llvm")
+add_dependencies(copy_shim_headers symlink_clang_headers symlink_llvm_headers)
 
 swift_install_in_component(compiler
     FILES ${sources}
@@ -134,6 +147,12 @@ swift_install_in_component(clang-builtin-headers
 swift_install_symlink_component(clang-resource-dir-symlink
   LINK_NAME clang
   TARGET ../clang/${CLANG_VERSION}
+  DESTINATION "lib/swift")
+
+# Adding link to "llvm" at install time.
+swift_install_symlink_component(llvm-resource-dir-symlink
+  LINK_NAME llvm
+  TARGET ../
   DESTINATION "lib/swift")
 
 # Possibly install Clang headers under Clang's resource directory in case we

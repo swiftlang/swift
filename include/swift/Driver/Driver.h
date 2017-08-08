@@ -19,6 +19,7 @@
 
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
@@ -108,7 +109,7 @@ public:
   /// (If empty, this implies no SDK.)
   std::string SDKPath;
 
-  SanitizerKind SelectedSanitizer;
+  OptionSet<SanitizerKind> SelectedSanitizers;
 };
 
 class Driver {
