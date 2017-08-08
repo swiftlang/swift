@@ -4541,6 +4541,10 @@ class ParamDecl : public VarDecl {
   Identifier ArgumentName;
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
+  SourceLoc ColonLoc;
+  SourceLoc EllipsisLoc;
+  SourceLoc DefaultEqualsLoc;
+  SourceLoc TrailingCommaLoc;
 
   struct StoredDefaultArgument {
     Expr *DefaultArg = nullptr;
@@ -4564,7 +4568,9 @@ public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
-            Identifier parameterName, Type ty, DeclContext *dc);
+            Identifier parameterName, SourceLoc colonLoc, SourceLoc ellipsisLoc,
+            SourceLoc defaultEqualsLoc, SourceLoc trailingCommaLoc,
+            Type ty, DeclContext *dc);
 
   /// Clone constructor, allocates a new ParamDecl identical to the first.
   /// Intentionally not defined as a typical copy constructor to avoid
@@ -4585,6 +4591,9 @@ public:
   ParameterTypeFlags getParameterFlags() const;
   
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
+  SourceLoc getColonLoc() const { return ColonLoc; }
+  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
+  SourceLoc getDefaultEqualsLoc() const { return DefaultEqualsLoc; }
     
   bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
   void setIsTypeLocImplicit(bool val) { IsTypeLocImplicit = val; }

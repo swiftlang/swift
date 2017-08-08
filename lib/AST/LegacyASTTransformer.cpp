@@ -522,6 +522,16 @@ LegacyASTTransformer::visitFuncDecl(FuncDecl *FD,
                                     const CursorIndex IndexInParent) {
   FunctionDeclSyntaxBuilder b;
 
+  auto pair = getAttributesFromDecl(FD);
+
+  for (auto attr : pair.first) {
+    b.addAttribute(attr);
+  }
+
+  for (auto mod : pair.second) {
+    b.addModifier(mod);
+  }
+
   auto funcKW = findToken(FD->getFuncLoc(), tok::kw_func, "func");
   b.useFuncKeyword(funcKW);
 
@@ -549,6 +559,21 @@ LegacyASTTransformer::visitFuncDecl(FuncDecl *FD,
                                     tok::identifier);
       fpb.useLocalName(localName);
 
+      if (param->getColonLoc().isValid()) {
+        fpb.useColon(findToken(param->getColonLoc(),
+                               tok::colon));
+      }
+
+      if (param->getDefaultEqualsLoc().isValid()) {
+        fpb.useDefaultEquals(findToken(param->getDefaultEqualsLoc(),
+                                       tok::equal));
+      }
+
+      if (param->getEllipsisLoc().isValid()) {
+        fpb.useEllipsis(findToken(param->getEllipsisLoc(),
+                                  None/*any token*/, "..."));
+      }
+
       if (param->isDefaultArgument()) {
         auto defaultExpr = param->getDefaultValue();
         if (auto defaultValue = transform(defaultExpr)) {
@@ -564,16 +589,6 @@ LegacyASTTransformer::visitFuncDecl(FuncDecl *FD,
   }
 
   b.useSignature(fsb.build());
-
-  auto pair = getAttributesFromDecl(FD);
-
-  for (auto attr : pair.first) {
-    b.addAttribute(attr);
-  }
-
-  for (auto mod : pair.second) {
-    b.addModifier(mod);
-  }
 
   return b.build().Root;
 }

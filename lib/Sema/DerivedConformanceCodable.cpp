@@ -505,7 +505,8 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
   // (keyedBy:)
   auto *keyedByDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
                                         SourceLoc(), C.Id_keyedBy, SourceLoc(),
-                                        C.Id_keyedBy, returnType, DC);
+                                        C.Id_keyedBy, SourceLoc(), SourceLoc(),
+                                        SourceLoc(), returnType, DC);
   keyedByDecl->setImplicit();
   keyedByDecl->setInterfaceType(returnType);
 
@@ -750,7 +751,8 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target);
   auto *encoderParam = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
                                          SourceLoc(), C.Id_to, SourceLoc(),
-                                         C.Id_encoder, encoderType, target);
+                                         C.Id_encoder, SourceLoc(), SourceLoc(),
+                                         SourceLoc(), encoderType, target);
   encoderParam->setInterfaceType(encoderType);
 
   ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
@@ -1093,7 +1095,8 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
                                              SourceLoc(),
                                              SourceLoc(), C.Id_from,
                                              SourceLoc(), C.Id_decoder,
-                                             decoderType, target);
+                                             SourceLoc(), SourceLoc(),
+                                             SourceLoc(), decoderType, target);
   decoderParamDecl->setImplicit();
   decoderParamDecl->setInterfaceType(decoderType);
 

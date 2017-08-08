@@ -36,8 +36,8 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
   auto &AC = gen.getASTContext();
   auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$metatype"), SourceLoc(),
-                               AC.getIdentifier("$metatype"), Type(),
-                               DC);
+                               AC.getIdentifier("$metatype"), SourceLoc(),
+                               SourceLoc(), SourceLoc(), Type(), DC);
   VD->setInterfaceType(metatype);
 
   gen.AllocatorMetatype = gen.F.begin()->createFunctionArgument(
@@ -64,8 +64,9 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
     auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$implicit_value"),
                                  SourceLoc(),
-                                 AC.getIdentifier("$implicit_value"), Type(),
-                                 DC);
+                                 AC.getIdentifier("$implicit_value"),
+                                 SourceLoc(), SourceLoc(), SourceLoc(),
+                                 Type(), DC);
     VD->setInterfaceType(interfaceType);
     SILValue arg =
         gen.F.begin()->createFunctionArgument(gen.getLoweredType(type), VD);
@@ -92,8 +93,9 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
-                                 AC.getIdentifier("$return_value"), Type(),
-                                 ctor);
+                                 AC.getIdentifier("$return_value"),
+                                 SourceLoc(), SourceLoc(), SourceLoc(),
+                                 Type(), ctor);
     VD->setInterfaceType(selfIfaceTyCan);
     resultSlot = gen.F.begin()->createFunctionArgument(selfTy, VD);
   }
@@ -374,7 +376,9 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
-                                 AC.getIdentifier("$return_value"), Type(),
+                                 AC.getIdentifier("$return_value"),
+                                 SourceLoc(), SourceLoc(),
+                                 SourceLoc(), Type(),
                                  element->getDeclContext());
     VD->setInterfaceType(enumIfaceTy);
     auto resultSlot =

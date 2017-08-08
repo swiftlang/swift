@@ -4160,11 +4160,14 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
 ParamDecl::ParamDecl(Specifier specifier,
                      SourceLoc specifierLoc, SourceLoc argumentNameLoc,
                      Identifier argumentName, SourceLoc parameterNameLoc,
-                     Identifier parameterName, Type ty, DeclContext *dc)
+                     Identifier parameterName, SourceLoc colonLoc,
+                     SourceLoc ellipsisLoc, SourceLoc defaultEqualsLoc,
+                     SourceLoc trailingCommaLoc, Type ty, DeclContext *dc)
   : VarDecl(DeclKind::Param, /*IsStatic*/false, specifier,
             /*IsCaptureList*/false, parameterNameLoc, parameterName, ty, dc),
   ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
-  SpecifierLoc(specifierLoc) {
+  SpecifierLoc(specifierLoc), ColonLoc(colonLoc), EllipsisLoc(ellipsisLoc),
+  DefaultEqualsLoc(defaultEqualsLoc), TrailingCommaLoc(trailingCommaLoc) {
     assert(specifier != Specifier::Var &&
            "'var' cannot appear on parameters; you meant 'inout'");
 }
@@ -4178,6 +4181,10 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
+    ColonLoc(PD->getColonLoc()),
+    EllipsisLoc(PD->getEllipsisLoc()),
+    DefaultEqualsLoc(PD->getDefaultEqualsLoc()),
+    TrailingCommaLoc(PD->getTrailingCommaLoc()),
     DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
@@ -4218,8 +4225,12 @@ Type DeclContext::getSelfInterfaceType() const {
 /// generic parameters.
 ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC) {
   ASTContext &C = DC->getASTContext();
-  auto *selfDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                     Identifier(), loc, C.Id_self, Type(), DC);
+  auto *selfDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
+                                     SourceLoc(),
+                                     Identifier(), loc, C.Id_self,
+                                     SourceLoc(), SourceLoc(),
+                                     SourceLoc(), SourceLoc(),
+                                     Type(), DC);
   selfDecl->setImplicit();
   return selfDecl;
 }
@@ -4250,8 +4261,11 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
     specifier = VarDecl::Specifier::InOut;
   }
 
-  auto *selfDecl = new (C) ParamDecl(specifier, SourceLoc(),SourceLoc(),
-                                     Identifier(), loc, C.Id_self, selfType,DC);
+  auto *selfDecl = new (C) ParamDecl(specifier, SourceLoc(), SourceLoc(),
+                                     Identifier(), loc, C.Id_self,
+                                     SourceLoc(), SourceLoc(),
+                                     SourceLoc(), SourceLoc(),
+                                     selfType, DC);
   selfDecl->setImplicit();
   selfDecl->setInterfaceType(selfInterfaceType);
   return selfDecl;

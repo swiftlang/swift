@@ -232,7 +232,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   auto *Arg = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
                                          SourceLoc(), Identifier(),
                                          Loc, Context.getIdentifier("arg"),
-                                         E->getType(), /*DC*/ newTopLevel);
+                                         SourceLoc(), SourceLoc(),
+                                         SourceLoc(), E->getType(),
+                                         /*DC*/ newTopLevel);
   Arg->setInterfaceType(E->getType());
   auto params = ParameterList::createWithoutLoc(Arg);
 

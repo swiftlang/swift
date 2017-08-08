@@ -389,6 +389,8 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
+                                 SourceLoc(), SourceLoc(),
+                                 SourceLoc(), SourceLoc(),
                                  enumDecl->getRawType(),
                                  enumDecl);
   param->setInterfaceType(enumDecl->getRawType());
@@ -596,6 +598,8 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   auto newValueDecl = new (C) ParamDecl(VarDecl::Specifier::Owned,
                                         SourceLoc(), SourceLoc(),
                                         Identifier(), SourceLoc(), C.Id_value,
+                                        SourceLoc(), SourceLoc(),
+                                        SourceLoc(), SourceLoc(),
                                         importedFieldDecl->getType(),
                                         importedDecl);
   newValueDecl->setInterfaceType(importedFieldDecl->getInterfaceType());
@@ -1129,7 +1133,8 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
         ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(), argName,
-                  SourceLoc(), var->getName(), var->getType(), structDecl);
+                  SourceLoc(), var->getName(), SourceLoc(), SourceLoc(),
+                  SourceLoc(), SourceLoc(), var->getType(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     valueParameters.push_back(param);
   }
@@ -1503,7 +1508,8 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   auto paramVarDecl =
       new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                         Identifier(), loc, valueIndex->get(0)->getName(),
-                        elementTy, dc);
+                        SourceLoc(), SourceLoc(), SourceLoc(),
+                        SourceLoc(), elementTy, dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
 
   auto valueIndicesPL = ParameterList::create(C, {paramVarDecl, index});
@@ -5250,8 +5256,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
     auto *paramDecl =
         new (Impl.SwiftContext) ParamDecl(
             VarDecl::Specifier::Let, SourceLoc(), SourceLoc(), argNames.front(),
-            SourceLoc(), argNames.front(), Impl.SwiftContext.TheEmptyTupleType,
-            dc);
+            SourceLoc(), argNames.front(), SourceLoc(), SourceLoc(),
+            SourceLoc(), SourceLoc(), Impl.SwiftContext.TheEmptyTupleType, dc);
     paramDecl->setInterfaceType(Impl.SwiftContext.TheEmptyTupleType);
 
     parameterList = ParameterList::createWithoutLoc(paramDecl);

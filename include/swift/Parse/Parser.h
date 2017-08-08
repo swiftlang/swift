@@ -988,6 +988,9 @@ public:
     /// \p SecondName is the name.
     SourceLoc SecondNameLoc;
 
+    /// The location of the ':' separating the \c SecondName from the type.
+    SourceLoc ColonLoc;
+
     /// The location of the '...', if present.
     SourceLoc EllipsisLoc;
 
@@ -1000,8 +1003,14 @@ public:
     /// The type following the ':'.
     TypeRepr *Type = nullptr;
 
+    /// The location of the '=' before a default argument, if present.
+    SourceLoc DefaultEqualsLoc;
+
     /// The default argument for this parameter.
     Expr *DefaultArg = nullptr;
+
+    /// The location of the ',' after this paramter, if present.
+    SourceLoc TrailingCommaLoc;
     
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;

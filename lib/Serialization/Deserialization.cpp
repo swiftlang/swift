@@ -2786,7 +2786,9 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto param = createDecl<ParamDecl>((VarDecl::Specifier)specifier,
                                        SourceLoc(), SourceLoc(),
                                        getIdentifier(argNameID), SourceLoc(),
-                                       getIdentifier(paramNameID), Type(), DC);
+                                       getIdentifier(paramNameID),
+                                       SourceLoc(), SourceLoc(),
+                                       SourceLoc(), Type(), DC);
 
     declOrOffset = param;
 

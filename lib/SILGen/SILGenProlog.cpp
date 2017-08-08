@@ -487,8 +487,9 @@ static void emitIndirectResultParameters(SILGenFunction &gen, Type resultType,
   auto var = new (ctx) ParamDecl(VarDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
-                                 ctx.getIdentifier("$return_value"), Type(),
-                                 DC);
+                                 ctx.getIdentifier("$return_value"),
+                                 SourceLoc(), SourceLoc(), SourceLoc(),
+                                 Type(), DC);
   var->setInterfaceType(resultType);
 
   auto *arg =

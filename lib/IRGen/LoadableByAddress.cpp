@@ -1143,7 +1143,8 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
   auto var = new (ctx) ParamDecl(
       VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
       ctx.getIdentifier("$return_value"), SourceLoc(),
-      ctx.getIdentifier("$return_value"),
+      ctx.getIdentifier("$return_value"), SourceLoc(),
+      SourceLoc(), SourceLoc(), SourceLoc(),
       resultStorageType.getSwiftRValueType(), pass.F->getDeclContext());
   pass.F->begin()->insertFunctionArgument(0, resultStorageType.getAddressType(),
                                           ValueOwnershipKind::Trivial, var);

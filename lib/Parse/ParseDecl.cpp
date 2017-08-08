@@ -3516,6 +3516,8 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
   auto result = new (P.Context) ParamDecl(VarDecl::Specifier::Owned,
                                           SourceLoc(),SourceLoc(),
                                           Identifier(), nameLoc, name,
+                                          SourceLoc(), SourceLoc(),
+                                          SourceLoc(), SourceLoc(),
                                           Type(), P.CurDeclContext);
   if (isNameImplicit)
     result->setImplicit();

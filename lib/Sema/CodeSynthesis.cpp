@@ -65,6 +65,7 @@ static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
   auto *param = new (context) ParamDecl(specifier, SourceLoc(), SourceLoc(),
                                         Identifier(), loc,
                                         context.getIdentifier(name),
+                                        SourceLoc(), SourceLoc(), SourceLoc(),
                                         type, DC);
   param->setImplicit();
   param->setInterfaceType(interfaceType);
@@ -1380,6 +1381,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                          Identifier(),
                                          SourceLoc(),
                                          Context.getIdentifier(ParamNameBuf),
+                                         SourceLoc(), SourceLoc(), SourceLoc(),
                                          contextTy, DC);
     param->setInterfaceType(interfaceTy);
     param->setImplicit();
@@ -1931,7 +1933,9 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       // Create the parameter.
       auto *arg = new (context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), 
                                           Loc, var->getName(),
-                                          Loc, var->getName(), varType, decl);
+                                          Loc, var->getName(),
+                                          SourceLoc(), SourceLoc(), SourceLoc(),
+                                          varType, decl);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
