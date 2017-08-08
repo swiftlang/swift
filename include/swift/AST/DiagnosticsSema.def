@@ -1012,8 +1012,8 @@ ERROR(attribute_requires_single_argument,none,
 ERROR(mutating_invalid_global_scope,none,
       "'mutating' is only valid on methods", ())
 ERROR(mutating_invalid_classes,none,
-      "'mutating' isn't valid on methods in classes or class-bound protocols",
-      ())
+      "'%select{|non}0mutating' isn't valid on methods in classes or class-bound protocols",
+      (bool))
 ERROR(functions_mutating_and_not,none,
       "method may not be declared both mutating and nonmutating", ())
 ERROR(static_functions_not_mutating,none,
