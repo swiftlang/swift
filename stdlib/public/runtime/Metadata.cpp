@@ -1494,7 +1494,7 @@ static MetadataAllocator &getResilientMetadataAllocator() {
 ClassMetadata *
 swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
                                                  size_t numFields,
-                                           const ClassFieldLayout *fieldLayouts,
+                                           const TypeLayout * const *fieldTypes,
                                                  size_t *fieldOffsets) {
   self = _swift_initializeSuperclass(self, /*copyFieldOffsetVectors=*/true);
 
@@ -1604,6 +1604,8 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
     rodata->IvarList = ivars;
 
     for (unsigned i = 0; i != numFields; ++i) {
+      auto *eltLayout = fieldTypes[i];
+
       ClassIvarEntry &ivar = ivars->getIvars()[i];
 
       // Remember the global ivar offset if present.
@@ -1617,11 +1619,11 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
       // If the ivar's size doesn't match the field layout we
       // computed, overwrite it and give it better type information.
-      if (ivar.Size != fieldLayouts[i].Size) {
-        ivar.Size = fieldLayouts[i].Size;
+      if (ivar.Size != eltLayout->size) {
+        ivar.Size = eltLayout->size;
         ivar.Type = nullptr;
         ivar.Log2Alignment =
-          getLog2AlignmentFromMask(fieldLayouts[i].AlignMask);
+          getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
       }
     }
   }
@@ -1629,13 +1631,16 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
   // Okay, now do layout.
   for (unsigned i = 0; i != numFields; ++i) {
+    auto *eltLayout = fieldTypes[i];
+
     // Skip empty fields.
-    if (fieldOffsets[i] == 0 && fieldLayouts[i].Size == 0)
+    if (fieldOffsets[i] == 0 && eltLayout->size == 0)
       continue;
-    auto offset = roundUpToAlignMask(size, fieldLayouts[i].AlignMask);
+    auto offset = roundUpToAlignMask(size,
+                                     eltLayout->flags.getAlignmentMask());
     fieldOffsets[i] = offset;
-    size = offset + fieldLayouts[i].Size;
-    alignMask = std::max(alignMask, fieldLayouts[i].AlignMask);
+    size = offset + eltLayout->size;
+    alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
   }
 
   // Save the final size and alignment into the metadata record.
