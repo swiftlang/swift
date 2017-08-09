@@ -84,3 +84,15 @@ extension OverridesInExtension {
 guard OverridesInExtension.a(4) == .b("foo") else { fatalError() }
 guard OverridesInExtension.a(4).hashValue == 2 else { fatalError() }
 guard OverridesInExtension.b("foo").hashValue == 2 else { fatalError() }
+
+// Try an indirect enum.
+enum BinaryTree<Element: Hashable>: Hashable {
+  indirect case tree(BinaryTree, BinaryTree)
+  case leaf(Element)
+}
+let one = BinaryTree<Int>.tree(.leaf(10), .leaf(20))
+let two = BinaryTree<Int>.tree(.leaf(10), .leaf(20))
+let three = BinaryTree<Int>.tree(.leaf(20), .leaf(30))
+guard one == two else { fatalError() }
+guard one != three else { fatalError() }
+guard one.hashValue == two.hashValue else { fatalError() }

@@ -197,6 +197,35 @@ extension OtherFileNonconforming: Hashable {
 // ...but synthesis in a type defined in another file doesn't work yet.
 extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension yet}}
 
+// Verify that an indirect enum doesn't emit any errors as long as its "leaves"
+// are conformant.
+enum StringBinaryTree: Hashable {
+  indirect case tree(StringBinaryTree, StringBinaryTree)
+  case leaf(String)
+}
+
+// Add some generics to make it more complex.
+enum BinaryTree<Element: Hashable>: Hashable {
+  indirect case tree(BinaryTree, BinaryTree)
+  case leaf(Element)
+}
+
+// Verify mutually indirect enums.
+enum MutuallyIndirectA: Hashable {
+  indirect case b(MutuallyIndirectB)
+  case data(Int)
+}
+enum MutuallyIndirectB: Hashable {
+  indirect case a(MutuallyIndirectA)
+  case data(Int)
+}
+
+// Verify that it works if the enum itself is indirect, rather than the cases.
+indirect enum TotallyIndirect: Hashable {
+  case another(TotallyIndirect)
+  case end(Int)
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
