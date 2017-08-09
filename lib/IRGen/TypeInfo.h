@@ -231,10 +231,6 @@ public:
   Address getUndefAddress() const;
     
   /// Return the size and alignment of this type.
-  virtual std::pair<llvm::Value*,llvm::Value*>
-    getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
-  virtual std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-    getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getSize(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getStride(IRGenFunction &IGF, SILType T) const = 0;
