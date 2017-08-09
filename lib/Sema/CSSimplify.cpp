@@ -3079,6 +3079,19 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // Look for members within the base.
   LookupResult &lookup = lookupMember(instanceTy, memberName);
 
+  TypeBase *favoredType = nullptr;
+  if (auto anchor = memberLocator->getAnchor()) {
+    if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+      auto argExpr = applyExpr->getArg();
+      favoredType = getFavoredType(argExpr);
+
+      if (!favoredType) {
+        optimizeConstraints(argExpr);
+        favoredType = getFavoredType(argExpr);
+      }
+    }
+  }
+
   // The set of directly accessible types, which is only used when
   // we're performing dynamic lookup into an existential type.
   bool isDynamicLookup = instanceTy->isAnyObject();
@@ -3127,6 +3140,26 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
           result.addUnviable(cand,
                              MemberLookupResult::UR_UnavailableInExistential);
           return;
+        }
+      }
+    }
+
+    // If the invocation's argument expression has a favored type,
+    // use that information to determine whether a specific overload for
+    // the candidate should be favored.
+    if (isa<ConstructorDecl>(cand) && favoredType &&
+        result.FavoredChoice == ~0U) {
+      // Only try and favor monomorphic initializers.
+      if (auto fnTypeWithSelf = cand->getInterfaceType()
+                                                      ->getAs<FunctionType>()) {
+        if (auto fnType = fnTypeWithSelf->getResult()
+                                                      ->getAs<FunctionType>()) {
+          auto argType = fnType->getInput()->getWithoutParens();
+          argType = cand->getInnermostDeclContext()
+                                                  ->mapTypeIntoContext(argType);
+          if (argType->isEqual(favoredType))
+            if (!cand->getAttrs().isUnavailable(getASTContext()))
+              result.FavoredChoice = result.ViableCandidates.size();
         }
       }
     }
