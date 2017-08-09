@@ -229,19 +229,15 @@ getDynamicResultSignature(ValueDecl *decl) {
 
 LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
   // Check whether we've already performed this lookup.
-  auto knownMember = MemberLookups.find({base, name});
-  if (knownMember != MemberLookups.end())
-    return *knownMember->second;
+  auto &result = MemberLookups[{base, name}];
+  if (result) return *result;
 
   // Lookup the member.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isa<AbstractFunctionDecl>(DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
 
-  MemberLookups[{base, name}] = None;
-  auto lookup = TC.lookupMember(DC, base, name, lookupOptions);
-  auto &result = MemberLookups[{base, name}];
-  result = std::move(lookup);
+  result = TC.lookupMember(DC, base, name, lookupOptions);
 
   // If we aren't performing dynamic lookup, we're done.
   if (!*result || !base->isAnyObject())
