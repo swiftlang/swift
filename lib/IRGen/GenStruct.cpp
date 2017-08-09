@@ -40,6 +40,7 @@
 #include "NonFixedTypeInfo.h"
 #include "ResilientTypeInfo.h"
 #include "StructMetadataVisitor.h"
+#include "MetadataLayout.h"
 
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
 
@@ -366,44 +367,6 @@ namespace {
       llvm_unreachable("non-fixed field in fixed struct?");
     }
   };
-
-  struct GetStartOfFieldOffsets
-    : StructMetadataScanner<GetStartOfFieldOffsets>
-  {
-    GetStartOfFieldOffsets(IRGenModule &IGM, StructDecl *target)
-      : StructMetadataScanner(IGM, target) {}
-
-    Size StartOfFieldOffsets = Size::invalid();
-
-    void noteAddressPoint() {
-      assert(StartOfFieldOffsets == Size::invalid()
-             && "found field offsets before address point?");
-      NextOffset = Size(0);
-    }
-    void noteStartOfFieldOffsets() { StartOfFieldOffsets = NextOffset; }
-  };
-  
-  /// Find the beginning of the field offset vector in a struct's metadata.
-  static Address
-  emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
-                                 StructDecl *S,
-                                 llvm::Value *metadata) {
-    // Find where the field offsets begin.
-    GetStartOfFieldOffsets scanner(IGF.IGM, S);
-    scanner.layout();
-    assert(scanner.StartOfFieldOffsets != Size::invalid()
-           && "did not find start of field offsets?!");
-    
-    Size StartOfFieldOffsets = scanner.StartOfFieldOffsets;
-    
-    // Find that offset into the metadata.
-    llvm::Value *fieldVector
-      = IGF.Builder.CreateBitCast(metadata, IGF.IGM.SizeTy->getPointerTo());
-    return IGF.Builder.CreateConstArrayGEP(
-                            Address(fieldVector, IGF.IGM.getPointerAlignment()),
-                            StartOfFieldOffsets / IGF.IGM.getPointerSize(),
-                            StartOfFieldOffsets);
-  }
   
   /// Accessor for the non-fixed offsets of a struct type.
   class StructNonFixedOffsets : public NonFixedOffsetsImpl {
@@ -418,9 +381,8 @@ namespace {
 
       // Get the field offset vector from the struct metadata.
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
-      Address fieldVector = emitAddressOfFieldOffsetVector(IGF,
-                                    TheStruct.getStructOrBoundGenericStruct(),
-                                    metadata);
+      Address fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
+                                    TheStruct.getStructOrBoundGenericStruct());
       
       // Grab the indexed offset.
       fieldVector = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
@@ -430,12 +392,13 @@ namespace {
 
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,
                                                 unsigned nonFixedIndex) {
-      GetStartOfFieldOffsets scanner(IGM,
-                                     TheStruct.getStructOrBoundGenericStruct());
-      scanner.layout();
+      auto start =
+        IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct())
+          .getFieldOffsetVectorOffset();
 
-      Size indirectOffset =
-        scanner.StartOfFieldOffsets + IGM.getPointerSize() * nonFixedIndex;
+      // FIXME: Handle resilience
+      auto indirectOffset = start.getStatic() +
+        (IGM.getPointerSize() * nonFixedIndex);
 
       return MemberAccessStrategy::getIndirectFixed(indirectOffset,
                                MemberAccessStrategy::OffsetKind::Bytes_Word);
@@ -478,9 +441,9 @@ namespace {
                             llvm::Value *vwtable,
                             SILType T) const override {
       // Get the field offset vector.
-      llvm::Value *fieldVector = emitAddressOfFieldOffsetVector(IGF,
-                                              T.getStructOrBoundGenericStruct(),
-                                              metadata).getAddress();
+      llvm::Value *fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
+                                              T.getStructOrBoundGenericStruct())
+        .getAddress();
 
       // Collect the stored properties of the type.
       llvm::SmallVector<VarDecl*, 4> storedProperties;

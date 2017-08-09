@@ -186,6 +186,25 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
                                       IGF.IGM.WitnessTablePtrTy);
 }
 
+Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
+                                              llvm::Value *metadata,
+                                              NominalTypeDecl *decl) {
+  auto &layout = IGF.IGM.getMetadataLayout(decl);
+  auto offset = [&]() {
+    if (isa<ClassDecl>(decl)) {
+      return cast<ClassMetadataLayout>(layout)
+        .getFieldOffsetVectorOffset(IGF);
+    } else {
+      assert(isa<StructDecl>(decl));
+      return cast<StructMetadataLayout>(layout)
+        .getFieldOffsetVectorOffset();
+    }
+  }();
+
+  return IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.SizeTy,
+                                 IGF.IGM.getPointerAlignment());
+}
+
 /********************************** CLASSES ***********************************/
 
 ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
@@ -295,16 +314,6 @@ Address irgen::emitAddressOfClassFieldOffset(IRGenFunction &IGF,
   return slot;
 }
 
-Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
-                                              llvm::Value *metadata,
-                                              ClassDecl *theClass) {
-  auto offset =
-    IGF.IGM.getMetadataLayout(theClass).getFieldOffsetVectorOffset(IGF);
- 
-  return IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.SizeTy,
-                                 IGF.IGM.getPointerAlignment());
-}
-
 /*********************************** ENUMS ************************************/
 
 EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
@@ -353,6 +362,11 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
       super::noteStartOfGenericRequirements();
     }
 
+    void noteStartOfFieldOffsets() {
+      Layout.FieldOffsetVector = getNextOffset();
+      super::noteStartOfFieldOffsets();
+    }
+
     void addFieldOffset(VarDecl *field) {
       Layout.FieldOffsets.try_emplace(field, getNextOffset());
       super::addFieldOffset(field);
@@ -371,4 +385,10 @@ Size StructMetadataLayout::getStaticFieldOffset(VarDecl *field) const {
   auto &stored = getStoredFieldOffset(field);
   assert(stored.isStatic() && "resilient struct metadata layout unsupported!");
   return stored.getStaticOffset();
+}
+
+Offset
+StructMetadataLayout::getFieldOffsetVectorOffset() const {
+  assert(FieldOffsetVector.isStatic());
+  return Offset(FieldOffsetVector.getStaticOffset());
 }
