@@ -65,7 +65,8 @@ static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
   auto *param = new (context) ParamDecl(specifier, SourceLoc(), SourceLoc(),
                                         Identifier(), loc,
                                         context.getIdentifier(name),
-                                        SourceLoc(), SourceLoc(), SourceLoc(),
+                                        SourceLoc(), SourceLoc(),
+                                        SourceLoc(), SourceLoc(),
                                         type, DC);
   param->setImplicit();
   param->setInterfaceType(interfaceType);
@@ -160,7 +161,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = FuncDecl::create(
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ArrowLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
       getterParams, TypeLoc::withoutLoc(storageInterfaceType),
       storage->getDeclContext());
@@ -208,6 +209,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   FuncDecl *setter = FuncDecl::create(
       TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
       Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*ArrowLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
       params, TypeLoc::withoutLoc(setterRetTy),
       storage->getDeclContext());
@@ -331,6 +333,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   auto *materializeForSet = FuncDecl::create(
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
       Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*ArrowLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(),
       (genericParams
        ? genericParams->clone(DC)
@@ -1381,7 +1384,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                          Identifier(),
                                          SourceLoc(),
                                          Context.getIdentifier(ParamNameBuf),
-                                         SourceLoc(), SourceLoc(), SourceLoc(),
+                                         SourceLoc(), SourceLoc(),
+                                         SourceLoc(), SourceLoc(),
                                          contextTy, DC);
     param->setInterfaceType(interfaceTy);
     param->setImplicit();
@@ -1396,6 +1400,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      DeclName(Context, ParameterBaseName, NameComponents),
                      /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*ArrowLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, ParamLists,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
@@ -1934,7 +1939,8 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       auto *arg = new (context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), 
                                           Loc, var->getName(),
                                           Loc, var->getName(),
-                                          SourceLoc(), SourceLoc(), SourceLoc(),
+                                          SourceLoc(), SourceLoc(),
+                                          SourceLoc(), SourceLoc(),
                                           varType, decl);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();

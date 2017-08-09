@@ -1690,7 +1690,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         param, Accessibility::Private,
         VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
-        SourceLoc(), SourceLoc(), SourceLoc(),
+        SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc(),
         dc->mapTypeIntoContext(swiftParamTy),
         ImportedHeaderUnit);
 
@@ -2133,8 +2133,8 @@ Type ClangImporter::Implementation::importMethodType(
                                            importSourceLoc(param->getLocation()),
                                            bodyName,
                                            SourceLoc(), SourceLoc(),
-                                           SourceLoc(), swiftParamTy,
-                                           ImportedHeaderUnit);
+                                           SourceLoc(), SourceLoc(),
+                                           swiftParamTy, ImportedHeaderUnit);
     paramInfo->setInterfaceType(dc->mapTypeOutOfContext(swiftParamTy));
 
     // Determine whether we have a default argument.
@@ -2255,6 +2255,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
                                            /*colon loc*/SourceLoc(),
                                            /*ellipsis loc*/SourceLoc(),
                                            /*default equals loc*/SourceLoc(),
+                                           /*trailing comma loc*/SourceLoc(),
                                            propertyTy,
                                            /*dummy DC*/ImportedHeaderUnit);
     paramInfo->setInterfaceType(dc->mapTypeOutOfContext(propertyTy));

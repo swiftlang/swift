@@ -2788,7 +2788,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                        getIdentifier(argNameID), SourceLoc(),
                                        getIdentifier(paramNameID),
                                        SourceLoc(), SourceLoc(),
-                                       SourceLoc(), Type(), DC);
+                                       SourceLoc(), SourceLoc(),
+                                       Type(), DC);
 
     declOrOffset = param;
 
@@ -2899,6 +2900,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
+        /*ArrowLoc*/SourceLoc(),
         /*AccessorKeywordLoc=*/SourceLoc(), genericParams,
         numParamPatterns, DC);
     fn->setEarlyAttrValidation();

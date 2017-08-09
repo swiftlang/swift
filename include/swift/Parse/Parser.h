@@ -767,6 +767,7 @@ public:
                                      SourceLoc &SpecifierLoc,
                                      TypeAttributes &Attributes);
   bool parseTypeAttribute(TypeAttributes &Attributes,
+                          SourceLoc AtLoc,
                           bool justChecking = false);
   
   
@@ -1067,6 +1068,7 @@ public:
                               SmallVectorImpl<ParameterList *> &bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &throws,
+                                      SourceLoc &error,
                                       bool &rethrows,
                                       TypeRepr *&retType);
 

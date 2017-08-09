@@ -48,9 +48,9 @@ class TrailingWhereClause;
 
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {
-  // Get a SourceLoc for every possible attribute that can be parsed in source.
-  // the presence of the attribute is indicated by its location being set.
-  SourceLoc AttrLocs[TAK_Count];
+  // Get a SourceRange for every possible attribute that can be parsed in
+  // source. The presence of the attribute is indicated by its range being set.
+  SourceRange AttrRanges[TAK_Count];
 public:
   /// AtLoc - This is the location of the first '@' in the attribute specifier.
   /// If this is an empty attribute specifier, then this will be an invalid loc.
@@ -65,7 +65,7 @@ public:
   bool isValid() const { return AtLoc.isValid(); }
   
   void clearAttribute(TypeAttrKind A) {
-    AttrLocs[A] = SourceLoc();
+    AttrRanges[A] = SourceRange();
   }
   
   bool has(TypeAttrKind A) const {
@@ -73,18 +73,18 @@ public:
   }
   
   SourceLoc getLoc(TypeAttrKind A) const {
-    return AttrLocs[A];
+    return AttrRanges[A].Start;
   }
   
-  void setAttr(TypeAttrKind A, SourceLoc L) {
-    assert(!L.isInvalid() && "Cannot clear attribute with this method");
-    AttrLocs[A] = L;
+  void setAttr(TypeAttrKind A, SourceRange R) {
+    assert(!R.isInvalid() && "Cannot clear attribute with this method");
+    AttrRanges[A] = R;
   }
 
   void getAttrRanges(SmallVectorImpl<SourceRange> &Ranges) const {
-    for (auto Loc : AttrLocs) {
-      if (Loc.isValid())
-        Ranges.push_back(Loc);
+    for (auto Range : AttrRanges) {
+      if (Range.isValid())
+        Ranges.push_back(Range);
     }
   }
 
@@ -93,7 +93,7 @@ public:
   // clients to be able to remove attributes they process until they get to
   // an empty list.
   bool empty() const {
-    for (SourceLoc elt : AttrLocs)
+    for (auto elt : AttrRanges)
       if (elt.isValid())
         return false;
     

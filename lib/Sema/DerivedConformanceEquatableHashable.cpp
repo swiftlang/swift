@@ -219,7 +219,8 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   auto getParamDecl = [&](StringRef s) -> ParamDecl* {
     auto *param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                     Identifier(), SourceLoc(), C.getIdentifier(s),
-                                    SourceLoc(), SourceLoc(), SourceLoc(),
+                                    SourceLoc(), SourceLoc(),
+                                    SourceLoc(), SourceLoc(),
                                     enumTy, parentDC);
     param->setInterfaceType(enumIfaceTy);
     return param;
@@ -244,6 +245,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
                      StaticSpellingKind::KeywordStatic,
                      /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*ArrowLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
                      params,
@@ -410,6 +412,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
                        /*FuncLoc=*/SourceLoc(),
                        Identifier(), /*NameLoc=*/SourceLoc(),
                        /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                       /*ArrowLoc=*/SourceLoc(),
                        /*AccessorKeywordLoc=*/SourceLoc(),
                        /*GenericParams=*/nullptr, params,
                        TypeLoc::withoutLoc(intType), parentDC);

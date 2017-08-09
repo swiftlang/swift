@@ -77,7 +77,8 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
   auto *rawValueDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
                                          SourceLoc(), C.Id_rawValue,
                                          SourceLoc(), C.Id_rawValue,
-                                         SourceLoc(), SourceLoc(), SourceLoc(),
+                                         SourceLoc(), SourceLoc(),
+                                         SourceLoc(), SourceLoc(),
                                          valueParam->getType(), parentDC);
   rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
   rawValueDecl->setImplicit();
@@ -127,7 +128,8 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   // rawValue
   auto *rawDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
                                     paramName, SourceLoc(), paramName,
-                                    SourceLoc(), SourceLoc(), SourceLoc(),
+                                    SourceLoc(), SourceLoc(),
+                                    SourceLoc(), SourceLoc(),
                                     paramType, parentDC);
   rawDecl->setInterfaceType(paramType);
   rawDecl->setImplicit();

@@ -452,10 +452,11 @@ unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
   for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes()) {
     auto bodyResultTy = pass.F->mapTypeIntoContext(resultTy);
     auto var = new (ctx)
-        ParamDecl(VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
-                  ctx.getIdentifier("$return_value"), SourceLoc(),
-                  ctx.getIdentifier("$return_value"), SourceLoc(), SourceLoc(),
-                  SourceLoc(), bodyResultTy.getSwiftRValueType(),
+        ParamDecl(VarDecl::Specifier::InOut, SourceLoc(),
+                  SourceLoc(), ctx.getIdentifier("$return_value"),
+                  SourceLoc(), ctx.getIdentifier("$return_value"),
+                  SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc(),
+                  bodyResultTy.getSwiftRValueType(),
                   pass.F->getDeclContext());
 
     pass.F->begin()->insertFunctionArgument(argIdx,

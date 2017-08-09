@@ -230,11 +230,11 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
 
   // Build function of type T->() which prints the operand.
   auto *Arg = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                         SourceLoc(), Identifier(),
-                                         Loc, Context.getIdentifier("arg"),
-                                         SourceLoc(), SourceLoc(),
-                                         SourceLoc(), E->getType(),
-                                         /*DC*/ newTopLevel);
+                                      SourceLoc(), Identifier(),
+                                      Loc, Context.getIdentifier("arg"),
+                                      SourceLoc(), SourceLoc(),
+                                      SourceLoc(), SourceLoc(),
+                                      E->getType(), /*DC*/ newTopLevel);
   Arg->setInterfaceType(E->getType());
   auto params = ParameterList::createWithoutLoc(Arg);
 

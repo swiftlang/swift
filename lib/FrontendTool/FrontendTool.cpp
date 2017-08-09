@@ -583,6 +583,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (Action == FrontendOptions::Parse ||
       Action == FrontendOptions::DumpParse ||
+      Action == FrontendOptions::EmitSyntax ||
       Action == FrontendOptions::DumpInterfaceHash ||
       Action == FrontendOptions::EmitImportedModules)
     Instance.performParseOnly();
@@ -686,6 +687,11 @@ static bool performCompile(CompilerInstance &Instance,
     else if (Action == FrontendOptions::DumpInterfaceHash)
       SF->dumpInterfaceHash(llvm::errs());
     else if (Action == FrontendOptions::EmitSyntax) {
+      if (Context.hadError()) {
+        // Don't emit a syntax tree with parse errors, even if they've been
+        // recovered.
+        return true;
+      }
       emitSyntax(SF, Invocation.getLangOptions(), Instance.getSourceMgr(),
                  opts.getSingleOutputFilename());
     } else

@@ -1508,7 +1508,8 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
 
 bool Parser::canParseTypeAttribute() {
   TypeAttributes attrs; // ignored
-  return !parseTypeAttribute(attrs, /*justChecking*/ true);
+  return !parseTypeAttribute(attrs, /*AtLoc*/SourceLoc(),
+                             /*justChecking*/ true);
 }
 
 /// \verbatim
@@ -1519,7 +1520,8 @@ bool Parser::canParseTypeAttribute() {
 /// \param justChecking - if true, we're just checking whether we
 ///   canParseTypeAttribute; don't emit any diagnostics, and there's
 ///   no need to actually record the attribute
-bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
+bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+                                bool justChecking) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       // These are keywords that we accept as attribute names.
@@ -1579,7 +1581,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef Text = Tok.getText();
-  SourceLoc Loc = consumeToken();
+  SourceLoc NameLoc = consumeToken();
+  SourceLoc EndLoc = NameLoc;
 
   bool isAutoclosureEscaping = false;
   SourceRange autoclosureEscapingParenRange;
@@ -1626,8 +1629,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     if (justChecking && Tok.isNot(tok::r_paren))
       return true;
 
-    SourceLoc RPLoc;
-    parseMatchingToken(tok::r_paren, RPLoc,
+    parseMatchingToken(tok::r_paren, EndLoc,
                        diag::convention_attribute_expected_rparen,
                        LPLoc);
   }
@@ -1640,7 +1642,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 
   // Diagnose duplicated attributes.
   if (Attributes.has(attr)) {
-    diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
+    diagnose(NameLoc, diag::duplicate_attribute, /*isModifier=*/false);
     return false;
   }
 
@@ -1652,42 +1654,42 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     if (isAutoclosureEscaping) {
       // @noescape @autoclosure(escaping) makes no sense.
       if (Attributes.has(TAK_noescape)) {
-        diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
+        diagnose(NameLoc, diag::attr_noescape_conflicts_escaping_autoclosure);
       } else {
-        diagnose(Loc, Context.isSwiftVersion3()
-                          ? diag::swift3_attr_autoclosure_escaping_deprecated
-                          : diag::attr_autoclosure_escaping_deprecated)
+        diagnose(NameLoc, Context.isSwiftVersion3()
+                            ? diag::swift3_attr_autoclosure_escaping_deprecated
+                            : diag::attr_autoclosure_escaping_deprecated)
             .fixItReplace(autoclosureEscapingParenRange, " @escaping ");
       }
-      Attributes.setAttr(TAK_escaping, Loc);
+      Attributes.setAttr(TAK_escaping, { AtLoc, NameLoc });
     } else if (Attributes.has(TAK_noescape)) {
-      diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
+      diagnose(NameLoc, diag::attr_noescape_implied_by_autoclosure);
     }
     break;
 
   case TAK_noescape:
     // You can't specify @noescape and @escaping together.
     if (Attributes.has(TAK_escaping)) {
-      diagnose(Loc, diag::attr_escaping_conflicts_noescape);
+      diagnose(NameLoc, diag::attr_escaping_conflicts_noescape);
       return false;
     }
 
     // @noescape after @autoclosure is redundant.
     if (Attributes.has(TAK_autoclosure)) {
-      diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
+      diagnose(NameLoc, diag::attr_noescape_implied_by_autoclosure);
     }
 
     // @noescape is deprecated and no longer used
-    diagnose(Loc, Context.isSwiftVersion3()
+    diagnose(NameLoc, Context.isSwiftVersion3()
                       ? diag::swift3_attr_noescape_deprecated
                       : diag::attr_noescape_deprecated)
-        .fixItRemove({Attributes.AtLoc, Loc});
+        .fixItRemove({AtLoc, NameLoc});
 
     break;
   case TAK_escaping:
     // You can't specify @noescape and @escaping together.
     if (Attributes.has(TAK_noescape)) {
-      diagnose(Loc, diag::attr_escaping_conflicts_noescape);
+      diagnose(NameLoc, diag::attr_escaping_conflicts_noescape);
       return false;
     }
     break;
@@ -1701,7 +1703,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_callee_guaranteed:
   case TAK_objc_metatype:
     if (!isInSILMode()) {
-      diagnose(Loc, diag::only_allowed_in_sil, Text);
+      diagnose(NameLoc, diag::only_allowed_in_sil, Text);
       return false;
     }
     break;
@@ -1710,12 +1712,12 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_sil_weak:
   case TAK_sil_unowned:
     if (!isInSILMode()) {
-      diagnose(Loc, diag::only_allowed_in_sil, Text);
+      diagnose(NameLoc, diag::only_allowed_in_sil, Text);
       return false;
     }
       
     if (Attributes.hasOwnership()) {
-      diagnose(Loc, diag::duplicate_attribute, /*isModifier*/false);
+      diagnose(NameLoc, diag::duplicate_attribute, /*isModifier*/false);
       return false;
     }
     break;
@@ -1723,19 +1725,19 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // 'inout' attribute.
   case TAK_inout:
     if (!isInSILMode()) {
-      diagnose(Loc, diag::inout_not_attribute);
+      diagnose(NameLoc, diag::inout_not_attribute);
       return false;
     }
     break;
       
   case TAK_opened: {
     if (!isInSILMode()) {
-      diagnose(Loc, diag::only_allowed_in_sil, "opened");
+      diagnose(NameLoc, diag::only_allowed_in_sil, "opened");
       return false;
     }
 
     // Parse the opened existential ID string in parens
-    SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
+    SourceLoc beginLoc = Tok.getLoc(), idLoc;
     if (consumeIfNotAtStartOfLine(tok::l_paren)) {
       if (Tok.is(tok::string_literal)) {
         UUID openedID;
@@ -1751,7 +1753,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       } else {
         diagnose(Tok, diag::opened_attribute_id_value);
       }
-      parseMatchingToken(tok::r_paren, endLoc,
+      parseMatchingToken(tok::r_paren, EndLoc,
                          diag::opened_attribute_expected_rparen,
                          beginLoc);
     } else {
@@ -1767,7 +1769,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     break;
   }
 
-  Attributes.setAttr(attr, Loc);
+  Attributes.setAttr(attr, {AtLoc, EndLoc});
   return false;
 }
 
@@ -1833,10 +1835,11 @@ bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
   }
 
   while (Tok.is(tok::at_sign)) {
+    SourceLoc AtLoc = Tok.getLoc();
     if (Attributes.AtLoc.isInvalid())
-      Attributes.AtLoc = Tok.getLoc();
+      Attributes.AtLoc = AtLoc;
     consumeToken();
-    if (parseTypeAttribute(Attributes))
+    if (parseTypeAttribute(Attributes, AtLoc))
       return true;
   }
   
@@ -3463,7 +3466,8 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
                              /*FIXME FuncLoc=*/DeclLoc, Identifier(),
                              /*NameLoc=*/DeclLoc, /*Throws=*/false,
-                             /*ThrowsLoc=*/SourceLoc(), AccessorKeywordLoc,
+                             /*ThrowsLoc=*/SourceLoc(),
+                             /*ArrowLoc=*/SourceLoc(), AccessorKeywordLoc,
                              (GenericParams
                               ? GenericParams->clone(P->CurDeclContext)
                               : nullptr),
@@ -4831,10 +4835,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   SourceLoc throwsLoc;
+  SourceLoc arrowLoc;
   bool rethrows;
   ParserStatus SignatureStatus =
       parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
-                             throwsLoc, rethrows, FuncRetTy);
+                             throwsLoc, arrowLoc, rethrows, FuncRetTy);
 
   SignatureHasCodeCompletion |= SignatureStatus.hasCodeCompletion();
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -4876,6 +4881,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                           FuncLoc, FullName, NameLoc,
                           /*Throws=*/throwsLoc.isValid(), throwsLoc,
+                          arrowLoc,
                           /*AccessorKeywordLoc=*/SourceLoc(),
                           GenericParams, BodyParams, FuncRetTy,
                           CurDeclContext);

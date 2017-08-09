@@ -327,6 +327,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       return status;
     }
 
+    // If there's a trailing comma, grab its loc.
+    if (Tok.is(tok::comma)) {
+      param.TrailingCommaLoc = Tok.getLoc();
+    }
+
     params.push_back(param);
     return status;
   });
@@ -345,16 +350,16 @@ mapParsedParameters(Parser &parser,
   // Local function to create a pattern for a single parameter.
   auto createParam = [&](Parser::ParsedParameter &paramInfo,
                          Identifier argName, SourceLoc argNameLoc,
-                         Identifier paramName, SourceLoc paramNameLoc,
-                         SourceLoc colonLoc, SourceLoc defaultEqualsLoc,
-                         SourceLoc ellipsisLoc, SourceLoc trailingCommaLoc)
+                         Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
     auto param = new (ctx) ParamDecl(paramInfo.SpecifierKind,
                                      paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName,
-                                     colonLoc, defaultEqualsLoc,
-                                     ellipsisLoc, trailingCommaLoc,
+                                     paramInfo.ColonLoc,
+                                     paramInfo.DefaultEqualsLoc,
+                                     paramInfo.EllipsisLoc,
+                                     paramInfo.TrailingCommaLoc,
                                      Type(), parser.CurDeclContext);
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       param->setImplicit();
@@ -451,8 +456,7 @@ mapParsedParameters(Parser &parser,
 
       // Both names were provided, so pass them in directly.
       result = createParam(param, argName, param.FirstNameLoc,
-                           paramName, param.SecondNameLoc, param.ColonLoc,
-                           param.EllipsisLoc, param.DefaultEqualsLoc);
+                           paramName, param.SecondNameLoc);
 
       // If the first and second names are equivalent and non-empty, and we
       // would have an argument label by default, complain.
@@ -469,8 +473,7 @@ mapParsedParameters(Parser &parser,
       paramName = param.FirstName;
 
       result = createParam(param, argName, SourceLoc(),
-                           param.FirstName, param.FirstNameLoc, param.ColonLoc,
-                           param.DefaultEqualsLoc, param.EllipsisLoc);
+                           param.FirstName, param.FirstNameLoc);
     }
 
     // Warn when an unlabeled parameter follows a variadic parameter
@@ -660,6 +663,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                SmallVectorImpl<ParameterList*> &bodyParams,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &throwsLoc,
+                               SourceLoc &arrowLoc,
                                bool &rethrows,
                                TypeRepr *&retType) {
   SmallVector<Identifier, 4> NamePieces;
@@ -683,8 +687,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     diagnose(throwsLoc, diag::throw_in_function_type)
       .fixItReplace(throwsLoc, "throws");
   }
-
-  SourceLoc arrowLoc;
 
   auto diagnoseInvalidThrows = [&]() -> Optional<InFlightDiagnostic> {
     if (throwsLoc.isValid())

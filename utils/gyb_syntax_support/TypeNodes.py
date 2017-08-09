@@ -74,11 +74,15 @@ TYPE_NODES = [
              Child('RightSquareBracket', kind='RightSquareBracketToken'),
          ]),
 
-    # type-annotation -> attribute-list 'inout'? type
+    # type-annotation -> attribute-list specifier? type
+    # specifier -> 'inout' | '__shared' | '__owned'
     Node('TypeAnnotation', kind='Syntax',
          children=[
              Child('Attributes', kind='AttributeList'),
-             Child('InOutKeyword', kind='InoutToken',
+             Child('Specifier', kind='Token',
+                   token_choices=[
+                       'InoutToken', '__sharedToken', '__ownedToken'
+                   ],
                    is_optional=True),
              Child('Type', kind='Type'),
          ]),

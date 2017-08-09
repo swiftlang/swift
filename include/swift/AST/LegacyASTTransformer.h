@@ -64,6 +64,15 @@ class LegacyASTTransformer : public ASTVisitor<LegacyASTTransformer,
   /// an `ExpressionStmt` or a `DeclarationStmt`.
   StmtSyntax getStmtSyntax(Syntax Node);
 
+  /// Transform a legacy TypeRepr to a full-fidelity `TypeSyntax`.
+  ///
+  /// If a TypeRepr's kind isn't covered by the transform, an `UnknownSyntax`
+  /// will be returned containing all of the `TokenSyntax`es that comprise the
+  /// node.
+  ///
+  /// If the node isn't expressible in a `TypeSyntax`, then `None` is returned.
+  Optional<TypeSyntax> transform(TypeRepr *T);
+
   /// Transform a legacy Expr to a full-fidelity `ExprSyntax`.
   ///
   /// If an ASTNode's kind isn't covered by the transform, an `UnknownSyntax`
@@ -110,6 +119,7 @@ public:
   SourceLoc getEndLocForStmt(const Stmt *S) const;
   SourceLoc getEndLocForExpr(const Expr *E) const;
   RC<SyntaxData> getUnknownSyntax(SourceRange SR, SyntaxKind Kind);
+  RC<SyntaxData> getUnknownType(TypeRepr *T);
   RC<SyntaxData> getUnknownDecl(Decl *D);
   RC<SyntaxData> getUnknownStmt(Stmt *S);
   RC<SyntaxData> getUnknownExpr(Expr *E);
@@ -141,6 +151,12 @@ public:
                      const SyntaxData *Parent = nullptr, \
                      const CursorIndex IndexInParent = 0);
 #include "swift/AST/ExprNodes.def"
+
+#define TYPEREPR(CLASS, PARENT) RC<SyntaxData> \
+  visit##CLASS##TypeRepr(CLASS##TypeRepr *, \
+                         const SyntaxData *Parent = nullptr, \
+                         const CursorIndex IndexInParent = 0);
+#include "swift/AST/TypeReprNodes.def"
 };
 
 /// Transform a legacy AST node to a full-fidelity `Syntax`.

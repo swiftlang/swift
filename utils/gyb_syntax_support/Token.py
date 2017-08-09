@@ -29,6 +29,8 @@ SYNTAX_TOKENS = [
     Keyword('Import', 'import'),
     Keyword('Init', 'init'),
     Keyword('Inout', 'inout'),
+    Keyword('__shared', '__shared'),
+    Keyword('__owned', '__owned'),
     Keyword('Let', 'let'),
     Keyword('Operator', 'operator'),
     Keyword('Precedencegroup', 'precedencegroup'),

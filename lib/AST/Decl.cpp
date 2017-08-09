@@ -4803,6 +4803,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc FuncLoc,
                                DeclName Name, SourceLoc NameLoc,
                                bool Throws, SourceLoc ThrowsLoc,
+                               SourceLoc ArrowLoc,
                                SourceLoc AccessorKeywordLoc,
                                GenericParamList *GenericParams,
                                unsigned NumParamPatterns,
@@ -4814,7 +4815,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                                   !ClangN.isNull());
   auto D = ::new (DeclPtr)
       FuncDecl(StaticLoc, StaticSpelling, FuncLoc,
-               Name, NameLoc, Throws, ThrowsLoc,
+               Name, NameLoc, Throws, ThrowsLoc, ArrowLoc,
                AccessorKeywordLoc, NumParamPatterns,
                GenericParams, Parent);
   if (ClangN)
@@ -4828,12 +4829,13 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        SourceLoc FuncLoc,
                                        DeclName Name, SourceLoc NameLoc,
                                        bool Throws, SourceLoc ThrowsLoc,
+                                       SourceLoc ArrowLoc,
                                        SourceLoc AccessorKeywordLoc,
                                        GenericParamList *GenericParams,
                                        unsigned NumParamPatterns,
                                        DeclContext *Parent) {
   return createImpl(Context, StaticLoc, StaticSpelling, FuncLoc,
-                    Name, NameLoc, Throws, ThrowsLoc,
+                    Name, NameLoc, Throws, ThrowsLoc, ArrowLoc,
                     AccessorKeywordLoc, GenericParams,
                     NumParamPatterns, Parent,
                     ClangNode());
@@ -4844,6 +4846,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            SourceLoc FuncLoc,
                            DeclName Name, SourceLoc NameLoc,
                            bool Throws, SourceLoc ThrowsLoc,
+                           SourceLoc ArrowLoc,
                            SourceLoc AccessorKeywordLoc,
                            GenericParamList *GenericParams,
                            ArrayRef<ParameterList*> BodyParams,
@@ -4852,7 +4855,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
   const unsigned NumParamPatterns = BodyParams.size();
   auto *FD = FuncDecl::createImpl(
       Context, StaticLoc, StaticSpelling, FuncLoc,
-      Name, NameLoc, Throws, ThrowsLoc,
+      Name, NameLoc, Throws, ThrowsLoc, ArrowLoc,
       AccessorKeywordLoc, GenericParams,
       NumParamPatterns, Parent, ClangN);
   FD->setDeserializedSignature(BodyParams, FnRetType);
@@ -4944,8 +4947,8 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  GenericParamList *GenericParams,
                                  DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
-                         Throws, ThrowsLoc, /*NumParameterLists=*/2,
-                         GenericParams),
+                         Throws, ThrowsLoc, /*ArrowLoc=*/SourceLoc(),
+                         /*NumParameterLists=*/2, GenericParams),
     FailabilityLoc(FailabilityLoc)
 {
   setParameterLists(SelfDecl, BodyParams);
@@ -4992,6 +4995,7 @@ DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,
                          /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                         /*ArrowLoc=*/SourceLoc(),
                          /*NumParameterLists=*/1, nullptr) {
   setSelfDecl(selfDecl);
 }

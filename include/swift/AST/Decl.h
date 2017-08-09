@@ -4589,11 +4589,21 @@ public:
   /// Retrieve the parameter type flags corresponding to the declaration of
   /// this parameter's argument type.
   ParameterTypeFlags getParameterFlags() const;
-  
+
+  /// The location of the ownership specifier, i.e. 'inout', '__shared'.
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
+
+  /// The location of the ':' marking the type.
   SourceLoc getColonLoc() const { return ColonLoc; }
+
+  /// The location of the '...' specifying a variadic parameter.
   SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
+
+  /// The location of the '=' signifying a default argument.
   SourceLoc getDefaultEqualsLoc() const { return DefaultEqualsLoc; }
+
+  /// The location of the comma after this parameter.
+  SourceLoc getTrailingCommaLoc() const { return TrailingCommaLoc; }
     
   bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
   void setIsTypeLocImplicit(bool val) { IsTypeLocImplicit = val; }
@@ -4849,15 +4859,19 @@ protected:
   /// Location of the 'throws' token.
   SourceLoc ThrowsLoc;
 
+  /// Location of the '->' token.
+  SourceLoc ArrowLoc;
+
   ImportAsMemberStatus IAMStatus;
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
+                       SourceLoc ArrowLoc,
                        unsigned NumParameterLists,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), ThrowsLoc(ThrowsLoc) {
+        Body(nullptr), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4898,6 +4912,9 @@ public:
 public:
   /// Retrieve the location of the 'throws' keyword, if present.
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+
+  /// Retrieve the location of the '->', if present.
+  SourceLoc getArrowLoc() const { return ArrowLoc; }
 
   /// Returns true if the function body throws.
   bool hasThrows() const { return AbstractFunctionDeclBits.Throws; }
@@ -5152,12 +5169,13 @@ class FuncDecl final : public AbstractFunctionDecl,
            SourceLoc FuncLoc,
            DeclName Name, SourceLoc NameLoc,
            bool Throws, SourceLoc ThrowsLoc,
+           SourceLoc ArrowLoc,
            SourceLoc AccessorKeywordLoc,
            unsigned NumParameterLists,
            GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent,
                            Name, NameLoc,
-                           Throws, ThrowsLoc,
+                           Throws, ThrowsLoc, ArrowLoc,
                            NumParameterLists, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       AccessorKeywordLoc(AccessorKeywordLoc),
@@ -5178,6 +5196,7 @@ class FuncDecl final : public AbstractFunctionDecl,
                               SourceLoc FuncLoc,
                               DeclName Name, SourceLoc NameLoc,
                               bool Throws, SourceLoc ThrowsLoc,
+                              SourceLoc ArrowLoc,
                               SourceLoc AccessorKeywordLoc,
                               GenericParamList *GenericParams,
                               unsigned NumParameterLists,
@@ -5191,6 +5210,7 @@ public:
                                       SourceLoc FuncLoc,
                                       DeclName Name, SourceLoc NameLoc,
                                       bool Throws, SourceLoc ThrowsLoc,
+                                      SourceLoc ArrowLoc,
                                       SourceLoc AccessorKeywordLoc,
                                       GenericParamList *GenericParams,
                                       unsigned NumParameterLists,
@@ -5201,6 +5221,7 @@ public:
                           SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc,
                           bool Throws, SourceLoc ThrowsLoc,
+                          SourceLoc ArrowLoc,
                           SourceLoc AccessorKeywordLoc,
                           GenericParamList *GenericParams,
                           ArrayRef<ParameterList *> ParameterLists,
@@ -5650,11 +5671,11 @@ class ConstructorDecl : public AbstractFunctionDecl {
   ConstructorDecl *OverriddenDecl = nullptr;
 
 public:
-  ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
+  ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                   OptionalTypeKind Failability, SourceLoc FailabilityLoc,
                   bool Throws, SourceLoc ThrowsLoc,
                   ParamDecl *SelfParam, ParameterList *BodyParams,
-                  GenericParamList *GenericParams, 
+                  GenericParamList *GenericParams,
                   DeclContext *Parent);
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }

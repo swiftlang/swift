@@ -107,6 +107,14 @@ StmtSyntax LegacyASTTransformer::getStmtSyntax(Syntax Node) {
   return Node.castTo<StmtSyntax>();
 }
 
+Optional<TypeSyntax> LegacyASTTransformer::transform(TypeRepr *T) {
+  if (T->getSourceRange().isInvalid()) {
+    return None;
+  }
+  auto Transformed = visit(T);
+  return TypeSyntax { Transformed, Transformed.get() };
+}
+
 Optional<ExprSyntax> LegacyASTTransformer::transform(Expr *E) {
   if (E->isImplicit() || E->getSourceRange().isInvalid()) {
     return None;
@@ -262,10 +270,23 @@ LegacyASTTransformer::getUnknownSyntax(SourceRange SR, SyntaxKind Kind) {
   return SyntaxData::make(Raw);
 }
 
+RC<SyntaxData> LegacyASTTransformer::getUnknownType(TypeRepr *T) {
+  auto ComprisingTokens = getRawTokenSyntaxesInRange(T->getSourceRange(),
+                             SourceMgr, BufferID, Tokens);
+  RawSyntax::LayoutList Layout;
+  std::copy(ComprisingTokens.begin(),
+            ComprisingTokens.end(),
+            std::back_inserter(Layout));
+  auto Raw = RawSyntax::make(SyntaxKind::UnknownType,
+                             Layout,
+                             SourcePresence::Present);
+  return SyntaxData::make(Raw);
+}
+
 RC<SyntaxData> LegacyASTTransformer::getUnknownDecl(Decl *D) {
   SourceRange SR {getStartLocForDecl(D),getEndLocForDecl(D)};
   auto ComprisingTokens = getRawTokenSyntaxesInRange(SR, SourceMgr,
-                                                 BufferID, Tokens);
+                                                     BufferID, Tokens);
   RawSyntax::LayoutList Layout;
   std::copy(ComprisingTokens.begin(),
             ComprisingTokens.end(),
@@ -394,6 +415,7 @@ LegacyASTTransformer::visitGenericTypeParamDecl(
     const CursorIndex IndexInParent) {
   return getUnknownDecl(D);
 }
+
 RC<SyntaxData>
 LegacyASTTransformer::visitAssociatedTypeDecl(AssociatedTypeDecl *D,
                                               const SyntaxData *Parent,
@@ -520,6 +542,47 @@ RC<SyntaxData>
 LegacyASTTransformer::visitFuncDecl(FuncDecl *FD,
                                     const SyntaxData *Parent,
                                     const CursorIndex IndexInParent) {
+
+  /// Builds type attributes into the provided attribute builder.
+  /// Returns `false` if there was no valid attribute.
+  auto buildTypeAttribute = [&](SourceRange range,
+                                AttributeSyntaxBuilder &attrBuilder) -> bool {
+    auto toks = getRawTokenSyntaxesInRange(range, SourceMgr,
+                                           BufferID, Tokens);
+    if (toks.size() < 2) return false;
+
+    // Handle attributes like `@autoclosure`.
+    if (toks[0]->getTokenKind() == tok::at_sign) {
+      attrBuilder.useAtSignToken(make<TokenSyntax>(toks[0]));
+    }
+
+    if (toks[1]->getTokenKind() == tok::identifier) {
+      attrBuilder.useIdentifier(make<TokenSyntax>(toks[1]));
+    }
+
+    // Handle attributes like @convention(c)
+    if (toks.size() > 2 && toks[2]->getTokenKind() == tok::l_paren) {
+      // Get the left paren
+      attrBuilder.useLeftParen(make<TokenSyntax>(toks[2]));
+
+      // Walk the rest of the tokens in the range. If the last
+      // token is a right paren, use it as "the" right paren.
+      // Otherwise, add it to the builder.
+      for (size_t i = 3; i < toks.size(); ++i) {
+        auto tok = toks[i];
+        auto tokSyntax = make<TokenSyntax>(tok);
+        if (i == toks.size() - 1 &&
+            tok->getTokenKind() == tok::r_paren) {
+          attrBuilder.useRightParen(tokSyntax);
+        } else {
+          attrBuilder.addToken(tokSyntax);
+        }
+      }
+    }
+
+    return true;
+  };
+
   FunctionDeclSyntaxBuilder b;
 
   auto pair = getAttributesFromDecl(FD);
@@ -543,52 +606,109 @@ LegacyASTTransformer::visitFuncDecl(FuncDecl *FD,
     b.useBody(codeBlock);
   }
 
-  FunctionSignatureSyntaxBuilder fsb;
+  FunctionSignatureSyntaxBuilder sigBuilder;
   auto paramList = FD->getParameterList(0);
-  fsb.useLeftParen(findToken(paramList->getLParenLoc(), tok::l_paren, "("));
-  fsb.useRightParen(findToken(paramList->getRParenLoc(), tok::r_paren, ")"));
+  sigBuilder.useLeftParen(findToken(paramList->getLParenLoc(),
+                                    tok::l_paren));
+  sigBuilder.useRightParen(findToken(paramList->getRParenLoc(),
+                                     tok::r_paren));
   for (auto param : *paramList) {
-    FunctionParameterSyntaxBuilder fpb;
+    FunctionParameterSyntaxBuilder paramBuilder;
 
     if (param->getArgumentNameLoc().isValid()) {
       auto externalName = findToken(param->getArgumentNameLoc(),
                                     tok::identifier);
-      fpb.useExternalName(externalName);
+      paramBuilder.useExternalName(externalName);
+    }
 
+    if (param->getNameLoc().isValid()) {
       auto localName = findToken(param->getNameLoc(),
                                     tok::identifier);
-      fpb.useLocalName(localName);
+      paramBuilder.useLocalName(localName);
+    }
 
-      if (param->getColonLoc().isValid()) {
-        fpb.useColon(findToken(param->getColonLoc(),
-                               tok::colon));
-      }
+    if (param->getColonLoc().isValid()) {
+      paramBuilder.useColon(findToken(param->getColonLoc(),
+                                      tok::colon));
+    }
 
-      if (param->getDefaultEqualsLoc().isValid()) {
-        fpb.useDefaultEquals(findToken(param->getDefaultEqualsLoc(),
-                                       tok::equal));
-      }
+    if (param->getDefaultEqualsLoc().isValid()) {
+      paramBuilder.useDefaultEquals(findToken(param->getDefaultEqualsLoc(),
+                                              tok::equal));
+    }
 
-      if (param->getEllipsisLoc().isValid()) {
-        fpb.useEllipsis(findToken(param->getEllipsisLoc(),
-                                  None/*any token*/, "..."));
-      }
+    if (param->getEllipsisLoc().isValid()) {
+      paramBuilder.useEllipsis(findToken(param->getEllipsisLoc(),
+                                         None/*any token*/, "..."));
+    }
 
-      if (param->isDefaultArgument()) {
-        auto defaultExpr = param->getDefaultValue();
-        if (auto defaultValue = transform(defaultExpr)) {
-          fpb.useDefaultValue(defaultValue.getValue());
-        } else {
-          auto data = getUnknownExpr(defaultExpr);
-          fpb.useDefaultValue(ExprSyntax { data, data.get() });
+    if (param->getTrailingCommaLoc().isValid()) {
+      paramBuilder.useTrailingComma(findToken(param->getTrailingCommaLoc(),
+                                              tok::comma));
+    }
+
+    TypeAnnotationSyntaxBuilder typeBuilder;
+    if (auto typeRepr = param->getTypeLoc().getTypeRepr()) {
+      if (auto attrTR = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+        if (auto underlyingType = attrTR->getTypeRepr()) {
+          if (auto transformed = transform(underlyingType)) {
+            typeBuilder.useType(transformed.getValue());
+          }
         }
+
+        SmallVector<SourceRange, 4> attrRanges;
+        attrTR->getAttrs().getAttrRanges(attrRanges);
+        for (auto range : attrRanges) {
+          AttributeSyntaxBuilder attrBuilder;
+          buildTypeAttribute(range, attrBuilder);
+          typeBuilder.addAttribute(attrBuilder.build());
+        }
+      } else if (auto type = transform(typeRepr)) {
+        typeBuilder.useType(type.getValue());
       }
     }
 
-    fsb.addFunctionParameter(fpb.build());
+    if (param->getSpecifierLoc().isValid()) {
+      typeBuilder.useSpecifier(findToken(param->getSpecifierLoc()));
+    }
+
+    paramBuilder.useTypeAnnotation(typeBuilder.build());
+
+    if (param->isDefaultArgument()) {
+      auto defaultExpr = param->getDefaultValue();
+      if (auto defaultValue = transform(defaultExpr)) {
+        paramBuilder.useDefaultValue(defaultValue.getValue());
+      } else {
+        auto data = getUnknownExpr(defaultExpr);
+        paramBuilder.useDefaultValue(ExprSyntax { data, data.get() });
+      }
+    }
+
+    sigBuilder.addFunctionParameter(paramBuilder.build());
   }
 
-  b.useSignature(fsb.build());
+  if (auto typeRepr = FD->getBodyResultTypeLoc().getTypeRepr()) {
+    if (auto attrTR = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+      typeRepr = attrTR->getTypeRepr();
+
+      SmallVector<SourceRange, 4> attrRanges;
+      attrTR->getAttrs().getAttrRanges(attrRanges);
+      for (auto range : attrRanges) {
+        AttributeSyntaxBuilder attrBuilder;
+        buildTypeAttribute(range, attrBuilder);
+        sigBuilder.addAttribute(attrBuilder.build());
+      }
+    }
+    if (auto type = transform(typeRepr)) {
+      sigBuilder.useReturnType(type.getValue());
+    }
+  }
+
+  if (FD->getArrowLoc().isValid()) {
+    sigBuilder.useArrow(findToken(FD->getArrowLoc(), tok::arrow));
+  }
+  
+  b.useSignature(sigBuilder.build());
 
   return b.build().Root;
 }
@@ -1452,6 +1572,119 @@ LegacyASTTransformer::visitKeyPathDotExpr(KeyPathDotExpr *E,
                                           const SyntaxData *Parent,
                                           const CursorIndex IndexInParent) {
   return getUnknownExpr(E);
+}
+
+#pragma mark - TypeReprs
+
+RC<SyntaxData>
+LegacyASTTransformer::visitErrorTypeRepr(ErrorTypeRepr *T,
+                                  const SyntaxData *Parent,
+                                  const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitAttributedTypeRepr(AttributedTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  auto name = findToken(T->getIdLoc(), tok::identifier);
+  return SyntaxFactory::makeTypeIdentifier(name, None, None, None).Root;
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitFunctionTypeRepr(FunctionTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitArrayTypeRepr(ArrayTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitDictionaryTypeRepr(DictionaryTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitOptionalTypeRepr(OptionalTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitImplicitlyUnwrappedOptionalTypeRepr(
+  ImplicitlyUnwrappedOptionalTypeRepr *T, const SyntaxData *Parent,
+  const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitTupleTypeRepr(TupleTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitCompositionTypeRepr(CompositionTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitMetatypeTypeRepr(MetatypeTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitProtocolTypeRepr(ProtocolTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitInOutTypeRepr(InOutTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitSharedTypeRepr(SharedTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitFixedTypeRepr(FixedTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitSILBoxTypeRepr(SILBoxTypeRepr *T,
+  const SyntaxData *Parent, const CursorIndex IndexInParent) {
+  return getUnknownType(T);
 }
 
 TokenSyntax

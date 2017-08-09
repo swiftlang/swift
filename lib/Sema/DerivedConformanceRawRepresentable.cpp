@@ -271,7 +271,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
                                     C.Id_rawValue, SourceLoc(),
                                     C.Id_rawValue,
                                     SourceLoc(), SourceLoc(),
-                                    SourceLoc(), rawType, parentDC);
+                                    SourceLoc(), SourceLoc(),
+                                    rawType, parentDC);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
