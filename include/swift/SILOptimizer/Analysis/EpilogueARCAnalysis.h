@@ -240,7 +240,7 @@ public:
   llvm::SmallSetVector<SILInstruction *, 1>
   computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind Kind,
                                  SILValue Arg) {
-    auto ARCCache = Kind == EpilogueARCContext::EpilogueARCKind::Retain ?
+    auto &ARCCache = Kind == EpilogueARCContext::EpilogueARCKind::Retain ?
                  EpilogueRetainInstCache :
                  EpilogueReleaseInstCache;
     auto Iter = ARCCache.find(Arg);
