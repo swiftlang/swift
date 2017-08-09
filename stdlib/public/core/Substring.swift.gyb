@@ -386,6 +386,10 @@ extension StringProtocol {
 %   View = ViewPrefix + 'View'
 %   RangeReplaceable = 'RangeReplaceable' if property == 'unicodeScalars' else ''
 extension Substring {
+  % if View == 'CharacterView':
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
+  % end
   public struct ${View} {
     var _slice: ${RangeReplaceable}BidirectionalSlice<String.${View}>
   }
@@ -424,6 +428,10 @@ extension Substring.${View} : BidirectionalCollection {
 }
 
 extension Substring {
+  % if View == 'CharacterView':
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
+  % end
   public var ${property}: ${View} {
     get {
       return ${View}(_wholeString.${property}, _bounds: startIndex..<endIndex)
