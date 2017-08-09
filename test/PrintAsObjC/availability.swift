@@ -38,6 +38,9 @@
 // CHECK-NEXT: - (void)multiPlatCombined
 // CHECK-DAG: SWIFT_AVAILABILITY(macos,introduced=10.6,deprecated=10.8,obsoleted=10.9)
 // CHECK-DAG: SWIFT_AVAILABILITY(ios,introduced=7.0,deprecated=9.0,obsoleted=10.0)
+// CHECK-NEXT: - (void)platUnavailableMessage SWIFT_AVAILABILITY(macos,unavailable,message="help I'm trapped in an availability factory");
+// CHECK-NEXT: - (void)platUnavailableRename SWIFT_AVAILABILITY(macos,unavailable,message="'platUnavailableRename' has been renamed to 'plea'");
+// CHECK-NEXT: - (void)platUnavailableRenameWithMessage SWIFT_AVAILABILITY(macos,unavailable,message="'platUnavailableRenameWithMessage' has been renamed to 'anotherPlea': still trapped");
 // CHECK-NEXT: - (void)extensionUnavailable
 // CHECK-DAG: SWIFT_AVAILABILITY(macos_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(ios_app_extension,unavailable)
@@ -46,10 +49,31 @@
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ OBJC_DESIGNATED_INITIALIZER SWIFT_AVAILABILITY(macos,introduced=10.10);
 // CHECK-NEXT: @end
+
+// CHECK-LABEL: {{^}}SWIFT_AVAILABILITY(macos,introduced=999){{$}}
+// CHECK-NEXT: @interface Availability (SWIFT_EXTENSION(availability))
+// CHECK-NEXT: - (void)extensionAvailability:(WholeClassAvailability * _Nonnull)_;
+// CHECK-NEXT: @end
+
 // CHECK-LABEL: @interface AvailabilitySub
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ SWIFT_UNAVAILABLE;
 // CHECK-NEXT: @end
+
+// CHECK-LABEL: SWIFT_CLASS("{{.+}}WholeClassAvailability") 
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=999)
+// CHECK-NEXT: @interface WholeClassAvailability
+// CHECK-NEXT: - (void)wholeClassAvailability:(id <WholeProtoAvailability> _Nonnull)_;
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+
+// CHECK-LABEL: SWIFT_PROTOCOL("{{.+}}WholeProtoAvailability{{.*}}") 
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=999)
+// CHECK-NEXT: @protocol WholeProtoAvailability
+// CHECK-NEXT: - (void)wholeProtoAvailability:(WholeClassAvailability * _Nonnull)_;
+// CHECK-NEXT: @end
+
+
 @objc class Availability {
     @objc func alwaysAvailable() {}
 
@@ -106,6 +130,13 @@
     @available(iOS, introduced: 7.0, deprecated: 9.0, obsoleted: 10.0)
     @objc func multiPlatCombined() {}
 
+    @available(macOS, unavailable, message: "help I'm trapped in an availability factory")
+    @objc func platUnavailableMessage() {}
+    @available(macOS, unavailable, renamed: "plea")
+    @objc func platUnavailableRename() {}
+    @available(macOS, unavailable, renamed: "anotherPlea", message: "still trapped")
+    @objc func platUnavailableRenameWithMessage() {}
+
     @available(macOSApplicationExtension, unavailable)
     @available(iOSApplicationExtension, unavailable)
     @available(tvOSApplicationExtension, unavailable)
@@ -117,8 +148,25 @@
     @objc init(x _: Int) {}
 }
 
+// Deliberately a high number that the default deployment target will not reach.
+@available(macOS 999, *)
+extension Availability {
+  @objc func extensionAvailability(_: WholeClassAvailability) {}
+}
+
 @objc class AvailabilitySub: Availability {
     private override init() { super.init() }
     @available(macOS 10.10, *)
     private override init(x _: Int) { super.init() }
+}
+
+
+@available(macOS 999, *)
+@objc class WholeClassAvailability {
+  func wholeClassAvailability(_: WholeProtoAvailability) {}
+}
+
+@available(macOS 999, *)
+@objc protocol WholeProtoAvailability {
+  func wholeProtoAvailability(_: WholeClassAvailability)
 }
