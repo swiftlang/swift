@@ -181,7 +181,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ^= (inout Int, Int) -> Void
   FuncDecl *MutatingXorIntDecl = nullptr;
 
-  /// func _mixInt(Int -> Int
+  /// func _mixInt(Int) -> Int
   FuncDecl *MixIntDecl = nullptr;
   
   /// func append(Element) -> void
