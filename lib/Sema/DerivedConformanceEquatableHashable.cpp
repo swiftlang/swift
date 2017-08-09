@@ -142,7 +142,7 @@ static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
   auto indexStr = C.AllocateCopy(indexVal);
   auto indexStrRef = StringRef(indexStr.data(), indexStr.size());
 
-  auto varDecl = new (C) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+  auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                  /*IsCaptureList*/true, SourceLoc(),
                                  C.getIdentifier(indexStrRef), type,
                                  varContext);
@@ -248,7 +248,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                               indexPat, nullptr, funcDecl);
 
   unsigned index = 0;
-  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     // generate: case .<Case>:
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
@@ -404,7 +404,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
 
   SmallVector<ASTNode, 6> statements;
-  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   unsigned elementCount = 0;
 
   // For each enum element, generate a case statement matching a pair containing
@@ -772,9 +772,10 @@ static Expr* mixInHashExpr_hashValue(ASTContext &C,
                                      VarDecl* resultVar,
                                      Expr *exprToHash) {
   auto intType = C.getIntDecl()->getDeclaredType();
-  auto inoutIntType = InOutType::get(intType);
   auto xorFuncInputType =
-    TupleType::get({ TupleTypeElt(inoutIntType), TupleTypeElt(intType) }, C);
+    TupleType::get({
+      TupleTypeElt(intType, Identifier(), ParameterTypeFlags().withInOut(true)),
+      TupleTypeElt(intType) }, C);
 
   // <exprToHash>.hashValue
   auto hashValueExpr = new (C) UnresolvedDotExpr(exprToHash, SourceLoc(),
@@ -792,7 +793,7 @@ static Expr* mixInHashExpr_hashValue(ASTContext &C,
   auto resultExpr = new (C) DeclRefExpr(ConcreteDeclRef(resultVar),
                                         DeclNameLoc(), /*implicit*/ true);
   auto resultInoutExpr = new (C) InOutExpr(SourceLoc(), resultExpr,
-                                           inoutIntType, /*implicit*/ true);
+                                           intType, /*implicit*/ true);
 
   auto xorFunc = C.getMutatingXorIntDecl();
   auto xorFuncExpr = new (C) DeclRefExpr(xorFunc, DeclNameLoc(),
@@ -820,7 +821,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   Type enumType = selfDecl->getType();
   Type intType = C.getIntDecl()->getDeclaredType();
 
-  auto resultVar = new (C) VarDecl(/*IsStatic*/ false, /*IsLet*/ false,
+  auto resultVar = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Specifier::Var,
                                    /*IsCaptureList*/ false, SourceLoc(),
                                    C.getIdentifier("result"), intType,
                                    hashValueDecl);
@@ -839,7 +840,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
                                                hashValueDecl);
 
   unsigned index = 0;
-  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<ASTNode, 4> cases;
 
   auto hasNoAssociatedValues = enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
@@ -937,7 +938,7 @@ deriveBodyHashable_struct_hashValue(AbstractFunctionDecl *hashValueDecl) {
 
   Type intType = C.getIntDecl()->getDeclaredType();
 
-  auto resultVar = new (C) VarDecl(/*IsStatic*/ false, /*IsLet*/ false,
+  auto resultVar = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Specifier::Var,
                                    /*IsCaptureList*/ false, SourceLoc(),
                                    C.getIdentifier("result"), intType,
                                    hashValueDecl);
