@@ -1831,10 +1831,8 @@ namespace {
         return visit(singletonFieldTy.getSwiftRValueType());
 
       // If the type is fixed-layout, emit a copy of its layout.
-      if (auto fixed = dyn_cast<FixedTypeInfo>(&ti)) {
-
+      if (auto fixed = dyn_cast<FixedTypeInfo>(&ti))
         return IGF.IGM.emitFixedTypeLayout(t, *fixed);
-      }
 
       return emitFromTypeMetadata(t);
     }

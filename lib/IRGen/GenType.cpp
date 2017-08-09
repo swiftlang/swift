@@ -1753,6 +1753,11 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
         || structDecl->hasClangNode())
       return SILType();
 
+    // A single-field struct with custom alignment has different layout from its
+    // field.
+    if (structDecl->getAttrs().hasAttribute<AlignmentAttr>())
+      return SILType();
+
     // If there's only one stored property, we have the layout of its field.
     auto allFields = structDecl->getStoredProperties();
     
