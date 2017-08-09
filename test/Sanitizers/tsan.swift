@@ -2,7 +2,7 @@
 // RUN: not env %env-TSAN_OPTIONS="abort_on_error=0" %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
-// XFAIL: tvos
+// UNSUPPORTED: OS=tvos
 #if os(OSX) || os(iOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
