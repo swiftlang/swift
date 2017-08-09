@@ -43,13 +43,15 @@ getChildrenMaxResidentSetSize() {
 }
 
 static std::string
-makeFileName(StringRef ProcessName) {
+makeFileName(StringRef ProgramName,
+             StringRef AuxName) {
   std::string tmp;
   raw_string_ostream stream(tmp);
   auto now = std::chrono::system_clock::now();
   stream << "stats"
          << "-" << now.time_since_epoch().count()
-         << "-" << ProcessName
+         << "-" << ProgramName
+         << "-" << AuxName
          << "-" << Process::GetRandomNumber()
          << ".json";
   return stream.str();
@@ -58,15 +60,17 @@ makeFileName(StringRef ProcessName) {
 // LLVM's statistics-reporting machinery is sensitive to filenames containing
 // YAML-quote-requiring characters, which occur surprisingly often in the wild;
 // we only need a recognizable and likely-unique name for a target here, not an
-// exact filename, so we go with a crude approximation.
+// exact filename, so we go with a crude approximation. Furthermore, to avoid
+// parse ambiguities when "demangling" counters and filenames we exclude hyphens
+// and slashes.
 static std::string
-cleanTargetName(StringRef TargetName) {
+cleanName(StringRef n) {
   std::string tmp;
-  for (auto c : TargetName) {
+  for (auto c : n) {
     if (('a' <= c && c <= 'z') ||
         ('A' <= c && c <= 'Z') ||
         ('0' <= c && c <= '9') ||
-        (c == '-') || (c == '.') || (c == '/'))
+        (c == '.'))
       tmp += c;
     else
       tmp += '_';
@@ -74,15 +78,57 @@ cleanTargetName(StringRef TargetName) {
   return tmp;
 }
 
+static std::string
+auxName(StringRef ModuleName,
+        StringRef InputName,
+        StringRef TripleName,
+        StringRef OutputType,
+        StringRef OptType) {
+  if (InputName.empty()) {
+    InputName = "all";
+  }
+  if (OptType.empty()) {
+    InputName = "Onone";
+  }
+  if (!OutputType.empty() && OutputType.front() == '.') {
+    OutputType = OutputType.substr(1);
+  }
+  if (!OptType.empty() && OptType.front() == '-') {
+    OptType = OptType.substr(1);
+  }
+  return (cleanName(ModuleName)
+          + "-" + cleanName(InputName)
+          + "-" + cleanName(TripleName)
+          + "-" + cleanName(OutputType)
+          + "-" + cleanName(OptType));
+}
+
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
-                                           StringRef TargetName,
+                                           StringRef ModuleName,
+                                           StringRef InputName,
+                                           StringRef TripleName,
+                                           StringRef OutputType,
+                                           StringRef OptType,
+                                           StringRef Directory)
+  : UnifiedStatsReporter(ProgramName,
+                         auxName(ModuleName,
+                                 InputName,
+                                 TripleName,
+                                 OutputType,
+                                 OptType),
+                         Directory)
+{
+}
+
+UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
+                                           StringRef AuxName,
                                            StringRef Directory)
   : Filename(Directory),
-    Timer(make_unique<NamedRegionTimer>(cleanTargetName(TargetName),
+    Timer(make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
                                         ProgramName, "Running Program"))
 {
-  path::append(Filename, makeFileName(ProgramName));
+  path::append(Filename, makeFileName(ProgramName, AuxName));
   EnableStatistics(/*PrintOnExit=*/false);
   SharedTimer::enableCompilationTimers();
 }

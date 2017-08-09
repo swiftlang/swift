@@ -149,8 +149,6 @@ void setModuleFlags(IRGenModule &IGM) {
 
 void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine) {
-  SharedTimer timer("LLVM optimization");
-
   // Set up a pipeline.
   PassManagerBuilderWrapper PMBuilder(Opts);
 
@@ -466,10 +464,8 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
   }
   }
 
-  {
-    SharedTimer timer("LLVM output");
-    EmitPasses.run(*Module);
-  }
+  EmitPasses.run(*Module);
+
   if (Stats && RawOS.hasValue()) {
     if (DiagMutex)
       DiagMutex->lock();
@@ -783,6 +779,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   if (outModuleHash) {
     *outModuleHash = IGM.ModuleHash;
   } else {
+    SharedTimer timer("LLVM pipeline");
+
     // Since no out module hash was set, we need to performLLVM.
     if (performLLVM(Opts, &IGM.Context.Diags, nullptr, IGM.ModuleHash,
                     IGM.getModule(), IGM.TargetMachine.get(),
@@ -1002,6 +1000,8 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
   // Bail out if there are any errors.
   if (Ctx.hadError()) return;
+
+  SharedTimer timer("LLVM pipeline");
 
   std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;
