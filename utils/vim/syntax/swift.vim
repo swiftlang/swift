@@ -139,8 +139,8 @@ syn match swiftTypeDeclaration skipwhite nextgroup=swiftType,swiftInOutKeyword
 syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
       \ /->/
 
-syn region swiftString start=/"/ skip=/\\\\\|\\"/ end=/"/ contains=swiftInterpolation
-syn region swiftInterpolation start=/\\(/ end=/)/ contained contains=swiftPreproc
+syn region swiftString start=/"/ skip=/\\\\\|\\"/ end=/"/ contains=swiftInterpolationRegion
+syn region swiftInterpolationRegion matchgroup=swiftInterpolation start=/\\(/ end=/)/ contained contains=TOP
 syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
 syn region swiftLineComment start="//" end="$" contains=swiftComment,swiftTodo
 
