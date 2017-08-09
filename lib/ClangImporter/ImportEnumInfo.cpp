@@ -36,6 +36,9 @@ using namespace importer;
 /// Classify the given Clang enumeration to describe how to import it.
 void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
                             clang::Preprocessor &pp) {
+  assert(decl);
+  clang::PrettyStackTraceDecl trace(decl, clang::SourceLocation(),
+                                    pp.getSourceManager(), "classifying");
   assert(decl->isThisDeclarationADefinition());
 
   // Anonymous enumerations simply get mapped to constants of the
