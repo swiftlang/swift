@@ -8,3 +8,13 @@ typedef SWIFT_ENUM_NAMED(NSInteger, ObjCEnum, "SwiftEnum") {
     ObjCEnumTwo,
     ObjCEnumThree
 };
+
+enum BareForwardEnum;
+enum ForwardEnumWithUnderlyingType : int;
+typedef SWIFT_ENUM_NAMED(NSInteger, ForwardObjCEnum, "ForwardSwiftEnum");
+
+void forwardBarePointer(enum BareForwardEnum * _Nonnull);
+void forwardWithUnderlyingValue(enum ForwardEnumWithUnderlyingType);
+void forwardWithUnderlyingPointer(enum ForwardEnumWithUnderlyingType * _Nonnull);
+void forwardObjCValue(ForwardObjCEnum);
+void forwardObjCPointer(ForwardObjCEnum * _Nonnull);
