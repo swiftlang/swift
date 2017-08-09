@@ -127,10 +127,6 @@ ERROR(init_candidate_inaccessible,none,
       "'%select{private|fileprivate|internal|%error|%error}1' protection level",
       (Type, Accessibility))
 
-ERROR(all_candidates_inaccessible,none,
-      "all %0 candidates are inaccessible",
-      (DeclName))
-
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
       (StringRef))
