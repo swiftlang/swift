@@ -204,6 +204,9 @@ public:
 class StructMetadataLayout : public NominalMetadataLayout {
   llvm::DenseMap<VarDecl*, StoredOffset> FieldOffsets;
 
+  /// The start of the field-offset vector.
+  StoredOffset FieldOffsetVector;
+
   const StoredOffset &getStoredFieldOffset(VarDecl *field) const {
     auto it = FieldOffsets.find(field);
     assert(it != FieldOffsets.end());
@@ -223,6 +226,8 @@ public:
   /// DEPRECATED: callers should be updated to handle this in a
   /// more arbitrary fashion.
   Size getStaticFieldOffset(VarDecl *field) const;
+
+  Offset getFieldOffsetVectorOffset() const;
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Struct;
@@ -248,10 +253,11 @@ Size getClassFieldOffsetOffset(IRGenModule &IGM,
                                ClassDecl *theClass,
                                VarDecl *field);
 
-/// Emit the address of the field-offset vector in the given class metadata.
+/// Emit the address of the field-offset vector in the given class or struct
+/// metadata.
 Address emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                        llvm::Value *metadata,
-                                       ClassDecl *theClass);
+                                       NominalTypeDecl *theDecl);
 
 } // end namespace irgen
 } // end namespace swift

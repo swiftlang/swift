@@ -41,90 +41,90 @@ namespace {
 
 template <class Impl, template <class> class Base>
 class LayoutScanner : public Base<Impl> {
-	Optional<Size> AddressPoint;
+  Optional<Size> AddressPoint;
 
 protected:
-	template <class... As>
-	LayoutScanner(As &&... args) : Base<Impl>(std::forward<As>(args)...) {}
+  template <class... As>
+  LayoutScanner(As &&... args) : Base<Impl>(std::forward<As>(args)...) {}
 
 public:
-	using StoredOffset = MetadataLayout::StoredOffset;
+  using StoredOffset = MetadataLayout::StoredOffset;
 
-	void noteAddressPoint() { AddressPoint = this->NextOffset; }
-	StoredOffset getNextOffset() {
-		return StoredOffset(this->NextOffset - AddressPoint.getValue());
-	}
+  void noteAddressPoint() { AddressPoint = this->NextOffset; }
+  StoredOffset getNextOffset() {
+    return StoredOffset(this->NextOffset - AddressPoint.getValue());
+  }
 };
 
 }
 
 ClassMetadataLayout &IRGenModule::getMetadataLayout(ClassDecl *decl) {
-	return cast<ClassMetadataLayout>(
-								        getMetadataLayout(static_cast<NominalTypeDecl*>(decl)));
+  return cast<ClassMetadataLayout>(
+                        getMetadataLayout(static_cast<NominalTypeDecl*>(decl)));
 }
 
 EnumMetadataLayout &IRGenModule::getMetadataLayout(EnumDecl *decl) {
-	return cast<EnumMetadataLayout>(
-								        getMetadataLayout(static_cast<NominalTypeDecl*>(decl)));
+  return cast<EnumMetadataLayout>(
+                        getMetadataLayout(static_cast<NominalTypeDecl*>(decl)));
 }
 
 StructMetadataLayout &IRGenModule::getMetadataLayout(StructDecl *decl) {
-	return cast<StructMetadataLayout>(
-								        getMetadataLayout(static_cast<NominalTypeDecl*>(decl)));
+  return cast<StructMetadataLayout>(
+                        getMetadataLayout(static_cast<NominalTypeDecl*>(decl)));
 }
 
 NominalMetadataLayout &IRGenModule::getMetadataLayout(NominalTypeDecl *decl) {
-	auto &entry = MetadataLayouts[decl];
-	if (!entry) {
-		if (auto theClass = dyn_cast<ClassDecl>(decl)) {
-			entry = new ClassMetadataLayout(*this, theClass);			
-		} else if (auto theEnum = dyn_cast<EnumDecl>(decl)) {
-			entry = new EnumMetadataLayout(*this, theEnum);			
-		} else if (auto theStruct = dyn_cast<StructDecl>(decl)) {
-			entry = new StructMetadataLayout(*this, theStruct);
-		} else {
-			llvm_unreachable("bad nominal type!");
-		}
-	}
-	return *cast<NominalMetadataLayout>(entry);
+  auto &entry = MetadataLayouts[decl];
+  if (!entry) {
+    if (auto theClass = dyn_cast<ClassDecl>(decl)) {
+      entry = new ClassMetadataLayout(*this, theClass);
+    } else if (auto theEnum = dyn_cast<EnumDecl>(decl)) {
+      entry = new EnumMetadataLayout(*this, theEnum);
+    } else if (auto theStruct = dyn_cast<StructDecl>(decl)) {
+      entry = new StructMetadataLayout(*this, theStruct);
+    } else {
+      llvm_unreachable("bad nominal type!");
+    }
+  }
+  return *cast<NominalMetadataLayout>(entry);
 }
 
 void IRGenModule::destroyMetadataLayoutMap() {
-	for (auto &entry : MetadataLayouts) {
-		entry.second->destroy();
-	}
+  for (auto &entry : MetadataLayouts) {
+    entry.second->destroy();
+  }
 }
 
 void MetadataLayout::destroy() const {
-	switch (getKind()) {
-	case Kind::Class:
-		delete cast<ClassMetadataLayout>(this);
-		return;
+  switch (getKind()) {
+  case Kind::Class:
+    delete cast<ClassMetadataLayout>(this);
+    return;
 
-	case Kind::Struct:
-		delete cast<StructMetadataLayout>(this);
-		return;
+  case Kind::Struct:
+    delete cast<StructMetadataLayout>(this);
+    return;
 
-	case Kind::Enum:
-		delete cast<EnumMetadataLayout>(this);
-		return;
-	}
-	llvm_unreachable("bad kind");
+  case Kind::Enum:
+    delete cast<EnumMetadataLayout>(this);
+    return;
+  }
+  llvm_unreachable("bad kind");
 }
 
 /******************************* NOMINAL TYPES ********************************/
 
 Offset NominalMetadataLayout::getParentOffset(IRGenFunction &IGF) const {
-	assert(Parent.isValid());
-	assert(Parent.isStatic() && "resilient metadata layout unsupported!");
-	return Offset(Parent.getStaticOffset());
+  assert(Parent.isValid());
+  assert(Parent.isStatic() && "resilient metadata layout unsupported!");
+  return Offset(Parent.getStaticOffset());
 }
 
 Offset
 NominalMetadataLayout::getGenericRequirementsOffset(IRGenFunction &IGF) const {
-	assert(GenericRequirements.isValid());
-	assert(GenericRequirements.isStatic() && "resilient metadata layout unsupported!");
-	return Offset(GenericRequirements.getStaticOffset());
+  assert(GenericRequirements.isValid());
+  assert(GenericRequirements.isStatic() && "resilient metadata layout unsupported!");
+  return Offset(GenericRequirements.getStaticOffset());
 }
 
 /// Given a reference to some metadata, derive a reference to the
@@ -186,21 +186,40 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
                                       IGF.IGM.WitnessTablePtrTy);
 }
 
+Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
+                                              llvm::Value *metadata,
+                                              NominalTypeDecl *decl) {
+  auto &layout = IGF.IGM.getMetadataLayout(decl);
+  auto offset = [&]() {
+    if (isa<ClassDecl>(decl)) {
+      return cast<ClassMetadataLayout>(layout)
+        .getFieldOffsetVectorOffset(IGF);
+    } else {
+      assert(isa<StructDecl>(decl));
+      return cast<StructMetadataLayout>(layout)
+        .getFieldOffsetVectorOffset();
+    }
+  }();
+
+  return IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.SizeTy,
+                                 IGF.IGM.getPointerAlignment());
+}
+
 /********************************** CLASSES ***********************************/
 
 ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
-		: NominalMetadataLayout(Kind::Class) {
+    : NominalMetadataLayout(Kind::Class) {
 
-	struct Scanner : LayoutScanner<Scanner, ClassMetadataScanner> {
-		using super = LayoutScanner;
+  struct Scanner : LayoutScanner<Scanner, ClassMetadataScanner> {
+    using super = LayoutScanner;
 
-		ClassMetadataLayout &Layout;
-		Scanner(IRGenModule &IGM, ClassDecl *decl, ClassMetadataLayout &layout)
-			: super(IGM, decl), Layout(layout) {}
+    ClassMetadataLayout &Layout;
+    Scanner(IRGenModule &IGM, ClassDecl *decl, ClassMetadataLayout &layout)
+      : super(IGM, decl), Layout(layout) {}
 
     void addParentMetadataRef(ClassDecl *forClass, Type classType) {
       if (forClass == Target)
-      	Layout.Parent = getNextOffset();
+        Layout.Parent = getNextOffset();
       super::addParentMetadataRef(forClass, classType);
     }
 
@@ -212,65 +231,65 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
 
     void addMethod(SILDeclRef fn) {
       if (fn.getDecl()->getDeclContext() == Target)
-      	Layout.MethodInfos.try_emplace(fn, getNextOffset());
+        Layout.MethodInfos.try_emplace(fn, getNextOffset());
       super::addMethod(fn);
     }
 
     void noteStartOfFieldOffsets(ClassDecl *forClass) {
-    	if (forClass == Target)
-    		Layout.FieldOffsetVector = getNextOffset();
-    	super::noteStartOfFieldOffsets(forClass);
+      if (forClass == Target)
+        Layout.FieldOffsetVector = getNextOffset();
+      super::noteStartOfFieldOffsets(forClass);
     }
 
     void addFieldOffset(VarDecl *field) {
-    	if (field->getDeclContext() == Target)
-    		Layout.FieldOffsets.try_emplace(field, getNextOffset());
-    	super::addFieldOffset(field);
+      if (field->getDeclContext() == Target)
+        Layout.FieldOffsets.try_emplace(field, getNextOffset());
+      super::addFieldOffset(field);
     }
-	};
+  };
 
-	Scanner(IGM, decl, *this).layout();
+  Scanner(IGM, decl, *this).layout();
 }
 
 ClassMetadataLayout::MethodInfo
 ClassMetadataLayout::getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const{
-	auto &stored = getStoredMethodInfo(method);
+  auto &stored = getStoredMethodInfo(method);
 
-	assert(stored.TheOffset.isStatic() &&
-				 "resilient class metadata layout unsupported!");
-	auto offset = Offset(stored.TheOffset.getStaticOffset());
+  assert(stored.TheOffset.isStatic() &&
+         "resilient class metadata layout unsupported!");
+  auto offset = Offset(stored.TheOffset.getStaticOffset());
 
-	return MethodInfo(offset);
+  return MethodInfo(offset);
 }
 
 Size ClassMetadataLayout::getStaticMethodOffset(SILDeclRef method) const{
-	auto &stored = getStoredMethodInfo(method);
+  auto &stored = getStoredMethodInfo(method);
 
-	assert(stored.TheOffset.isStatic() &&
-				 "resilient class metadata layout unsupported!");
-	return stored.TheOffset.getStaticOffset();
+  assert(stored.TheOffset.isStatic() &&
+         "resilient class metadata layout unsupported!");
+  return stored.TheOffset.getStaticOffset();
 }
 
 Offset ClassMetadataLayout::getFieldOffset(IRGenFunction &IGF,
-																					 VarDecl *field) const {
-	// TODO: implement resilient metadata layout
-	return Offset(getStaticFieldOffset(field));
+                                           VarDecl *field) const {
+  // TODO: implement resilient metadata layout
+  return Offset(getStaticFieldOffset(field));
 }
 Size ClassMetadataLayout::getStaticFieldOffset(VarDecl *field) const {
-	auto &stored = getStoredFieldOffset(field);
-	assert(stored.isStatic() && "resilient class metadata layout unsupported!");
-	return stored.getStaticOffset();
+  auto &stored = getStoredFieldOffset(field);
+  assert(stored.isStatic() && "resilient class metadata layout unsupported!");
+  return stored.getStaticOffset();
 }
 
 Offset
 ClassMetadataLayout::getFieldOffsetVectorOffset(IRGenFunction &IGF) const {
-	// TODO: implement resilient metadata layout
-	assert(FieldOffsetVector.isStatic());
-	return Offset(FieldOffsetVector.getStaticOffset());
+  // TODO: implement resilient metadata layout
+  assert(FieldOffsetVector.isStatic());
+  return Offset(FieldOffsetVector.getStaticOffset());
 }
 
 Size irgen::getClassFieldOffsetOffset(IRGenModule &IGM, ClassDecl *theClass,
-                                			VarDecl *field) {
+                                      VarDecl *field) {
   return IGM.getMetadataLayout(theClass).getStaticFieldOffset(field);
 }
 
@@ -281,41 +300,31 @@ llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
                                          ClassDecl *theClass,
                                          VarDecl *field,
                                          llvm::Value *metadata) {
-	auto slot = emitAddressOfClassFieldOffset(IGF, metadata, theClass, field);
+  auto slot = emitAddressOfClassFieldOffset(IGF, metadata, theClass, field);
   return IGF.emitInvariantLoad(slot);
 }
 
 Address irgen::emitAddressOfClassFieldOffset(IRGenFunction &IGF,
-																						 llvm::Value *metadata,
-                                         		 ClassDecl *theClass,
-                                         		 VarDecl *field) {
-	auto offset = IGF.IGM.getMetadataLayout(theClass).getFieldOffset(IGF, field);
-	auto slot = IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.SizeTy,
-																			IGF.IGM.getPointerAlignment());
-	return slot;
-}
-
-Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
-																							llvm::Value *metadata,
-                                              ClassDecl *theClass) {
-	auto offset =
-		IGF.IGM.getMetadataLayout(theClass).getFieldOffsetVectorOffset(IGF);
- 
-  return IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.SizeTy,
-                                 IGF.IGM.getPointerAlignment());
+                                             llvm::Value *metadata,
+                                              ClassDecl *theClass,
+                                              VarDecl *field) {
+  auto offset = IGF.IGM.getMetadataLayout(theClass).getFieldOffset(IGF, field);
+  auto slot = IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.SizeTy,
+                                      IGF.IGM.getPointerAlignment());
+  return slot;
 }
 
 /*********************************** ENUMS ************************************/
 
 EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
-		: NominalMetadataLayout(Kind::Enum) {
+    : NominalMetadataLayout(Kind::Enum) {
 
-	struct Scanner : LayoutScanner<Scanner, EnumMetadataScanner> {
-		using super = LayoutScanner;
+  struct Scanner : LayoutScanner<Scanner, EnumMetadataScanner> {
+    using super = LayoutScanner;
 
-		EnumMetadataLayout &Layout;
-		Scanner(IRGenModule &IGM, EnumDecl *decl, EnumMetadataLayout &layout)
-			: super(IGM, decl), Layout(layout) {}
+    EnumMetadataLayout &Layout;
+    Scanner(IRGenModule &IGM, EnumDecl *decl, EnumMetadataLayout &layout)
+      : super(IGM, decl), Layout(layout) {}
 
     void addParentMetadataRef() {
       Layout.Parent = getNextOffset();
@@ -326,22 +335,22 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
       Layout.GenericRequirements = getNextOffset();
       super::noteStartOfGenericRequirements();
     }
-	};
+  };
 
-	Scanner(IGM, decl, *this).layout();
+  Scanner(IGM, decl, *this).layout();
 }
 
 /********************************** STRUCTS ***********************************/
 
 StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
-		: NominalMetadataLayout(Kind::Struct) {
+    : NominalMetadataLayout(Kind::Struct) {
 
-	struct Scanner : LayoutScanner<Scanner, StructMetadataScanner> {
-		using super = LayoutScanner;
+  struct Scanner : LayoutScanner<Scanner, StructMetadataScanner> {
+    using super = LayoutScanner;
 
-		StructMetadataLayout &Layout;
-		Scanner(IRGenModule &IGM, StructDecl *decl, StructMetadataLayout &layout)
-			: super(IGM, decl), Layout(layout) {}
+    StructMetadataLayout &Layout;
+    Scanner(IRGenModule &IGM, StructDecl *decl, StructMetadataLayout &layout)
+      : super(IGM, decl), Layout(layout) {}
 
     void addParentMetadataRef() {
       Layout.Parent = getNextOffset();
@@ -351,24 +360,35 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
     void noteStartOfGenericRequirements() {
       Layout.GenericRequirements = getNextOffset();
       super::noteStartOfGenericRequirements();
+    }
+
+    void noteStartOfFieldOffsets() {
+      Layout.FieldOffsetVector = getNextOffset();
+      super::noteStartOfFieldOffsets();
     }
 
     void addFieldOffset(VarDecl *field) {
       Layout.FieldOffsets.try_emplace(field, getNextOffset());
       super::addFieldOffset(field);
     }
-	};
+  };
 
-	Scanner(IGM, decl, *this).layout();
+  Scanner(IGM, decl, *this).layout();
 }
 
 Offset StructMetadataLayout::getFieldOffset(IRGenFunction &IGF,
-																						VarDecl *field) const {
-	// TODO: implement resilient metadata layout
-	return Offset(getStaticFieldOffset(field));
+                                            VarDecl *field) const {
+  // TODO: implement resilient metadata layout
+  return Offset(getStaticFieldOffset(field));
 }
 Size StructMetadataLayout::getStaticFieldOffset(VarDecl *field) const {
-	auto &stored = getStoredFieldOffset(field);
-	assert(stored.isStatic() && "resilient struct metadata layout unsupported!");
-	return stored.getStaticOffset();
+  auto &stored = getStoredFieldOffset(field);
+  assert(stored.isStatic() && "resilient struct metadata layout unsupported!");
+  return stored.getStaticOffset();
+}
+
+Offset
+StructMetadataLayout::getFieldOffsetVectorOffset() const {
+  assert(FieldOffsetVector.isStatic());
+  return Offset(FieldOffsetVector.getStaticOffset());
 }
