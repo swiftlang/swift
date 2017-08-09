@@ -57,6 +57,8 @@ extension String {
   ///         print(firstName)
   ///     }
   ///     // Prints "Marie"
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
   public struct CharacterView {
     @_versioned
     internal var _core: _StringCore
@@ -82,6 +84,8 @@ extension String {
   }
 
   /// A view of the string's contents as a collection of characters.
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
   public var characters: CharacterView {
     get {
       return CharacterView(self)
