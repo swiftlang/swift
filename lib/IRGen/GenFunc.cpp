@@ -746,7 +746,7 @@ static unsigned findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
 /// Swift-refcountable type that is being used directly as the
 /// context object.
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
-                                   llvm::Function *staticFnPtr,
+                                   const Optional<FunctionPointer> &staticFnPtr,
                                    bool calleeHasContext,
                                    const Signature &origSig,
                                    CanSILFunctionType origType,
@@ -762,7 +762,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   StringRef FnName;
   if (staticFnPtr)
-    FnName = staticFnPtr->getName();
+    FnName = staticFnPtr->getPointer()->getName();
 
   IRGenMangler Mangler;
   std::string thunkName = Mangler.manglePartialApplyForwarder(FnName);
@@ -1179,12 +1179,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   FunctionPointer fnPtr = [&] {
     // If we found a function pointer statically, great.
     if (staticFnPtr) {
-      assert(staticFnPtr->getType() == fnTy &&
+      assert(staticFnPtr->getPointer()->getType() == fnTy &&
              "static function type mismatch?!");
-      Signature sig(cast<llvm::FunctionType>(fnTy->getElementType()),
-                    staticFnPtr->getAttributes(),
-                    staticFnPtr->getCallingConv());
-      return FunctionPointer::forDirect(staticFnPtr, sig);
+      return *staticFnPtr;
     }
 
     // Otherwise, it was the last thing we added to the layout.
@@ -1334,8 +1331,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
-  llvm::Value *fnPtr = fn.getPointer();
-
   // Reserve space for polymorphic bindings.
   SubstitutionMap subMap;
   if (auto genericSig = origType->getGenericSignature())
@@ -1460,6 +1455,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       hasSingleSwiftRefcountedContext == Yes &&
       outType->getCalleeConvention() == *singleRefcountedConvention) {
     assert(args.size() == 1);
+    auto fnPtr = fn.getPointer();
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     out.add(fnPtr);
     llvm::Value *ctx = args.claimNext();
@@ -1468,11 +1464,13 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     return;
   }
   
+  Optional<FunctionPointer> staticFn;
+  if (fn.isConstant()) staticFn = fn;
+
   // If the function pointer is dynamic, include it in the context.
-  auto staticFn = dyn_cast<llvm::Function>(fnPtr);
+  size_t nonStaticFnIndex = ~size_t(0);
   if (!staticFn) {
-    llvm::Value *fnRawPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
-    args.add(fnRawPtr);
+    nonStaticFnIndex = argTypeInfos.size();
     argValTypes.push_back(SILType::getRawPointerType(IGF.IGM.Context));
     argTypeInfos.push_back(
          &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheRawPointerType));
@@ -1492,13 +1490,12 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
 
     auto origSig = IGF.IGM.getSignature(origType);
 
-    llvm::Function *forwarder =
+    llvm::Value *forwarder =
       emitPartialApplicationForwarder(IGF.IGM, staticFn, fnContext != nullptr,
                                       origSig, origType, substType,
                                       outType, subs, nullptr, argConventions);
-    llvm::Value *forwarderValue =
-      IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
-    out.add(forwarderValue);
+    forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
+    out.add(forwarder);
 
     llvm::Value *ctx = args.claimNext();
     if (isIndirectFormalParameter(*singleRefcountedConvention))
@@ -1545,6 +1542,16 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       auto &fieldLayout = layout.getElement(i);
       auto &fieldTy = layout.getElementTypes()[i];
       Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
+
+      // We don't add non-constant function pointers to the explosion above,
+      // so we need to handle them specially now.
+      if (i == nonStaticFnIndex) {
+        llvm::Value *fnPtr = fn.getPointer();
+        fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
+        IGF.Builder.CreateStore(fnPtr, fieldAddr);
+        continue;
+      }
+
       switch (argConventions[i]) {
       // Take indirect value arguments out of memory.
       case ParameterConvention::Indirect_In:
@@ -1571,7 +1578,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // Create the forwarding stub.
   auto origSig = IGF.IGM.getSignature(origType);
 
-  llvm::Function *forwarder = emitPartialApplicationForwarder(IGF.IGM,
+  llvm::Value *forwarder = emitPartialApplicationForwarder(IGF.IGM,
                                                               staticFn,
                                                           fnContext != nullptr,
                                                               origSig,
@@ -1581,9 +1588,8 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                               subs,
                                                               &layout,
                                                               argConventions);
-  llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
-                                                          IGF.IGM.Int8PtrTy);
-  out.add(forwarderValue);
+  forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
+  out.add(forwarder);
   out.add(data);
 }
 
