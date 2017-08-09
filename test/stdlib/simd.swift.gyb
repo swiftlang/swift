@@ -90,6 +90,18 @@ simdTestSuite.test("sizes") {
   expectEqual(128, MemoryLayout<double4x4>.size)
 }
 
+simdTestSuite.test("alignment") {
+  struct GenericLayout<T> {
+    let t: T = 0 as! T
+    let v: int4 = [1,2,3,4]
+  }
+
+  let g = GenericLayout<Int>()
+  expectEqual(0, g.t)
+  expectEqual([1,2,3,4], g.v)
+}
+
+
 simdTestSuite.test("vector init") {
 % for type in scalar_types:
 %   for size in [2,3,4]:

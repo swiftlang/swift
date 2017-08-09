@@ -16,6 +16,11 @@ enum EMult { case X(Int64), Y(Int64) }
 @_alignment(4)
 struct CommonLayout { var x,y,z,w: Int8 }
 
+struct FourInts { var x,y,z,w: Int32 }
+
+@_alignment(16)
+struct AlignedFourInts { var x: FourInts }
+
 // CHECK:       @_T011type_layout14TypeLayoutTestVMP = internal global {{.*}} @create_generic_metadata_TypeLayoutTest
 // CHECK:       define private %swift.type* @create_generic_metadata_TypeLayoutTest
 struct TypeLayoutTest<T> {
@@ -62,4 +67,7 @@ struct TypeLayoutTest<T> {
   // -- Common layout, reuse common value witness table layout
   // CHECK:       store i8** getelementptr (i8*, i8** @_T0Bi32_WV, i32 11)
   var k: CommonLayout
+  // -- Single-field aggregate with alignment
+  // CHECK:       store i8** getelementptr (i8*, i8** @_T0Bi128_WV, i32 11)
+  var l: AlignedFourInts
 }
