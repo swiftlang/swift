@@ -765,7 +765,8 @@ private:
           && !AvAttr->isUnconditionallyUnavailable()) {
         continue;
       }
-      const char *plat = nullptr;
+
+      const char *plat;
       switch (AvAttr->Platform) {
       case PlatformKind::OSX:
         plat = "macos";
@@ -791,10 +792,9 @@ private:
       case PlatformKind::watchOSApplicationExtension:
         plat = "watchos_app_extension";
         break;
-      default:
-        break;
+      case PlatformKind::none:
+        llvm_unreachable("handled above");
       }
-      if (!plat) continue;
 
       maybePrintLeadingSpace();
       os << "SWIFT_AVAILABILITY(" << plat;
