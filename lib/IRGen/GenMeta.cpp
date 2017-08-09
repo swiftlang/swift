@@ -3063,13 +3063,15 @@ namespace {
   };
 } // end anonymous namespace
 
-// Classes
-
-static llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
-                                                    ClassDecl *target,
-                                                    llvm::Value *metadata) {
+llvm::Value *
+irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
+                                       SILType T,
+                                       llvm::Value *metadata,
+                                       llvm::Value *vwtable) {
+  auto *target = T.getNominalOrBoundGenericNominal();
   llvm::Value *fieldVector
-    = emitAddressOfFieldOffsetVector(IGF, metadata, target).getAddress();
+    = emitAddressOfFieldOffsetVector(IGF, metadata, target)
+      .getAddress();
   
   // Collect the stored properties of the type.
   llvm::SmallVector<VarDecl*, 4> storedProperties;
@@ -3088,10 +3090,8 @@ static llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 
   unsigned index = 0;
   for (auto prop : storedProperties) {
-    auto propFormalTy = target->mapTypeIntoContext(prop->getInterfaceType())
-                            ->getCanonicalType();
-    SILType propLoweredTy = IGF.IGM.getLoweredType(propFormalTy);
-    llvm::Value *metadata = IGF.emitTypeLayoutRef(propLoweredTy);
+    auto propTy = T.getFieldType(prop, IGF.getSILModule());
+    llvm::Value *metadata = IGF.emitTypeLayoutRef(propTy);
     Address field = IGF.Builder.CreateConstArrayGEP(fields, index,
                                                     IGF.IGM.getPointerSize());
     IGF.Builder.CreateStore(metadata, field);
@@ -3101,14 +3101,26 @@ static llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   // Ask the runtime to lay out the class.  This can relocate it if it
   // wasn't allocated with swift_allocateGenericClassMetadata.
   auto numFields = IGF.IGM.getSize(Size(storedProperties.size()));
-  metadata = IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
-                                    {metadata, numFields,
-                                     fields.getAddress(), fieldVector});
+
+  if (isa<ClassDecl>(target)) {
+    assert(vwtable == nullptr);
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
+                                      {metadata, numFields,
+                                       fields.getAddress(), fieldVector});
+  } else {
+    assert(isa<StructDecl>(target));
+    IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
+                           {numFields, fields.getAddress(),
+                            fieldVector, vwtable});
+  }
+
   IGF.Builder.CreateLifetimeEnd(fields,
                   IGF.IGM.getPointerSize() * storedProperties.size());
 
   return metadata;
 }
+
+// Classes
 
 namespace {
   /// An adapter for laying out class metadata.
@@ -3451,7 +3463,11 @@ namespace {
       //
       // emitInitializeFieldOffsetVector will do everything in the full case.
       if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, Target)) {
-        metadata = emitInitializeFieldOffsetVector(IGF, Target, metadata);
+        auto classTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+        auto loweredClassTy = IGF.IGM.getLoweredType(classTy);
+        metadata = emitInitializeFieldOffsetVector(IGF, loweredClassTy,
+                                                   metadata,
+                                                   /*vwtable=*/nullptr);
 
       // TODO: do something intermediate when e.g. all we needed to do was
       // set parent metadata pointers.

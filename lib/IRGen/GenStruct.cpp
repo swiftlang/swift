@@ -440,44 +440,7 @@ namespace {
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
                             SILType T) const override {
-      // Get the field offset vector.
-      llvm::Value *fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
-                                              T.getStructOrBoundGenericStruct())
-        .getAddress();
-
-      // Collect the stored properties of the type.
-      llvm::SmallVector<VarDecl*, 4> storedProperties;
-      for (auto prop : T.getStructOrBoundGenericStruct()
-                        ->getStoredProperties()) {
-        storedProperties.push_back(prop);
-      }
-      // Fill out an array with the field type layout records.
-      Address fields = IGF.createAlloca(
-                       llvm::ArrayType::get(IGF.IGM.Int8PtrPtrTy,
-                                            storedProperties.size()),
-                       IGF.IGM.getPointerAlignment(), "structFields");
-      IGF.Builder.CreateLifetimeStart(fields,
-                            IGF.IGM.getPointerSize() * storedProperties.size());
-
-      fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
-      unsigned index = 0;
-      for (auto prop : storedProperties) {
-        auto propTy = T.getFieldType(prop, IGF.getSILModule());
-        llvm::Value *metadata = IGF.emitTypeLayoutRef(propTy);
-        Address field = IGF.Builder.CreateConstArrayGEP(fields, index,
-                                                      IGF.IGM.getPointerSize());
-        IGF.Builder.CreateStore(metadata, field);
-        ++index;
-      }
-      
-      // Ask the runtime to lay out the struct.
-      auto numFields = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                              storedProperties.size());
-      IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
-                             {numFields, fields.getAddress(),
-                              fieldVector, vwtable});
-      IGF.Builder.CreateLifetimeEnd(fields,
-                            IGF.IGM.getPointerSize() * storedProperties.size());
+      emitInitializeFieldOffsetVector(IGF, T, metadata, vwtable);
     }
   };
 
