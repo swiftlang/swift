@@ -82,6 +82,12 @@ namespace irgen {
                                              llvm::Value *fnPtr,
                                              CanSILFunctionType fnType);
 
+    /// Is this function pointer completely constant?  That is, can it
+    /// be safely moved to a different function context?
+    bool isConstant() const {
+      return (isa<llvm::Constant>(Value));
+    }
+
     /// Return the actual function pointer.
     llvm::Value *getPointer() const { return Value; }
 
