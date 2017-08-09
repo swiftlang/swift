@@ -8639,21 +8639,8 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       allInaccessible = false;
   }
 
-  // If no candidates were accessible, say so.
-  if (allInaccessible && !viableCandidatesToReport.empty()) {
-    diagnose(BaseLoc, diag::all_candidates_inaccessible, memberName);
-    for (auto &candidate : result.ViableCandidates) {
-      if (!candidate.isDecl())
-        continue;
-
-      if (auto decl = candidate.getDecl()) {
-        diagnose(decl, diag::note_candidate_inaccessible, decl->getFullName(),
-                 decl->getFormalAccess());
-      }
-    }
-
-    return true;
-  }
+  // diagnoseSimpleErrors() should have diagnosed this scenario.
+  assert(!allInaccessible || viableCandidatesToReport.empty());
 
   if (result.UnviableCandidates.empty() && isInitializer &&
       !baseObjTy->is<AnyMetatypeType>()) {
