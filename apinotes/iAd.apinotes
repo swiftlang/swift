@@ -1,7 +1,0 @@
----
-Name: iAd
-Tags:
-- Name: ADError
-  NSErrorDomain: ADErrorDomain
-- Name: ADClientError
-  NSErrorDomain: ADClientErrorDomain
