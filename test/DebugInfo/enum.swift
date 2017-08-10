@@ -61,7 +61,7 @@ public func foo(_ empty : Nothing) { }
 // CHECK: !DICompositeType({{.*}}name: "Nothing", {{.*}}elements: ![[EMPTY]]
 
 // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS:[0-9]+]],
-// CHECK-SAME:             {{.*}}identifier: "_T04enum4RoseOyxGD")
+// CHECK-SAME:             {{.*}}identifier: "_T04enum4RoseOyxG{{z?}}D")
 enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
   // DWARF: !DICompositeType({{.*}}name: "Rose",{{.*}}identifier: "_T04enum4RoseOyAA3fooACyxGAElFQq_GD")
@@ -70,10 +70,9 @@ enum Rose<A> {
 
 func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 
-// CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
-// CHECK-SAME:             {{.*}}identifier: "_T04enum5TupleOyAA3barACyxGAElFQq_GD")
+// CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]], {{.*}}identifier: "_T04enum5TupleOyAA3barACyxGAElFQq_GD")
 // DWARF: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
-// DWARF-SAME:             {{.*}}identifier: "_T04enum5TupleOyxGD")
+// DWARF-SAME:             {{.*}}identifier: "_T04enum5TupleOyxG{{z?}}D")
 public enum Tuple<P> {
   // DWARF: !DICompositeType({{.*}}name: "Tuple",{{.*}}identifier: "_T04enum5TupleOyAA3barACyxGAElFQq_GD")
 	case C(P, () -> Tuple)
