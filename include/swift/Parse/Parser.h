@@ -676,7 +676,6 @@ public:
     PD_InExtension          = 1 << 8,
     PD_InStruct             = 1 << 9,
     PD_InEnum               = 1 << 10,
-    PD_InLoop               = 1 << 11,
   };
 
   /// Options that control the parsing of declarations.
