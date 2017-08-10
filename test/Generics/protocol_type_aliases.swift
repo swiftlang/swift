@@ -37,7 +37,7 @@ protocol Q2 {
 // CHECK-NEXT:   τ_0_0 : Q2 [τ_0_0: Explicit @ 42:59]
 // CHECK-NEXT:   τ_0_0[.Q2].B : P2 [τ_0_0: Explicit @ 42:59 -> Protocol requirement (via Self.B in Q2)
 // CHECK-NEXT:   τ_0_0[.Q2].C == S<T.B.A> [τ_0_0[.Q2].C: Explicit]
-// CHECK-NEXT:   τ_0_0[.Q2].B[.P2].X == S<T.B.A> [τ_0_0[.Q2].B[.P2].X: Nested type match]
+// CHECK-NEXT:   τ_0_0[.Q2].B[.P2].X == S<T.B.A> [τ_0_0[.Q2].B[.P2].X: Concrete type binding]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == S<τ_0_0.B.A>>
 func requirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, T.C == T.B.X {}
 
@@ -46,7 +46,7 @@ func requirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, T.C == T.B.X {}
 // CHECK-NEXT:   τ_0_0 : Q2 [τ_0_0: Explicit @ 51:67]
 // CHECK-NEXT:   τ_0_0[.Q2].B : P2 [τ_0_0: Explicit @ 51:67 -> Protocol requirement (via Self.B in Q2)
 // CHECK-NEXT:   τ_0_0[.Q2].C == τ_0_0[.Q2].B[.P2].A [τ_0_0[.Q2].C: Explicit]
-// CHECK-NEXT:   τ_0_0[.Q2].B[.P2].X == S<T.B.A> [τ_0_0[.Q2].B[.P2].X: Nested type match]
+// CHECK-NEXT:   τ_0_0[.Q2].B[.P2].X == S<T.B.A> [τ_0_0[.Q2].B[.P2].X: Concrete type binding]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == τ_0_0.B.A>
 func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> == T.B.X {}
 
