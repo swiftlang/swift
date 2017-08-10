@@ -5,7 +5,7 @@ set(swift_stubs_sources
     KeyPaths.cpp
     LibcShims.cpp
     Stubs.cpp
-    UnicodeExtendedGraphemeClusters.cpp.gyb)
+)
 set(swift_stubs_objc_sources
     Availability.mm
     FoundationHelpers.mm

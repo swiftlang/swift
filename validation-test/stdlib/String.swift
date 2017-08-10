@@ -56,10 +56,11 @@ StringTests.test("sizeof") {
 
 StringTests.test("AssociatedTypes-UTF8View") {
   typealias View = String.UTF8View
+  typealias SubView = Substring.UTF8View
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: View.Iterator.self,
-    subSequenceType: Substring.UTF8View.self,
+    subSequenceType: SubView.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)
@@ -67,10 +68,11 @@ StringTests.test("AssociatedTypes-UTF8View") {
 
 StringTests.test("AssociatedTypes-UTF16View") {
   typealias View = String.UTF16View
+  typealias SubView = Substring.UTF16View
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: IndexingIterator<View>.self,
-    subSequenceType: Substring.UTF16View.self,
+    subSequenceType: SubView.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: View.Indices.self)
@@ -78,10 +80,11 @@ StringTests.test("AssociatedTypes-UTF16View") {
 
 StringTests.test("AssociatedTypes-UnicodeScalarView") {
   typealias View = String.UnicodeScalarView
+  typealias SubView = Substring.UnicodeScalarView
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: View.Iterator.self,
-    subSequenceType: Substring.UnicodeScalarView.self,
+    subSequenceType: SubView.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)
@@ -89,10 +92,11 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
 
 StringTests.test("AssociatedTypes-CharacterView") {
   typealias View = String.CharacterView
+  typealias SubView = Substring.CharacterView
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
+    subSequenceType: SubView.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultBidirectionalIndices<View>.self)

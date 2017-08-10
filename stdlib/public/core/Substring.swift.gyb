@@ -384,7 +384,7 @@ extension StringProtocol {
 %   ('characters', 'Character')
 % ]:
 %   View = ViewPrefix + 'View'
-%   RangeReplaceable = 'RangeReplaceable' if property == 'unicodeScalars' else ''
+%   RangeReplaceable = 'RangeReplaceable' if property == 'unicodeScalars' or property == 'characters' else ''
 extension Substring {
   public struct ${View} {
     var _slice: ${RangeReplaceable}BidirectionalSlice<String.${View}>
@@ -467,10 +467,10 @@ extension String {
   }
   % end
 }
-% end
 
 // FIXME: The other String views should be RangeReplaceable too.
-extension Substring.UnicodeScalarView : RangeReplaceableCollection {
+% if RangeReplaceable == 'RangeReplaceable':
+extension Substring.${View} : RangeReplaceableCollection {
   public init() { _slice = RangeReplaceableBidirectionalSlice.init() }
 
   public mutating func replaceSubrange<C : Collection>(
@@ -479,6 +479,9 @@ extension Substring.UnicodeScalarView : RangeReplaceableCollection {
     _slice.replaceSubrange(target, with: replacement)
   }
 }
+% end # if RangeReplaceable
+
+% end # for (property, ViewPrefix) in
 
 #if _runtime(_ObjC)
 
@@ -522,6 +525,16 @@ extension Substring : RangeReplaceableCollection {
       self = s[...]
     }
   }
+}
+
+extension Substring.CharacterView : _SwiftStringView {
+  var _persistentContent : String {
+    return Substring(self)._persistentContent
+  }
+  var _ephemeralContent : String {
+    return Substring(self)._ephemeralContent
+  }
+
 }
 
 extension Substring {
@@ -612,3 +625,39 @@ extension Substring {
   }
 }
 //===----------------------------------------------------------------------===//
+
+// popFirst() is only present when a collection is its own subsequence. This was
+// dropped in Swift 4.
+extension String {
+  @available(swift, obsoleted: 4, message:
+    "Please use 'first', 'dropFirst()', or 'Substring.popFirst()'.")
+  public mutating func popFirst() -> String.Element? {
+    guard !isEmpty else { return nil }
+    let element = first!
+    let nextIdx = self.index(after: self.startIndex)
+    self = String(self[nextIdx...])
+    return element
+  }
+}
+extension String.CharacterView {
+  @available(swift, obsoleted: 4, message:
+    "Please use 'first', 'dropFirst()', or 'Substring.CharacterView.popFirst()'.")
+  public mutating func popFirst() -> String.CharacterView.Element? {
+    guard !isEmpty else { return nil }
+    let element = first!
+    let nextIdx = self.index(after: self.startIndex)
+    self = String(self[nextIdx...]).characters
+    return element
+  }
+}
+extension String.UnicodeScalarView {
+  @available(swift, obsoleted: 4, message:
+    "Please use 'first', 'dropFirst()', or 'Substring.UnicodeScalarView.popFirst()'.")
+  public mutating func popFirst() -> String.UnicodeScalarView.Element? {
+    guard !isEmpty else { return nil }
+    let element = first!
+    let nextIdx = self.index(after: self.startIndex)
+    self = String(self[nextIdx...]).unicodeScalars
+    return element
+  }
+}
