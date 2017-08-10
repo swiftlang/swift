@@ -1,0 +1,192 @@
+# Lines starting with '#' are comments.
+# Each line is a file pattern followed by one or more owners.
+
+# Order is important. The last matching pattern has the most precedence.
+# So if a pull request only touches javascript files, only these owners
+# will be requested to review.
+# *.js    @octocat @github/js
+#
+# You can also use email addresses if you prefer.
+# docs/*  docs@example.com
+
+# Default owner where none is specified
+*                                       @DougGregor
+
+# Top-level files
+CHANGELOG.md                            @DougGregor @rudkx
+CODEOWNERS                              @rudkx
+CONTRIBUTING.md                         @tkremenek
+LICENSE.txt                             @tkremenek
+README.md                               @tkremenek
+
+# Files that appear multiple times. Later mentions will take precedence.
+CMakeLists.txt                          @DougGregor
+lit.cfg                                 @DougGregor
+lit.site.cfg.in                         @DougGregor
+
+# Directories
+apinotes/*                              @rudkx
+benchmark/*                             @eeckstein
+bindings/*                              @rudkx
+cmake/*                                 @rudkx
+docs/*                                  @rudkx
+
+######################################################################
+# Include files
+######################################################################
+include/*                               @rudkx
+include/swift/ABI/*                     @rudkx
+include/swift/AST/*                     @rudkx
+include/swift/ASTSectionImporter/*      @rudkx
+include/swift/Basic/*                   @rudkx
+include/swift/ClangImporter/*           @rudkx
+include/swift/Demangling/*              @rudkx
+include/swift/Driver/*                  @rudkx
+include/swift/Frontend/*                @rudkx
+include/swift/FrontendTool/*            @rudkx
+include/swift/IDE/*                     @rudkx
+include/swift/IRGen/*                   @rudkx
+include/swift/Immediate/*               @rudkx
+include/swift/Index/*                   @rudkx
+include/swift/LLVMPasses/*              @rudkx
+include/swift/Markup/*                  @rudkx
+include/swift/Migrator/*                @rudkx
+include/swift/Option/*                  @rudkx
+include/swift/Parse/*                   @rudkx
+include/swift/PrintAsObjC/*             @rudkx
+include/swift/Reflection/*              @rudkx
+include/swift/Remote/*                  @rudkx
+include/swift/RemoteAST/*               @rudkx
+include/swift/Runtime/*                 @rudkx
+include/swift/SIL/*                     @rudkx
+include/swift/SILOptimizer/*            @rudkx
+include/swift/Sema/*                    @rudkx
+include/swift/Serialization/*           @rudkx
+include/swift/SwiftDemangle/*           @rudkx
+include/swift/SwiftRemoteMirror/*       @rudkx
+include/swift/Syntax/*                  @rudkx
+include/swift/TBDGen/*                  @rudkx
+include/swift/Strings.h                 @rudkx
+include/swift/Subsystems.h              @rudkx
+
+
+######################################################################
+# Source files
+######################################################################
+lib/*                                   @rudkx
+lib/AST/*                               @rudkx
+lib/ASTSectionImporter/*                @rudkx
+lib/Basic/*                             @rudkx
+lib/ClangImporter/*                     @rudkx
+lib/Demangling/*                        @rudkx
+lib/Driver/*                            @rudkx
+lib/Frontend/*                          @rudkx
+lib/FrontendTool/*                      @rudkx
+lib/IDE/*                               @rudkx
+lib/IRGen/*                             @rudkx
+lib/Immediate/*                         @rudkx
+lib/Index/*                             @rudkx
+lib/LLVMPasses/*                        @rudkx
+lib/Markup/*                            @rudkx
+lib/Migrator/*                          @rudkx
+lib/Option/*                            @rudkx
+lib/Parse/*                             @rudkx
+lib/ParseSIL/*                          @rudkx
+lib/PrintAsObjC/*                       @rudkx
+lib/RemoteAST/*                         @rudkx
+lib/SIL/*                               @rudkx
+lib/SILGen/*                            @rudkx
+lib/SILOptimizer/*                      @rudkx
+lib/Sema/*                              @rudkx
+lib/Serialization/*                     @rudkx
+lib/SwiftDemangle/*                     @rudkx
+lib/Syntax/*                            @rudkx
+lib/TBDGen/*                            @rudkx
+
+
+stdlib/*                                @airspeedswift
+
+test/*                                  @rudkx
+test/APINotes/*                         @rudkx
+test/AutolinkExtract/*                  @rudkx
+test/CircularReferences/*               @rudkx
+test/ClangImporter/*                    @rudkx
+test/Compatibility/*                    @rudkx
+test/Constraints/*                      @rudkx
+test/DebugInfo/*                        @rudkx
+test/Demangle/*                         @rudkx
+test/Driver/*                           @rudkx
+test/FixCode/*                          @rudkx
+test/Frontend/*                         @rudkx
+test/Fuzzing/*                          @rudkx
+test/Generics/*                         @rudkx
+test/IDE/*                              @rudkx
+test/IRGen/*                            @rudkx
+test/Index/*                            @rudkx
+test/Inputs/*                           @rudkx
+test/InterfaceHash/*                    @rudkx
+test/Interpreter/*                      @rudkx
+test/LLVMPasses/*                       @rudkx
+test/Migrator/*                         @rudkx
+test/Misc/*                             @rudkx
+test/NameBinding/*                      @rudkx
+test/PCMacro/*                          @rudkx
+test/Parse/*                            @rudkx
+test/PlaygroundTransform/*              @rudkx
+test/PrintAsObjC/*                      @rudkx
+test/Prototypes/*                       @rudkx
+test/Reflection/*                       @rudkx
+test/RemoteAST/*                        @rudkx
+test/Runtime/*                          @rudkx
+test/SIL/*                              @rudkx
+test/SILGen/*                           @rudkx
+test/SILOptimizer/*                     @rudkx
+test/Sanitizers/*                       @rudkx
+test/Sema/*                             @rudkx
+test/Serialization/*                    @rudkx
+test/SourceKit/*                        @rudkx
+test/Syntax/*                           @rudkx
+test/TBD/*                              @rudkx
+test/TypeCoercion/*                     @rudkx
+test/Unit/*                             @rudkx
+test/api-digester/*                     @rudkx
+test/attr/*                             @rudkx
+test/decl/*                             @rudkx
+test/expr/*                             @rudkx
+test/multifile/*                        @rudkx
+test/reproducible-builds/*              @rudkx
+test/sil-func-extractor/*               @rudkx
+test/sil-llvm-gen/*                     @rudkx
+test/sil-nm/*                           @rudkx
+test/sil-opt/*                          @rudkx
+test/sil-passpipeline-dump/*            @rudkx
+test/stdlib/*                           @rudkx
+test/stmt/*                             @rudkx
+test/swift-format/*                     @rudkx
+test/type/*                             @rudkx
+
+tools/*                                 @rudkx
+unittests/*                             @rudkx
+utils/*                                 @rudkx
+
+validation-test/*                       @rudkx
+validation-test/BuildSystem/*           @rudkx
+validation-test/Driver/*                @rudkx
+validation-test/Evolution/*             @rudkx
+validation-test/IDE/*                   @rudkx
+validation-test/Python/*                @rudkx
+validation-test/Reflection/*            @rudkx
+validation-test/SIL/*                   @rudkx
+validation-test/Sema/*                  @rudkx
+validation-test/Serialization/*         @rudkx
+validation-test/StdlibUnittest/*        @rudkx
+validation-test/benchmark/*             @rudkx
+validation-test/compiler_crashers/*     @rudkx
+validation-test/compiler_crashers_2/*   @rudkx
+validation-test/compiler_crashers_2_fixed/*     @rudkx
+validation-test/compiler_crashers_fixed/*       @rudkx
+validation-test/compiler_scale/*                @rudkx
+validation-test/execution/*                     @rudkx
+validation-test/radar/*                         @rudkx
+validation-test/stdlib/*                        @rudkx
+validation-test/test-runner/*                   @rudkx
