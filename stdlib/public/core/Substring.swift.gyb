@@ -616,8 +616,7 @@ extension Substring {
 // popFirst() is only present when a collection is its own subsequence. This was
 // dropped in Swift 4.
 extension String {
-  @available(swift, deprecated: 3.2)
-  @available(swift, obsoleted: 4, message:
+  @available(swift, deprecated: 3.2, obsoleted: 4, message:
     "Please use 'first', 'dropFirst()', or 'Substring.popFirst()'.")
   public mutating func popFirst() -> String.Element? {
     guard !isEmpty else { return nil }
@@ -628,8 +627,7 @@ extension String {
   }
 }
 extension String.CharacterView {
-  @available(swift, deprecated: 3.2)
-  @available(swift, obsoleted: 4, message:
+  @available(swift, deprecated: 3.2, obsoleted: 4, message:
     "Please use 'first', 'dropFirst()', or 'Substring.CharacterView.popFirst()'.")
   public mutating func popFirst() -> String.CharacterView.Element? {
     guard !isEmpty else { return nil }
@@ -640,8 +638,7 @@ extension String.CharacterView {
   }
 }
 extension String.UnicodeScalarView {
-  @available(swift, deprecated: 3.2)
-  @available(swift, obsoleted: 4, message:
+  @available(swift, deprecated: 3.2, obsoleted: 4, message:
     "Please use 'first', 'dropFirst()', or 'Substring.UnicodeScalarView.popFirst()'.")
   public mutating func popFirst() -> String.UnicodeScalarView.Element? {
     guard !isEmpty else { return nil }
