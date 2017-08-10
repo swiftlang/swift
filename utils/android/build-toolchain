@@ -36,3 +36,5 @@ rm -rf ${SWIFT_TOOLCHAIN_DIR}
 mkdir -p ${SWIFT_TOOLCHAIN_DIR}/usr
 
 cp -r ${SWIFT_LINUX_DIR}/{bin,lib,include} ${SWIFT_TOOLCHAIN_DIR}/usr
+cp ${ANDROID_ICU_DIR}/armeabi-v7a/*.so ${SWIFT_TOOLCHAIN_DIR}/usr/lib/swift/android
+
