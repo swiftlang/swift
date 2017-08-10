@@ -1735,16 +1735,16 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   auto descriptorVal = llvm::ConstantExpr::getBitCast(descriptor,
                                                       IGF.IGM.Int8PtrTy);
   
-  //
-  // Store the block header literal.
-  llvm::Constant *blockFields[] = {
-    NSConcreteStackBlock,
-    flagsVal,
-    reserved,
-    invokeVal,
-    descriptorVal,
-  };
-  auto blockHeader = llvm::ConstantStruct::get(IGF.IGM.ObjCBlockStructTy,
-                                               blockFields);
-  IGF.Builder.CreateStore(blockHeader, headerAddr);
+  // Store the block header.
+  auto layout = IGF.IGM.DataLayout.getStructLayout(IGF.IGM.ObjCBlockStructTy);
+  IGF.Builder.CreateStore(NSConcreteStackBlock,
+                          IGF.Builder.CreateStructGEP(headerAddr, 0, layout));
+  IGF.Builder.CreateStore(flagsVal,
+                          IGF.Builder.CreateStructGEP(headerAddr, 1, layout));
+  IGF.Builder.CreateStore(reserved,
+                          IGF.Builder.CreateStructGEP(headerAddr, 2, layout));
+  IGF.Builder.CreateStore(invokeVal,
+                          IGF.Builder.CreateStructGEP(headerAddr, 3, layout));
+  IGF.Builder.CreateStore(descriptorVal,
+                          IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
 }
