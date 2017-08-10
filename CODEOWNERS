@@ -95,6 +95,7 @@ lib/ParseSIL/*                          @rudkx
 lib/PrintAsObjC/*                       @rudkx
 lib/RemoteAST/*                         @rudkx
 lib/SIL/*                               @rudkx
+lib/SIL/SILOwnershipVerifier.cpp        @mgottesman
 lib/SILGen/*                            @rudkx
 lib/SILOptimizer/*                      @rudkx
 lib/Sema/*                              @rudkx
