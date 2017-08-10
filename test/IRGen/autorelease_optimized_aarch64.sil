@@ -1,5 +1,8 @@
 // RUN: %swift -gnone -O -target arm64-apple-ios7 -emit-assembly %s -o - | %FileCheck %s
 
+// rdar://33818526
+// XFAIL: linux
+
 // REQUIRES: CODEGENERATOR=AArch64
 
 // rdar://17999904
