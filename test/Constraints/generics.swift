@@ -496,3 +496,11 @@ extension Sequence {
   func foo24329052<Element>(_ v: Element) { rdar24329052(v) }
   // expected-error@-1 {{cannot convert value of type 'Element' (generic parameter of instance method 'foo24329052(_:)') to expected argument type 'Self.Element' (associated type of protocol 'Sequence')}}
 }
+
+func rdar27700622<E: Comparable>(_ input: [E]) -> [E] {
+  let pivot = input.first!
+  let lhs = input.dropFirst().filter { $0 <= pivot }
+  let rhs = input.dropFirst().filter { $0 > pivot }
+
+  return rdar27700622(lhs) + [pivot] + rdar27700622(rhs) // Ok
+}
