@@ -1,9 +1,6 @@
 set(SWIFT_API_NOTES_INPUTS
   Accelerate
   Dispatch
-  iAd
-  ModelIO
-  ScreenSaver
   ScriptingBridge
   os
 )
