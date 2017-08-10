@@ -314,12 +314,6 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
     case RequirementSource::Inferred:
     case RequirementSource::QuietlyInferred:
     case RequirementSource::RequirementSignatureSelf:
-      for (auto parent = currentPA->getParent(); parent;
-           parent = parent->getParent()) {
-        if (parent->isInSameEquivalenceClassAs(pa))
-          return true;
-      }
-
       return false;
 
     case RequirementSource::Parent:
