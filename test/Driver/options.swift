@@ -85,20 +85,20 @@
 // I_MODE: error: the flag '-i' is no longer required and has been removed; use 'swift input-filename'
 
 // RUN: not %swift_driver -### -c %s 2>&1 | %FileCheck -check-prefix=C_MODE %s
-// C_MODE: error: unsupported option '-c'
+// C_MODE: error: option '-c' is not supported by 'swift'; did you mean to use 'swiftc'?
 // RUN: not %swift_driver -### -emit-object %s 2>&1 | %FileCheck -check-prefix=OBJ_MODE %s
-// OBJ_MODE: error: unsupported option '-emit-object'
+// OBJ_MODE: error: option '-emit-object' is not supported by 'swift'; did you mean to use 'swiftc'?
 // RUN: not %swift_driver -### -emit-executable %s 2>&1 | %FileCheck -check-prefix=EXEC_MODE %s
-// EXEC_MODE: error: unsupported option '-emit-executable'
+// EXEC_MODE: error: option '-emit-executable' is not supported by 'swift'; did you mean to use 'swiftc'?
 // RUN: not %swift_driver -### -o %t %s 2>&1 | %FileCheck -check-prefix=ARG_o %s
-// ARG_o: error: unsupported option '-o'
+// ARG_o: error: option '-o' is not supported by 'swift'; did you mean to use 'swiftc'?
 
 // RUN: not %swiftc_driver -### -repl 2>&1 | %FileCheck -check-prefix=REPL_MODE_SWIFTC %s
-// REPL_MODE_SWIFTC: error: unsupported option '-repl'
+// REPL_MODE_SWIFTC: error: option '-repl' is not supported by 'swiftc'; did you mean to use 'swift'?
 // RUN: not %swiftc_driver -### -lldb-repl 2>&1 | %FileCheck -check-prefix=LLDB_REPL_MODE_SWIFTC %s
-// LLDB_REPL_MODE_SWIFTC: error: unsupported option '-lldb-repl'
+// LLDB_REPL_MODE_SWIFTC: error: option '-lldb-repl' is not supported by 'swiftc'; did you mean to use 'swift'?
 // RUN: not %swiftc_driver -### -deprecated-integrated-repl 2>&1 | %FileCheck -check-prefix=INT_REPL_MODE_SWIFTC %s
-// INT_REPL_MODE_SWIFTC: error: unsupported option '-deprecated-integrated-repl'
+// INT_REPL_MODE_SWIFTC: error: option '-deprecated-integrated-repl' is not supported by 'swiftc'; did you mean to use 'swift'?
 
 // RUN: %swift_driver -g -### %s 2>&1 | %FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
 // OPTIONS_BEFORE_FILE: -g
