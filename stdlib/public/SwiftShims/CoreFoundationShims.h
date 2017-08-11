@@ -69,6 +69,7 @@ _swift_shims_CFIndex _swift_stdlib_CFStringGetLength(
     _swift_shims_CFStringRef _Nonnull theString);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
+__attribute__((ns_returns_retained))
 _swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithSubstring(
     _swift_shims_CFAllocatorRef _Nullable alloc,
     _swift_shims_CFStringRef _Nonnull str, _swift_shims_CFRange range);
