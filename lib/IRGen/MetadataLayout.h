@@ -31,6 +31,18 @@ class Address;
 class IRGenFunction;
 class IRGenModule;
 
+/// The total size and address point of a metadata object.
+struct MetadataSize {
+  Size FullSize;
+  Size AddressPoint;
+
+  /// Return the offset from the address point to the end of the
+  /// metadata object.
+  Size getOffsetToEnd() const {
+    return FullSize - AddressPoint;
+  }
+};
+
 /// A base class for various kinds of metadata layout.
 class MetadataLayout {
 public:
@@ -88,6 +100,8 @@ private:
   Kind TheKind;
 
 protected:
+  MetadataSize TheSize;
+
   MetadataLayout(Kind theKind) : TheKind(theKind) {}
 
   MetadataLayout(const MetadataLayout &other) = delete;
@@ -98,6 +112,8 @@ public:
   void destroy() const;
 
   Kind getKind() const { return TheKind; }
+
+  MetadataSize getSize() const { return TheSize; }
 };
 
 /// Base class for nominal type metadata layouts.
