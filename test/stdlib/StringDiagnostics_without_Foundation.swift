@@ -19,9 +19,9 @@ func testStringCollectionTypes(s: String) {
   acceptsBidirectionalCollection(s.unicodeScalars)
   acceptsRandomAccessCollection(s.unicodeScalars) // expected-error{{argument type 'String.UnicodeScalarView' does not conform to expected type 'RandomAccessCollection'}}
 
-  acceptsCollection(s.characters)
-  acceptsBidirectionalCollection(s.characters)
-  acceptsRandomAccessCollection(s.characters) // expected-error{{argument type 'String.CharacterView' does not conform to expected type 'RandomAccessCollection'}}
+  acceptsCollection(s)
+  acceptsBidirectionalCollection(s)
+  acceptsRandomAccessCollection(s) // expected-error{{argument type 'String' does not conform to expected type 'RandomAccessCollection'}}
 }
 
 struct NotLosslessStringConvertible {}

@@ -55,7 +55,6 @@ func giveMeAString() -> Int {
   return "Here's a string".#^LITERAL5^# // try .characters.count here
 }
 
-// LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#String.Index#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}

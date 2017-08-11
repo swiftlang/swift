@@ -503,7 +503,7 @@ func _String<S : Sequence>(s: S, sep: String) where S.Iterator.Element == String
   _ = s.joinWithSeparator(sep) // expected-error {{'joinWithSeparator' has been renamed to 'joined(separator:)'}} {{9-26=joined}} {{27-27=separator: }} {{none}}
 }
 
-func _StringCharacterView<S, C>(x: String.CharacterView, s: S, c: C, i: String.CharacterView.Index)
+func _StringCharacterView<S, C>(x: String, s: S, c: C, i: String.Index)
   where S : Sequence, S.Iterator.Element == Character, C : Collection, C.Iterator.Element == Character {
   var x = x
   x.replaceRange(i..<i, with: c) // expected-error {{'replaceRange(_:with:)' has been renamed to 'replaceSubrange'}} {{5-17=replaceSubrange}} {{none}}
