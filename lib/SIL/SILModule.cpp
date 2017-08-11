@@ -555,32 +555,24 @@ void SILModule::removeFromZombieList(StringRef Name) {
 
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
-
   assert(! F->isZombie() && "zombie function is in list of alive functions");
-  if (F->isInlined() || F->isExternallyUsedSymbol() ||
-      F->isReferencedByMetainformation()) {
+  // The owner of the function's Name is the FunctionTable key. As we remove
+  // the function from the table we have to store the name string elsewhere:
+  // in zombieFunctionNames.
+  StringRef copiedName = F->getName().copy(zombieFunctionNames);
+  FunctionTable.erase(F->getName());
+  F->Name = copiedName;
 
-    // The owner of the function's Name is the FunctionTable key. As we remove
-    // the function from the table we have to store the name string elsewhere:
-    // in zombieFunctionNames.
-    StringRef copiedName = F->getName().copy(zombieFunctionNames);
-    FunctionTable.erase(F->getName());
-    F->Name = copiedName;
-    
-    // The function is dead, but we need it later (at IRGen) for debug info
-    // or vtable stub generation. So we move it into the zombie list.
-    getFunctionList().remove(F);
-    zombieFunctions.push_back(F);
-    ZombieFunctionTable[copiedName] = F;
-    F->setZombie();
+  // The function is dead, but we need it later (at IRGen) for debug info
+  // or vtable stub generation. So we move it into the zombie list.
+  getFunctionList().remove(F);
+  zombieFunctions.push_back(F);
+  ZombieFunctionTable[copiedName] = F;
+  F->setZombie();
 
-    // This opens dead-function-removal opportunities for called functions.
-    // (References are not needed anymore.)
-    F->dropAllReferences();
-  } else {
-    FunctionTable.erase(F->getName());
-    getFunctionList().erase(F);
-  }
+  // This opens dead-function-removal opportunities for called functions.
+  // (References are not needed anymore.)
+  F->dropAllReferences();
 }
 
 void SILModule::invalidateFunctionInSILCache(SILFunction *F) {
