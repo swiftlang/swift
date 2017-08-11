@@ -442,8 +442,9 @@ public:
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
 
-  void addAssociatedType(AssociatedTypeDecl *td) {
+  void addAssociatedType(AssociatedType requirement) {
     // Find the substitution info for the witness type.
+    auto td = requirement.getAssociation();
     Type witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
 
     // Emit the record for the type itself.
@@ -451,14 +452,16 @@ public:
                                                 witness->getCanonicalType()});
   }
 
-  void addAssociatedConformance(CanType dependentType, ProtocolDecl *protocol) {
+  void addAssociatedConformance(AssociatedConformance req) {
     auto assocConformance =
-      Conformance->getAssociatedConformance(dependentType, protocol);
+      Conformance->getAssociatedConformance(req.getAssociation(),
+                                            req.getAssociatedRequirement());
 
     SGM.useConformance(assocConformance);
 
     Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        dependentType, protocol, assocConformance});
+        req.getAssociation(), req.getAssociatedRequirement(),
+        assocConformance});
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *d) {
@@ -745,12 +748,12 @@ public:
     DefaultWitnesses.push_back(entry);
   }
 
-  void addAssociatedType(AssociatedTypeDecl *ty) {
+  void addAssociatedType(AssociatedType req) {
     // Add a dummy entry for the metatype itself.
     addMissingDefault();
   }
 
-  void addAssociatedConformance(CanType type, ProtocolDecl *requirement) {
+  void addAssociatedConformance(const AssociatedConformance &req) {
     addMissingDefault();
   }
 

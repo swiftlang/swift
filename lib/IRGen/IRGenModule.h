@@ -75,6 +75,8 @@ namespace clang {
 
 namespace swift {
   class GenericSignatureBuilder;
+  class AssociatedConformance;
+  class AssociatedType;
   class ASTContext;
   class BraceStmt;
   class CanType;
@@ -1012,11 +1014,10 @@ public:
                                     const NormalProtocolConformance *C);
   llvm::Function *getAddrOfAssociatedTypeMetadataAccessFunction(
                                            const NormalProtocolConformance *C,
-                                           AssociatedTypeDecl *associatedType);
+                                           AssociatedType association);
   llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
-                                           const NormalProtocolConformance *C,
-                                           CanType depAssociatedType,
-                                           ProtocolDecl *requiredProtocol);
+                                     const NormalProtocolConformance *C,
+                                     const AssociatedConformance &association);
 
   Address getAddrOfObjCISAMask();
 

@@ -21,6 +21,7 @@
 
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallVector.h"
@@ -59,7 +60,7 @@ public:
       for (Decl *member : protocol->getMembers()) {
         if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
           // TODO: only add associated types when they're new?
-          asDerived().addAssociatedType(associatedType);
+          asDerived().addAssociatedType(AssociatedType(associatedType));
         }
       }
     };
@@ -100,7 +101,8 @@ public:
         addAssociatedTypes();
 
         // Otherwise, add an associated requirement.
-        asDerived().addAssociatedConformance(type, requirement);
+        AssociatedConformance assocConf(protocol, type, requirement);
+        asDerived().addAssociatedConformance(assocConf);
         continue;
       }
       }
