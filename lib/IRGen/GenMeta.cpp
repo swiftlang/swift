@@ -2183,46 +2183,6 @@ namespace {
     //   void addKindDependentFields();
   };
 
-  /// A CRTP helper for classes which are simply searching for a
-  /// specific index within the metadata.
-  ///
-  /// The pattern is that subclasses should override an 'add' method
-  /// from the appropriate layout class and ensure that they call
-  /// setTargetOffset() when the appropriate location is reached.  The
-  /// subclass user then just calls getTargetOffset(), which performs
-  /// the layout and returns the found index.
-  ///
-  /// \tparam Base the base class, which should generally be a CRTP
-  ///   class template applied to the most-derived class
-  template <class Base> class MetadataSearcher : public Base {
-    Size TargetOffset = Size::invalid();
-    Size AddressPoint = Size::invalid();
-
-  protected:
-    void setTargetOffset() {
-      assert(TargetOffset.isInvalid() && "setting twice");
-      TargetOffset = this->NextOffset;
-    }
-
-  public:
-    template <class... T> MetadataSearcher(T &&...args)
-      : Base(std::forward<T>(args)...) {}
-
-    void noteAddressPoint() { AddressPoint = this->NextOffset; }
-
-    Size getTargetOffset() {
-      assert(TargetOffset.isInvalid() && "computing twice");
-      this->layout();
-      assert(!TargetOffset.isInvalid() && "target not found!");
-      assert(!AddressPoint.isInvalid() && "address point not set");
-      return TargetOffset - AddressPoint;
-    }
-
-    Size::int_type getTargetIndex() {
-      return this->IGM.getOffsetInWords(getTargetOffset());
-    }
-  };
-
   /// The total size and address point of a metadata object.
   struct MetadataSize {
     Size FullSize;
