@@ -1146,7 +1146,7 @@ namespace {
       // If the declaration is in a different resilience domain, we have
       // to use materializeForSet.
       //
-      // FIXME: Use correct ResilienceExpansion if gen is @transparent
+      // FIXME: Use correct ResilienceExpansion if SGF is @transparent
       if (!decl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
                                 ResilienceExpansion::Maximal))
         return true;
