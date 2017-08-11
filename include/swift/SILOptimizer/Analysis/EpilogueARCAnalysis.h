@@ -57,35 +57,35 @@ public:
   enum EpilogueARCKind { Retain = 0, Release = 1 };
 
 private:
+  /// Current post-order we are using.
+  LazyFunctionInfo<PostOrderAnalysis, PostOrderFunctionInfo> PO;
+
+  /// Current alias analysis we are using.
+  AliasAnalysis *AA;
+
+  /// Current rc-identity we are using.
+  LazyFunctionInfo<RCIdentityAnalysis, RCIdentityFunctionInfo> RCFI;
+
+  // All state below this line must always be cleared by the reset routine.
+  //
   // Are we finding retains or releases.
   EpilogueARCKind Kind;
 
   // The argument we are looking for epilogue ARC instruction for.
   SILValue Arg;
 
-  /// The allocator we are currently using.
-  llvm::SpecificBumpPtrAllocator<EpilogueARCBlockState> BPA;
-
-  /// Current function we are analyzing.
-  SILFunction *F;
-
-  /// Current post-order we are using.
-  PostOrderFunctionInfo *PO;
-
-  /// Current alias analysis we are using.
-  AliasAnalysis *AA;
-
-  /// Current rc-identity we are using.
-  RCIdentityFunctionInfo *RCFI;
+  /// A map from a block's post order index to block state.
+  std::vector<EpilogueARCBlockState> IndexToStateMap;
 
   /// The epilogue retains or releases.
   llvm::SmallSetVector<SILInstruction *, 1> EpilogueARCInsts; 
 
-  /// All the retain/release block state for all the basic blocks in the function. 
-  llvm::DenseMap<SILBasicBlock *, EpilogueARCBlockState *> EpilogueARCBlockStates;
-
   /// The exit blocks of the function.
   llvm::SmallPtrSet<SILBasicBlock *, 2> ExitBlocks;
+
+  EpilogueARCBlockState &getState(SILBasicBlock *BB) {
+    return IndexToStateMap[*PO->getPONumber(BB)];
+  }
 
   /// Return true if this is a function exiting block this epilogue ARC
   /// matcher is interested in. 
@@ -112,8 +112,8 @@ private:
     return isa<ReleaseValueInst>(II) || isa<StrongReleaseInst>(II);
   }
 
-  SILValue getArg(SILBasicBlock *B) {
-    SILValue A = EpilogueARCBlockStates[B]->LocalArg;
+  SILValue getArg(SILBasicBlock *BB) {
+    SILValue A = getState(BB).LocalArg;
     if (A)
       return A;
     return Arg;
@@ -121,13 +121,15 @@ private:
 
 public:
   /// Constructor.
-  EpilogueARCContext(EpilogueARCKind Kind, SILValue Arg, SILFunction *F,
-                     PostOrderFunctionInfo *PO, AliasAnalysis *AA,
-                     RCIdentityFunctionInfo *RCFI)
-    : Kind(Kind), Arg(Arg), F(F), PO(PO), AA(AA), RCFI(RCFI) {}
+  EpilogueARCContext(SILFunction *F, PostOrderAnalysis *PO, AliasAnalysis *AA,
+                     RCIdentityAnalysis *RCIA)
+      : PO(F, PO), AA(AA), RCFI(F, RCIA) {}
 
   /// Run the data flow to find the epilogue retains or releases.
-  bool run() {
+  bool run(EpilogueARCKind NewKind, SILValue NewArg) {
+    Kind = NewKind;
+    Arg = NewArg;
+
     // Initialize the epilogue arc data flow context.
     initializeDataflow();
     // Converge the data flow.
@@ -138,9 +140,15 @@ public:
   }
 
   /// Reset the epilogue arc instructions. 
-  void resetEpilogueARCInsts() { EpilogueARCInsts.clear(); }
   llvm::SmallSetVector<SILInstruction *, 1> getEpilogueARCInsts() {
     return EpilogueARCInsts;
+  }
+
+  void reset() {
+    IndexToStateMap.clear();
+    EpilogueARCInsts.clear();
+    ExitBlocks.clear();
+    EpilogueARCInsts.clear();
   }
 
   /// Initialize the data flow.
@@ -205,21 +213,13 @@ public:
 
 /// This class is a simple wrapper around an identity cache.
 class EpilogueARCFunctionInfo {
-  /// Current function we are analyzing.
-  SILFunction *F;
-
-  /// Current post-order we are using.
-  PostOrderAnalysis *PO;
-
-  /// Current alias analysis we are using.
-  AliasAnalysis *AA;
-
-  /// Current rc-identity we are using.
-  RCIdentityAnalysis *RC;
-
   using ARCInstructions = llvm::SmallSetVector<SILInstruction *, 1>;
+
+  EpilogueARCContext Context;
+
   /// The epilogue retain cache.
   llvm::DenseMap<SILValue, ARCInstructions> EpilogueRetainInstCache;
+
   /// The epilogue release cache.
   llvm::DenseMap<SILValue, ARCInstructions> EpilogueReleaseInstCache;
 
@@ -233,7 +233,7 @@ public:
   /// Constructor.
   EpilogueARCFunctionInfo(SILFunction *F, PostOrderAnalysis *PO,
                           AliasAnalysis *AA, RCIdentityAnalysis *RC)
-    : F(F), PO(PO), AA(AA), RC(RC) {}
+      : Context(F, PO, AA, RC) {}
 
   /// Find the epilogue ARC instruction based on the given \p Kind and given
   /// \p Arg.
@@ -247,14 +247,17 @@ public:
     if (Iter != ARCCache.end())
       return Iter->second;
 
-    EpilogueARCContext CM(Kind, Arg, F, PO->get(F), AA, RC->get(F));
     // Initialize and run the data flow. Clear the epilogue arc instructions if the
     // data flow is aborted in middle.
-   if (!CM.run()) { 
-     CM.resetEpilogueARCInsts();
-     return CM.getEpilogueARCInsts();
+    if (!Context.run(Kind, Arg)) {
+      Context.reset();
+      return llvm::SmallSetVector<SILInstruction *, 1>();
     }
-    return ARCCache[Arg] = CM.getEpilogueARCInsts();
+
+    auto Result = Context.getEpilogueARCInsts();
+    Context.reset();
+    ARCCache[Arg] = Result;
+    return Result;
   }
 };
 
