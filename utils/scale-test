@@ -101,12 +101,17 @@ def run_once_with_primary(args, ast, rng, primary_idx):
             trace = "trace.txt"
             script = ("pid$target:swiftc:*%s*:entry { @[probefunc] = count() }"
                       % args.select)
-            subprocess.check_call(
-                ["sudo", "dtrace", "-q",
-                 "-o", trace,
-                 "-b", "256",
-                 "-n", script,
-                 "-c", " ".join(command)], cwd=d)
+            try:
+                subprocess.check_call(
+                    ["sudo", "dtrace", "-q",
+                     "-o", trace,
+                     "-b", "256",
+                     "-n", script,
+                     "-c", " ".join(command)], cwd=d)
+            except subprocess.CalledProcessError as e:
+                if e.returncode != args.expected_exit_code:
+                    raise
+
             r = {fields[0]: int(fields[1]) for fields in
                  [line.split() for line in open(os.path.join(d, trace))]
                  if len(fields) == 2}
@@ -117,7 +122,12 @@ def run_once_with_primary(args, ast, rng, primary_idx):
             argv = command + ["-Xllvm", "-stats",
                               "-Xllvm", "-stats-json",
                               "-Xllvm", "-info-output-file=" + stats]
-            subprocess.check_call(argv, cwd=d)
+            try:
+                subprocess.check_call(argv, cwd=d)
+            except subprocess.CalledProcessError as e:
+                if e.returncode != args.expected_exit_code:
+                    raise
+
             with open(os.path.join(d, stats)) as f:
                 r = json.load(f)
     finally:
@@ -325,6 +335,9 @@ def main():
     parser.add_argument(
         '--debug', action='store_true',
         default=False, help='invoke lldb on each scale test')
+    parser.add_argument(
+        '--expected-exit-code', type=int, default=0,
+        help='exit code expected from the compiler invocation')
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
