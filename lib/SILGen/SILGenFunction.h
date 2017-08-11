@@ -802,7 +802,7 @@ public:
                                                  const TypeLowering &optTL,
                                                  SGFContext C = SGFContext());
 
-  typedef llvm::function_ref<ManagedValue(SILGenFunction &gen,
+  typedef llvm::function_ref<ManagedValue(SILGenFunction &SGF,
                                     SILLocation loc,
                                     ManagedValue input,
                                     SILType loweredResultTy,
