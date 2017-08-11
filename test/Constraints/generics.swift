@@ -418,7 +418,7 @@ extension Array where Element: Hashable {
     }
 }
 
-func rdar29633747(characters: String.CharacterView) {
+func rdar29633747(characters: String) {
   let _ = Array(characters).trimmed(["("])
 }
 
