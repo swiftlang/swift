@@ -281,7 +281,11 @@ public:
     if (F->isExternalDeclaration()) {
       return;
     }
-    get(F)->handleDeleteNotification(V);
+
+    // If we do have an analysis, tell it to handle its delete notifications.
+    if (auto A = maybeGet(F)) {
+      A.get()->handleDeleteNotification(V);
+    }
   }
 
   virtual bool needsNotifications() override { return true; }
