@@ -10,7 +10,7 @@ class MyCls : OtherClass {
   class var cbar : Int = 0
 
   // CHECK:   <ifunc>func <name>foo(<param>_ arg1: Int</param>, <param><name>name</name>: String</param>, <param><name>param</name> par: String</param>)</name> {
-  // CHECK:     var abc
+  // CHECK:     <lvar>var <name>abc</name></lvar>
   // CHECK:     <if>if <elem-condexpr>1</elem-condexpr> <brace>{
   // CHECK:       <call><name>foo</name>(<arg>1</arg>, <arg><name>name</name>:"test"</arg>, <arg><name>param</name>:"test2"</arg>)</call>
   // CHECK:     }</brace>
@@ -64,29 +64,24 @@ var gvar : Int = 0
 // CHECK: <ffunc>func <name>ffoo()</name> {}</ffunc>
 func ffoo() {}
 
-// CHECK: <foreach>for <elem-id>i</elem-id> in <elem-expr>0...5</elem-expr> <brace>{}</brace></foreach>
+// CHECK: <foreach>for <elem-id><lvar><name>i</name></lvar></elem-id> in <elem-expr>0...5</elem-expr> <brace>{}</brace></foreach>
 for i in 0...5 {}
-// CHECK: <foreach>for <elem-id>var (i, j)</elem-id> in <elem-expr>array</elem-expr> <brace>{}</brace></foreach>
+// CHECK: <foreach>for <elem-id>var (<lvar><name>i</name></lvar>, <lvar><name>j</name></lvar>)</elem-id> in <elem-expr>array</elem-expr> <brace>{}</brace></foreach>
 for var (i, j) in array {}
-// CHECK: <foreach>for <elem-id>var i</elem-id> = 0, i2 = 1; i == 0; ++i <brace>{}</brace></foreach>
-for var i = 0, i2 = 1; i == 0; ++i {}
-// CHECK: <foreach>for <elem-id>var (i,i2)</elem-id> = (0,0), i3 = 1; i == 0; ++i <brace>{}</brace></foreach>
-for var (i,i2) = (0,0), i3 = 1; i == 0; ++i {}
 
-for i = 0; i == 0; ++i {}
-// CHECK: <while>while <elem-condexpr>var v = o, z = o where v > z</elem-condexpr> <brace>{}</brace></while>
+// CHECK: <while>while <elem-condexpr>var <lvar><name>v</name></lvar> = o, <lvar><name>z</name></lvar> = o where v > z</elem-condexpr> <brace>{}</brace></while>
 while var v = o, z = o where v > z {}
 // CHECK: <while>while <elem-condexpr>v == 0</elem-condexpr> <brace>{}</brace></while>
 while v == 0 {}
 // CHECK: <repeat-while>repeat <brace>{}</brace> while <elem-expr>v == 0</elem-expr></repeat-while>
 repeat {} while v == 0
-// CHECK: <if>if <elem-condexpr>var v = o, z = o where v > z</elem-condexpr> <brace>{}</brace></if>
+// CHECK: <if>if <elem-condexpr>var <lvar><name>v</name></lvar> = o, <lvar><name>z</name></lvar> = o where v > z</elem-condexpr> <brace>{}</brace></if>
 if var v = o, z = o where v > z {}
 
 // CHECK: <switch>switch <elem-expr>v</elem-expr> {
 // CHECK:   <case>case <elem-pattern>1</elem-pattern>: break;</case>
 // CHECK:   <case>case <elem-pattern>2</elem-pattern>, <elem-pattern>3</elem-pattern>: break;</case>
-// CHECK:   <case>case <elem-pattern><call><name>Foo</name>(<arg>var x</arg>, <arg>var y</arg>)</call> where x < y</elem-pattern>: break;</case>
+// CHECK:   <case>case <elem-pattern><call><name>Foo</name>(<arg>var <lvar><name>x</name></lvar></arg>, <arg>var <lvar><name>y</name></lvar></arg>)</call> where x < y</elem-pattern>: break;</case>
 // CHECK:   <case>case <elem-pattern>2 where <call><name>foo</name>()</call></elem-pattern>, <elem-pattern>3 where <call><name>bar</name>()</call></elem-pattern>: break;</case>
 // CHECK:   <case><elem-pattern>default</elem-pattern>: break;</case>
 // CHECK: }</switch>
@@ -114,7 +109,7 @@ for {}
 class <#MyCls#> : <#OtherClass#> {}
 
 // CHECK: <ffunc>func <name><#test1#> ()</name> {
-// CHECK:   <foreach>for <elem-id><#name#></elem-id> in <elem-expr><#items#></elem-expr> <brace>{}</brace></foreach>
+// CHECK:   <foreach>for <elem-id><lvar><name><#name#></name></lvar></elem-id> in <elem-expr><#items#></elem-expr> <brace>{}</brace></foreach>
 // CHECK: }</ffunc>
 func <#test1#> () {
   for <#name#> in <#items#> {}
