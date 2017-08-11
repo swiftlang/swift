@@ -118,6 +118,14 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
               next.is(tok::colon))
             Kind = SyntaxNodeKind::Identifier;
         }
+
+        if (I) {
+          auto Prev = Tokens[I - 1];
+          if (Prev.isAny(tok::period, tok::period_prefix) &&
+              SM.getByteDistance(Prev.getLoc(), Tok.getLoc()) == 1) {
+            Kind = SyntaxNodeKind::Identifier;
+          }
+        }
         break;
 
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
