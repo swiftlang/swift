@@ -48,7 +48,7 @@ func test_UnicodeScalarView(s: String.UnicodeScalarView, i: String.UnicodeScalar
   _ = s.distance(from: i, to: i) // OK
 }
 
-func test_CharacterView(s: String.CharacterView, i: String.CharacterView.Index, d: Int) {
+func test_CharacterView(s: String, i: String.Index, d: Int) {
   _ = s.index(after: i) // OK
   _ = s.index(before: i) // OK
   _ = s.index(i, offsetBy: d) // OK
