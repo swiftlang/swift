@@ -527,7 +527,7 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
   return table;
 }
 
-static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
+static bool maybeOpenCodeProtocolWitness(SILGenFunction &SGF,
                                          ProtocolConformance *conformance,
                                          SILLinkage linkage,
                                          Type selfInterfaceType,
@@ -540,7 +540,7 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
     if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
       auto reqFn = cast<FuncDecl>(requirement.getDecl());
       assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
-      return gen.maybeEmitMaterializeForSetThunk(conformance, linkage,
+      return SGF.maybeEmitMaterializeForSetThunk(conformance, linkage,
                                                  selfInterfaceType, selfType,
                                                  genericEnv, reqFn, witnessFn,
                                                  witnessSubs);

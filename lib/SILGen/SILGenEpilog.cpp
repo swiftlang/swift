@@ -54,7 +54,7 @@ void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
 ///
 /// Note that this intentionally loses any tuple sub-structure of the
 /// formal result type.
-static SILValue buildReturnValue(SILGenFunction &gen, SILLocation loc,
+static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
                                  ArrayRef<SILValue> directResults) {
   if (directResults.size() == 1)
     return directResults[0];
@@ -63,8 +63,8 @@ static SILValue buildReturnValue(SILGenFunction &gen, SILLocation loc,
   for (auto elt : directResults)
     eltTypes.push_back(elt->getType().getSwiftRValueType());
   auto resultType = SILType::getPrimitiveObjectType(
-    CanType(TupleType::get(eltTypes, gen.getASTContext())));
-  return gen.B.createTuple(loc, resultType, directResults);
+    CanType(TupleType::get(eltTypes, SGF.getASTContext())));
+  return SGF.B.createTuple(loc, resultType, directResults);
 }
 
 std::pair<Optional<SILValue>, SILLocation>
