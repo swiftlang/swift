@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
+// rdar://33761334
+// UNSUPPORTED: CPU=armv7
+
 // FIXME(id-as-any): make Swift errors boxed in NSError eagerly bridged.
 
 // FIXME(id-as-any): add tests for unboxing.
