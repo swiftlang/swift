@@ -1059,6 +1059,17 @@ public:
   /// derived from another constraint but does not require further information.
   const RequirementSource *viaDerived(GenericSignatureBuilder &builder) const;
 
+  /// Form a new requirement source without the subpath [start, end).
+  ///
+  /// Removes a redundant sub-path \c [start, end) from the requirement source,
+  /// creating a new requirement source comprised on \c start followed by
+  /// everything that follows \c end.
+  /// It is the caller's responsibility to ensure that the path up to \c start
+  /// and the path through \c start to \c end produce the same thing.
+  const RequirementSource *withoutRedundantSubpath(
+                                          const RequirementSource *start,
+                                          const RequirementSource *end) const;
+
   /// Retrieve the root requirement source.
   const RequirementSource *getRoot() const;
 
