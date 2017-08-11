@@ -113,7 +113,11 @@ public:
     return GenericRequirements.isValid();
   }
 
+  /// Should only be used when emitting the nominal type descriptor.
+  Size getStaticGenericRequirementsOffset() const;
+
   Offset getGenericRequirementsOffset(IRGenFunction &IGF) const;
+
   Offset getParentOffset(IRGenFunction &IGF) const;
 
   static bool classof(const MetadataLayout *layout) {
@@ -179,6 +183,9 @@ public:
   /// more arbitrary fashion.
   Size getStaticFieldOffset(VarDecl *field) const;
 
+  /// Should only be used when emitting the nominal type descriptor.
+  Size getStaticFieldOffsetVectorOffset() const;
+
   Offset getFieldOffsetVectorOffset(IRGenFunction &IGF) const;
 
   static bool classof(const MetadataLayout *layout) {
@@ -188,6 +195,9 @@ public:
 
 /// Layout for enum type metadata.
 class EnumMetadataLayout : public NominalMetadataLayout {
+  /// The offset of the payload size field, if there is one.
+  StoredOffset PayloadSizeOffset;
+
   // TODO: presumably it would be useful to store *something* here
   // for resilience.
 
@@ -195,6 +205,12 @@ class EnumMetadataLayout : public NominalMetadataLayout {
   EnumMetadataLayout(IRGenModule &IGM, EnumDecl *theEnum);
 
 public:
+  bool hasPayloadSizeOffset() const {
+    return PayloadSizeOffset.isValid();
+  }
+
+  Offset getPayloadSizeOffset() const;
+
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Enum;
   }

@@ -120,6 +120,13 @@ Offset NominalMetadataLayout::getParentOffset(IRGenFunction &IGF) const {
   return Offset(Parent.getStaticOffset());
 }
 
+Size
+NominalMetadataLayout::getStaticGenericRequirementsOffset() const {
+  assert(GenericRequirements.isValid());
+  assert(GenericRequirements.isStatic() && "resilient metadata layout unsupported!");
+  return GenericRequirements.getStaticOffset();
+}
+
 Offset
 NominalMetadataLayout::getGenericRequirementsOffset(IRGenFunction &IGF) const {
   assert(GenericRequirements.isValid());
@@ -281,6 +288,14 @@ Size ClassMetadataLayout::getStaticFieldOffset(VarDecl *field) const {
   return stored.getStaticOffset();
 }
 
+Size
+ClassMetadataLayout::getStaticFieldOffsetVectorOffset() const {
+  // TODO: if class is resilient, return the offset relative to the start
+  // of immediate class metadata
+  assert(FieldOffsetVector.isStatic());
+  return FieldOffsetVector.getStaticOffset();
+}
+
 Offset
 ClassMetadataLayout::getFieldOffsetVectorOffset(IRGenFunction &IGF) const {
   // TODO: implement resilient metadata layout
@@ -326,6 +341,11 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
     Scanner(IRGenModule &IGM, EnumDecl *decl, EnumMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
+    void addPayloadSize() {
+      Layout.PayloadSizeOffset = getNextOffset();
+      super::addPayloadSize();
+    }
+
     void addParentMetadataRef() {
       Layout.Parent = getNextOffset();
       super::addParentMetadataRef();
@@ -338,6 +358,12 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
   };
 
   Scanner(IGM, decl, *this).layout();
+}
+
+Offset
+EnumMetadataLayout::getPayloadSizeOffset() const {
+  assert(PayloadSizeOffset.isStatic());
+  return Offset(PayloadSizeOffset.getStaticOffset());
 }
 
 /********************************** STRUCTS ***********************************/
