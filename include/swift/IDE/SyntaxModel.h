@@ -90,6 +90,7 @@ enum class SyntaxStructureKind : uint8_t {
   InstanceVariable,
   StaticVariable,
   ClassVariable,
+  LocalVariable,
   EnumCase,
   EnumElement,
   TypeAlias,
@@ -146,6 +147,7 @@ struct SyntaxStructureNode {
     case SyntaxStructureKind::InstanceVariable:
     case SyntaxStructureKind::StaticVariable:
     case SyntaxStructureKind::ClassVariable:
+    case SyntaxStructureKind::LocalVariable:
     case SyntaxStructureKind::Parameter:
     case SyntaxStructureKind::Subscript:
       return true;
