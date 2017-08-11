@@ -13,12 +13,13 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ANALYSIS_H
 
+#include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/Notifications.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include <vector>
 
 namespace swift {
@@ -175,6 +176,17 @@ namespace swift {
     }
 
   public:
+    /// Returns true if we have an analysis for a specific function \p F without
+    /// actually constructing it.
+    bool hasAnalysis(SILFunction *F) const { return Storage.count(F); }
+
+    NullablePtr<AnalysisTy> maybeGet(SILFunction *F) {
+      auto Iter = Storage.find(F);
+      if (Iter == Storage.end())
+        return nullptr;
+      return Iter->second;
+    }
+
     /// Returns an analysis provider for a specific function \p F.
     AnalysisTy *get(SILFunction *F) {
 
