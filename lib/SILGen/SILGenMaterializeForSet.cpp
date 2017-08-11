@@ -710,12 +710,12 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
 
   PrettyStackTraceSILFunction X("silgen materializeForSet callback", callback);
   {
-    SILGenFunction gen(SGM, *callback);
+    SILGenFunction SGF(SGM, *callback);
 
     auto makeParam = [&](unsigned index) -> SILArgument * {
-      SILType type = gen.F.mapTypeIntoContext(
-          gen.getSILType(callbackType->getParameters()[index]));
-      return gen.F.begin()->createFunctionArgument(type);
+      SILType type = SGF.F.mapTypeIntoContext(
+          SGF.getSILType(callbackType->getParameters()[index]));
+      return SGF.F.begin()->createFunctionArgument(type);
     };
 
     // Add arguments for all the parameters.
@@ -729,13 +729,13 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
 
     // Call the generator function we were provided.
     {
-      LexicalScope scope(gen, CleanupLocation::get(loc));
-      generator(gen, loc, valueBuffer, storageBuffer, self);
+      LexicalScope scope(SGF, CleanupLocation::get(loc));
+      generator(SGF, loc, valueBuffer, storageBuffer, self);
     }
 
     // Return void.
-    auto result = gen.emitEmptyTuple(loc);
-    gen.B.createReturn(loc, result);
+    auto result = SGF.emitEmptyTuple(loc);
+    SGF.B.createReturn(loc, result);
   }
 
   callback->verify();

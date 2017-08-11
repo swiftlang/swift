@@ -2623,7 +2623,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 /// The one exception is if the thunk type involves an open existential,
 /// in which case we "promote" the opened existential to a new generic parameter.
 ///
-/// \param gen - the parent function
+/// \param SGF - the parent function
 /// \param openedExistential - the opened existential to promote to a generic
 //  parameter, if any
 /// \param inheritGenericSig - whether to inherit the generic signature from the
