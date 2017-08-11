@@ -668,17 +668,17 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
         genericEnv, selfInterfaceType);
   }
 
-  SILGenFunction gen(*this, *f);
+  SILGenFunction SGF(*this, *f);
 
   // Open-code certain protocol witness "thunks".
-  if (maybeOpenCodeProtocolWitness(gen, conformance, linkage,
+  if (maybeOpenCodeProtocolWitness(SGF, conformance, linkage,
                                    selfInterfaceType, selfType, genericEnv,
                                    requirement, witnessRef, witnessSubs)) {
     assert(!isFree);
     return f;
   }
 
-  gen.emitProtocolWitness(selfType,
+  SGF.emitProtocolWitness(selfType,
                           AbstractionPattern(reqtOrigTy),
                           reqtSubstTy,
                           requirement, witnessRef,
