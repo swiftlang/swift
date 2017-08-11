@@ -613,6 +613,14 @@
       ],
       key.substructure: [
         {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "i",
+          key.offset: 1118,
+          key.length: 1,
+          key.nameoffset: 1118,
+          key.namelength: 1
+        },
+        {
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1129,
           key.length: 2,
@@ -638,6 +646,14 @@
       ],
       key.substructure: [
         {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "i",
+          key.offset: 1140,
+          key.length: 1,
+          key.nameoffset: 1140,
+          key.namelength: 1
+        },
+        {
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1167,
           key.length: 2,
@@ -662,6 +678,22 @@
         }
       ],
       key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "v",
+          key.offset: 1180,
+          key.length: 1,
+          key.nameoffset: 1180,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "z",
+          key.offset: 1191,
+          key.length: 1,
+          key.nameoffset: 1191,
+          key.namelength: 1
+        },
         {
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1204,
@@ -712,6 +744,22 @@
         }
       ],
       key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "v",
+          key.offset: 1237,
+          key.length: 1,
+          key.nameoffset: 1237,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "z",
+          key.offset: 1248,
+          key.length: 1,
+          key.nameoffset: 1248,
+          key.namelength: 1
+        },
         {
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1261,
