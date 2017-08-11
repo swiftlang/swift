@@ -3439,11 +3439,12 @@ IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *conf,
 llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
                                   const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *associate) {
+                                  AssociatedType association) {
   auto forDefinition = ForDefinition;
 
   LinkEntity entity =
-    LinkEntity::forAssociatedTypeMetadataAccessFunction(conformance, associate);
+    LinkEntity::forAssociatedTypeMetadataAccessFunction(conformance,
+                                                        association);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
     if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
@@ -3459,14 +3460,12 @@ IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
 llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                   const NormalProtocolConformance *conformance,
-                                  CanType associatedType,
-                                  ProtocolDecl *associatedProtocol) {
+                                  const AssociatedConformance &association) {
   auto forDefinition = ForDefinition;
 
   LinkEntity entity =
     LinkEntity::forAssociatedTypeWitnessTableAccessFunction(conformance,
-                                                            associatedType,
-                                                            associatedProtocol);
+                                                            association);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
     if (forDefinition) updateLinkageForDefinition(*this, entry, entity);

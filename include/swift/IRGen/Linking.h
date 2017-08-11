@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_LINKING_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/ValueWitness.h"
@@ -509,21 +510,22 @@ public:
 
   static LinkEntity
   forAssociatedTypeMetadataAccessFunction(const ProtocolConformance *C,
-                                          AssociatedTypeDecl *associate) {
+                                          AssociatedType association) {
     LinkEntity entity;
     entity.setForProtocolConformanceAndAssociatedType(
-                     Kind::AssociatedTypeMetadataAccessFunction, C, associate);
+                     Kind::AssociatedTypeMetadataAccessFunction, C,
+                     association.getAssociation());
     return entity;
   }
 
   static LinkEntity
   forAssociatedTypeWitnessTableAccessFunction(const ProtocolConformance *C,
-                                              CanType associatedType,
-                                              ProtocolDecl *associatedProtocol){
+                                     const AssociatedConformance &association) {
     LinkEntity entity;
     entity.setForProtocolConformanceAndAssociatedConformance(
                      Kind::AssociatedTypeWitnessTableAccessFunction, C,
-                     associatedType, associatedProtocol);
+                     association.getAssociation(),
+                     association.getAssociatedRequirement());
     return entity;
   }
 
