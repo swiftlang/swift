@@ -253,44 +253,53 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
   T &asDerived() { return *static_cast<T*>(this); }
 
 public:
-  void addMethod(FuncDecl *fd, Witness witness) {
-    return addMethod(fd, witness.getDecl(), witness);
-  }
+  void addMethod(SILDeclRef requirementRef) {
+    auto reqFunc = dyn_cast<FuncDecl>(requirementRef.getDecl());
+    auto accessorKind = (reqFunc ? reqFunc->getAccessorKind()
+                                 : AccessorKind::NotAccessor);
 
-  void addConstructor(ConstructorDecl *cd, Witness witness) {
-    SILDeclRef requirementRef(cd, SILDeclRef::Kind::Allocator);
-    SILDeclRef witnessRef(witness.getDecl(), SILDeclRef::Kind::Allocator);
+    // If it's not an accessor, just look for the witness.
+    if (accessorKind == AccessorKind::NotAccessor) {
+      if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
+        return addMethodImplementation(requirementRef,
+                                       SILDeclRef(witness.getDecl(),
+                                                  requirementRef.kind),
+                                       witness);
+      }
 
-    asDerived().addMethod(requirementRef, witnessRef, IsNotFreeFunctionWitness,
-                          witness);
-  }
+      return asDerived().addMissingMethod(requirementRef);
+    }
 
-  /// Subclasses must override SILWitnessVisitor::visitAbstractStorageDecl()
-  /// to call addAbstractStorageDecl(), since we need the substitutions to
-  /// be passed down into addMethod().
-  ///
-  /// FIXME: Seems that conformance->getWitness() should do this for us?
-  void addAbstractStorageDecl(AbstractStorageDecl *d, Witness witness) {
-    auto *witnessSD = cast<AbstractStorageDecl>(witness.getDecl());
-    addMethod(d->getGetter(), witnessSD->getGetter(), witness);
-    if (d->isSettable(d->getDeclContext()))
-      addMethod(d->getSetter(), witnessSD->getSetter(), witness);
-    if (auto materializeForSet = d->getMaterializeForSetFunc())
-      addMethod(materializeForSet, witnessSD->getMaterializeForSetFunc(),
-                witness);
+    // Otherwise, we need to map the storage declaration and then get
+    // the appropriate accessor for it.
+    auto witness =
+      asDerived().getWitness(reqFunc->getAccessorStorageDecl());
+    if (!witness)
+      return asDerived().addMissingMethod(requirementRef);
+
+    auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
+    auto witnessAccessor =
+      witnessStorage->getAccessorFunction(reqFunc->getAccessorKind());
+    if (!witnessAccessor)
+      return asDerived().addMissingMethod(requirementRef);
+
+    return addMethodImplementation(requirementRef,
+                                   SILDeclRef(witnessAccessor,
+                                              SILDeclRef::Kind::Func),
+                                   witness);
   }
 
 private:
-  void addMethod(FuncDecl *fd, ValueDecl *witnessDecl, Witness witness) {
-    SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func);
+  void addMethodImplementation(SILDeclRef requirementRef,
+                               SILDeclRef witnessRef,
+                               Witness witness) {
     // Free function witnesses have an implicit uncurry layer imposed on them by
     // the inserted metatype argument.
-    auto isFree = isFreeFunctionWitness(fd, witnessDecl);
-    SILDeclRef witnessRef(witnessDecl, SILDeclRef::Kind::Func);
-
-    asDerived().addMethod(requirementRef, witnessRef, isFree, witness);
+    auto isFree =
+      isFreeFunctionWitness(requirementRef.getDecl(), witnessRef.getDecl());
+    asDerived().addMethodImplementation(requirementRef, witnessRef,
+                                        isFree, witness);
   }
-
 };
 
 /// Emit a witness table for a protocol conformance.
@@ -390,24 +399,22 @@ public:
       SGM.getWitnessTable(conformance->getRootNormalConformance());
   }
 
-  void addMethod(FuncDecl *fd) {
-    Witness witness = Conformance->getWitness(fd, nullptr);
-    super::addMethod(fd, witness);
-  }
-
-  void addConstructor(ConstructorDecl *cd) {
-    Witness witness = Conformance->getWitness(cd, nullptr);
-    super::addConstructor(cd, witness);
+  Witness getWitness(ValueDecl *decl) {
+    return Conformance->getWitness(decl, nullptr);
   }
 
   void addPlaceholder(MissingMemberDecl *placeholder) {
     llvm_unreachable("generating a witness table with placeholders in it");
   }
 
-  void addMethod(SILDeclRef requirementRef,
-                 SILDeclRef witnessRef,
-                 IsFreeFunctionWitness_t isFree,
-                 Witness witness) {
+  void addMissingMethod(SILDeclRef requirement) {
+    llvm_unreachable("generating a witness table with placeholders in it");
+  }
+
+  void addMethodImplementation(SILDeclRef requirementRef,
+                               SILDeclRef witnessRef,
+                               IsFreeFunctionWitness_t isFree,
+                               Witness witness) {
     // Emit the witness thunk and add it to the table.
 
     // If this is a non-present optional requirement, emit a MissingOptional.
@@ -462,11 +469,6 @@ public:
     Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
         req.getAssociation(), req.getAssociatedRequirement(),
         assocConformance});
-  }
-
-  void visitAbstractStorageDecl(AbstractStorageDecl *d) {
-    Witness witness = Conformance->getWitness(d, nullptr);
-    addAbstractStorageDecl(d, witness);
   }
 };
 
@@ -711,34 +713,22 @@ public:
     addMissingDefault();
   }
 
-  void addMethod(FuncDecl *fd) {
-    auto witness = Proto->getDefaultWitness(fd);
-    if (!witness) {
-      addMissingDefault();
-      return;
-    }
-
-    super::addMethod(fd, witness);
-  }
-
-  void addConstructor(ConstructorDecl *cd) {
-    auto witness = Proto->getDefaultWitness(cd);
-    if (!witness) {
-      addMissingDefault();
-      return;
-    }
-
-    super::addConstructor(cd, witness);
+  void addMissingMethod(SILDeclRef ref) {
+    addMissingDefault();
   }
 
   void addPlaceholder(MissingMemberDecl *placeholder) {
     llvm_unreachable("generating a witness table with placeholders in it");
   }
 
-  void addMethod(SILDeclRef requirementRef,
-                 SILDeclRef witnessRef,
-                 IsFreeFunctionWitness_t isFree,
-                 Witness witness) {
+  Witness getWitness(ValueDecl *decl) {
+    return Proto->getDefaultWitness(decl);
+  }
+
+  void addMethodImplementation(SILDeclRef requirementRef,
+                               SILDeclRef witnessRef,
+                               IsFreeFunctionWitness_t isFree,
+                               Witness witness) {
     SILFunction *witnessFn = SGM.emitProtocolWitness(nullptr,
                                                      SILLinkage::Private,
                                                      IsNotSerialized,
@@ -755,20 +745,6 @@ public:
 
   void addAssociatedConformance(const AssociatedConformance &req) {
     addMissingDefault();
-  }
-
-  void visitAbstractStorageDecl(AbstractStorageDecl *d) {
-    auto witness = Proto->getDefaultWitness(d);
-    if (!witness) {
-      addMissingDefault();
-      if (d->isSettable(d->getDeclContext()))
-        addMissingDefault();
-      if (d->getMaterializeForSetFunc())
-        addMissingDefault();
-      return;
-    }
-
-    addAbstractStorageDecl(d, witness);
   }
 };
 

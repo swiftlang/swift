@@ -126,23 +126,26 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
-    asDerived().addMethod(sd->getGetter());
+    asDerived().addMethod(SILDeclRef(sd->getGetter(),
+                                     SILDeclRef::Kind::Func));
     if (sd->isSettable(sd->getDeclContext())) {
-      asDerived().addMethod(sd->getSetter());
+      asDerived().addMethod(SILDeclRef(sd->getSetter(),
+                                       SILDeclRef::Kind::Func));
       if (sd->getMaterializeForSetFunc())
-        asDerived().addMethod(sd->getMaterializeForSetFunc());
+        asDerived().addMethod(SILDeclRef(sd->getMaterializeForSetFunc(),
+                                         SILDeclRef::Kind::Func));
     }
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    asDerived().addConstructor(cd);
+    asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
   void visitFuncDecl(FuncDecl *func) {
-    // Accessors are emitted by their var/subscript declaration.
+    // Accessors are emitted by visitAbstractStorageDecl, above.
     if (func->isAccessor())
       return;
-    asDerived().addMethod(func);
+    asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
