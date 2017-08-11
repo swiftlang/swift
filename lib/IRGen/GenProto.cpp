@@ -709,12 +709,9 @@ namespace {
       Entries.push_back(WitnessTableEntry::forOutOfLineBase(baseProto));
     }
 
-    void addMethod(FuncDecl *func) {
-      Entries.push_back(WitnessTableEntry::forFunction(func));
-    }
-
-    void addConstructor(ConstructorDecl *ctor) {
-      Entries.push_back(WitnessTableEntry::forFunction(ctor));
+    void addMethod(SILDeclRef func) {
+      auto decl = cast<AbstractFunctionDecl>(func.getDecl());
+      Entries.push_back(WitnessTableEntry::forFunction(decl));
     }
 
     void addPlaceholder(MissingMemberDecl *placeholder) {
@@ -1137,7 +1134,7 @@ public:
       Table.addNullPointer(IGM.Int8PtrTy);
     }
 
-    void addMethodFromSILWitnessTable(AbstractFunctionDecl *requirement) {
+    void addMethod(SILDeclRef requirement) {
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
 
@@ -1150,9 +1147,10 @@ public:
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
              && "sil witness table does not match protocol");
-      assert(entry.getMethodWitness().Requirement.getDecl() == requirement
+      assert(entry.getMethodWitness().Requirement == requirement
              && "sil witness table does not match protocol");
-      auto piIndex = PI.getFunctionIndex(requirement);
+      auto piIndex =
+        PI.getFunctionIndex(cast<AbstractFunctionDecl>(requirement.getDecl()));
       assert(piIndex.getValue() == Table.size()
              && "offset doesn't match ProtocolInfo layout");
 #endif
@@ -1168,14 +1166,6 @@ public:
       }
       Table.addBitCast(witness, IGM.Int8PtrTy);
       return;
-    }
-
-    void addMethod(FuncDecl *requirement) {
-      return addMethodFromSILWitnessTable(requirement);
-    }
-
-    void addConstructor(ConstructorDecl *requirement) {
-      return addMethodFromSILWitnessTable(requirement);
     }
 
     void addPlaceholder(MissingMemberDecl *placeholder) {
