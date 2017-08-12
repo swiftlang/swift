@@ -1085,6 +1085,78 @@ private:
     }
   };
 
+  class SolverStep {
+    std::shared_ptr<SolverStep> Parent;
+    SmallVector<std::shared_ptr<SolverStep>, 8> Next;
+
+    Optional<std::pair<Constraint *, unsigned>> Choice;
+    SmallVector<Constraint *, 4> Failures;
+
+  public:
+    SolverStep(std::shared_ptr<SolverStep> parent) : Parent(parent) {}
+    SolverStep(std::shared_ptr<SolverStep> parent, Constraint *disjunction,
+               unsigned choice)
+        : Parent(parent), Choice(std::make_pair(disjunction, choice)) {}
+
+    std::shared_ptr<SolverStep> getParent() { return Parent; }
+
+    void addStep(std::shared_ptr<SolverStep> step) { Next.push_back(step); }
+
+    void recordFailure(Constraint *constraint) {
+      Failures.push_back(constraint);
+    }
+
+    void print(ConstraintSystem &cs, llvm::raw_ostream &log,
+               unsigned depth) const {
+      log.indent(depth * 2) << ">>> Step\n";
+      if (Choice) {
+        auto *disjunction = Choice->first;
+        auto *choice = disjunction->getNestedConstraints()[Choice->second];
+
+        choice->print(log.indent(depth * 2), &cs.getASTContext().SourceMgr);
+        log.indent(depth * 2) << '\n';
+      }
+
+      if (!Failures.empty()) {
+        log.indent(depth * 2) << "---> Failures\n";
+        for (auto *constraint : Failures) {
+          constraint->print(log.indent(depth * 2),
+                            &cs.getASTContext().SourceMgr);
+          log << '\n';
+        }
+      }
+
+      for (auto &nested : Next)
+        nested->print(cs, log, depth + 1);
+    }
+  };
+
+  class SolverPath {
+    std::shared_ptr<SolverStep> Root;
+    std::shared_ptr<SolverStep> CurrentStep;
+
+  public:
+    SolverPath()
+        : Root(std::make_shared<SolverStep>(nullptr)), CurrentStep(Root) {}
+
+    void incrementDepth(Constraint *disjunction, unsigned choice) {
+      auto step =
+          std::make_shared<SolverStep>(CurrentStep, disjunction, choice);
+      CurrentStep->addStep(step);
+      CurrentStep = step;
+    }
+
+    void decrementDepth() { CurrentStep = CurrentStep->getParent(); }
+
+    void recordFailure(Constraint *constraint) {
+      CurrentStep->recordFailure(constraint);
+    }
+
+    void print(ConstraintSystem &cs, llvm::raw_ostream &log) const {
+      Root->print(cs, log, 0);
+    }
+  };
+
   /// \brief Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs);
@@ -1117,9 +1189,26 @@ private:
     /// Refers to the innermost partial solution scope.
     SolverScope *PartialSolutionScope = nullptr;
 
+    /// Tracks each path taken by the constraint solver.
+    SolverPath Path;
+
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
+
+    void incrementDepth(Constraint *disjunction, unsigned choice) {
+      Path.incrementDepth(disjunction, choice);
+      ++depth;
+    }
+
+    void decrementDepth() {
+      Path.decrementDepth();
+      --depth;
+    }
+
+    void recordFailure(Constraint *constraint) {
+      Path.recordFailure(constraint);
+    }
 
     /// \brief Register given scope to be tracked by the current solver state,
     /// this helps to make sure that all of the retired/generated constraints
