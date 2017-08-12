@@ -85,7 +85,6 @@ syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
 
 syn match swiftMultiwordTypeDefinition skipwhite nextgroup=swiftTypeName
       \ "indirect enum"
-      \ "indirect case"
 
 syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
       \ let
