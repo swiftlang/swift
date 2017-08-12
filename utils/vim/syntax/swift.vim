@@ -1,7 +1,7 @@
 " Vim syntax file
 " Language: swift
 " Maintainer: Joe Groff <jgroff@apple.com>
-" Last Change: 2013 Feb 2
+" Last Change: 2017 Aug 12
 
 if exists("b:current_syntax")
     finish
