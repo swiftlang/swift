@@ -85,7 +85,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const LogJobSet &ljs) {
 
 
 Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
-                         SmallVectorImpl<std::unique_ptr<const Action>> &&Actions,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
@@ -96,8 +95,7 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter)
-  : Diags(Diags), Level(Level), Actions(std::move(Actions)),
-    RawInputArgs(std::move(InputArgs)),
+  : Diags(Diags), Level(Level), RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), 
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
@@ -710,7 +708,6 @@ Job *Compilation::addJob(std::unique_ptr<Job> J) {
   Jobs.emplace_back(std::move(J));
   return result;
 }
-
 
 static void checkForOutOfDateInputs(DiagnosticEngine &diags,
                                     const InputInfoMap &inputs) {

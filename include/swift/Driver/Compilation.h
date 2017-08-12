@@ -170,10 +170,9 @@ private:
   template <typename T>
   using UnwrappedArrayView =
       ArrayRefView<std::unique_ptr<T>, T *, Compilation::unwrap<T>>;
-  
+
 public:
   Compilation(DiagnosticEngine &Diags, OutputLevel Level,
-              SmallVectorImpl<std::unique_ptr<const Action>> &&Actions,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
@@ -188,6 +187,13 @@ public:
 
   UnwrappedArrayView<const Action> getActions() const {
     return llvm::makeArrayRef(Actions);
+  }
+
+  template <typename SpecificAction, typename... Args>
+  SpecificAction *createAction(Args &&...args) {
+    auto newAction = new SpecificAction(std::forward<Args>(args)...);
+    Actions.emplace_back(newAction);
+    return newAction;
   }
 
   UnwrappedArrayView<const Job> getJobs() const {

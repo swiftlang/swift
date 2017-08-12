@@ -59,19 +59,19 @@ public:
   static const char *getClassName(ActionClass AC);
 
 private:
-  unsigned OwnsInputs : 1;
   unsigned Kind : 4;
-  unsigned Type : 27;
+  unsigned Type : 28;
+
+  friend class Compilation;
+  /// Actions must be created through Compilation::createAction.
+  void *operator new(size_t size) { return ::operator new(size); };
 
 protected:
   Action(ActionClass Kind, types::ID Type)
-    : OwnsInputs(true), Kind(Kind), Type(Type) {
+    : Kind(Kind), Type(Type) {
     assert(Kind == getKind() && "not enough bits");
     assert(Type == getType() && "not enough bits");
   }
-
-  bool getOwnsInputs() const { return OwnsInputs; }
-  void setOwnsInputs(bool Value) { OwnsInputs = Value; }
 
 public:
   virtual ~Action() = default;
@@ -104,11 +104,6 @@ protected:
       : Action(Kind, Type), Inputs(Inputs) {}
 
 public:
-  ~JobAction() override;
-
-  bool getOwnsInputs() const { return Action::getOwnsInputs(); }
-  void setOwnsInputs(bool Value) { Action::setOwnsInputs(Value); }
-
   ArrayRef<const Action *> getInputs() const { return Inputs; }
   void addInput(const Action *Input) { Inputs.push_back(Input); }
 

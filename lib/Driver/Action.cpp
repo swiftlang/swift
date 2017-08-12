@@ -18,12 +18,6 @@
 using namespace swift::driver;
 using namespace llvm::opt;
 
-JobAction::~JobAction() {
-  if (getOwnsInputs()) {
-    llvm::DeleteContainerPointers(Inputs);
-  }
-}
-
 const char *Action::getClassName(ActionClass AC) {
   switch (AC) {
     case Input: return "input";
