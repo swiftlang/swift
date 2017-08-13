@@ -411,6 +411,7 @@
           key.name: "test(arg1:)",
           key.offset: 732,
           key.length: 156,
+          key.typename: "Int",
           key.nameoffset: 737,
           key.namelength: 16,
           key.bodyoffset: 762,
