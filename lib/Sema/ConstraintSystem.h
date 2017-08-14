@@ -1018,6 +1018,7 @@ private:
     Expr *E;
     TypeChecker &TC;
     DeclContext *DC;
+    llvm::BumpPtrAllocator &Allocator;
 
     // Contextual Information.
     Type CT;
@@ -1026,7 +1027,8 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), TC(cs.TC), DC(cs.DC), CT(ct), CTP(ctp) {}
+        : E(expr), TC(cs.TC), DC(cs.DC), Allocator(cs.Allocator), CT(ct),
+          CTP(ctp) {}
 
     /// \brief Return underlying expression.
     Expr *getExpr() const { return E; }
@@ -1038,7 +1040,7 @@ private:
     /// domains have been successfully shrunk so far.
     ///
     /// \returns true on solver failure, false otherwise.
-    bool solve(llvm::SmallDenseSet<Expr *> &shrunkExprs);
+    bool solve(llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs);
 
     /// \brief Apply solutions found by solver as reduced OSR sets for
     /// for current and all of it's sub-expressions.
@@ -1048,14 +1050,16 @@ private:
     ///
     /// \param shrunkExprs The set of expressions which
     /// domains have been successfully shrunk so far.
-    void applySolutions(llvm::SmallVectorImpl<Solution> &solutions,
-                        llvm::SmallDenseSet<Expr *> &shrunkExprs) const;
+    void applySolutions(
+        llvm::SmallVectorImpl<Solution> &solutions,
+        llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) const;
 
     /// Check if attempt at solving of the candidate makes sense given
     /// the current conditions - number of shrunk domains which is related
     /// to the given candidate over the total number of disjunctions present.
-    static bool isTooComplexGiven(ConstraintSystem *const cs,
-                                  llvm::SmallDenseSet<Expr *> &shrunkExprs) {
+    static bool
+    isTooComplexGiven(ConstraintSystem *const cs,
+                      llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) {
       SmallVector<Constraint *, 8> disjunctions;
       cs->collectDisjunctions(disjunctions);
 
@@ -1066,7 +1070,11 @@ private:
           continue;
 
         if (auto *anchor = locator->getAnchor()) {
-          if (shrunkExprs.count(anchor) > 0)
+          auto *OSR = dyn_cast<OverloadSetRefExpr>(anchor);
+          if (!OSR)
+            continue;
+
+          if (shrunkExprs.count(OSR) > 0)
             --unsolvedDisjunctions;
         }
       }
