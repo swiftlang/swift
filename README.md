@@ -21,6 +21,8 @@ features like flow control, data structures, and functions, with high-level
 constructs like objects, protocols, closures, and generics. Swift embraces
 modules, eliminating the need for headers and the code duplication they entail.
 
+To learn more about the programming language, visit [swift.org](https://swift.org/documentation/)
+
 ## Contributing to Swift
 
 Contributions to Swift are welcomed and encouraged! Please see the
