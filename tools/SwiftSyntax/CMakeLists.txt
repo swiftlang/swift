@@ -20,4 +20,5 @@ add_swift_library(swiftSwiftSyntax SHARED
 
   SWIFT_MODULE_DEPENDS Foundation
   INSTALL_IN_COMPONENT swift-syntax
+  TARGET_SDKS OSX
   IS_STDLIB)

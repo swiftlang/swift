@@ -22,7 +22,7 @@ if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   add_swift_tool_subdirectory(swift-stdlib-tool)
 
   if(SWIFT_BUILD_STDLIB)
-      add_subdirectory(SwiftSyntax)
+    add_subdirectory(SwiftSyntax)
   endif()
 endif()
 
