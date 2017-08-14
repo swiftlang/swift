@@ -108,7 +108,7 @@ options such as building a Swift-compatible LLDB, building the Swift Package
 Manager, building for iOS, running tests after builds, and more. It also
 supports presets, which you can define for common combinations of build options.
 
-To find out more:
+View the inline help to find out more, in particular the section "Typical uses"
 
     utils/build-script -h
 
