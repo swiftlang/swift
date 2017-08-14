@@ -2927,7 +2927,7 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   };
 
   for (auto tyR : repr->getTypes()) {
-    Type ty = TC.resolveType(tyR, DC, withoutContext(options), Resolver);
+    Type ty = resolveType(tyR, withoutContext(options));
     if (!ty || ty->hasError()) return ty;
 
     auto nominalDecl = ty->getAnyNominal();
