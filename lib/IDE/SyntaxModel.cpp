@@ -766,6 +766,10 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                                                      AFD->getBodySourceRange());
       SN.NameRange = charSourceRangeFromSourceRange(SM,
                           AFD->getSignatureSourceRange());
+      if (FD) {
+        SN.TypeRange = charSourceRangeFromSourceRange(SM,
+                                      FD->getReturnTypeLoc().getSourceRange());
+      }
       pushStructureNode(SN, AFD);
     }
   } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -963,6 +967,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                                                SubscriptD->getBracesRange());
     SN.NameRange = charSourceRangeFromSourceRange(SM,
                                         SubscriptD->getSignatureSourceRange());
+    SN.TypeRange = charSourceRangeFromSourceRange(SM,
+                            SubscriptD->getElementTypeLoc().getSourceRange());
     pushStructureNode(SN, SubscriptD);
   }
 
