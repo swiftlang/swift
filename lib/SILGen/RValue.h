@@ -304,6 +304,14 @@ public:
   /// Return the type lowering of RValue::getType().
   const Lowering::TypeLowering &getTypeLowering(SILGenFunction &SGF) const &;
 
+  /// Return the lowered SILType that would be used to implode the given RValue
+  /// into 1 tuple value.
+  ///
+  /// This means that if any sub-objects are address only, an address type will
+  /// be returned. Otherwise, an object will be returned. So this is a
+  /// convenient way to determine if an RValue needs an address.
+  SILType getLoweredImplodedTupleType(SILGenFunction &SGF) const &;
+
   /// Rewrite the type of this r-value.
   void rewriteType(CanType newType) & {
 #ifndef NDEBUG

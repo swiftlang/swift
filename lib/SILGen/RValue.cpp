@@ -284,7 +284,7 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
 
   // To implode an address-only tuple, we need to create a buffer to hold the
   // result tuple.
-  if (loweredType.isAddressOnly(SGF.F.getModule()) &&
+  if (loweredType.isAddressOnly(SGF.getModule()) &&
       SGF.silConv.useLoweredAddresses()) {
     assert(KIND != ImplodeKind::Unmanaged &&
            "address-only values are always managed!");
@@ -796,4 +796,12 @@ const TypeLowering &RValue::getTypeLowering(SILGenFunction &SGF) const & {
 
 SILType RValue::getLoweredType(SILGenFunction &SGF) const & {
   return getTypeLowering(SGF).getLoweredType();
+}
+
+SILType RValue::getLoweredImplodedTupleType(SILGenFunction &SGF) const & {
+  SILType loweredType = getLoweredType(SGF);
+  if (loweredType.isAddressOnly(SGF.getModule()) &&
+      SGF.silConv.useLoweredAddresses())
+    return loweredType.getAddressType();
+  return loweredType.getObjectType();
 }
