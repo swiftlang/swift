@@ -34,9 +34,6 @@ The testsuite is split into four subsets:
 * Unit tests, located under ``swift/unittests``.
 * Long tests, which are marked with ``REQUIRES: long_test``.
 
-Unlike other tests, every long test should also include either
-``REQUIRES: nonexecutable_test`` or ``REQUIRES: executable_test``.
-
 ### Running the LLVM lit-based testsuite
 
 It is recommended that you run the Swift test suites via ``utils/build-script``.
@@ -186,6 +183,9 @@ standard library that only has a very basic set of APIs.
 
 If you write an executable test please add ``REQUIRES: executable_test`` to the
 test.
+
+Every long test must also include ``REQUIRES: nonexecutable_test`` or
+``REQUIRES: executable_test``.
 
 #### Substitutions in lit tests
 
