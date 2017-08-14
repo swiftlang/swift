@@ -29,22 +29,69 @@ ManagedValue Scope::popPreservingValue(ManagedValue mv) {
   return cloner.clone(value);
 }
 
+// Since we have an RValue, we know that RValue invariants imply that all
+// subvalues that are addresses must be address only types. Such address only
+// types if they are +1 rvalues should be independent of any values from outside
+// the +1 rvalue emission (that is if someone else has a reference to the
+// address only type, we should have produced a copy). This means that it is
+// safe to move the value into new memory that is guaranteed to live through the
+// scope being pushed. As an additional complication due to SIL enforcing stack
+// ordering, we can not use a temporary stack location since any stack locations
+// that are inside the scope will be cleaned up while such a scope jumping stack
+// is still alive (violating stack ordering). Instead we use an alloc_box to
+// store the new value. allocbox-to-stack will then reorder/expand the stack
+// lifetimes to resolve the issues.
+static void lifetimeExtendAddressOnlyRValueSubValues(
+    SILGenFunction &SGF, SILLocation loc,
+    llvm::SmallVectorImpl<SILValue> &values,
+    llvm::SmallVectorImpl<SILValue> &lifetimeExtendingBoxes) {
+  for (SILValue &v : values) {
+    // If v is not an address, it isn't interesting, continue.
+    if (!v->getType().isAddress()) {
+      continue;
+    }
+
+    // Otherwise, create the box and move the address only value into the box.
+    assert(v->getType().isAddressOnly(SGF.getModule()) &&
+           "RValue invariants imply that all RValue subtypes that are "
+           "addresses must be address only.");
+    auto boxTy = SILBoxType::get(v->getType().getSwiftRValueType());
+    SILValue box = SGF.B.createAllocBox(loc, boxTy);
+    SILValue addr = SGF.B.createProjectBox(loc, box, 0);
+    SGF.B.createCopyAddr(loc, v, addr, IsTake, IsInitialization);
+
+    // Then save the box so we create the box destroy in the caller and
+    // overwrite v with the project box since that is where the value is now.
+    lifetimeExtendingBoxes.emplace_back(box);
+    v = addr;
+  }
+}
+
 RValue Scope::popPreservingValue(RValue &&rv) {
-  assert(rv.isPlusOne(cleanups.SGF) &&
-         "Can only push plus one rvalues through a scope");
-  assert(rv.getTypeLowering(cleanups.SGF).isLoadable() &&
-         "Can only push loadable +1 rvalues through a scope");
+  auto &SGF = cleanups.SGF;
+  assert(rv.isPlusOne(SGF) && "Can only push plus one rvalues through a scope");
 
   // First gather all of the data that we need to recreate the RValue in the
   // outer scope.
   CanType type = rv.type;
   unsigned numEltsRemaining = rv.elementsToBeAdded;
-  CleanupCloner cloner(cleanups.SGF, rv);
+  CleanupCloner cloner(SGF, rv);
   llvm::SmallVector<SILValue, 4> values;
-  std::move(rv).forwardAll(cleanups.SGF, values);
+  std::move(rv).forwardAll(SGF, values);
+
+  // Lifetime any address only values that we may have.
+  llvm::SmallVector<SILValue, 4> lifetimeExtendingBoxes;
+  lifetimeExtendAddressOnlyRValueSubValues(SGF, loc, values,
+                                           lifetimeExtendingBoxes);
 
   // Then pop the cleanups.
   pop();
+
+  // Then create cleanups for any lifetime extending boxes that we may have to
+  // ensure that the boxes are cleaned up /after/ the value stored in the box.
+  for (auto v : lifetimeExtendingBoxes) {
+    SGF.emitManagedRValueWithCleanup(v);
+  }
 
   // Reconstruct the managed values from the underlying sil values in the outer
   // scope. Since the RValue wants a std::vector value, we use that instead.
@@ -54,7 +101,7 @@ RValue Scope::popPreservingValue(RValue &&rv) {
       [&cloner](SILValue v) -> ManagedValue { return cloner.clone(v); });
 
   // And then assemble the managed values into a rvalue.
-  return RValue(cleanups.SGF, std::move(managedValues), type, numEltsRemaining);
+  return RValue(SGF, std::move(managedValues), type, numEltsRemaining);
 }
 
 void Scope::popImpl() {
