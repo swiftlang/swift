@@ -188,6 +188,10 @@ described above.
 
 See [docs/Testing.md](docs/Testing.md).
 
+## Debugging the Compiler
+
+See [docs/DebuggingTheCompiler.md](docs/DebuggingTheCompiler.md).
+
 ## Documentation
 
 To read the documentation, start by installing the
