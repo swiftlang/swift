@@ -74,6 +74,16 @@ fromStableSILLinkage(unsigned value) {
   }
 }
 
+static Optional<SILVTable::Entry::Kind>
+fromStableVTableEntryKind(unsigned value) {
+  switch (value) {
+  case SIL_VTABLE_ENTRY_NORMAL: return SILVTable::Entry::Kind::Normal;
+  case SIL_VTABLE_ENTRY_INHERITED: return SILVTable::Entry::Kind::Inherited;
+  case SIL_VTABLE_ENTRY_OVERRIDE: return SILVTable::Entry::Kind::Override;
+  default: return None;
+  }
+}
+
 /// Used to deserialize entries in the on-disk func hash table.
 class SILDeserializer::FuncTableInfo {
 public:
@@ -2441,9 +2451,10 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
     unsigned RawLinkage;
-    VTableEntryLayout::readRecord(scratch, NameID, RawLinkage, ListOfValues);
+    unsigned RawEntryKind;
+    VTableEntryLayout::readRecord(scratch, NameID, RawEntryKind, RawLinkage, ListOfValues);
 
-    Optional<SILLinkage> Linkage = fromStableSILLinkage(RawLinkage);
+    auto Linkage = fromStableSILLinkage(RawLinkage);
     if (!Linkage) {
       DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
             << " for VTable Entry\n");
@@ -2451,11 +2462,13 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
       return nullptr;
     }
 
+    auto EntryKind = fromStableVTableEntryKind(RawEntryKind);
+
     SILFunction *Func = getFuncForReference(MF->getIdentifier(NameID).str());
     if (Func) {
       unsigned NextValueIndex = 0;
       vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, NextValueIndex),
-                                 Func, Linkage.getValue());
+                                 Func, EntryKind.getValue(), Linkage.getValue());
     }
 
     // Fetch the next record.

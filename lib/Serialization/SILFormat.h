@@ -47,6 +47,13 @@ enum SILLinkageEncoding : uint8_t {
 };
 using SILLinkageField = BCFixed<3>;
 
+enum SILVTableEntryKindEncoding : uint8_t {
+  SIL_VTABLE_ENTRY_NORMAL,
+  SIL_VTABLE_ENTRY_INHERITED,
+  SIL_VTABLE_ENTRY_OVERRIDE,
+};
+using SILVTableEntryKindField = BCFixed<2>;
+
 enum CheckedCastKindEncoding : uint8_t {
   SIL_CHECKED_CAST_ARCHETYPE_TO_ARCHETYPE,
   SIL_CHECKED_CAST_ARCHETYPE_TO_CONCRETE,
@@ -185,6 +192,7 @@ namespace sil_block {
   using VTableEntryLayout = BCRecordLayout<
     SIL_VTABLE_ENTRY,
     DeclIDField,  // SILFunction name
+    SILVTableEntryKindField,  // Kind
     SILLinkageField,      // Linkage
     BCArray<ValueIDField> // SILDeclRef
   >;

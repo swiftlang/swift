@@ -43,11 +43,27 @@ public:
   // TODO: Entry should include substitutions needed to invoke an overridden
   // generic base class method.
   struct Entry {
+    enum Kind : uint8_t {
+      /// The vtable entry is for a method defined directly in this class.
+      Normal,
+      /// The vtable entry is inherited from the superclass.
+      Inherited,
+      /// The vtable entry is inherited from the superclass, and overridden
+      /// in this class.
+      Override,
+    };
 
-    Entry() : Implementation(nullptr), Linkage(SILLinkage::Private) { }
+    Entry()
+      : Implementation(nullptr),
+        TheKind(Kind::Normal),
+        Linkage(SILLinkage::Private) { }
 
-    Entry(SILDeclRef Method, SILFunction *Implementation, SILLinkage Linkage) :
-      Method(Method), Implementation(Implementation), Linkage(Linkage) { }
+    Entry(SILDeclRef Method, SILFunction *Implementation,
+          Kind TheKind, SILLinkage Linkage)
+      : Method(Method),
+        Implementation(Implementation),
+        TheKind(TheKind),
+        Linkage(Linkage) { }
 
     /// The declaration reference to the least-derived method visible through
     /// the class.
@@ -55,6 +71,9 @@ public:
 
     /// The function which implements the method for the class.
     SILFunction *Implementation;
+
+    /// The entry kind.
+    Kind TheKind;
 
     /// The linkage of the implementing function.
     ///

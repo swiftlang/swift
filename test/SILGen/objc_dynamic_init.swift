@@ -39,7 +39,7 @@ final class Bobamathing: Thingamabob {
 // CHECK:         class_method {{%.*}} : $@thick Gadget.Type, #Gadget.init!allocator.1 :
 
 // CHECK-LABEL: sil_vtable Gadget {
-// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : _T{{.*}}GadgetC{{.*}}C {{ *}}//
+// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : _T{{.*}}GadgetC{{.*}}C //
 
 // CHECK-LABEL: sil_vtable Gizmo {
-// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : _T{{.*}}GizmoC{{.*}}C {{ *}}//
+// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : _T{{.*}}GizmoC{{.*}}C [override] //
