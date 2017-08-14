@@ -112,9 +112,6 @@ View the inline help to find out more, in particular the section "Typical uses"
 
     utils/build-script -h
 
-Note: Arguments after "--" above are forwarded to `build-script-impl`, which is
-the ultimate shell script that invokes the actual build and test commands.
-
 A basic command to build Swift with optimizations and run basic tests with
 Ninja:
 
