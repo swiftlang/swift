@@ -910,58 +910,6 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   llvm_unreachable("bad pattern kind!");
 }
 
-/// Coerce the given 'isa' pattern via a conditional downcast.
-///
-/// This allows us to use an arbitrary conditional downcast to
-/// evaluate an "is" / "as" pattern, which includes any kind of
-/// downcast for which we don't have specialized logic.
-static bool coercePatternViaConditionalDowncast(TypeChecker &tc, 
-                                                Pattern *&pattern,
-                                                DeclContext *dc,
-                                                Type type,
-                                                TypeResolutionOptions options) {
-  auto isa = cast<IsPattern>(pattern);
-
-  // FIXME: We can't handle subpatterns here.
-  if (isa->getSubPattern()) {
-    tc.diagnose(isa->getLoc(), diag::isa_pattern_value, 
-                isa->getCastTypeLoc().getType());
-    return false;
-  }
-
-  // Create a new match variable $match.
-  auto *matchVar = new (tc.Context) VarDecl(/*IsStatic*/false,
-                                            VarDecl::Specifier::Let,
-                                            /*IsCaptureList*/false,
-                                            pattern->getLoc(),
-                                            tc.Context.getIdentifier("$match"),
-                                            type, dc);
-  matchVar->setInterfaceType(dc->mapTypeOutOfContext(type));
-  matchVar->setHasNonPatternBindingInit();
-
-  // Form the cast $match as? T, which produces an optional.
-  Expr *matchRef = new (tc.Context) DeclRefExpr(matchVar,
-                                                DeclNameLoc(pattern->getLoc()),
-                                                /*Implicit=*/true);
-  Expr *cast = new (tc.Context) ConditionalCheckedCastExpr(
-                                  matchRef,
-                                  isa->getLoc(),
-                                  isa->getLoc(),
-                                  isa->getCastTypeLoc());
-
-  // Type-check the cast as a condition.
-  if (tc.typeCheckCondition(cast, dc))
-    return true;
-
-  // Form an expression pattern with this match.
-  // FIXME: This is lossy; we can't get the value out.
-  pattern = new (tc.Context) ExprPattern(matchRef, /*isResolved=*/true, 
-                                         /*matchExpr=*/cast, matchVar,
-                                         false);
-  pattern->setType(isa->getCastTypeLoc().getType());
-  return false;
-}
-
 /// Perform top-down type coercion on the given pattern.
 bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       TypeResolutionOptions options,
@@ -1283,10 +1231,12 @@ recur:
     // Valid checks.
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
-    case CheckedCastKind::SetDowncast:
-      return coercePatternViaConditionalDowncast(
-               *this, P, dc, type,
-               subOptions|TR_FromNonInferredPattern);
+    case CheckedCastKind::SetDowncast: {
+      diagnose(IP->getLoc(),
+               diag::isa_collection_downcast_pattern_value_unimplemented,
+               IP->getCastTypeLoc().getType());
+      return false;
+    }
 
     case CheckedCastKind::ValueCast:
     case CheckedCastKind::Swift3BridgingDowncast:
