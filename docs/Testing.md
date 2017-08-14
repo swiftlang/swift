@@ -45,6 +45,69 @@ Before committing a large change to a compiler (especially a language change),
 or API changes to the standard library, it is recommended to run validation
 test suite, via ``utils/build-script --validation-test``.
 
+Using ``utils/build-script`` will rebuild all targets which can add substantial
+time to a debug cycle.
+
+#### Using lit.py
+
+Using `lit.py` directly can provide more control and faster feedback to your
+development cycle. To invoke LLVM's `lit.py` script directly, it must be
+configured to use your local build directory. For example:
+
+```
+    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/Parse/
+```
+
+This runs the tests in the 'test/Parse/' directory targeting the 32-bit iOS
+Simulator. The ``-sv`` options give you a nice progress bar and only show you
+output from the tests that fail.
+
+One downside of using this form is that you're appending relative paths from
+the source directory to the test directory in your build directory. (That is,
+there may not actually be a directory named 'Parse' in
+'test-iphonesimulator-i386/'; the invocation works because there is one in the
+source 'test/' directory.) There is a more verbose form that specifies the
+testing configuration explicitly, which then allows you to test files
+regardless of location.
+
+```
+    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
+```
+
+For more complicated configuration, copy the invocation from one of the build
+targets mentioned above and modify it as necessary. lit.py also has several
+useful features, like timing tests and providing a timeout. Check these features
+out with ``lit.py -h``. We document some of the more useful ones below:
+
+##### Extra lit.py invocation options
+
+* ``-s`` reduces the amount of output that lit shows.
+* ``-v`` causes a test's commandline and output to be printed if the test fails.
+* ``-a`` causes a test's commandline and output to always be printed.
+* ``--filter=<pattern>`` causes only tests with paths matching the given regular
+  expression to be run.
+* ``-i`` causes tests that have a newer modification date and failing tests to
+  be run first. This is implemented by updating the mtimes of the tests.
+* ``--no-execute`` causes a dry run to be performed. *NOTE* This means that all
+  tests are assumed to PASS.
+* ``--time-tests`` will cause elapsed wall time to be tracked for each test.
+* ``--timeout=<MAXINDIVIDUALTESTTIME>`` sets a maximum time that can be spent
+  running a single test (in seconds). 0 (the default means no time limit.
+* ``--max-failures=<MAXFAILURES>`` stops execution after ``MAXFAILURES`` number
+  of failures.
+* ``--param gmalloc`` will run all tests under Guard Malloc (macOS only). See
+  ``man libgmalloc`` for more information.
+* ``--param swift-version=<MAJOR>`` overrides the default Swift language
+  version used by swift/swiftc and swift-ide-test.
+* ``--param interpret`` is an experimental option for running execution tests
+  using Swift's interpreter rather than compiling them first. Note that this
+  does not affect all substitutions.
+* ``--param swift_test_mode=<MODE>`` drives the various suffix variations
+  mentioned above. Again, it's best to get the invocation from the existing
+  build system targets and modify it rather than constructing it yourself.
+
+#### CMake
+
 Although it is not recommended for day-to-day contributions, it is also
 technically possible to execute the tests directly via CMake. For example, if you have
 built Swift products at the directory ``build/Ninja-ReleaseAssert/swift-macosx-x86_64``,
@@ -82,61 +145,6 @@ For every target above, there are variants for different optimizations:
 * the target with ``-non-executable`` suffix (e.g.,
   ``check-swift-non-executable-iphoneos-arm64``) -- runs tests not marked with
   ``executable_test`` in ``-Onone`` mode.
-
-If more control is required (e.g. to manually run certain tests), you can invoke
-LLVM's lit.py script directly. For example:
-
-```
-    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/Parse/
-```
-
-This runs the tests in the test/Parse/ directory targeting the 32-bit iOS
-Simulator. The ``-sv`` options give you a nice progress bar and only show you
-output from the tests that fail.
-
-One downside of using this form is that you're appending relative paths from
-the source directory to the test directory in your build directory. (That is,
-there may not actually be a directory named 'Parse' in
-'test-iphonesimulator-i386/'; the invocation works because there is one in the
-source 'test/' directory.) There is a more verbose form that specifies the
-testing configuration explicitly, which then allows you to test files
-regardless of location.
-
-```
-    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
-```
-
-For more complicated configuration, copy the invocation from one of the build
-targets mentioned above and modify it as necessary. lit.py also has several
-useful features, like timing tests and providing a timeout. Check these features
-out with ``lit.py -h``. We document some of the more useful ones below:
-
-#### Extra lit.py invocation options
-
-* ``-s`` reduces the amount of output that lit shows.
-* ``-v`` causes a test's commandline and output to be printed if the test fails.
-* ``-a`` causes a test's commandline and output to always be printed.
-* ``--filter=<pattern>`` causes only tests with paths matching the given regular
-  expression to be run.
-* ``-i`` causes tests that have a newer modification date and failing tests to
-  be run first. This is implemented by updating the mtimes of the tests.
-* ``--no-execute`` causes a dry run to be performed. *NOTE* This means that all
-  tests are assumed to PASS.
-* ``--time-tests`` will cause elapsed wall time to be tracked for each test.
-* ``--timeout=<MAXINDIVIDUALTESTTIME>`` sets a maximum time that can be spent
-  running a single test (in seconds). 0 (the default means no time limit.
-* ``--max-failures=<MAXFAILURES>`` stops execution after ``MAXFAILURES`` number
-  of failures.
-* ``--param gmalloc`` will run all tests under Guard Malloc (macOS only). See
-  ``man libgmalloc`` for more information.
-* ``--param swift-version=<MAJOR>`` overrides the default Swift language
-  version used by swift/swiftc and swift-ide-test.
-* ``--param interpret`` is an experimental option for running execution tests
-  using Swift's interpreter rather than compiling them first. Note that this
-  does not affect all substitutions.
-* ``--param swift_test_mode=<MODE>`` drives the various suffix variations
-  mentioned above. Again, it's best to get the invocation from the existing
-  build system targets and modify it rather than constructing it yourself.
 
 ### Writing tests
 
