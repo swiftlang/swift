@@ -20,7 +20,6 @@ def make_missing_child(child):
     """
     Generates a C++ call to make the raw syntax for a given Child object.
     """
-
     if child.is_token():
         token = child.main_token()
         tok_kind = "tok::" + token.kind if token else "tok::unknown"
@@ -30,6 +29,22 @@ def make_missing_child(child):
         missing_kind = "Unknown" if child.syntax_kind == "Syntax" \
                        else child.syntax_kind
         return 'RawSyntax::missing(SyntaxKind::%s)' % missing_kind
+
+
+def make_missing_swift_child(child):
+    """
+    Generates a Swift call to make the raw syntax for a given Child object.
+    """
+    if child.is_token():
+        token = child.main_token()
+        tok_kind = token.swift_kind() if token else "unknown"
+        if token and not token.text:
+            tok_kind += '("")'
+        return 'RawSyntax.missingToken(.%s)' % tok_kind
+    else:
+        missing_kind = "unknown" if child.syntax_kind == "Syntax" \
+                       else child.swift_syntax_kind
+        return 'RawSyntax.missing(.%s)' % missing_kind
 
 
 def create_node_map():

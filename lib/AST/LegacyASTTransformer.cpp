@@ -225,7 +225,10 @@ RC<SyntaxData>
 LegacyASTTransformer::visitTopLevelCodeDecl(TopLevelCodeDecl *D,
                                             const SyntaxData *Parent,
                                             const CursorIndex IndexInParent) {
-  return visitBraceStmt(D->getBody(), Parent, IndexInParent);
+  auto body = visitBraceStmt(D->getBody(), Parent, IndexInParent);
+  return SyntaxData::make(RawSyntax::make(SyntaxKind::TopLevelCodeDecl,
+                                          {body->getRaw()},
+                                          SourcePresence::Present));
 }
 
 RC<SyntaxData>

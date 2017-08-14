@@ -532,6 +532,27 @@ public func expectFalse(_ actual: Bool, ${TRACE}) {
   }
 }
 
+public func expectThrows<ErrorType: Error & Equatable>(
+  _ expectedError: ErrorType? = nil, _ test: () throws -> Void, ${TRACE}) {
+  do {
+    try test()
+  } catch let error as ErrorType {
+    if let expectedError = expectedError {
+      expectEqual(expectedError, error)
+    }
+  } catch {
+    expectationFailure("unexpected error thrown: \"\(error)\"", trace: ${trace})
+  }
+}
+
+public func expectDoesNotThrow(_ test: () throws -> Void, ${TRACE}) {
+  do {
+    try test()
+  } catch {
+    expectationFailure("unexpected error thrown: \"\(error)\"", trace: ${trace})
+  }
+}
+
 public func expectNil<T>(_ value: T?, ${TRACE}) {
   if value != nil {
     expectationFailure(
