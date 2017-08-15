@@ -2,7 +2,8 @@
 
 This is meant to be a guide to people working on the standard library. It covers coding standards, code organization, best practices, internal annotations, and provides a guide to standard library internals. This document is inspired by LLVM's excellent [programmer's manual](http://llvm.org/docs/ProgrammersManual.html) and [coding standards](http://llvm.org/docs/CodingStandards.html).
 
-TBD: Should this subsume [StdlibRationales.rst](https://github.com/apple/swift/blob/master/docs/StdlibRationales.rst)?
+TBD: Should this subsume (or link to) [StdlibRationales.rst](https://github.com/apple/swift/blob/master/docs/StdlibRationales.rst)?
+TBD: Should this subsume (or link to) [AccessControlInStdlib.rst](https://github.com/apple/swift/blob/master/docs/AccessControlInStdlib.rst)
 
 ## Library Organization
 
