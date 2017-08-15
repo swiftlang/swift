@@ -26,6 +26,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
+#include "llvm/ADT/Optional.h"
 #include <algorithm>
 
 namespace swift {
@@ -117,7 +118,7 @@ public:
   ArrayRef<Entry> getEntries() const { return {Entries, NumEntries}; }
 
   /// Look up the implementation function for the given method.
-  SILFunction *getImplementation(SILModule &M, SILDeclRef method) const;
+  Optional<Entry> getEntry(SILModule &M, SILDeclRef method) const;
 
   /// Removes entries from the vtable.
   /// \p predicate Returns true if the passed entry should be removed.

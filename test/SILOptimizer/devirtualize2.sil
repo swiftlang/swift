@@ -18,9 +18,9 @@ class Foo : Bar {
 sil_global @x : $Bar
 
 // CHECK-LABEL: sil @function_with_cm_with_cast
+// CHECK: [[SELF:%.*]] = alloc_ref $Foo
 // CHECK-NOT: class_method
-// CHECK: [[REF:%.*]] = function_ref @_TFC4main3Bar4pingfS0_FT_T_
-// CHECK: [[SELF:%.*]] = upcast
+// CHECK: [[REF:%.*]] = function_ref @_TFC4main3Foo4pingfS0_FT_T_
 // CHECK: apply [[REF]]([[SELF]])
 // CHECK: return
 sil @function_with_cm_with_cast : $@convention(thin) () -> () {
@@ -113,7 +113,7 @@ sil_vtable Bar {
 }
 
 sil_vtable Foo {
-  #Foo.ping!1: _TFC4main3Foo4pingfS0_FT_T_
+  #Bar.ping!1: _TFC4main3Foo4pingfS0_FT_T_
 }
 
 

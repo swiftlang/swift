@@ -150,7 +150,7 @@ private:
   VTableListType vtables;
 
   /// This is a cache of vtable entries for quick look-up
-  llvm::DenseMap<std::pair<const SILVTable *, SILDeclRef>, SILFunction *>
+  llvm::DenseMap<std::pair<const SILVTable *, SILDeclRef>, SILVTable::Entry>
       VTableEntryCache;
 
   /// Lookup table for SIL witness tables from conformances.
