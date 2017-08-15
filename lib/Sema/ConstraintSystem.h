@@ -1085,12 +1085,32 @@ private:
     }
   };
 
+  class TypeMismatch {
+    Type LHS, RHS;
+    ConstraintLocator *Locator;
+
+  public:
+    TypeMismatch(Type lhs, Type rhs, ConstraintLocator *locator)
+        : LHS(lhs), RHS(rhs), Locator(locator) {}
+
+    void print(llvm::raw_ostream &log, SourceManager *SM,
+               unsigned depth) const {
+      log.indent(depth * 2) << "(LHS: " << LHS->getString() << ","
+                            << " RHS: " << RHS->getString() << ","
+                            << " Loc: ";
+
+      Locator->dump(SM, log);
+      log << ")";
+    }
+  };
+
   class SolverStep {
     std::shared_ptr<SolverStep> Parent;
     SmallVector<std::shared_ptr<SolverStep>, 8> Next;
 
     Optional<std::pair<Constraint *, unsigned>> Choice;
-    SmallVector<Constraint *, 4> Failures;
+
+    llvm::SmallDenseMap<Constraint *, SmallVector<TypeMismatch, 8>> Failures;
 
   public:
     SolverStep(std::shared_ptr<SolverStep> parent) : Parent(parent) {}
@@ -1102,8 +1122,9 @@ private:
 
     void addStep(std::shared_ptr<SolverStep> step) { Next.push_back(step); }
 
-    void recordFailure(Constraint *constraint) {
-      Failures.push_back(constraint);
+    void recordFailure(Constraint *constraint,
+                       ArrayRef<TypeMismatch> failures) {
+      Failures[constraint].append(failures.begin(), failures.end());
     }
 
     void print(ConstraintSystem &cs, llvm::raw_ostream &log,
@@ -1118,12 +1139,25 @@ private:
       }
 
       if (!Failures.empty()) {
-        log.indent(depth * 2) << "---> Failures\n";
-        for (auto *constraint : Failures) {
+        log.indent(depth * 2) << "--- Failures ---\n";
+        for (auto &e : Failures) {
+          auto *constraint = e.getFirst();
+          auto &failures = e.getSecond();
+
+          log.indent(depth * 2) << "-----> Failure <-----\n";
+
+          log.indent(depth * 2) << "-> Constraint:\n";
           constraint->print(log.indent(depth * 2),
                             &cs.getASTContext().SourceMgr);
+
+          log << '\n';
+          log.indent(depth * 2) << "-> Type Failures:\n";
+          for (auto &failure : failures)
+            failure.print(log.indent(depth * 2), &cs.getASTContext().SourceMgr,
+                          depth);
           log << '\n';
         }
+        log.indent(depth * 2) << "<----- /// ----->\n";
       }
 
       for (auto &nested : Next)
@@ -1148,8 +1182,9 @@ private:
 
     void decrementDepth() { CurrentStep = CurrentStep->getParent(); }
 
-    void recordFailure(Constraint *constraint) {
-      CurrentStep->recordFailure(constraint);
+    void recordFailure(Constraint *constraint,
+                       ArrayRef<TypeMismatch> failures) {
+      CurrentStep->recordFailure(constraint, failures);
     }
 
     void print(ConstraintSystem &cs, llvm::raw_ostream &log) const {
@@ -1192,6 +1227,9 @@ private:
     /// Tracks each path taken by the constraint solver.
     SolverPath Path;
 
+    /// Tracks all type match failures encountered per step in the solver path.
+    SmallVector<TypeMismatch, 8> Failures;
+
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
@@ -1207,7 +1245,12 @@ private:
     }
 
     void recordFailure(Constraint *constraint) {
-      Path.recordFailure(constraint);
+      Path.recordFailure(constraint, Failures);
+      Failures.clear();
+    }
+
+    void recordFailure(Type lhs, Type rhs, ConstraintLocator *locator) {
+      Failures.push_back({lhs, rhs, locator});
     }
 
     /// \brief Register given scope to be tracked by the current solver state,
