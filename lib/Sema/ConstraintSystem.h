@@ -1125,6 +1125,8 @@ private:
       return NextSteps;
     }
 
+    bool hasFailures() const { return !Failures.empty(); }
+
     bool isViable() const {
       // If there is something already linked
       // to this step, we can't drop it, but
@@ -1147,7 +1149,7 @@ private:
           return false;
       }
 
-      return true;
+      return hasFailures();
     }
 
     void recordFailure(Constraint *constraint,
@@ -1158,6 +1160,7 @@ private:
     void print(ConstraintSystem &cs, llvm::raw_ostream &log,
                unsigned depth) const {
       log.indent(depth * 2) << ">>> Step\n";
+
       if (Choice) {
         auto *disjunction = Choice->first;
         auto *choice = disjunction->getNestedConstraints()[Choice->second];
@@ -1193,65 +1196,57 @@ private:
     }
   };
 
-  class SolverPath {
-    std::shared_ptr<SolverStep> Root;
-    std::shared_ptr<SolverStep> CurrentStep;
+  class DiagnosticListener {
+    typedef std::shared_ptr<SolverStep> Step;
+
+    ConstraintSystem &CS;
+
+    Step Root;
+    Step CurrentStep;
+
+    /// Tracks all type match failures encountered per step in the solver path.
+    SmallVector<TypeMismatch, 8> LocalFailures;
+
+    unsigned Depth = 0;
+    unsigned LongestPath = 0;
 
   public:
-    SolverPath()
-        : Root(std::make_shared<SolverStep>(nullptr)), CurrentStep(Root) {}
+    DiagnosticListener(ConstraintSystem &cs)
+        : CS(cs), Root(std::make_shared<SolverStep>(nullptr)),
+          CurrentStep(Root) {}
 
-    void incrementDepth(Constraint *disjunction, unsigned choice) {
-      CurrentStep =
-          std::make_shared<SolverStep>(CurrentStep, disjunction, choice);
+    void print() const {
+      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+      log << ">>> Longest Path: " << LongestPath << '\n';
+      Root->print(CS, log, 0);
+    }
+
+    unsigned getLongestPath() const { return LongestPath; }
+
+    void incrementDepth(Constraint *disjunction, unsigned idx) {
+      ++Depth;
+
+      CurrentStep = std::make_shared<SolverStep>(CurrentStep, disjunction, idx);
+      LongestPath = std::max(LongestPath, Depth);
     }
 
     void decrementDepth() {
-      auto parent = CurrentStep->getParent();
+      --Depth;
 
+      auto parent = CurrentStep->getParent();
       if (CurrentStep->isViable())
         parent->add(CurrentStep);
 
       CurrentStep = parent;
     }
 
-    void recordFailure(Constraint *constraint,
-                       ArrayRef<TypeMismatch> failures) {
-      CurrentStep->recordFailure(constraint, failures);
-    }
-
-    void print(ConstraintSystem &cs, llvm::raw_ostream &log) const {
-      Root->print(cs, log, 0);
-    }
-  };
-
-  class DiagnosticListener {
-    ConstraintSystem &CS;
-    SolverPath Tracker;
-
-    /// Tracks all type match failures encountered per step in the solver path.
-    SmallVector<TypeMismatch, 8> Failures;
-
-  public:
-    DiagnosticListener(ConstraintSystem &cs) : CS(cs) {}
-
-    void incrementDepth(Constraint *disjunction, unsigned choice) {
-      Tracker.incrementDepth(disjunction, choice);
-    }
-
-    void decrementDepth() { Tracker.decrementDepth(); }
-
     void recordFailure(Constraint *constraint) {
-      Tracker.recordFailure(constraint, Failures);
-      Failures.clear();
+      CurrentStep->recordFailure(constraint, LocalFailures);
+      LocalFailures.clear();
     }
 
     void recordFailure(Type lhs, Type rhs, ConstraintLocator *locator) {
-      Failures.push_back({lhs, rhs, locator});
-    }
-
-    void print() const {
-      Tracker.print(CS, CS.getASTContext().TypeCheckerDebug->getStream());
+      LocalFailures.push_back({lhs, rhs, locator});
     }
   };
 
