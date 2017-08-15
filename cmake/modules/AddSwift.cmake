@@ -516,6 +516,7 @@ endfunction()
 #     [FILE_DEPENDS target1 ...]
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
+#     [MODULE_DIR]
 #     [FORCE_BUILD_OPTIMIZED]
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
@@ -580,6 +581,9 @@ endfunction()
 # IS_STDLIB
 #   Install library dylib and swift module files to lib/swift.
 #
+# MODULE_DIR
+#   Directory to install .swiftmodule and .o file in.
+#
 # IS_STDLIB_CORE
 #   Compile as the standard library core.
 #
@@ -597,7 +601,7 @@ endfunction()
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
       SHARED STATIC OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
+      TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK MODULE_DIR
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE FORCE_BUILD_OPTIMIZED)
   cmake_parse_arguments(SWIFTLIB_SINGLE
     "${SWIFTLIB_SINGLE_options}"
@@ -1588,6 +1592,7 @@ function(add_swift_library name)
           PRIVATE_LINK_LIBRARIES ${swiftlib_private_link_libraries_targets}
           INCORPORATE_OBJECT_LIBRARIES ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES}
           INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY}
+          MODULE_DIR ${SWIFTLIB_MODULE_DIR}
           ${SWIFTLIB_DONT_EMBED_BITCODE_keyword}
           ${SWIFTLIB_API_NOTES_NON_OVERLAY_keyword}
           ${SWIFTLIB_IS_STDLIB_keyword}

@@ -18,7 +18,8 @@ add_swift_library(swiftSwiftSyntax SHARED
   TokenKind.swift.gyb
   Trivia.swift
 
+  TARGET_LIBRARY
+  HAS_SWIFT_CONTENT
   SWIFT_MODULE_DEPENDS Foundation
   INSTALL_IN_COMPONENT swift-syntax
-  TARGET_SDKS OSX
-  IS_STDLIB)
+  TARGET_SDKS OSX)
