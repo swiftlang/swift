@@ -2966,11 +2966,19 @@ namespace {
   protected:
     using super::IGM;
     using super::Target;
+    using super::asImpl;
 
     ConstantStructBuilder &B;
     const StructLayout &Layout;
     const ClassLayout &FieldLayout;
     SILVTable *VTable;
+
+    struct MethodOverride {
+      Size Offset;
+      SILFunction *Method;
+    };
+
+    SmallVector<MethodOverride, 4> Overrides;
 
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              ConstantStructBuilder &builder,
@@ -3224,6 +3232,26 @@ namespace {
       // Find the vtable entry.
       assert(VTable && "no vtable?!");
       if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
+        if (doesClassMetadataRequireDynamicInitialization(IGM, Target)) {
+          switch (entry->TheKind) {
+          case SILVTable::Entry::Kind::Normal:
+            // VTable entries belonging to the immediate class are
+            // emitted statically.
+            break;
+          case SILVTable::Entry::Kind::Inherited:
+            // Do nothing -- the runtime will copy the vtable slot from
+            // superclass metadata.
+            B.addNullPointer(IGM.FunctionPtrTy);
+            return;
+          case SILVTable::Entry::Kind::Override:
+            // Record the override so that we can fill it in later.
+            Overrides.push_back({asImpl().getNextOffsetFromAddressPoint(),
+                                 entry->Implementation});
+            B.addNullPointer(IGM.FunctionPtrTy);
+            return;
+          }
+        }
+
         B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
       } else {
         // The method is removed by dead method elimination.
@@ -3302,7 +3330,10 @@ namespace {
       // Otherwise, all we need to do is register with the ObjC runtime.
       } else {
         metadata = emitFinishIdempotentInitialization(IGF, metadata);
+        assert(Overrides.empty());
       }
+
+      emitInitializeMethodOverrides(IGF, metadata);
 
       // Realizing the class with the ObjC runtime will copy back to the
       // field offset globals for us; but if ObjC interop is disabled, we
@@ -3312,6 +3343,29 @@ namespace {
         emitInitializeFieldOffsets(IGF, metadata);
 
       return metadata;
+    }
+
+    // Update vtable entries for method overrides. The runtime copies in
+    // the vtable from the superclass for us; we have to install method
+    // overrides ourselves.
+    void emitInitializeMethodOverrides(IRGenFunction &IGF,
+                                       llvm::Value *metadata) {
+      if (Overrides.empty())
+        return;
+
+      Address metadataWords(
+          IGF.Builder.CreateBitCast(metadata, IGM.Int8PtrPtrTy),
+          IGM.getPointerAlignment());
+
+      for (auto Override : Overrides) {
+        auto *implFn = IGM.getAddrOfSILFunction(Override.Method,
+                                                NotForDefinition);
+
+        auto dest = createPointerSizedGEP(IGF, metadataWords,
+                                          Override.Offset);
+        auto *value = IGF.Builder.CreateBitCast(implFn, IGM.Int8PtrTy);
+        IGF.Builder.CreateStore(value, dest);
+      }
     }
 
     // The Objective-C runtime will copy field offsets from the field offset
