@@ -1186,7 +1186,7 @@ Using option presets:
   using the name=value syntax on the command line.
 
 
-Any arguments not listed, or arguments after `--` are forwarded to Swift's
+Any arguments not listed are forwarded directly to Swift's
 'build-script-impl'.  See that script's help for details.
 
 Environment variables
