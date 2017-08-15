@@ -582,7 +582,7 @@ endfunction()
 #   Install library dylib and swift module files to lib/swift.
 #
 # MODULE_DIR
-#   Directory to install .swiftmodule and .o file in.
+#   Put .swiftmodule, .swiftdoc., and .o into this directory.
 #
 # IS_STDLIB_CORE
 #   Compile as the standard library core.
