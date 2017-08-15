@@ -622,6 +622,10 @@ ERROR(sil_vtable_func_not_found,none,
       "sil function not found %0", (Identifier))
 ERROR(sil_vtable_class_not_found,none,
       "sil class not found %0", (Identifier))
+ERROR(sil_vtable_bad_entry_kind,none,
+      "expected 'inherited' or 'override'", ())
+ERROR(sil_vtable_expect_rsquare,none,
+      "expected ']' after vtable entry kind", ())
 
 // SIL Global
 ERROR(sil_global_variable_not_found,none,
