@@ -2849,6 +2849,11 @@ namespace {
       return B.getNextOffsetFromGlobal() - TemplateHeaderSize;
     }
 
+    /// Ignore the destructor and value witness table.
+    Size getNextOffsetFromAddressPoint() const {
+      return getNextOffsetFromTemplateHeader() - AddressPoint;
+    }
+
     template <class... T>
     void addGenericArgument(CanType type, T &&...args) {
       NumGenericWitnesses++;
@@ -3340,14 +3345,28 @@ namespace {
   class ClassMetadataBuilder :
     public ClassMetadataBuilderBase<ClassMetadataBuilder> {
 
+    using super = ClassMetadataBuilderBase<ClassMetadataBuilder>;
+
     bool HasUnfilledSuperclass = false;
     bool HasUnfilledParent = false;
+
+    Size AddressPoint;
+
   public:
     ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                          ConstantStructBuilder &builder,
                          const StructLayout &layout,
                          const ClassLayout &fieldLayout)
       : ClassMetadataBuilderBase(IGM, theClass, builder, layout, fieldLayout) {
+    }
+
+    void noteAddressPoint() {
+      super::noteAddressPoint();
+      AddressPoint = B.getNextOffsetFromGlobal();
+    }
+
+    Size getNextOffsetFromAddressPoint() const {
+      return B.getNextOffsetFromGlobal() - AddressPoint;
     }
 
     void addSuperClass() {
