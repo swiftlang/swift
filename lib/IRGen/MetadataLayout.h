@@ -153,6 +153,9 @@ public:
   };
 
 private:
+  StoredOffset InstanceSize;
+  StoredOffset InstanceAlignMask;
+
   struct StoredMethodInfo {
     StoredOffset TheOffset;
     StoredMethodInfo(StoredOffset offset) : TheOffset(offset) {}
@@ -184,6 +187,10 @@ private:
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *theClass);
 
 public:
+  Size getInstanceSizeOffset() const;
+
+  Size getInstanceAlignMaskOffset() const;
+
   /// Should only be used when emitting the nominal type descriptor.
   Size getStaticVTableOffset() const;
 

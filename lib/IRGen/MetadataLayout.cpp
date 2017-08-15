@@ -236,6 +236,16 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     Scanner(IRGenModule &IGM, ClassDecl *decl, ClassMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
+    void addInstanceSize() {
+      Layout.InstanceSize = getNextOffset();
+      super::addInstanceSize();
+    }
+
+    void addInstanceAlignMask() {
+      Layout.InstanceAlignMask = getNextOffset();
+      super::addInstanceAlignMask();
+    }
+
     void addParentMetadataRef(ClassDecl *forClass, Type classType) {
       if (forClass == Target)
         Layout.Parent = getNextOffset();
@@ -279,6 +289,16 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
   };
 
   Scanner(IGM, decl, *this).layout();
+}
+
+Size ClassMetadataLayout::getInstanceSizeOffset() const {
+  assert(InstanceSize.isStatic());
+  return InstanceSize.getStaticOffset();
+}
+
+Size ClassMetadataLayout::getInstanceAlignMaskOffset() const {
+  assert(InstanceAlignMask.isStatic());
+  return InstanceAlignMask.getStaticOffset();
 }
 
 ClassMetadataLayout::MethodInfo

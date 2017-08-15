@@ -3872,50 +3872,22 @@ std::pair<llvm::Value *, llvm::Value *>
 irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                   ClassDecl *theClass,
                                                   llvm::Value *metadata) {
-  class FindClassSize
-         : public ClassMetadataScanner<FindClassSize> {
-    using super = ClassMetadataScanner<FindClassSize>;
-  public:
-    FindClassSize(IRGenModule &IGM, ClassDecl *theClass)
-      : ClassMetadataScanner(IGM, theClass) {}
+  auto &layout = IGF.IGM.getMetadataLayout(theClass);
 
-    Size InstanceSize = Size::invalid();
-    Size InstanceAlignMask = Size::invalid();
-        
-    void noteAddressPoint() {
-      assert(InstanceSize.isInvalid() && InstanceAlignMask.isInvalid()
-             && "found size or alignment before address point?!");
-      NextOffset = Size(0);
-    }
-        
-    void addInstanceSize() {
-      InstanceSize = NextOffset;
-      super::addInstanceSize();
-    }
-      
-    void addInstanceAlignMask() {
-      InstanceAlignMask = NextOffset;
-      super::addInstanceAlignMask();
-    }
-  };
-
-  FindClassSize scanner(IGF.IGM, theClass);
-  scanner.layout();
-  assert(!scanner.InstanceSize.isInvalid()
-         && !scanner.InstanceAlignMask.isInvalid()
-         && "didn't find size or alignment in metadata?!");
   Address metadataAsBytes(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
                           IGF.IGM.getPointerAlignment());
 
-  Address slot = IGF.Builder.CreateConstByteArrayGEP(metadataAsBytes,
-                                                     scanner.InstanceSize);
+  Address slot = IGF.Builder.CreateConstByteArrayGEP(
+      metadataAsBytes,
+      layout.getInstanceSizeOffset());
   slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
   llvm::Value *size = IGF.Builder.CreateLoad(slot);
   if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
     size = IGF.Builder.CreateZExt(size, IGF.IGM.SizeTy);
 
-  slot = IGF.Builder.CreateConstByteArrayGEP(metadataAsBytes,
-                                             scanner.InstanceAlignMask);
+  slot = IGF.Builder.CreateConstByteArrayGEP(
+      metadataAsBytes,
+      layout.getInstanceAlignMaskOffset());
   slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int16Ty->getPointerTo());
   llvm::Value *alignMask = IGF.Builder.CreateLoad(slot);
   alignMask = IGF.Builder.CreateZExt(alignMask, IGF.IGM.SizeTy);
