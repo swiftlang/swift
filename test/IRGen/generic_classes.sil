@@ -13,32 +13,38 @@ import Swift
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private constant [7 x i8] c"x\00y\00z\00\00"
 // CHECK: @_T015generic_classes11RootGenericCMn = hidden constant <{ {{.*}} i32 }> <{
 // --       name
-// CHECK:   [32 x i8]* [[ROOTGENERIC_NAME]]
+// CHECK-SAME:   [32 x i8]* [[ROOTGENERIC_NAME]]
 // --       num fields
-// CHECK:   i32 3,
+// CHECK-SAME:   i32 3,
 // --       field offset vector offset
-// CHECK:   i32 15,
+// CHECK-SAME:   i32 15,
 // --       field names
-// CHECK:   [7 x i8]* [[ROOTGENERIC_FIELDS]]
+// CHECK-SAME:   [7 x i8]* [[ROOTGENERIC_FIELDS]]
 // --       generic metadata pattern
-// CHECK:   @_T015generic_classes11RootGenericCMP
+// CHECK-SAME:   @_T015generic_classes11RootGenericCMP
 // --       generic parameter vector offset
-// CHECK:   i32 10,
-// --       generic parameter count, primary count, witness table counts
-// CHECK:   i32 1, i32 1, i32 0
-// CHECK: }
+// CHECK-SAME:   i32 10,
+// --       generic parameter count, primary count
+// CHECK-SAME:   i32 1, i32 1,
+// --       flags -- has vtable
+// CHECK-SAME:   i32 4,
+// --       vtable offset
+// CHECK-SAME:   i32 11,
+// --       vtable size
+// CHECK-SAME:   i32 4
+// CHECK-SAME: }
 // CHECK: @_T015generic_classes11RootGenericCMP = internal global
 // --       template fill function
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_RootGeneric
+// CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_RootGeneric
 // --       nominal type descriptor
-// CHECK:   @_T015generic_classes11RootGenericCMn
+// CHECK-SAME:   @_T015generic_classes11RootGenericCMn
 // --       vtable
-// CHECK:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
-// CHECK:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
-// CHECK:   @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
+// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
+// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
+// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
 // --       field offset placeholders
-// CHECK:   i64 16, i64 0, i64 0
-// CHECK: }>
+// CHECK-SAME:   i64 16, i64 0, i64 0
+// CHECK-SAME: }>
 
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
@@ -51,55 +57,55 @@ import Swift
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [35 x i8] c"15generic_classes14RootNonGenericC\00"
 // CHECK: @_T015generic_classes14RootNonGenericCMn = hidden constant <{ {{.*}} i32 }> <{
 // --       name
-// CHECK:   [35 x i8]* [[ROOTNONGENERIC_NAME]]
+// CHECK-SAME:   [35 x i8]* [[ROOTNONGENERIC_NAME]]
 // --       num fields
-// CHECK:   i32 3,
+// CHECK-SAME:   i32 3,
 // --       -- field offset vector offset
-// CHECK:   i32 11,
+// CHECK-SAME:   i32 11,
 // --       field names
-// CHECK:   [7 x i8]* [[ROOTGENERIC_FIELDS]]
+// CHECK-SAME:   [7 x i8]* [[ROOTGENERIC_FIELDS]]
 // --       no generic metadata pattern, kind 0
-// CHECK:   i32 0,
+// CHECK-SAME:   i32 0,
 // --       0 = no generic parameter vector
-// CHECK:   i32 0,
+// CHECK-SAME:   i32 0,
 // --       number of generic params, primary params
-// CHECK:   i32 0, i32 0
-// CHECK: }>
+// CHECK-SAME:   i32 0, i32 0
+// CHECK-SAME: }>
 
 // CHECK: @_T015generic_classes14RootNonGenericCMf = internal global <{ {{.*}} }> <{
-// CHECK:   void (%T15generic_classes14RootNonGenericC*)* @_T015generic_classes14RootNonGenericCfD,
-// CHECK:   i8** @_T0BoWV,
-// CHECK-native: i64 0,
-// CHECK-native: %swift.type* null,
-// CHECK-native: %swift.opaque* null,
-// CHECK-objc:   i64 ptrtoint (%objc_class* @_T015generic_classes14RootNonGenericCMm to i64),
-// CHECK-objc:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
-// CHECK-objc:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* null,
-// CHECK-native: i64 1,
-// CHECK-objc:   @_DATA__TtC15generic_classes14RootNonGeneric
-// CHECK:   i32 33,
-// CHECK:   i16 7,
-// CHECK:   i16 0,
-// CHECK:   {{.*}}* @_T015generic_classes14RootNonGenericCMn
-// CHECK: }>
+// CHECK-SAME:   void (%T15generic_classes14RootNonGenericC*)* @_T015generic_classes14RootNonGenericCfD,
+// CHECK-SAME:   i8** @_T0BoWV,
+// CHECK-SAME-native: i64 0,
+// CHECK-SAME-native: %swift.type* null,
+// CHECK-SAME-native: %swift.opaque* null,
+// CHECK-SAME-objc:   i64 ptrtoint (%objc_class* @_T015generic_classes14RootNonGenericCMm to i64),
+// CHECK-SAME-objc:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
+// CHECK-SAME-objc:   %swift.opaque* @_objc_empty_cache,
+// CHECK-SAME:   %swift.opaque* null,
+// CHECK-SAME-native: i64 1,
+// CHECK-SAME-objc:   @_DATA__TtC15generic_classes14RootNonGeneric
+// CHECK-SAME:   i32 33,
+// CHECK-SAME:   i16 7,
+// CHECK-SAME:   i16 0,
+// CHECK-SAME:   {{.*}}* @_T015generic_classes14RootNonGenericCMn
+// CHECK-SAME: }>
 
 // CHECK: @_T015generic_classes015GenericInheritsC0CMP = internal global
 // --       template fill function
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_GenericInheritsGeneric
+// CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_GenericInheritsGeneric
 // --       RootGeneric vtable
-// CHECK:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
-// CHECK:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
-// CHECK:   @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
+// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
+// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
+// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
 // --       RootGeneric field offset placeholders
-// CHECK:   i64 16, i64 0, i64 0
+// CHECK-SAME:   i64 16, i64 0, i64 0
 // --       GenericInheritsGeneric vtable
-// CHECK:   @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_,
-// CHECK:   @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_,
-// CHECK:   @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_,
+// CHECK-SAME:   @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_,
+// CHECK-SAME:   @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_,
+// CHECK-SAME:   @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_,
 // --       GenericInheritsGeneric field offset placeholder
-// CHECK:   i64 0
-// CHECK: }
+// CHECK-SAME:   i64 0
+// CHECK-SAME: }
 
 // CHECK: @_T015generic_classes018GenericInheritsNonC0CMP
 

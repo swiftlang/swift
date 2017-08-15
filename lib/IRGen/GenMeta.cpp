@@ -2155,6 +2155,11 @@ namespace {
         flags = flags.withHasParent(true);
       if (requirements.hasParentType())
         flags = flags.withHasGenericParent(true);
+      if (auto *cd = dyn_cast<ClassDecl>(ntd)) {
+        auto &layout = IGM.getMetadataLayout(cd);
+        if (layout.getVTableSize() > 0)
+          flags = flags.withHasVTable(true);
+      }
       B.addInt32(flags.getIntValue());
 
       // TODO: provide reflective descriptions of the type and
@@ -2335,7 +2340,9 @@ namespace {
     
     // Offsets of key fields in the metadata records.
     Size FieldVectorOffset, GenericParamsOffset;
-    
+    Size VTableOffset;
+    unsigned VTableSize;
+
     ClassDecl *Target;
     
   public:
@@ -2346,6 +2353,8 @@ namespace {
       auto &layout = IGM.getMetadataLayout(Target);
       FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
       GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
+      VTableOffset = layout.getStaticVTableOffset();
+      VTableSize = layout.getVTableSize();
     }
     
     ClassDecl *getTarget() { return Target; }
@@ -2375,6 +2384,20 @@ namespace {
                                    Target->getStoredProperties());
       
       B.addRelativeAddress(fieldTypeVectorAccessor);
+    }
+
+    void addVTableDescriptor() {
+      assert(VTableSize != 0);
+      B.addInt32(VTableOffset / IGM.getPointerSize());
+      B.addInt32(VTableSize);
+
+      // TODO: Emit reflection metadata for virtual methods
+    }
+
+    void layout() {
+      super::layout();
+      if (VTableSize != 0)
+        addVTableDescriptor();
     }
   };
   
