@@ -214,12 +214,6 @@ function(_compile_swift_files
   compute_library_subdir(library_subdir
       "${SWIFTFILE_SDK}" "${SWIFTFILE_ARCHITECTURE}")
 
-  # Allow import of other Swift modules we just built.
-  list(APPEND swift_flags
-      "-I" "${SWIFTLIB_DIR}/${library_subdir}")
-  # FIXME: should we use '-resource-dir' here?  Seems like it has no advantage
-  # over '-I' in this case.
-
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
     list(APPEND swift_flags "-module-cache-path" "${SWIFT_MODULE_CACHE_PATH}")

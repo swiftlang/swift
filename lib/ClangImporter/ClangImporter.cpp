@@ -445,6 +445,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
+  SmallString<128> shimsPath;
+  shimsPath = searchPathOpts.RuntimeResourcePath;
+  llvm::sys::path::append(shimsPath, "shims");
   invocationArgStrs.insert(
       invocationArgStrs.end(),
       {
@@ -464,7 +467,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
           "-fretain-comments-from-system-headers",
 
-          SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+          SHIMS_INCLUDE_FLAG, shimsPath.str(),
       });
 
   // Set C language options.
