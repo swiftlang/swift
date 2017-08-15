@@ -19,7 +19,7 @@ import Foundation
 // <rdar://problem/29447066>
 // Compiler incorrectly handles combinations of availability declarations on
 // independent axes.
-internal protocol _INRideOptionMeteredFare {
+public protocol _INRideOptionMeteredFare {
   var __usesMeteredFare: NSNumber? { get set }
 }
 
