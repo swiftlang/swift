@@ -1620,6 +1620,15 @@ private:
         ConstraintSystemFlags::ReturnAllDiscoveredSolutions);
   }
 
+  /// \brief Select the best disjunction in current conditions to attempt
+  /// to solve next.
+  ///
+  /// \param disjunctions The list of currently available disjunctions.
+  ///
+  /// \returns the disjunction to solve next, or nullptr.
+  Constraint *
+  selectDisjunction(SmallVectorImpl<Constraint *> &disjunctions) const;
+
   /// \brief Finalize this constraint system; we're done attempting to solve
   /// it.
   ///
