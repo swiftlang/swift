@@ -3710,7 +3710,6 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   auto init = builder.beginStruct();
   init.setPacked(true);
 
-  // TODO: classes nested within generic types
   bool isPattern;
   bool canBeConstant;
   if (classDecl->isGenericContext()) {
