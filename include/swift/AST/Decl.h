@@ -5219,6 +5219,10 @@ public:
   void setMutating(bool mutating = true) {
     Mutating = mutating;
   }
+
+  TypeLoc getReturnTypeLoc() const {
+    return FnRetType;
+  }
   
   /// \brief Returns the parameter lists(s) for the function definition.
   ///
