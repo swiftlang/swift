@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 
 // REQUIRES: executable_test
-// UNSUPPORTED: CPU=armv7
 
 struct Structure {
   var a: UInt8

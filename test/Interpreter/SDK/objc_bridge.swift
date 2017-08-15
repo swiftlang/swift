@@ -13,7 +13,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// UNSUPPORTED: CPU=armv7
 
 import Foundation
 import Appliances
