@@ -109,35 +109,44 @@ static_assert(std::is_same<__swift_pthread_key_t, pthread_key_t>::value,
 #endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_pthread_key_create(
+int swift::_swift_stdlib_tls_key_create(
   __swift_pthread_key_t * _Nonnull key,
   void (* _Nullable destructor)(void *)
 ) {
   #if defined(_WIN32)
-    *key = TlsAlloc();
-    return 0;
+    // We're using the Fls- (Fiber) instead of Tls- (Thread) functions since
+    // on Windows, "If no fiber switching occurs, FLS acts exactly the same 
+    // as thread local storage," and FlsAlloc takes a destructor while
+    // TlsAlloc doesn't.
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/ms682661.aspx
+    __swift_pthread_key_t result = FlsAlloc(destructor);
+    if (result != FLS_OUT_OF_INDEXES) {
+      *key = result;
+      return 0;
+    }
+    return result;
   #else
     return pthread_key_create(key, destructor);
   #endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void * _Nullable swift::_swift_stdlib_pthread_getspecific(
+void * _Nullable swift::_swift_stdlib_tls_getspecific(
   __swift_pthread_key_t key
 ) {
   #if defined(_WIN32)
-    return TlsGetValue(key);
+    return FlsGetValue(key);
   #else
     return pthread_getspecific(key);
   #endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_pthread_setspecific(
+int swift::_swift_stdlib_tls_setspecific(
   __swift_pthread_key_t key, const void * _Nullable value
 ) {
   #if defined(_WIN32)
-    return TlsSetValue(key, const_cast<void*>(value));
+    return FlsSetValue(key, const_cast<void*>(value));
   #else
     return pthread_setspecific(key, value);
   #endif
