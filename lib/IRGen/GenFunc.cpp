@@ -1176,7 +1176,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   // Derive the callee function pointer.
   auto fnTy = origSig.getType()->getPointerTo();
-  FunctionPointer fnPtr = [&] {
+  FunctionPointer fnPtr = [&]() -> FunctionPointer {
     // If we found a function pointer statically, great.
     if (staticFnPtr) {
       assert(staticFnPtr->getPointer()->getType() == fnTy &&
