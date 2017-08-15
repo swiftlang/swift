@@ -185,5 +185,6 @@ NODE(OutlinedCopy)
 NODE(OutlinedConsume)
 NODE(OutlinedRetain)
 NODE(OutlinedRelease)
+NODE(OutlinedVariable)
 #undef CONTEXT_NODE
 #undef NODE

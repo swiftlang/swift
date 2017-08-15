@@ -174,6 +174,7 @@ Entities
   entity-spec ::= 'fd'                       // non-deallocating destructor; untyped
   entity-spec ::= 'fE'                       // ivar destroyer; untyped
   entity-spec ::= 'fe'                       // ivar initializer; untyped
+  entity-spec ::= 'Tv' NATURAL               // outlined global variable (from context function)
 
   entity-spec ::= decl-name function-signature generic-signature? 'F'    // function
   entity-spec ::= decl-name type 'i'                 // subscript ('i'ndex) itself (not the individual accessors)
