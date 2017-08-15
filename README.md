@@ -52,9 +52,13 @@ build will take multiple hours, but incremental builds will finish much faster.
 macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
 supported host development operating systems.
 
-To build for macOS, you always need the latest version of Xcode, currently
-[Xcode 9.0 beta 4](https://developer.apple.com/xcode/downloads/). You will
-also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
+<a name="xcode"></a>
+To build for macOS, you need [Xcode 9.0 beta 4](https://developer.apple.com/xcode/downloads/).
+The version of Xcode required to build swift changes frequently, and is often a
+pre-release version of Xcode. Check this document or [here](https://ci.swift.org)
+to see the version required.
+
+You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
 which can be installed via a package manager:
 
 **[Homebrew](https://brew.sh/)**
@@ -69,8 +73,7 @@ Instructions for installing CMake and Ninja directly can be found [here](#build-
 
 #### Linux
 
-<a name="linux-dependencies"></a>For Ubuntu, you'll need the following
-development dependencies:
+For Ubuntu, you'll need the following development dependencies:
 
     sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev autoconf libtool systemtap-sdt-dev tzdata
 
@@ -179,7 +182,8 @@ flow would involve:
 
 ### Build Failures
 
-Make sure you are using the latest release of Xcode to build, including Betas.
+Make sure you are using the [correct release](#xcode) of Xcode.
+
 If you have changed Xcode versions but still encounter errors that appear to
 be related to the Xcode version, try passing `-- --rebuild` to `build-script`.
 
@@ -227,7 +231,7 @@ command line tools to your `PATH`:
     export PATH=/Applications/CMake.app/Contents/bin:$PATH
 
 On Linux, if you have not already installed Swift's [development
-dependencies](#linux-dependencies), you can download and install the CMake
+dependencies](#linux), you can download and install the CMake
 package separately using the following command:
 
     sudo apt-get install cmake
