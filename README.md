@@ -42,8 +42,8 @@ well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-c
 ## Getting Started
 
 These instructions give the most direct path to a working Swift development
-environment. To build from source you will need 2gb of disk space for the
-source code and over 20gb of disk space for the build artifacts. The first
+environment. To build from source you will need 2 GB of disk space for the
+source code and over 20 GB of disk space for the build artifacts. The first
 build will take multiple hours, but incremental builds will finish much faster.
 
 
