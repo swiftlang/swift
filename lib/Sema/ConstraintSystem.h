@@ -1104,12 +1104,36 @@ private:
     }
   };
 
+  class ConstraintFailure {
+    Constraint *FailedConstraint;
+    SmallVector<TypeMismatch, 8> Errors;
+
+  public:
+    ConstraintFailure(Constraint *constraint, ArrayRef<TypeMismatch> errors)
+        : FailedConstraint(constraint) {
+      Errors.append(errors.begin(), errors.end());
+    }
+
+    // ConstraintFailure is a non-copyable type for performance reasons.
+    ConstraintFailure(const ConstraintFailure &other) = delete;
+    ConstraintFailure &operator=(const ConstraintFailure &other) = delete;
+
+    ConstraintFailure(ConstraintFailure &&other) = default;
+    ConstraintFailure &operator=(ConstraintFailure &&other) = default;
+
+    Constraint *getConstraint() const { return FailedConstraint; }
+
+    bool hasErrors() const { return !Errors.empty(); }
+
+    ArrayRef<TypeMismatch> getErrors() const { return Errors; }
+  };
+
   class SolverStep {
     const std::shared_ptr<SolverStep> Parent;
     const unsigned Depth;
 
     Optional<std::pair<Constraint *, unsigned>> Choice;
-    llvm::SmallDenseMap<Constraint *, SmallVector<TypeMismatch, 8>> Failures;
+    SmallVector<ConstraintFailure, 8> Failures;
 
     SmallVector<std::shared_ptr<SolverStep>, 8> NextSteps;
 
@@ -1130,9 +1154,15 @@ private:
       return NextSteps;
     }
 
+    Optional<unsigned> getChoice() const {
+      return Choice ? Optional<unsigned>(Choice->second) : None;
+    }
+
     unsigned getDepth() const { return Depth; }
 
     bool hasFailures() const { return !Failures.empty(); }
+
+    ArrayRef<ConstraintFailure> getFailures() const { return Failures; }
 
     bool isViable() const {
       // If there is something already linked
@@ -1145,23 +1175,22 @@ private:
       // If there is only one failure, let's
       // if if it brings any interesting information.
       if (Failures.size() == 1) {
-        auto &failure = *Failures.begin();
-        auto *constraint = failure.getFirst();
+        auto &failure = Failures.front();
+        auto *constraint = failure.getConstraint();
 
         // If the only thing which failed is function
         // application itself without any further clarification,
         // let's drop this step.
         if (constraint->getKind() == ConstraintKind::ApplicableFunction &&
-            failure.second.empty())
+            !failure.hasErrors())
           return false;
       }
 
       return hasFailures();
     }
 
-    void recordFailure(Constraint *constraint,
-                       ArrayRef<TypeMismatch> failures) {
-      Failures[constraint].append(failures.begin(), failures.end());
+    void recordFailure(Constraint *constraint, ArrayRef<TypeMismatch> errors) {
+      Failures.push_back({constraint, errors});
     }
 
     void print(ConstraintSystem &cs, llvm::raw_ostream &log) const {
@@ -1178,8 +1207,8 @@ private:
       if (!Failures.empty()) {
         log.indent(Depth * 2) << "--- Failures ---\n";
         for (auto &e : Failures) {
-          auto *constraint = e.getFirst();
-          auto &failures = e.getSecond();
+          auto *constraint = e.getConstraint();
+          auto errors = e.getErrors();
 
           log.indent(Depth * 2) << "-----> Failure <-----\n";
 
@@ -1189,9 +1218,9 @@ private:
 
           log << '\n';
           log.indent(Depth * 2) << "-> Type Failures:\n";
-          for (auto &failure : failures)
-            failure.print(log.indent(Depth * 2), &cs.getASTContext().SourceMgr,
-                          Depth);
+          for (auto &e : errors)
+            e.print(log.indent(Depth * 2), &cs.getASTContext().SourceMgr,
+                    Depth);
           log << '\n';
         }
         log.indent(Depth * 2) << "<----- /// ----->\n";
