@@ -92,6 +92,13 @@ FUNCTION(InitStackObject, swift_initStackObject, DefaultCC,
          ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// HeapObject *swift_initStaticObject(HeapMetadata const *metadata,
+//                                    HeapObject *object);
+FUNCTION(InitStaticObject, swift_initStaticObject, DefaultCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_verifyEndOfLifetime(HeapObject *object);
 FUNCTION(VerifyEndOfLifetime, swift_verifyEndOfLifetime, DefaultCC,
          RETURNS(VoidTy),

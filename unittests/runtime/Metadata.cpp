@@ -15,6 +15,7 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Once.h"
 #include "gtest/gtest.h"
 #include <iterator>
 #include <functional>
@@ -194,6 +195,36 @@ GenericMetadataTest<StructMetadata> MetadataTest1 = {
     nullptr
   }
 };
+
+struct TestObjContainer {
+  swift_once_t token;
+  HeapObject obj;
+};
+
+TestObjContainer StaticTestObj;
+HeapMetadata StaticTestMD;
+
+TEST(StaticObjects, ini) {
+  RaceTest_ExpectEqual<const Metadata *>(
+     [&]() -> const Metadata * {
+       // Check if the object header is initialized once.
+       HeapObject *o = swift_initStaticObject(&StaticTestMD, &StaticTestObj.obj);
+       EXPECT_EQ(o, &StaticTestObj.obj);
+       EXPECT_EQ(StaticTestObj.obj.metadata, &StaticTestMD);
+#ifdef __APPLE__
+       EXPECT_NE(StaticTestObj.token, 0);
+#endif
+       const int NumRcOps = 1000;
+       for (int i = 0; i < NumRcOps; i++) {
+         swift_retain(&StaticTestObj.obj);
+       }
+       for (int i = 0; i < NumRcOps; i++) {
+         swift_release(&StaticTestObj.obj);
+       }
+       return StaticTestObj.obj.metadata;
+     });
+  EXPECT_EQ(swift_retainCount(&StaticTestObj.obj), 1u);
+}
 
 TEST(Concurrent, ConcurrentList) {
   const int numElem = 100;
