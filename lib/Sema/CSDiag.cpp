@@ -9542,10 +9542,12 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // eliminated.
   viable.clear();
 
+  DiagnosticListener diagnostics(*this);
   {
     // Set up solver state.
     SolverState state(*this);
     state.recordFixes = true;
+    state.Diagnostics = &diagnostics;
 
     // Solve the system.
     solveRec(viable, FreeTypeVariableBinding::Disallow);
@@ -9596,8 +9598,15 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     return true;
   }
 
+  if (diagnoseFailure(diagnostics))
+    return true;
+
   // If all else fails, diagnose the failure by looking through the system's
   // constraints.
   diagnoseFailureForExpr(expr);
   return true;
+}
+
+bool ConstraintSystem::diagnoseFailure(DiagnosticListener &capturedInfo) {
+  return false;
 }

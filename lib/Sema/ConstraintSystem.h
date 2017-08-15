@@ -1225,6 +1225,36 @@ private:
     }
   };
 
+  class DiagnosticListener {
+    ConstraintSystem &CS;
+    SolverPath Tracker;
+
+    /// Tracks all type match failures encountered per step in the solver path.
+    SmallVector<TypeMismatch, 8> Failures;
+
+  public:
+    DiagnosticListener(ConstraintSystem &cs) : CS(cs) {}
+
+    void incrementDepth(Constraint *disjunction, unsigned choice) {
+      Tracker.incrementDepth(disjunction, choice);
+    }
+
+    void decrementDepth() { Tracker.decrementDepth(); }
+
+    void recordFailure(Constraint *constraint) {
+      Tracker.recordFailure(constraint, Failures);
+      Failures.clear();
+    }
+
+    void recordFailure(Type lhs, Type rhs, ConstraintLocator *locator) {
+      Failures.push_back({lhs, rhs, locator});
+    }
+
+    void print() const {
+      Tracker.print(CS, CS.getASTContext().TypeCheckerDebug->getStream());
+    }
+  };
+
   /// \brief Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs);
@@ -1257,33 +1287,36 @@ private:
     /// Refers to the innermost partial solution scope.
     SolverScope *PartialSolutionScope = nullptr;
 
-    /// Tracks each path taken by the constraint solver.
-    SolverPath Path;
-
-    /// Tracks all type match failures encountered per step in the solver path.
-    SmallVector<TypeMismatch, 8> Failures;
+    /// \brief Tracks diagnostic information e.g. each solver
+    /// path taken, constraint failures, type mismatches etc.
+    DiagnosticListener *Diagnostics = nullptr;
 
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
 
     void incrementDepth(Constraint *disjunction, unsigned choice) {
-      Path.incrementDepth(disjunction, choice);
       ++depth;
+
+      if (Diagnostics)
+        Diagnostics->incrementDepth(disjunction, choice);
     }
 
     void decrementDepth() {
-      Path.decrementDepth();
       --depth;
+
+      if (Diagnostics)
+        Diagnostics->decrementDepth();
     }
 
     void recordFailure(Constraint *constraint) {
-      Path.recordFailure(constraint, Failures);
-      Failures.clear();
+      if (Diagnostics)
+        Diagnostics->recordFailure(constraint);
     }
 
-    void recordFailure(Type lhs, Type rhs, ConstraintLocator *locator) {
-      Failures.push_back({lhs, rhs, locator});
+    void recordFailure(Type lhs, Type rhs, ConstraintLocatorBuilder &locator) {
+      if (Diagnostics)
+        Diagnostics->recordFailure(lhs, rhs, CS.getConstraintLocator(locator));
     }
 
     /// \brief Register given scope to be tracked by the current solver state,
@@ -1863,7 +1896,14 @@ public:
   /// invalid, emit a detailed error about the condition.
   void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
 
-  
+  /// \brief Generate a diagnosis of why the system could not be solved.
+  ///
+  /// \param capturedInfo The information captured from the solver
+  /// which identifies each solver path taken, constraint failures etc.
+  ///
+  /// \returns true if diagnostic was provided, false otherwise.
+  bool diagnoseFailure(DiagnosticListener &capturedInfo);
+
   /// \brief Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
   /// solved.

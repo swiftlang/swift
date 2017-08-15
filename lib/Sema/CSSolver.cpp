@@ -428,9 +428,6 @@ ConstraintSystem::SolverState::~SolverState() {
          "Expected constraint system to have this solver state!");
   CS.solverState = nullptr;
 
-  if (CS.TC.getLangOpts().DebugConstraintSolver)
-    Path.print(CS, CS.getASTContext().TypeCheckerDebug->getStream());
-
   // Restore debugging state.
   LangOptions &langOpts = CS.getTypeChecker().Context.LangOpts;
   langOpts.DebugConstraintSolver = OldDebugConstraintSolver;
