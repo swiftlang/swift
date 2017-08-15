@@ -162,6 +162,9 @@ private:
   /// Field offsets for various fields.
   llvm::DenseMap<VarDecl*, StoredOffset> FieldOffsets;
 
+  /// The start of the vtable.
+  StoredOffset VTableOffset;
+
   /// The start of the field-offset vector.
   StoredOffset FieldOffsetVector;
 
@@ -181,6 +184,17 @@ private:
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *theClass);
 
 public:
+  /// Should only be used when emitting the nominal type descriptor.
+  Size getStaticVTableOffset() const;
+
+  /// Returns the start of the vtable in the class metadata.
+  Offset getVTableOffset(IRGenFunction &IGF) const;
+
+  /// Returns the size of the vtable, in words.
+  unsigned getVTableSize() const {
+    return MethodInfos.size();
+  }
+
   MethodInfo getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const;
 
   /// Assuming that the given method is at a static offset in the metadata,
