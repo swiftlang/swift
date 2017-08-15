@@ -35,13 +35,13 @@ SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class,
   M.VTableMap[Class] = vt;
   // Update the Module's cache with new vtable + vtable entries:
   for (const Entry &entry : Entries) {
-    M.VTableEntryCache.insert({{vt, entry.Method}, entry.Implementation});
+    M.VTableEntryCache.insert({{vt, entry.Method}, entry});
   }
   return vt;
 }
 
-SILFunction *
-SILVTable::getImplementation(SILModule &M, SILDeclRef method) const {
+Optional<SILVTable::Entry>
+SILVTable::getEntry(SILModule &M, SILDeclRef method) const {
   SILDeclRef m = method;
   do {
     auto entryIter = M.VTableEntryCache.find({this, m});
@@ -49,7 +49,7 @@ SILVTable::getImplementation(SILModule &M, SILDeclRef method) const {
       return (*entryIter).second;
     }
   } while ((m = m.getOverridden()));
-  return nullptr;
+  return None;
 }
 
 void SILVTable::removeFromVTableCache(Entry &entry) {

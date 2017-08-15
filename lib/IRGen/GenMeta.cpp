@@ -3195,9 +3195,8 @@ namespace {
     void addMethod(SILDeclRef fn) {
       // Find the vtable entry.
       assert(VTable && "no vtable?!");
-      if (SILFunction *func =
-            VTable->getImplementation(IGM.getSILModule(), fn)) {
-        B.add(IGM.getAddrOfSILFunction(func, NotForDefinition));
+      if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
+        B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.

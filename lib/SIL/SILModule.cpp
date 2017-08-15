@@ -711,8 +711,8 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 
     // Ok, we have a VTable. Try to lookup the SILFunction implementation from
     // the VTable.
-    if (SILFunction *F = Vtbl->getImplementation(*this, Member))
-      return F;
+    if (auto E = Vtbl->getEntry(*this, Member))
+      return E->Implementation;
 
     // If we fail to lookup the SILFunction, again skip Class and attempt to
     // resolve the method in the VTable of the super class of Class if such a
