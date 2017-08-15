@@ -2968,9 +2968,9 @@ ${assignmentOperatorComment(x.operator, True)}
       )._lowWord._value)
   }
 
-% if bits <= word_bits:
-  public typealias Words = CollectionOfOne<UInt>
-% else:  
+  // Keep Words defined the same on 32- and 64-bit platforms.
+% WordsType = 'UInt' if self_type.is_word or bits <= 32 else 'UInt64'
+% if WordsType == Self:
   public struct Words : RandomAccessCollection {
     public typealias Indices = CountableRange<Int>
     public typealias SubSequence = RandomAccessSlice<${Self}.Words>
@@ -2999,6 +2999,8 @@ ${assignmentOperatorComment(x.operator, True)}
       }
     }
   }
+% else:
+  public typealias Words = ${WordsType}.Words
 % end
 
   /// A collection containing the words of this value's binary
@@ -3010,10 +3012,10 @@ ${assignmentOperatorComment(x.operator, True)}
 % end
   @_transparent
   public var words: Words {
-    % if bits <= word_bits:
+    % if WordsType == 'UInt':
     return Words(self._lowWord)
-    % else:
-    return Words(self)
+    % else: # UInt64, Int64
+    return Words(UInt64(_value))
     % end
   }
 
