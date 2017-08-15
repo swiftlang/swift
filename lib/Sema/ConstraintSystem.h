@@ -1105,17 +1105,22 @@ private:
   };
 
   class SolverStep {
-    std::shared_ptr<SolverStep> Parent;
-    SmallVector<std::shared_ptr<SolverStep>, 8> NextSteps;
+    const std::shared_ptr<SolverStep> Parent;
+    const unsigned Depth;
 
     Optional<std::pair<Constraint *, unsigned>> Choice;
     llvm::SmallDenseMap<Constraint *, SmallVector<TypeMismatch, 8>> Failures;
 
+    SmallVector<std::shared_ptr<SolverStep>, 8> NextSteps;
+
   public:
-    SolverStep(std::shared_ptr<SolverStep> parent) : Parent(parent) {}
+    SolverStep(std::shared_ptr<SolverStep> parent, unsigned depth)
+        : Parent(parent), Depth(depth) {}
+
     SolverStep(std::shared_ptr<SolverStep> parent, Constraint *disjunction,
                unsigned choice)
-        : Parent(parent), Choice(std::make_pair(disjunction, choice)) {}
+        : Parent(parent), Depth(parent->getDepth() + 1),
+          Choice(std::make_pair(disjunction, choice)) {}
 
     std::shared_ptr<SolverStep> getParent() { return Parent; }
 
@@ -1124,6 +1129,8 @@ private:
     ArrayRef<std::shared_ptr<SolverStep>> getNextSteps() const {
       return NextSteps;
     }
+
+    unsigned getDepth() const { return Depth; }
 
     bool hasFailures() const { return !Failures.empty(); }
 
@@ -1157,42 +1164,41 @@ private:
       Failures[constraint].append(failures.begin(), failures.end());
     }
 
-    void print(ConstraintSystem &cs, llvm::raw_ostream &log,
-               unsigned depth) const {
-      log.indent(depth * 2) << ">>> Step\n";
+    void print(ConstraintSystem &cs, llvm::raw_ostream &log) const {
+      log.indent(Depth * 2) << ">>> Step (Depth: " << Depth << ")\n";
 
       if (Choice) {
         auto *disjunction = Choice->first;
         auto *choice = disjunction->getNestedConstraints()[Choice->second];
 
-        choice->print(log.indent(depth * 2), &cs.getASTContext().SourceMgr);
-        log.indent(depth * 2) << '\n';
+        choice->print(log.indent(Depth * 2), &cs.getASTContext().SourceMgr);
+        log.indent(Depth * 2) << '\n';
       }
 
       if (!Failures.empty()) {
-        log.indent(depth * 2) << "--- Failures ---\n";
+        log.indent(Depth * 2) << "--- Failures ---\n";
         for (auto &e : Failures) {
           auto *constraint = e.getFirst();
           auto &failures = e.getSecond();
 
-          log.indent(depth * 2) << "-----> Failure <-----\n";
+          log.indent(Depth * 2) << "-----> Failure <-----\n";
 
-          log.indent(depth * 2) << "-> Constraint:\n";
-          constraint->print(log.indent(depth * 2),
+          log.indent(Depth * 2) << "-> Constraint:\n";
+          constraint->print(log.indent(Depth * 2),
                             &cs.getASTContext().SourceMgr);
 
           log << '\n';
-          log.indent(depth * 2) << "-> Type Failures:\n";
+          log.indent(Depth * 2) << "-> Type Failures:\n";
           for (auto &failure : failures)
-            failure.print(log.indent(depth * 2), &cs.getASTContext().SourceMgr,
-                          depth);
+            failure.print(log.indent(Depth * 2), &cs.getASTContext().SourceMgr,
+                          Depth);
           log << '\n';
         }
-        log.indent(depth * 2) << "<----- /// ----->\n";
+        log.indent(Depth * 2) << "<----- /// ----->\n";
       }
 
       for (auto &nested : NextSteps)
-        nested->print(cs, log, depth + 1);
+        nested->print(cs, log);
     }
   };
 
@@ -1207,32 +1213,43 @@ private:
     /// Tracks all type match failures encountered per step in the solver path.
     SmallVector<TypeMismatch, 8> LocalFailures;
 
-    unsigned Depth = 0;
     unsigned LongestPath = 0;
 
   public:
     DiagnosticListener(ConstraintSystem &cs)
-        : CS(cs), Root(std::make_shared<SolverStep>(nullptr)),
+        : CS(cs), Root(std::make_shared<SolverStep>(nullptr, 0)),
           CurrentStep(Root) {}
 
     void print() const {
       auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
       log << ">>> Longest Path: " << LongestPath << '\n';
-      Root->print(CS, log, 0);
+      Root->print(CS, log);
     }
 
     unsigned getLongestPath() const { return LongestPath; }
 
-    void incrementDepth(Constraint *disjunction, unsigned idx) {
-      ++Depth;
+    void forEach(std::function<bool(Step)> processor) const {
+      SmallVector<Step, 16> steps;
+      steps.push_back(Root);
 
+      do {
+        auto current = steps.back();
+        steps.pop_back();
+
+        if (processor(current))
+          break;
+
+        for (auto nextStep : current->getNextSteps())
+          steps.push_back(nextStep);
+      } while (!steps.empty());
+    }
+
+    void incrementDepth(Constraint *disjunction, unsigned idx) {
       CurrentStep = std::make_shared<SolverStep>(CurrentStep, disjunction, idx);
-      LongestPath = std::max(LongestPath, Depth);
+      LongestPath = std::max(LongestPath, CurrentStep->getDepth());
     }
 
     void decrementDepth() {
-      --Depth;
-
       auto parent = CurrentStep->getParent();
       if (CurrentStep->isViable())
         parent->add(CurrentStep);
