@@ -407,6 +407,8 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
                                              PotentialArchetype *currentPA,
                                              ProtocolDecl *proto,
                                              bool &derivedViaConcrete) const {
+  derivedViaConcrete = false;
+
   // If it's not a derived requirement, it's not self-derived.
   if (!isDerivedRequirement()) return this;
 
@@ -428,7 +430,6 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     return nullptr;
   };
 
-  derivedViaConcrete = false;
   bool sawProtocolRequirement = false;
 
   PotentialArchetype *rootPA = nullptr;
