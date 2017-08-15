@@ -1106,10 +1106,9 @@ private:
 
   class SolverStep {
     std::shared_ptr<SolverStep> Parent;
-    SmallVector<std::shared_ptr<SolverStep>, 8> Next;
+    SmallVector<std::shared_ptr<SolverStep>, 8> NextSteps;
 
     Optional<std::pair<Constraint *, unsigned>> Choice;
-
     llvm::SmallDenseMap<Constraint *, SmallVector<TypeMismatch, 8>> Failures;
 
   public:
@@ -1120,7 +1119,36 @@ private:
 
     std::shared_ptr<SolverStep> getParent() { return Parent; }
 
-    void addStep(std::shared_ptr<SolverStep> step) { Next.push_back(step); }
+    void add(std::shared_ptr<SolverStep> step) { NextSteps.push_back(step); }
+
+    ArrayRef<std::shared_ptr<SolverStep>> getNextSteps() const {
+      return NextSteps;
+    }
+
+    bool isViable() const {
+      // If there is something already linked
+      // to this step, we can't drop it, but
+      // that also means that it doesn't have
+      // any failures.
+      if (!NextSteps.empty())
+        return true;
+
+      // If there is only one failure, let's
+      // if if it brings any interesting information.
+      if (Failures.size() == 1) {
+        auto &failure = *Failures.begin();
+        auto *constraint = failure.getFirst();
+
+        // If the only thing which failed is function
+        // application itself without any further clarification,
+        // let's drop this step.
+        if (constraint->getKind() == ConstraintKind::ApplicableFunction &&
+            failure.second.empty())
+          return false;
+      }
+
+      return true;
+    }
 
     void recordFailure(Constraint *constraint,
                        ArrayRef<TypeMismatch> failures) {
@@ -1160,7 +1188,7 @@ private:
         log.indent(depth * 2) << "<----- /// ----->\n";
       }
 
-      for (auto &nested : Next)
+      for (auto &nested : NextSteps)
         nested->print(cs, log, depth + 1);
     }
   };
@@ -1174,13 +1202,18 @@ private:
         : Root(std::make_shared<SolverStep>(nullptr)), CurrentStep(Root) {}
 
     void incrementDepth(Constraint *disjunction, unsigned choice) {
-      auto step =
+      CurrentStep =
           std::make_shared<SolverStep>(CurrentStep, disjunction, choice);
-      CurrentStep->addStep(step);
-      CurrentStep = step;
     }
 
-    void decrementDepth() { CurrentStep = CurrentStep->getParent(); }
+    void decrementDepth() {
+      auto parent = CurrentStep->getParent();
+
+      if (CurrentStep->isViable())
+        parent->add(CurrentStep);
+
+      CurrentStep = parent;
+    }
 
     void recordFailure(Constraint *constraint,
                        ArrayRef<TypeMismatch> failures) {
