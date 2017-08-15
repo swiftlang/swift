@@ -236,6 +236,16 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     Scanner(IRGenModule &IGM, ClassDecl *decl, ClassMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
+    void addInstanceSize() {
+      Layout.InstanceSize = getNextOffset();
+      super::addInstanceSize();
+    }
+
+    void addInstanceAlignMask() {
+      Layout.InstanceAlignMask = getNextOffset();
+      super::addInstanceAlignMask();
+    }
+
     void addParentMetadataRef(ClassDecl *forClass, Type classType) {
       if (forClass == Target)
         Layout.Parent = getNextOffset();
@@ -266,6 +276,12 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::addFieldOffset(field);
     }
 
+    void addVTableEntries(ClassDecl *forClass) {
+      if (forClass == Target)
+        Layout.VTableOffset = getNextOffset();
+      super::addVTableEntries(forClass);
+    }
+
     void layout() {
       super::layout();
       Layout.TheSize = getMetadataSize();
@@ -273,6 +289,16 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
   };
 
   Scanner(IGM, decl, *this).layout();
+}
+
+Size ClassMetadataLayout::getInstanceSizeOffset() const {
+  assert(InstanceSize.isStatic());
+  return InstanceSize.getStaticOffset();
+}
+
+Size ClassMetadataLayout::getInstanceAlignMaskOffset() const {
+  assert(InstanceAlignMask.isStatic());
+  return InstanceAlignMask.getStaticOffset();
 }
 
 ClassMetadataLayout::MethodInfo
@@ -292,6 +318,21 @@ Size ClassMetadataLayout::getStaticMethodOffset(SILDeclRef method) const{
   assert(stored.TheOffset.isStatic() &&
          "resilient class metadata layout unsupported!");
   return stored.TheOffset.getStaticOffset();
+}
+
+Size
+ClassMetadataLayout::getStaticVTableOffset() const {
+  // TODO: if class is resilient, return the offset relative to the start
+  // of immediate class metadata
+  assert(VTableOffset.isStatic());
+  return VTableOffset.getStaticOffset();
+}
+
+Offset
+ClassMetadataLayout::getVTableOffset(IRGenFunction &IGF) const {
+  // TODO: implement resilient metadata layout
+  assert(VTableOffset.isStatic());
+  return Offset(VTableOffset.getStaticOffset());
 }
 
 Offset ClassMetadataLayout::getFieldOffset(IRGenFunction &IGF,
