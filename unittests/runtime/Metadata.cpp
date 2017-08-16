@@ -1199,8 +1199,8 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_indirect) {
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
   EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_indirect) {
@@ -1235,8 +1235,8 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_indirect) {
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
   EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod_indirect) {
@@ -1269,7 +1269,7 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod_indirect) {
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
   EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithTake_pod_indirect) {
@@ -1302,7 +1302,7 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_pod_indirect) {
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
   EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_pod) {
@@ -1339,7 +1339,7 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_pod) {
   EXPECT_EQ(existBox.buffer.PrivateData[0], someAddr);
   EXPECT_EQ(existBox.buffer.PrivateData[1], nullptr);
   EXPECT_EQ(existBox.buffer.PrivateData[2], someAddr);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_pod) {
@@ -1376,7 +1376,7 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_pod) {
   EXPECT_EQ(existBox.buffer.PrivateData[0], someAddr);
   EXPECT_EQ(existBox.buffer.PrivateData[1], nullptr);
   EXPECT_EQ(existBox.buffer.PrivateData[2], someAddr);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_initWithCopy_pod) {
@@ -1477,7 +1477,7 @@ TEST(TestOpaqueExistentialBox, test_initWithCopy_indirect) {
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
   EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2u);
 }
 
 TEST(TestOpaqueExistentialBox, test_initWithTake_indirect) {
@@ -1510,5 +1510,5 @@ TEST(TestOpaqueExistentialBox, test_initWithTake_indirect) {
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
   EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
 }
