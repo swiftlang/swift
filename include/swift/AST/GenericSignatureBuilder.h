@@ -1142,19 +1142,21 @@ public:
   /// if they are equivalent in length.
   int compare(const RequirementSource *other) const;
 
+  /// Retrieve the written requirement location, if there is one.
+  WrittenRequirementLoc getWrittenRequirementLoc() const {
+    if (!hasTrailingWrittenRequirementLoc) return WrittenRequirementLoc();
+    return getTrailingObjects<WrittenRequirementLoc>()[0];
+  }
+
   /// Retrieve the type representation for this requirement, if there is one.
   const TypeRepr *getTypeRepr() const {
-    if (!hasTrailingWrittenRequirementLoc) return nullptr;
-    return getTrailingObjects<WrittenRequirementLoc>()[0]
-             .dyn_cast<const TypeRepr *>();
+    return getWrittenRequirementLoc().dyn_cast<const TypeRepr *>();
   }
 
   /// Retrieve the requirement representation for this requirement, if there is
   /// one.
   const RequirementRepr *getRequirementRepr() const {
-    if (!hasTrailingWrittenRequirementLoc) return nullptr;
-    return getTrailingObjects<WrittenRequirementLoc>()[0]
-             .dyn_cast<const RequirementRepr *>();
+    return getWrittenRequirementLoc().dyn_cast<const RequirementRepr *>();
   }
 
   /// Retrieve the type stored in this requirement.
