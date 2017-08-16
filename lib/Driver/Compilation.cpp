@@ -709,7 +709,6 @@ Job *Compilation::addJob(std::unique_ptr<Job> J) {
   return result;
 }
 
-
 static void checkForOutOfDateInputs(DiagnosticEngine &diags,
                                     const InputInfoMap &inputs) {
   for (const auto &inputPair : inputs) {
