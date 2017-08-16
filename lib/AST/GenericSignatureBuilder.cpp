@@ -687,12 +687,14 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
   case ProtocolRequirement:
     return parent->withoutRedundantSubpath(start, end)
       ->viaProtocolRequirement(builder, getStoredType(),
-                               getProtocolDecl(), /*inferred=*/false);
+                               getProtocolDecl(), /*inferred=*/false,
+                               getWrittenRequirementLoc());
 
   case InferredProtocolRequirement:
     return parent->withoutRedundantSubpath(start, end)
       ->viaProtocolRequirement(builder, getStoredType(),
-                               getProtocolDecl(), /*inferred=*/true);
+                               getProtocolDecl(), /*inferred=*/true,
+                               getWrittenRequirementLoc());
 
   case Concrete:
     return parent->withoutRedundantSubpath(start, end)
