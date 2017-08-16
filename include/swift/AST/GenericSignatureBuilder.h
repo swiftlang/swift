@@ -1299,9 +1299,8 @@ public:
   }
 
   static FloatingRequirementSource forNestedTypeNameMatch(
-                                     const RequirementSource *base,
                                      Identifier nestedName) {
-    FloatingRequirementSource result{ NestedTypeNameMatch, base };
+    FloatingRequirementSource result{ NestedTypeNameMatch, Storage() };
     result.nestedName = nestedName;
     return result;
   };

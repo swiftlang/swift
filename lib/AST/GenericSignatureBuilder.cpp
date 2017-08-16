@@ -3221,7 +3221,6 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
     auto firstPA = allNested.front();
     auto sameNamedSource =
       FloatingRequirementSource::forNestedTypeNameMatch(
-                                                nullptr,
                                                 nestedPA->getNestedName());
 
     addSameTypeRequirement(firstPA, nestedPA, sameNamedSource,
@@ -3245,7 +3244,6 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
 
   auto sameNamedSource =
     FloatingRequirementSource::forNestedTypeNameMatch(
-                                                nullptr,
                                                 nestedPA->getNestedName());
   addSameTypeRequirement(existingPA, nestedPA, sameNamedSource,
                          UnresolvedHandlingKind::GenerateConstraints);
@@ -3386,7 +3384,6 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
             addSameTypeRequirement(
                nestedT1, T2Nested.second.front(),
                FloatingRequirementSource::forNestedTypeNameMatch(
-                                                      Source,
                                                       assocTypeT2->getName()),
                UnresolvedHandlingKind::GenerateConstraints)))
         return ConstraintResult::Conflicting;
