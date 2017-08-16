@@ -2155,6 +2155,11 @@ namespace {
         flags = flags.withHasParent(true);
       if (requirements.hasParentType())
         flags = flags.withHasGenericParent(true);
+      if (auto *cd = dyn_cast<ClassDecl>(ntd)) {
+        auto &layout = IGM.getMetadataLayout(cd);
+        if (layout.getVTableSize() > 0)
+          flags = flags.withHasVTable(true);
+      }
       B.addInt32(flags.getIntValue());
 
       // TODO: provide reflective descriptions of the type and
@@ -2335,7 +2340,9 @@ namespace {
     
     // Offsets of key fields in the metadata records.
     Size FieldVectorOffset, GenericParamsOffset;
-    
+    Size VTableOffset;
+    unsigned VTableSize;
+
     ClassDecl *Target;
     
   public:
@@ -2346,6 +2353,8 @@ namespace {
       auto &layout = IGM.getMetadataLayout(Target);
       FieldVectorOffset = layout.getStaticFieldOffsetVectorOffset();
       GenericParamsOffset = layout.getStaticGenericRequirementsOffset();
+      VTableOffset = layout.getStaticVTableOffset();
+      VTableSize = layout.getVTableSize();
     }
     
     ClassDecl *getTarget() { return Target; }
@@ -2375,6 +2384,20 @@ namespace {
                                    Target->getStoredProperties());
       
       B.addRelativeAddress(fieldTypeVectorAccessor);
+    }
+
+    void addVTableDescriptor() {
+      assert(VTableSize != 0);
+      B.addInt32(VTableOffset / IGM.getPointerSize());
+      B.addInt32(VTableSize);
+
+      // TODO: Emit reflection metadata for virtual methods
+    }
+
+    void layout() {
+      super::layout();
+      if (VTableSize != 0)
+        addVTableDescriptor();
     }
   };
   
@@ -2826,6 +2849,11 @@ namespace {
       return B.getNextOffsetFromGlobal() - TemplateHeaderSize;
     }
 
+    /// Ignore the destructor and value witness table.
+    Size getNextOffsetFromAddressPoint() const {
+      return getNextOffsetFromTemplateHeader() - AddressPoint;
+    }
+
     template <class... T>
     void addGenericArgument(CanType type, T &&...args) {
       NumGenericWitnesses++;
@@ -2938,11 +2966,19 @@ namespace {
   protected:
     using super::IGM;
     using super::Target;
+    using super::asImpl;
 
     ConstantStructBuilder &B;
     const StructLayout &Layout;
     const ClassLayout &FieldLayout;
     SILVTable *VTable;
+
+    struct MethodOverride {
+      Size Offset;
+      SILFunction *Method;
+    };
+
+    SmallVector<MethodOverride, 4> Overrides;
 
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              ConstantStructBuilder &builder,
@@ -3196,6 +3232,26 @@ namespace {
       // Find the vtable entry.
       assert(VTable && "no vtable?!");
       if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
+        if (doesClassMetadataRequireDynamicInitialization(IGM, Target)) {
+          switch (entry->TheKind) {
+          case SILVTable::Entry::Kind::Normal:
+            // VTable entries belonging to the immediate class are
+            // emitted statically.
+            break;
+          case SILVTable::Entry::Kind::Inherited:
+            // Do nothing -- the runtime will copy the vtable slot from
+            // superclass metadata.
+            B.addNullPointer(IGM.FunctionPtrTy);
+            return;
+          case SILVTable::Entry::Kind::Override:
+            // Record the override so that we can fill it in later.
+            Overrides.push_back({asImpl().getNextOffsetFromAddressPoint(),
+                                 entry->Implementation});
+            B.addNullPointer(IGM.FunctionPtrTy);
+            return;
+          }
+        }
+
         B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
       } else {
         // The method is removed by dead method elimination.
@@ -3274,7 +3330,10 @@ namespace {
       // Otherwise, all we need to do is register with the ObjC runtime.
       } else {
         metadata = emitFinishIdempotentInitialization(IGF, metadata);
+        assert(Overrides.empty());
       }
+
+      emitInitializeMethodOverrides(IGF, metadata);
 
       // Realizing the class with the ObjC runtime will copy back to the
       // field offset globals for us; but if ObjC interop is disabled, we
@@ -3284,6 +3343,29 @@ namespace {
         emitInitializeFieldOffsets(IGF, metadata);
 
       return metadata;
+    }
+
+    // Update vtable entries for method overrides. The runtime copies in
+    // the vtable from the superclass for us; we have to install method
+    // overrides ourselves.
+    void emitInitializeMethodOverrides(IRGenFunction &IGF,
+                                       llvm::Value *metadata) {
+      if (Overrides.empty())
+        return;
+
+      Address metadataWords(
+          IGF.Builder.CreateBitCast(metadata, IGM.Int8PtrPtrTy),
+          IGM.getPointerAlignment());
+
+      for (auto Override : Overrides) {
+        auto *implFn = IGM.getAddrOfSILFunction(Override.Method,
+                                                NotForDefinition);
+
+        auto dest = createPointerSizedGEP(IGF, metadataWords,
+                                          Override.Offset);
+        auto *value = IGF.Builder.CreateBitCast(implFn, IGM.Int8PtrTy);
+        IGF.Builder.CreateStore(value, dest);
+      }
     }
 
     // The Objective-C runtime will copy field offsets from the field offset
@@ -3317,14 +3399,28 @@ namespace {
   class ClassMetadataBuilder :
     public ClassMetadataBuilderBase<ClassMetadataBuilder> {
 
+    using super = ClassMetadataBuilderBase<ClassMetadataBuilder>;
+
     bool HasUnfilledSuperclass = false;
     bool HasUnfilledParent = false;
+
+    Size AddressPoint;
+
   public:
     ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                          ConstantStructBuilder &builder,
                          const StructLayout &layout,
                          const ClassLayout &fieldLayout)
       : ClassMetadataBuilderBase(IGM, theClass, builder, layout, fieldLayout) {
+    }
+
+    void noteAddressPoint() {
+      super::noteAddressPoint();
+      AddressPoint = B.getNextOffsetFromGlobal();
+    }
+
+    Size getNextOffsetFromAddressPoint() const {
+      return B.getNextOffsetFromGlobal() - AddressPoint;
     }
 
     void addSuperClass() {

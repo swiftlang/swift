@@ -1,8 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
-
-import Swift
 
 // CHECK: [[A:%T13generic_types1AC]] = type <{ [[REF:%swift.refcounted]], [[INT:%TSi]] }>
 // CHECK: [[INT]] = type <{ i64 }>
@@ -69,7 +67,6 @@ import Swift
 // CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
 // CHECK-SAME:   i64 1,
-// CHECK-SAME:   void (%swift.opaque*, [[A]]*)* @_T013generic_types1AC3run{{[_0-9a-zA-Z]*}}F
 // CHECK-SAME: }
 // CHECK-LABEL: @_T013generic_types1DCMP = internal global
 // CHECK-SAME:   void ([[D]]*)* @_T013generic_types1DCfD,
@@ -80,7 +77,6 @@ import Swift
 // CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
 // CHECK-SAME:   i64 1,
-// CHECK-SAME:   void (%TSi*, [[D]]*)* @_T013generic_types1DC3runySiFAA1ACADyxFTV
 // CHECK-SAME: }
 
 // CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_A(%swift.type_pattern*, i8**) {{.*}} {
