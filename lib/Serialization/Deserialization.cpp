@@ -238,6 +238,52 @@ getActualDefaultArgKind(uint8_t raw) {
   return None;
 }
 
+ParameterList *ModuleFile::maybeReadParameterList() {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return nullptr;
+
+  unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
+  if (kind != PARAMETERLIST)
+    return nullptr;
+
+  unsigned numParams;
+  decls_block::ParameterListLayout::readRecord(scratch, numParams);
+
+  SmallVector<ParamDecl*, 8> params;
+  for (unsigned i = 0; i != numParams; ++i) {
+    scratch.clear();
+    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
+    assert(recordID == PARAMETERLIST_ELT);
+    (void) recordID;
+
+    DeclID paramID;
+    bool isVariadic;
+    uint8_t rawDefaultArg;
+    decls_block::ParameterListEltLayout::readRecord(scratch, paramID,
+                                                    isVariadic, rawDefaultArg);
+
+
+    auto decl = cast<ParamDecl>(getDecl(paramID));
+    decl->setVariadic(isVariadic);
+
+    // Decode the default argument kind.
+    // FIXME: Default argument expression, if available.
+    if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
+      decl->setDefaultArgumentKind(*defaultArg);
+    params.push_back(decl);
+  }
+
+  return ParameterList::create(getContext(), params);
+}
+
 ParameterList *ModuleFile::readParameterList() {
   using namespace decls_block;
 
@@ -3674,14 +3720,12 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     IdentifierID nameID;
     DeclContextID contextID;
     TypeID interfaceTypeID;
-    bool hasArgumentType;
     bool isImplicit; bool isNegative;
     unsigned rawValueKindID;
 
     decls_block::EnumElementLayout::readRecord(scratch, nameID,
                                                contextID,
                                                interfaceTypeID,
-                                               hasArgumentType,
                                                isImplicit, rawValueKindID,
                                                isNegative);
 
@@ -3691,8 +3735,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     auto elem = createDecl<EnumElementDecl>(SourceLoc(),
                                             getIdentifier(nameID),
-                                            TypeLoc(),
-                                            hasArgumentType,
+                                            maybeReadParameterList(),
                                             SourceLoc(),
                                             nullptr,
                                             DC);

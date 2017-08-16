@@ -96,7 +96,7 @@ public struct Mirror {
     ///             children: ["someProperty": self.someProperty],
     ///             ancestorRepresentation: .customized({ super.customMirror })) // <==
     ///     }
-    case customized(() -> Mirror)
+    case customized(@escaping () -> Mirror)
 
     /// Suppresses the representation of all ancestor classes.
     ///

@@ -91,6 +91,7 @@ static ParserStatus parseDefaultArgument(Parser &P,
   case Parser::ParameterContextKind::Function:
   case Parser::ParameterContextKind::Operator:
   case Parser::ParameterContextKind::Initializer:
+  case Parser::ParameterContextKind::EnumElement:
     break;
   case Parser::ParameterContextKind::Closure:
     diagID = diag::no_default_arg_closure;
@@ -184,8 +185,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     unsigned defaultArgIndex = defaultArgs ? defaultArgs->NextIndex++ : 0;
 
     // Attributes.
-    bool FoundCCToken;
-    parseDeclAttributeList(param.Attrs, FoundCCToken);
+    bool FoundCCToken = false;
+    if (paramContext != ParameterContextKind::EnumElement)
+      parseDeclAttributeList(param.Attrs, FoundCCToken);
     if (FoundCCToken) {
       if (CodeCompletion) {
         CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(), true);
@@ -253,9 +255,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = consumeToken();
       }
 
-      // Operators and closures cannot have API names.
+      // Operators, closures, and enum elements cannot have API names.
       if ((paramContext == ParameterContextKind::Operator ||
-           paramContext == ParameterContextKind::Closure) &&
+           paramContext == ParameterContextKind::Closure ||
+           paramContext == ParameterContextKind::EnumElement) &&
           !param.FirstName.empty() &&
           param.SecondNameLoc.isValid()) {
         diagnose(param.FirstNameLoc, diag::parameter_operator_keyword_argument,
@@ -289,7 +292,15 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                                                  tok::equal);
       }
 
-      if (isBareType) {
+      if (isBareType && paramContext == ParameterContextKind::EnumElement) {
+        auto type = parseType(diag::expected_parameter_type, false);
+        status |= type;
+        param.Type = type.getPtrOrNull();
+        param.FirstName = Identifier();
+        param.FirstNameLoc = SourceLoc();
+        param.SecondName = Identifier();
+        param.SecondNameLoc = SourceLoc();
+      } else if (isBareType) {
         // Otherwise, if this is a bare type, then the user forgot to name the
         // parameter, e.g. "func foo(Int) {}"
         SourceLoc typeStartLoc = Tok.getLoc();
@@ -469,6 +480,7 @@ mapParsedParameters(Parser &parser,
     case Parser::ParameterContextKind::Operator:
       isKeywordArgumentByDefault = false;
       break;
+    case Parser::ParameterContextKind::EnumElement:
     case Parser::ParameterContextKind::Curried:
     case Parser::ParameterContextKind::Initializer:
     case Parser::ParameterContextKind::Function:
@@ -538,7 +550,8 @@ mapParsedParameters(Parser &parser,
     if (param.DefaultArg) {
       assert((paramContext == Parser::ParameterContextKind::Function ||
               paramContext == Parser::ParameterContextKind::Operator ||
-              paramContext == Parser::ParameterContextKind::Initializer) &&
+              paramContext == Parser::ParameterContextKind::Initializer ||
+              paramContext == Parser::ParameterContextKind::EnumElement) &&
              "Default arguments are only permitted on the first param clause");
       result->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
       result->setDefaultValue(param.DefaultArg);
@@ -566,6 +579,9 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
     case ParameterContextKind::Function:
     case ParameterContextKind::Operator:
       diagID = diag::func_decl_without_paren;
+      break;
+    case ParameterContextKind::EnumElement:
+      diagID = diag::enum_element_decl_without_paren;
       break;
     case ParameterContextKind::Subscript:
       skipIdentifier = Tok.is(tok::identifier) &&

@@ -333,6 +333,8 @@ ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
 // Func
 ERROR(func_decl_without_paren,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
+ERROR(enum_element_decl_without_paren,PointsToFirstBadToken,
+      "expected '(' in argument list of enum element declaration", ())
 ERROR(static_func_decl_global_scope,none,
       "%select{%error|static methods|class methods}0 may only be declared on a type",
       (StaticSpellingKind))

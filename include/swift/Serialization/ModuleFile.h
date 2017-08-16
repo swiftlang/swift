@@ -535,7 +535,8 @@ private:
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
   ParameterList *readParameterList();
-  
+  ParameterList *maybeReadParameterList();
+
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a generic param list, returns null

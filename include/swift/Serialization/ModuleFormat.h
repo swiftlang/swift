@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 403; // Last change: `init` special name
+const uint16_t VERSION_MINOR = 404; // Last change: SE-0155 
 
 using DeclIDField = BCFixed<31>;
 
@@ -1077,11 +1077,13 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // interface type
-    BCFixed<1>,  // has argument type?
     BCFixed<1>,  // implicit?
     EnumElementRawValueKindField,  // raw value kind
     BCFixed<1>,  // negative raw value?
     BCBlob       // raw value
+
+    // The record is trailed by:
+    // - its argument parameters, if any
   >;
 
   using SubscriptLayout = BCRecordLayout<
