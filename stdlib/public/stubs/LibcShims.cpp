@@ -15,6 +15,9 @@
 #include <cmath>
 #if defined(_WIN32)
 #include <io.h>
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRA_LEAN
+#define NOMINMAX
 #include <windows.h>
 #else
 #include <unistd.h>
