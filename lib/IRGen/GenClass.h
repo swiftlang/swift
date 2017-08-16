@@ -44,6 +44,8 @@ namespace irgen {
   class OwnedAddress;
   class Address;
   class Size;
+  class StructLayout;
+  class TypeInfo;
   
   enum class ReferenceCounting : unsigned char;
   enum class IsaEncoding : unsigned char;
@@ -147,6 +149,13 @@ namespace irgen {
   FieldAccess getClassFieldAccess(IRGenModule &IGM,
                                   SILType baseType,
                                   VarDecl *field);
+
+  /// Creates a layout for the class \p classType with allocated tail elements
+  /// \p tailTypes.
+  ///
+  /// The caller is responsible for deleting the returned StructLayout.
+  StructLayout *getClassLayoutWithTailElems(IRGenModule &IGM, SILType classType,
+                                            llvm::ArrayRef<SILType> tailTypes);
 
   /// What reference counting mechanism does a class-like type use?
   ReferenceCounting getReferenceCountingForType(IRGenModule &IGM,
