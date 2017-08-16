@@ -222,3 +222,10 @@ class ReturnType {
   func foo3() -> () -> Int {}
   // CHECK:  <ifunc>func <name>foo3()</name> -> <type>() -> Int</type> {}</ifunc>
 }
+
+protocol FooProtocol {
+  associatedtype Bar
+  // CHECK:  <associatedtype>associatedtype <name>Bar</name></associatedtype>
+  associatedtype Baz: Equatable
+  // CHECK:  <associatedtype>associatedtype <name>Baz</name>: Equatable</associatedtype>
+}
