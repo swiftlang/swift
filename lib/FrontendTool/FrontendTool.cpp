@@ -65,7 +65,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
@@ -403,25 +402,6 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
     C.NumPrefixOperators = SF->PrefixOperators.size();
     C.NumPrecedenceGroups = SF->PrecedenceGroups.size();
     C.NumUsedConformances = SF->getUsedConformances().size();
-  }
-}
-
-static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
-                                const llvm::Module& Module) {
-  auto &C = Stats.getFrontendCounters();
-  // FIXME: calculate these in constant time if possible.
-  C.NumIRGlobals = Module.getGlobalList().size();
-  C.NumIRFunctions = Module.getFunctionList().size();
-  C.NumIRAliases = Module.getAliasList().size();
-  C.NumIRIFuncs = Module.getIFuncList().size();
-  C.NumIRNamedMetaData = Module.getNamedMDList().size();
-  C.NumIRValueSymbols = Module.getValueSymbolTable().size();
-  C.NumIRComdatSymbols = Module.getComdatSymbolTable().size();
-  for (auto const &Func : Module) {
-    for (auto const &BB : Func) {
-      C.NumIRBasicBlocks++;
-      C.NumIRInsts += BB.size();
-    }
   }
 }
 
@@ -959,10 +939,6 @@ static bool performCompile(CompilerInstance &Instance,
   // modules.
   if (!IRModule) {
     return HadError;
-  }
-
-  if (Stats) {
-    countStatsPostIRGen(*Stats, *IRModule);
   }
 
   bool allSymbols = false;
