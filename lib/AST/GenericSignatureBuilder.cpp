@@ -2051,32 +2051,8 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
       else
         resultPA = new PotentialArchetype(this, concreteDecl);
 
-      auto &allNested = NestedTypes[name];
-      allNested.push_back(resultPA);
-
-      // We created a new type, which might be equivalent to a type by the
-      // same name elsewhere.
-      PotentialArchetype *existingPA = nullptr;
-      if (allNested.size() > 1) {
-        existingPA = allNested.front();
-      } else {
-        auto rep = getRepresentative();
-        if (rep != this) {
-          if (assocType)
-            existingPA = rep->getNestedType(assocType, builder);
-          else
-            existingPA = rep->getNestedType(concreteDecl, builder);
-        }
-      }
-
-      if (existingPA) {
-        auto sameNamedSource =
-          RequirementSource::forNestedTypeNameMatch(existingPA);
-        builder.addSameTypeRequirement(
-                                 existingPA, resultPA, sameNamedSource,
-                                 UnresolvedHandlingKind::GenerateConstraints);
-      }
-
+      NestedTypes[name].push_back(resultPA);
+      builder.addedNestedType(resultPA);
       shouldUpdatePA = true;
       break;
     }
@@ -3234,6 +3210,47 @@ void GenericSignatureBuilder::PotentialArchetype::addSameTypeConstraint(
   }
 }
 
+void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
+  // If there was already another type with this name within the parent
+  // potential archetype, equate this type with that one.
+  auto parentPA = nestedPA->getParent();
+  auto &allNested = parentPA->NestedTypes[nestedPA->getNestedName()];
+  assert(!allNested.empty());
+  assert(allNested.back() == nestedPA);
+  if (allNested.size() > 1) {
+    auto firstPA = allNested.front();
+    auto sameNamedSource =
+      FloatingRequirementSource::forNestedTypeNameMatch(
+                                                nullptr,
+                                                nestedPA->getNestedName());
+
+    addSameTypeRequirement(firstPA, nestedPA, sameNamedSource,
+                           UnresolvedHandlingKind::GenerateConstraints);
+    return;
+  }
+
+  // If our parent type is not the representative, equate this nested
+  // potential archetype to the equivalent nested type within the
+  // representative.
+  auto parentRepPA = parentPA->getRepresentative();
+  if (parentPA == parentRepPA) return;
+
+  PotentialArchetype *existingPA;
+  if (auto assocType = nestedPA->getResolvedAssociatedType()) {
+    existingPA = parentRepPA->getNestedType(assocType, *this);
+  } else {
+    existingPA = parentRepPA->getNestedType(nestedPA->getConcreteTypeDecl(),
+                                            *this);
+  }
+
+  auto sameNamedSource =
+    FloatingRequirementSource::forNestedTypeNameMatch(
+                                                nullptr,
+                                                nestedPA->getNestedName());
+  addSameTypeRequirement(existingPA, nestedPA, sameNamedSource,
+                         UnresolvedHandlingKind::GenerateConstraints);
+}
+
 ConstraintResult
 GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *OrigT1,
@@ -3356,12 +3373,21 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
       }
 
       // Otherwise, make the nested types equivalent.
-      Type nestedT1 = DependentMemberType::get(dependentT1, T2Nested.first);
+      AssociatedTypeDecl *assocTypeT2 = nullptr;
+      for (auto T2 : T2Nested.second) {
+        assocTypeT2 = T2->getResolvedAssociatedType();
+        if (assocTypeT2) break;
+      }
+
+      if (!assocTypeT2) continue;
+
+      Type nestedT1 = DependentMemberType::get(dependentT1, assocTypeT2);
       if (isErrorResult(
             addSameTypeRequirement(
                nestedT1, T2Nested.second.front(),
                FloatingRequirementSource::forNestedTypeNameMatch(
-                                                      Source, T2Nested.first),
+                                                      Source,
+                                                      assocTypeT2->getName()),
                UnresolvedHandlingKind::GenerateConstraints)))
         return ConstraintResult::Conflicting;
     }
