@@ -67,14 +67,19 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
   return dyn_cast<EnumElementDecl>(ctorExpr->getDecl());
 }
 
-/// Find the first enum element in \p foundElements.
+/// Filter the most relevant enum elements from a lookup into an out vector.
 ///
 /// If there are no enum elements but there are properties, attempts to map
 /// an arbitrary property to an enum element using extractEnumElement.
-static EnumElementDecl *
+///
+/// This function returns true if there are no matching elements, and false if
+/// there are one or more matching element decls.  Note that if there is
+/// more than one element in the out parameter it indicates an ambiguity.
+static bool
 filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
-                     bool unqualifiedLookup, LookupResult foundElements) {
-  EnumElementDecl *foundElement = nullptr;
+                     DeclName elemName,
+                     bool unqualifiedLookup, LookupResult foundElements,
+                     SmallVectorImpl<EnumElementDecl *> &filteredDecls) {
   VarDecl *foundConstant = nullptr;
 
   for (LookupResultEntry result : foundElements) {
@@ -92,10 +97,19 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
     }
 
     if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
-      // Ambiguities should be ruled out by parsing.
-      assert(!foundElement && "ambiguity in enum case name lookup?!");
-      foundElement = oe;
-      continue;
+      // Break ambiguities between decls with similar base names as in:
+      //
+      // enum Foo { case bar; case bar(x: Int) }
+      //
+      // by preferring matching the base name to an element with no associated
+      // values if we can find it.
+      if (elemName.getArgumentNames().empty() && !oe->hasAssociatedValues()) {
+        filteredDecls.clear();
+        filteredDecls.push_back(oe);
+        return false;
+      }
+
+      filteredDecls.push_back(oe);
     }
 
     if (auto *var = dyn_cast<VarDecl>(e)) {
@@ -104,36 +118,40 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
     }
   }
 
-  if (!foundElement && foundConstant && foundConstant->hasClangNode())
-    foundElement = extractEnumElement(TC, DC, UseLoc, foundConstant);
+  if (filteredDecls.empty() && foundConstant && foundConstant->hasClangNode()) {
+    if (auto *foundElement = extractEnumElement(TC, DC, UseLoc, foundConstant))
+      filteredDecls.push_back(foundElement);
+  }
 
-  return foundElement;
+  return filteredDecls.empty();
 }
 
 /// Find an unqualified enum element.
-static EnumElementDecl *
+static bool
 lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
-                                   Identifier name, SourceLoc UseLoc) {
+                                   Identifier name, SourceLoc UseLoc,
+                                   SmallVectorImpl<EnumElementDecl *> &fds) {
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
-  return filterForEnumElement(TC, DC, UseLoc,
-                              /*unqualifiedLookup=*/true, lookup);
+  return filterForEnumElement(TC, DC, UseLoc, name,
+                              /*unqualifiedLookup=*/true, lookup, fds);
 }
 
 /// Find an enum element in an enum type.
-static EnumElementDecl *
+static bool
 lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
-                        Identifier name, SourceLoc UseLoc) {
+                        DeclName name, SourceLoc UseLoc,
+                        SmallVectorImpl<EnumElementDecl *> &fds) {
   if (!ty->mayHaveMembers())
-    return nullptr;
+    return true;
 
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   LookupResult foundElements = TC.lookupMember(DC, ty, name, lookupOptions);
-  return filterForEnumElement(TC, DC, UseLoc,
-                              /*unqualifiedLookup=*/false, foundElements);
+  return filterForEnumElement(TC, DC, UseLoc, name,
+                              /*unqualifiedLookup=*/false, foundElements, fds);
 }
 
 namespace {
@@ -469,10 +487,13 @@ public:
       return nullptr;
 
     // FIXME: Argument labels?
-    EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseIdentifier(),
-                                ude->getLoc());
-    if (!referencedElement)
+    SmallVector<EnumElementDecl *, 2> referencedElements;
+    if (lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseIdentifier(),
+                                ude->getLoc(), referencedElements))
+      return nullptr;
+
+    // If there were any ambiguities, bail.
+    if (referencedElements.size() > 1)
       return nullptr;
     
     // Build a TypeRepr from the head of the full path.
@@ -485,7 +506,7 @@ public:
                                                  .getBaseNameLoc(),
                                                ude->getName()
                                                  .getBaseIdentifier(),
-                                               referencedElement,
+                                               referencedElements.front(),
                                                nullptr);
   }
   
@@ -510,25 +531,26 @@ public:
     // rdar://20879992 is addressed.
     //
     // Try looking up an enum element in context.
-    if (EnumElementDecl *referencedElement
-        = lookupUnqualifiedEnumMemberElement(TC, DC,
-                                             ude->getName().getBaseIdentifier(),
-                                             ude->getLoc())) {
-      auto *enumDecl = referencedElement->getParentEnum();
-      auto enumTy = enumDecl->getDeclaredTypeInContext();
-      TypeLoc loc = TypeLoc::withoutLoc(enumTy);
-      
-      return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
-                                                 ude->getLoc(),
-                                                 ude->getName()
-                                                   .getBaseIdentifier(),
-                                                 referencedElement,
-                                                 nullptr);
+    SmallVector<EnumElementDecl *, 2> referencedElements;
+    if (lookupUnqualifiedEnumMemberElement(TC, DC,
+                                           ude->getName().getBaseIdentifier(),
+                                           ude->getLoc(), referencedElements)
+        || referencedElements.size() > 1) {
+      // Perform unqualified name lookup to find out what the UDRE is.
+      return getSubExprPattern(TC.resolveDeclRefExpr(ude, DC));
     }
-      
-    
-    // Perform unqualified name lookup to find out what the UDRE is.
-    return getSubExprPattern(TC.resolveDeclRefExpr(ude, DC));
+
+    auto referencedElement = referencedElements.front();
+    auto *enumDecl = referencedElement->getParentEnum();
+    auto enumTy = enumDecl->getDeclaredTypeInContext();
+    TypeLoc loc = TypeLoc::withoutLoc(enumTy);
+
+    return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
+                                               ude->getLoc(),
+                                               ude->getName()
+                                               .getBaseIdentifier(),
+                                               referencedElement,
+                                               nullptr);
   }
   
   // Call syntax forms a pattern if:
@@ -557,13 +579,16 @@ public:
 
     if (components.empty()) {
       // Only one component. Try looking up an enum element in context.
-      referencedElement
-        = lookupUnqualifiedEnumMemberElement(TC, DC,
+      SmallVector<EnumElementDecl *, 2> referencedElements;
+      if (lookupUnqualifiedEnumMemberElement(TC, DC,
                                              tailComponent->getIdentifier(),
-                                             tailComponent->getLoc());
-      if (!referencedElement)
+                                             tailComponent->getLoc(),
+                                             referencedElements)
+          || referencedElements.size() > 1) {
         return nullptr;
+      }
 
+      referencedElement = referencedElements.front();
       auto *enumDecl = referencedElement->getParentEnum();
       loc = TypeLoc::withoutLoc(enumDecl->getDeclaredTypeInContext());
     } else {
@@ -581,13 +606,16 @@ public:
       if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
         return nullptr;
 
-      referencedElement
-        = lookupEnumMemberElement(TC, DC, enumTy,
+      SmallVector<EnumElementDecl *, 2> referencedElements;
+      if (lookupEnumMemberElement(TC, DC, enumTy,
                                   tailComponent->getIdentifier(),
-                                  tailComponent->getLoc());
-      if (!referencedElement)
-        return nullptr;
+                                  tailComponent->getLoc(),
+                                  referencedElements)
+          || referencedElements.size() > 1) {
+          return nullptr;
+      }
 
+      referencedElement = referencedElements.front();
       loc = TypeLoc(prefixRepr);
       loc.setType(enumTy);
     }
@@ -1000,6 +1028,24 @@ recur:
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren: {
     auto PP = cast<ParenPattern>(P);
+    // Paren Patterns may not match enum payloads when not in Swift 3 mode.
+    if (options.contains(TypeResolutionFlags::EnumCase)
+        && type->is<TupleType>() && !PP->isImplicit()) {
+      if (Context.isSwiftVersionAtLeast(5)) {
+        diagnose(PP->getStartLoc(), diag::paren_pattern_in_tuple_context,
+                 type)
+        .highlight(PP->getSourceRange());
+        return true;
+      } else {
+        // FIXME: Re-enable this post-discussion on Swift Evolution.
+//        diagnose(PP->getStartLoc(),
+//                 diag::paren_pattern_in_tuple_context_warn_swift3, type)
+//          .highlight(PP->getSourceRange());
+
+        // Fall through to old pattern matching behavior
+      }
+    }
+
     auto sub = PP->getSubPattern();
     auto semantic = P->getSemanticsProvidingPattern();
     // If this is the payload of an enum, and the type is a single-element
@@ -1173,6 +1219,16 @@ recur:
     // Coerce each tuple element to the respective type.
     P->setType(type);
 
+    enum class TuplePatternMatchStrategy {
+      None,
+      Swift3,
+      ByPosition,
+      ByLabels,
+    };
+
+    auto strategy = //Context.isSwiftVersion3()
+                /*?*/ TuplePatternMatchStrategy::Swift3;
+                  //: TuplePatternMatchStrategy::None;
     for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = TP->getElement(i);
       Pattern *pattern = elt.getPattern();
@@ -1182,18 +1238,80 @@ recur:
         CoercionType = ErrorType::get(Context);
       else
         CoercionType = tupleTy->getElement(i).getType();
-      
-      // If the tuple pattern had a label for the tuple element, it must match
-      // the label for the tuple type being matched.
-      if (!hadError && !elt.getLabel().empty() &&
-          elt.getLabel() != tupleTy->getElement(i).getName()) {
-        diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
-                 elt.getLabel(), tupleTy->getElement(i).getName());
-        hadError = true;
+
+      if (strategy == TuplePatternMatchStrategy::Swift3) {
+        // If the tuple pattern had a label for the tuple element, it must match
+        // the label for the tuple type being matched.
+        //
+        // N.B. Swift <=3 has the source of truth regarding the labels
+        // backwards.  This allows e.g. patterns without labels to match a
+        // value of labeled tuple type.
+        if (!hadError && !elt.getLabel().empty() &&
+            elt.getLabel() != tupleTy->getElement(i).getName()) {
+          diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
+                   elt.getLabel(), tupleTy->getElement(i).getName());
+          hadError = true;
+        }
+      } else {
+        // If the type has no label here but the pattern does, complain.
+        if (!tupleTy->getElement(i).hasName() && !elt.getLabel().empty()) {
+          diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
+                   elt.getLabel(), tupleTy->getElement(i).getName());
+          hadError = true;
+        } else if (tupleTy->getElement(i).hasName() && elt.getLabel().empty()) {
+          // If the type has a label but the pattern doesn't, we had better
+          // be matching this pattern by position.
+          switch (strategy) {
+          case TuplePatternMatchStrategy::None:
+          case TuplePatternMatchStrategy::ByPosition:
+            strategy = TuplePatternMatchStrategy::ByPosition;
+            break;
+          case TuplePatternMatchStrategy::ByLabels: {
+            diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
+                     elt.getLabel(), tupleTy->getElement(i).getName());
+            hadError = true;
+          }
+            break;
+
+          case TuplePatternMatchStrategy::Swift3:
+            llvm_unreachable("should have handled Swift 3 matching already");
+          }
+        } else if (tupleTy->getElement(i).hasName() && !elt.getLabel().empty()) {
+          // If the type has a label and the pattern does too, we had
+          // better be matching this pattern by label:
+          switch (strategy) {
+          case TuplePatternMatchStrategy::None:
+          case TuplePatternMatchStrategy::ByLabels: {
+            strategy = TuplePatternMatchStrategy::ByLabels;
+
+            // Check if the label matches.
+            if (tupleTy->getElement(i).getName() != elt.getLabel()) {
+              diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
+                       elt.getLabel(), tupleTy->getElement(i).getName());
+              hadError = true;
+            }
+          }
+            break;
+          case TuplePatternMatchStrategy::ByPosition: {
+            diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_missing,
+                     tupleTy->getElement(i).getName());
+            hadError = true;
+          }
+          break;
+
+          case TuplePatternMatchStrategy::Swift3:
+            llvm_unreachable("should have handled Swift 3 matching already");
+          }
+        } else {
+          // Finally, if the type has no label and the pattern has no label,
+          // then they match and we can't make a judgement call yet as to the
+          // matching strategy.  Continue onward.
+        }
       }
       
       hadError |= coercePatternToType(pattern, resolution, CoercionType,
                                       options);
+
       if (!hadError)
         elt.setPattern(pattern);
     }
@@ -1334,12 +1452,23 @@ recur:
     Optional<CheckedCastKind> castKind;
     
     EnumElementDecl *elt = EEP->getElementDecl();
-    
     Type enumTy;
     if (!elt) {
-      elt = lookupEnumMemberElement(*this, dc, type, EEP->getName(),
-                                    EEP->getLoc());
-      if (!elt) {
+      SmallVector<Identifier, 4> components;
+      DeclName lookupName = EEP->getName();
+      if (EEP->hasSubPattern() && Context.isSwiftVersionAtLeast(5)) {
+        /// Gather any argument names so we can perform lookup with a full name.
+        if (auto *ArgP = dyn_cast<TuplePattern>(EEP->getSubPattern())) {
+          for (auto &comp : ArgP->getElements()) {
+            components.push_back(comp.getLabel());
+          }
+         lookupName = DeclName(Context, EEP->getName(), components);
+        }
+      }
+
+      SmallVector<EnumElementDecl *, 2> candidateElements;
+      if (lookupEnumMemberElement(*this, dc, type, lookupName,
+                                  EEP->getLoc(), candidateElements)) {
         if (!type->hasError()) {
           // Lowercasing of Swift.Optional's cases is handled in the
           // standard library itself, not through the clang importer,
@@ -1376,12 +1505,27 @@ recur:
           // If we have an optional type let's try to see if the case
           // exists in its base type, if so we can suggest a fix-it for that.
           if (auto baseType = type->getOptionalObjectType()) {
-            if (lookupEnumMemberElement(*this, dc, baseType, EEP->getName(),
-                                        EEP->getLoc()))
+            SmallVector<EnumElementDecl *, 2> scratch;
+            if (!lookupEnumMemberElement(*this, dc, baseType, EEP->getName(),
+                                         EEP->getLoc(), scratch))
               diag.fixItInsertAfter(EEP->getEndLoc(), "?");
           }
         }
         return true;
+      } else {
+        // Validate the candidates.
+        if (candidateElements.size() == 1) {
+          elt = candidateElements.front();
+        } else {
+          assert(candidateElements.size() > 1);
+          diagnose(EEP->getLoc(), diag::ambiguous_enum_element_in_pattern,
+                   EEP->getName());
+          for (auto &eed : candidateElements) {
+            diagnose(eed->getLoc(), diag::ambiguous_enum_element_candidate,
+                     eed->getFullName());
+          }
+          return true;
+        }
       }
       enumTy = type;
     } else {

@@ -832,6 +832,9 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
   // Enum element constructors are always emitted by need, so don't need
   // delayed emission.
+  if (auto params = decl->getParameterList())
+    emitDefaultArgGenerators(decl, params);
+
   SILDeclRef constant(decl);
   SILFunction *f = getFunction(constant, ForDefinition);
   preEmitFunction(constant, decl, f, decl);

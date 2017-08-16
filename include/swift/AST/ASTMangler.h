@@ -90,7 +90,7 @@ public:
   std::string mangleGlobalGetterEntity(const ValueDecl *decl,
                                        SymbolKind SKind = SymbolKind::Default);
 
-  std::string mangleDefaultArgumentEntity(const DeclContext *func,
+  std::string mangleDefaultArgumentEntity(const ValueDecl *decl,
                                           unsigned index,
                                           SymbolKind SKind);
 

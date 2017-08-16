@@ -509,6 +509,31 @@ public:
       llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
     });
   }
+
+  /// Assert that two payload types are equal.
+  void requireSamePayloadType(SILType type1, SILType type2,
+                              const Twine &complaint) {
+    if (auto tuple1 = dyn_cast<TupleType>(type1.getSwiftRValueType())) {
+      require(type2.is<TupleType>(),
+              "Second payload type does not match first tuple type payload!");
+
+      auto tuple2 = type2.castTo<TupleType>();
+
+      require(tuple1->getElements().size() == tuple2->getNumElements(),
+              "Payload tuple element count mismatch!");
+
+      for (size_t i = 0, size = tuple1->getElements().size(); i < size; ++i) {
+        _require(tuple1.getElementType(i) == tuple2.getElementType(i),
+                 complaint, [&] {
+          llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
+        });
+      }
+    } else {
+      _require(type1 == type2, complaint, [&] {
+        llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
+      });
+    }
+  }
   
   /// Require two function types to be ABI-compatible.
   void requireABICompatibleFunctionTypes(CanSILFunctionType type1,
@@ -2090,7 +2115,7 @@ public:
       SILType caseTy = UI->getType().getEnumElementType(UI->getElement(),
                                                         F.getModule());
       if (UI->getModule().getStage() != SILStage::Lowered) {
-        require(caseTy == UI->getOperand()->getType(),
+        requireSamePayloadType(caseTy, UI->getOperand()->getType(),
                 "EnumInst operand type does not match type of case");
       }
     }
@@ -3922,7 +3947,7 @@ public:
           if (F.getModule().getStage() != SILStage::Lowered) {
             // During the lowered stage, a function type might have different
             // signature
-            require(eltArgTy == bbArgTy,
+            requireSamePayloadType(eltArgTy, bbArgTy,
                     "switch_enum destination bbarg must match case arg type");
           }
           require(!dest->getArguments()[0]->getType().isAddress(),

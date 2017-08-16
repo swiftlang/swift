@@ -373,15 +373,14 @@ static bool paramIsIUO(Decl *decl, int paramNum) {
     auto *paramList = fn->getParameters();
     auto *param = paramList->get(paramNum);
     return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  } else if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+    auto *index = subscript->getIndices()->get(paramNum);
+    return index->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  } else {
+    auto *enumElt = cast<EnumElementDecl>(decl);
+    auto *index = enumElt->getParameterList()->get(paramNum);
+    return index->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
   }
-  if (auto *ee = dyn_cast<EnumElementDecl>(decl)) {
-    auto *param = ee->getParameterList()->get(paramNum);
-    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  }
-
-  auto *subscript = cast<SubscriptDecl>(decl);
-  auto *index = subscript->getIndices()->get(paramNum);
-  return index->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 }
 
 /// \brief Determine whether the first declaration is as "specialized" as
@@ -632,6 +631,21 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
 
       case CheckInput: {
+        if (auto *ED1 = dyn_cast<EnumElementDecl>(decl1)) {
+          if (auto *ED2 = dyn_cast<EnumElementDecl>(decl2)) {
+            assert(ED1->hasAssociatedValues() || ED2->hasAssociatedValues());
+
+            // If the first function has fewer effective parameters than the
+            // second, it is more specialized.
+            if (!ED1->hasAssociatedValues() && ED2->hasAssociatedValues())
+              return true;
+            if (ED1->hasAssociatedValues() && !ED2->hasAssociatedValues())
+              return false;
+
+            // Else, fall through to compare function type specialization.
+          }
+        }
+
         // Check whether the first function type's input is a subtype of the
         // second type's inputs, i.e., can we forward the arguments?
         auto funcTy1 = openedType1->castTo<FunctionType>();

@@ -3223,6 +3223,12 @@ ERROR(type_pattern_missing_is,none,
 ERROR(pattern_type_mismatch_context,none,
       "type annotation does not match contextual type %0", (Type))
 
+ERROR(paren_pattern_in_tuple_context,none,
+      "parenthesized pattern cannot match value of tuple type %0", (Type))
+WARNING(paren_pattern_in_tuple_context_warn_swift3,none,
+        "parenthesized pattern matches value of tuple type %0; this may be "
+        "unintended and will be removed in a future version of Swift", (Type))
+
 ERROR(tuple_pattern_in_non_tuple_context,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
 ERROR(closure_argument_list_tuple,none,
@@ -3250,10 +3256,18 @@ ERROR(enum_element_pattern_assoc_values_mismatch,none,
       (Identifier))
 NOTE(enum_element_pattern_assoc_values_remove,none,
      "remove associated values to make the pattern match", ())
+
 ERROR(tuple_pattern_length_mismatch,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
 ERROR(tuple_pattern_label_mismatch,none,
       "tuple pattern element label %0 must be %1", (Identifier, Identifier))
+ERROR(tuple_pattern_label_missing,none,
+      "tuple pattern mentioning element labels must also specify label '%0'",
+      (Identifier))
+ERROR(tuple_pattern_label_should_be_elided,none,
+      "tuple pattern not mentioning element labels may not specify label %0",
+      (Identifier))
+
 ERROR(enum_element_pattern_member_not_found,none,
       "enum case '%0' not found in type %1", (StringRef, Type))
 ERROR(optional_element_pattern_not_valid_type,none,
@@ -3283,6 +3297,16 @@ NOTE(unowned_assignment_requires_strong,none,
 ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
       "collection downcast in cast pattern is not implemented; use an explicit "
       "downcast to %0 instead", (Type))
+
+WARNING(swift3_ignore_specialized_enum_element_call,none,
+        "cannot specialize enum case; ignoring generic argument, "
+        "which will be rejected in future version of Swift", ())
+
+ERROR(ambiguous_enum_element_in_pattern,none,
+      "enum case %0 is ambiguous without explicit pattern matching "
+      "associated values", (Identifier))
+NOTE(ambiguous_enum_element_candidate,none,
+     "found potentially matching case %0", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Error-handling diagnostics
