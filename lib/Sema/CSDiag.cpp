@@ -1340,13 +1340,11 @@ findCorrectEnumCaseName(Type Ty, LookupResult &Result,
   llvm::SmallVector<DeclName, 4> candidates;
   for (auto &correction : Result) {
     DeclName correctName = correction.getValueDecl()->getFullName();
-    if (!correctName.isSimpleName())
-      continue;
     if (!isa<EnumElementDecl>(correction.getValueDecl()))
       continue;
     if (correctName.getBaseIdentifier().str().equals_lower(
             memberName.getBaseIdentifier().str()))
-      candidates.push_back(correctName);
+      candidates.push_back(correctName.getBaseName());
   }
   if (candidates.size() == 1)
     return candidates.front();
