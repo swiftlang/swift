@@ -556,6 +556,13 @@ namespace {
     ~SpeculativeDevirtualization() override {}
 
     void run() override {
+
+      auto &CurFn = *getFunction();
+      // Don't perform speculative devirtualization at -Os.
+      if (CurFn.getModule().getOptions().Optimization ==
+          SILOptions::SILOptMode::OptimizeForSize)
+        return;
+
       ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
 
       bool Changed = false;
