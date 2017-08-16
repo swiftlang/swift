@@ -52,7 +52,8 @@ build can take multiple hours, but incremental builds will finish much faster.
 macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
 supported host development operating systems.
 
-<a name="xcode"></a>
+#### macOS
+
 To build for macOS, you need [Xcode 9.0 beta 4](https://developer.apple.com/xcode/downloads/).
 The version of Xcode required to build swift changes frequently, and is often a
 pre-release version of Xcode. Check this document or [here](https://ci.swift.org)
@@ -205,7 +206,7 @@ then run the build product in Terminal.
 
 ### Build Failures
 
-Make sure you are using the [correct release](#xcode) of Xcode.
+Make sure you are using the [correct release](#macos) of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
 be related to the Xcode version, try passing `--rebuild` to `build-script`.
