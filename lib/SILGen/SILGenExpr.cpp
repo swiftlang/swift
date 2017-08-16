@@ -2432,15 +2432,19 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   
   auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc,generator));
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
-  auto substFnType = fnType->substGenericArgs(SGM.M,
-                                          defaultArgsOwner.getSubstitutions());
+
+  SubstitutionList subs;
+  if (fnType->isPolymorphic())
+    subs = defaultArgsOwner.getSubstitutions();
+
+  auto substFnType = fnType->substGenericArgs(SGM.M, subs);
+
   CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   defaultArgsOwner.getSubstitutions(), {}, calleeTypeInfo,
-                   ApplyOptions::None, C);
+                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
