@@ -492,3 +492,15 @@ protocol P4 {
 class C4 : P4 { // expected-error {{type 'C4' does not conform to protocol 'P4'}}
   associatedtype T = Int  // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}} {{3-17=typealias}}
 }
+
+// <rdar://problem/25185722> Crash with invalid 'let' property in protocol
+protocol LetThereBeCrash {
+  let x: Int
+  // expected-error@-1 {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  // expected-note@-2 {{change 'let' to 'var' to make it mutable}}
+}
+
+extension LetThereBeCrash {
+  init() { x = 1 }
+  // expected-error@-1 {{cannot assign to property: 'x' is a 'let' constant}}
+}
