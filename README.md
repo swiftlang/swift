@@ -181,13 +181,11 @@ any other target. Building the `swift-stdlib` target as an additional layer of
 testing from time to time is also a good idea.
 
     ninja swift-stdlib
-    ninja benchmarks
 
-This command will rebuild the stdlib, and is great for developers interested in
-working on the standard library. The `benchmarks` target can also help measure
-the impact of your change.
+This command will rebuild the stdlib and skip the `benchmarks` target. This
+is great for developers interested in working on the standard library.
 
-It is still always a good idea to do a full build after using `update-checkout`.
+It is always a good idea to do a full build after using `update-checkout`.
 
 #### Using Xcode
 
