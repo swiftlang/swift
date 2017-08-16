@@ -1342,7 +1342,19 @@ struct GenericParameterDescriptor {
 
   // TODO: add meaningful descriptions of the generic requirements.
 };
-  
+
+/// Header for a class vtable descriptor. This is a variable-sized
+/// structure that describes how to find and parse a vtable
+/// within the type metadata for a class.
+struct VTableDescriptor {
+  /// The offset of the vtable for this class in its metadata, if any.
+  uint32_t VTableOffset;
+  /// The number of vtable entries, in words.
+  uint32_t VTableSize;
+
+  // TODO: add meaningful descriptions of the virtual methods.
+};
+
 struct ClassTypeDescriptor;
 struct StructTypeDescriptor;
 struct EnumTypeDescriptor;
@@ -1483,6 +1495,19 @@ struct TargetNominalTypeDescriptor {
 
   int32_t offsetToNameOffset() const {
     return offsetof(TargetNominalTypeDescriptor<Runtime>, Name);
+  }
+
+  const VTableDescriptor *getVTableDescriptor() const {
+    if (getKind() != NominalTypeKind::Class ||
+        !GenericParams.Flags.hasVTable())
+      return nullptr;
+
+    auto asWords = reinterpret_cast<const void * const*>(this + 1);
+
+    // TODO: Once we emit reflective descriptions of generic requirements,
+    // skip the right number of words here.
+
+    return reinterpret_cast<const VTableDescriptor *>(asWords);
   }
 
   /// The generic parameter descriptor header. This describes how to find and

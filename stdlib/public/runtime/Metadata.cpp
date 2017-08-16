@@ -1458,6 +1458,14 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
              numParamWords * sizeof(uintptr_t));
     }
 
+    // Copy the vtable entries.
+    if (genericParams.Flags.hasVTable()) {
+      auto *vtable = description->getVTableDescriptor();
+      memcpy(classWords + vtable->VTableOffset,
+             superWords + vtable->VTableOffset,
+             vtable->VTableSize * sizeof(uintptr_t));
+    }
+
     // Copy the field offsets.
     if (copyFieldOffsetVectors &&
         description->Class.hasFieldOffsetVector()) {
