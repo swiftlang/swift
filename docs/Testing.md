@@ -55,7 +55,7 @@ development cycle. To invoke LLVM's `lit.py` script directly, it must be
 configured to use your local build directory. For example:
 
 ```
-    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/Parse/
+    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_DIR}/test-iphonesimulator-i386/Parse/
 ```
 
 This runs the tests in the 'test/Parse/' directory targeting the 32-bit iOS
@@ -71,7 +71,7 @@ testing configuration explicitly, which then allows you to test files
 regardless of location.
 
 ```
-    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
+    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_DIR}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
 ```
 
 For more complicated configuration, copy the invocation from one of the build
@@ -126,7 +126,7 @@ Besides ``check-swift``, other targets are also available. Here's the full list:
 * ``check-swift-only_long``: Runs long tests only.
 * ``check-swift-all``: Runs all tests (primary, validation, and long).
 * ``SwiftUnitTests``: Builds all unit tests.  Executables are located under
-  ``${SWIFT_BUILD_ROOT}/unittests`` and must be run individually.
+  ``${SWIFT_BUILD_DIR}/unittests`` and must be run individually.
 
 For every target above, there are variants for different optimizations:
 

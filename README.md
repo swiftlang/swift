@@ -165,7 +165,7 @@ If macOS swift with Ninja in DebugAssert mode was built, all of the products
 would be in `swift-source/build/Ninja-DebugAssert/swift-macosx-x86_64/`. It
 helps to save this directory as an environment variable for future use.
 
-    export SWIFT_BUILD_ROOT="~/swift-source/build/Ninja-DebugAssert/swift-macosx-x86_64"
+    export SWIFT_BUILD_DIR="~/swift-source/build/Ninja-DebugAssert/swift-macosx-x86_64"
 
 #### Ninja
 
@@ -173,7 +173,7 @@ Once the first build has completed, ninja can perform fast incremental builds of
 various products. These incremental builds are a big timesaver when developing
 and debugging.
 
-    cd ${SWIFT_BUILD_ROOT}
+    cd ${SWIFT_BUILD_DIR}
     ninja swift
 
 This will build the swift compiler, but will not rebuild the standard library or
@@ -191,7 +191,7 @@ It is still always a good idea to do a full build after using `update-checkout`.
 
 #### Using Xcode
 
-To open the swift project in Xcode, open `${SWIFT_BUILD_ROOT}/Swift.xcodeproj`.
+To open the swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
 It will auto-create a *lot* of schemes for all of the available targets. A
 common debug flow would involve:
 
