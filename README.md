@@ -44,7 +44,7 @@ well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-c
 These instructions give the most direct path to a working Swift development
 environment. To build from source you will need 2 GB of disk space for the
 source code and over 20 GB of disk space for the build artifacts. The first
-build will take multiple hours, but incremental builds will finish much faster.
+build can take multiple hours, but incremental builds will finish much faster.
 
 
 ### System Requirements
@@ -69,7 +69,7 @@ which can be installed via a package manager:
 
     sudo port install cmake ninja
 
-Instructions for installing CMake and Ninja directly can be found [here](#build-dependencies)
+Instructions for installing CMake and Ninja directly can be found [below](#build-dependencies)
 
 #### Linux
 
@@ -113,14 +113,14 @@ options such as building a Swift-compatible LLDB, building the Swift Package
 Manager, building for iOS, running tests after builds, and more. It also
 supports presets, which you can define for common combinations of build options.
 
-View the inline help to find out more, in particular the section "Typical uses"
+View the inline help to find out more, in particular the section "Typical uses":
 
     utils/build-script -h
 
 A basic command to build Swift with optimizations and run basic tests with
 Ninja:
 
-    utils/build-script -r -t
+    utils/build-script --release --test
 
 ### Development Environment
 
@@ -130,19 +130,33 @@ supports more environments.
 
 To build using Xcode, run:
 
-    utils/build-script -x
+    utils/build-script --xcode
 
 The Xcode IDE can be used to edit the Swift source code, but it is not currently
-fully supported as a build environment for SDKs other than macOS. If you need to
-work with other SDKs, you'll need to create a second build using Ninja.
+fully supported as a build environment for SDKs other than macOS. The generated
+Xcode project does not integrate with the test runner, but the tests can be run
+with the 'check-swift' target.
+
+If you need to work with other SDKs, you'll need to create a second build using
+Ninja.
 
 To build using Ninja, run:
 
-    utils/build-script -R --debug-swift
+    utils/build-script --release
 
-This will build LLVM+Clang with optimizations and no debug symbols, but will
-build swift with debug symbols. This is a good starting point since the debugger
-will work in the swift code base, and the tests will run faster.
+If you are interested in compiler development it helps to build LLVM + Clang
+with optimizations enabled, but enable debug support in Swift. This is a good
+starting point since the debugger will work in the swift code base, and the
+tests will run faster.
+
+    utils/build-script --release-debuginfo --debug-swift
+
+If you are interested in standard library development, this will build a fully
+optimized compiler, but will build the standard library and swift overlays with
+debug information.
+
+    utils/build-script --release --debug-swift-stdlib
+
 
 #### Build Products
 
@@ -155,50 +169,67 @@ helps to save this directory as an environment variable for future use.
 
 #### Ninja
 
-Once the first build has been finished with `build-script`, ninja can perform
-fast incremental builds of various products.
+Once the first build has completed, ninja can perform fast incremental builds of
+various products. These incremental builds are a big timesaver when developing
+and debugging.
 
     cd ${SWIFT_BUILD_ROOT}
     ninja swift
+
+This will build the swift compiler, but will not rebuild the standard library or
+any other target. Building the `swift-stdlib` target as an additional layer of
+testing from time to time is also a good idea.
+
     ninja swift-stdlib
+    ninja benchmarks
 
-These incremental builds are a big timesaver when developing and debugging. It
-is still always a good idea to do a full build after using `update-checkout`.
-Building the `swift-stdlib` target as an additional layer of testing from time
-to time is also a good idea.
+This command will rebuild the stdlib, and is great for developers interested in
+working on the standard library. The `benchmarks` target can also help measure
+the impact of your change.
 
-#### Xcode
+It is still always a good idea to do a full build after using `update-checkout`.
 
-To open the swift in Xcode, open `${SWIFT_BUILD_ROOT}/Swift.xcodeproj`. It will
-auto-create a *lot* of schemes for all of the available targets. A common debug
-flow would involve:
+#### Using Xcode
 
- - Select the ‘swift’ scheme
- - Pull up the scheme editor (⌘+⇧+<)
- - Select the ‘Arguments’ tab and click the ‘+’
+To open the swift project in Xcode, open `${SWIFT_BUILD_ROOT}/Swift.xcodeproj`.
+It will auto-create a *lot* of schemes for all of the available targets. A
+common debug flow would involve:
+
+ - Select the 'swift' scheme
+ - Pull up the scheme editor (⌘⇧<)
+ - Select the 'Arguments' tab and click the '+'
  - Add the command line options
  - Close the scheme editor
  - Build and run
+
+Another option is to change the scheme to "Wait for executable to be launched",
+then run the build product in Terminal.
 
 ### Build Failures
 
 Make sure you are using the [correct release](#xcode) of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
-be related to the Xcode version, try passing `-- --rebuild` to `build-script`.
+be related to the Xcode version, try passing `--rebuild` to `build-script`.
+
+When a new version of Xcode is released, you can update your build without
+recompiling the entire project by passing the `--reconfigure` option.
 
 Make sure all repositories are up to date with the `update-checkout` command
 described above.
 
 ## Testing Swift
 
-See [docs/Testing.md](docs/Testing.md).
+See [docs/Testing.md](docs/Testing.md), in particular the section on [lit.py](docs/Testing.md#using-litpy).
 
-## Debugging the Compiler
+## Learning More
 
-See [docs/DebuggingTheCompiler.md](docs/DebuggingTheCompiler.md).
+Be sure to look through the [docs/] docs directory for more information about the
+compiler. In particular, the document on [Debugging The Compiler](docs/DebuggingTheCompiler.rst),
+and [Continuous Integration.md](docs/ContinuousIntegration.md) are very helpful
+to understand before submitting your first PR.
 
-## Documentation
+### Building Documentation
 
 To read the compiler documentation, start by installing the
 [Sphinx](http://sphinx-doc.org) documentation generator tool by running the command:
