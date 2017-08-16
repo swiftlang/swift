@@ -187,6 +187,7 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     PUBLISH_STAT(C, "Sema", NumLazyGenericEnvironments);
     PUBLISH_STAT(C, "Sema", NumLazyGenericEnvironmentsLoaded);
     PUBLISH_STAT(C, "Sema", NumLazyIterableDeclContexts);
+    PUBLISH_STAT(C, "Sema", NominalTypeLookupDirectCount);
     PUBLISH_STAT(C, "Sema", NumTypesDeserialized);
     PUBLISH_STAT(C, "Sema", NumTypesValidated);
     PUBLISH_STAT(C, "Sema", NumUnloadedLazyIterableDeclContexts);
@@ -277,6 +278,7 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
     PRINT_STAT(OS, delim, C, "Sema", NumLazyGenericEnvironments);
     PRINT_STAT(OS, delim, C, "Sema", NumLazyGenericEnvironmentsLoaded);
     PRINT_STAT(OS, delim, C, "Sema", NumLazyIterableDeclContexts);
+    PRINT_STAT(OS, delim, C, "Sema", NominalTypeLookupDirectCount);
     PRINT_STAT(OS, delim, C, "Sema", NumTypesDeserialized);
     PRINT_STAT(OS, delim, C, "Sema", NumTypesValidated);
     PRINT_STAT(OS, delim, C, "Sema", NumUnloadedLazyIterableDeclContexts);

@@ -45,6 +45,30 @@ namespace swift {
       CompilationTimersEnabled = State::Enabled;
     }
   };
+  
+  // A SharedTimer for recursive routines.
+  // Declare as a static, and call enter and exit.
+  class RecursiveSharedTimer {
+  private:
+    int recursionCount = 0;
+    const StringRef name;
+    SharedTimer *timer;
+  public:
+    RecursiveSharedTimer(StringRef name) : name(name), timer(nullptr) {}
+    
+    void enter() {
+      assert(recursionCount >= 0  &&  "too many exits");
+      if (recursionCount++ == 0)
+        timer = new SharedTimer(name);
+    }
+    void exit() {
+      assert(recursionCount > 0  &&  "too many exits");
+      if (--recursionCount == 0) {
+        delete timer;
+        timer = nullptr;
+      }
+    }
+  };
 } // end namespace swift
 
 #endif // SWIFT_BASIC_TIMER_H

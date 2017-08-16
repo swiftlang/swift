@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTScope.h"
@@ -1191,6 +1192,12 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
+  static RecursiveSharedTimer timer("lookupDirect");
+  timer.enter();
+  ASTContext &ctx = getASTContext();
+  if (ctx.Stats)
+    ++ctx.Stats->getFrontendCounters().NominalTypeLookupDirectCount;
+  
   (void)getMembers();
 
   // Make sure we have the complete list of members (in this nominal and in all
@@ -1204,6 +1211,8 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
 
   // Look for the declarations with this name.
   auto known = LookupTable.getPointer()->find(name);
+  timer.exit();
+  
   if (known == LookupTable.getPointer()->end())
     return { };
 

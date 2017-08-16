@@ -101,6 +101,7 @@ public:
     size_t NumLazyGenericEnvironments;
     size_t NumLazyGenericEnvironmentsLoaded;
     size_t NumLazyIterableDeclContexts;
+    size_t NominalTypeLookupDirectCount;
     size_t NumTypesDeserialized;
     size_t NumTypesValidated;
     size_t NumUnloadedLazyIterableDeclContexts;
