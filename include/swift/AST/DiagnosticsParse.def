@@ -895,6 +895,11 @@ WARNING(swift3_unlabeled_parameter_following_variadic_parameter,none,
 ERROR(unlabeled_parameter_following_variadic_parameter,none,
       "a parameter following a variadic parameter requires a label", ())
 
+ERROR(enum_element_empty_arglist,none,
+      "empty enum element argument list must be spelled with 'Void'", ())
+WARNING(enum_element_empty_arglist_swift3,none,
+        "empty enum element argument list must be spelled with 'Void'", ())
+
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------

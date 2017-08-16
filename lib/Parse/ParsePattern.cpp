@@ -168,6 +168,21 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                                           SyntaxKind::FunctionParameterList);
     }
     rightParenLoc = consumeToken(tok::r_paren);
+
+    // Per SE-0155, enum elements may not have empty parameter lists.
+    // Diagnose and insert 'Void' where appropriate.
+    if (paramContext == ParameterContextKind::EnumElement) {
+      decltype(diag::enum_element_empty_arglist) diagnostic;
+      if (Context.isSwiftVersion3()) {
+        diagnostic = diag::enum_element_empty_arglist_swift3;
+      } else {
+        diagnostic = diag::enum_element_empty_arglist;
+      }
+
+      diagnose(leftParenLoc, diagnostic)
+        .highlight({leftParenLoc, rightParenLoc})
+        .fixItInsert(leftParenLoc, "Void");
+    }
     return ParserStatus();
   }
 
