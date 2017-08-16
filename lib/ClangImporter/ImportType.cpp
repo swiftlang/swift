@@ -1765,7 +1765,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>()) {
     const clang::EnumDecl *enumDef = enumTy->getDecl()->getDefinition();
-    if (nameImporter.getEnumKind(enumDef) == EnumKind::Options) {
+    if (enumDef && nameImporter.getEnumKind(enumDef) == EnumKind::Options) {
       auto enumName = enumDef->getName();
       for (auto word : reversed(camel_case::getWords(enumName))) {
         if (camel_case::sameWordIgnoreFirstCase(word, "options"))

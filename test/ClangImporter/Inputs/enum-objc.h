@@ -18,3 +18,8 @@ void forwardWithUnderlyingValue(enum ForwardEnumWithUnderlyingType);
 void forwardWithUnderlyingPointer(enum ForwardEnumWithUnderlyingType * _Nonnull);
 void forwardObjCValue(ForwardObjCEnum);
 void forwardObjCPointer(ForwardObjCEnum * _Nonnull);
+
+@interface SomeClass : NSObject
++ (void)tryInferDefaultArgumentUnderlyingValue:(bool)dummy options:(enum ForwardEnumWithUnderlyingType)options;
++ (void)tryInferDefaultArgumentObjCValue:(bool)dummy options:(ForwardObjCEnum)options;
+@end
