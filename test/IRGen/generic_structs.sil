@@ -134,7 +134,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %a = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.a2
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
+  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i64 3
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 2
   // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
@@ -143,7 +143,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %b = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.b
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
+  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i64 3
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 3
   // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
@@ -153,7 +153,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %c = struct_element_addr %5 : $*SingleDynamic<B>, #SingleDynamic.x
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
+  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i64 3
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 4
   // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
@@ -214,7 +214,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK:   store i8* [[VWTABLE_VAL]], i8** [[VWTABLE_SLOT_ADDR]], align 8
 //   Lay out fields.
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i64, i64* [[T0]], i32 3
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i64, i64* [[T0]], i64 3
 // CHECK:   [[T2:%.*]] = getelementptr inbounds i8**, i8*** [[TYPES:%.*]], i32 0
 // CHECK:   call void @swift_initStructMetadata_UniversalStrategy(i64 1, i8*** [[TYPES]], i64* [[T1]], i8** [[VWTABLE_ADDR]])
 // CHECK:   ret %swift.type* [[METADATA]]

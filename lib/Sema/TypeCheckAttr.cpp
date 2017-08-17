@@ -284,20 +284,21 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
 void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
 
+  // Verify we don't have both mutating and nonmutating.
+  if (FD->getAttrs().hasAttribute<MutatingAttr>() &&
+      FD->getAttrs().getAttribute<NonMutatingAttr>()) {
+    TC.diagnose(attr->getLocation(), diag::functions_mutating_and_not);
+    attr->setInvalid();
+  }
+
   auto contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
   if (!contextTy)
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
 
   if (contextTy->hasReferenceSemantics())
-    return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes);
-  
-  // Verify we don't have both mutating and nonmutating.
-  if (FD->getAttrs().hasAttribute<MutatingAttr>())
-    if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
-      diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not);
-      if (NMA == attr) return;
-    }
-  
+    return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
+                                 isa<NonMutatingAttr>(attr));
+
   // Verify that we don't have a static function.
   if (FD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
@@ -1978,56 +1979,49 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
     return;
 
   auto ownershipKind = attr->get();
-  assert(ownershipKind != Ownership::Strong &&
-         "Cannot specify 'strong' in an ownership attribute");
 
   // A weak variable must have type R? or R! for some ownership-capable type R.
   Type underlyingType = type;
-  if (ownershipKind == Ownership::Weak) {
+  switch (ownershipKind) {
+  case Ownership::Strong:
+    llvm_unreachable("Cannot specify 'strong' in an ownership attribute");
+  case Ownership::Unowned:
+  case Ownership::Unmanaged:
+    break;
+  case Ownership::Weak:
     if (var->isLet()) {
       diagnose(var->getStartLoc(), diag::invalid_weak_let);
       attr->setInvalid();
-      return;
     }
 
-    if (Type objType = type->getAnyOptionalObjectType())
+    if (Type objType = type->getAnyOptionalObjectType()) {
       underlyingType = objType;
-    else if (type->allowsOwnership()) {
-      // Use this special diagnostic if it's actually a reference type but just
-      // isn't Optional.
-      if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
-        // Let @IBOutlet complain about this; it's more specific.
-        attr->setInvalid();
-        return;
-      }
-
-      diagnose(var->getStartLoc(), diag::invalid_weak_ownership_not_optional,
-               OptionalType::get(type));
-      attr->setInvalid();
-
-      return;
     } else {
-      // This is also an error, but the code below will diagnose it.
+      // @IBOutlet must be optional, but not necessarily weak. Let it diagnose.
+      if (!var->getAttrs().hasAttribute<IBOutletAttr>()) {
+        diagnose(var->getStartLoc(), diag::invalid_weak_ownership_not_optional,
+                 OptionalType::get(type));
+      }
+      attr->setInvalid();
     }
-  } else if (ownershipKind == Ownership::Strong) {
-    // We allow strong on optional-qualified reference types.
-    if (Type objType = type->getAnyOptionalObjectType())
-      underlyingType = objType;
+    break;
   }
 
   if (!underlyingType->allowsOwnership()) {
-    // If we have an opaque type, suggest the possibility of adding
-    // a class bound.
-    if (type->isExistentialType() || type->is<ArchetypeType>()) {
-      diagnose(var->getStartLoc(), diag::invalid_ownership_protocol_type,
-               (unsigned) ownershipKind, underlyingType);
-    } else {
-      diagnose(var->getStartLoc(), diag::invalid_ownership_type,
-               (unsigned) ownershipKind, underlyingType);
+    auto D = diag::invalid_ownership_type;
+
+    if (underlyingType->isExistentialType() ||
+        underlyingType->is<ArchetypeType>()) {
+      // Suggest the possibility of adding a class bound.
+      D = diag::invalid_ownership_protocol_type;
     }
+
+    diagnose(var->getStartLoc(), D, (unsigned) ownershipKind, underlyingType);
     attr->setInvalid();
-    return;
   }
+
+  if (attr->isInvalid())
+    return;
 
   // Change the type to the appropriate reference storage type.
   var->setType(ReferenceStorageType::get(

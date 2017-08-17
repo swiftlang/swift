@@ -1157,22 +1157,56 @@ static void
 addLinkSanitizerLibArgsForLinux(const ArgList &Args,
                                  ArgStringList &Arguments,
                                  StringRef Sanitizer, const ToolChain &TC) {
+  addLinkRuntimeLibForLinux(Args, Arguments,
+      getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
 
-     addLinkRuntimeLibForLinux(Args, Arguments,
-         getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
+  // Code taken from
+  // https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
+  // There's no libpthread or librt on RTEMS.
+  if (TC.getTriple().getOS() != llvm::Triple::RTEMS) {
+    Arguments.push_back("-lpthread");
+    Arguments.push_back("-lrt");
+  }
+  Arguments.push_back("-lm");
 
-	//Code here from https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
-    // There's no libpthread or librt on RTEMS.
-    if (TC.getTriple().getOS() != llvm::Triple::RTEMS) {
-      Arguments.push_back("-lpthread");
-      Arguments.push_back("-lrt");
-    }
-    Arguments.push_back("-lm");
-    // There's no libdl on FreeBSD or RTEMS.
-    if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
-        TC.getTriple().getOS() != llvm::Triple::RTEMS)
-      Arguments.push_back("-ldl");
-	
+  // There's no libdl on FreeBSD or RTEMS.
+  if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
+      TC.getTriple().getOS() != llvm::Triple::RTEMS)
+    Arguments.push_back("-ldl");
+}
+
+static void
+addLinkFuzzerLibArgsForDarwin(const ArgList &Args,
+                       ArgStringList &Arguments,
+                       const ToolChain &TC) {
+
+  // libFuzzer requires C++.
+  Arguments.push_back("-lc++");
+
+  // Link libfuzzer.
+  SmallString<128> Dir;
+  getRuntimeLibraryPath(Dir, Args, TC);
+  llvm::sys::path::remove_filename(Dir);
+  llvm::sys::path::append(Dir, "llvm", "libLLVMFuzzer.a");
+  SmallString<128> P(Dir);
+
+  Arguments.push_back(Args.MakeArgString(P));
+}
+
+static void
+addLinkFuzzerLibArgsForLinux(const ArgList &Args,
+                             ArgStringList &Arguments,
+                             const ToolChain &TC) {
+  Arguments.push_back("-lstdc++");
+
+  // Link libfuzzer.
+  SmallString<128> Dir;
+  getRuntimeLibraryPath(Dir, Args, TC);
+  llvm::sys::path::remove_filename(Dir);
+  llvm::sys::path::append(Dir, "llvm", "libLLVMFuzzer.a");
+  SmallString<128> P(Dir);
+
+  Arguments.push_back(Args.MakeArgString(P));
 }
 
 ToolChain::InvocationInfo
@@ -1305,11 +1339,16 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   // Linking sanitizers will add rpaths, which might negatively interact when
   // other rpaths are involved, so we should make sure we add the rpaths after
   // all user-specified rpaths.
-  if (context.OI.SelectedSanitizer == SanitizerKind::Address)
+  if (context.OI.SelectedSanitizers & SanitizerKind::Address)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
 
-  if (context.OI.SelectedSanitizer == SanitizerKind::Thread)
+  if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
+
+  // Only link in libFuzzer for executables.
+  if (job.getKind() == LinkKind::Executable &&
+      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
+    addLinkFuzzerLibArgsForDarwin(context.Args, Arguments, *this);
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {
@@ -1678,11 +1717,14 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   if (getTriple().getOS() == llvm::Triple::Linux) {
     //Make sure we only add SanitizerLibs for executables
     if (job.getKind() == LinkKind::Executable) {
-      if (context.OI.SelectedSanitizer == SanitizerKind::Address) 
+      if (context.OI.SelectedSanitizers & SanitizerKind::Address)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "asan", *this);
 
-      if (context.OI.SelectedSanitizer == SanitizerKind::Thread) 
+      if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
+
+      if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
+        addLinkFuzzerLibArgsForLinux(context.Args, Arguments, *this);
     }
   }
 

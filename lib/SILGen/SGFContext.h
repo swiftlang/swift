@@ -156,10 +156,21 @@ public:
     result.state.setInt(state.getInt());
     return result;
   }
+
+  /// Get a context for a sub-expression where we plan to evaluate arbitrary
+  /// side-effects. This means we propagate down the initialization, but
+  /// eliminates the +0/+1-ness.
+  SGFContext withSubExprSideEffects() const {
+    if (auto *init = getEmitInto()) {
+      return SGFContext(init);
+    }
+
+    return SGFContext();
+  }
 };
 
 using ValueProducerRef =
-  llvm::function_ref<ManagedValue(SILGenFunction &gen, SILLocation loc,
+  llvm::function_ref<ManagedValue(SILGenFunction &SGF, SILLocation loc,
                                   SGFContext context)>;
 
 } // end namespace Lowering

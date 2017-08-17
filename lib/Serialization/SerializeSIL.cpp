@@ -74,6 +74,15 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   llvm_unreachable("bad linkage");
 }
 
+static unsigned toStableVTableEntryKind(SILVTable::Entry::Kind kind) {
+  switch (kind) {
+  case SILVTable::Entry::Kind::Normal: return SIL_VTABLE_ENTRY_NORMAL;
+  case SILVTable::Entry::Kind::Inherited: return SIL_VTABLE_ENTRY_INHERITED;
+  case SILVTable::Entry::Kind::Override: return SIL_VTABLE_ENTRY_OVERRIDE;
+  }
+  llvm_unreachable("bad vtable entry kind");
+}
+
 static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
   switch (kind) {
   case CastConsumptionKind::TakeAlways:
@@ -2029,6 +2038,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
         SILAbbrCodes[VTableEntryLayout::Code],
         // SILFunction name
         S.addDeclBaseNameRef(Ctx.getIdentifier(entry.Implementation->getName())),
+        toStableVTableEntryKind(entry.TheKind),
         toStableSILLinkage(entry.Linkage),
         ListOfValues);
   }

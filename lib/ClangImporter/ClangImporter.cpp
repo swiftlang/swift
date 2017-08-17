@@ -1289,13 +1289,23 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 
   std::string result;
   bool success = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
-    clang::RewriteIncludesAction action;
-    action.BeginSourceFile(rewriteInstance,
-                           invocation->getFrontendOpts().Inputs.front());
+    // A much simpler version of clang::RewriteIncludesAction that lets us
+    // write to an in-memory buffer.
+    class RewriteIncludesAction : public clang::PreprocessorFrontendAction {
+      raw_ostream &OS;
+
+      void ExecuteAction() override {
+        clang::CompilerInstance &compiler = getCompilerInstance();
+        clang::RewriteIncludesInInput(compiler.getPreprocessor(), &OS,
+                                      compiler.getPreprocessorOutputOpts());
+      }
+    public:
+      explicit RewriteIncludesAction(raw_ostream &os) : OS(os) {}
+    };
+
     llvm::raw_string_ostream os(result);
-    clang::RewriteIncludesInInput(rewriteInstance.getPreprocessor(), &os,
-                                  rewriteInstance.getPreprocessorOutputOpts());
-    action.EndSourceFile();
+    RewriteIncludesAction action(os);
+    rewriteInstance.ExecuteAction(action);
   });
 
   success |= !rewriteInstance.getDiagnostics().hasErrorOccurred();

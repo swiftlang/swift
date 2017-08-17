@@ -1545,10 +1545,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // "Code" off the end of the name, if it's there, because it's
   // redundant.
   if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
-    auto enumInfo = getEnumInfo(enumDecl);
-    if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
-        camel_case::getLastWord(baseName) == "Code")
-      baseName = baseName.substr(0, baseName.size() - 4);
+    if (enumDecl->isThisDeclarationADefinition()) {
+      auto enumInfo = getEnumInfo(enumDecl);
+      if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
+          camel_case::getLastWord(baseName) == "Code")
+        baseName = baseName.substr(0, baseName.size() - 4);
+    }
   }
 
   // Objective-C protocols may have the suffix "Protocol" appended if

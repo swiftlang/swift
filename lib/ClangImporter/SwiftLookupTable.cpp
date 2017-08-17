@@ -1677,6 +1677,7 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
                                       NameImporter &nameImporter) {
   auto &pp = nameImporter.getClangPreprocessor();
   auto *tu = nameImporter.getClangContext().getTranslationUnitDecl();
+  bool isModule = pp.getLangOpts().isCompilingModule();
   for (const auto &macro : pp.macros(false)) {
     auto maybeAddMacro = [&](clang::MacroInfo *info,
                              clang::ModuleMacro *moduleMacro) {
@@ -1694,6 +1695,19 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
         return;
       if (pp.getSourceManager().getFileID(loc) == pp.getPredefinesFileID())
         return;
+
+      // If we're in a module, we really need moduleMacro to be valid.
+      if (isModule && !moduleMacro) {
+#ifndef NDEBUG
+        // Refetch this just for the assertion.
+        clang::MacroDirective *MD = pp.getLocalMacroDirective(macro.first);
+        assert(isa<clang::VisibilityMacroDirective>(MD));
+#endif
+
+        // FIXME: "public" visibility macros should actually be added to the 
+        // table.
+        return;
+      }
 
       // Add this entry.
       auto name = nameImporter.importMacroName(macro.first, info);
@@ -1713,8 +1727,8 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
       if (!MD)
         continue;
 
-      // If we hit a builtin macro, we're done.
       maybeAddMacro(MD->getMacroInfo(), nullptr);
+
     } else {
       SmallVector<clang::ModuleMacro *, 8> worklist;
       worklist.append(moduleMacros.begin(), moduleMacros.end());

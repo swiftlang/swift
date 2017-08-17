@@ -344,7 +344,7 @@ func resyncParserB5() {}
 for var i = 0; ; {
   #^TOP_LEVEL_STMT_5^#
 // TOP_LEVEL_STMT_5: Begin completions
-// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#Int#]{{; name=.+$}}
+// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
 // TOP_LEVEL_STMT_5: End completions
 }
 
@@ -396,7 +396,6 @@ func resyncParserB11() {}
 // rdar://21346928
 func optStr() -> String? { return nil }
 let x = (optStr() ?? "autoclosure").#^TOP_LEVEL_AUTOCLOSURE_1^#
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      unicodeScalars[#String.UnicodeScalarView#]
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
 

@@ -379,9 +379,9 @@ public:
 
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
-    typeCheckStmt(S);
+    bool HadError = typeCheckStmt(S);
     setAutoClosureDiscriminators(DC, S);
-    return false;
+    return HadError;
   }
   
   //===--------------------------------------------------------------------===//
@@ -545,37 +545,6 @@ public:
     TC.typeCheckCondition(E, DC);
     RWS->setCond(E);
     return RWS;
-  }
-  Stmt *visitForStmt(ForStmt *FS) {
-    // Type check any var decls in the initializer.
-    for (auto D : FS->getInitializerVarDecls())
-      TC.typeCheckDecl(D, /*isFirstPass*/false);
-
-    if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
-      TC.typeCheckExpression(Initializer, DC, TypeLoc(), CTP_Unused,
-                             TypeCheckExprFlags::IsDiscarded);
-      FS->setInitializer(Initializer);
-      TC.checkIgnoredExpr(Initializer);
-    }
-
-    if (auto *Cond = FS->getCond().getPtrOrNull()) {
-      TC.typeCheckCondition(Cond, DC);
-      FS->setCond(Cond);
-    }
-
-    if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
-      TC.typeCheckExpression(Increment, DC, TypeLoc(), CTP_Unused,
-                             TypeCheckExprFlags::IsDiscarded);
-      FS->setIncrement(Increment);
-      TC.checkIgnoredExpr(Increment);
-    }
-
-    AddLabeledStmt loopNest(*this, FS);
-    Stmt *S = FS->getBody();
-    typeCheckStmt(S);
-    FS->setBody(S);
-    
-    return FS;
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
@@ -1631,17 +1600,18 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
   return HadError;
 }
 
-void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
+bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   BraceStmt *body = closure->getBody();
 
   Optional<FunctionBodyTimer> timer;
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(closure, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
-  StmtChecker(*this, closure).typeCheckBody(body);
+  bool HadError = StmtChecker(*this, closure).typeCheckBody(body);
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());
   }
+  return HadError;
 }
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

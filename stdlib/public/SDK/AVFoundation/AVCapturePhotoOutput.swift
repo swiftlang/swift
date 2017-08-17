@@ -16,7 +16,7 @@ import Foundation
 
 #if os(iOS)
 
-internal protocol _AVCapturePhotoOutputSwiftNativeTypes {
+public protocol _AVCapturePhotoOutputSwiftNativeTypes {
   var __supportedFlashModes: [NSNumber] { get }
   var __availablePhotoPixelFormatTypes: [NSNumber] { get }
   var __availableRawPhotoPixelFormatTypes: [NSNumber] { get }
@@ -71,7 +71,7 @@ extension AVCapturePhotoOutput : _AVCapturePhotoOutputSwiftNativeTypes {
 }
 
 
-internal protocol _AVCapturePhotoSettingsSwiftNativeTypes {
+public protocol _AVCapturePhotoSettingsSwiftNativeTypes {
   var __availablePreviewPhotoPixelFormatTypes: [NSNumber] { get }
 }
 

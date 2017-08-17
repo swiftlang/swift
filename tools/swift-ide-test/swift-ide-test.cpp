@@ -1034,6 +1034,8 @@ private:
     for (auto &Elem : Node.Elements) {
       tagRange(Elem.Range, getTagName(Elem.Kind), Node);
     }
+    if (Node.TypeRange.isValid() && Node.Range.contains(Node.TypeRange))
+      tagRange(Node.TypeRange, "type", Node);
 
     return true;
   }
@@ -1067,13 +1069,13 @@ private:
       case SyntaxStructureKind::InstanceVariable: return "property";
       case SyntaxStructureKind::StaticVariable: return "svar";
       case SyntaxStructureKind::ClassVariable: return "cvar";
+      case SyntaxStructureKind::LocalVariable: return "lvar";
       case SyntaxStructureKind::EnumCase: return "enum-case";
       case SyntaxStructureKind::EnumElement: return "enum-elem";
       case SyntaxStructureKind::TypeAlias: return "typealias";
       case SyntaxStructureKind::Subscript: return "subscript";
       case SyntaxStructureKind::Parameter: return "param";
       case SyntaxStructureKind::ForEachStatement: return "foreach";
-      case SyntaxStructureKind::ForStatement: return "for";
       case SyntaxStructureKind::WhileStatement: return "while";
       case SyntaxStructureKind::RepeatWhileStatement: return "repeat-while";
       case SyntaxStructureKind::IfStatement: return "if";

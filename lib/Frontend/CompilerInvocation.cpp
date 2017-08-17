@@ -1474,15 +1474,15 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
-    Opts.Sanitize = parseSanitizerArgValues(
-        A, Triple, Diags,
+    Opts.Sanitizers = parseSanitizerArgValues(
+        Args, A, Triple, Diags,
         /* sanitizerRuntimeLibExists= */[](StringRef libName) {
 
           // The driver has checked the existence of the library
           // already.
           return true;
         });
-    IRGenOpts.Sanitize = Opts.Sanitize;
+    IRGenOpts.Sanitizers = Opts.Sanitizers;
   }
 
   if (Opts.Optimization > SILOptions::SILOptMode::None)
@@ -1667,9 +1667,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
-        parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitize);
+        parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitizers);
+  } else if (Opts.Sanitizers & SanitizerKind::Fuzzer) {
+
+    // Automatically set coverage flags, unless coverage type was explicitly
+    // requested.
+    Opts.SanitizeCoverage.IndirectCalls = true;
+    Opts.SanitizeCoverage.TraceCmp = true;
+    Opts.SanitizeCoverage.TracePCGuard = true;
+    Opts.SanitizeCoverage.CoverageType = llvm::SanitizerCoverageOptions::SCK_Edge;
   }
 
   if (Args.hasArg(OPT_disable_reflection_metadata)) {

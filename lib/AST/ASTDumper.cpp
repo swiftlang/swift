@@ -1458,35 +1458,6 @@ public:
     printRec(S->getCond());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitForStmt(ForStmt *S) {
-    printCommon(S, "for_stmt") << '\n';
-    if (!S->getInitializerVarDecls().empty()) {
-      for (auto D : S->getInitializerVarDecls()) {
-        printRec(D);
-        OS << '\n';
-      }
-    } else if (auto *Initializer = S->getInitializer().getPtrOrNull()) {
-      printRec(Initializer);
-      OS << '\n';
-    } else {
-      OS.indent(Indent+2) << "<null initializer>\n";
-    }
-
-    if (auto *Cond = S->getCond().getPtrOrNull())
-      printRec(Cond);
-    else
-      OS.indent(Indent+2) << "<null condition>";
-    OS << '\n';
-
-    if (auto *Increment = S->getIncrement().getPtrOrNull()) {
-      printRec(Increment);
-    } else {
-      OS.indent(Indent+2) << "<null increment>";
-    }
-    OS << '\n';
-    printRec(S->getBody());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
   void visitForEachStmt(ForEachStmt *S) {
     printCommon(S, "for_each_stmt") << '\n';
     printRec(S->getPattern());

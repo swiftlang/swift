@@ -59,7 +59,7 @@ public func functionWithResilientTypes(_ r: Rectangle) {
 
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct9RectangleVMa()
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
-// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], i32 3
+// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] 3
 // CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[FIELD_OFFSET_VECTOR]], i32 2
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
 // CHECK-NEXT: [[STRUCT_ADDR:%.*]] = bitcast %T16resilient_struct9RectangleV* %0 to i8*
@@ -116,7 +116,7 @@ public struct StructWithResilientStorage {
 // CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @_T017struct_resilience26StructWithResilientStorageV1nSifg(%T17struct_resilience26StructWithResilientStorageV* {{.*}})
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_T017struct_resilience26StructWithResilientStorageVMa()
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
-// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], i32 3
+// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] 3
 // CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[FIELD_OFFSET_VECTOR]], i32 2
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
 // CHECK-NEXT: [[STRUCT_ADDR:%.*]] = bitcast %T17struct_resilience26StructWithResilientStorageV* %0 to i8*

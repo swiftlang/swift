@@ -24,20 +24,52 @@
 #define SWIFT_LOWERING_RVALUE_H
 
 #include "ManagedValue.h"
+#include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 namespace Lowering {
 
 class Initialization;
+class Scope;
 class SILGenFunction;
+class TypeLowering;
 
 /// An "exploded" SIL rvalue, in which tuple values are recursively
 /// destructured.
 ///
+/// In terms of implementation, an RValue is a collection of ManagedValues that
+/// the RValue class allows to be worked with as if they were one tuple. This
+/// allows for tuples to represent tuples without needing to canonicalize into
+/// the actual tuple value.
+///
+/// Once constructed, RValues obey the following invariants:
+///
+///   1. All non-trivially typed sub-ManagedValues must consistently have
+///   cleanups. This is verified upon construction of an RValue.
+///
+///   2. All sub-ManagedValues with non-trivial ValueOwnershipKind must have the
+///   same ValueOwnershipKind. There is a subtle thing occuring here. Since all
+///   addresses are viewed from an ownership perspective as having trivial
+///   ownership, this causes the verification to ignore address only
+///   values. Once we transition to opaque values, the verification will
+///   proceed.
+///
+///   3. All loadable sub-ManagedValues of an RValue must be of object
+///   type. This means that if the lowered type of an RValue is loadable, then
+///   the RValue's sub-parts must also be objects (i.e. not
+///   addresses). Originally this was a hard invariant of RValue constructors,
+///   but some parts of ArgEmission pass in addresses for loadable values. So
+///   RValue loads them in the constructor.
+///
+///  FIXME(opaque_values): Update invariant #2 once address only types are no
+///  longer emitted by SILGen.
+///
 /// *NOTE* In SILGen we don't try to explode structs, because doing so would
 /// require considering resilience, a job we want to delegate to IRGen.
 class RValue {
+  friend class swift::Lowering::Scope;
+
   std::vector<ManagedValue> values;
   CanType type;
   unsigned elementsToBeAdded;
@@ -64,19 +96,25 @@ class RValue {
   }
 
   /// Private constructor used by copy() and borrow().
-  RValue(std::vector<ManagedValue> &&values, CanType type,
+  RValue(SILGenFunction &SGF, std::vector<ManagedValue> &&values, CanType type,
          unsigned elementsToBeAdded)
       : values(std::move(values)), type(type),
         elementsToBeAdded(elementsToBeAdded) {
-    verifyConsistentOwnership();
+    verify(SGF);
   }
 
-  /// Construct an RValue from a pre-exploded set of ManagedValues.
+  /// Private constructor for RValue::extractElement and pre-exploded element
+  /// constructor.
   ///
-  /// Used to implement the extractElement* methods. *NOTE* This constructor
-  /// assumes that the constructed RValue is fully formed and thus has
-  /// elementsToBeAdded set to zero.
-  RValue(ArrayRef<ManagedValue> values, CanType type);
+  /// If SGF is nullptr, this constructor assumes that it is passed a
+  /// pre-exploded set of ManagedValues that have already been verified as being
+  /// RValue compatible since they once made up an RValue. If SGF is non-null,
+  /// then we verify as well that all objects of loadable type are actually
+  /// loaded (i.e. are objects).
+  ///
+  /// *NOTE* This constructor assumes that the constructed RValue is fully
+  /// formed and thus has elementsToBeAdded set to zero.
+  RValue(SILGenFunction *SGF, ArrayRef<ManagedValue> values, CanType type);
 
   RValue(unsigned state) : elementsToBeAdded(state) {
     assert(isInSpecialState());
@@ -116,11 +154,12 @@ public:
   /// will be exploded.
   RValue(SILGenFunction &SGF, SILLocation l, CanType type, ManagedValue v);
 
-  /// Construct an RValue from a pre-exploded set of ManagedValues.
+  /// Create a complete RValue from a pre-exploded set of elements.
   ///
-  /// This is used to implement the extractElement* methods.
-  static RValue withPreExplodedElements(ArrayRef<ManagedValue> values,
-                                        CanType type);
+  /// Since the RValue is assumed to be complete, no further values can be
+  /// added.
+  RValue(SILGenFunction &SGF, ArrayRef<ManagedValue> values, CanType type)
+      : RValue(&SGF, values, type) {}
 
   /// Creates an invalid RValue object, in an "in-context" state.
   static RValue forInContext() {
@@ -259,6 +298,20 @@ public:
   
   CanType getType() const & { return type; }
 
+  /// Return the lowered type associated with the given CanType's type lowering.
+  SILType getLoweredType(SILGenFunction &SGF) const &;
+
+  /// Return the type lowering of RValue::getType().
+  const Lowering::TypeLowering &getTypeLowering(SILGenFunction &SGF) const &;
+
+  /// Return the lowered SILType that would be used to implode the given RValue
+  /// into 1 tuple value.
+  ///
+  /// This means that if any sub-objects are address only, an address type will
+  /// be returned. Otherwise, an object will be returned. So this is a
+  /// convenient way to determine if an RValue needs an address.
+  SILType getLoweredImplodedTupleType(SILGenFunction &SGF) const &;
+
   /// Rewrite the type of this r-value.
   void rewriteType(CanType newType) & {
 #ifndef NDEBUG
@@ -305,12 +358,13 @@ public:
   void dump() const;
   void dump(raw_ostream &OS, unsigned indent = 0) const;
 
-private:
-  /// Assert that all non-trivial ManagedValues in this RValue either all have a
-  /// cleanup or all do not have a cleanup.
+  /// Verify RValue invariants.
+  ///
+  /// This checks ownership invariants and also checks that all sub managed
+  /// values that are loadable are actually objects.
   ///
   /// *NOTE* This is a no-op in non-assert builds.
-  void verifyConsistentOwnership() const;
+  void verify(SILGenFunction &SGF) const &;
 };
 
 } // end namespace Lowering

@@ -374,6 +374,9 @@ private:
                           FloatingRequirementSource source,
                           UnresolvedHandlingKind unresolvedHandling);
 
+  /// Note that we have added the nested type nestedPA
+  void addedNestedType(PotentialArchetype *nestedPA);
+
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
   ConstraintResult addSameTypeRequirementBetweenArchetypes(
@@ -765,6 +768,12 @@ public:
     /// This is a root requirement source.
     NestedTypeNameMatch,
 
+    /// The requirement is the implicit binding of a potential archetype to
+    /// the interface type of the concrete type declaration it represents.
+    ///
+    /// This is a root requirement source.
+    ConcreteTypeBinding,
+
     /// The requirement is a protocol requirement.
     ///
     /// This stores the protocol that introduced the requirement as well as the
@@ -853,6 +862,7 @@ private:
     case Inferred:
     case QuietlyInferred:
     case NestedTypeNameMatch:
+    case ConcreteTypeBinding:
     case Superclass:
     case Parent:
     case Concrete:
@@ -893,6 +903,7 @@ private:
     case QuietlyInferred:
     case RequirementSignatureSelf:
     case NestedTypeNameMatch:
+    case ConcreteTypeBinding:
       return true;
 
     case ProtocolRequirement:
@@ -1011,6 +1022,11 @@ public:
   static const RequirementSource *forNestedTypeNameMatch(
                                      PotentialArchetype *root);
 
+  /// Retrieve a requirement source describing when a concrete type
+  /// declaration is used to define a potential archetype.
+  static const RequirementSource *forConcreteTypeBinding(
+                                     PotentialArchetype *root);
+
 private:
   /// A requirement source that describes that a requirement comes from a
   /// requirement of the given protocol described by the parent.
@@ -1021,7 +1037,6 @@ private:
                              bool inferred,
                              WrittenRequirementLoc writtenLoc =
                                WrittenRequirementLoc()) const;
-
 public:
   /// A requirement source that describes that a requirement that is resolved
   /// via a superclass requirement.
@@ -1045,6 +1060,17 @@ public:
   /// A constraint source that describes a constraint that is structurally
   /// derived from another constraint but does not require further information.
   const RequirementSource *viaDerived(GenericSignatureBuilder &builder) const;
+
+  /// Form a new requirement source without the subpath [start, end).
+  ///
+  /// Removes a redundant sub-path \c [start, end) from the requirement source,
+  /// creating a new requirement source comprised on \c start followed by
+  /// everything that follows \c end.
+  /// It is the caller's responsibility to ensure that the path up to \c start
+  /// and the path through \c start to \c end produce the same thing.
+  const RequirementSource *withoutRedundantSubpath(
+                                          const RequirementSource *start,
+                                          const RequirementSource *end) const;
 
   /// Retrieve the root requirement source.
   const RequirementSource *getRoot() const;
@@ -1118,19 +1144,21 @@ public:
   /// if they are equivalent in length.
   int compare(const RequirementSource *other) const;
 
+  /// Retrieve the written requirement location, if there is one.
+  WrittenRequirementLoc getWrittenRequirementLoc() const {
+    if (!hasTrailingWrittenRequirementLoc) return WrittenRequirementLoc();
+    return getTrailingObjects<WrittenRequirementLoc>()[0];
+  }
+
   /// Retrieve the type representation for this requirement, if there is one.
   const TypeRepr *getTypeRepr() const {
-    if (!hasTrailingWrittenRequirementLoc) return nullptr;
-    return getTrailingObjects<WrittenRequirementLoc>()[0]
-             .dyn_cast<const TypeRepr *>();
+    return getWrittenRequirementLoc().dyn_cast<const TypeRepr *>();
   }
 
   /// Retrieve the requirement representation for this requirement, if there is
   /// one.
   const RequirementRepr *getRequirementRepr() const {
-    if (!hasTrailingWrittenRequirementLoc) return nullptr;
-    return getTrailingObjects<WrittenRequirementLoc>()[0]
-             .dyn_cast<const RequirementRepr *>();
+    return getWrittenRequirementLoc().dyn_cast<const RequirementRepr *>();
   }
 
   /// Retrieve the type stored in this requirement.
@@ -1271,9 +1299,8 @@ public:
   }
 
   static FloatingRequirementSource forNestedTypeNameMatch(
-                                     const RequirementSource *base,
                                      Identifier nestedName) {
-    FloatingRequirementSource result{ NestedTypeNameMatch, base };
+    FloatingRequirementSource result{ NestedTypeNameMatch, Storage() };
     result.nestedName = nestedName;
     return result;
   };
@@ -1401,11 +1428,11 @@ class GenericSignatureBuilder::PotentialArchetype {
   friend class GenericSignatureBuilder;
   friend class GenericSignature;
 
-  /// \brief Retrieve the debug name of this potential archetype.
-  std::string getDebugName() const;
-
 public:
   ~PotentialArchetype();
+
+  /// \brief Retrieve the debug name of this potential archetype.
+  std::string getDebugName() const;
 
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.

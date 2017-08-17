@@ -132,3 +132,31 @@ func testTupleUnsplat() {
   // CHECK: apply [[REABSTRACTED]]([[X]], [[Y]])
   _ = GenericEnum<(Int, Int)>.callback(x, y)
 } // CHECK: end sil function '_T06tuples16testTupleUnsplatyyF'
+
+// Make sure that we use a load_borrow instead of a load [take] when RValues are
+// formed with isGuaranteed set.
+extension P {
+  // CHECK-LABEL: sil hidden @_T06tuples1PPAAE12immutableUseyAA1CC5index_x5valuet5tuple_tFZ
+  // CHECK: bb0([[TUP0:%.*]] : $C, [[TUP1:%.*]] : $*Self
+  // Allocate space for the RValue.
+  // CHECK:   [[RVALUE:%.*]] = alloc_stack $(index: C, value: Self), let, name "tuple"
+  //
+  // Initialize the RValue. (This is here to help pattern matching).
+  // CHECK:   [[ZERO_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 0
+  // CHECK:   store [[TUP0]] to [init] [[ZERO_ADDR]]
+  // CHECK:   [[ONE_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 1
+  // CHECK:   copy_addr [take] [[TUP1]] to [initialization] [[ONE_ADDR]]
+  //
+  // What we are actually trying to check. Note that there is no actual use of
+  // LOADED_CLASS. This is b/c of the nature of the RValue we are working with.
+  // CHECK:   [[ZERO_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 0
+  // CHECK:   [[LOADED_CLASS:%.*]] = load_borrow [[ZERO_ADDR]]
+  // CHECK:   [[ONE_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 1
+  // CHECK:   apply {{.*}}([[ONE_ADDR]]) : $@convention(witness_method)
+  // CHECK:   end_borrow [[LOADED_CLASS]] from [[ZERO_ADDR]]
+  // CHECK:   destroy_addr [[RVALUE]]
+  // CHECK:   dealloc_stack [[RVALUE]]
+  public static func immutableUse(tuple: (index: C, value: Self)) -> () {
+    return tuple.value.foo()
+  }
+}

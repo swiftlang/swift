@@ -5058,7 +5058,31 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
         if (!Linkage)
           Linkage = stripExternalFromLinkage(Func->getLinkage());
       }
-      vtableEntries.emplace_back(Ref, Func, Linkage.getValue());
+
+      auto Kind = SILVTable::Entry::Kind::Normal;
+      if (P.Tok.is(tok::l_square)) {
+        P.consumeToken(tok::l_square);
+        if (P.Tok.isNot(tok::identifier)) {
+          P.diagnose(P.Tok.getLoc(), diag::sil_vtable_bad_entry_kind);
+          return true;
+        }
+
+        if (P.Tok.getText() == "override") {
+          P.consumeToken();
+          Kind = SILVTable::Entry::Kind::Override;
+        } else if (P.Tok.getText() == "inherited") {
+          P.consumeToken();
+          Kind = SILVTable::Entry::Kind::Inherited;
+        } else {
+          P.diagnose(P.Tok.getLoc(), diag::sil_vtable_bad_entry_kind);
+          return true;
+        }
+
+        if (P.parseToken(tok::r_square, diag::sil_vtable_expect_rsquare))
+          return true;
+      }
+
+      vtableEntries.emplace_back(Ref, Func, Kind, Linkage.getValue());
     } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
   }
 

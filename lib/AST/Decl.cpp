@@ -3902,7 +3902,11 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
     if (!CD) return false;
     
     auto *CDC = CD->getDeclContext();
-      
+
+    // 'let' properties are not valid inside protocols.
+    if (CDC->getAsProtocolExtensionContext())
+      return false;
+
     // If this init is defined inside of the same type (or in an extension
     // thereof) as the let property, then it is mutable.
     if (!CDC->isTypeContext() ||
@@ -4421,6 +4425,18 @@ SourceRange SubscriptDecl::getSourceRange() const {
   if (getBracesRange().isValid())
     return { getSubscriptLoc(), getBracesRange().End };
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
+}
+
+SourceRange SubscriptDecl::getSignatureSourceRange() const {
+  if (isImplicit())
+    return SourceRange();
+  if (auto Indices = getIndices()) {
+    auto End = Indices->getEndLoc();
+    if (End.isValid()) {
+      return SourceRange(getSubscriptLoc(), End);
+    }
+  }
+  return getSubscriptLoc();
 }
 
 DeclName AbstractFunctionDecl::getEffectiveFullName() const {

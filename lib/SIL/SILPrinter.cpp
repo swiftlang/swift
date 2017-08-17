@@ -42,6 +42,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/FileSystem.h"
@@ -244,11 +245,21 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
 
   if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
-  } else if (Decl->getBaseName() == "subscript" ||
-             Decl->getBaseName() == "deinit") {
-    OS << '`' << Decl->getBaseName() << '`';
   } else {
-    OS << Decl->getBaseName();
+    bool shouldEscape = !Decl->getBaseName().isSpecial() &&
+        llvm::StringSwitch<bool>(Decl->getBaseName().userFacingName())
+            // FIXME: Represent "init" by a special name and remove this case
+            .Case("init", false)
+#define KEYWORD(kw) \
+            .Case(#kw, true)
+#include "swift/Syntax/TokenKinds.def"
+            .Default(false);
+
+    if (shouldEscape) {
+      OS << '`' << Decl->getBaseName().userFacingName() << '`';
+    } else {
+      OS << Decl->getBaseName().userFacingName();
+    }
   }
 }
 
@@ -2437,8 +2448,19 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
         stripExternalFromLinkage(entry.Implementation->getLinkage())) {
       OS << getLinkageString(entry.Linkage);
     }
-    OS << entry.Implementation->getName()
-       << "\t// " << demangleSymbol(entry.Implementation->getName()) << "\n";
+    OS << entry.Implementation->getName();
+    switch (entry.TheKind) {
+    case SILVTable::Entry::Kind::Normal:
+      break;
+    case SILVTable::Entry::Kind::Inherited:
+      OS << " [inherited]";
+      break;
+    case SILVTable::Entry::Kind::Override:
+      OS << " [override]";
+      break;
+    }
+    OS << "\t// " << demangleSymbol(entry.Implementation->getName());
+    OS << "\n";
   }
   OS << "}\n\n";
 }

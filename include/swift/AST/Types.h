@@ -4409,9 +4409,12 @@ public:
 
   Type getReferentType() const { return Referent; }
   Ownership getOwnership() const {
-    return (getKind() == TypeKind::WeakStorage    ? Ownership::Weak :
-            getKind() == TypeKind::UnownedStorage ? Ownership::Unowned
-                                                  : Ownership::Unmanaged);
+    switch (getKind()) {
+    case TypeKind::WeakStorage: return Ownership::Weak;
+    case TypeKind::UnownedStorage: return Ownership::Unowned;
+    case TypeKind::UnmanagedStorage: return Ownership::Unmanaged;
+    default: llvm_unreachable("Unhandled reference storage type");
+    }
   }
 
   // Implement isa/cast/dyncast/etc.

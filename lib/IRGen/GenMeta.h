@@ -252,7 +252,14 @@ namespace irgen {
                              NominalTypeDecl *type,
                              llvm::Function *fn,
                              ArrayRef<FieldTypeInfo> fieldTypes);
-  
+
+  /// \brief Initialize the field offset vector within the given class or struct
+  /// metadata.
+  llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
+                                               SILType T,
+                                               llvm::Value *metadata,
+                                               llvm::Value *vwtable);
+
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.
   namespace MetadataAdjustmentIndex {

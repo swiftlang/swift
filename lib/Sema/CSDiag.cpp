@@ -2464,6 +2464,10 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
       Diag.emplace(diagnose(loc,
                             diag::assoc_type_outside_of_protocol,
                             ATD->getName()));
+    } else if (auto CD = dyn_cast<ConstructorDecl>(member)) {
+      Diag.emplace(diagnose(loc,
+                            diag::construct_protocol_by_name,
+                            metatypeTy->getInstanceType()));
     } else {
       Diag.emplace(diagnose(loc,
                             diag::could_not_use_type_member_on_protocol_metatype,
@@ -5132,12 +5136,309 @@ static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
   return false;
 }
 
-/// Emit a class of diagnostics that we only know how to generate when there is
-/// exactly one candidate we know about.  Return true if an error is emitted.
-static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
-                                            Expr *fnExpr, Expr *argExpr,
-                                            ArrayRef<Identifier> argLabels) {
-  // We only handle the situation where there is exactly one candidate here.
+class ArgumentMatcher : public MatchCallArgumentListener {
+  TypeChecker &TC;
+  Expr *FnExpr;
+  Expr *ArgExpr;
+  ArrayRef<AnyFunctionType::Param> &Parameters;
+  SmallVectorImpl<bool> &DefaultMap;
+  SmallVectorImpl<AnyFunctionType::Param> &Arguments;
+
+  CalleeCandidateInfo CandidateInfo;
+
+  // Indicates if problem has been found and diagnostic was emitted.
+  bool Diagnosed = false;
+  // Indicates if functions we are trying to call is a subscript.
+  bool IsSubscript;
+
+  // Stores parameter bindings determined by call to matchCallArguments.
+  SmallVector<ParamBinding, 4> Bindings;
+
+public:
+  ArgumentMatcher(Expr *fnExpr, Expr *argExpr,
+                  ArrayRef<AnyFunctionType::Param> &params,
+                  SmallVectorImpl<bool> &defaultMap,
+                  SmallVectorImpl<AnyFunctionType::Param> &args,
+                  CalleeCandidateInfo &CCI, bool isSubscript)
+      : TC(CCI.CS.TC), FnExpr(fnExpr), ArgExpr(argExpr), Parameters(params),
+        DefaultMap(defaultMap), Arguments(args), CandidateInfo(CCI),
+        IsSubscript(isSubscript) {}
+
+  void extraArgument(unsigned extraArgIdx) override {
+    auto name = Arguments[extraArgIdx].getLabel();
+    Expr *arg = ArgExpr;
+
+    auto tuple = dyn_cast<TupleExpr>(ArgExpr);
+    if (tuple)
+      arg = tuple->getElement(extraArgIdx);
+
+    auto loc = arg->getLoc();
+    if (tuple && extraArgIdx == tuple->getNumElements() - 1 &&
+        tuple->hasTrailingClosure())
+      TC.diagnose(loc, diag::extra_trailing_closure_in_call)
+          .highlight(arg->getSourceRange());
+    else if (Parameters.empty()) {
+      auto Paren = dyn_cast<ParenExpr>(ArgExpr);
+      Expr *SubExpr = nullptr;
+      if (Paren) {
+        SubExpr = Paren->getSubExpr();
+      }
+
+      if (SubExpr && CandidateInfo.CS.getType(SubExpr) &&
+          CandidateInfo.CS.getType(SubExpr)->isVoid()) {
+        TC.diagnose(loc, diag::extra_argument_to_nullary_call)
+            .fixItRemove(SubExpr->getSourceRange());
+      } else {
+        TC.diagnose(loc, diag::extra_argument_to_nullary_call)
+            .highlight(ArgExpr->getSourceRange());
+      }
+    } else if (name.empty())
+      TC.diagnose(loc, diag::extra_argument_positional)
+          .highlight(arg->getSourceRange());
+    else
+      TC.diagnose(loc, diag::extra_argument_named, name)
+          .highlight(arg->getSourceRange());
+
+    Diagnosed = true;
+  }
+
+  void missingArgument(unsigned missingParamIdx) override {
+    auto &param = Parameters[missingParamIdx];
+    Identifier name = param.getLabel();
+
+    // Search insertion index.
+    unsigned argIdx = 0;
+    for (int Idx = missingParamIdx - 1; Idx >= 0; --Idx) {
+      if (Bindings[Idx].empty())
+        continue;
+      argIdx = Bindings[Idx].back() + 1;
+      break;
+    }
+
+    unsigned insertableEndIdx = Arguments.size();
+    if (CandidateInfo.hasTrailingClosure)
+      insertableEndIdx -= 1;
+
+    // Build argument string for fix-it.
+    SmallString<32> insertBuf;
+    llvm::raw_svector_ostream insertText(insertBuf);
+
+    if (argIdx != 0)
+      insertText << ", ";
+    if (!name.empty())
+      insertText << name.str() << ": ";
+    Type Ty = param.getType();
+    // Explode inout type.
+    if (auto IOT = param.getType()->getAs<InOutType>()) {
+      insertText << "&";
+      Ty = IOT->getObjectType();
+    }
+    // @autoclosure; the type should be the result type.
+    if (auto FT = param.getType()->getAs<AnyFunctionType>())
+      if (FT->isAutoClosure())
+        Ty = FT->getResult();
+    insertText << "<#" << Ty << "#>";
+    if (argIdx == 0 && insertableEndIdx != 0)
+      insertText << ", ";
+
+    SourceLoc insertLoc;
+    if (argIdx > insertableEndIdx) {
+      // Unreachable for now.
+      // FIXME: matchCallArguments() doesn't detect "missing argument after
+      // trailing closure". E.g.
+      //   func fn(x: Int, y: () -> Int, z: Int) { ... }
+      //   fn(x: 1) { return 1 }
+      // is diagnosed as "missing argument for 'y'" (missingParamIdx 1).
+      // It should be "missing argument for 'z'" (missingParamIdx 2).
+    } else if (auto *TE = dyn_cast<TupleExpr>(ArgExpr)) {
+      // fn():
+      //   fn([argMissing])
+      // fn(argX, argY):
+      //   fn([argMissing, ]argX, argY)
+      //   fn(argX[, argMissing], argY)
+      //   fn(argX, argY[, argMissing])
+      // fn(argX) { closure }:
+      //   fn([argMissing, ]argX) { closure }
+      //   fn(argX[, argMissing]) { closure }
+      //   fn(argX[, closureLabel: ]{closure}[, argMissing)] // Not impl.
+      if (insertableEndIdx == 0)
+        insertLoc = TE->getRParenLoc();
+      else if (argIdx != 0)
+        insertLoc = Lexer::getLocForEndOfToken(
+            TC.Context.SourceMgr, TE->getElement(argIdx - 1)->getEndLoc());
+      else {
+        insertLoc = TE->getElementNameLoc(0);
+        if (insertLoc.isInvalid())
+          insertLoc = TE->getElement(0)->getStartLoc();
+      }
+    } else if (auto *PE = dyn_cast<ParenExpr>(ArgExpr)) {
+      assert(argIdx <= 1);
+      if (PE->getRParenLoc().isValid()) {
+        // fn(argX):
+        //   fn([argMissing, ]argX)
+        //   fn(argX[, argMissing])
+        // fn() { closure }:
+        //   fn([argMissing]) {closure}
+        //   fn([closureLabel: ]{closure}[, argMissing]) // Not impl.
+        if (insertableEndIdx == 0)
+          insertLoc = PE->getRParenLoc();
+        else if (argIdx == 0)
+          insertLoc = PE->getSubExpr()->getStartLoc();
+        else
+          insertLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                 PE->getSubExpr()->getEndLoc());
+      } else {
+        // fn { closure }:
+        //   fn[(argMissing)] { closure }
+        //   fn[(closureLabel:] { closure }[, missingArg)]  // Not impl.
+        assert(!IsSubscript && "bracket less subscript");
+        assert(PE->hasTrailingClosure() &&
+               "paren less ParenExpr without trailing closure");
+        insertBuf.insert(insertBuf.begin(), '(');
+        insertBuf.insert(insertBuf.end(), ')');
+        insertLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                               FnExpr->getEndLoc());
+      }
+    } else {
+      auto &CS = CandidateInfo.CS;
+      (void)CS;
+      // FIXME: Due to a quirk of CSApply, we can end up without a
+      // ParenExpr if the argument has an '@lvalue TupleType'.
+      assert((isa<TupleType>(CS.getType(ArgExpr).getPointer()) ||
+              isa<ParenType>(CS.getType(ArgExpr).getPointer())) &&
+             "unexpected argument expression type");
+      insertLoc = ArgExpr->getLoc();
+
+      // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
+    }
+
+    assert(insertLoc.isValid() && "missing argument after trailing closure?");
+
+    if (name.empty())
+      TC.diagnose(insertLoc, diag::missing_argument_positional,
+                  missingParamIdx + 1)
+          .fixItInsert(insertLoc, insertText.str());
+    else
+      TC.diagnose(insertLoc, diag::missing_argument_named, name)
+          .fixItInsert(insertLoc, insertText.str());
+
+    auto candidate = CandidateInfo[0];
+    if (candidate.getDecl())
+      TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
+                  candidate.getDecl()->getFullName());
+
+    Diagnosed = true;
+  }
+
+  void missingLabel(unsigned paramIdx) override {
+    auto tuple = cast<TupleExpr>(ArgExpr);
+    TC.diagnose(tuple->getElement(paramIdx)->getStartLoc(),
+                diag::missing_argument_labels, false,
+                Parameters[paramIdx].getLabel().str(), IsSubscript);
+
+    Diagnosed = true;
+  }
+
+  void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
+    auto tuple = cast<TupleExpr>(ArgExpr);
+    Identifier first = tuple->getElementName(argIdx);
+    Identifier second = tuple->getElementName(prevArgIdx);
+
+    // Build a mapping from arguments to parameters.
+    SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
+    for (unsigned paramIdx = 0; paramIdx != Bindings.size(); ++paramIdx) {
+      for (auto argIdx : Bindings[paramIdx])
+        argBindings[argIdx] = paramIdx;
+    }
+
+    auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
+      auto range = tuple->getElement(argIdx)->getSourceRange();
+      if (!label.empty())
+        range.Start = tuple->getElementNameLoc(argIdx);
+
+      unsigned paramIdx = argBindings[argIdx];
+      if (Bindings[paramIdx].size() > 1)
+        range.End = tuple->getElement(Bindings[paramIdx].back())->getEndLoc();
+
+      return range;
+    };
+
+    auto firstRange = argRange(argIdx, first);
+    auto secondRange = argRange(prevArgIdx, second);
+
+    SourceLoc diagLoc = firstRange.Start;
+
+    auto addFixIts = [&](InFlightDiagnostic diag) {
+      diag.highlight(firstRange).highlight(secondRange);
+
+      // Move the misplaced argument by removing it from one location and
+      // inserting it in another location. To maintain argument comma
+      // separation, since the argument is always moving to an earlier index
+      // the preceding comma and whitespace is removed and a new trailing
+      // comma and space is inserted with the moved argument.
+      auto &SM = TC.Context.SourceMgr;
+      auto text = SM.extractText(
+          Lexer::getCharSourceRangeFromSourceRange(SM, firstRange));
+
+      auto removalRange =
+          SourceRange(Lexer::getLocForEndOfToken(
+                          SM, tuple->getElement(argIdx - 1)->getEndLoc()),
+                      firstRange.End);
+      diag.fixItRemove(removalRange);
+      diag.fixItInsert(secondRange.Start, text.str() + ", ");
+    };
+
+    // There are 4 diagnostic messages variations depending on
+    // labeled/unlabeled arguments.
+    if (first.empty() && second.empty()) {
+      addFixIts(TC.diagnose(diagLoc,
+                            diag::argument_out_of_order_unnamed_unnamed,
+                            argIdx + 1, prevArgIdx + 1));
+    } else if (first.empty() && !second.empty()) {
+      addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_named,
+                            argIdx + 1, second));
+    } else if (!first.empty() && second.empty()) {
+      addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed,
+                            first, prevArgIdx + 1));
+    } else {
+      addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_named_named,
+                            first, second));
+    }
+
+    Diagnosed = true;
+  }
+
+  bool relabelArguments(ArrayRef<Identifier> newNames) override {
+    assert(!newNames.empty() && "No arguments were re-labeled");
+
+    // Let's diagnose labeling problem but only related to corrected ones.
+    if (diagnoseArgumentLabelError(TC, ArgExpr, newNames, IsSubscript))
+      Diagnosed = true;
+
+    return true;
+  }
+
+  bool diagnose() {
+    // Use matchCallArguments to determine how close the argument list is (in
+    // shape) to the specified candidates parameters.  This ignores the
+    // concrete types of the arguments, looking only at the argument labels.
+    matchCallArguments(Arguments, Parameters, DefaultMap,
+                       CandidateInfo.hasTrailingClosure,
+                       /*allowFixes:*/ true, *this, Bindings);
+
+    return Diagnosed;
+  }
+};
+
+/// Emit a class of diagnostics that we only know how to generate when
+/// there is exactly one candidate we know about.  Return true if an error
+/// is emitted.
+static bool
+diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
+                                Expr *argExpr,
+                                ArrayRef<Identifier> argLabels) {
+  // We only handle the situation where there is exactly one candidate
+  // here.
   if (CCI.size() != 1)
     return false;
 
@@ -5145,11 +5446,13 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   auto &TC = CCI.CS.TC;
 
   auto argTy = candidate.getArgumentType();
-  if (!argTy) return false;
+  if (!argTy)
+    return false;
 
   auto params = candidate.getUncurriedFunctionType()->getParams();
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(argTy, candidate.getDecl(), candidate.level, defaultMap);
+  computeDefaultMap(argTy, candidate.getDecl(), candidate.level,
+                    defaultMap);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -5157,19 +5460,19 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   //
   //    MyEnumType(MyEnumType.foo)
   //
-  // This is missing 'rawValue:' label, but a better fix is to just remove the
-  // unnecessary constructor call:
+  // This is missing 'rawValue:' label, but a better fix is to just remove
+  // the unnecessary constructor call:
   //
   //    MyEnumType.foo
   //
-  if (params.size() == 1 && args.size() == 1 &&
-      candidate.getDecl() && isa<ConstructorDecl>(candidate.getDecl()) &&
-      candidate.level == 1) {
+  if (params.size() == 1 && args.size() == 1 && candidate.getDecl() &&
+      isa<ConstructorDecl>(candidate.getDecl()) && candidate.level == 1) {
     AnyFunctionType::Param &arg = args[0];
-    auto resTy = candidate.getResultType()->lookThroughAllAnyOptionalTypes();
+    auto resTy =
+        candidate.getResultType()->lookThroughAllAnyOptionalTypes();
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
     if (rawTy && arg.getType() && resTy->isEqual(arg.getType())) {
-      auto getInnerExpr = [](Expr *E) -> Expr* {
+      auto getInnerExpr = [](Expr *E) -> Expr * {
         auto *parenE = dyn_cast<ParenExpr>(E);
         if (!parenE)
           return nullptr;
@@ -5177,20 +5480,22 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       };
       Expr *innerE = getInnerExpr(argExpr);
 
-      InFlightDiagnostic diag = TC.diagnose(fnExpr->getLoc(),
+      InFlightDiagnostic diag = TC.diagnose(
+          fnExpr->getLoc(),
           diag::invalid_initialization_parameter_same_type, resTy);
       diag.highlight((innerE ? innerE : argExpr)->getSourceRange());
       if (innerE) {
         // Remove the unnecessary constructor call.
         diag.fixItRemoveChars(fnExpr->getLoc(), innerE->getStartLoc())
-          .fixItRemove(argExpr->getEndLoc());
+            .fixItRemove(argExpr->getEndLoc());
       }
       return true;
     }
   }
 
   if (diagnoseTupleParameterMismatch(CCI, candidate.getArgumentType(),
-                                     CCI.CS.getType(argExpr), fnExpr, argExpr))
+                                     CCI.CS.getType(argExpr), fnExpr,
+                                     argExpr))
     return true;
 
   // We only handle structural errors here.
@@ -5200,304 +5505,8 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 
   // If we have a single candidate that failed to match the argument list,
   // attempt to use matchCallArguments to diagnose the problem.
-  class ArgumentDiagnostic : public MatchCallArgumentListener {
-    TypeChecker &TC;
-    Expr *FnExpr;
-    Expr *ArgExpr;
-    ArrayRef<AnyFunctionType::Param> &Parameters;
-    SmallVectorImpl<bool> &DefaultMap;
-    SmallVectorImpl<AnyFunctionType::Param> &Arguments;
-
-    CalleeCandidateInfo CandidateInfo;
-
-    // Indicates if problem has been found and diagnostic was emitted.
-    bool Diagnosed = false;
-    // Indicates if functions we are trying to call is a subscript.
-    bool IsSubscript;
-
-    // Stores parameter bindings determined by call to matchCallArguments.
-    SmallVector<ParamBinding, 4> Bindings;
-
-  public:
-    ArgumentDiagnostic(Expr *fnExpr, Expr *argExpr,
-                       ArrayRef<AnyFunctionType::Param> &params,
-                       SmallVectorImpl<bool> &defaultMap,
-                       SmallVectorImpl<AnyFunctionType::Param> &args,
-                       CalleeCandidateInfo &CCI, bool isSubscript)
-        : TC(CCI.CS.TC), FnExpr(fnExpr), ArgExpr(argExpr), Parameters(params),
-          DefaultMap(defaultMap), Arguments(args), CandidateInfo(CCI),
-          IsSubscript(isSubscript) {}
-
-    void extraArgument(unsigned extraArgIdx) override {
-      auto name = Arguments[extraArgIdx].getLabel();
-      Expr *arg = ArgExpr;
-
-      auto tuple = dyn_cast<TupleExpr>(ArgExpr);
-      if (tuple)
-        arg = tuple->getElement(extraArgIdx);
-
-      auto loc = arg->getLoc();
-      if (tuple && extraArgIdx == tuple->getNumElements() - 1 &&
-          tuple->hasTrailingClosure())
-        TC.diagnose(loc, diag::extra_trailing_closure_in_call)
-            .highlight(arg->getSourceRange());
-      else if (Parameters.empty()) {
-        auto Paren = dyn_cast<ParenExpr>(ArgExpr);
-        Expr *SubExpr = nullptr;
-        if (Paren) {
-          SubExpr = Paren->getSubExpr();
-        }
-
-        if (SubExpr && CandidateInfo.CS.getType(SubExpr) &&
-            CandidateInfo.CS.getType(SubExpr)->isVoid()) {
-          TC.diagnose(loc, diag::extra_argument_to_nullary_call)
-            .fixItRemove(SubExpr->getSourceRange());
-        } else {
-          TC.diagnose(loc, diag::extra_argument_to_nullary_call)
-            .highlight(ArgExpr->getSourceRange());
-        }
-      }
-      else if (name.empty())
-        TC.diagnose(loc, diag::extra_argument_positional)
-            .highlight(arg->getSourceRange());
-      else
-        TC.diagnose(loc, diag::extra_argument_named, name)
-            .highlight(arg->getSourceRange());
-
-      Diagnosed = true;
-    }
-
-    void missingArgument(unsigned missingParamIdx) override {
-      auto &param = Parameters[missingParamIdx];
-      Identifier name = param.getLabel();
-
-      // Search insertion index.
-      unsigned argIdx = 0;
-      for (int Idx = missingParamIdx - 1; Idx >= 0; --Idx) {
-        if (Bindings[Idx].empty()) continue;
-        argIdx = Bindings[Idx].back() + 1;
-        break;
-      }
-
-      unsigned insertableEndIdx = Arguments.size();
-      if (CandidateInfo.hasTrailingClosure)
-        insertableEndIdx -= 1;
-
-      // Build argument string for fix-it.
-      SmallString<32> insertBuf;
-      llvm::raw_svector_ostream insertText(insertBuf);
-
-      if (argIdx != 0)
-        insertText << ", ";
-      if (!name.empty())
-        insertText << name.str() << ": ";
-      Type Ty = param.getType();
-      // Explode inout type.
-      if (auto IOT = param.getType()->getAs<InOutType>()) {
-        insertText << "&";
-        Ty = IOT->getObjectType();
-      }
-      // @autoclosure; the type should be the result type.
-      if (auto FT = param.getType()->getAs<AnyFunctionType>())
-        if (FT->isAutoClosure())
-          Ty = FT->getResult();
-      insertText << "<#" << Ty << "#>";
-      if (argIdx == 0 && insertableEndIdx != 0)
-        insertText << ", ";
-
-      SourceLoc insertLoc;
-      if (argIdx > insertableEndIdx) {
-        // Unreachable for now.
-        // FIXME: matchCallArguments() doesn't detect "missing argument after
-        // trailing closure". E.g.
-        //   func fn(x: Int, y: () -> Int, z: Int) { ... }
-        //   fn(x: 1) { return 1 }
-        // is diagnosed as "missing argument for 'y'" (missingParamIdx 1).
-        // It should be "missing argument for 'z'" (missingParamIdx 2).
-      } else if (auto *TE = dyn_cast<TupleExpr>(ArgExpr)) {
-        // fn():
-        //   fn([argMissing])
-        // fn(argX, argY):
-        //   fn([argMissing, ]argX, argY)
-        //   fn(argX[, argMissing], argY)
-        //   fn(argX, argY[, argMissing])
-        // fn(argX) { closure }:
-        //   fn([argMissing, ]argX) { closure }
-        //   fn(argX[, argMissing]) { closure }
-        //   fn(argX[, closureLabel: ]{closure}[, argMissing)] // Not impl.
-        if (insertableEndIdx == 0)
-          insertLoc = TE->getRParenLoc();
-        else if (argIdx != 0)
-          insertLoc = Lexer::getLocForEndOfToken(
-              TC.Context.SourceMgr, TE->getElement(argIdx - 1)->getEndLoc());
-        else {
-          insertLoc = TE->getElementNameLoc(0);
-          if (insertLoc.isInvalid())
-            insertLoc = TE->getElement(0)->getStartLoc();
-        }
-      } else if (auto *PE = dyn_cast<ParenExpr>(ArgExpr)) {
-        assert(argIdx <= 1);
-        if (PE->getRParenLoc().isValid()) {
-          // fn(argX):
-          //   fn([argMissing, ]argX)
-          //   fn(argX[, argMissing])
-          // fn() { closure }:
-          //   fn([argMissing]) {closure}
-          //   fn([closureLabel: ]{closure}[, argMissing]) // Not impl.
-          if (insertableEndIdx == 0)
-            insertLoc = PE->getRParenLoc();
-          else if (argIdx == 0)
-            insertLoc = PE->getSubExpr()->getStartLoc();
-          else
-            insertLoc = Lexer::getLocForEndOfToken(
-                TC.Context.SourceMgr, PE->getSubExpr()->getEndLoc());
-        } else {
-          // fn { closure }:
-          //   fn[(argMissing)] { closure }
-          //   fn[(closureLabel:] { closure }[, missingArg)]  // Not impl.
-          assert(!IsSubscript && "bracket less subscript");
-          assert(PE->hasTrailingClosure() &&
-                 "paren less ParenExpr without trailing closure");
-          insertBuf.insert(insertBuf.begin(), '(');
-          insertBuf.insert(insertBuf.end(), ')');
-          insertLoc = Lexer::getLocForEndOfToken(
-              TC.Context.SourceMgr, FnExpr->getEndLoc());
-        }
-      } else {
-        auto &CS = CandidateInfo.CS;
-        (void)CS;
-        // FIXME: Due to a quirk of CSApply, we can end up without a
-        // ParenExpr if the argument has an '@lvalue TupleType'.
-        assert((isa<TupleType>(CS.getType(ArgExpr).getPointer()) ||
-                isa<ParenType>(CS.getType(ArgExpr).getPointer())) &&
-               "unexpected argument expression type");
-        insertLoc = ArgExpr->getLoc();
-
-        // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
-      }
-
-      assert(insertLoc.isValid() && "missing argument after trailing closure?");
-
-      if (name.empty())
-        TC.diagnose(insertLoc, diag::missing_argument_positional,
-                    missingParamIdx + 1)
-          .fixItInsert(insertLoc, insertText.str());
-      else
-        TC.diagnose(insertLoc, diag::missing_argument_named, name)
-          .fixItInsert(insertLoc, insertText.str());
-
-      auto candidate = CandidateInfo[0];
-      if (candidate.getDecl())
-        TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
-                    candidate.getDecl()->getFullName());
-
-      Diagnosed = true;
-    }
-
-    void missingLabel(unsigned paramIdx) override {
-      auto tuple = cast<TupleExpr>(ArgExpr);
-      TC.diagnose(tuple->getElement(paramIdx)->getStartLoc(),
-                  diag::missing_argument_labels, false,
-                  Parameters[paramIdx].getLabel().str(), IsSubscript);
-
-      Diagnosed = true;
-    }
-
-    void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
-      auto tuple = cast<TupleExpr>(ArgExpr);
-      Identifier first = tuple->getElementName(argIdx);
-      Identifier second = tuple->getElementName(prevArgIdx);
-
-      // Build a mapping from arguments to parameters.
-      SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
-      for (unsigned paramIdx = 0; paramIdx != Bindings.size(); ++paramIdx) {
-        for (auto argIdx : Bindings[paramIdx])
-          argBindings[argIdx] = paramIdx;
-      }
-
-      auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
-        auto range = tuple->getElement(argIdx)->getSourceRange();
-        if (!label.empty())
-          range.Start = tuple->getElementNameLoc(argIdx);
-
-        unsigned paramIdx = argBindings[argIdx];
-        if (Bindings[paramIdx].size() > 1)
-          range.End = tuple->getElement(Bindings[paramIdx].back())->getEndLoc();
-
-        return range;
-      };
-
-      auto firstRange = argRange(argIdx, first);
-      auto secondRange = argRange(prevArgIdx, second);
-
-      SourceLoc diagLoc = firstRange.Start;
-
-      auto addFixIts = [&](InFlightDiagnostic diag) {
-        diag.highlight(firstRange).highlight(secondRange);
-
-        // Move the misplaced argument by removing it from one location and
-        // inserting it in another location. To maintain argument comma
-        // separation, since the argument is always moving to an earlier index
-        // the preceding comma and whitespace is removed and a new trailing
-        // comma and space is inserted with the moved argument.
-        auto &SM = TC.Context.SourceMgr;
-        auto text = SM.extractText(
-            Lexer::getCharSourceRangeFromSourceRange(SM, firstRange));
-
-        auto removalRange =
-            SourceRange(Lexer::getLocForEndOfToken(
-                            SM, tuple->getElement(argIdx - 1)->getEndLoc()),
-                        firstRange.End);
-        diag.fixItRemove(removalRange);
-        diag.fixItInsert(secondRange.Start, text.str() + ", ");
-      };
-
-      // There are 4 diagnostic messages variations depending on
-      // labeled/unlabeled arguments.
-      if (first.empty() && second.empty()) {
-        addFixIts(TC.diagnose(diagLoc,
-                              diag::argument_out_of_order_unnamed_unnamed,
-                              argIdx + 1, prevArgIdx + 1));
-      } else if (first.empty() && !second.empty()) {
-        addFixIts(TC.diagnose(diagLoc,
-                              diag::argument_out_of_order_unnamed_named,
-                              argIdx + 1, second));
-      } else if (!first.empty() && second.empty()) {
-        addFixIts(TC.diagnose(diagLoc,
-                              diag::argument_out_of_order_named_unnamed, first,
-                              prevArgIdx + 1));
-      } else {
-        addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_named_named,
-                              first, second));
-      }
-
-      Diagnosed = true;
-    }
-
-    bool relabelArguments(ArrayRef<Identifier> newNames) override {
-      assert (!newNames.empty() && "No arguments were re-labeled");
-
-      // Let's diagnose labeling problem but only related to corrected ones.
-      if (diagnoseArgumentLabelError(TC, ArgExpr, newNames, IsSubscript))
-        Diagnosed = true;
-
-      return true;
-    }
-
-    bool diagnose() {
-      // Use matchCallArguments to determine how close the argument list is (in
-      // shape) to the specified candidates parameters.  This ignores the
-      // concrete types of the arguments, looking only at the argument labels.
-      matchCallArguments(Arguments, Parameters, DefaultMap,
-                         CandidateInfo.hasTrailingClosure,
-                         /*allowFixes:*/ true, *this, Bindings);
-
-      return Diagnosed;
-    }
-  };
-
-  return ArgumentDiagnostic(fnExpr, argExpr, params, defaultMap, args, CCI,
-                            isa<SubscriptExpr>(fnExpr))
+  return ArgumentMatcher(fnExpr, argExpr, params, defaultMap, args, CCI,
+                         isa<SubscriptExpr>(fnExpr))
       .diagnose();
 }
 
@@ -5617,8 +5626,9 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
       // is malformed.
       SourceRange initExprRange(fnExpr->getSourceRange().Start,
                                 argExpr->getSourceRange().End);
-      CS.TC
-          .diagnose(fnExpr->getLoc(), diag::non_nominal_no_initializers, instTy)
+      CS.TC.diagnose(fnExpr->getLoc(), instTy->isExistentialType() ?
+                     diag::construct_protocol_by_name :
+                     diag::non_nominal_no_initializers, instTy)
           .highlight(initExprRange);
       return true;
     }
@@ -6609,7 +6619,11 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     
     auto arg = callExpr->getArg();
 
-    {
+    if (fnType->is<ExistentialMetatypeType>()) {
+      auto diag = diagnose(arg->getStartLoc(),
+                           diag::missing_init_on_metatype_initialization);
+      diag.highlight(fnExpr->getSourceRange());
+    } else {
       auto diag = diagnose(arg->getStartLoc(),
                            diag::cannot_call_non_function_value, fnType);
       diag.highlight(fnExpr->getSourceRange());
@@ -6962,6 +6976,13 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
     
     return true;
+  }
+
+  if (auto MTT = fnType->getAs<MetatypeType>()) {
+    if (MTT->getInstanceType()->isExistentialType()) {
+      diagnose(fnExpr->getLoc(), diag::construct_protocol_value, fnType);
+      return true;
+    }
   }
   
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
@@ -8635,21 +8656,8 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       allInaccessible = false;
   }
 
-  // If no candidates were accessible, say so.
-  if (allInaccessible && !viableCandidatesToReport.empty()) {
-    diagnose(BaseLoc, diag::all_candidates_inaccessible, memberName);
-    for (auto &candidate : result.ViableCandidates) {
-      if (!candidate.isDecl())
-        continue;
-
-      if (auto decl = candidate.getDecl()) {
-        diagnose(decl, diag::note_candidate_inaccessible, decl->getFullName(),
-                 decl->getFormalAccess());
-      }
-    }
-
-    return true;
-  }
+  // diagnoseSimpleErrors() should have diagnosed this scenario.
+  assert(!allInaccessible || viableCandidatesToReport.empty());
 
   if (result.UnviableCandidates.empty() && isInitializer &&
       !baseObjTy->is<AnyMetatypeType>()) {

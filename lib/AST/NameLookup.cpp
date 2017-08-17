@@ -423,7 +423,6 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::ForEachStmt:
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::SwitchStmt:
-  case ASTScopeKind::ForStmt:
   case ASTScopeKind::Accessors:
   case ASTScopeKind::TopLevelCode:
     llvm_unreachable("no local declarations?");
@@ -443,7 +442,6 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::BraceStmt:
   case ASTScopeKind::CatchStmt:
   case ASTScopeKind::CaseStmt:
-  case ASTScopeKind::ForStmtInitializer:
     return DeclVisibilityKind::LocalVariable;
   }
 

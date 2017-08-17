@@ -183,21 +183,6 @@ static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
   return llvm::ConstantInt::get(IGM.SizeTy, size.getValue());
 }
 
-/// Return the size and alignment of this type.
-std::pair<llvm::Value*,llvm::Value*>
-FixedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF,
-                                       SILType T) const {
-  return {FixedTypeInfo::getSize(IGF, T),
-          FixedTypeInfo::getAlignmentMask(IGF, T)};
-}
-std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-FixedTypeInfo::getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF,
-                                                SILType T) const {
-  return std::make_tuple(FixedTypeInfo::getSize(IGF, T),
-                         FixedTypeInfo::getAlignmentMask(IGF, T),
-                         FixedTypeInfo::getStride(IGF, T));
-}
-
 llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF, SILType T) const {
   return FixedTypeInfo::getStaticSize(IGF.IGM);
 }
@@ -1751,6 +1736,11 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     // from its field.
     if (structDecl->hasUnreferenceableStorage()
         || structDecl->hasClangNode())
+      return SILType();
+
+    // A single-field struct with custom alignment has different layout from its
+    // field.
+    if (structDecl->getAttrs().hasAttribute<AlignmentAttr>())
       return SILType();
 
     // If there's only one stored property, we have the layout of its field.

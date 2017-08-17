@@ -58,6 +58,14 @@
           ],
           key.substructure: [
             {
+              key.kind: source.lang.swift.decl.var.local,
+              key.name: "<#name#>",
+              key.offset: 63,
+              key.length: 8,
+              key.nameoffset: 63,
+              key.namelength: 8
+            },
+            {
               key.kind: source.lang.swift.stmt.brace,
               key.offset: 85,
               key.length: 2,

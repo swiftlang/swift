@@ -15,6 +15,7 @@
 
 #include "JumpDest.h"
 #include "ManagedValue.h"
+#include "RValue.h"
 #include "swift/SIL/SILBuilder.h"
 
 namespace swift {
@@ -350,15 +351,19 @@ class CleanupCloner {
   SILGenFunction &SGF;
   bool hasCleanup;
   bool isLValue;
-  ValueOwnershipKind ownershipKind;
 
 public:
   CleanupCloner(SILGenFunction &SGF, ManagedValue mv)
-      : SGF(SGF), hasCleanup(mv.hasCleanup()), isLValue(mv.isLValue()),
-        ownershipKind(mv.getOwnershipKind()) {}
+      : SGF(SGF), hasCleanup(mv.hasCleanup()), isLValue(mv.isLValue()) {}
 
   CleanupCloner(SILGenBuilder &builder, ManagedValue mv)
       : CleanupCloner(builder.getSILGenFunction(), mv) {}
+
+  CleanupCloner(SILGenFunction &SGF, const RValue &rv)
+      : SGF(SGF), hasCleanup(rv.isPlusOne(SGF)), isLValue(false) {}
+
+  CleanupCloner(SILGenBuilder &builder, const RValue &rv)
+      : CleanupCloner(builder.getSILGenFunction(), rv) {}
 
   ManagedValue clone(SILValue value) const;
 };

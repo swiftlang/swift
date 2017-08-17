@@ -2231,13 +2231,7 @@ void KeyPathInst::dropReferencedPattern() {
 
 GenericSpecializationInformation::GenericSpecializationInformation(
     SILFunction *Caller, SILFunction *Parent, SubstitutionList Subs)
-    : Caller(Caller), Parent(Parent), Subs(Subs) {
-  // Specialization information may reference these functions, even
-  // if they are removed by means of e.g. dead function elimination.
-  if (Caller)
-    Caller->setReferencedByMetainformation();
-  Parent->setReferencedByMetainformation();
-}
+    : Caller(Caller), Parent(Parent), Subs(Subs) {}
 
 const GenericSpecializationInformation *
 GenericSpecializationInformation::create(SILFunction *Caller,

@@ -79,6 +79,15 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 #endif
 }
 
+#if SWIFT_OBJC_INTEROP
+/// \brief Replacement for ObjC object_isClass(), which is unavailable on
+/// deployment targets macOS 10.9 and iOS 7.
+static bool objcObjectIsClass(id object) {
+  // same as object_isClass(object)
+  return class_isMetaClass(object_getClass(object));
+}
+#endif
+
 /// \brief Fetch the type metadata associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal
 /// dynamic type ignores dynamic subclasses such as those introduced
@@ -105,7 +114,7 @@ const Metadata *swift::swift_getObjectType(HeapObject *object) {
 
   id objcObject = reinterpret_cast<id>(object);
   Class objcClass = [objcObject class];
-  if (object_isClass(objcObject)) {
+  if (objcObjectIsClass(objcObject)) {
     // Original object is a class. We want a
     // metaclass but +class doesn't give that to us.
     objcClass = object_getClass(objcClass);

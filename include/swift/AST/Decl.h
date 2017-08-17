@@ -4722,6 +4722,7 @@ public:
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getSubscriptLoc(); }
   SourceRange getSourceRange() const;
+  SourceRange getSignatureSourceRange() const;
 
   /// \brief Retrieve the indices for this subscript operation.
   ParameterList *getIndices() { return Indices; }
@@ -5231,6 +5232,10 @@ public:
   }
   void setMutating(bool mutating = true) {
     Mutating = mutating;
+  }
+
+  TypeLoc getReturnTypeLoc() const {
+    return FnRetType;
   }
   
   /// \brief Returns the parameter lists(s) for the function definition.
