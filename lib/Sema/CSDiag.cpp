@@ -9542,7 +9542,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // eliminated.
   viable.clear();
 
-  DiagnosticListener diagnostics(*this);
+  DiagnosticListener diagnostics;
   {
     // Set up solver state.
     SolverState state(*this);
@@ -9598,8 +9598,10 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     return true;
   }
 
-  if (diagnoseFailure(diagnostics))
-    return true;
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    if (diagnoseFailure(diagnostics))
+      return true;
+  }
 
   // If all else fails, diagnose the failure by looking through the system's
   // constraints.
@@ -9607,6 +9609,351 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   return true;
 }
 
+// TODO: This has to become FailureDiagnosis later on.
+class FailureAnalysis {
+  typedef std::shared_ptr<SolverStep> Step;
+
+  TypeChecker &TC;
+  ConstraintSystem &CS;
+
+public:
+  FailureAnalysis(ConstraintSystem &cs) : TC(cs.TC), CS(cs) {}
+
+  bool diagnose(DiagnosticListener &capturedInfo) {
+    SmallVector<Step, 8> failedAt;
+    const auto longestPath = capturedInfo.getLongestPath();
+
+    capturedInfo.forEach([&](Step step) -> bool {
+      auto currentDepth = step->getDepth();
+
+      if (currentDepth == longestPath && longestPath == 0) {
+        // FIXME: Some of the failures happen in CSGen,
+        //        currently there is no way to track that.
+        if (!step->hasFailures())
+          return true;
+
+        failedAt.push_back(step);
+        return true;
+      } else if (currentDepth == longestPath - 1) {
+        auto steps = step->getNextSteps();
+        failedAt.append(steps.begin(), steps.end());
+        return true;
+      }
+
+      // Right now we can't replay the state of the system,
+      // so let's just record all of the intermediate choices.
+      return false;
+    });
+
+    SmallVector<TypeMismatch, 8> errors;
+    ConstraintLocator *locator = locateFailures(failedAt, errors);
+    if (!locator)
+      return false;
+
+    assert(!errors.empty());
+
+    return diagnose(locator, errors);
+  }
+
+private:
+  bool diagnose(ConstraintLocator *locator, ArrayRef<TypeMismatch> errors) {
+    auto path = locator->getPath();
+
+    // TODO: For now if the path is empty just give up.
+    if (path.empty())
+      return false;
+
+    switch (path.back().getKind()) {
+    // One of the arguments has incorrect type.
+    case ConstraintLocator::PathElementKind::ApplyArgToParam:
+      return diagnoseArgumentTypeMismatch(locator, errors);
+
+    // Shape of the argument type doesn't match shape of the parameter type.
+    case ConstraintLocator::PathElementKind::ApplyArgument:
+      return diagnoseArgumentStructuralFailures(locator, errors);
+
+    // While comparing tuples one of the elements didn't match.
+    case ConstraintLocator::PathElementKind::TupleElement:
+      return diagnoseTupleMismatch(locator, errors);
+
+    default:
+      break;
+    }
+
+    return false;
+  }
+
+  bool diagnoseTupleMismatch(ConstraintLocator *locator,
+                             ArrayRef<TypeMismatch> errors) {
+    auto *expr = getAnchor(locator);
+    if (!expr)
+      return false;
+
+    // If there have multiple errors, that means there where
+    // multiple types attempted by constraint solver, let's
+    // see why did that happen, if it's because of literal
+    // let's continue, otherwise we don't know what is going
+    // on here.
+    auto &error = errors.front();
+    if (auto *DE = dyn_cast<DictionaryExpr>(expr)) {
+      auto path = locator->getPath();
+
+      auto elementAt = path[path.size() - 2];
+      auto failureAt = path.back();
+
+      auto *tuple = dyn_cast<TupleExpr>(DE->getElement(elementAt.getValue()));
+      if (!tuple)
+        return false;
+
+      auto *failedExpr = tuple->getElement(failureAt.getValue());
+
+      Diag<Type, Type> diagnostic;
+      if (failureAt.getValue() == 0) {
+        diagnostic = diag::cannot_convert_dict_key;
+      } else {
+        diagnostic = diag::cannot_convert_dict_value;
+      }
+
+      TC.diagnose(failedExpr->getLoc(), diagnostic, error.LHS, error.RHS)
+          .highlight(failedExpr->getSourceRange());
+      return true;
+    }
+
+    if (auto *AE = dyn_cast<ArrayExpr>(expr)) {
+      auto &element = locator->getPath().back();
+      auto *failureAt = AE->getElement(element.getValue());
+
+      TC.diagnose(failureAt->getLoc(), diag::cannot_convert_array_element,
+                  error.LHS, error.RHS)
+          .highlight(failureAt->getSourceRange());
+      return true;
+    }
+
+    return false;
+  }
+
+  bool diagnoseArgumentTypeMismatch(ConstraintLocator *locator,
+                                    ArrayRef<TypeMismatch> errors) {
+    // TODO: Handle multiple distinct errors.
+    auto &error = errors.front();
+
+    auto lhs = error.LHS;
+    auto rhs = error.RHS;
+
+    auto *expr = getAnchor(locator);
+    if (!expr)
+      return false;
+
+    auto diagnostic = TC.diagnose(
+        expr->getLoc(), diag::cannot_convert_argument_value, lhs, rhs);
+
+    // Let's attempt various fix-its.
+    tryRawRepresentableFixIts(diagnostic, CS, lhs, rhs,
+                              KnownProtocolKind::ExpressibleByIntegerLiteral,
+                              expr) ||
+        tryRawRepresentableFixIts(diagnostic, CS, lhs, rhs,
+                                  KnownProtocolKind::ExpressibleByStringLiteral,
+                                  expr) ||
+        tryIntegerCastFixIts(diagnostic, CS, lhs, rhs, expr) ||
+        addTypeCoerceFixit(diagnostic, CS, lhs, rhs, expr);
+
+    return true;
+  }
+
+  bool diagnoseArgumentStructuralFailures(ConstraintLocator *locator,
+                                          ArrayRef<TypeMismatch> errors) {
+    auto *expr = locator->getAnchor();
+    if (!expr)
+      return false;
+
+    auto *AE = dyn_cast<ApplyExpr>(expr);
+    // TODO: Handle other types of expressions e.g. [unresolved] members
+    if (!AE)
+      return false;
+
+    auto &error = errors.front();
+
+    bool matchStructurally = true;
+    for (unsigned i = 1, n = errors.size(); i != n; ++i) {
+      auto &current = errors[i];
+
+      // Match right-hand side (parameters) of all errors against each other.
+
+      auto aTuple = error.RHS->getAs<TupleType>();
+      auto bTuple = current.RHS->getAs<TupleType>();
+
+      if ((!aTuple || !bTuple) || !tuplesMatchStructurally(aTuple, bTuple)) {
+        matchStructurally = false;
+        break;
+      }
+    }
+
+    auto *fnExpr = AE->getFn();
+    auto *argExpr = AE->getArg();
+
+    SmallVector<Identifier, 2> scratch;
+    ArrayRef<Identifier> argLabels = AE->getArgumentLabels(scratch);
+
+    CalleeCandidateInfo CCI(fnExpr, callArgHasTrailingClosure(argExpr), CS);
+
+    if (!matchStructurally) {
+      auto args = decomposeArgType(CS.getType(argExpr), argLabels);
+      TC.diagnose(AE->getLoc(), diag::wrong_argument_labels_overload,
+                  getParamListAsString(args));
+
+      CCI.suggestPotentialOverloads(fnExpr->getLoc());
+      return true;
+    }
+
+    // Since we know for sure that this is labels that didn't line-up
+    // it doesn't really matter how many candidates we have, because
+    // all of the candidates are structurally the same.
+
+    auto candidate = CCI[0];
+    auto params = candidate.getUncurriedFunctionType()->getParams();
+    SmallVector<bool, 4> defaultMap;
+    computeDefaultMap(error.LHS, candidate.getDecl(), candidate.level,
+                      defaultMap);
+
+    auto args = decomposeArgType(error.LHS, argLabels);
+
+    return ArgumentMatcher(fnExpr, argExpr, params, defaultMap, args, CCI,
+                           isa<SubscriptExpr>(fnExpr))
+        .diagnose();
+  }
+
+  static bool tuplesMatchStructurally(TupleType *aTuple, TupleType *bTuple) {
+    auto aSize = aTuple->getNumElements();
+    auto bSize = bTuple->getNumElements();
+
+    if (aSize != bSize)
+      return false;
+
+    for (unsigned j = 0, m = aSize; j != m; ++j) {
+      auto &a = aTuple->getElement(j);
+      auto &b = bTuple->getElement(j);
+
+      if (a.getName() != b.getName())
+        return false;
+    }
+
+    return true;
+  }
+
+  static ConstraintLocator *
+  locateFailures(ArrayRef<Step> failedAt,
+                 SmallVectorImpl<TypeMismatch> &errors) {
+    typedef llvm::SmallDenseMap<Constraint *, SmallVector<TypeMismatch, 8>>
+        ErrorsPerConstraint;
+
+    if (failedAt.empty())
+      return nullptr;
+
+    llvm::SmallDenseMap<ConstraintLocator *, unsigned> failures;
+    llvm::SmallDenseMap<ConstraintLocator *, ErrorsPerConstraint>
+        errorsPerLocator;
+
+    // Let's assume that all of the immediate steps
+    // are related to the same disjunction, otherwise
+    // it means solver jumped back and forth.
+    for (auto step : failedAt) {
+      assert(step->hasFailures());
+
+      for (auto &failure : step->getFailures()) {
+        auto *constraint = failure.getConstraint();
+
+        for (auto &error : failure.getErrors()) {
+          auto *locator = error.getLocator();
+
+          // TODO: Make this better (at least my using some kind of a set).
+          auto &currentErrors = errorsPerLocator[locator][constraint];
+
+          if (currentErrors.empty()) {
+            currentErrors.push_back(error);
+          } else if (!currentErrors.back().isEqual(error)) {
+            currentErrors.push_back(error);
+          }
+
+          ++failures[locator];
+        }
+      }
+    }
+
+    // Let's find the locator with the most number of errors
+    // associated with it, that gives us pretty good idea where
+    // the problem is located.
+
+    ConstraintLocator *best = nullptr;
+    unsigned maxErrors = 0;
+
+    for (auto &e : failures) {
+      if (e.second >= maxErrors) {
+        best = e.getFirst();
+        maxErrors = e.second;
+      }
+    }
+
+    // Let's get the constraint with the most number of errors
+    // associated with it.
+    Constraint *constraint = nullptr;
+    maxErrors = 0;
+
+    for (auto &e : errorsPerLocator[best]) {
+      auto numErrors = e.getSecond().size();
+      if (numErrors >= maxErrors) {
+        constraint = e.first;
+        maxErrors = numErrors;
+      }
+    }
+
+    for (auto &error : errorsPerLocator[best][constraint])
+      errors.push_back(std::move(error));
+
+    return best;
+  }
+
+  Expr *getAnchor(ConstraintLocator *locator) const {
+    auto *expr = simplifyLocatorToAnchor(CS, locator);
+    return expr ? expr : locator->getAnchor();
+  }
+};
+
 bool ConstraintSystem::diagnoseFailure(DiagnosticListener &capturedInfo) {
-  return false;
+  FailureAnalysis analyser(*this);
+  return analyser.diagnose(capturedInfo);
+}
+
+void SolverStep::print(ConstraintSystem &cs, llvm::raw_ostream &log) const {
+  log.indent(Depth * 2) << ">>> Step (Depth: " << Depth << ")\n";
+
+  if (Choice) {
+    auto *disjunction = Choice->first;
+    auto *choice = disjunction->getNestedConstraints()[Choice->second];
+
+    choice->print(log.indent(Depth * 2), &cs.getASTContext().SourceMgr);
+    log.indent(Depth * 2) << '\n';
+  }
+
+  if (!Failures.empty()) {
+    log.indent(Depth * 2) << "--- Failures ---\n";
+    for (auto &e : Failures) {
+      auto *constraint = e.getConstraint();
+      auto errors = e.getErrors();
+
+      log.indent(Depth * 2) << "-----> Failure <-----\n";
+
+      log.indent(Depth * 2) << "-> Constraint:\n";
+      constraint->print(log.indent(Depth * 2), &cs.getASTContext().SourceMgr);
+
+      log << '\n';
+      log.indent(Depth * 2) << "-> Type Failures:\n";
+      for (auto &e : errors)
+        e.print(log.indent(Depth * 2), &cs.getASTContext().SourceMgr, Depth);
+      log << '\n';
+    }
+    log.indent(Depth * 2) << "<----- /// ----->\n";
+  }
+
+  for (auto &nested : NextSteps)
+    nested->print(cs, log);
 }
