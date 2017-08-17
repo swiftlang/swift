@@ -61,6 +61,14 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_2 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_3 | %FileCheck %s -check-prefix=IN_FOR_EACH_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_4 | %FileCheck %s -check-prefix=IN_FOR_EACH_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_5 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_6 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_7 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_8 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_9 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_10 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_11 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_12 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 | %FileCheck %s -check-prefix=DEPRECATED_1
 
@@ -455,6 +463,47 @@ func testInForEach4(arg: Int) {
   for index in 1 ... 2 {
     #^IN_FOR_EACH_4^#
   }
+  let after = 4
+}
+
+func testInForEach5(arg: Int) {
+  let local = 2
+  for index in [#^IN_FOR_EACH_5^#] {}
+  let after = 4
+}
+func testInForEach6(arg: Int) {
+  let local = 2
+  for index in [1,#^IN_FOR_EACH_6^#] {}
+  let after = 4
+}
+func testInForEach7(arg: Int) {
+  let local = 2
+  for index in [1:#^IN_FOR_EACH_7^#] {}
+  let after = 4
+}
+func testInForEach8(arg: Int) {
+  let local = 2
+  for index in [#^IN_FOR_EACH_8^#:] {}
+  let after = 4
+}
+func testInForEach9(arg: Int) {
+  let local = 2
+  for index in [#^IN_FOR_EACH_9^#:2] {}
+  let after = 4
+}
+func testInForEach10(arg: Int) {
+  let local = 2
+  for index in [1:2, #^IN_FOR_EACH_10^#] {}
+  let after = 4
+}
+func testInForEach11(arg: Int) {
+  let local = 2
+  for index in [1:2, #^IN_FOR_EACH_11^#:] {}
+  let after = 4
+}
+func testInForEach12(arg: Int) {
+  let local = 2
+  for index in [1:2, #^IN_FOR_EACH_12^#:2] {}
   let after = 4
 }
 
