@@ -172,7 +172,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                       FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccess(std::max(typeDecl->getFormalAccess(),
-                                 Accessibility::Internal));
+                                 AccessLevel::Internal));
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration

@@ -1685,34 +1685,34 @@ public:
     return ExtensionDeclBits.DefaultAndMaxAccessLevel != 0;
   }
 
-  Accessibility getDefaultAccessLevel() const {
+  AccessLevel getDefaultAccessLevel() const {
     assert(hasDefaultAccessLevel() && "not computed yet");
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(Accessibility::FilePrivate) - 1)))
-      return Accessibility::FilePrivate;
+        (1 << (static_cast<unsigned>(AccessLevel::FilePrivate) - 1)))
+      return AccessLevel::FilePrivate;
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(Accessibility::Internal) - 1)))
-      return Accessibility::Internal;
-    return Accessibility::Public;
+        (1 << (static_cast<unsigned>(AccessLevel::Internal) - 1)))
+      return AccessLevel::Internal;
+    return AccessLevel::Public;
   }
 
-  Accessibility getMaxAccessLevel() const {
+  AccessLevel getMaxAccessLevel() const {
     assert(hasDefaultAccessLevel() && "not computed yet");
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(Accessibility::Public) - 1)))
-      return Accessibility::Public;
+        (1 << (static_cast<unsigned>(AccessLevel::Public) - 1)))
+      return AccessLevel::Public;
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(Accessibility::Internal) - 1)))
-      return Accessibility::Internal;
-    return Accessibility::FilePrivate;
+        (1 << (static_cast<unsigned>(AccessLevel::Internal) - 1)))
+      return AccessLevel::Internal;
+    return AccessLevel::FilePrivate;
   }
 
-  void setDefaultAndMaxAccess(Accessibility defaultAccess,
-                              Accessibility maxAccess) {
+  void setDefaultAndMaxAccess(AccessLevel defaultAccess,
+                              AccessLevel maxAccess) {
     assert(!hasDefaultAccessLevel() && "default accessibility already set");
     assert(maxAccess >= defaultAccess);
-    assert(maxAccess != Accessibility::Private && "private not valid");
-    assert(defaultAccess != Accessibility::Private && "private not valid");
+    assert(maxAccess != AccessLevel::Private && "private not valid");
+    assert(defaultAccess != AccessLevel::Private && "private not valid");
     ExtensionDeclBits.DefaultAndMaxAccessLevel =
         (1 << (static_cast<unsigned>(defaultAccess) - 1)) |
         (1 << (static_cast<unsigned>(maxAccess) - 1));
@@ -2076,7 +2076,7 @@ public:
 class ValueDecl : public Decl {
   DeclName Name;
   SourceLoc NameLoc;
-  llvm::PointerIntPair<Type, 3, OptionalEnum<Accessibility>> TypeAndAccess;
+  llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
 
 protected:
   ValueDecl(DeclKind K,
@@ -2152,7 +2152,7 @@ public:
   }
 
   /// \see getFormalAccess
-  Accessibility getFormalAccessImpl(const DeclContext *useDC) const;
+  AccessLevel getFormalAccessImpl(const DeclContext *useDC) const;
 
   bool isVersionedInternalDecl() const;
 
@@ -2165,18 +2165,18 @@ public:
   /// taken into account.
   ///
   /// \sa getFormalAccessScope
-  Accessibility getFormalAccess(const DeclContext *useDC = nullptr,
-                                bool respectVersionedAttr = false) const {
+  AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
+                              bool respectVersionedAttr = false) const {
     assert(hasAccess() && "accessibility not computed yet");
-    Accessibility result = TypeAndAccess.getInt().getValue();
+    AccessLevel result = TypeAndAccess.getInt().getValue();
     if (respectVersionedAttr &&
-        result == Accessibility::Internal &&
+        result == AccessLevel::Internal &&
         isVersionedInternalDecl()) {
       assert(!useDC);
-      return Accessibility::Public;
+      return AccessLevel::Public;
     }
-    if (useDC && (result == Accessibility::Internal ||
-                  result == Accessibility::Public))
+    if (useDC && (result == AccessLevel::Internal ||
+                  result == AccessLevel::Public))
       return getFormalAccessImpl(useDC);
     return result;
   }
@@ -2203,16 +2203,16 @@ public:
   ///
   /// This is the access used when making optimization and code generation
   /// decisions. It should not be used at the AST or semantic level.
-  Accessibility getEffectiveAccess() const;
+  AccessLevel getEffectiveAccess() const;
 
-  void setAccess(Accessibility access) {
+  void setAccess(AccessLevel access) {
     assert(!hasAccess() && "accessibility already set");
     overwriteAccess(access);
   }
 
   /// Overwrite the accessibility of this declaration.
   // This is needed in the LLDB REPL.
-  void overwriteAccess(Accessibility access) {
+  void overwriteAccess(AccessLevel access) {
     TypeAndAccess.setInt(access);
   }
 
@@ -3961,8 +3961,8 @@ private:
   void configureObservingRecord(ObservingRecord *record,
                                 FuncDecl *willSet, FuncDecl *didSet);
 
-  llvm::PointerIntPair<GetSetRecord*, 3, OptionalEnum<Accessibility>> GetSetInfo;
-  llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<Accessibility>>
+  llvm::PointerIntPair<GetSetRecord*, 3, OptionalEnum<AccessLevel>> GetSetInfo;
+  llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<AccessLevel>>
     BehaviorInfo;
 
   ObservingRecord &getDidSetInfo() const {
@@ -4179,18 +4179,18 @@ public:
     return nullptr;
   }
 
-  Accessibility getSetterFormalAccess() const {
+  AccessLevel getSetterFormalAccess() const {
     assert(hasAccess());
     assert(GetSetInfo.getInt().hasValue());
     return GetSetInfo.getInt().getValue();
   }
 
-  void setSetterAccess(Accessibility accessLevel) {
+  void setSetterAccess(AccessLevel accessLevel) {
     assert(!GetSetInfo.getInt().hasValue());
     overwriteSetterAccess(accessLevel);
   }
 
-  void overwriteSetterAccess(Accessibility accessLevel);
+  void overwriteSetterAccess(AccessLevel accessLevel);
 
   /// \brief Retrieve the materializeForSet function, if this
   /// declaration has one.
@@ -6277,7 +6277,7 @@ NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
 }
 
 inline void
-AbstractStorageDecl::overwriteSetterAccess(Accessibility accessLevel) {
+AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
   GetSetInfo.setInt(accessLevel);
   if (auto setter = getSetter())
     setter->overwriteAccess(accessLevel);

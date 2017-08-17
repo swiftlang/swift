@@ -191,7 +191,7 @@ public:
   void visitFinalAttr(FinalAttr *attr) {
     // Reject combining 'final' with 'open'.
     if (auto accessibility = D->getAttrs().getAttribute<AccessibilityAttr>()) {
-      if (accessibility->getAccess() == Accessibility::Open) {
+      if (accessibility->getAccess() == AccessLevel::Open) {
         TC.diagnose(attr->getLocation(), diag::open_decl_cannot_be_final,
                     D->getDescriptiveKind());
         return;
@@ -1415,7 +1415,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
 void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
   if (auto extension = dyn_cast<ExtensionDecl>(D)) {
-    if (attr->getAccess() == Accessibility::Open) {
+    if (attr->getAccess() == AccessLevel::Open) {
       TC.diagnose(attr->getLocation(), diag::access_control_extension_open)
         .fixItReplace(attr->getRange(), "public");
       attr->setInvalid();
@@ -1423,7 +1423,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
     }
 
     Type extendedTy = extension->getExtendedType();
-    Accessibility typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
+    AccessLevel typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
       TC.diagnose(attr->getLocation(), diag::access_control_extension_more,
                   typeAccess,
@@ -1436,8 +1436,8 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
 
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
     TC.computeDefaultAccessLevel(extension);
-    Accessibility maxAccess = extension->getMaxAccessLevel();
-    if (std::min(attr->getAccess(), Accessibility::Public) > maxAccess) {
+    AccessLevel maxAccess = extension->getMaxAccessLevel();
+    if (std::min(attr->getAccess(), AccessLevel::Public) > maxAccess) {
       // FIXME: It would be nice to say what part of the requirements actually
       // end up being problematic.
       auto diag =
@@ -1462,7 +1462,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
     }
   }
 
-  if (attr->getAccess() == Accessibility::Open) {
+  if (attr->getAccess() == AccessLevel::Open) {
     if (!isa<ClassDecl>(D) && !D->isPotentiallyOverridable() &&
         !attr->isInvalid()) {
       TC.diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
@@ -1872,7 +1872,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
 
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
                                     /*respectVersionedAttr=*/true);
-  if (access < Accessibility::Public) {
+  if (access < AccessLevel::Public) {
     TC.diagnose(attr->getLocation(),
                 diag::fixed_layout_attr_on_internal_type,
                 VD->getFullName(),
@@ -1896,9 +1896,8 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
   }
 
   // @_versioned can only be applied to internal declarations.
-  if (VD->getFormalAccess() != Accessibility::Internal) {
-    TC.diagnose(attr->getLocation(),
-                diag::versioned_attr_with_explicit_accessibility,
+  if (VD->getFormalAccess() != AccessLevel::Internal) {
+    TC.diagnose(attr->getLocation(), diag::versioned_attr_with_explicit_access,
                 VD->getFullName(),
                 VD->getFormalAccess())
         .fixItRemove(attr->getRangeWithAt());
@@ -1928,7 +1927,7 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
   // declarations.
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
                                     /*respectVersionedAttr=*/true);
-  if (access < Accessibility::Public) {
+  if (access < AccessLevel::Public) {
     TC.diagnose(attr->getLocation(),
                 diag::inlineable_decl_not_public,
                 VD->getBaseName(),

@@ -357,7 +357,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
   {
     PrintOptions PO = PrintOptions::printInterface();
     PO.PrintAccess = false;
-    PO.AccessFilter = Accessibility::Private;
+    PO.AccessFilter = AccessLevel::Private;
     PO.PrintDocumentationComments = false;
     PO.TypeDefinitions = false;
     PO.VarInitializers = false;

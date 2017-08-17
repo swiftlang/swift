@@ -1895,7 +1895,7 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being versioned.
 bool ValueDecl::isVersionedInternalDecl() const {
-  assert(getFormalAccess() == Accessibility::Internal);
+  assert(getFormalAccess() == AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<VersionedAttr>())
     return true;
@@ -1914,40 +1914,40 @@ bool ValueDecl::isVersionedInternalDecl() const {
 
 /// Return the accessibility of an internal or public declaration
 /// that's been testably imported.
-static Accessibility getTestableAccess(const ValueDecl *decl) {
+static AccessLevel getTestableAccess(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
     if (!cls->isFinal())
-      return Accessibility::Open;
+      return AccessLevel::Open;
 
   // Non-final overridable class members are considered open to
   // @testable importers.
   } else if (decl->isPotentiallyOverridable()) {
     if (!cast<ValueDecl>(decl)->isFinal())
-      return Accessibility::Open;
+      return AccessLevel::Open;
   }
 
   // Everything else is considered public.
-  return Accessibility::Public;
+  return AccessLevel::Public;
 }
 
-Accessibility ValueDecl::getEffectiveAccess() const {
+AccessLevel ValueDecl::getEffectiveAccess() const {
   auto effectiveAccess = getFormalAccess(/*useDC=*/nullptr,
                                          /*respectVersionedAttr=*/true);
 
   // Handle @testable.
   switch (effectiveAccess) {
-  case Accessibility::Open:
+  case AccessLevel::Open:
     break;
-  case Accessibility::Public:
-  case Accessibility::Internal:
+  case AccessLevel::Public:
+  case AccessLevel::Internal:
     if (getModuleContext()->isTestingEnabled())
       effectiveAccess = getTestableAccess(this);
     break;
-  case Accessibility::FilePrivate:
+  case AccessLevel::FilePrivate:
     break;
-  case Accessibility::Private:
-    effectiveAccess = Accessibility::FilePrivate;
+  case AccessLevel::Private:
+    effectiveAccess = AccessLevel::FilePrivate;
     break;
   }
 
@@ -1966,15 +1966,15 @@ Accessibility ValueDecl::getEffectiveAccess() const {
     }
 
   } else if (getDeclContext()->isLocalContext()) {
-    effectiveAccess = Accessibility::FilePrivate;
+    effectiveAccess = AccessLevel::FilePrivate;
   }
 
   return effectiveAccess;
 }
 
-Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
-  assert((getFormalAccess() == Accessibility::Internal ||
-          getFormalAccess() == Accessibility::Public) &&
+AccessLevel ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
+  assert((getFormalAccess() == AccessLevel::Internal ||
+          getFormalAccess() == AccessLevel::Public) &&
          "should be able to fast-path non-internal cases");
   assert(useDC && "should fast-path non-scoped cases");
   if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
@@ -1986,10 +1986,10 @@ Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
 AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
                                             bool respectVersionedAttr) const {
   const DeclContext *result = getDeclContext();
-  Accessibility access = getFormalAccess(useDC, respectVersionedAttr);
+  AccessLevel access = getFormalAccess(useDC, respectVersionedAttr);
 
   while (!result->isModuleScopeContext()) {
-    if (result->isLocalContext() || access == Accessibility::Private)
+    if (result->isLocalContext() || access == AccessLevel::Private)
       return AccessScope(result, true);
 
     if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
@@ -2016,14 +2016,14 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
   }
 
   switch (access) {
-  case Accessibility::Private:
-  case Accessibility::FilePrivate:
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
     assert(result->isModuleScopeContext());
-    return AccessScope(result, access == Accessibility::Private);
-  case Accessibility::Internal:
+    return AccessScope(result, access == AccessLevel::Private);
+  case AccessLevel::Internal:
     return AccessScope(result->getParentModule());
-  case Accessibility::Public:
-  case Accessibility::Open:
+  case AccessLevel::Public:
+  case AccessLevel::Open:
     return AccessScope::getPublic();
   }
 

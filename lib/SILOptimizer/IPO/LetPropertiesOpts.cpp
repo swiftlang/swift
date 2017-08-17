@@ -163,10 +163,10 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
   // Check if a given let property can be removed, because it
   // is not accessible elsewhere. This can happen if this property
   // is private or if it is internal and WMO mode is used.
-  if (TypeAccess <= Accessibility::FilePrivate ||
-      PropertyAccess <= Accessibility::FilePrivate
-      || ((TypeAccess <= Accessibility::Internal ||
-          PropertyAccess <= Accessibility::Internal) &&
+  if (TypeAccess <= AccessLevel::FilePrivate ||
+      PropertyAccess <= AccessLevel::FilePrivate
+      || ((TypeAccess <= AccessLevel::Internal ||
+          PropertyAccess <= AccessLevel::Internal) &&
           Module->isWholeModule())) {
     CanRemove = true;
     DEBUG(llvm::dbgs() << "Storage for property '" << *Property
@@ -279,20 +279,20 @@ static bool compareInsnSequences(SmallVectorImpl<SILInstruction *> &LHS,
 
 /// Check if a given let property can be assigned externally.
 static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
-  Accessibility accessibility = Property->getEffectiveAccess();
+  AccessLevel accessibility = Property->getEffectiveAccess();
   SILLinkage linkage;
   switch (accessibility) {
-  case Accessibility::Private:
-  case Accessibility::FilePrivate:
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
     linkage = SILLinkage::Private;
     DEBUG(llvm::dbgs() << "Property " << *Property << " has private access\n");
     break;
-  case Accessibility::Internal:
+  case AccessLevel::Internal:
     linkage = SILLinkage::Hidden;
     DEBUG(llvm::dbgs() << "Property " << *Property << " has internal access\n");
     break;
-  case Accessibility::Public:
-  case Accessibility::Open:
+  case AccessLevel::Public:
+  case AccessLevel::Open:
     linkage = SILLinkage::Public;
     DEBUG(llvm::dbgs() << "Property " << *Property << " has public access\n");
     break;
@@ -322,8 +322,8 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
     // may exist.
     for (auto SP : Ty->getStoredProperties()) {
       auto storedPropertyAccess = SP->getEffectiveAccess();
-      if (storedPropertyAccess <= Accessibility::FilePrivate ||
-          (storedPropertyAccess <= Accessibility::Internal &&
+      if (storedPropertyAccess <= AccessLevel::FilePrivate ||
+          (storedPropertyAccess <= AccessLevel::Internal &&
            Module->isWholeModule())) {
        DEBUG(llvm::dbgs() << "Property " << *Property
                        << " cannot be set externally\n");

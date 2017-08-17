@@ -181,7 +181,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              TypeLoc::withoutLoc(ResType), DC);
   FD->setInterfaceType(FnType);
   FD->setImplicit();
-  FD->setAccess(Accessibility::Public);
+  FD->setAccess(AccessLevel::Public);
   return FD;
 }
 
@@ -246,7 +246,7 @@ getBuiltinGenericFunction(Identifier Id,
   func->setInterfaceType(InterfaceType);
   func->setGenericEnvironment(Env);
   func->setImplicit();
-  func->setAccess(Accessibility::Public);
+  func->setAccess(AccessLevel::Public);
 
   return func;
 }

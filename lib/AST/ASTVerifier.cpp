@@ -831,12 +831,12 @@ public:
       if (D->hasAccess()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
         if (D->getFormalAccessScope().isPublic() &&
-            D->getFormalAccess() < Accessibility::Public) {
+            D->getFormalAccess() < AccessLevel::Public) {
           Out << "non-public decl has no formal access scope\n";
           D->dump(Out);
           abort();
         }
-        if (D->getEffectiveAccess() == Accessibility::Private) {
+        if (D->getEffectiveAccess() == AccessLevel::Private) {
           Out << "effective access should use 'fileprivate' for 'private'\n";
           D->dump(Out);
           abort();

@@ -181,7 +181,7 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
-  initDecl->setAccess(std::max(Accessibility::Internal,
+  initDecl->setAccess(std::max(AccessLevel::Internal,
                                enumDecl->getFormalAccess()));
 
   // If the enum was not imported, the derived conformance is either from the

@@ -429,23 +429,23 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printAccess(Accessibility access, StringRef suffix = "") {
+  void printAccess(AccessLevel access, StringRef suffix = "") {
     switch (access) {
-    case Accessibility::Private:
+    case AccessLevel::Private:
       Printer << tok::kw_private;
       break;
-    case Accessibility::FilePrivate:
+    case AccessLevel::FilePrivate:
       Printer << tok::kw_fileprivate;
       break;
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       if (!Options.PrintInternalAccessKeyword)
         return;
       Printer << tok::kw_internal;
       break;
-    case Accessibility::Public:
+    case AccessLevel::Public:
       Printer << tok::kw_public;
       break;
-    case Accessibility::Open:
+    case AccessLevel::Open:
       Printer.printKeyword("open");
       break;
     }
@@ -461,7 +461,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
     if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (auto setter = storageDecl->getSetter()) {
-        Accessibility setterAccess = setter->getFormalAccess();
+        AccessLevel setterAccess = setter->getFormalAccess();
         if (setterAccess != D->getFormalAccess())
           printAccess(setterAccess, "(set)");
       }
@@ -1266,7 +1266,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
 
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (Options.AccessFilter > Accessibility::Private &&
+    if (Options.AccessFilter > AccessLevel::Private &&
         VD->hasAccess() && VD->getFormalAccess() < Options.AccessFilter)
       return false;
   }

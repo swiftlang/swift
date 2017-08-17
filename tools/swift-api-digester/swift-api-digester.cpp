@@ -1283,12 +1283,12 @@ static bool shouldIgnore(Decl *D) {
     if (VD->getBaseName().empty())
       return true;
     switch (VD->getFormalAccess()) {
-    case Accessibility::Internal:
-    case Accessibility::Private:
-    case Accessibility::FilePrivate:
+    case AccessLevel::Internal:
+    case AccessLevel::Private:
+    case AccessLevel::FilePrivate:
       return true;
-    case Accessibility::Public:
-    case Accessibility::Open:
+    case AccessLevel::Public:
+    case AccessLevel::Open:
       break;
     }
   }

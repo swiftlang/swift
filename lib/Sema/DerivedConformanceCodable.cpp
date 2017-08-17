@@ -365,7 +365,7 @@ static EnumDecl *synthesizeCodingKeysEnum(TypeChecker &tc,
   auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
                                     inherited, nullptr, target);
   enumDecl->setImplicit();
-  enumDecl->setAccess(Accessibility::Private);
+  enumDecl->setAccess(AccessLevel::Private);
 
   // For classes which inherit from something Encodable or Decodable, we
   // provide case `super` as the first key (to be used in encoding super).
@@ -790,7 +790,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
 
   encodeDecl->setInterfaceType(interfaceType);
   encodeDecl->setAccess(std::max(target->getFormalAccess(),
-                                 Accessibility::Internal));
+                                 AccessLevel::Internal));
 
   // If the type was not imported, the derived conformance is either from the
   // type itself or an extension, in which case we will emit the declaration
@@ -1137,7 +1137,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   initDecl->setInterfaceType(interfaceType);
   initDecl->setInitializerInterfaceType(initializerType);
   initDecl->setAccess(std::max(target->getFormalAccess(),
-                               Accessibility::Internal));
+                               AccessLevel::Internal));
 
   // If the type was not imported, the derived conformance is either from the
   // type itself or an extension, in which case we will emit the declaration

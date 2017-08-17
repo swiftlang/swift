@@ -606,14 +606,14 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
       return false;
     auto *AFD = cast<AbstractFunctionDecl>(this);
     if (AFD->hasAccess())
-      return AFD->getFormalAccess() > Accessibility::FilePrivate;
+      return AFD->getFormalAccess() > AccessLevel::FilePrivate;
     break;
   }
 
   case DeclContextKind::SubscriptDecl: {
     auto *SD = cast<SubscriptDecl>(this);
     if (SD->hasAccess())
-      return SD->getFormalAccess() > Accessibility::FilePrivate;
+      return SD->getFormalAccess() > AccessLevel::FilePrivate;
     break;
   }
       
@@ -624,17 +624,17 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   case DeclContextKind::GenericTypeDecl: {
     auto *nominal = cast<GenericTypeDecl>(this);
     if (nominal->hasAccess())
-      return nominal->getFormalAccess() > Accessibility::FilePrivate;
+      return nominal->getFormalAccess() > AccessLevel::FilePrivate;
     break;
   }
 
   case DeclContextKind::ExtensionDecl: {
     auto *extension = cast<ExtensionDecl>(this);
     if (extension->hasDefaultAccessLevel())
-      return extension->getDefaultAccessLevel() > Accessibility::FilePrivate;
+      return extension->getDefaultAccessLevel() > AccessLevel::FilePrivate;
     // FIXME: duplicated from computeDefaultAccessLevel in TypeCheckDecl.cpp.
     if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
-      return AA->getAccess() > Accessibility::FilePrivate;
+      return AA->getAccess() > AccessLevel::FilePrivate;
     if (Type extendedTy = extension->getExtendedType()) {
 
       // Need to check if extendedTy is ErrorType
@@ -1055,16 +1055,16 @@ bool AccessScope::isFileScope() const {
   return DC && isa<FileUnit>(DC);
 }
 
-Accessibility AccessScope::accessLevelForDiagnostics() const {
+AccessLevel AccessScope::accessLevelForDiagnostics() const {
   if (isPublic())
-    return Accessibility::Public;
+    return AccessLevel::Public;
   if (isa<ModuleDecl>(getDeclContext()))
-    return Accessibility::Internal;
+    return AccessLevel::Internal;
   if (getDeclContext()->isModuleScopeContext()) {
-    return isPrivate() ? Accessibility::Private : Accessibility::FilePrivate;
+    return isPrivate() ? AccessLevel::Private : AccessLevel::FilePrivate;
   }
 
-  return Accessibility::Private;
+  return AccessLevel::Private;
 }
 
 bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC) {

@@ -258,7 +258,7 @@ struct PrintOptions {
   bool PrintInternalAccessKeyword = true;
 
   /// Print all decls that have at least this level of access.
-  Accessibility AccessFilter = Accessibility::Private;
+  AccessLevel AccessFilter = AccessLevel::Private;
 
   /// Print IfConfigDecls.
   bool PrintIfConfig = true;
@@ -387,7 +387,7 @@ struct PrintOptions {
     result.ExcludeAttrList.push_back(DAK_Inline);
     result.ExcludeAttrList.push_back(DAK_Rethrows);
     result.PrintOverrideKeyword = false;
-    result.AccessFilter = Accessibility::Public;
+    result.AccessFilter = AccessLevel::Public;
     result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
@@ -429,7 +429,7 @@ struct PrintOptions {
   /// Retrieve the print options that are suitable to print the testable interface.
   static PrintOptions printTestableInterface() {
     PrintOptions result = printInterface();
-    result.AccessFilter = Accessibility::Internal;
+    result.AccessFilter = AccessLevel::Internal;
     return result;
   }
 
@@ -437,7 +437,7 @@ struct PrintOptions {
   /// swift file.
   static PrintOptions printSwiftFileInterface() {
     PrintOptions result = printInterface();
-    result.AccessFilter = Accessibility::Internal;
+    result.AccessFilter = AccessLevel::Internal;
     result.EmptyLineBetweenMembers = true;
     return result;
   }

@@ -591,15 +591,15 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_Accessibility:
   case DAK_SetterAccessibility:
     switch (cast<AbstractAccessibilityAttr>(this)->getAccess()) {
-    case Accessibility::Private:
+    case AccessLevel::Private:
       return "private";
-    case Accessibility::FilePrivate:
+    case AccessLevel::FilePrivate:
       return "fileprivate";
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       return "internal";
-    case Accessibility::Public:
+    case AccessLevel::Public:
       return "public";
-    case Accessibility::Open:
+    case AccessLevel::Open:
       return "open";
     }
     llvm_unreachable("bad accessibility kind");

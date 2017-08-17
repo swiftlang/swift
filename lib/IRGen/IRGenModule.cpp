@@ -736,11 +736,11 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
     wt->getConformance()->getType()->getNominalOrBoundGenericNominal();
 
   switch (ConformingTy->getEffectiveAccess()) {
-    case Accessibility::Private:
-    case Accessibility::FilePrivate:
+    case AccessLevel::Private:
+    case AccessLevel::FilePrivate:
       return true;
 
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       return PrimaryIGM->getSILModule().isWholeModule();
 
     default:

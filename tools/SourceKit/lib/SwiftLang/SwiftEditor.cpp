@@ -890,7 +890,7 @@ void SwiftEditorDocument::Implementation::buildSwiftInv(
 
 namespace  {
 
-static UIdent getAccessLevelUID(Accessibility Access) {
+static UIdent getAccessLevelUID(AccessLevel Access) {
   static UIdent AccessOpen("source.lang.swift.accessibility.open");
   static UIdent AccessPublic("source.lang.swift.accessibility.public");
   static UIdent AccessInternal("source.lang.swift.accessibility.internal");
@@ -898,22 +898,22 @@ static UIdent getAccessLevelUID(Accessibility Access) {
   static UIdent AccessPrivate("source.lang.swift.accessibility.private");
 
   switch (Access) {
-  case Accessibility::Private:
+  case AccessLevel::Private:
     return AccessPrivate;
-  case Accessibility::FilePrivate:
+  case AccessLevel::FilePrivate:
     return AccessFilePrivate;
-  case Accessibility::Internal:
+  case AccessLevel::Internal:
     return AccessInternal;
-  case Accessibility::Public:
+  case AccessLevel::Public:
     return AccessPublic;
-  case Accessibility::Open:
+  case AccessLevel::Open:
     return AccessOpen;
   }
 
   llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
-static Optional<Accessibility> getAccessLevelStrictly(const ExtensionDecl *ED) {
+static Optional<AccessLevel> getAccessLevelStrictly(const ExtensionDecl *ED) {
   if (ED->hasDefaultAccessLevel())
     return ED->getDefaultAccessLevel();
 
@@ -924,18 +924,18 @@ static Optional<Accessibility> getAccessLevelStrictly(const ExtensionDecl *ED) {
   return None;
 }
 
-static Accessibility inferDefaultAccessLevel(const ExtensionDecl *ED) {
+static AccessLevel inferDefaultAccessLevel(const ExtensionDecl *ED) {
   if (auto StrictAccess = getAccessLevelStrictly(ED))
     return StrictAccess.getValue();
 
   // Assume "internal", which is the most common thing anyway.
-  return Accessibility::Internal;
+  return AccessLevel::Internal;
 }
 
 /// If typechecking was performed we use the computed accessibility, otherwise
 /// we fallback to inferring accessibility syntactically. This may not be as
 /// accurate but it's only until we have typechecked the AST.
-static Accessibility inferAccessLevel(const ValueDecl *D) {
+static AccessLevel inferAccessLevel(const ValueDecl *D) {
   assert(D);
   if (D->hasAccess())
     return D->getFormalAccess();
@@ -952,15 +952,15 @@ static Accessibility inferAccessLevel(const ValueDecl *D) {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
-    return Accessibility::Private;
+    return AccessLevel::Private;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
-    return Accessibility::Internal;
+    return AccessLevel::Internal;
   case DeclContextKind::GenericTypeDecl: {
     auto Nominal = cast<GenericTypeDecl>(DC);
-    Accessibility Access = inferAccessLevel(Nominal);
+    AccessLevel Access = inferAccessLevel(Nominal);
     if (!isa<ProtocolDecl>(Nominal))
-      Access = std::min(Access, Accessibility::Internal);
+      Access = std::min(Access, AccessLevel::Internal);
     return Access;
   }
   case DeclContextKind::ExtensionDecl:
@@ -970,7 +970,7 @@ static Accessibility inferAccessLevel(const ValueDecl *D) {
   llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
-static Optional<Accessibility>
+static Optional<AccessLevel>
 inferSetterAccessLevel(const AbstractStorageDecl *D) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->isLet())
@@ -1049,7 +1049,7 @@ public:
           AccessLevel = getAccessLevelUID(StrictAccess.getValue());
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
-        Optional<Accessibility> SetAccess = inferSetterAccessLevel(ASD);
+        Optional<swift::AccessLevel> SetAccess = inferSetterAccessLevel(ASD);
         if (SetAccess.hasValue()) {
           SetterAccessLevel = getAccessLevelUID(SetAccess.getValue());
         }

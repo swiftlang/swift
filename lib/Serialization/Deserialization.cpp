@@ -1882,12 +1882,11 @@ static bool isDeclAttrRecord(unsigned ID) {
   }
 }
 
-static Optional<swift::Accessibility>
-getActualAccessLevel(uint8_t raw) {
+static Optional<swift::AccessLevel> getActualAccessLevel(uint8_t raw) {
   switch (serialization::AccessibilityKind(raw)) {
 #define CASE(NAME) \
   case serialization::AccessibilityKind::NAME: \
-    return Accessibility::NAME;
+    return AccessLevel::NAME;
   CASE(Private)
   CASE(FilePrivate)
   CASE(Internal)
@@ -2500,8 +2499,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     assert(!assocType->getDeclaredInterfaceType()->hasError() &&
            "erroneous associated type");
 
-    Accessibility parentAccess = cast<ProtocolDecl>(DC)->getFormalAccess();
-    assocType->setAccess(std::max(parentAccess,Accessibility::Internal));
+    AccessLevel parentAccess = cast<ProtocolDecl>(DC)->getFormalAccess();
+    assocType->setAccess(std::max(parentAccess, AccessLevel::Internal));
     if (isImplicit)
       assocType->setImplicit();
 
@@ -3390,7 +3389,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       elem->setImplicit();
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
-                             Accessibility::Internal));
+                             AccessLevel::Internal));
 
     break;
   }
@@ -3590,7 +3589,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     configureGenericEnvironment(dtor, genericEnvID);
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
-                             Accessibility::Internal));
+                             AccessLevel::Internal));
     auto *selfParams = readParameterList();
     selfParams->get(0)->setImplicit();  // self is implicit.
 

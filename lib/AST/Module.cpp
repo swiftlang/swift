@@ -88,7 +88,7 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
-      TAD->setAccess(Accessibility::Public);
+      TAD->setAccess(AccessLevel::Public);
       Entry = TAD;
     }
   }
@@ -350,7 +350,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
-  setAccess(Accessibility::Public);
+  setAccess(AccessLevel::Public);
 }
 
 void ModuleDecl::addFile(FileUnit &newFile) {
@@ -451,14 +451,14 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   } else if (privateDiscriminator.empty()) {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [](const ValueDecl *VD) -> bool {
-      return VD->getFormalAccess() <= Accessibility::FilePrivate;
+      return VD->getFormalAccess() <= AccessLevel::FilePrivate;
     });
     results.erase(newEnd, results.end());
 
   } else {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [=](const ValueDecl *VD) -> bool {
-      if (VD->getFormalAccess() > Accessibility::FilePrivate)
+      if (VD->getFormalAccess() > AccessLevel::FilePrivate)
         return true;
       auto enclosingFile =
         cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());

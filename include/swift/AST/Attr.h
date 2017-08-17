@@ -862,15 +862,15 @@ public:
 class AbstractAccessibilityAttr : public DeclAttribute {
 protected:
   AbstractAccessibilityAttr(DeclAttrKind DK, SourceLoc atLoc, SourceRange range,
-                            Accessibility access, bool implicit)
+                            AccessLevel access, bool implicit)
       : DeclAttribute(DK, atLoc, range, implicit) {
     AccessibilityAttrBits.AccessLevel = static_cast<unsigned>(access);
     assert(getAccess() == access && "not enough bits for accessibility");
   }
 
 public:
-  Accessibility getAccess() const {
-    return static_cast<Accessibility>(AccessibilityAttrBits.AccessLevel);
+  AccessLevel getAccess() const {
+    return static_cast<AccessLevel>(AccessibilityAttrBits.AccessLevel);
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -882,7 +882,7 @@ public:
 /// Represents a 'private', 'internal', or 'public' marker on a declaration.
 class AccessibilityAttr : public AbstractAccessibilityAttr {
 public:
-  AccessibilityAttr(SourceLoc atLoc, SourceRange range, Accessibility access,
+  AccessibilityAttr(SourceLoc atLoc, SourceRange range, AccessLevel access,
                     bool implicit = false)
       : AbstractAccessibilityAttr(DAK_Accessibility, atLoc, range, access,
                                   implicit) {}
@@ -897,7 +897,7 @@ public:
 class SetterAccessibilityAttr : public AbstractAccessibilityAttr {
 public:
   SetterAccessibilityAttr(SourceLoc atLoc, SourceRange range,
-                          Accessibility access, bool implicit = false)
+                          AccessLevel access, bool implicit = false)
       : AbstractAccessibilityAttr(DAK_SetterAccessibility, atLoc, range, access,
                                   implicit) {}
 

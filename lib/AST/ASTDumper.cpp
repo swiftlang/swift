@@ -250,16 +250,16 @@ static StringRef getImportKindString(ImportKind value) {
   
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
-static StringRef getAccessLevelString(Accessibility value) {
+static StringRef getAccessLevelString(AccessLevel value) {
   switch (value) {
-  case Accessibility::Private: return "private";
-  case Accessibility::FilePrivate: return "fileprivate";
-  case Accessibility::Internal: return "internal";
-  case Accessibility::Public: return "public";
-  case Accessibility::Open: return "open";
+  case AccessLevel::Private: return "private";
+  case AccessLevel::FilePrivate: return "fileprivate";
+  case AccessLevel::Internal: return "internal";
+  case AccessLevel::Public: return "public";
+  case AccessLevel::Open: return "open";
   }
 
-  llvm_unreachable("Unhandled Accessibility in switch.");
+  llvm_unreachable("Unhandled AccessLevel in switch.");
 }
 static StringRef
 getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {

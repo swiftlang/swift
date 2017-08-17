@@ -2522,7 +2522,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       diagnoseOrDefer(assocType, false,
         [DC, typeDecl, requiredAccessScope](
           NormalProtocolConformance *conformance) {
-        Accessibility requiredAccess =
+        AccessLevel requiredAccess =
           requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
@@ -2582,8 +2582,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       // a typealias added for an internal protocol shouldn't need to be
       // public---but that can be problematic if the same type conforms to two
       // protocols with different access levels.
-      Accessibility aliasAccess = nominal->getFormalAccess();
-      aliasAccess = std::max(aliasAccess, Accessibility::Internal);
+      AccessLevel aliasAccess = nominal->getFormalAccess();
+      aliasAccess = std::max(aliasAccess, AccessLevel::Internal);
       aliasDecl->setAccess(aliasAccess);
 
       if (nominal == DC) {
@@ -2636,14 +2636,14 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   ExtraIndentStreamPrinter Printer(OS, StubIndent);
   Printer.printNewline();
 
-  Accessibility Access =
+  AccessLevel Access =
     std::min(
       /* Access of the context */
       Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
       /* Access of the protocol */
       Requirement->getDeclContext()->getAsProtocolOrProtocolExtensionContext()->
         getFormalAccess());
-  if (Access == Accessibility::Public)
+  if (Access == AccessLevel::Public)
     Printer << "public ";
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
@@ -2662,7 +2662,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 
     PrintOptions Options = PrintOptions::printForDiagnostics();
     Options.PrintDocumentationComments = false;
-    Options.AccessFilter = Accessibility::Private;
+    Options.AccessFilter = AccessLevel::Private;
     Options.PrintAccess = false;
     Options.SkipAttributes = true;
     Options.FunctionBody = [](const ValueDecl *VD) { return getCodePlaceholder(); };
@@ -2941,7 +2941,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         [DC, witness, check, requirement](
           NormalProtocolConformance *conformance) {
         auto requiredAccessScope = check.RequiredAccessScope;
-        Accessibility requiredAccess =
+        AccessLevel requiredAccess =
           requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
@@ -5968,7 +5968,7 @@ static unsigned getNameLength(DeclName name) {
 /// match for the given optional requirement.
 static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
                                             ValueDecl *witness,
-                                            Accessibility accessibility,
+                                            AccessLevel access,
                                             unsigned score) {
   // If the warning couldn't be suppressed, don't warn.
   if (!canSuppressPotentialWitnessWarningWithMovement(req, witness) &&
@@ -5981,7 +5981,7 @@ static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
 
   // Don't warn if the potential witness has been explicitly given less
   // visibility than the conformance.
-  if (witness->getFormalAccess() < accessibility) {
+  if (witness->getFormalAccess() < access) {
     if (auto attr = witness->getAttrs().getAttribute<AccessibilityAttr>())
       if (!attr->isImplicit()) return false;
   }
@@ -6003,7 +6003,7 @@ static void diagnosePotentialWitness(TypeChecker &tc,
                                      NormalProtocolConformance *conformance,
                                      ValueDecl *req,
                                      ValueDecl *witness,
-                                     Accessibility accessibility) {
+                                     AccessLevel access) {
   auto proto = cast<ProtocolDecl>(req->getDeclContext());
 
   // Primary warning.
@@ -6038,11 +6038,10 @@ static void diagnosePotentialWitness(TypeChecker &tc,
   }
 
   // If adding 'private', 'fileprivate', or 'internal' can help, suggest that.
-  if (accessibility > Accessibility::FilePrivate &&
+  if (access > AccessLevel::FilePrivate &&
       !witness->getAttrs().hasAttribute<AccessibilityAttr>()) {
-    tc.diagnose(witness, diag::optional_req_near_match_accessibility,
-                witness->getFullName(),
-                accessibility)
+    tc.diagnose(witness, diag::optional_req_near_match_access,
+                witness->getFullName(), access)
       .fixItInsert(witness->getAttributeInsertionLoc(true), "private ");
   }
 
@@ -6114,7 +6113,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
   // Determine the accessibility of this conformance.
   Decl *currentDecl = nullptr;
-  Accessibility defaultAccess;
+  AccessLevel defaultAccess;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     Type extendedTy = ext->getExtendedType();
     if (!extendedTy)
@@ -6151,7 +6150,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     if (tracker)
       tracker->addUsedMember({conformance->getProtocol(), Identifier()},
-                             defaultAccess > Accessibility::FilePrivate);
+                             defaultAccess > AccessLevel::FilePrivate);
 
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
     // have unstable archival names.
@@ -6175,17 +6174,17 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
             kind = UnstableNameKind::Local;
         } else {
           switch (classDecl->getFormalAccess()) {
-          case Accessibility::FilePrivate:
+          case AccessLevel::FilePrivate:
             kind = UnstableNameKind::FilePrivate;
             break;
 
-          case Accessibility::Private:
+          case AccessLevel::Private:
             kind = UnstableNameKind::Private;
             break;
 
-          case Accessibility::Internal:
-          case Accessibility::Open:
-          case Accessibility::Public:
+          case AccessLevel::Internal:
+          case AccessLevel::Open:
+          case AccessLevel::Public:
             break;
           }
         }

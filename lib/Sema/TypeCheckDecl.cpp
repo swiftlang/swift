@@ -942,7 +942,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
   bool isCascading = true;
   if (current->hasAccess())
-    isCascading = (current->getFormalAccess() > Accessibility::FilePrivate);
+    isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
@@ -1428,7 +1428,7 @@ void TypeChecker::computeDefaultAccessLevel(ExtensionDecl *ED) {
   if (ED->hasDefaultAccessLevel())
     return;
 
-  Accessibility maxAccess = Accessibility::Public;
+  AccessLevel maxAccess = AccessLevel::Public;
 
   if (!ED->getExtendedType().isNull() &&
       !ED->getExtendedType()->hasError()) {
@@ -1437,31 +1437,31 @@ void TypeChecker::computeDefaultAccessLevel(ExtensionDecl *ED) {
       if (ED->hasDefaultAccessLevel())
         return;
       maxAccess = std::max(nominal->getFormalAccess(),
-                           Accessibility::FilePrivate);
+                           AccessLevel::FilePrivate);
     }
   }
 
   if (const GenericParamList *genericParams = ED->getGenericParams()) {
-    auto getTypeAccess = [this, ED](const TypeLoc &TL) -> Accessibility {
+    auto getTypeAccess = [this, ED](const TypeLoc &TL) -> AccessLevel {
       if (!TL.getType())
-        return Accessibility::Public;
+        return AccessLevel::Public;
       auto accessScope =
           TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(),
                                                      ED->getDeclContext(),
                                                      TypeAccessScopeCache);
       // This is an error case and will be diagnosed elsewhere.
       if (!accessScope.hasValue())
-        return Accessibility::Public;
+        return AccessLevel::Public;
 
       if (accessScope->isPublic())
-        return Accessibility::Public;
+        return AccessLevel::Public;
       if (isa<ModuleDecl>(accessScope->getDeclContext()))
-        return Accessibility::Internal;
+        return AccessLevel::Internal;
       // Because extensions are always at top-level, they should never
       // reference declarations not at the top level. (And any such references
       // should be diagnosed elsewhere.) This code should not crash if that
       // occurs, though.
-      return Accessibility::FilePrivate;
+      return AccessLevel::FilePrivate;
     };
 
     // Only check the trailing 'where' requirements. Other requirements come
@@ -1483,16 +1483,16 @@ void TypeChecker::computeDefaultAccessLevel(ExtensionDecl *ED) {
     }
   }
 
-  Accessibility defaultAccess;
+  AccessLevel defaultAccess;
   if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
-    defaultAccess = std::max(AA->getAccess(), Accessibility::FilePrivate);
+    defaultAccess = std::max(AA->getAccess(), AccessLevel::FilePrivate);
   else
-    defaultAccess = Accessibility::Internal;
+    defaultAccess = AccessLevel::Internal;
 
   // Don't set the max or default accessibility to 'open'.  This should
   // be diagnosed as invalid anyway.
-  defaultAccess = std::min(defaultAccess, Accessibility::Public);
-  maxAccess = std::min(maxAccess, Accessibility::Public);
+  defaultAccess = std::min(defaultAccess, AccessLevel::Public);
+  maxAccess = std::min(maxAccess, AccessLevel::Public);
 
   // Normally putting a public member in an internal extension is harmless,
   // because that member can never be used elsewhere. But if some of the types
@@ -1502,7 +1502,7 @@ void TypeChecker::computeDefaultAccessLevel(ExtensionDecl *ED) {
   if (ED->getTrailingWhereClause())
     defaultAccess = std::min(defaultAccess, maxAccess);
   else
-    maxAccess = Accessibility::Public;
+    maxAccess = AccessLevel::Public;
 
   ED->setDefaultAndMaxAccess(defaultAccess, maxAccess);
 }
@@ -1537,33 +1537,33 @@ void TypeChecker::computeAccessLevel(ValueDecl *D) {
     case DeclContextKind::TopLevelCodeDecl:
       // Variables declared in a top-level 'guard' statement can be accessed in
       // later top-level code.
-      D->setAccess(Accessibility::FilePrivate);
+      D->setAccess(AccessLevel::FilePrivate);
       break;
     case DeclContextKind::AbstractClosureExpr:
       if (isa<ParamDecl>(D)) {
         // Closure parameters may need to be accessible to the enclosing
         // context, for single-expression closures.
-        D->setAccess(Accessibility::FilePrivate);
+        D->setAccess(AccessLevel::FilePrivate);
       } else {
-        D->setAccess(Accessibility::Private);
+        D->setAccess(AccessLevel::Private);
       }
       break;
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::Initializer:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
-      D->setAccess(Accessibility::Private);
+      D->setAccess(AccessLevel::Private);
       break;
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
-      D->setAccess(Accessibility::Internal);
+      D->setAccess(AccessLevel::Internal);
       break;
     case DeclContextKind::GenericTypeDecl: {
       auto generic = cast<GenericTypeDecl>(DC);
       validateAccessControl(generic);
-      Accessibility access = Accessibility::Internal;
+      AccessLevel access = AccessLevel::Internal;
       if (isa<ProtocolDecl>(generic))
-        access = std::max(Accessibility::FilePrivate,
+        access = std::max(AccessLevel::FilePrivate,
                           generic->getFormalAccess());
       D->setAccess(access);
       break;
@@ -1800,7 +1800,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
                                     const GenericParamList *params,
                                     const Decl *owner,
                                     AccessScope accessScope,
-                                    Accessibility contextAccess) {
+                                    AccessLevel contextAccess) {
   if (!params)
     return;
 
@@ -2419,7 +2419,7 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     if (!allowImplicit && VD->isImplicit())
       return false;
 
-    if (VD->getFormalAccess() <= Accessibility::FilePrivate)
+    if (VD->getFormalAccess() <= AccessLevel::FilePrivate)
       return false;
 
     return true;
@@ -4578,7 +4578,7 @@ public:
         if (auto *SF = CD->getParentSourceFile()) {
           if (auto *tracker = SF->getReferencedNameTracker()) {
             bool isPrivate =
-                CD->getFormalAccess() <= Accessibility::FilePrivate;
+                CD->getFormalAccess() <= AccessLevel::FilePrivate;
             tracker->addUsedMember({Super, Identifier()}, !isPrivate);
           }
         }
@@ -4641,7 +4641,7 @@ public:
         // un-subclassable.
         if (!isInvalidSuperclass &&
             Super->getFormalAccess(CD->getDeclContext())
-              < Accessibility::Open &&
+              < AccessLevel::Open &&
             Super->getModuleContext() != CD->getModuleContext()) {
           TC.diagnose(CD, diag::superclass_not_open, superclassTy);
           isInvalidSuperclass = true;
@@ -4652,8 +4652,8 @@ public:
         // e.g. to enable a "sealed" superclass whose subclasses are all
         // of one of several alternatives.
         if (!isInvalidSuperclass &&
-            CD->getFormalAccess() == Accessibility::Open &&
-            Super->getFormalAccess() != Accessibility::Open) {
+            CD->getFormalAccess() == AccessLevel::Open &&
+            Super->getFormalAccess() != AccessLevel::Open) {
           TC.diagnose(CD, diag::superclass_of_open_not_open, superclassTy);
           TC.diagnose(Super, diag::superclass_here);
         }
@@ -4707,7 +4707,7 @@ public:
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
           bool isNonPrivate =
-              (PD->getFormalAccess() > Accessibility::FilePrivate);
+              (PD->getFormalAccess() > AccessLevel::FilePrivate);
           for (auto *parentProto : PD->getInheritedProtocols())
             tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
         }
@@ -5925,24 +5925,24 @@ public:
       // defining module.  This is not required for constructors, which are
       // never really "overridden" in the intended sense here, because of
       // course derived classes will change how the class is initialized.
-      Accessibility matchAccess = matchDecl->getFormalAccess(dc);
-      if (matchAccess < Accessibility::Open &&
+      AccessLevel matchAccess = matchDecl->getFormalAccess(dc);
+      if (matchAccess < AccessLevel::Open &&
           matchDecl->getModuleContext() != decl->getModuleContext() &&
           !isa<ConstructorDecl>(decl)) {
         TC.diagnose(decl, diag::override_of_non_open,
                     decl->getDescriptiveKind());
 
-      } else if (matchAccess == Accessibility::Open &&
+      } else if (matchAccess == AccessLevel::Open &&
                  classDecl->getFormalAccess(dc) ==
-                   Accessibility::Open &&
-                 decl->getFormalAccess() != Accessibility::Open &&
+                   AccessLevel::Open &&
+                 decl->getFormalAccess() != AccessLevel::Open &&
                  !decl->isFinal()) {
         {
           auto diag = TC.diagnose(decl, diag::override_not_accessible,
                                   /*setter*/false,
                                   decl->getDescriptiveKind(),
                                   /*fromOverridden*/true);
-          fixItAccess(diag, decl, Accessibility::Open);
+          fixItAccess(diag, decl, AccessLevel::Open);
         }
         TC.diagnose(matchDecl, diag::overridden_here);
 
@@ -5974,8 +5974,8 @@ public:
         if (shouldDiagnose || shouldDiagnoseSetter) {
           bool overriddenForcesAccess =
             (requiredAccessScope->hasEqualDeclContextWith(matchAccessScope) &&
-             matchAccess != Accessibility::Open);
-          Accessibility requiredAccess =
+             matchAccess != AccessLevel::Open);
+          AccessLevel requiredAccess =
             requiredAccessScope->requiredAccessForDiagnostics();
           {
             auto diag = TC.diagnose(decl, diag::override_not_accessible,
@@ -6667,22 +6667,22 @@ public:
         const auto access = AA->getAccess();
         AccessScope desiredAccessScope = AccessScope::getPublic();
         switch (access) {
-        case Accessibility::Private:
+        case AccessLevel::Private:
           assert((ED->isInvalid() ||
                   ED->getDeclContext()->isModuleScopeContext()) &&
                  "non-top-level extensions make 'private' != 'fileprivate'");
           LLVM_FALLTHROUGH;
-        case Accessibility::FilePrivate: {
+        case AccessLevel::FilePrivate: {
           const DeclContext *DC = ED->getModuleScopeContext();
-          bool isPrivate = access == Accessibility::Private;
+          bool isPrivate = access == AccessLevel::Private;
           desiredAccessScope = AccessScope(DC, isPrivate);
           break;
         }
-        case Accessibility::Internal:
+        case AccessLevel::Internal:
           desiredAccessScope = AccessScope(ED->getModuleContext());
           break;
-        case Accessibility::Public:
-        case Accessibility::Open:
+        case AccessLevel::Public:
+        case AccessLevel::Open:
           break;
         }
         checkGenericParamAccess(TC, ED->getGenericParams(), ED,
@@ -6912,9 +6912,9 @@ public:
       if (auto nominal = CD->getDeclContext()
               ->getAsNominalTypeOrNominalTypeExtensionContext()) {
         auto requiredAccess = std::min(nominal->getFormalAccess(),
-                                       Accessibility::Public);
-        if (requiredAccess == Accessibility::Private)
-          requiredAccess = Accessibility::FilePrivate;
+                                       AccessLevel::Public);
+        if (requiredAccess == AccessLevel::Private)
+          requiredAccess = AccessLevel::FilePrivate;
         if (CD->getFormalAccess() < requiredAccess) {
           auto diag = TC.diagnose(CD,
                                   diag::required_initializer_not_accessible);
@@ -7097,7 +7097,7 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
 /// Validate the underlying type of the given typealias.
 static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
-  if (typeAlias->getFormalAccess() <= Accessibility::FilePrivate)
+  if (typeAlias->getFormalAccess() <= AccessLevel::FilePrivate)
     options |= TR_KnownNonCascadingDependency;
 
   if (typeAlias->getDeclContext()->isModuleScopeContext() &&
@@ -7568,7 +7568,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         SWIFT_DEFER { typealias->setIsBeingValidated(false); };
 
         validateAccessControl(typealias);
-        if (typealias->getFormalAccess() <= Accessibility::FilePrivate)
+        if (typealias->getFormalAccess() <= AccessLevel::FilePrivate)
           options |= TR_KnownNonCascadingDependency;
 
         if (validateType(typealias->getUnderlyingTypeLoc(),
@@ -7635,7 +7635,7 @@ void TypeChecker::validateAccessControl(ValueDecl *D) {
       auto prot = assocType->getProtocol();
       validateAccessControl(prot);
       assocType->setAccess(std::max(prot->getFormalAccess(),
-                                    Accessibility::Internal));
+                                    AccessLevel::Internal));
       break;
     }
 
@@ -7654,12 +7654,12 @@ void TypeChecker::validateAccessControl(ValueDecl *D) {
   case DeclKind::Destructor:
   case DeclKind::EnumElement: {
     if (D->isInvalid()) {
-      D->setAccess(Accessibility::Private);
+      D->setAccess(AccessLevel::Private);
     } else {
       auto container = cast<NominalTypeDecl>(D->getDeclContext());
       validateAccessControl(container);
       D->setAccess(std::max(container->getFormalAccess(),
-                            Accessibility::Internal));
+                            AccessLevel::Internal));
     }
     break;
   }

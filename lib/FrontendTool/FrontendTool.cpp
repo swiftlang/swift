@@ -323,8 +323,8 @@ static bool printAsObjC(const std::string &outputPath, ModuleDecl *M,
     return true;
   }
 
-  auto requiredAccess = moduleIsPublic ? Accessibility::Public
-                                       : Accessibility::Internal;
+  auto requiredAccess = moduleIsPublic ? AccessLevel::Public
+                                       : AccessLevel::Internal;
   bool hadError = printAsObjC(*out, M, bridgingHeader, requiredAccess);
   out->flush();
 

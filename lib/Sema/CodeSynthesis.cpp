@@ -1199,8 +1199,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
-  Storage->setAccess(Accessibility::Private);
-  Storage->setSetterAccess(Accessibility::Private);
+  Storage->setAccess(AccessLevel::Private);
+  Storage->setSetterAccess(AccessLevel::Private);
   
   addMemberToContextIfNeeded(Storage, DC);
   
@@ -1406,7 +1406,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   if (DC->getAsClassOrClassExtensionContext())
     makeFinal(Context, Parameter);
   Parameter->setImplicit();
-  Parameter->setAccess(Accessibility::Private);
+  Parameter->setAccess(AccessLevel::Private);
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the parameter function.
@@ -1623,8 +1623,8 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
-  Storage->setAccess(Accessibility::Private);
-  Storage->setSetterAccess(Accessibility::Private);
+  Storage->setAccess(AccessLevel::Private);
+  Storage->setSetterAccess(AccessLevel::Private);
 }
 
 /// Consider add a materializeForSet accessor to the given storage
@@ -1892,7 +1892,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                                   ImplicitConstructorKind ICK) {
   ASTContext &context = tc.Context;
   SourceLoc Loc = decl->getLoc();
-  auto accessLevel = Accessibility::Internal;
+  auto accessLevel = AccessLevel::Internal;
   if (decl->hasClangNode())
     accessLevel = std::max(accessLevel, decl->getFormalAccess());
 
@@ -2096,8 +2096,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   ctor->setImplicit();
 
-  Accessibility access = classDecl->getFormalAccess();
-  access = std::max(access, Accessibility::Internal);
+  AccessLevel access = classDecl->getFormalAccess();
+  access = std::max(access, AccessLevel::Internal);
   access = std::min(access, superclassCtor->getFormalAccess());
   ctor->setAccess(access);
 

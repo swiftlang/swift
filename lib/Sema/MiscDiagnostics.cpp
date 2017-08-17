@@ -3433,14 +3433,14 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 //===----------------------------------------------------------------------===//
 
 void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
-                        Accessibility desiredAccess, bool isForSetter) {
+                        AccessLevel desiredAccess, bool isForSetter) {
   StringRef fixItString;
   switch (desiredAccess) {
-  case Accessibility::Private:      fixItString = "private ";      break;
-  case Accessibility::FilePrivate:  fixItString = "fileprivate ";  break;
-  case Accessibility::Internal:     fixItString = "internal ";     break;
-  case Accessibility::Public:       fixItString = "public ";       break;
-  case Accessibility::Open:         fixItString = "open ";         break;
+  case AccessLevel::Private:      fixItString = "private ";      break;
+  case AccessLevel::FilePrivate:  fixItString = "fileprivate ";  break;
+  case AccessLevel::Internal:     fixItString = "internal ";     break;
+  case AccessLevel::Public:       fixItString = "public ";       break;
+  case AccessLevel::Open:         fixItString = "open ";         break;
   }
 
   DeclAttributes &attrs = VD->getAttrs();

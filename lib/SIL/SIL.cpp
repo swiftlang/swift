@@ -50,18 +50,18 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   }
 
   switch (D->getEffectiveAccess()) {
-  case Accessibility::Public:
-  case Accessibility::Open:
+  case AccessLevel::Public:
+  case AccessLevel::Open:
     return FormalLinkage::PublicUnique;
-  case Accessibility::Internal:
+  case AccessLevel::Internal:
     // If we're serializing all function bodies, type metadata for internal
     // types needs to be public too.
     if (D->getDeclContext()->getParentModule()->getResilienceStrategy()
         == ResilienceStrategy::Fragile)
       return FormalLinkage::PublicUnique;
     return FormalLinkage::HiddenUnique;
-  case Accessibility::FilePrivate:
-  case Accessibility::Private:
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Private:
     // Why "hidden" instead of "private"? Because the debugger may need to
     // access these symbols.
     return FormalLinkage::HiddenUnique;
@@ -127,14 +127,14 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
       && conformanceModule == typeUnit->getParentModule())
     return SILLinkage::Shared;
 
-  Accessibility accessibility = std::min(C->getProtocol()->getEffectiveAccess(),
-                                         typeDecl->getEffectiveAccess());
-  switch (accessibility) {
-    case Accessibility::Private:
-    case Accessibility::FilePrivate:
+  AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),
+                                typeDecl->getEffectiveAccess());
+  switch (access) {
+    case AccessLevel::Private:
+    case AccessLevel::FilePrivate:
       return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
 
     default:

@@ -318,7 +318,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
-  initDecl->setAccess(std::max(Accessibility::Internal,
+  initDecl->setAccess(std::max(AccessLevel::Internal,
                                enumDecl->getFormalAccess()));
 
   // If the enum was not imported, the derived conformance is either from the

@@ -300,7 +300,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   // Since we can't insert the == operator into the same FileUnit as the enum,
   // itself, we have to give it at least internal access.
   eqDecl->setAccess(std::max(enumDecl->getFormalAccess(),
-                             Accessibility::Internal));
+                             AccessLevel::Internal));
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -430,7 +430,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
                                       AnyFunctionType::ExtInfo());
   
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccess(std::max(Accessibility::Internal,
+  getterDecl->setAccess(std::max(AccessLevel::Internal,
                                  enumDecl->getFormalAccess()));
 
   // If the enum was not imported, the derived conformance is either from the

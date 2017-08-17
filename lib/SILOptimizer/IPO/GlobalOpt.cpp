@@ -899,13 +899,13 @@ static bool canBeChangedExternally(SILGlobalVariable *SILG) {
   // if possible.
   if (auto *Decl = SILG->getDecl()) {
     switch (Decl->getEffectiveAccess()) {
-    case Accessibility::Private:
-    case Accessibility::FilePrivate:
+    case AccessLevel::Private:
+    case AccessLevel::FilePrivate:
       return false;
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       return !SILG->getModule().isWholeModule();
-    case Accessibility::Public:
-    case Accessibility::Open:
+    case AccessLevel::Public:
+    case AccessLevel::Open:
       return true;
     }
   }

@@ -348,7 +348,7 @@ enum class DiscriminatorMatch {
 
 static DiscriminatorMatch matchDiscriminator(Identifier discriminator,
                                              const ValueDecl *value) {
-  if (value->getFormalAccess() > Accessibility::FilePrivate)
+  if (value->getFormalAccess() > AccessLevel::FilePrivate)
     return DiscriminatorMatch::NoDiscriminator;
 
   auto containingFile =
@@ -1284,18 +1284,18 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
 }
 
 static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
-                        Accessibility access) {
+                        AccessLevel access) {
   if (!useDC)
-    return access >= Accessibility::Public;
+    return access >= AccessLevel::Public;
 
   assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
   switch (access) {
-  case Accessibility::Private:
+  case AccessLevel::Private:
     return (useDC == sourceDC ||
       AccessScope::allowsPrivateAccess(useDC, sourceDC));
-  case Accessibility::FilePrivate:
+  case AccessLevel::FilePrivate:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
-  case Accessibility::Internal: {
+  case AccessLevel::Internal: {
     const ModuleDecl *sourceModule = sourceDC->getParentModule();
     const DeclContext *useFile = useDC->getModuleScopeContext();
     if (useFile->getParentModule() == sourceModule)
@@ -1305,8 +1305,8 @@ static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
         return true;
     return false;
   }
-  case Accessibility::Public:
-  case Accessibility::Open:
+  case AccessLevel::Public:
+  case AccessLevel::Open:
     return true;
   }
   llvm_unreachable("bad Accessibility");
