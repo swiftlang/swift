@@ -16,6 +16,7 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
     1. What benchmarks are where
         1. Furthermore, should there be benchmarks, microbenchmarks, and nanobenchmarks (aka whitebox microbenchmarks)?
     1. What SPIs exist, where, and who uses them
+    1. Explain test/Prototypes, and how to use that for rapid (relatively speaking) prototyping
 1. Library Concepts
     1. Protocol hierarchy
         1. Customization hooks
