@@ -408,6 +408,8 @@ struct StructLoweringState {
   SmallVector<TermInst *, 8> returnInsts;
   // All return instructions that are modified
   SmallVector<ReturnInst *, 8> modReturnInsts;
+  // All destroy_value instrs should be replaced with _addr version
+  SmallVector<SILInstruction *, 16> destroyValueInstsToMod;
   // All debug instructions.
   // to be modified *only if* the operands are used in "real" instructions
   SmallVector<SILInstruction *, 16> debugInstsToMod;
@@ -443,6 +445,7 @@ protected:
   void visitReleaseInst(ReleaseValueInst *instr);
   void visitResultTyInst(SILInstruction *instr);
   void visitDebugValueInst(DebugValueInst *instr);
+  void visitDestroyValueInst(DestroyValueInst *instr);
   void visitTupleInst(SILInstruction *instr);
   void visitAllocStackInst(AllocStackInst *instr);
   void visitPointerToAddressInst(PointerToAddressInst *instr);
@@ -507,6 +510,11 @@ void LargeValueVisitor::mapValueStorage() {
       case ValueKind::DebugValueInst: {
         auto *DI = dyn_cast<DebugValueInst>(currIns);
         visitDebugValueInst(DI);
+        break;
+      }
+      case ValueKind::DestroyValueInst: {
+        auto *DI = dyn_cast<DestroyValueInst>(currIns);
+        visitDestroyValueInst(DI);
         break;
       }
       case ValueKind::SwitchEnumInst: {
@@ -731,6 +739,15 @@ void LargeValueVisitor::visitDebugValueInst(DebugValueInst *instr) {
   }
 }
 
+void LargeValueVisitor::visitDestroyValueInst(DestroyValueInst *instr) {
+  for (Operand &operand : instr->getAllOperands()) {
+    if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
+                  operand.get()) != pass.largeLoadableArgs.end()) {
+      pass.destroyValueInstsToMod.push_back(instr);
+    }
+  }
+}
+
 void LargeValueVisitor::visitResultTyInst(SILInstruction *instr) {
   GenericEnvironment *genEnv = instr->getFunction()->getGenericEnvironment();
   auto loweredTy = instr->getFunction()->getLoweredFunctionType();
@@ -908,6 +925,12 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       pass.debugInstsToMod.push_back(insToInsert);
       break;
     }
+    case ValueKind::DestroyValueInst: {
+      auto *insToInsert = dyn_cast<DestroyValueInst>(userIns);
+      assert(insToInsert && "Unexpected cast failure");
+      pass.destroyValueInstsToMod.push_back(insToInsert);
+      break;
+    }
     case ValueKind::StructExtractInst: {
       auto *instToInsert = dyn_cast<StructExtractInst>(userIns);
       if (std::find(pass.structExtractInstsToMod.begin(),
@@ -1051,6 +1074,13 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
       auto *insToInsert = dyn_cast<DebugValueInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.debugInstsToMod.push_back(insToInsert);
+      usersToMod.push_back(user);
+      break;
+    }
+    case ValueKind::DestroyValueInst: {
+      auto *insToInsert = dyn_cast<DestroyValueInst>(userIns);
+      assert(insToInsert && "Unexpected cast failure");
+      pass.destroyValueInstsToMod.push_back(insToInsert);
       usersToMod.push_back(user);
       break;
     }
@@ -1515,6 +1545,7 @@ static bool allUsesAreReplaceable(SILInstruction *instr,
     case ValueKind::ReleaseValueInst:
     case ValueKind::StoreInst:
     case ValueKind::DebugValueInst:
+    case ValueKind::DestroyValueInst:
       break;
     case ValueKind::ApplyInst:
     case ValueKind::TryApplyInst:
@@ -1839,6 +1870,18 @@ static void rewriteFunction(StructLoweringState &pass,
         debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand);
         instr->getParent()->erase(instr);
       }
+    }
+  }
+
+  for (SILInstruction *instr : pass.destroyValueInstsToMod) {
+    assert(instr->getAllOperands().size() == 1 &&
+           "destroy_value instructions have one operand");
+    for (Operand &operand : instr->getAllOperands()) {
+      auto currOperand = operand.get();
+      assert(currOperand->getType().isAddress() && "Expected an address type");
+      SILBuilder destroyBuilder(instr);
+      destroyBuilder.createDestroyAddr(instr->getLoc(), currOperand);
+      instr->getParent()->erase(instr);
     }
   }
 
