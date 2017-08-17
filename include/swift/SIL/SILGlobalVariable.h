@@ -147,6 +147,11 @@ public:
   /// static initializer.
   SILInstruction *getStaticInitializerValue();
 
+  /// Returns true if the global is a statically initialized heap object.
+  bool isInitializedObject() {
+    return dyn_cast_or_null<ObjectInst>(getStaticInitializerValue()) != nullptr;
+  }
+
   /// Returns true if \p I is a valid instruction to be contained in the
   /// static initializer.
   static bool isValidStaticInitializerInst(const SILInstruction *I);

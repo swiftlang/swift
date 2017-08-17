@@ -444,6 +444,10 @@ public:
     return insert(new (F->getModule())
                   GlobalAddrInst(getSILDebugLocation(Loc), Ty));
   }
+  GlobalValueInst *createGlobalValue(SILLocation Loc, SILGlobalVariable *g) {
+    return insert(new (getModule())
+                      GlobalValueInst(getSILDebugLocation(Loc), g));
+  }
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E);
 
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
@@ -979,6 +983,14 @@ public:
                                             Atomicity atomicity) {
     return insert(new (getModule()) SetDeallocatingInst(
         getSILDebugLocation(Loc), operand, atomicity));
+  }
+
+  ObjectInst *createObject(SILLocation Loc, SILType Ty,
+                           ArrayRef<SILValue> Elements,
+                           unsigned NumBaseElements) {
+    return insert(
+        ObjectInst::create(getSILDebugLocation(Loc), Ty, Elements,
+                           NumBaseElements, getModule()));
   }
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,

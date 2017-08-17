@@ -533,14 +533,16 @@ AllocGlobalInst::AllocGlobalInst(SILDebugLocation Loc,
 AllocGlobalInst::AllocGlobalInst(SILDebugLocation Loc)
     : SILInstruction(ValueKind::AllocGlobalInst, Loc) {}
 
-GlobalAddrInst::GlobalAddrInst(SILDebugLocation Loc,
+GlobalAddrInst::GlobalAddrInst(SILDebugLocation DebugLoc,
                                SILGlobalVariable *Global)
-    : LiteralInst(ValueKind::GlobalAddrInst, Loc,
-              Global->getLoweredType().getAddressType()),
-      Global(Global) {}
+      : GlobalAccessInst(ValueKind::GlobalAddrInst, DebugLoc, Global,
+                          Global->getLoweredType().getAddressType()) {}
 
-GlobalAddrInst::GlobalAddrInst(SILDebugLocation Loc, SILType Ty)
-    : LiteralInst(ValueKind::GlobalAddrInst, Loc, Ty), Global(nullptr) {}
+GlobalValueInst::GlobalValueInst(SILDebugLocation DebugLoc,
+                                 SILGlobalVariable *Global)
+      : GlobalAccessInst(ValueKind::GlobalValueInst, DebugLoc, Global,
+                          Global->getLoweredType().getObjectType()) {}
+
 
 const IntrinsicInfo &BuiltinInst::getIntrinsicInfo() const {
   return getModule().getIntrinsicInfo(getName());
@@ -832,6 +834,20 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
     : SILInstruction(ValueKind::StructInst, Loc, Ty), Operands(this, Elems) {
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
+
+ObjectInst *ObjectInst::create(SILDebugLocation Loc, SILType Ty,
+                               ArrayRef<SILValue> Elements,
+                               unsigned NumBaseElements, SILModule &M) {
+  void *Buffer = M.allocateInst(sizeof(ObjectInst) +
+                            decltype(Operands)::getExtraSize(Elements.size()),
+                            alignof(ObjectInst));
+  return ::new(Buffer) ObjectInst(Loc, Ty, Elements, NumBaseElements);
+}
+
+ObjectInst::ObjectInst(SILDebugLocation Loc, SILType Ty,
+                       ArrayRef<SILValue> Elems, unsigned NumBaseElements)
+    : SILInstruction(ValueKind::ObjectInst, Loc, Ty),
+      NumBaseElements(NumBaseElements), Operands(this, Elems) {}
 
 TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
                              ArrayRef<SILValue> Elements, SILModule &M) {

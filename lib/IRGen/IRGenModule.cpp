@@ -49,6 +49,7 @@
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
+#include "StructLayout.h"
 
 #include <initializer_list>
 

@@ -1180,20 +1180,34 @@ public:
     }
   }
 
+  void checkGlobalAccessInst(GlobalAccessInst *GAI) {
+    SILGlobalVariable *RefG = GAI->getReferencedGlobal();
+    require(GAI->getType().getObjectType() == RefG->getLoweredType(),
+            "global_addr/value must be the type of the variable it references");
+    if (F.isSerialized()) {
+      require(RefG->isSerialized()
+              || hasPublicVisibility(RefG->getLinkage()),
+              "global_addr/value inside fragile function cannot "
+              "reference a private or hidden symbol");
+    }
+  }
+
   void checkGlobalAddrInst(GlobalAddrInst *GAI) {
     require(GAI->getType().isAddress(),
             "global_addr must have an address result type");
-    require(GAI->getType().getObjectType() ==
-              GAI->getReferencedGlobal()->getLoweredType(),
-            "global_addr must be the address type of the variable it "
-            "references");
-    if (F.isSerialized()) {
-      SILGlobalVariable *RefG = GAI->getReferencedGlobal();
-      require(RefG->isSerialized()
-                || hasPublicVisibility(RefG->getLinkage()),
-              "global_addr inside fragile function cannot "
-              "reference a private or hidden symbol");
-    }
+    require(!GAI->getReferencedGlobal()->isInitializedObject(),
+            "global_addr cannot refer to a statically initialized object");
+    checkGlobalAccessInst(GAI);
+  }
+
+  void checkGlobalValueInst(GlobalValueInst *GVI) {
+    require(GVI->getType().isObject(),
+            "global_value must have an address result type");
+    checkGlobalAccessInst(GVI);
+  }
+
+  void checkObjectInst(ObjectInst *) {
+    require(false, "object instruction is only allowed in a static initializer");
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {
@@ -4374,8 +4388,13 @@ void SILGlobalVariable::verify() const {
   // Verify the static initializer.
   for (const SILInstruction &I : StaticInitializerBlock) {
     assert(isValidStaticInitializerInst(&I) && "illegal static initializer");
-    assert((I.use_empty() == (&I == &StaticInitializerBlock.back())) &&
-           "dead instruction in static initializer");
+    if (&I == &StaticInitializerBlock.back()) {
+      assert(I.use_empty() && "Init value must not have another use");
+    } else {
+      assert(!I.use_empty() && "dead instruction in static initializer");
+      assert(!isa<ObjectInst>(&I) &&
+             "object instruction is only allowed for final initial value");
+    }
     assert(I.getParent() == &StaticInitializerBlock);
   }
 }

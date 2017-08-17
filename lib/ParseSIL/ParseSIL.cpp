@@ -3759,15 +3759,27 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     ResultVal = B.createBindMemory(InstLoc, Val, IndexVal, EltTy);
     break;
   }
+  case ValueKind::ObjectInst:
   case ValueKind::StructInst: {
-    SILType StructTy;
-    if (parseSILType(StructTy) ||
+    SILType Ty;
+    if (parseSILType(Ty) ||
         P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
       return true;
 
     // Parse a list of SILValue.
+    unsigned NumBaseElems = 0;
     if (P.Tok.isNot(tok::r_paren)) {
       do {
+        if (Opcode == ValueKind::ObjectInst) {
+          bool StartOfTailElems = false;
+          if (parseSILOptional(StartOfTailElems, *this, "tail_elems"))
+            return true;
+          if (StartOfTailElems) {
+            if (NumBaseElems)
+              return true;
+            NumBaseElems = OpList.size();
+          }
+        }
         if (parseTypedValueRef(Val, B)) return true;
         OpList.push_back(Val);
       } while (P.consumeIf(tok::comma));
@@ -3777,7 +3789,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createStruct(InstLoc, StructTy, OpList);
+    if (Opcode == ValueKind::StructInst) {
+      ResultVal = B.createStruct(InstLoc, Ty, OpList);
+    } else {
+      ResultVal = B.createObject(InstLoc, Ty, OpList, NumBaseElems);
+    }
     break;
   }
   case ValueKind::StructElementAddrInst:
@@ -3917,7 +3933,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     ResultVal = B.createAllocGlobal(InstLoc, global);
     break;
   }
-  case ValueKind::GlobalAddrInst: {
+  case ValueKind::GlobalAddrInst:
+  case ValueKind::GlobalValueInst: {
     Identifier GlobalName;
     SourceLoc IdLoc;
     SILType Ty;
@@ -3935,14 +3952,21 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
 
-    if (global->getLoweredType().getAddressType() != Ty) {
+    SILType expectedType = (Opcode == ValueKind::GlobalAddrInst ?
+                            global->getLoweredType().getAddressType() :
+                            global->getLoweredType());
+    if (expectedType != Ty) {
       P.diagnose(IdLoc, diag::sil_value_use_type_mismatch, GlobalName.str(),
                  global->getLoweredType().getSwiftRValueType(),
                  Ty.getSwiftRValueType());
       return true;
     }
 
-    ResultVal = B.createGlobalAddr(InstLoc, global);
+    if (Opcode == ValueKind::GlobalAddrInst) {
+      ResultVal = B.createGlobalAddr(InstLoc, global);
+    } else {
+      ResultVal = B.createGlobalValue(InstLoc, global);
+    }
     break;
   }
   case ValueKind::SelectEnumInst:

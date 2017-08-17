@@ -144,6 +144,15 @@ llvm::Value *IRGenFunction::emitInitStackObjectCall(llvm::Value *metadata,
   return call;
 }
 
+llvm::Value *IRGenFunction::emitInitStaticObjectCall(llvm::Value *metadata,
+                                                     llvm::Value *object,
+                                                     const llvm::Twine &name) {
+  llvm::CallInst *call =
+    Builder.CreateCall(IGM.getInitStaticObjectFn(), { metadata, object }, name);
+  call->setDoesNotThrow();
+  return call;
+}
+
 llvm::Value *IRGenFunction::emitVerifyEndOfLifetimeCall(llvm::Value *object,
                                                       const llvm::Twine &name) {
   llvm::CallInst *call =

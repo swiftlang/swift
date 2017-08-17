@@ -646,6 +646,15 @@ SILCloner<ImplClass>::visitGlobalAddrInst(GlobalAddrInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitGlobalValueInst(GlobalValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createGlobalValue(getOpLocation(Inst->getLoc()),
+                                    Inst->getReferencedGlobal()));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitIntegerLiteralInst(IntegerLiteralInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -1338,6 +1347,16 @@ SILCloner<ImplClass>::visitSetDeallocatingInst(SetDeallocatingInst *Inst) {
     getBuilder().createSetDeallocating(getOpLocation(Inst->getLoc()),
                                        getOpValue(Inst->getOperand()),
                                        Inst->getAtomicity()));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitObjectInst(ObjectInst *Inst) {
+  auto Elements = getOpValueArray<8>(Inst->getAllElements());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createObject(getOpLocation(Inst->getLoc()), Inst->getType(),
+                              Elements, Inst->getBaseElements().size()));
 }
 
 template<typename ImplClass>

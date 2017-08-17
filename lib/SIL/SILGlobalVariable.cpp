@@ -105,6 +105,7 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I) {
     case ValueKind::TupleInst:
     case ValueKind::IntegerLiteralInst:
     case ValueKind::FloatLiteralInst:
+    case ValueKind::ObjectInst:
       return true;
     default:
       return false;

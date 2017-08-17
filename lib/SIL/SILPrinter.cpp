@@ -1078,6 +1078,11 @@ public:
     *this << " : " << GAI->getType();
   }
 
+  void visitGlobalValueInst(GlobalValueInst *GVI) {
+    GVI->getReferencedGlobal()->printName(PrintState.OS);
+    *this << " : " << GVI->getType();
+  }
+
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
     *this << ILI->getType() << ", " << lit;
@@ -1429,6 +1434,20 @@ public:
     interleave(SI->getElements(),
                [&](const SILValue &V) { *this << getIDAndType(V); },
                [&] { *this << ", "; });
+    *this << ')';
+  }
+
+  void visitObjectInst(ObjectInst *OI) {
+    *this << OI->getType() << " (";
+    interleave(OI->getBaseElements(),
+               [&](const SILValue &V) { *this << getIDAndType(V); },
+               [&] { *this << ", "; });
+    if (OI->getTailElements().size() > 0) {
+      *this << ", [tail_elems] ";
+      interleave(OI->getTailElements(),
+                 [&](const SILValue &V) { *this << getIDAndType(V); },
+                 [&] { *this << ", "; });
+    }
     *this << ')';
   }
 

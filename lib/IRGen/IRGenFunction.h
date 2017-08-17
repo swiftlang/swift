@@ -161,6 +161,9 @@ public:
   llvm::Value *emitInitStackObjectCall(llvm::Value *metadata,
                                        llvm::Value *object,
                                        const llvm::Twine &name = "");
+  llvm::Value *emitInitStaticObjectCall(llvm::Value *metadata,
+                                        llvm::Value *object,
+                                        const llvm::Twine &name = "");
   llvm::Value *emitVerifyEndOfLifetimeCall(llvm::Value *object,
                                            const llvm::Twine &name = "");
   llvm::Value *emitAllocRawCall(llvm::Value *size, llvm::Value *alignMask,

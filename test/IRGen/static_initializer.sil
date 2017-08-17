@@ -22,6 +22,8 @@ public struct S2 {
 // CHECK: %Ts5Int32V = type <{ i32 }>
 // CHECK: %T18static_initializer2S2V = type <{ %Ts5Int32V, %Ts5Int32V, %T18static_initializer1SV }>
 // CHECK: %T18static_initializer1SV = type <{ %Ts5Int32V }>
+// CHECK: %T18static_initializer16TestArrayStorageC_tailelems0c = type { i64, %T18static_initializer16TestArrayStorageC_tailelems0 }
+// CHECK: %T18static_initializer16TestArrayStorageC_tailelems0 = type <{ %swift.refcounted, %Ts5Int32V, [4 x i8], %Ts5Int64V, %Ts5Int64V }>
 
 sil_global @_T02ch1xSiv : $Int32 = {
   %1 = integer_literal $Builtin.Int32, 2
@@ -40,6 +42,28 @@ sil_global @_T06nested1xAA2S2Vv : $S2 = {
   %initval = struct $S2 (%2 : $Int32, %4 : $Int32, %7 : $S)
 }
 // CHECK: @_T06nested1xAA2S2Vv = {{(protected )?}}global %T18static_initializer2S2V <{ %Ts5Int32V <{ i32 2 }>, %Ts5Int32V <{ i32 3 }>, %T18static_initializer1SV <{ %Ts5Int32V <{ i32 4 }> }> }>, align 4
+
+final class TestArrayStorage {
+  @sil_stored var count: Int32
+  init()
+}
+
+sil_vtable TestArrayStorage { }
+
+struct TestArray {
+  var storage : TestArrayStorage
+}
+
+sil_global @static_array : $TestArrayStorage = {
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = integer_literal $Builtin.Int64, 20
+  %3 = struct $Int32 (%0 : $Builtin.Int32)
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %5 = struct $Int64 (%2 : $Builtin.Int64)
+  %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
+}
+// CHECK: @static_array = {{(protected )?}}global %T18static_initializer16TestArrayStorageC_tailelems0c { i64 0, %T18static_initializer16TestArrayStorageC_tailelems0 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }>, [4 x i8] undef, %Ts5Int64V <{ i64 10 }>, %Ts5Int64V <{ i64 20 }> }> }, align 8
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc i8* @_TF2cha1xSi() {{.*}} {
 // CHECK-NEXT: entry:
@@ -83,3 +107,17 @@ bb0:
   %1 = load %0 : $*S2
   return %1 : $S2
 }
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T18static_initializer16TestArrayStorageC* @return_static_array() {{.*}} {
+sil @return_static_array : $@convention(thin) () -> TestArray {
+bb0:
+  // CHECK: [[MD:%[0-9]+]] = call %swift.type* @_T018static_initializer16TestArrayStorageCMa()
+  // CHECK: [[O:%[0-9a-z]+]] = call %swift.refcounted* @swift_initStaticObject(%swift.type* [[MD]], %swift.refcounted* getelementptr inbounds (%T18static_initializer16TestArrayStorageC_tailelems0c, %T18static_initializer16TestArrayStorageC_tailelems0c* @static_array, i32 0, i32 1, i32 0))
+  // CHECK: [[R:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %T18static_initializer16TestArrayStorageC_tailelems0*
+  // CHECK: [[R2:%[0-9]+]] = bitcast %T18static_initializer16TestArrayStorageC_tailelems0* [[R]] to %T18static_initializer16TestArrayStorageC*
+  // CHECK: ret %T18static_initializer16TestArrayStorageC* [[R2]]
+  %0 = global_value @static_array : $TestArrayStorage
+  %1 = struct $TestArray (%0 : $TestArrayStorage)
+  return %1 : $TestArray
+}
+
