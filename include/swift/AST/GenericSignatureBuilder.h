@@ -1428,11 +1428,11 @@ class GenericSignatureBuilder::PotentialArchetype {
   friend class GenericSignatureBuilder;
   friend class GenericSignature;
 
-  /// \brief Retrieve the debug name of this potential archetype.
-  std::string getDebugName() const;
-
 public:
   ~PotentialArchetype();
+
+  /// \brief Retrieve the debug name of this potential archetype.
+  std::string getDebugName() const;
 
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.

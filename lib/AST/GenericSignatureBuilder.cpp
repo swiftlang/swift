@@ -30,11 +30,13 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
@@ -116,6 +118,218 @@ struct GenericSignatureBuilder::Implementation {
   bool finalized = false;
 #endif
 };
+
+#pragma mark GraphViz visualization
+static int compareDependentTypes(PotentialArchetype * const* pa,
+                                 PotentialArchetype * const* pb,
+                                 bool outermost);
+
+static int compareDependentTypes(PotentialArchetype * const* pa,
+                                 PotentialArchetype * const* pb) {
+  return compareDependentTypes(pa, pb, /*outermost=*/true);
+}
+
+namespace {
+  /// A node in the equivalence class, used for visualization.
+  struct EquivalenceClassVizNode {
+    const EquivalenceClass *first;
+    PotentialArchetype *second;
+
+    operator const void *() const { return second; }
+  };
+
+  /// Iterator through the adjacent nodes in an equivalence class, for
+  /// visualization.
+  class EquivalenceClassVizIterator {
+    using BaseIterator = const Constraint<PotentialArchetype *> *;
+
+    const EquivalenceClass *equivClass;
+    BaseIterator base;
+    BaseIterator baseEnd;
+
+    void advance() {
+      while (base != baseEnd &&
+             compareDependentTypes(&base->archetype, &base->value) > 0) {
+        ++base;
+      }
+    }
+
+  public:
+    using difference_type = ptrdiff_t;
+    using value_type = EquivalenceClassVizNode;
+    using reference = value_type;
+    using pointer = value_type*;
+    using iterator_category = std::forward_iterator_tag;
+
+    EquivalenceClassVizIterator(const EquivalenceClass *equivClass,
+                                BaseIterator base,
+                                BaseIterator baseEnd)
+        : equivClass(equivClass), base(base), baseEnd(baseEnd) {
+      advance();
+    }
+
+    BaseIterator &getBase() { return base; }
+    const BaseIterator &getBase() const { return base; }
+
+    reference operator*() const {
+      return { equivClass, getBase()->value };
+    }
+
+    EquivalenceClassVizIterator& operator++() {
+      ++getBase();
+      advance();
+      return *this;
+    }
+
+    EquivalenceClassVizIterator operator++(int) {
+      EquivalenceClassVizIterator result = *this;
+      ++(*this);
+      return result;
+    }
+
+    friend bool operator==(const EquivalenceClassVizIterator &lhs,
+                           const EquivalenceClassVizIterator &rhs) {
+      return lhs.getBase() == rhs.getBase();
+    }
+
+    friend bool operator!=(const EquivalenceClassVizIterator &lhs,
+                           const EquivalenceClassVizIterator &rhs) {
+      return lhs.getBase() != rhs.getBase();
+    }
+  };
+}
+
+namespace std {
+  // FIXME: Egregious hack to work around a bogus static_assert in
+  // llvm::GraphWriter. Good thing nobody else cares about this trait...
+  template<>
+  struct is_pointer<EquivalenceClassVizNode>
+    : std::integral_constant<bool, true> { };
+}
+
+namespace llvm {
+  // Visualize the same-type constraints within an equivalence class.
+  template<>
+  struct GraphTraits<const EquivalenceClass *> {
+    using NodeRef = EquivalenceClassVizNode;
+
+    static NodeRef getEntryNode(const EquivalenceClass *equivClass) {
+      return { equivClass, equivClass->members.front() };
+    }
+
+    class nodes_iterator {
+      using BaseIterator = PotentialArchetype * const *;
+
+      const EquivalenceClass *equivClass;
+      BaseIterator base;
+
+    public:
+      using difference_type = ptrdiff_t;
+      using value_type = EquivalenceClassVizNode;
+      using reference = value_type;
+      using pointer = value_type*;
+      using iterator_category = std::forward_iterator_tag;
+
+      nodes_iterator(const EquivalenceClass *equivClass, BaseIterator base)
+        : equivClass(equivClass), base(base) { }
+
+      BaseIterator &getBase() { return base; }
+      const BaseIterator &getBase() const { return base; }
+
+      reference operator*() const {
+        return { equivClass, *getBase() };
+      }
+
+      nodes_iterator& operator++() {
+        ++getBase();
+        return *this;
+      }
+
+      nodes_iterator operator++(int) {
+        nodes_iterator result = *this;
+        ++(*this);
+        return result;
+      }
+
+      friend bool operator==(const nodes_iterator &lhs,
+                             const nodes_iterator &rhs) {
+        return lhs.getBase() == rhs.getBase();
+      }
+
+      friend bool operator!=(const nodes_iterator &lhs,
+                             const nodes_iterator &rhs) {
+        return lhs.getBase() != rhs.getBase();
+      }
+    };
+
+    static nodes_iterator nodes_begin(const EquivalenceClass *equivClass) {
+      return nodes_iterator(equivClass, equivClass->members.begin());
+    }
+
+    static nodes_iterator nodes_end(const EquivalenceClass *equivClass) {
+      return nodes_iterator(equivClass, equivClass->members.end());
+    }
+
+    static unsigned size(const EquivalenceClass *equivClass) {
+      return equivClass->members.size();
+    }
+
+    using ChildIteratorType = EquivalenceClassVizIterator;
+
+    static ChildIteratorType child_begin(NodeRef node) {
+      const Constraint<PotentialArchetype *> *base = nullptr,
+        *baseEnd = nullptr;
+      auto known = node.first->sameTypeConstraints.find(node.second);
+      if (known != node.first->sameTypeConstraints.end() &&
+          !known->second.empty()) {
+        base = &known->second.front();
+        baseEnd = &known->second.front() + known->second.size();
+      }
+
+      return ChildIteratorType(node.first, base, baseEnd);
+    }
+
+    static ChildIteratorType child_end(NodeRef node) {
+      const Constraint<PotentialArchetype *> *base = nullptr;
+      auto known = node.first->sameTypeConstraints.find(node.second);
+      if (known != node.first->sameTypeConstraints.end() &&
+          !known->second.empty())
+        base = &known->second.front() + known->second.size();
+
+      return ChildIteratorType(node.first, base, base);
+    }
+  };
+
+  template <>
+  struct DOTGraphTraits<const EquivalenceClass *>
+    : public DefaultDOTGraphTraits
+  {
+    DOTGraphTraits(bool = false) { }
+
+    static std::string getGraphName(const EquivalenceClass *equivClass) {
+      return "Equivalence class for '" +
+        equivClass->members.front()->getDebugName() + "'";
+    }
+
+    std::string getNodeLabel(EquivalenceClassVizNode node,
+                             const EquivalenceClass *equivClass) const {
+      return node.second->getDebugName();
+    }
+
+    static std::string getEdgeAttributes(EquivalenceClassVizNode node,
+                                         EquivalenceClassVizIterator iter,
+                                         const EquivalenceClass *equivClass) {
+      if (iter.getBase()->source->kind
+            == RequirementSource::NestedTypeNameMatch)
+        return "color=\"blue\"";
+
+      if (iter.getBase()->source->isDerivedRequirement())
+        return "color=\"gray\"";
+
+      return "color=\"red\"";
+    }
+  };
+} // end namespace llvm
 
 #pragma mark Requirement sources
 
@@ -1297,6 +1511,37 @@ void EquivalenceClass::dump(llvm::raw_ostream &out) const {
     out << "\nLayout: " << layout.getString();
 
   out << "\n";
+
+  {
+    out << "---GraphViz output for same-type constraints---\n";
+
+    // Render the output
+    std::string graphviz;
+    {
+      llvm::raw_string_ostream graphvizOut(graphviz);
+      llvm::WriteGraph(graphvizOut, this);
+    }
+
+    // Clean up the output to turn it into an undirected graph.
+    // FIXME: This is horrible, GraphWriter should be able to support
+    // undirected graphs.
+    auto digraphPos = graphviz.find("digraph");
+    if (digraphPos != std::string::npos) {
+      // digraph -> graph
+      graphviz.erase(graphviz.begin() + digraphPos,
+                     graphviz.begin() + digraphPos + 2);
+    }
+
+    // Directed edges to undirected edges: -> to --
+    while (true) {
+      auto arrowPos = graphviz.find("->");
+      if (arrowPos == std::string::npos) break;
+
+      graphviz.replace(arrowPos, 2, "--");
+    }
+
+    out << graphviz;
+  }
 }
 
 void EquivalenceClass::dump() const {
@@ -1706,11 +1951,6 @@ static int compareDependentTypes(PotentialArchetype * const* pa,
   }
 
   llvm_unreachable("potential archetype total order failure");
-}
-
-static int compareDependentTypes(PotentialArchetype * const* pa,
-                                 PotentialArchetype * const* pb) {
-  return compareDependentTypes(pa, pb, /*outermost=*/true);
 }
 
 PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
