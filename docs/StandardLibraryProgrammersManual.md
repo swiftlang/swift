@@ -2,31 +2,43 @@
 
 This is meant to be a guide to people working on the standard library. It covers coding standards, code organization, best practices, internal annotations, and provides a guide to standard library internals. This document is inspired by LLVM's excellent [programmer's manual](http://llvm.org/docs/ProgrammersManual.html) and [coding standards](http://llvm.org/docs/CodingStandards.html).
 
-TBD: Should this subsume (or link to) [StdlibRationales.rst](https://github.com/apple/swift/blob/master/docs/StdlibRationales.rst)?
+TODO: Should this subsume or link to [StdlibRationales.rst](https://github.com/apple/swift/blob/master/docs/StdlibRationales.rst)?
 
-TBD: Should this subsume (or link to) [AccessControlInStdlib.rst](https://github.com/apple/swift/blob/master/docs/AccessControlInStdlib.rst)
+TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.com/apple/swift/blob/master/docs/AccessControlInStdlib.rst)
 
-## Library Organization
 
-TBD
+## (Meta): List of wants and TODOs for this guide
 
-### Stubs
+1. Library Organization
+    1. What files are where
+    1. What tests are where
+        1. Furthermore, should there be a split between whitebox tests and blackbox tests?
+    1. What benchmarks are where
+        1. Furthermore, should there be benchmarks, microbenchmarks, and nanobenchmarks (aka whitebox microbenchmarks)?
+    1. What SPIs exist, where, and who uses them
+1. Library Concepts
+    1. Protocol hierarchy
+        1. Customization hooks
+    1. Use of classes, COW implementation, buffers, etc
+    1. Compatiblity, `@available`, etc.
+    1. Resilience, ABI stability, `@_inlineable`, `@_versioned`, etc
+1. Coding Standards
+    1. High level concerns
+    1. Best practices
+    1. Formatting
+1. Internals
+    1. `@inline(__always)` and `@inline(never)`
+    1. `@semantics(...)`
+    1. `@_silgen_name`
+1. Dirty hacks
+    1. Why all the underscores and extra protocols?
+    1. How does the `...` ranges work?
+1. Frequently Encountered Issues
 
-TBD
-
-## Protocols and Classes
-
-TBD
-
-### Customization Hooks
-
-TBD
 
 ## Internals
 
-### Internal Functionality and SPI
-
-#### Optionals
+#### Unwrapping Optionals
 
 Optionals can be unwrapped with `!`, which triggers a trap on nil. Alternatively, they can be `.unsafelyUnwrapped()`, which will check and trap in debug builds of user code. Internal to the standard library is `._unsafelyUnwrappedUnchecked()` which will only check and trap in debug builds of the standard library itself. These correspond directly with `_precondition`, `_debugPrecondition`, and `_sanityCheck`. See [that section](#precondition) for details.
 
@@ -93,40 +105,13 @@ let theBits = unsafeBitCast(&x, ...)
 ... // use of theBits in ways that may outlive x if it weren't for the _fixLifetime call
 ```
 
-
 ### Annotations
-
-#### `@_versioned`
-
-TBD
-
-#### `@_inlineable`
-
-TBD
-
-#### `@inline(__always)` and `@inline(never)`
-
-TBD
-
-#### `@_semantics(...)`
-
-TBD
 
 #### `@_transparent`
 
 Should only be used if necessary. This has the effect of forcing inlining to occur before any dataflow analyses take place. Unless you specifically need this behavior, use `@_inline(__always)` or some other mechanism. Its primary purpose is to force the compiler's static checks to peer into the body for diagnostic purposes.
 
 Use of this attribute imposes limitations on what can be in the body. For more details, refer to the [documentation](https://github.com/apple/swift/blob/master/docs/TransparentAttr.rst).
-
-### Versioning and Compatibility
-
-#### `@available`
-
-TBD
-
-#### `@_silgen_name`
-
-TBD
 
 ### Internal structures
 
@@ -143,9 +128,5 @@ The standard library utilizes thread local storage (TLS) to cache expensive comp
 3. If the field is not trivially destructable, update `_destroyTLS` to properly destroy the value.
 
 See [ThreadLocalStorage.swift](https://github.com/apple/swift/blob/master/stdlib/public/core/ThreadLocalStorage.swift) for more details.
-
-## Coding Standards
-
-TBD
 
 
