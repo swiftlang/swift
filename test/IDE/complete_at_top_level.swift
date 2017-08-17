@@ -123,6 +123,31 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_3 | %FileCheck %s -check-prefix=STRING_INTERP
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_4 | %FileCheck %s -check-prefix=STRING_INTERP
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_1 > %t.for_collection1
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection1
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_2 > %t.for_collection2
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection2
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_3 > %t.for_collection3
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection3
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_4 > %t.for_collection4
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection4
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_5 > %t.for_collection5
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection5
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_6 > %t.for_collection6
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection6
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_7 > %t.for_collection7
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection7
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_8 > %t.for_collection8
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection8
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection8
+
 // Test code completion in top-level code.
 //
 // This test is not meant to test that we can correctly form all kinds of
@@ -436,6 +461,16 @@ _ = "" + "\(#^STRING_INTERP_4^#)" + ""
 // STRING_INTERP-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#];
 // STRING_INTERP: End completions
 func resyncParserC1() {}
+
+// FOR_COLLECTION-NOT: forIndex
+for forIndex in [#^FOR_COLLECTION_1^#] {}
+for forIndex in [1,#^FOR_COLLECTION_2^#] {}
+for forIndex in [1:#^FOR_COLLECTION_3^#] {}
+for forIndex in [#^FOR_COLLECTION_4^#:] {}
+for forIndex in [#^FOR_COLLECTION_5^#:2] {}
+for forIndex in [1:2, #^FOR_COLLECTION_6^#] {}
+for forIndex in [1:2, #^FOR_COLLECTION_7^#:] {}
+for forIndex in [1:2, #^FOR_COLLECTION_8^#:2] {}
 
 
 //
