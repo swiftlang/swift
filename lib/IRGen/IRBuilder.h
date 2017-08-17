@@ -307,7 +307,7 @@ public:
 } // end namespace swift
 
 namespace llvm {
-  template <> class PointerLikeTypeTraits<swift::irgen::IRBuilder::StableIP> {
+  template <> struct PointerLikeTypeTraits<swift::irgen::IRBuilder::StableIP> {
     typedef swift::irgen::IRBuilder::StableIP type;
   public:
     static void *getAsVoidPointer(type IP) {

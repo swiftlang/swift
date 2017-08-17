@@ -150,7 +150,7 @@ SILBasicBlock *GeneralizedUser::getParent() const {
 
 namespace llvm {
 
-template <> class PointerLikeTypeTraits<GeneralizedUser> {
+template <> struct PointerLikeTypeTraits<GeneralizedUser> {
 
 public:
   static void *getAsVoidPointer(GeneralizedUser v) {

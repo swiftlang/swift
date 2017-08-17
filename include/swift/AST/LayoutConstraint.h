@@ -379,7 +379,7 @@ template <> struct DenseMapInfo<swift::LayoutConstraint> {
 };
 
 // A LayoutConstraint is "pointer like".
-template <> class PointerLikeTypeTraits<swift::LayoutConstraint> {
+template <> struct PointerLikeTypeTraits<swift::LayoutConstraint> {
 public:
   static inline void *getAsVoidPointer(swift::LayoutConstraint I) {
     return (void *)I.getPointer();

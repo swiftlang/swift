@@ -239,7 +239,7 @@ namespace llvm {
 /// ValueBase * is always at least eight-byte aligned; make the three tag bits
 /// available through PointerLikeTypeTraits.
 template<>
-class PointerLikeTypeTraits<swift::ValueBase *> {
+struct PointerLikeTypeTraits<swift::ValueBase *> {
 public:
   static inline void *getAsVoidPointer(swift::ValueBase *I) {
     return (void*)I;
@@ -818,7 +818,7 @@ namespace llvm {
   };
 
   /// SILValue is a PointerLikeType.
-  template<> class PointerLikeTypeTraits<::swift::SILValue> {
+  template<> struct PointerLikeTypeTraits<::swift::SILValue> {
     using SILValue = ::swift::SILValue;
   public:
     static void *getAsVoidPointer(SILValue v) {
