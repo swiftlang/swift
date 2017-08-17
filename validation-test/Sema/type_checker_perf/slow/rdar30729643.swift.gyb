@@ -1,0 +1,23 @@
+// RUN: not %scale-test --begin 7 --end 9 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+enum X : String {
+  case first
+}
+
+enum Y : Int {
+  case first
+}
+
+_ =
+[
+%for i in range(0, N):
+  [
+    X.first : Y.first
+  ],
+%end
+  [
+    X.first : "literal",
+  ],
+]
