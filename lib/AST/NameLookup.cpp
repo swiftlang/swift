@@ -56,8 +56,8 @@ void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
                                             DeclVisibilityKind reason) {
   if (D->getASTContext().LangOpts.EnableAccessControl) {
     if (TypeResolver)
-      TypeResolver->resolveAccessibility(D);
-    if (D->isInvalid() && !D->hasAccessibility())
+      TypeResolver->resolveAccessControl(D);
+    if (D->isInvalid() && !D->hasAccess())
       return;
     if (!D->isAccessibleFrom(DC))
       return;
@@ -584,7 +584,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (IsTypeLookup)
           options |= NL_OnlyTypes;
         if (IgnoreAccessControl)
-          options |= NL_IgnoreAccessibility;
+          options |= NL_IgnoreAccessControl;
 
         SmallVector<ValueDecl *, 4> lookup;
         dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
@@ -794,7 +794,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (IsTypeLookup)
             options |= NL_OnlyTypes;
           if (IgnoreAccessControl)
-            options |= NL_IgnoreAccessibility;
+            options |= NL_IgnoreAccessControl;
 
           SmallVector<ValueDecl *, 4> Lookup;
           DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
@@ -1283,9 +1283,8 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   vec.push_back(method);
 }
 
-static bool checkAccessibility(const DeclContext *useDC,
-                               const DeclContext *sourceDC,
-                               Accessibility access) {
+static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
+                        Accessibility access) {
   if (!useDC)
     return access >= Accessibility::Public;
 
@@ -1314,7 +1313,7 @@ static bool checkAccessibility(const DeclContext *useDC,
 }
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
-  return checkAccessibility(DC, getDeclContext(), getFormalAccess());
+  return checkAccess(DC, getDeclContext(), getFormalAccess());
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
@@ -1326,7 +1325,7 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   if (hasStorage() && !isSettable(nullptr))
     return true;
   
-  return checkAccessibility(DC, getDeclContext(), getSetterAccessibility());
+  return checkAccess(DC, getDeclContext(), getSetterFormalAccess());
 }
 
 bool DeclContext::lookupQualified(Type type,
@@ -1408,7 +1407,7 @@ bool DeclContext::lookupQualified(Type type,
 
   auto &ctx = getASTContext();
   if (!ctx.LangOpts.EnableAccessControl)
-    options |= NL_IgnoreAccessibility;
+    options |= NL_IgnoreAccessControl;
 
   // The set of nominal type declarations we should (and have) visited.
   SmallVector<NominalTypeDecl *, 4> stack;
@@ -1485,7 +1484,7 @@ bool DeclContext::lookupQualified(Type type,
     }
 
     // Check access.
-    if (!(options & NL_IgnoreAccessibility))
+    if (!(options & NL_IgnoreAccessControl))
       return decl->isAccessibleFrom(this);
 
     return true;

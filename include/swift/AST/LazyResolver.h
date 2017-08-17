@@ -55,7 +55,7 @@ public:
   /// Resolve the accessibility of a value.
   ///
   /// It does no type-checking.
-  virtual void resolveAccessibility(ValueDecl *VD) = 0;
+  virtual void resolveAccessControl(ValueDecl *VD) = 0;
 
   /// Resolve the type and declaration attributes of a value.
   ///
@@ -122,8 +122,8 @@ public:
     Principal.resolveWitness(conformance, requirement);
   }
 
-  void resolveAccessibility(ValueDecl *VD) override {
-    Principal.resolveAccessibility(VD);
+  void resolveAccessControl(ValueDecl *VD) override {
+    Principal.resolveAccessControl(VD);
   }
 
   void resolveDeclSignature(ValueDecl *VD) override {

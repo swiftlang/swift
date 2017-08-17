@@ -321,9 +321,9 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
     // it is a whole module compilation. In this case, no external initializer
     // may exist.
     for (auto SP : Ty->getStoredProperties()) {
-      auto storedPropertyAccessibility = SP->getEffectiveAccess();
-      if (storedPropertyAccessibility <= Accessibility::FilePrivate ||
-          (storedPropertyAccessibility <= Accessibility::Internal &&
+      auto storedPropertyAccess = SP->getEffectiveAccess();
+      if (storedPropertyAccess <= Accessibility::FilePrivate ||
+          (storedPropertyAccess <= Accessibility::Internal &&
            Module->isWholeModule())) {
        DEBUG(llvm::dbgs() << "Property " << *Property
                        << " cannot be set externally\n");

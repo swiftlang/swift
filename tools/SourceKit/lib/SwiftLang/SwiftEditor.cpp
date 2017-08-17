@@ -890,7 +890,7 @@ void SwiftEditorDocument::Implementation::buildSwiftInv(
 
 namespace  {
 
-static UIdent getAccessibilityUID(Accessibility Access) {
+static UIdent getAccessLevelUID(Accessibility Access) {
   static UIdent AccessOpen("source.lang.swift.accessibility.open");
   static UIdent AccessPublic("source.lang.swift.accessibility.public");
   static UIdent AccessInternal("source.lang.swift.accessibility.internal");
@@ -913,9 +913,9 @@ static UIdent getAccessibilityUID(Accessibility Access) {
   llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
-static Optional<Accessibility> getAccessibilityStrictly(const ExtensionDecl *ED) {
-  if (ED->hasDefaultAccessibility())
-    return ED->getDefaultAccessibility();
+static Optional<Accessibility> getAccessLevelStrictly(const ExtensionDecl *ED) {
+  if (ED->hasDefaultAccessLevel())
+    return ED->getDefaultAccessLevel();
 
   // Check if the decl has an explicit accessibility attribute.
   if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
@@ -924,8 +924,8 @@ static Optional<Accessibility> getAccessibilityStrictly(const ExtensionDecl *ED)
   return None;
 }
 
-static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
-  if (auto StrictAccess = getAccessibilityStrictly(ED))
+static Accessibility inferDefaultAccessLevel(const ExtensionDecl *ED) {
+  if (auto StrictAccess = getAccessLevelStrictly(ED))
     return StrictAccess.getValue();
 
   // Assume "internal", which is the most common thing anyway.
@@ -935,9 +935,9 @@ static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
 /// If typechecking was performed we use the computed accessibility, otherwise
 /// we fallback to inferring accessibility syntactically. This may not be as
 /// accurate but it's only until we have typechecked the AST.
-static Accessibility inferAccessibility(const ValueDecl *D) {
+static Accessibility inferAccessLevel(const ValueDecl *D) {
   assert(D);
-  if (D->hasAccessibility())
+  if (D->hasAccess())
     return D->getFormalAccess();
 
   // Check if the decl has an explicit accessibility attribute.
@@ -958,20 +958,20 @@ static Accessibility inferAccessibility(const ValueDecl *D) {
     return Accessibility::Internal;
   case DeclContextKind::GenericTypeDecl: {
     auto Nominal = cast<GenericTypeDecl>(DC);
-    Accessibility Access = inferAccessibility(Nominal);
+    Accessibility Access = inferAccessLevel(Nominal);
     if (!isa<ProtocolDecl>(Nominal))
       Access = std::min(Access, Accessibility::Internal);
     return Access;
   }
   case DeclContextKind::ExtensionDecl:
-    return inferDefaultAccessibility(cast<ExtensionDecl>(DC));
+    return inferDefaultAccessLevel(cast<ExtensionDecl>(DC));
   }
 
   llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
 static Optional<Accessibility>
-inferSetterAccessibility(const AbstractStorageDecl *D) {
+inferSetterAccessLevel(const AbstractStorageDecl *D) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->isLet())
       return None;
@@ -985,7 +985,7 @@ inferSetterAccessibility(const AbstractStorageDecl *D) {
   if (auto *AA = D->getAttrs().getAttribute<SetterAccessibilityAttr>())
     return AA->getAccess();
   else
-    return inferAccessibility(D);
+    return inferAccessLevel(D);
 }
 
 class SwiftDocumentStructureWalker: public ide::SyntaxModelWalker {
@@ -1043,15 +1043,15 @@ public:
     if (Node.Kind != SyntaxStructureKind::Parameter &&
         Node.Kind != SyntaxStructureKind::LocalVariable) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
-        AccessLevel = getAccessibilityUID(inferAccessibility(VD));
+        AccessLevel = getAccessLevelUID(inferAccessLevel(VD));
       } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
-        if (auto StrictAccess = getAccessibilityStrictly(ED))
-          AccessLevel = getAccessibilityUID(StrictAccess.getValue());
+        if (auto StrictAccess = getAccessLevelStrictly(ED))
+          AccessLevel = getAccessLevelUID(StrictAccess.getValue());
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
-        Optional<Accessibility> SetAccess = inferSetterAccessibility(ASD);
+        Optional<Accessibility> SetAccess = inferSetterAccessLevel(ASD);
         if (SetAccess.hasValue()) {
-          SetterAccessLevel = getAccessibilityUID(SetAccess.getValue());
+          SetterAccessLevel = getAccessLevelUID(SetAccess.getValue());
         }
       }
     }

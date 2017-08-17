@@ -250,7 +250,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
   if (!CD->isChildContextOf(DC))
     return false;
 
-  if (!CD->hasAccessibility())
+  if (!CD->hasAccess())
     return false;
 
   // Only consider 'private' members, unless we are in whole-module compilation.

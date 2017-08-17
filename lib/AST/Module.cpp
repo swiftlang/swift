@@ -88,7 +88,7 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
-      TAD->setAccessibility(Accessibility::Public);
+      TAD->setAccess(Accessibility::Public);
       Entry = TAD;
     }
   }
@@ -350,7 +350,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
-  setAccessibility(Accessibility::Public);
+  setAccess(Accessibility::Public);
 }
 
 void ModuleDecl::addFile(FileUnit &newFile) {

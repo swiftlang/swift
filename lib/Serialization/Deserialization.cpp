@@ -1883,7 +1883,7 @@ static bool isDeclAttrRecord(unsigned ID) {
 }
 
 static Optional<swift::Accessibility>
-getActualAccessibility(uint8_t raw) {
+getActualAccessLevel(uint8_t raw) {
   switch (serialization::AccessibilityKind(raw)) {
 #define CASE(NAME) \
   case serialization::AccessibilityKind::NAME: \
@@ -2423,8 +2423,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     alias->setUnderlyingType(getType(underlyingTypeID));
 
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      alias->setAccessibility(*accessLevel);
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      alias->setAccess(*accessLevel);
     } else {
       error();
       return nullptr;
@@ -2501,7 +2501,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
            "erroneous associated type");
 
     Accessibility parentAccess = cast<ProtocolDecl>(DC)->getFormalAccess();
-    assocType->setAccessibility(std::max(parentAccess,Accessibility::Internal));
+    assocType->setAccess(std::max(parentAccess,Accessibility::Internal));
     if (isImplicit)
       assocType->setImplicit();
 
@@ -2546,8 +2546,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // Read the generic environment.
     configureGenericEnvironment(theStruct, genericEnvID);
 
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      theStruct->setAccessibility(*accessLevel);
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      theStruct->setAccess(*accessLevel);
     } else {
       error();
       return nullptr;
@@ -2652,8 +2652,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     configureGenericEnvironment(ctor, genericEnvID);
 
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      ctor->setAccessibility(*accessLevel);
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      ctor->setAccess(*accessLevel);
     } else {
       error();
       return nullptr;
@@ -2756,16 +2756,16 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     configureStorage(var, storageKind, getterID, setterID, materializeForSetID,
                      addressorID, mutableAddressorID, willSetID, didSetID);
 
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      var->setAccessibility(*accessLevel);
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      var->setAccess(*accessLevel);
     } else {
       error();
       return nullptr;
     }
 
     if (var->isSettable(nullptr)) {
-      if (auto setterAccess = getActualAccessibility(rawSetterAccessLevel)) {
-        var->setSetterAccessibility(*setterAccess);
+      if (auto setterAccess = getActualAccessLevel(rawSetterAccessLevel)) {
+        var->setSetterAccess(*setterAccess);
       } else {
         error();
         return nullptr;
@@ -2917,8 +2917,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     configureGenericEnvironment(fn, genericEnvID);
 
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      fn->setAccessibility(*accessLevel);
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      fn->setAccess(*accessLevel);
     } else {
       error();
       return nullptr;
@@ -3063,8 +3063,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     proto->setRequiresClass(isClassBounded);
     
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      proto->setAccessibility(*accessLevel);
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      proto->setAccess(*accessLevel);
     } else {
       error();
       return nullptr;
@@ -3245,8 +3245,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     configureGenericEnvironment(theClass, genericEnvID);
 
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      theClass->setAccessibility(*accessLevel);
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      theClass->setAccess(*accessLevel);
     } else {
       error();
       return nullptr;
@@ -3316,8 +3316,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     configureGenericEnvironment(theEnum, genericEnvID);
 
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      theEnum->setAccessibility(*accessLevel);
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      theEnum->setAccess(*accessLevel);
     } else {
       error();
       return nullptr;
@@ -3389,8 +3389,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       elem->setImplicit();
-    elem->setAccessibility(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
-                                    Accessibility::Internal));
+    elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
+                             Accessibility::Internal));
 
     break;
   }
@@ -3460,16 +3460,16 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                      getterID, setterID, materializeForSetID,
                      addressorID, mutableAddressorID, willSetID, didSetID);
 
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      subscript->setAccessibility(*accessLevel);
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      subscript->setAccess(*accessLevel);
     } else {
       error();
       return nullptr;
     }
 
     if (subscript->isSettable()) {
-      if (auto setterAccess = getActualAccessibility(rawSetterAccessLevel)) {
-        subscript->setSetterAccessibility(*setterAccess);
+      if (auto setterAccess = getActualAccessLevel(rawSetterAccessLevel)) {
+        subscript->setSetterAccess(*setterAccess);
       } else {
         error();
         return nullptr;
@@ -3589,8 +3589,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     configureGenericEnvironment(dtor, genericEnvID);
 
-    dtor->setAccessibility(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
-                                    Accessibility::Internal));
+    dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
+                             Accessibility::Internal));
     auto *selfParams = readParameterList();
     selfParams->get(0)->setImplicit();  // self is implicit.
 

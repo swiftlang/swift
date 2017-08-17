@@ -172,9 +172,9 @@ static void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPa
     auto newEndIter = std::remove_if(localDecls.begin(), localDecls.end(),
                                     [=](ValueDecl *VD) {
       if (typeResolver) {
-        typeResolver->resolveAccessibility(VD);
+        typeResolver->resolveAccessControl(VD);
       }
-      if (!VD->hasAccessibility())
+      if (!VD->hasAccess())
         return false;
       return !VD->isAccessibleFrom(moduleScopeContext);
     });

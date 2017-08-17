@@ -49,8 +49,8 @@ void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);
 /// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
 ///
 /// This actually updates \p VD as well.
-void fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
-                        Accessibility desiredAccess, bool isForSetter = false);
+void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
+                 Accessibility desiredAccess, bool isForSetter = false);
 
 /// Emit fix-its to correct the argument labels in \p expr, which is the
 /// argument tuple or single argument of a call.

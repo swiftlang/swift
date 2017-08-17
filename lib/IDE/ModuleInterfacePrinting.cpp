@@ -363,9 +363,9 @@ void swift::ide::printSubmoduleInterface(
 
     // Skip declarations that are not accessible.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (Options.AccessibilityFilter > Accessibility::Private &&
-          VD->hasAccessibility() &&
-          VD->getFormalAccess() < Options.AccessibilityFilter)
+      if (Options.AccessFilter > Accessibility::Private &&
+          VD->hasAccess() &&
+          VD->getFormalAccess() < Options.AccessFilter)
         continue;
     }
 

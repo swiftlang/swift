@@ -125,14 +125,14 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
                                       LazyResolver *TypeResolver) {
   if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
-    TypeResolver->resolveAccessibility(Member);
+    TypeResolver->resolveAccessControl(Member);
   }
 
   // Check accessibility when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
       !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member) &&
       FromContext->getASTContext().LangOpts.EnableAccessControl) {
-    if (Member->isInvalid() && !Member->hasAccessibility())
+    if (Member->isInvalid() && !Member->hasAccess())
       return false;
     if (!Member->isAccessibleFrom(FromContext))
       return false;
@@ -745,7 +745,7 @@ public:
 
     if (TypeResolver) {
       TypeResolver->resolveDeclSignature(VD);
-      TypeResolver->resolveAccessibility(VD);
+      TypeResolver->resolveAccessControl(VD);
     }
 
     if (VD->isInvalid()) {

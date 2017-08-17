@@ -828,7 +828,7 @@ public:
       if (D->hasInterfaceType())
         verifyChecked(D->getInterfaceType());
 
-      if (D->hasAccessibility()) {
+      if (D->hasAccess()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
         if (D->getFormalAccessScope().isPublic() &&
             D->getFormalAccess() < Accessibility::Public) {
@@ -2002,7 +2002,7 @@ public:
     }
 
     void verifyChecked(ValueDecl *VD) {
-      if (!VD->hasAccessibility() && !VD->getDeclContext()->isLocalContext() &&
+      if (!VD->hasAccess() && !VD->getDeclContext()->isLocalContext() &&
           !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
         dumpRef(VD);
         Out << " does not have accessibility";
@@ -2034,8 +2034,8 @@ public:
     }
 
     void verifyChecked(AbstractStorageDecl *ASD) {
-      if (ASD->hasAccessibility() && ASD->isSettable(nullptr)) {
-        auto setterAccess = ASD->getSetterAccessibility();
+      if (ASD->hasAccess() && ASD->isSettable(nullptr)) {
+        auto setterAccess = ASD->getSetterFormalAccess();
         if (ASD->getSetter() &&
             ASD->getSetter()->getFormalAccess() != setterAccess) {
           Out << "AbstractStorageDecl's setter accessibility is out of sync"

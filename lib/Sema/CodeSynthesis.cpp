@@ -1199,8 +1199,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
-  Storage->setAccessibility(Accessibility::Private);
-  Storage->setSetterAccessibility(Accessibility::Private);
+  Storage->setAccess(Accessibility::Private);
+  Storage->setSetterAccess(Accessibility::Private);
   
   addMemberToContextIfNeeded(Storage, DC);
   
@@ -1406,7 +1406,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   if (DC->getAsClassOrClassExtensionContext())
     makeFinal(Context, Parameter);
   Parameter->setImplicit();
-  Parameter->setAccessibility(Accessibility::Private);
+  Parameter->setAccess(Accessibility::Private);
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the parameter function.
@@ -1623,8 +1623,8 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
-  Storage->setAccessibility(Accessibility::Private);
-  Storage->setSetterAccessibility(Accessibility::Private);
+  Storage->setAccess(Accessibility::Private);
+  Storage->setSetterAccess(Accessibility::Private);
 }
 
 /// Consider add a materializeForSet accessor to the given storage
@@ -1694,8 +1694,8 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
         if (mightBeMutating && valueProp->getGetter()->isMutating())
           getter->setSelfAccessKind(SelfAccessKind::Mutating);
 
-        getter->setAccessibility(var->getFormalAccess());
-        
+        getter->setAccess(var->getFormalAccess());
+
         // Make a setter if the behavior property has one.
         if (auto valueSetter = valueProp->getSetter()) {
           ParamDecl *newValueParam = nullptr;
@@ -1703,18 +1703,18 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
           if (mightBeMutating && valueSetter->isMutating())
             setter->setSelfAccessKind(SelfAccessKind::Mutating);
           // TODO: max of property and implementation setter visibility?
-          setter->setAccessibility(var->getFormalAccess());
+          setter->setAccess(var->getFormalAccess());
         }
       } else {
         // Even if we couldn't find a value property, still make up a stub
         // getter and setter, so that subsequent diagnostics make sense for a
         // computed-ish property.
         getter = createGetterPrototype(var, TC);
-        getter->setAccessibility(var->getFormalAccess());
+        getter->setAccess(var->getFormalAccess());
         ParamDecl *newValueParam = nullptr;
         setter = createSetterPrototype(var, newValueParam, TC);
         setter->setSelfAccessKind(SelfAccessKind::NonMutating);
-        setter->setAccessibility(var->getFormalAccess());
+        setter->setAccess(var->getFormalAccess());
       }
       
       var->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
@@ -1812,7 +1812,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     // lazy getters are mutating on an enclosing value type.
     if (!dc->getAsClassOrClassExtensionContext())
       getter->setSelfAccessKind(SelfAccessKind::Mutating);
-    getter->setAccessibility(var->getFormalAccess());
+    getter->setAccess(var->getFormalAccess());
 
     ParamDecl *newValueParam = nullptr;
     auto *setter = createSetterPrototype(var, newValueParam, TC);
@@ -1956,7 +1956,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 
   // Mark implicit.
   ctor->setImplicit();
-  ctor->setAccessibility(accessLevel);
+  ctor->setAccess(accessLevel);
 
   if (ICK == ImplicitConstructorKind::Memberwise)
     ctor->setIsMemberwiseInitializer();
@@ -2099,7 +2099,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   Accessibility access = classDecl->getFormalAccess();
   access = std::max(access, Accessibility::Internal);
   access = std::min(access, superclassCtor->getFormalAccess());
-  ctor->setAccessibility(access);
+  ctor->setAccess(access);
 
   // Make sure the constructor is only as available as its superclass's
   // constructor.

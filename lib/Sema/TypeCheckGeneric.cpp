@@ -369,8 +369,8 @@ TypeChecker::prepareGenericParamList(GenericParamList *gp,
   unsigned depth = gp->getDepth();
   for (auto paramDecl : *gp) {
     paramDecl->setDepth(depth);
-    if (!paramDecl->hasAccessibility())
-      paramDecl->setAccessibility(access);
+    if (!paramDecl->hasAccess())
+      paramDecl->setAccess(access);
   }
 }
 

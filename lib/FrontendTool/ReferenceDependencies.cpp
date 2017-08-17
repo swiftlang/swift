@@ -41,7 +41,7 @@ static void findNominalsAndOperators(
     if (!VD)
       continue;
 
-    if (VD->hasAccessibility() &&
+    if (VD->hasAccess() &&
         VD->getFormalAccess() <= Accessibility::FilePrivate) {
       continue;
     }
@@ -174,7 +174,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
       auto *NTD = ED->getExtendedType()->getAnyNominal();
       if (!NTD)
         break;
-      if (NTD->hasAccessibility() &&
+      if (NTD->hasAccess() &&
           NTD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
@@ -215,7 +215,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
       auto *NTD = cast<NominalTypeDecl>(D);
       if (!NTD->hasName())
         break;
-      if (NTD->hasAccessibility() &&
+      if (NTD->hasAccess() &&
           NTD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
@@ -232,7 +232,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
       auto *VD = cast<ValueDecl>(D);
       if (!VD->hasName())
         break;
-      if (VD->hasAccessibility() &&
+      if (VD->hasAccess() &&
           VD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
@@ -371,7 +371,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
 
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
-    if (entry.first.first->hasAccessibility() &&
+    if (entry.first.first->hasAccess() &&
         entry.first.first->getFormalAccess() <= Accessibility::FilePrivate)
       continue;
 
@@ -394,7 +394,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
       isCascading |= i->second;
     }
 
-    if (i->first.first->hasAccessibility() &&
+    if (i->first.first->hasAccess() &&
         i->first.first->getFormalAccess() <= Accessibility::FilePrivate)
       continue;
 

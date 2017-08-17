@@ -530,7 +530,7 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
 
       // FIXME: Make sure this method is never called on decls that have not
       // been fully validated.
-      if (!AFD->hasAccessibility())
+      if (!AFD->hasAccess())
         break;
 
       // If the function is not externally visible, we will not be serializing
@@ -605,14 +605,14 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
     if (functionsAreNonCascading)
       return false;
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    if (AFD->hasAccessibility())
+    if (AFD->hasAccess())
       return AFD->getFormalAccess() > Accessibility::FilePrivate;
     break;
   }
 
   case DeclContextKind::SubscriptDecl: {
     auto *SD = cast<SubscriptDecl>(this);
-    if (SD->hasAccessibility())
+    if (SD->hasAccess())
       return SD->getFormalAccess() > Accessibility::FilePrivate;
     break;
   }
@@ -623,16 +623,16 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
 
   case DeclContextKind::GenericTypeDecl: {
     auto *nominal = cast<GenericTypeDecl>(this);
-    if (nominal->hasAccessibility())
+    if (nominal->hasAccess())
       return nominal->getFormalAccess() > Accessibility::FilePrivate;
     break;
   }
 
   case DeclContextKind::ExtensionDecl: {
     auto *extension = cast<ExtensionDecl>(this);
-    if (extension->hasDefaultAccessibility())
-      return extension->getDefaultAccessibility() > Accessibility::FilePrivate;
-    // FIXME: duplicated from computeDefaultAccessibility in TypeCheckDecl.cpp.
+    if (extension->hasDefaultAccessLevel())
+      return extension->getDefaultAccessLevel() > Accessibility::FilePrivate;
+    // FIXME: duplicated from computeDefaultAccessLevel in TypeCheckDecl.cpp.
     if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
       return AA->getAccess() > Accessibility::FilePrivate;
     if (Type extendedTy = extension->getExtendedType()) {
@@ -1055,7 +1055,7 @@ bool AccessScope::isFileScope() const {
   return DC && isa<FileUnit>(DC);
 }
 
-Accessibility AccessScope::accessibilityForDiagnostics() const {
+Accessibility AccessScope::accessLevelForDiagnostics() const {
   if (isPublic())
     return Accessibility::Public;
   if (isa<ModuleDecl>(getDeclContext()))

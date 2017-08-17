@@ -98,7 +98,7 @@ static bool isInSystemModule(DeclContext *D) {
   return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
 }
 
-static Accessibility getOverridableAccessibility(DeclContext *dc) {
+static Accessibility getOverridableAccessLevel(DeclContext *dc) {
   return (dc->getAsProtocolOrProtocolExtensionContext()
             ? Accessibility::Public : Accessibility::Open);
 }
@@ -122,8 +122,8 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
 static std::pair<VarDecl *, PatternBindingDecl *>
 createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
                      VarDecl::Specifier specifier, bool isImplicit,
-                     Accessibility accessibility,
-                     Accessibility setterAccessibility) {
+                     Accessibility access,
+                     Accessibility setterAccess) {
   // Create a variable to store the underlying value.
   auto var = new (cxt) VarDecl(
       /*IsStatic*/false,
@@ -133,8 +133,8 @@ createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
   if (isImplicit)
     var->setImplicit();
   var->setInterfaceType(ty);
-  var->setAccessibility(accessibility);
-  var->setSetterAccessibility(setterAccessibility);
+  var->setAccess(access);
+  var->setSetterAccess(setterAccess);
 
   // Create a pattern binding to describe the variable.
   Pattern *varPattern = createTypedNamedPattern(var);
@@ -404,7 +404,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                             selfDecl, paramPL,
                             /*GenericParams=*/nullptr, enumDecl);
   ctorDecl->setImplicit();
-  ctorDecl->setAccessibility(Accessibility::Public);
+  ctorDecl->setAccess(Accessibility::Public);
 
   auto optEnumTy = OptionalType::get(enumTy);
 
@@ -473,7 +473,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
 
   getterDecl->setInterfaceType(type);
 
-  getterDecl->setAccessibility(Accessibility::Public);
+  getterDecl->setAccess(Accessibility::Public);
 
   rawValueDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                              SourceLoc());
@@ -535,7 +535,7 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
 
   getterDecl->setInterfaceType(type);
 
-  getterDecl->setAccessibility(Accessibility::Public);
+  getterDecl->setAccess(Accessibility::Public);
 
   computedVar->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                             SourceLoc());
@@ -578,7 +578,7 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
-  getterDecl->setAccessibility(Accessibility::Public);
+  getterDecl->setAccess(Accessibility::Public);
 
   auto type = ParameterList::getFullInterfaceType(getterType, params, C);
   getterDecl->setInterfaceType(type);
@@ -619,9 +619,8 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   auto type = ParameterList::getFullInterfaceType(voidTy, params, C);
   setterDecl->setInterfaceType(type);
 
-  setterDecl->setAccessibility(Accessibility::Public);
+  setterDecl->setAccess(Accessibility::Public);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-
 
   return setterDecl;
 }
@@ -1064,7 +1063,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   constructor->setInterfaceType(allocFnTy);
   constructor->setInitializerInterfaceType(initFnTy);
 
-  constructor->setAccessibility(Accessibility::Public);
+  constructor->setAccess(Accessibility::Public);
 
   // Mark the constructor transparent so that we inline it away completely.
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
@@ -1158,7 +1157,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   constructor->setInterfaceType(allocFnTy);
   constructor->setInitializerInterfaceType(initFnTy);
 
-  constructor->setAccessibility(Accessibility::Public);
+  constructor->setAccess(Accessibility::Public);
 
   // Make the constructor transparent so we inline it away completely.
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
@@ -1252,7 +1251,7 @@ static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
                                            nullptr, nominal);
   typealias->setUnderlyingType(underlyingType);
   typealias->setEarlyAttrValidation(true);
-  typealias->setAccessibility(Accessibility::Public);
+  typealias->setAccess(Accessibility::Public);
   typealias->setValidationStarted();
   typealias->setImplicit();
 
@@ -1265,7 +1264,7 @@ static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
 /// \param underlyingType the type of the raw value
 /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
 /// \param protocols the protocols to make this struct conform to
-/// \param setterAccessibility the accessibility of the raw value's setter
+/// \param setterAccess the access level of the raw value's setter
 ///
 /// This will perform most of the work involved in making a new Swift struct
 /// be backed by a raw value. This will populated derived protocols and
@@ -1277,7 +1276,7 @@ static void makeStructRawValued(
     Type underlyingType, ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
     ArrayRef<ProtocolDecl *> protocols,
     MakeStructRawValuedOptions options = getDefaultMakeStructRawValuedOptions(),
-    Accessibility setterAccessibility = Accessibility::Private) {
+    Accessibility setterAccess = Accessibility::Private) {
   auto &cxt = Impl.SwiftContext;
   addProtocolsToStruct(Impl, structDecl, synthesizedProtocolAttrs, protocols);
 
@@ -1292,7 +1291,7 @@ static void makeStructRawValued(
       specifier,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
       Accessibility::Public,
-      setterAccessibility);
+      setterAccess);
 
   structDecl->setHasDelayedMembers();
 
@@ -1391,8 +1390,8 @@ static void makeStructRawValuedWithBridge(
       SourceLoc(), computedVarName, bridgedType, structDecl);
   computedVar->setInterfaceType(bridgedType);
   computedVar->setImplicit();
-  computedVar->setAccessibility(Accessibility::Public);
-  computedVar->setSetterAccessibility(Accessibility::Private);
+  computedVar->setAccess(Accessibility::Public);
+  computedVar->setSetterAccess(Accessibility::Private);
 
   // Create the getter for the computed value variable.
   auto computedVarGetter = makeNewtypeBridgedRawValueGetter(
@@ -1474,7 +1473,7 @@ static FuncDecl *buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
   thunk->setInterfaceType(interfaceType);
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
-  thunk->setAccessibility(getOverridableAccessibility(dc));
+  thunk->setAccess(getOverridableAccessLevel(dc));
 
   auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>();
   assert(objcAttr);
@@ -1536,7 +1535,7 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   thunk->setInterfaceType(interfaceType);
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
-  thunk->setAccessibility(getOverridableAccessibility(dc));
+  thunk->setAccess(getOverridableAccessLevel(dc));
 
   auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>();
   assert(objcAttr);
@@ -1699,7 +1698,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
       /*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
       SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
-  errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
+  errorDomainPropertyDecl->setAccess(Accessibility::Public);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
   swiftDecl->addMember(getterDecl);
@@ -1710,7 +1709,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
-  getterDecl->setAccessibility(Accessibility::Public);
+  getterDecl->setAccess(Accessibility::Public);
 
   auto ret = new (C) ReturnStmt(SourceLoc(), domainDeclRef);
   getterDecl->setBody(
@@ -2454,8 +2453,7 @@ namespace {
 
         makeStructRawValued(Impl, structDecl, underlyingType,
                             {KnownProtocolKind::RawRepresentable}, protocols,
-                            options,
-                            /*setterAccessibility=*/Accessibility::Public);
+                            options, /*setterAccess=*/Accessibility::Public);
 
         result = structDecl;
         break;
@@ -2494,7 +2492,7 @@ namespace {
           // Create the wrapper struct.
           errorWrapper = new (C) StructDecl(loc, name, loc, None, nullptr, dc);
           errorWrapper->computeType();
-          errorWrapper->setAccessibility(Accessibility::Public);
+          errorWrapper->setAccess(Accessibility::Public);
 
           // Add inheritance clause.
           TypeLoc inheritedTypes[1] = {
@@ -2516,7 +2514,7 @@ namespace {
                                              loc, C.Id_nsError, nsErrorType,
                                              errorWrapper);
           nsErrorProp->setImplicit();
-          nsErrorProp->setAccessibility(Accessibility::Public);
+          nsErrorProp->setAccess(Accessibility::Public);
           nsErrorProp->setInterfaceType(nsErrorType);
 
           // Create a pattern binding to describe the variable.
@@ -2584,8 +2582,8 @@ namespace {
                                         SourceLoc(), varName, underlyingType,
                                         enumDecl);
         rawValue->setImplicit();
-        rawValue->setAccessibility(Accessibility::Public);
-        rawValue->setSetterAccessibility(Accessibility::Private);
+        rawValue->setAccess(Accessibility::Public);
+        rawValue->setSetterAccess(Accessibility::Private);
         rawValue->setInterfaceType(underlyingType);
 
         // Create a pattern binding to describe the variable.
@@ -3334,7 +3332,7 @@ namespace {
       result->setInterfaceType(type);
 
       // Someday, maybe this will need to be 'open' for C++ virtual methods.
-      result->setAccessibility(Accessibility::Public);
+      result->setAccess(Accessibility::Public);
       finishFuncDecl(decl, result);
 
       // If this is a compatibility stub, mark it as such.
@@ -3783,7 +3781,7 @@ namespace {
           /*ThrowsLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
           /*GenericParams=*/nullptr, bodyParams, TypeLoc(), dc, decl);
 
-      result->setAccessibility(getOverridableAccessibility(dc));
+      result->setAccess(getOverridableAccessLevel(dc));
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
 
@@ -4577,7 +4575,7 @@ namespace {
       }
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-          getOverridableAccessibility(dc),
+          getOverridableAccessLevel(dc),
           /*IsStatic*/decl->isClassProperty(), VarDecl::Specifier::Var,
           /*IsCaptureList*/false, Impl.importSourceLoc(decl->getLocation()),
           name, dc->mapTypeIntoContext(type), dc);
@@ -5380,7 +5378,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
   result->setInterfaceType(interfaceType);
   result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
-  result->setAccessibility(Accessibility::Public);
+  result->setAccess(Accessibility::Public);
   if (selfIsInOut)
     result->setSelfAccessKind(SelfAccessKind::Mutating);
   if (selfIdx) {
@@ -6280,7 +6278,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   auto bodyParams = getterThunk->getParameterList(1)->clone(C);
   DeclName name(C, DeclBaseName::createSubscript(), {Identifier()});
   auto subscript = Impl.createDeclWithClangNode<SubscriptDecl>(
-      getter->getClangNode(), getOverridableAccessibility(dc), name,
+      getter->getClangNode(), getOverridableAccessLevel(dc), name,
       decl->getLoc(), bodyParams, decl->getLoc(),
       TypeLoc::withoutLoc(elementContextTy), dc,
       /*GenericParams=*/nullptr);
@@ -7824,7 +7822,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
   func->setInterfaceType(getterType);
-  func->setAccessibility(getOverridableAccessibility(dc));
+  func->setAccess(getOverridableAccessLevel(dc));
   func->setImplicit();
 
   // If we're not done type checking, build the getter body.

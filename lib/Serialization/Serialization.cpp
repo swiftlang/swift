@@ -1907,7 +1907,7 @@ getStableStaticSpelling(swift::StaticSpellingKind SS) {
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");
 }
 
-static uint8_t getRawStableAccessibility(Accessibility access) {
+static uint8_t getRawStableAccessLevel(Accessibility access) {
   switch (access) {
 #define CASE(NAME) \
   case Accessibility::NAME: \
@@ -2437,7 +2437,7 @@ void Serializer::writeDecl(const Decl *D) {
   }
 
   if (auto *value = dyn_cast<ValueDecl>(D)) {
-    if (value->hasAccessibility() &&
+    if (value->hasAccess() &&
         value->getFormalAccess() <= Accessibility::FilePrivate &&
         !value->getDeclContext()->isLocalContext()) {
       // FIXME: We shouldn't need to encode this for /all/ private decls.
@@ -2665,7 +2665,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto underlying = typeAlias->getUnderlyingTypeLoc().getType();
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(typeAlias->getFormalAccess());
+      getRawStableAccessLevel(typeAlias->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasLayout::Code];
     TypeAliasLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2733,7 +2733,7 @@ void Serializer::writeDecl(const Decl *D) {
       inheritedTypes.push_back(addTypeRef(inherited.getType()));
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(theStruct->getFormalAccess());
+      getRawStableAccessLevel(theStruct->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[StructLayout::Code];
     StructLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2779,7 +2779,7 @@ void Serializer::writeDecl(const Decl *D) {
       inheritedAndDependencyTypes.push_back(addTypeRef(ty));
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(theEnum->getFormalAccess());
+      getRawStableAccessLevel(theEnum->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[EnumLayout::Code];
     EnumLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2816,7 +2816,7 @@ void Serializer::writeDecl(const Decl *D) {
       inheritedTypes.push_back(addTypeRef(inherited.getType()));
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(theClass->getFormalAccess());
+      getRawStableAccessLevel(theClass->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2849,8 +2849,7 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto element : proto->getInherited())
       inherited.push_back(addTypeRef(element.getType()));
 
-    uint8_t rawAccessLevel =
-      getRawStableAccessibility(proto->getFormalAccess());
+    uint8_t rawAccessLevel = getRawStableAccessLevel(proto->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolLayout::Code];
     ProtocolLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2880,12 +2879,11 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(var->getDeclContext());
     
     Accessors accessors = getAccessors(var);
-    uint8_t rawAccessLevel =
-      getRawStableAccessibility(var->getFormalAccess());
+    uint8_t rawAccessLevel = getRawStableAccessLevel(var->getFormalAccess());
     uint8_t rawSetterAccessLevel = rawAccessLevel;
     if (var->isSettable(nullptr))
       rawSetterAccessLevel =
-        getRawStableAccessibility(var->getSetterAccessibility());
+        getRawStableAccessLevel(var->getSetterFormalAccess());
 
     Type ty = var->getInterfaceType();
     SmallVector<TypeID, 2> dependencies;
@@ -2952,8 +2950,7 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto argName : fn->getFullName().getArgumentNames())
       nameComponentsAndDependencies.push_back(addDeclBaseNameRef(argName));
 
-    uint8_t rawAccessLevel =
-      getRawStableAccessibility(fn->getFormalAccess());
+    uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
     uint8_t rawAddressorKind =
       getRawStableAddressorKind(fn->getAddressorKind());
     Type ty = fn->getInterfaceType();
@@ -3044,11 +3041,11 @@ void Serializer::writeDecl(const Decl *D) {
 
     Accessors accessors = getAccessors(subscript);
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(subscript->getFormalAccess());
+      getRawStableAccessLevel(subscript->getFormalAccess());
     uint8_t rawSetterAccessLevel = rawAccessLevel;
     if (subscript->isSettable())
       rawSetterAccessLevel =
-        getRawStableAccessibility(subscript->getSetterAccessibility());
+        getRawStableAccessLevel(subscript->getSetterFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3093,8 +3090,7 @@ void Serializer::writeDecl(const Decl *D) {
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
-    uint8_t rawAccessLevel =
-      getRawStableAccessibility(ctor->getFormalAccess());
+    uint8_t rawAccessLevel = getRawStableAccessLevel(ctor->getFormalAccess());
 
     bool firstTimeRequired = ctor->isRequired();
     if (auto *overridden = ctor->getOverriddenDecl())

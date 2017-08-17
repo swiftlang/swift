@@ -158,10 +158,10 @@ namespace {
                          unsigned &bestIdx,
                          bool &doNotDiagnoseMatches);
 
-    bool checkWitnessAccessibility(AccessScope &requiredAccessScope,
-                                   ValueDecl *requirement,
-                                   ValueDecl *witness,
-                                   bool *isSetter);
+    bool checkWitnessAccess(AccessScope &requiredAccessScope,
+                            ValueDecl *requirement,
+                            ValueDecl *witness,
+                            bool *isSetter);
 
     bool checkWitnessAvailability(ValueDecl *requirement,
                                   ValueDecl *witness,
@@ -1476,11 +1476,10 @@ bool WitnessChecker::findBestWitness(
   return isReallyBest;
 }
 
-bool WitnessChecker::
-checkWitnessAccessibility(AccessScope &requiredAccessScope,
-                          ValueDecl *requirement,
-                          ValueDecl *witness,
-                          bool *isSetter) {
+bool WitnessChecker::checkWitnessAccess(AccessScope &requiredAccessScope,
+                                        ValueDecl *requirement,
+                                        ValueDecl *witness,
+                                        bool *isSetter) {
   *isSetter = false;
 
   auto scopeIntersection =
@@ -1537,8 +1536,8 @@ checkWitness(AccessScope requiredAccessScope,
     return CheckKind::OptionalityConflict;
 
   bool isSetter = false;
-  if (checkWitnessAccessibility(requiredAccessScope, requirement,
-                                match.Witness, &isSetter)) {
+  if (checkWitnessAccess(requiredAccessScope, requirement, match.Witness,
+                         &isSetter)) {
     CheckKind kind = (isSetter
                       ? CheckKind::AccessibilityOfSetter
                       : CheckKind::Accessibility);
@@ -2514,8 +2513,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     AccessScope requiredAccessScope =
         Adoptee->getAnyNominal()->getFormalAccessScope(DC);
     bool isSetter = false;
-    if (checkWitnessAccessibility(requiredAccessScope, assocType, typeDecl,
-                                  &isSetter)) {
+    if (checkWitnessAccess(requiredAccessScope, assocType, typeDecl,
+                           &isSetter)) {
       assert(!isSetter);
 
       // Avoid relying on the lifetime of 'this'.
@@ -2524,7 +2523,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         [DC, typeDecl, requiredAccessScope](
           NormalProtocolConformance *conformance) {
         Accessibility requiredAccess =
-          requiredAccessScope.requiredAccessibilityForDiagnostics();
+          requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
@@ -2538,7 +2537,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                    typeDecl->getFullName(),
                                    requiredAccess,
                                    proto->getName());
-        fixItAccessibility(diag, typeDecl, requiredAccess);
+        fixItAccess(diag, typeDecl, requiredAccess);
       });
     }
   } else {
@@ -2578,14 +2577,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      TC.computeAccessibility(nominal);
+      TC.computeAccessLevel(nominal);
       // FIXME: Ideally this would use the protocol's access too---that is,
       // a typealias added for an internal protocol shouldn't need to be
       // public---but that can be problematic if the same type conforms to two
       // protocols with different access levels.
       Accessibility aliasAccess = nominal->getFormalAccess();
       aliasAccess = std::max(aliasAccess, Accessibility::Internal);
-      aliasDecl->setAccessibility(aliasAccess);
+      aliasDecl->setAccess(aliasAccess);
 
       if (nominal == DC) {
         nominal->addMember(aliasDecl);
@@ -2663,8 +2662,8 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 
     PrintOptions Options = PrintOptions::printForDiagnostics();
     Options.PrintDocumentationComments = false;
-    Options.AccessibilityFilter = Accessibility::Private;
-    Options.PrintAccessibility = false;
+    Options.AccessFilter = Accessibility::Private;
+    Options.PrintAccess = false;
     Options.SkipAttributes = true;
     Options.FunctionBody = [](const ValueDecl *VD) { return getCodePlaceholder(); };
     Options.setBaseType(AdopterTy);
@@ -2943,7 +2942,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           NormalProtocolConformance *conformance) {
         auto requiredAccessScope = check.RequiredAccessScope;
         Accessibility requiredAccess =
-          requiredAccessScope.requiredAccessibilityForDiagnostics();
+          requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
@@ -2960,9 +2959,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                              witness->getFullName(),
                              isSetter,
                              requiredAccess,
-                             protoAccessScope.accessibilityForDiagnostics(),
+                             protoAccessScope.accessLevelForDiagnostics(),
                              proto->getName());
-        fixItAccessibility(diag, witness, requiredAccess, isSetter);
+        fixItAccess(diag, witness, requiredAccess, isSetter);
       });
       break;
     }
@@ -6115,7 +6114,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
   // Determine the accessibility of this conformance.
   Decl *currentDecl = nullptr;
-  Accessibility defaultAccessibility;
+  Accessibility defaultAccess;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     Type extendedTy = ext->getExtendedType();
     if (!extendedTy)
@@ -6123,10 +6122,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     const NominalTypeDecl *nominal = extendedTy->getAnyNominal();
     if (!nominal)
       return;
-    defaultAccessibility = nominal->getFormalAccess();
+    defaultAccess = nominal->getFormalAccess();
     currentDecl = ext;
   } else {
-    defaultAccessibility = cast<NominalTypeDecl>(dc)->getFormalAccess();
+    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
     currentDecl = cast<NominalTypeDecl>(dc);
   }
 
@@ -6152,7 +6151,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     if (tracker)
       tracker->addUsedMember({conformance->getProtocol(), Identifier()},
-                             defaultAccessibility > Accessibility::FilePrivate);
+                             defaultAccess > Accessibility::FilePrivate);
 
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
     // have unstable archival names.
@@ -6368,8 +6367,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
             bestOptionalReqs.begin(),
             bestOptionalReqs.end(),
             [&](ValueDecl *req) {
-              return !shouldWarnAboutPotentialWitness(req, value,
-                                                      defaultAccessibility,
+              return !shouldWarnAboutPotentialWitness(req, value, defaultAccess,
                                                       bestScore);
             }),
           bestOptionalReqs.end());
@@ -6383,7 +6381,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           if (conformance->getProtocol() == req->getDeclContext()) {
             diagnosePotentialWitness(*this,
                                      conformance->getRootNormalConformance(),
-                                     req, value, defaultAccessibility);
+                                     req, value, defaultAccess);
             diagnosed = true;
             break;
           }

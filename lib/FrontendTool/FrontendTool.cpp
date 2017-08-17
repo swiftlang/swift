@@ -1139,7 +1139,7 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
     PrintOptions PO = PrintOptions::printInterface();
     PO.PrintOriginalSourceText = true;
     PO.Indent = 2;
-    PO.PrintAccessibility = false;
+    PO.PrintAccess = false;
     PO.SkipUnderscoredStdlibProtocols = true;
     SF->print(TempOS, PO);
     if (TempOS.str().trim().empty())

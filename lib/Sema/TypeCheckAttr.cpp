@@ -1435,8 +1435,8 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
     }
 
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
-    TC.computeDefaultAccessibility(extension);
-    Accessibility maxAccess = extension->getMaxAccessibility();
+    TC.computeDefaultAccessLevel(extension);
+    Accessibility maxAccess = extension->getMaxAccessLevel();
     if (std::min(attr->getAccess(), Accessibility::Public) > maxAccess) {
       // FIXME: It would be nice to say what part of the requirements actually
       // end up being problematic.
@@ -1446,7 +1446,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                       attr->getAccess(),
                       D->getDescriptiveKind(),
                       maxAccess);
-      swift::fixItAccessibility(diag, cast<ValueDecl>(D), maxAccess);
+      swift::fixItAccess(diag, cast<ValueDecl>(D), maxAccess);
       return;
     }
 
@@ -1457,7 +1457,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                               attr->getAccess(),
                               D->getDescriptiveKind(),
                               extAttr->getAccess());
-      swift::fixItAccessibility(diag, cast<ValueDecl>(D), extAttr->getAccess());
+      swift::fixItAccess(diag, cast<ValueDecl>(D), extAttr->getAccess());
       return;
     }
   }

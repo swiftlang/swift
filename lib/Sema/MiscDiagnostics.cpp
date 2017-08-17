@@ -3432,8 +3432,8 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
-                               Accessibility desiredAccess, bool isForSetter) {
+void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
+                        Accessibility desiredAccess, bool isForSetter) {
   StringRef fixItString;
   switch (desiredAccess) {
   case Accessibility::Private:      fixItString = "private ";      break;
@@ -3447,20 +3447,20 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
   AbstractAccessibilityAttr *attr;
   if (isForSetter) {
     attr = attrs.getAttribute<SetterAccessibilityAttr>();
-    cast<AbstractStorageDecl>(VD)->overwriteSetterAccessibility(desiredAccess);
+    cast<AbstractStorageDecl>(VD)->overwriteSetterAccess(desiredAccess);
   } else {
     attr = attrs.getAttribute<AccessibilityAttr>();
-    VD->overwriteAccessibility(desiredAccess);
+    VD->overwriteAccess(desiredAccess);
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD)) {
       if (auto *getter = ASD->getGetter())
-        getter->overwriteAccessibility(desiredAccess);
+        getter->overwriteAccess(desiredAccess);
 
       if (auto *setterAttr = attrs.getAttribute<SetterAccessibilityAttr>()) {
         if (setterAttr->getAccess() > desiredAccess)
-          fixItAccessibility(diag, VD, desiredAccess, true);
+          fixItAccess(diag, VD, desiredAccess, true);
       } else {
-        ASD->overwriteSetterAccessibility(desiredAccess);
+        ASD->overwriteSetterAccess(desiredAccess);
       }
     }
   }

@@ -250,7 +250,7 @@ static StringRef getImportKindString(ImportKind value) {
   
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
-static StringRef getAccessibilityString(Accessibility value) {
+static StringRef getAccessLevelString(Accessibility value) {
   switch (value) {
   case Accessibility::Private: return "private";
   case Accessibility::FilePrivate: return "fileprivate";
@@ -724,9 +724,9 @@ namespace {
         PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
 
-      if (VD->hasAccessibility()) {
+      if (VD->hasAccess()) {
         PrintWithColorRAII(OS, AccessibilityColor) << " access="
-          << getAccessibilityString(VD->getFormalAccess());
+          << getAccessLevelString(VD->getFormalAccess());
       }
 
       if (auto Overridden = VD->getOverriddenDecl()) {

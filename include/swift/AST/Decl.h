@@ -1681,12 +1681,12 @@ public:
     ExtensionDeclBits.CheckedInheritanceClause = checked;
   }
 
-  bool hasDefaultAccessibility() const {
+  bool hasDefaultAccessLevel() const {
     return ExtensionDeclBits.DefaultAndMaxAccessLevel != 0;
   }
 
-  Accessibility getDefaultAccessibility() const {
-    assert(hasDefaultAccessibility() && "not computed yet");
+  Accessibility getDefaultAccessLevel() const {
+    assert(hasDefaultAccessLevel() && "not computed yet");
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
         (1 << (static_cast<unsigned>(Accessibility::FilePrivate) - 1)))
       return Accessibility::FilePrivate;
@@ -1696,8 +1696,8 @@ public:
     return Accessibility::Public;
   }
 
-  Accessibility getMaxAccessibility() const {
-    assert(hasDefaultAccessibility() && "not computed yet");
+  Accessibility getMaxAccessLevel() const {
+    assert(hasDefaultAccessLevel() && "not computed yet");
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
         (1 << (static_cast<unsigned>(Accessibility::Public) - 1)))
       return Accessibility::Public;
@@ -1707,17 +1707,17 @@ public:
     return Accessibility::FilePrivate;
   }
 
-  void setDefaultAndMaxAccessibility(Accessibility defaultAccess,
-                                     Accessibility maxAccess) {
-    assert(!hasDefaultAccessibility() && "default accessibility already set");
+  void setDefaultAndMaxAccess(Accessibility defaultAccess,
+                              Accessibility maxAccess) {
+    assert(!hasDefaultAccessLevel() && "default accessibility already set");
     assert(maxAccess >= defaultAccess);
     assert(maxAccess != Accessibility::Private && "private not valid");
     assert(defaultAccess != Accessibility::Private && "private not valid");
     ExtensionDeclBits.DefaultAndMaxAccessLevel =
         (1 << (static_cast<unsigned>(defaultAccess) - 1)) |
         (1 << (static_cast<unsigned>(maxAccess) - 1));
-    assert(getDefaultAccessibility() == defaultAccess && "not enough bits");
-    assert(getMaxAccessibility() == maxAccess && "not enough bits");
+    assert(getDefaultAccessLevel() == defaultAccess && "not enough bits");
+    assert(getMaxAccessLevel() == maxAccess && "not enough bits");
   }
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
@@ -2147,7 +2147,7 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  bool hasAccessibility() const {
+  bool hasAccess() const {
     return TypeAndAccess.getInt().hasValue();
   }
 
@@ -2167,7 +2167,7 @@ public:
   /// \sa getFormalAccessScope
   Accessibility getFormalAccess(const DeclContext *useDC = nullptr,
                                 bool respectVersionedAttr = false) const {
-    assert(hasAccessibility() && "accessibility not computed yet");
+    assert(hasAccess() && "accessibility not computed yet");
     Accessibility result = TypeAndAccess.getInt().getValue();
     if (respectVersionedAttr &&
         result == Accessibility::Internal &&
@@ -2205,14 +2205,14 @@ public:
   /// decisions. It should not be used at the AST or semantic level.
   Accessibility getEffectiveAccess() const;
 
-  void setAccessibility(Accessibility access) {
-    assert(!hasAccessibility() && "accessibility already set");
-    overwriteAccessibility(access);
+  void setAccess(Accessibility access) {
+    assert(!hasAccess() && "accessibility already set");
+    overwriteAccess(access);
   }
 
   /// Overwrite the accessibility of this declaration.
   // This is needed in the LLDB REPL.
-  void overwriteAccessibility(Accessibility access) {
+  void overwriteAccess(Accessibility access) {
     TypeAndAccess.setInt(access);
   }
 
@@ -4179,18 +4179,18 @@ public:
     return nullptr;
   }
 
-  Accessibility getSetterAccessibility() const {
-    assert(hasAccessibility());
+  Accessibility getSetterFormalAccess() const {
+    assert(hasAccess());
     assert(GetSetInfo.getInt().hasValue());
     return GetSetInfo.getInt().getValue();
   }
 
-  void setSetterAccessibility(Accessibility accessLevel) {
+  void setSetterAccess(Accessibility accessLevel) {
     assert(!GetSetInfo.getInt().hasValue());
-    overwriteSetterAccessibility(accessLevel);
+    overwriteSetterAccess(accessLevel);
   }
 
-  void overwriteSetterAccessibility(Accessibility accessLevel);
+  void overwriteSetterAccess(Accessibility accessLevel);
 
   /// \brief Retrieve the materializeForSet function, if this
   /// declaration has one.
@@ -6277,12 +6277,12 @@ NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
 }
 
 inline void
-AbstractStorageDecl::overwriteSetterAccessibility(Accessibility accessLevel) {
+AbstractStorageDecl::overwriteSetterAccess(Accessibility accessLevel) {
   GetSetInfo.setInt(accessLevel);
   if (auto setter = getSetter())
-    setter->overwriteAccessibility(accessLevel);
+    setter->overwriteAccess(accessLevel);
   if (auto materializeForSet = getMaterializeForSetFunc())
-    materializeForSet->overwriteAccessibility(accessLevel);
+    materializeForSet->overwriteAccess(accessLevel);
 }
 
 inline bool AbstractStorageDecl::isStatic() const {
