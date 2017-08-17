@@ -11,6 +11,8 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
 
 1. Library Organization
     1. What files are where
+        1. Brief about CMakeLists
+	1. Brief about GroupInfo.json
     1. What tests are where
         1. Furthermore, should there be a split between whitebox tests and blackbox tests?
     1. What benchmarks are where
@@ -23,6 +25,9 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
     1. Use of classes, COW implementation, buffers, etc
     1. Compatiblity, `@available`, etc.
     1. Resilience, ABI stability, `@_inlineable`, `@_versioned`, etc
+    1. Strings and ICU
+    1. Lifetimes
+        1. withExtendedLifetime, withUnsafe..., 
 1. Coding Standards
     1. High level concerns
     1. Best practices
@@ -31,6 +36,8 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
     1. `@inline(__always)` and `@inline(never)`
     1. `@semantics(...)`
     1. `@_silgen_name`
+    1. Builtins
+        1. Builtin.addressof, _isUnique, _isUniqueOrPinned, etc
 1. Dirty hacks
     1. Why all the underscores and extra protocols?
     1. How does the `...` ranges work?
