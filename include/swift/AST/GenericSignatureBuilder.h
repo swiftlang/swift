@@ -374,6 +374,9 @@ private:
                           FloatingRequirementSource source,
                           UnresolvedHandlingKind unresolvedHandling);
 
+  /// Note that we have added the nested type nestedPA
+  void addedNestedType(PotentialArchetype *nestedPA);
+
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
   ConstraintResult addSameTypeRequirementBetweenArchetypes(
@@ -1034,7 +1037,6 @@ private:
                              bool inferred,
                              WrittenRequirementLoc writtenLoc =
                                WrittenRequirementLoc()) const;
-
 public:
   /// A requirement source that describes that a requirement that is resolved
   /// via a superclass requirement.
@@ -1297,9 +1299,8 @@ public:
   }
 
   static FloatingRequirementSource forNestedTypeNameMatch(
-                                     const RequirementSource *base,
                                      Identifier nestedName) {
-    FloatingRequirementSource result{ NestedTypeNameMatch, base };
+    FloatingRequirementSource result{ NestedTypeNameMatch, Storage() };
     result.nestedName = nestedName;
     return result;
   };
@@ -1427,11 +1428,11 @@ class GenericSignatureBuilder::PotentialArchetype {
   friend class GenericSignatureBuilder;
   friend class GenericSignature;
 
-  /// \brief Retrieve the debug name of this potential archetype.
-  std::string getDebugName() const;
-
 public:
   ~PotentialArchetype();
+
+  /// \brief Retrieve the debug name of this potential archetype.
+  std::string getDebugName() const;
 
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
