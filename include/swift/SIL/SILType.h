@@ -607,7 +607,7 @@ namespace llvm {
 // Allow the low bit of SILType to be used for nefarious purposes, e.g. putting
 // a SILType into a PointerUnion.
 template<>
-class PointerLikeTypeTraits<swift::SILType> {
+struct PointerLikeTypeTraits<swift::SILType> {
 public:
   static inline void *getAsVoidPointer(swift::SILType T) {
     return T.getOpaqueValue();
