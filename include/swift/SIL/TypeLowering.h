@@ -254,6 +254,14 @@ public:
 
   enum class LoweringStyle { Shallow, Deep };
 
+  /// Given the result of the expansion heuristic,
+  /// return appropriate lowering style.
+  static LoweringStyle getLoweringStyle(bool shouldExpand) {
+    if (shouldExpand)
+      return TypeLowering::LoweringStyle::Deep;
+    return TypeLowering::LoweringStyle::Shallow;
+  }
+
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
@@ -528,7 +536,10 @@ class TypeConverter {
   llvm::DenseMap<OverrideKey, SILConstantInfo> ConstantOverrideTypes;
 
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
-  
+
+  /// Cache of loadable SILType to number of (estimated) fields
+  llvm::DenseMap<SILType, unsigned> TypeFields;
+
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
   /// Get the generic environment for a constant.
@@ -575,7 +586,10 @@ public:
   
   /// Get the method dispatch strategy for a protocol.
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
-  
+
+  /// Count the total number of fields inside the given SIL Type
+  unsigned countNumberOfFields(SILType Ty);
+
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
     return ProtocolDescriptorFlags::needsWitnessTable
@@ -889,7 +903,7 @@ private:
   GenericContextScope(const GenericContextScope&) = delete;
   GenericContextScope &operator=(const GenericContextScope&) = delete;
 };
-  
+
 } // namespace Lowering
 } // namespace swift
 

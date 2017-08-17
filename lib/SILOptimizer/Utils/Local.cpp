@@ -35,6 +35,9 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool> EnableExpandAll("enable-expand-all",
+                                           llvm::cl::init(false));
+
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
 /// creates a strong_retain if \p Ptr has reference semantics itself or a
 /// retain_value if \p Ptr is a non-trivial value without reference-semantics.
@@ -225,6 +228,10 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst,
   for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;) {
     auto *User = UI->getUser();
     UI++;
+    // User have already been deleted by our recursive eraser
+    if (!User) {
+      continue;
+    }
 
     // If the instruction itself has any uses, recursively zap them so that
     // nothing uses this instruction.
@@ -2829,6 +2836,22 @@ bool swift::simplifyUsers(SILInstruction *I) {
   }
 
   return Changed;
+}
+
+/// True if a type can be expanded
+/// without a significant increase to code size.
+bool swift::shouldExpand(SILModule &Module, SILType Ty) {
+  if (EnableExpandAll) {
+    return true;
+  }
+  if (Ty.isAddressOnly(Module)) {
+    return false;
+  }
+  unsigned numFields = Module.Types.countNumberOfFields(Ty);
+  if (numFields > 6) {
+    return false;
+  }
+  return true;
 }
 
 /// Some support functions for the global-opt and let-properties-opts

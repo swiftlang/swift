@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/Analysis/TypeExpansionAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -29,7 +30,15 @@ TypeExpansionAnalysis::getTypeExpansion(SILType B, SILModule *Mod) {
   auto Iter = ExpansionCache.find(B);
   if (Iter != ExpansionCache.end()) {
     return Iter->second;
-  }   
+  }
+
+  // Don't expand large types. This would defeat keeping them in memory.
+  if (!shouldExpand(*Mod, B)) {
+    // Push the empty projection path.
+    ProjectionPath P(B);
+    ExpansionCache[B].push_back(P);
+    return ExpansionCache[B];
+  }
 
   // Flush the cache if the size of the cache is too large.
   if (ExpansionCache.size() > TypeExpansionAnalysisMaxCacheSize) {
