@@ -9,7 +9,7 @@ import AppKit
 
 func testStringBridge(_ str: String) {
   var str2 = str.nsStringMethod()!
-  var int = String.nsStringClassMethod()
+  var int = NSString.nsStringClassMethod()
   var str3 = str.nsStringProperty!
 
   // Make sure the types worked out as expected
