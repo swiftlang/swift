@@ -419,7 +419,7 @@ FIXME: full list.
 
 * ``optimized_stdlib_<CPUNAME>``: an optimized stdlib plus cpu configuration.
 
-* ``SWIFT_VERSION=<MAJOR>``: restricts a test to Swift 3 or Swift 4. If you
+* ``SWIFT_VERSION=<MAJOR>``: restricts a test to Swift 3, Swift 4, Swift 5. If you
   need to use this, make sure to add a test for the other version as well
   unless you are specifically testing ``-swift-version``-related functionality.
 

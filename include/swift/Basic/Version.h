@@ -109,6 +109,12 @@ public:
 
   /// Whether this version is in the Swift 3 family
   bool isVersion3() const { return !empty() && Components[0] == 3; }
+    
+  /// Whether this version is in the Swift 4 family
+  bool isVersion4() const { return !empty() && Components[0] == 4; }
+  
+  /// Whether this version is in the Swift 5 family
+  bool isVersion5() const { return !empty() && Components[0] == 5; }
 
   /// Return this Version struct with minor and sub-minor components stripped
   Version asMajorVersion() const;
@@ -137,8 +143,8 @@ public:
 
   // Whitelist of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
-  static std::array<StringRef, 2> getValidEffectiveVersions() {
-    return {{"3", "4"}};
+  static std::array<StringRef, 3> getValidEffectiveVersions() {
+    return {{"3", "4", "5"}};
   };
 };
 

@@ -65,7 +65,9 @@ importer::nameVersionFromOptions(const LangOptions &langOpts) {
     return ImportNameVersion::Swift2;
   case 3:
     return ImportNameVersion::Swift3;
+  // Fixme: Figure out the importing story for 5 instead of falling back to 4.
   case 4:
+  case 5:
     return ImportNameVersion::Swift4;
   }
 }
