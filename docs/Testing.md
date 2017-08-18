@@ -36,10 +36,10 @@ The testsuite is split into four subsets:
 
 ### Running the LLVM lit-based testsuite
 
-It is recommended that you run the Swift test suites via ``utils/build-script``.
-For day-to-day work on the Swift compiler, using ``utils/build-script --test``
-should be sufficient.  The buildbot runs validation tests, so if those are
-accidentally broken, it should not go unnoticed.
+The simplest way to run the Swift test suite is with the ``--test`` switch to
+``utils/build-script``. This will run the primary test suite. The buildbot runs
+validation tests, so if those are accidentally broken, it should not go
+unnoticed.
 
 Before committing a large change to a compiler (especially a language change),
 or API changes to the standard library, it is recommended to run validation
