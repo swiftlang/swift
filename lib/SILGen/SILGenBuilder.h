@@ -9,6 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// \file
+///
+/// This file defines SILGenBuilder, a subclass of SILBuilder that provides APIs
+/// that traffic in ManagedValue. The intention is that if one is using a
+/// SILGenBuilder, the SILGenBuilder will handle preserving ownership invariants
+/// (or assert upon failure) freeing the implementor of such concerns.
+///
+//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILGEN_SILGENBUILDER_H
 #define SWIFT_SILGEN_SILGENBUILDER_H

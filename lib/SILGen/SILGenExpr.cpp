@@ -4670,52 +4670,6 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
            .getAsSingleValue(*this, loc);
 }
 
-static std::pair<ManagedValue, ManagedValue>
-emitArrayToPointer(SILGenFunction &SGF, SILLocation loc, ManagedValue array,
-                   SILGenFunction::ArrayAccessInfo accessInfo) {
-  auto &ctx = SGF.getASTContext();
-
-  FuncDecl *converter;
-  if (accessInfo.AccessKind == AccessKind::Read) {
-    converter = ctx.getConvertConstArrayToPointerArgument(nullptr);
-    if (array.isLValue())
-      array = SGF.B.createLoadCopy(loc, array);
-
-  } else {
-    converter = ctx.getConvertMutableArrayToPointerArgument(nullptr);
-    assert(array.isLValue());
-  }
-
-  // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  auto *M = SGF.SGM.M.getSwiftModule();
-  auto firstSubMap =
-    accessInfo.ArrayType->getContextSubstitutionMap(M, ctx.getArrayDecl());
-  auto secondSubMap =
-    accessInfo.PointerType->getContextSubstitutionMap(M,
-                                                      SGF.getPointerProtocol());
-
-  auto *genericSig = converter->getGenericSignature();
-  auto subMap =
-    SubstitutionMap::combineSubstitutionMaps(firstSubMap,
-                                             secondSubMap,
-                                             CombineSubstitutionMaps::AtIndex,
-                                             1, 0,
-                                             genericSig);
-
-  SmallVector<ManagedValue, 2> resultScalars;
-  SGF.emitApplyOfLibraryIntrinsic(loc, converter, subMap, array, SGFContext())
-    .getAll(resultScalars);
-  assert(resultScalars.size() == 2);
-
-  // Mark the dependence of the pointer on the owner value.
-  auto owner = resultScalars[0];
-  auto pointer = resultScalars[1].forward(SGF);
-  pointer = SGF.B.createMarkDependence(loc, pointer, owner.getValue());
-
-  // The owner's already in its own cleanup.  Return the pointer.
-  return {ManagedValue::forTrivialObjectRValue(pointer), owner};
-}
-
 RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
                                               SGFContext C) {
   FormalEvaluationScope writeback(SGF);
@@ -4734,7 +4688,7 @@ RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
     array = SGF.emitRValueAsSingleValue(subExpr);
   }
 
-  auto pointer = ::emitArrayToPointer(SGF, E, array, accessInfo).first;
+  auto pointer = SGF.emitArrayToPointer(E, array, accessInfo).first;
   return RValue(SGF, E, pointer);
 }
 
@@ -4749,13 +4703,49 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, LValue &&lv,
                                    ArrayAccessInfo accessInfo) {
   auto array =
     emitAddressOfLValue(loc, std::move(lv), accessInfo.AccessKind);
-  return ::emitArrayToPointer(*this, loc, array, accessInfo);
+  return emitArrayToPointer(loc, array, accessInfo);
 }
 
 std::pair<ManagedValue, ManagedValue>
 SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
                                    ArrayAccessInfo accessInfo) {
-  return ::emitArrayToPointer(*this, loc, array, accessInfo);
+  auto &ctx = getASTContext();
+
+  FuncDecl *converter;
+  if (accessInfo.AccessKind == AccessKind::Read) {
+    converter = ctx.getConvertConstArrayToPointerArgument(nullptr);
+    if (array.isLValue())
+      array = B.createLoadCopy(loc, array);
+
+  } else {
+    converter = ctx.getConvertMutableArrayToPointerArgument(nullptr);
+    assert(array.isLValue());
+  }
+
+  // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
+  auto *M = SGM.M.getSwiftModule();
+  auto firstSubMap =
+      accessInfo.ArrayType->getContextSubstitutionMap(M, ctx.getArrayDecl());
+  auto secondSubMap = accessInfo.PointerType->getContextSubstitutionMap(
+      M, getPointerProtocol());
+
+  auto *genericSig = converter->getGenericSignature();
+  auto subMap = SubstitutionMap::combineSubstitutionMaps(
+      firstSubMap, secondSubMap, CombineSubstitutionMaps::AtIndex, 1, 0,
+      genericSig);
+
+  SmallVector<ManagedValue, 2> resultScalars;
+  emitApplyOfLibraryIntrinsic(loc, converter, subMap, array, SGFContext())
+      .getAll(resultScalars);
+  assert(resultScalars.size() == 2);
+
+  // Mark the dependence of the pointer on the owner value.
+  auto owner = resultScalars[0];
+  auto pointer = resultScalars[1].forward(*this);
+  pointer = B.createMarkDependence(loc, pointer, owner.getValue());
+
+  // The owner's already in its own cleanup.  Return the pointer.
+  return {ManagedValue::forTrivialObjectRValue(pointer), owner};
 }
 
 RValue RValueEmitter::visitStringToPointerExpr(StringToPointerExpr *E,
