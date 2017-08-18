@@ -55,9 +55,9 @@ supported host development operating systems.
 #### macOS
 
 To build for macOS, you need [Xcode 9.0 beta 4](https://developer.apple.com/xcode/downloads/).
-The version of Xcode required to build swift changes frequently, and is often a
-pre-release version of Xcode. Check this document or [here](https://ci.swift.org)
-to see the version required.
+The required version of Xcode changes frequently, and is often a beta release.
+Check this document or the host information on <https://ci.swift.org> for the
+current required version.
 
 You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
 which can be installed via a package manager:
@@ -151,7 +151,7 @@ with the 'check-swift' target.
 #### Build Products
 
 All of the build products are placed in `swift-source/build/${TOOL}-${MODE}/${PRODUCT}-${PLATFORM}/`.
-If macOS swift with Ninja in DebugAssert mode was built, all of the products
+If macOS Swift with Ninja in DebugAssert mode was built, all of the products
 would be in `swift-source/build/Ninja-DebugAssert/swift-macosx-x86_64/`. It
 helps to save this directory as an environment variable for future use.
 
@@ -166,7 +166,7 @@ and debugging.
     cd ${SWIFT_BUILD_DIR}
     ninja swift
 
-This will build the swift compiler, but will not rebuild the standard library or
+This will build the Swift compiler, but will not rebuild the standard library or
 any other target. Building the `swift-stdlib` target as an additional layer of
 testing from time to time is also a good idea. To build just the standard
 library, run:
@@ -177,7 +177,7 @@ It is always a good idea to do a full build after using `update-checkout`.
 
 #### Using Xcode
 
-To open the swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
+To open the Swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
 It will auto-create a *lot* of schemes for all of the available targets. A
 common debug flow would involve:
 
