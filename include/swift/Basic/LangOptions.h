@@ -310,16 +310,6 @@ namespace swift {
     bool isSwiftVersion3() const {
       return EffectiveLanguageVersion.isVersion3();
     }
-      
-    /// Whether our effective Swift version is in the Swift 4 family
-    bool isSwiftVersion4() const {
-       return EffectiveLanguageVersion.isVersion4();
-    }
-      
-    /// Whether our effective Swift version is in the Swift 5 family
-    bool isSwiftVersion5() const {
-       return EffectiveLanguageVersion.isVersion5();
-    }
 
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.

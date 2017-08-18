@@ -865,12 +865,6 @@ public:
   
   /// Whether our effective Swift version is in the Swift 3 family
   bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
-  
-  /// Whether our effective Swift version is in the Swift 4 family
-  bool isSwiftVersion4() const { return LangOpts.isSwiftVersion4(); }
-  
-  /// Whether our effective Swift version is in the Swift 5 family
-  bool isSwiftVersion5() const { return LangOpts.isSwiftVersion5(); }
 
 private:
   friend Decl;
