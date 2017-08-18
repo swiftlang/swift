@@ -1369,6 +1369,9 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
   if (!isTypeMetadataAccessTrivial(IGM, type)) {
     cacheVariable = cast<llvm::GlobalVariable>(
         IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition));
+
+    if (IGM.getOptions().OptimizeForSize)
+      accessor->addFnAttr(llvm::Attribute::NoInline);
   }
 
   emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
@@ -1410,6 +1413,9 @@ static llvm::Function *getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   // have defined it, just return the pointer.
   if (!shouldDefine || !accessor->empty())
     return accessor;
+
+  if (IGM.getOptions().OptimizeForSize)
+    accessor->addFnAttr(llvm::Attribute::NoInline);
 
   emitLazyCacheAccessFunction(IGM, accessor, /*cacheVariable=*/nullptr,
                               [&](IRGenFunction &IGF) -> llvm::Value* {

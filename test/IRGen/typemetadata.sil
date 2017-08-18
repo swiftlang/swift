@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Osize -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=OSIZE
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -46,4 +47,8 @@ bb0:
 // CHECK-NEXT: br label
 // CHECK:      [[RES:%.*]] = phi
 // CHECK-NEXT: ret %swift.type* [[RES]]
+
+
+// OSIZE: define hidden %swift.type* @_T012typemetadata1CCMa() [[ATTR:#[0-9]+]] {
+// OSIZE: [[ATTR]] = {{{.*}}noinline
 

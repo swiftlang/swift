@@ -135,7 +135,7 @@ set(profdata_merge_worker
     "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
 
 set(TEST_MODES
-    optimize_none optimize optimize_unchecked
+    optimize_none optimize optimize_unchecked optimize_size
     only_executable only_non_executable
 )
 set(TEST_SUBSETS
