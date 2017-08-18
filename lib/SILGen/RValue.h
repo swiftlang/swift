@@ -74,8 +74,13 @@ class RValue {
   CanType type;
   unsigned elementsToBeAdded;
   
-  /// Flag value used to mark an rvalue as invalid, because it was
-  /// consumed or it was default-initialized.
+  /// \brief Flag value used to mark an rvalue as invalid.
+  ///
+  /// The reasons why this can be true is:
+  ///
+  /// 1. The RValue was consumed.
+  /// 2. The RValue was default-initialized.
+  /// 3. The RValue was emitted into an SGFContext initialization.
   enum : unsigned {
     Null = ~0U,
     Used = Null - 1,
