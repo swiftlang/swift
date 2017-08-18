@@ -1323,6 +1323,8 @@ To use it, specify the '--preset=' argument:
   --build-subdir=ds --
   ...
 
+Existing presets can be found in `utils/build-presets.ini`
+
 Philosophy
 ----------
 

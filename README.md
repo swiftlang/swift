@@ -111,8 +111,7 @@ cloning over SSH may provide a better experience (which requires
 
 The `build-script` is a high-level build automation script that supports basic
 options such as building a Swift-compatible LLDB, building the Swift Package
-Manager, building for iOS, running tests after builds, and more. It also
-supports presets, which you can define for common combinations of build options.
+Manager, building for various platforms, running tests after builds, and more.
 
 View the inline help to find out more, in particular the section "Typical uses":
 
@@ -156,7 +155,8 @@ If you are interested in standard library development, this will build a fully
 optimized compiler, but will build the standard library and swift overlays with
 debug information.
 
-    utils/build-script --release --debug-swift-stdlib
+The build script also supports presets that define the various CI builds. Look
+for 'Preset Mode' in the build script help for more information.
 
 
 #### Build Products
