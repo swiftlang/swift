@@ -446,7 +446,10 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
   _fixLifetime(bridgedBack)
 }
 
-ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied")
+  .xfail(.iOSAny("<rdar://problem/33926468>"))
+  .xfail(.tvOSAny("<rdar://problem/33926468>"))
+  .code {
   let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
 
   CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
