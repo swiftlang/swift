@@ -3056,20 +3056,22 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
   // Parse the first expression.
   ParserResult<Expr> FirstExpr
     = parseExpr(diag::expected_expr_in_collection_literal);
-  if (FirstExpr.isNull()) {
+  if (FirstExpr.isNull() || FirstExpr.hasCodeCompletion()) {
     skipUntil(tok::r_square);
     if (Tok.is(tok::r_square))
       consumeToken();
-    return FirstExpr;
+    if (FirstExpr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
+    return nullptr;
   }
 
   // If we have a ':', this is a dictionary literal.
   if (Tok.is(tok::colon)) {
-    return parseExprDictionary(LSquareLoc, FirstExpr);
+    return parseExprDictionary(LSquareLoc, FirstExpr.get());
   }
 
   // Otherwise, we have an array literal.
-  return parseExprArray(LSquareLoc, FirstExpr);
+  return parseExprArray(LSquareLoc, FirstExpr.get());
 }
 
 /// parseExprArray - Parse an array literal expression.
@@ -3081,13 +3083,13 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
 ///     '[' expr (',' expr)* ','? ']'
 ///     '[' ']'
 ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
-                                          ParserResult<Expr> FirstExpr) {
+                                          Expr *FirstExpr) {
   SmallVector<Expr *, 8> SubExprs;
   SmallVector<SourceLoc, 8> CommaLocs;
-  SubExprs.push_back(FirstExpr.get());
+  SubExprs.push_back(FirstExpr);
 
   SourceLoc CommaLoc, RSquareLoc;
-  ParserStatus Status(FirstExpr);
+  ParserStatus Status;
 
   if (Tok.isNot(tok::r_square) && !consumeIf(tok::comma, CommaLoc)) {
     diagnose(Tok, diag::expected_separator, ",")
@@ -3113,6 +3115,9 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
     return Element;
   });
 
+  if (Status.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+
   assert(SubExprs.size() >= 1);
   return makeParserResult(Status,
           ArrayExpr::create(Context, LSquareLoc, SubExprs, CommaLocs,
@@ -3128,7 +3133,7 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
 ///     '[' expr ':' expr (',' expr ':' expr)* ','? ']'
 ///     '[' ':' ']'
 ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
-                                               ParserResult<Expr> FirstKey) {
+                                               Expr *FirstKey) {
   assert(Tok.is(tok::colon));
 
   // Each subexpression is a (key, value) tuple.
@@ -3144,44 +3149,48 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
 
   bool FirstPair = true;
 
-  ParserStatus Status(FirstKey);
-  Status |=
+  ParserStatus Status =
       parseList(tok::r_square, LSquareLoc, RSquareLoc,
                 /*AllowSepAfterLast=*/true,
                 diag::expected_rsquare_array_expr, [&]() -> ParserStatus {
     // Parse the next key.
     ParserResult<Expr> Key;
     if (FirstPair) {
-      Key = makeParserResult(FirstKey.get());
+      Key = makeParserResult(FirstKey);
       FirstPair = false;
     } else {
       Key = parseExpr(diag::expected_key_in_dictionary_literal);
-      if (Key.isNull())
+      if (Key.isNull() || Key.hasCodeCompletion())
         return Key;
     }
 
     // Parse the ':'.
     if (Tok.isNot(tok::colon)) {
       diagnose(Tok, diag::expected_colon_in_dictionary_literal);
-      return ParserStatus(Key) | makeParserError();
+      return makeParserError();
     }
     consumeToken();
 
     // Parse the next value.
     ParserResult<Expr> Value =
         parseExpr(diag::expected_value_in_dictionary_literal);
+    if (Value.hasCodeCompletion())
+      return Value;
 
     if (Value.isNull())
       Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
 
     // Add this key/value pair.
     addKeyValuePair(Key.get(), Value.get());
-    return ParserStatus(Key) | ParserStatus(Value);
+    return Value;
   });
 
+  if (Status.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+
   assert(SubExprs.size() >= 1);
-  return makeParserResult(Status, DictionaryExpr::create(Context, LSquareLoc,
-                                                         SubExprs, RSquareLoc));
+  return makeParserResult(DictionaryExpr::create(Context, LSquareLoc, SubExprs,
+                                                 RSquareLoc));
 }
 
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {

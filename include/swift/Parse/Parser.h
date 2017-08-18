@@ -1252,10 +1252,8 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection(SourceLoc LSquareLoc = SourceLoc());
-  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc,
-                                    ParserResult<Expr> FirstExpr);
-  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc,
-                                         ParserResult<Expr> FirstKey);
+  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
+  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
