@@ -75,4 +75,32 @@ if #available(iOS 10.0, watchOS 3.2, *) {
 }
 #endif
 
+#if os(iOS)
+if #available(iOS 11.0, *) {
+  IntentsTestSuite.test("INSetProfileInCarIntent Initializers/\(swiftVersion)") {
+#if swift(>=4)
+    _ = INSetProfileInCarIntent()
+    _ = INSetProfileInCarIntent(isDefaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileName: nil)
+    _ = INSetProfileInCarIntent(profileName: nil, isDefaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil, isDefaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil, profileName: nil)
+    _ = INSetProfileInCarIntent(
+      profileNumber: nil, profileName: nil, isDefaultProfile: nil)
+#else
+    _ = INSetProfileInCarIntent()
+    _ = INSetProfileInCarIntent(defaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileName: nil)
+    _ = INSetProfileInCarIntent(profileName: nil, defaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil, defaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil, profileName: nil)
+    _ = INSetProfileInCarIntent(
+      profileNumber: nil, profileName: nil, defaultProfile: nil)
+#endif
+  }
+}
+#endif
+
 runAllTests()
