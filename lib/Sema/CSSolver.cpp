@@ -1886,8 +1886,6 @@ bool ConstraintSystem::solveSimplified(
 
   // If we are exiting due to an expression that is too complex, do
   // not allow our caller to continue as if we have been successful.
-  // Maintain the broken behavior under Swift 3 mode though, to avoid
-  // breaking code.
   auto tooComplex = getExpressionTooComplex(solutions);
   return tooComplex || !lastSolvedChoice;
 }
