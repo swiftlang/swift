@@ -1857,10 +1857,6 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     consumeToken(tok::code_complete);
   } else {
     Container = parseExprBasic(diag::expected_foreach_container);
-    llvm::errs() << "container:\n";
-    if (!Container.isNull()) {
-      Container.get()->dump();
-    }
     Status |= Container;
     if (Container.isNull())
       Container = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
