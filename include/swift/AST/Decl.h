@@ -1722,8 +1722,6 @@ public:
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
-  DeclRange getMembers() const;
-
   /// Determine whether this is a constrained extension, which adds additional
   /// requirements beyond those of the nominal type.
   bool isConstrainedExtension() const;
@@ -2775,7 +2773,6 @@ protected:
 public:
   using GenericTypeDecl::getASTContext;
 
-  DeclRange getMembers() const;
   SourceRange getBraces() const { return Braces; }
   
   void setBraces(SourceRange braces) { Braces = braces; }
@@ -2967,7 +2964,7 @@ public:
 ///
 /// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Bool" or "Optional" in the above example).
-class EnumDecl : public NominalTypeDecl {
+class EnumDecl final : public NominalTypeDecl {
   SourceLoc EnumLoc;
 
   struct {
@@ -3123,7 +3120,7 @@ public:
 ///
 /// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
-class StructDecl : public NominalTypeDecl {
+class StructDecl final : public NominalTypeDecl {
   SourceLoc StructLoc;
 
 public:
@@ -3193,7 +3190,7 @@ enum class ObjCClassKind : uint8_t {
 ///
 /// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
-class ClassDecl : public NominalTypeDecl {
+class ClassDecl final : public NominalTypeDecl {
   class ObjCMethodLookupTable;
 
   SourceLoc ClassLoc;
@@ -3488,7 +3485,7 @@ private:
 ///   protocol Drawable {
 ///     func draw()
 ///   }
-class ProtocolDecl : public NominalTypeDecl {
+class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
   /// The location of the 'class' keyword for class-bound protocols.
