@@ -133,7 +133,8 @@ tests will run faster:
     utils/build-script --release-debuginfo --debug-swift
 
 This will only build the compiler, and it will not build the standard library.
-Add `--debug-swift-stdlib` to build both the compiler and the standard library.
+Add `--debug-swift-stdlib` to build both the compiler and the standard library
+with debug info.
 
 If you are interested in standard library development, this will build a fully
 optimized compiler, but will build the standard library and swift overlays with
