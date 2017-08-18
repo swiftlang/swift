@@ -179,12 +179,10 @@ and debugging.
 
 This will build the swift compiler, but will not rebuild the standard library or
 any other target. Building the `swift-stdlib` target as an additional layer of
-testing from time to time is also a good idea.
+testing from time to time is also a good idea. To build just the standard
+library, run:
 
     ninja swift-stdlib
-
-This command will rebuild the stdlib and skip the `benchmarks` target. This
-is great for developers interested in working on the standard library.
 
 It is always a good idea to do a full build after using `update-checkout`.
 
