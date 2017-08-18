@@ -117,47 +117,40 @@ View the inline help to find out more, in particular the section "Typical uses":
 
     utils/build-script -h
 
-A basic command to build Swift with optimizations and run basic tests with
-Ninja:
-
-    utils/build-script --release --test
-
-### Development Environment
-
 There are two primary build options to use with CMake, xcodebuild or Ninja.
-xcodebuild integrates nicely with Xcode.app, but Ninja is a bit faster and
+xcodebuild integrates with Xcode.app, but Ninja is a bit faster and
 supports more environments.
-
-To build using Xcode, run:
-
-    utils/build-script --xcode
-
-The Xcode IDE can be used to edit the Swift source code, but it is not currently
-fully supported as a build environment for SDKs other than macOS. The generated
-Xcode project does not integrate with the test runner, but the tests can be run
-with the 'check-swift' target.
-
-If you need to work with other SDKs, you'll need to create a second build using
-Ninja.
 
 To build using Ninja, run:
 
-    utils/build-script --release
+    utils/build-script --release-debuginfo
 
 If you are interested in compiler development it helps to build LLVM + Clang
 with optimizations enabled, but enable debug support in Swift. This is a good
 starting point since the debugger will work in the swift code base, and the
-tests will run faster.
+tests will run faster:
 
     utils/build-script --release-debuginfo --debug-swift
 
+This will only build the compiler, and it will not build the standard library.
+Add `--debug-swift-stdlib` to build both the compiler and the standard library.
+
 If you are interested in standard library development, this will build a fully
 optimized compiler, but will build the standard library and swift overlays with
-debug information.
+debug information:
+
+    utils/build-script --release-debuginfo --debug-swift-stdlib
 
 The build script also supports presets that define the various CI builds. Look
 for 'Preset Mode' in the build script help for more information.
 
+#### Xcode
+
+To build using Xcode, specify the `--xcode` argument on any of the above commands.
+Xcode.app can be used to edit the Swift source code, but it is not currently
+fully supported as a build environment for SDKs other than macOS. The generated
+Xcode project does not integrate with the test runner, but the tests can be run
+with the 'check-swift' target.
 
 #### Build Products
 
