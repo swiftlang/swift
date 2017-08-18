@@ -183,9 +183,13 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     if (AI.getFunction()->isThunk())
       return false;
 
-    // Don't inline methods.
-    if (Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
-      return false;
+    // Don't inline class methods.
+    if (Callee->hasSelfParam()) {
+      auto SelfTy = Callee->getLoweredFunctionType()->getSelfInstanceType();
+      if (SelfTy->mayHaveSuperclass() &&
+          Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
+        return false;
+    }
 
     BaseBenefit = BaseBenefit / 2;
   }
