@@ -43,7 +43,7 @@ well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-c
 
 These instructions give the most direct path to a working Swift development
 environment. To build from source you will need 2 GB of disk space for the
-source code and over 20 GB of disk space for the build artifacts. The first
+source code and over 20 GB of disk space for the build artifacts. A clean
 build can take multiple hours, but incremental builds will finish much faster.
 
 
@@ -113,37 +113,32 @@ The `build-script` is a high-level build automation script that supports basic
 options such as building a Swift-compatible LLDB, building the Swift Package
 Manager, building for various platforms, running tests after builds, and more.
 
-View the inline help to find out more, in particular the section "Typical uses":
-
-    utils/build-script -h
-
-There are two primary build options to use with CMake, xcodebuild or Ninja.
-xcodebuild integrates with Xcode.app, but Ninja is a bit faster and
-supports more environments.
+There are two primary build systems to use: Xcode and Ninja. The Xcode build
+system allows you to work in Xcode.app, but Ninja is a bit faster and supports
+more environments.
 
 To build using Ninja, run:
 
     utils/build-script --release-debuginfo
 
-If you are interested in compiler development it helps to build LLVM + Clang
-with optimizations enabled, but enable debug support in Swift. This is a good
-starting point since the debugger will work in the swift code base, and the
-tests will run faster:
+If you are interested in debugging the compiler, run:
+
+    utils/build-script --debug
+
+However, the compiler will be slower when built in debug mode. When developing
+in a specific area of the compiler, it helps to build an optimized compiler and
+override specific projects to use the debug variant.
+
+Below are some examples of using debug variants:
 
     utils/build-script --release-debuginfo --debug-swift
-
-This will only build the compiler, and it will not build the standard library.
-Add `--debug-swift-stdlib` to build both the compiler and the standard library
-with debug info.
-
-If you are interested in standard library development, this will build a fully
-optimized compiler, but will build the standard library and swift overlays with
-debug information:
-
     utils/build-script --release-debuginfo --debug-swift-stdlib
+    utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker
 
-The build script also supports presets that define the various CI builds. Look
-for 'Preset Mode' in the build script help for more information.
+For documentation of all available arguments, as well as additional usage
+information, see the inline help:
+
+    utils/build-script -h
 
 #### Xcode
 
