@@ -49,8 +49,8 @@ indirect enum RawSyntax: Codable {
   /// The source presence of this node.
   var presence: SourcePresence {
     switch self {
-      case .node(_, _, let presence),
-           .token(_, _, _, let presence): return presence
+    case .node(_, _, let presence): return presence
+    case .token(_, _, _, let presence): return presence
     }
   }
 
