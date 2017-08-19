@@ -71,8 +71,18 @@ RValue Scope::popPreservingValue(RValue &&rv) {
   auto &SGF = cleanups.SGF;
   assert(rv.isPlusOne(SGF) && "Can only push plus one rvalues through a scope");
 
-  // First gather all of the data that we need to recreate the RValue in the
-  // outer scope.
+  // Perform a quick check if we have an incontext value. If so, just pop and
+  // return rv.
+  if (rv.isInContext()) {
+    pop();
+    return std::move(rv);
+  }
+
+  // After this point, we should have /no/ special states.
+  assert(!rv.isInSpecialState());
+
+  // Ok, we have a normal RValue. Gather all of the data that we need to
+  // recreate the RValue in the outer scope.
   CanType type = rv.type;
   unsigned numEltsRemaining = rv.elementsToBeAdded;
   CleanupCloner cloner(SGF, rv);
