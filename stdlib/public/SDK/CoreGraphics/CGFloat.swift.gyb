@@ -57,12 +57,12 @@ public struct CGFloat {
   }
 
 % for src_ty in all_integer_types(word_bits):
-%   if src_ty.access == 'public':
++%   if src_ty.access == 'Public':
   @_transparent public init(_ value: ${src_ty.stdlib_name}) {
     self.native = NativeType(value)
   }
 
-%   end
++%   end
 % end
 
   /// The native value.
@@ -392,7 +392,7 @@ extension CGFloat : Hashable {
 }
 
 % for dst_ty in all_integer_types(word_bits):
-%   if dst_ty.access == 'public':
++%   if dst_ty.access == 'public':
 
 extension ${dst_ty.stdlib_name} {
   @_transparent
@@ -401,7 +401,7 @@ extension ${dst_ty.stdlib_name} {
   }
 }
 
-%   end
++%   end
 % end
 
 
