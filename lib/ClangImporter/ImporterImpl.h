@@ -1126,6 +1126,18 @@ public:
 
   void finishNormalConformance(NormalProtocolConformance *conformance,
                                uint64_t unused) override;
+  
+  /// Returns the default definition type for \p ATD.
+  TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                            uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+  
+  /// Returns the generic environment.
+  virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
+                                                     uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
 
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, Accessibility access,
