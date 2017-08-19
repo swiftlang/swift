@@ -807,11 +807,6 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   return FirstKind;
 }
 
-DeclRange NominalTypeDecl::getMembers() const {
-  loadAllMembers();
-  return IterableDeclContext::getMembers();
-}
-
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                            uint64_t contextData) {
   assert(!NominalTypeDeclBits.HasLazyConformances &&
@@ -869,11 +864,6 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
     result->setClangNode(clangNode);
 
   return result;
-}
-
-DeclRange ExtensionDecl::getMembers() const {
-  loadAllMembers();
-  return IterableDeclContext::getMembers();
 }
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
