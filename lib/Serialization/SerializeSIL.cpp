@@ -74,6 +74,15 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   llvm_unreachable("bad linkage");
 }
 
+static unsigned toStableVTableEntryKind(SILVTable::Entry::Kind kind) {
+  switch (kind) {
+  case SILVTable::Entry::Kind::Normal: return SIL_VTABLE_ENTRY_NORMAL;
+  case SILVTable::Entry::Kind::Inherited: return SIL_VTABLE_ENTRY_INHERITED;
+  case SILVTable::Entry::Kind::Override: return SIL_VTABLE_ENTRY_OVERRIDE;
+  }
+  llvm_unreachable("bad vtable entry kind");
+}
+
 static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
   switch (kind) {
   case CastConsumptionKind::TakeAlways:
@@ -1322,7 +1331,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
     ValueID listOfValues[] = {
-      toStableCastConsumptionKind(CI->getConsumptionKind()),
       S.addTypeRef(CI->getSourceType()),
       addValueRef(CI->getSrc()),
       S.addTypeRef(CI->getSrc()->getType().getSwiftRValueType()),
@@ -1342,7 +1350,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstCastLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstCastLayout::Code],
         (unsigned)SI.getKind(),
-        toStableCastConsumptionKind(CI->getConsumptionKind()),
+        /*attr*/ 0,
         S.addTypeRef(CI->getType().getSwiftRValueType()),
         (unsigned)CI->getType().getCategory(),
         S.addTypeRef(CI->getOperand()->getType().getSwiftRValueType()),
@@ -2029,6 +2037,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
         SILAbbrCodes[VTableEntryLayout::Code],
         // SILFunction name
         S.addDeclBaseNameRef(Ctx.getIdentifier(entry.Implementation->getName())),
+        toStableVTableEntryKind(entry.TheKind),
         toStableSILLinkage(entry.Linkage),
         ListOfValues);
   }

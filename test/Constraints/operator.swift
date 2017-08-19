@@ -138,3 +138,41 @@ func shrinkTooFar(_ : Double, closure : ()->()) {}
 func testShrinkTooFar() {
   shrinkTooFar(0*0*0) {}
 }
+
+// rdar://problem/33759839
+
+enum E_33759839 {
+    case foo
+    case bar(String)
+}
+
+let foo_33759839 = ["a", "b", "c"]
+let bar_33759839 = ["A", "B", "C"]
+
+let _: [E_33759839] = foo_33759839.map { .bar($0) } +
+                      bar_33759839.map { .bar($0) } +
+                      [E_33759839.foo] // Ok
+
+// rdar://problem/28688585
+
+class B_28688585 {
+  var value: Int
+
+  init(value: Int) {
+    self.value = value
+  }
+
+  func add(_ other: B_28688585) -> B_28688585 {
+    return B_28688585(value: value + other.value)
+  }
+}
+
+class D_28688585 : B_28688585 {
+}
+
+func + (lhs: B_28688585, rhs: B_28688585) -> B_28688585 {
+  return lhs.add(rhs)
+}
+
+let var_28688585 = D_28688585(value: 1)
+_ = var_28688585 + var_28688585 + var_28688585 // Ok

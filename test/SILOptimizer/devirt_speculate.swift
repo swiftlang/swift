@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -parse-as-library -Osize -emit-sil | %FileCheck %s --check-prefix=OSIZE
 //
 // Test speculative devirtualization.
 
@@ -40,6 +41,10 @@ class Sub7 : Base {
 // CHECK-NOT: checked_cast_br
 // CHECK: %[[CM:[0-9]+]] = class_method %0 : $Base, #Base.foo!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK: apply %[[CM]](%0) : $@convention(method) (@guaranteed Base) -> ()
+
+// OSIZE: @_T016devirt_speculate28testMaxNumSpeculativeTargetsyAA4BaseCF
+// OSIZE-NOT: checked_cast_br [exact] %0 : $Base to $Base
+// OSIZE-NOT: checked_cast_br [exact] %0 : $Base to $Sub
 public func testMaxNumSpeculativeTargets(_ b: Base) {
   b.foo()
 }

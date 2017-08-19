@@ -1,5 +1,10 @@
 // RUN: %target-build-swift -parse-as-library -sanitize=fuzzer %s -o %t
 // RUN: not %t -only_ascii=1 -max_len=3 | %FileCheck %s
+// REQUIRES: CPU=x86_64
+// REQUIRES: executable_test
+// XFAIL: OS=ios
+// XFAIL: OS=tvos
+// XFAIL: OS=watchos
 // CHECK: Crash!
 
 #if os(OSX) || os(iOS)

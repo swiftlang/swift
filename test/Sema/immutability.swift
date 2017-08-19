@@ -61,6 +61,12 @@ class FooClass {
   mutating            // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} {{3-12=}}
   func baz() {}
 
+  nonmutating         // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}} {{3-15=}}
+  func bay() {}
+
+  mutating nonmutating // expected-error {{method may not be declared both mutating and nonmutating}} expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+  func bax() {}
+
   var x : Int {
     get {
       return 32
@@ -459,7 +465,7 @@ struct F { // expected-note 1 {{in declaration of 'F'}}
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{expected declaration}}
   }
   
-  mutating nonmutating func g() {  // expected-error {{method may not be declared both mutating and nonmutating}} {{12-24=}}
+  mutating nonmutating func g() {  // expected-error {{method may not be declared both mutating and nonmutating}}
   }
 }
 

@@ -502,18 +502,18 @@ public:
   ExistentialInitialization(SILValue existential, SILValue address,
                             CanType concreteFormalType,
                             ExistentialRepresentation repr,
-                            SILGenFunction &gen)
+                            SILGenFunction &SGF)
       : KnownAddressInitialization(address) {
     // Any early exit before we store a value into the existential must
     // clean up the existential container.
-    Cleanup = gen.enterDeinitExistentialCleanup(existential,
+    Cleanup = SGF.enterDeinitExistentialCleanup(existential,
                                                 concreteFormalType,
                                                 repr);
   }
 
-  void finishInitialization(SILGenFunction &gen) override {
-    SingleBufferInitialization::finishInitialization(gen);
-    gen.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
+  void finishInitialization(SILGenFunction &SGF) override {
+    SingleBufferInitialization::finishInitialization(SGF);
+    SGF.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
   }
 };
 

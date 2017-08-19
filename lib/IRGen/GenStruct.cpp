@@ -40,6 +40,7 @@
 #include "NonFixedTypeInfo.h"
 #include "ResilientTypeInfo.h"
 #include "StructMetadataVisitor.h"
+#include "MetadataLayout.h"
 
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
 
@@ -366,44 +367,6 @@ namespace {
       llvm_unreachable("non-fixed field in fixed struct?");
     }
   };
-
-  struct GetStartOfFieldOffsets
-    : StructMetadataScanner<GetStartOfFieldOffsets>
-  {
-    GetStartOfFieldOffsets(IRGenModule &IGM, StructDecl *target)
-      : StructMetadataScanner(IGM, target) {}
-
-    Size StartOfFieldOffsets = Size::invalid();
-
-    void noteAddressPoint() {
-      assert(StartOfFieldOffsets == Size::invalid()
-             && "found field offsets before address point?");
-      NextOffset = Size(0);
-    }
-    void noteStartOfFieldOffsets() { StartOfFieldOffsets = NextOffset; }
-  };
-  
-  /// Find the beginning of the field offset vector in a struct's metadata.
-  static Address
-  emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
-                                 StructDecl *S,
-                                 llvm::Value *metadata) {
-    // Find where the field offsets begin.
-    GetStartOfFieldOffsets scanner(IGF.IGM, S);
-    scanner.layout();
-    assert(scanner.StartOfFieldOffsets != Size::invalid()
-           && "did not find start of field offsets?!");
-    
-    Size StartOfFieldOffsets = scanner.StartOfFieldOffsets;
-    
-    // Find that offset into the metadata.
-    llvm::Value *fieldVector
-      = IGF.Builder.CreateBitCast(metadata, IGF.IGM.SizeTy->getPointerTo());
-    return IGF.Builder.CreateConstArrayGEP(
-                            Address(fieldVector, IGF.IGM.getPointerAlignment()),
-                            StartOfFieldOffsets / IGF.IGM.getPointerSize(),
-                            StartOfFieldOffsets);
-  }
   
   /// Accessor for the non-fixed offsets of a struct type.
   class StructNonFixedOffsets : public NonFixedOffsetsImpl {
@@ -418,9 +381,8 @@ namespace {
 
       // Get the field offset vector from the struct metadata.
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
-      Address fieldVector = emitAddressOfFieldOffsetVector(IGF,
-                                    TheStruct.getStructOrBoundGenericStruct(),
-                                    metadata);
+      Address fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
+                                    TheStruct.getStructOrBoundGenericStruct());
       
       // Grab the indexed offset.
       fieldVector = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
@@ -430,12 +392,13 @@ namespace {
 
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,
                                                 unsigned nonFixedIndex) {
-      GetStartOfFieldOffsets scanner(IGM,
-                                     TheStruct.getStructOrBoundGenericStruct());
-      scanner.layout();
+      auto start =
+        IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct())
+          .getFieldOffsetVectorOffset();
 
-      Size indirectOffset =
-        scanner.StartOfFieldOffsets + IGM.getPointerSize() * nonFixedIndex;
+      // FIXME: Handle resilience
+      auto indirectOffset = start.getStatic() +
+        (IGM.getPointerSize() * nonFixedIndex);
 
       return MemberAccessStrategy::getIndirectFixed(indirectOffset,
                                MemberAccessStrategy::OffsetKind::Bytes_Word);
@@ -477,44 +440,7 @@ namespace {
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
                             SILType T) const override {
-      // Get the field offset vector.
-      llvm::Value *fieldVector = emitAddressOfFieldOffsetVector(IGF,
-                                              T.getStructOrBoundGenericStruct(),
-                                              metadata).getAddress();
-
-      // Collect the stored properties of the type.
-      llvm::SmallVector<VarDecl*, 4> storedProperties;
-      for (auto prop : T.getStructOrBoundGenericStruct()
-                        ->getStoredProperties()) {
-        storedProperties.push_back(prop);
-      }
-      // Fill out an array with the field type layout records.
-      Address fields = IGF.createAlloca(
-                       llvm::ArrayType::get(IGF.IGM.Int8PtrPtrTy,
-                                            storedProperties.size()),
-                       IGF.IGM.getPointerAlignment(), "structFields");
-      IGF.Builder.CreateLifetimeStart(fields,
-                            IGF.IGM.getPointerSize() * storedProperties.size());
-
-      fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
-      unsigned index = 0;
-      for (auto prop : storedProperties) {
-        auto propTy = T.getFieldType(prop, IGF.getSILModule());
-        llvm::Value *metadata = IGF.emitTypeLayoutRef(propTy);
-        Address field = IGF.Builder.CreateConstArrayGEP(fields, index,
-                                                      IGF.IGM.getPointerSize());
-        IGF.Builder.CreateStore(metadata, field);
-        ++index;
-      }
-      
-      // Ask the runtime to lay out the struct.
-      auto numFields = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                              storedProperties.size());
-      IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
-                             {numFields, fields.getAddress(),
-                              fieldVector, vwtable});
-      IGF.Builder.CreateLifetimeEnd(fields,
-                            IGF.IGM.getPointerSize() * storedProperties.size());
+      emitInitializeFieldOffsetVector(IGF, T, metadata, vwtable);
     }
   };
 

@@ -1,16 +1,16 @@
 // RUN: %swift-ide-test -structure -source-filename %s | %FileCheck %s
 
 // CHECK: <class>class <name>MyCls</name> : <inherited><elem-typeref>OtherClass</elem-typeref></inherited> {
-// CHECK:   <property>var <name>bar</name> : Int</property>
-// CHECK:   <property>var <name>anotherBar</name> : Int = 42</property>
-// CHECK:   <cvar>class var <name>cbar</name> : Int = 0</cvar>
+// CHECK:   <property>var <name>bar</name> : <type>Int</type></property>
+// CHECK:   <property>var <name>anotherBar</name> : <type>Int</type> = 42</property>
+// CHECK:   <cvar>class var <name>cbar</name> : <type>Int</type> = 0</cvar>
 class MyCls : OtherClass {
   var bar : Int
   var anotherBar : Int = 42
   class var cbar : Int = 0
 
-  // CHECK:   <ifunc>func <name>foo(<param>_ arg1: Int</param>, <param><name>name</name>: String</param>, <param><name>param</name> par: String</param>)</name> {
-  // CHECK:     var abc
+  // CHECK:   <ifunc>func <name>foo(<param>_ arg1: <type>Int</type></param>, <param><name>name</name>: <type>String</type></param>, <param><name>param</name> par: <type>String</type></param>)</name> {
+  // CHECK:     <lvar>var <name>abc</name></lvar>
   // CHECK:     <if>if <elem-condexpr>1</elem-condexpr> <brace>{
   // CHECK:       <call><name>foo</name>(<arg>1</arg>, <arg><name>name</name>:"test"</arg>, <arg><name>param</name>:"test2"</arg>)</call>
   // CHECK:     }</brace>
@@ -22,7 +22,7 @@ class MyCls : OtherClass {
     }
   }
 
-  // CHECK:   <ifunc><name>init (<param><name>x</name>: Int</param>)</name></ifunc>
+  // CHECK:   <ifunc><name>init (<param><name>x</name>: <type>Int</type></param>)</name></ifunc>
   init (x: Int)
 
   // CHECK:   <cfunc>class func <name>cfoo()</name></cfunc>
@@ -32,8 +32,8 @@ class MyCls : OtherClass {
 }
 
 // CHECK: <struct>struct <name>MyStruc</name> {
-// CHECK:   <property>var <name>myVar</name>: Int</property>
-// CHECK:   <svar>static var <name>sbar</name> : Int = 0</svar>
+// CHECK:   <property>var <name>myVar</name>: <type>Int</type></property>
+// CHECK:   <svar>static var <name>sbar</name> : <type>Int</type> = 0</svar>
 // CHECK:   <sfunc>static func <name>cfoo()</name></sfunc>
 // CHECK: }</struct>
 struct MyStruc {
@@ -58,33 +58,30 @@ extension MyStruc {
   }
 }
 
-// CHECK: <gvar>var <name>gvar</name> : Int = 0</gvar>
+// CHECK: <gvar>var <name>gvar</name> : <type>Int</type> = 0</gvar>
 var gvar : Int = 0
 
 // CHECK: <ffunc>func <name>ffoo()</name> {}</ffunc>
 func ffoo() {}
 
-// CHECK: <foreach>for <elem-id>i</elem-id> in <elem-expr>0...5</elem-expr> <brace>{}</brace></foreach>
+// CHECK: <foreach>for <elem-id><lvar><name>i</name></lvar></elem-id> in <elem-expr>0...5</elem-expr> <brace>{}</brace></foreach>
 for i in 0...5 {}
-// CHECK: <for>for <elem-initexpr>var i = 0, i2 = 1</elem-initexpr>; <elem-expr>i == 0</elem-expr>; <elem-expr>++i</elem-expr> <brace>{}</brace></for>
-for var i = 0, i2 = 1; i == 0; ++i {}
-// CHECK: <for>for <elem-initexpr>var (i,i2) = (0,0), i3 = 1</elem-initexpr>; <elem-expr>i == 0</elem-expr>; <elem-expr>++i</elem-expr> <brace>{}</brace></for>
-for var (i,i2) = (0,0), i3 = 1; i == 0; ++i {}
+// CHECK: <foreach>for <elem-id>var (<lvar><name>i</name></lvar>, <lvar><name>j</name></lvar>)</elem-id> in <elem-expr>array</elem-expr> <brace>{}</brace></foreach>
+for var (i, j) in array {}
 
-for i = 0; i == 0; ++i {}
-// CHECK: <while>while <elem-condexpr>var v = o, z = o where v > z</elem-condexpr> <brace>{}</brace></while>
+// CHECK: <while>while <elem-condexpr>var <lvar><name>v</name></lvar> = o, <lvar><name>z</name></lvar> = o where v > z</elem-condexpr> <brace>{}</brace></while>
 while var v = o, z = o where v > z {}
 // CHECK: <while>while <elem-condexpr>v == 0</elem-condexpr> <brace>{}</brace></while>
 while v == 0 {}
 // CHECK: <repeat-while>repeat <brace>{}</brace> while <elem-expr>v == 0</elem-expr></repeat-while>
 repeat {} while v == 0
-// CHECK: <if>if <elem-condexpr>var v = o, z = o where v > z</elem-condexpr> <brace>{}</brace></if>
+// CHECK: <if>if <elem-condexpr>var <lvar><name>v</name></lvar> = o, <lvar><name>z</name></lvar> = o where v > z</elem-condexpr> <brace>{}</brace></if>
 if var v = o, z = o where v > z {}
 
 // CHECK: <switch>switch <elem-expr>v</elem-expr> {
 // CHECK:   <case>case <elem-pattern>1</elem-pattern>: break;</case>
 // CHECK:   <case>case <elem-pattern>2</elem-pattern>, <elem-pattern>3</elem-pattern>: break;</case>
-// CHECK:   <case>case <elem-pattern><call><name>Foo</name>(<arg>var x</arg>, <arg>var y</arg>)</call> where x < y</elem-pattern>: break;</case>
+// CHECK:   <case>case <elem-pattern><call><name>Foo</name>(<arg>var <lvar><name>x</name></lvar></arg>, <arg>var <lvar><name>y</name></lvar></arg>)</call> where x < y</elem-pattern>: break;</case>
 // CHECK:   <case>case <elem-pattern>2 where <call><name>foo</name>()</call></elem-pattern>, <elem-pattern>3 where <call><name>bar</name>()</call></elem-pattern>: break;</case>
 // CHECK:   <case><elem-pattern>default</elem-pattern>: break;</case>
 // CHECK: }</switch>
@@ -105,14 +102,14 @@ let myArray2 = [1]
 // CHECK: <gvar>let <name>myDict2</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>]</dictionary></gvar>
 let myDict2 = [1:1]
 
-// CHECK: <for>for <brace><brace>{}</brace></brace></for>
+// CHECK: <foreach>for <brace>{}</brace></foreach>
 for {}
 
 // CHECK: <class>class <name><#MyCls#></name> : <inherited><elem-typeref><#OtherClass#></elem-typeref></inherited> {}
 class <#MyCls#> : <#OtherClass#> {}
 
 // CHECK: <ffunc>func <name><#test1#> ()</name> {
-// CHECK:   <foreach>for <elem-id><#name#></elem-id> in <elem-expr><#items#></elem-expr> <brace>{}</brace></foreach>
+// CHECK:   <foreach>for <elem-id><lvar><name><#name#></name></lvar></elem-id> in <elem-expr><#items#></elem-expr> <brace>{}</brace></foreach>
 // CHECK: }</ffunc>
 func <#test1#> () {
   for <#name#> in <#items#> {}
@@ -152,7 +149,7 @@ enum Rawness : Int {
   case Two = 2, Three = 3
 }
 
-// CHECK: <ffunc>func <name>rethrowFunc(<param>_ f: () throws -> ()</param>)</name> rethrows {}</ffunc>
+// CHECK: <ffunc>func <name>rethrowFunc(<param>_ f: <type>() throws -> ()</type></param>)</name> rethrows {}</ffunc>
 func rethrowFunc(_ f: () throws -> ()) rethrows {}
 
 class NestedPoundIf{
@@ -192,7 +189,7 @@ class SubscriptTest {
   subscript(index: Int) -> Int {
     return 0
   }
-  // CHECK: <subscript><name>subscript(<param>index: Int</param>)</name> -> Int {
+  // CHECK: <subscript><name>subscript(<param>index: <type>Int</type></param>)</name> -> <type>Int</type> {
   // CHECK:  return 0
   // CHECK: }</subscript>
 
@@ -204,11 +201,24 @@ class SubscriptTest {
       print(value)
     }
   }
-  // CHECK: <subscript><name>subscript(<param>string: String</param>)</name> -> Int {
+  // CHECK: <subscript><name>subscript(<param>string: <type>String</type></param>)</name> -> <type>Int</type> {
   // CHECK: get {
   // CHECK:   return 0
   // CHECK: }
   // CHECK: set(<param>value</param>) {
   // CHECK:   <call><name>print</name>(value)</call>
   // CHECK: }</subscript>
+}
+
+class ReturnType {
+  func foo() -> Int { return 0 }
+  // CHECK:  <ifunc>func <name>foo()</name> -> <type>Int</type> {
+  // CHECK:  return 0
+  // CHECK: }</ifunc>
+  
+  func foo2<T>() -> T {}
+  // CHECK:  <ifunc>func <name>foo2<T>()</name> -> <type>T</type> {}</ifunc>
+  
+  func foo3() -> () -> Int {}
+  // CHECK:  <ifunc>func <name>foo3()</name> -> <type>() -> Int</type> {}</ifunc>
 }

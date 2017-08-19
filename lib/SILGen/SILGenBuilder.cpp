@@ -22,26 +22,6 @@ using namespace swift;
 using namespace Lowering;
 
 //===----------------------------------------------------------------------===//
-//                               CleanupCloner
-//===----------------------------------------------------------------------===//
-
-ManagedValue CleanupCloner::clone(SILValue value) const {
-  if (isLValue) {
-    return ManagedValue::forLValue(value);
-  }
-
-  if (!hasCleanup) {
-    return ManagedValue::forUnmanaged(value);
-  }
-
-  if (value->getType().isAddress()) {
-    return SGF.emitManagedBufferWithCleanup(value);
-  }
-
-  return SGF.emitManagedRValueWithCleanup(value);
-}
-
-//===----------------------------------------------------------------------===//
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
 
@@ -541,10 +521,9 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
 }
 
 ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
-    SILLocation loc, CastConsumptionKind consumption, ManagedValue operand,
-    SILType type) {
+    SILLocation loc, ManagedValue operand, SILType type) {
   SILValue result = SILBuilder::createUnconditionalCheckedCastValue(
-      loc, consumption, operand.forward(SGF), type);
+      loc, operand.forward(SGF), type);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 

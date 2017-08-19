@@ -802,7 +802,7 @@ public:
                                                  const TypeLowering &optTL,
                                                  SGFContext C = SGFContext());
 
-  typedef llvm::function_ref<ManagedValue(SILGenFunction &gen,
+  typedef llvm::function_ref<ManagedValue(SILGenFunction &SGF,
                                     SILLocation loc,
                                     ManagedValue input,
                                     SILType loweredResultTy,
@@ -939,6 +939,21 @@ public:
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
+
+  /// Emit the given expression as a +1 r-value.
+  ///
+  /// *NOTE* This creates the +1 r-value and then pushes that +1 r-value through
+  /// a scope. So all temporaries resulting will be cleaned up.
+  ///
+  /// *NOTE* +0 vs +1 is ignored by this function. The only reason to use the
+  /// SGFContext argument is to pass in an initialization.
+  RValue emitPlusOneRValue(Expr *E, SGFContext C = SGFContext());
+
+  /// Emit the given expression as a +0 r-value.
+  ///
+  /// *NOTE* This does not scope the creation of the +0 r-value. The reason why
+  /// this is done is that +0 r-values can not be pushed through scopes.
+  RValue emitPlusZeroRValue(Expr *E);
 
   /// Emit the given expression as an r-value with the given conversion
   /// context.  This may be more efficient --- and, in some cases,

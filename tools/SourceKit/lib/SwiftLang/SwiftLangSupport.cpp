@@ -371,6 +371,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindDeclVarStatic;
     case SyntaxStructureKind::ClassVariable:
       return KindDeclVarClass;
+    case SyntaxStructureKind::LocalVariable:
+      return KindDeclVarLocal;
     case SyntaxStructureKind::EnumCase:
       return KindDeclEnumCase;
     case SyntaxStructureKind::EnumElement:
@@ -383,8 +385,6 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindDeclVarParam;
     case SyntaxStructureKind::ForEachStatement:
       return KindStmtForEach;
-    case SyntaxStructureKind::ForStatement:
-      return KindStmtFor;
     case SyntaxStructureKind::WhileStatement:
       return KindStmtWhile;
     case SyntaxStructureKind::RepeatWhileStatement:

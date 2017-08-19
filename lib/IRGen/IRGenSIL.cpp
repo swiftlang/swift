@@ -4128,7 +4128,8 @@ visitUncheckedRefCastAddrInst(swift::UncheckedRefCastAddrInst *i) {
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
   emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
-                  i->getConsumptionKind(), CheckedCastMode::Unconditional);
+                  CastConsumptionKind::TakeAlways,
+                  CheckedCastMode::Unconditional);
 }
 
 void IRGenSILFunction::visitUncheckedAddrCastInst(
@@ -4496,7 +4497,8 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
   emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
-                  i->getConsumptionKind(), CheckedCastMode::Unconditional);
+                  CastConsumptionKind::TakeAlways,
+                  CheckedCastMode::Unconditional);
 }
 
 void IRGenSILFunction::visitUnconditionalCheckedCastValueInst(

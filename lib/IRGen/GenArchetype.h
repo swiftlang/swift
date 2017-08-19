@@ -25,6 +25,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class AssociatedType;
   class ProtocolDecl;
   class SILType;
 
@@ -47,7 +48,7 @@ namespace irgen {
   /// Emit a metadata reference for an associated type of an archetype.
   llvm::Value *emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                              CanArchetypeType origin,
-                                             AssociatedTypeDecl *associate);
+                                             AssociatedType association);
 
   /// Emit a dynamic metatype lookup for the given archetype.
   llvm::Value *emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,

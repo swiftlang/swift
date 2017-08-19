@@ -476,6 +476,7 @@ public:
   void skipUntilDeclRBrace();
 
   void skipUntilDeclStmtRBrace(tok T1);
+  void skipUntilDeclStmtRBrace(tok T1, tok T2);
 
   void skipUntilDeclRBrace(tok T1, tok T2);
   
@@ -675,7 +676,6 @@ public:
     PD_InExtension          = 1 << 8,
     PD_InStruct             = 1 << 9,
     PD_InEnum               = 1 << 10,
-    PD_InLoop               = 1 << 11,
   };
 
   /// Options that control the parsing of declarations.
@@ -1252,8 +1252,10 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection(SourceLoc LSquareLoc = SourceLoc());
-  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
-  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);
+  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc,
+                                    ParserResult<Expr> FirstExpr);
+  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc,
+                                         ParserResult<Expr> FirstKey);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
@@ -1279,11 +1281,7 @@ public:
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo);
   ParserResult<CatchStmt> parseStmtCatch();
-  ParserResult<Stmt> parseStmtFor(LabeledStmtInfo LabelInfo);
-  ParserResult<Stmt> parseStmtForCStyle(SourceLoc ForLoc,
-                                        LabeledStmtInfo LabelInfo);
-  ParserResult<Stmt> parseStmtForEach(SourceLoc ForLoc,
-                                      LabeledStmtInfo LabelInfo);
+  ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
   ParserResult<CaseStmt> parseStmtCase(bool IsActive);

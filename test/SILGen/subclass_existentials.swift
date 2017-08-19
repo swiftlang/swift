@@ -362,7 +362,7 @@ func archetypeDowncasts<S,
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Base<T> & P
-  // CHECK-NEXT: unconditional_checked_cast_addr take_always S in [[COPY]] : $*S to Base<T> & P in [[RESULT]] : $*Base<T> & P
+  // CHECK-NEXT: unconditional_checked_cast_addr S in [[COPY]] : $*S to Base<T> & P in [[RESULT]] : $*Base<T> & P
   let _ = s as! (Base<T> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
@@ -374,7 +374,7 @@ func archetypeDowncasts<S,
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Base<Int> & P
-  // CHECK-NEXT: unconditional_checked_cast_addr take_always S in [[COPY]] : $*S to Base<Int> & P in [[RESULT]] : $*Base<Int> & P
+  // CHECK-NEXT: unconditional_checked_cast_addr S in [[COPY]] : $*S to Base<Int> & P in [[RESULT]] : $*Base<Int> & P
   let _ = s as! (Base<Int> & P)
 
   // CHECK:      [[BORROWED:%.*]] = begin_borrow %5 : $BaseTAndP
@@ -401,7 +401,7 @@ func archetypeDowncasts<S,
   // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<T> & P
   // CHECK-NEXT: store [[COPIED]] to [init] [[COPY]] : $*Base<T> & P
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $S
-  // CHECK-NEXT: unconditional_checked_cast_addr take_always Base<T> & P in [[COPY]] : $*Base<T> & P to S in [[RESULT]] : $*S
+  // CHECK-NEXT: unconditional_checked_cast_addr Base<T> & P in [[COPY]] : $*Base<T> & P to S in [[RESULT]] : $*S
   let _ = baseTAndP_concrete as! S
 
   // CHECK:      [[BORROWED:%.*]] = begin_borrow %9 : $Base<T> & P
@@ -458,7 +458,7 @@ func archetypeDowncasts<S,
   // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
   // CHECK-NEXT: store [[COPIED]] to [init] [[COPY]] : $*Base<Int> & P
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $S
-  // CHECK-NEXT: unconditional_checked_cast_addr take_always Base<Int> & P in [[COPY]] : $*Base<Int> & P to S in [[RESULT]] : $*S
+  // CHECK-NEXT: unconditional_checked_cast_addr Base<Int> & P in [[COPY]] : $*Base<Int> & P to S in [[RESULT]] : $*S
   let _ = baseIntAndP_concrete as! S
 
   // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P

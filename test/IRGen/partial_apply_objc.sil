@@ -51,7 +51,6 @@ bb0(%0 : $ObjCClass):
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @indirect_partial_apply(i8*, %swift.refcounted*, i64) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[T0:%.*]] = bitcast i8* %0 to void (i64, %swift.refcounted*)*
-// CHECK:   [[CAST_FN:%.*]] = bitcast void (i64, %swift.refcounted*)* [[T0]] to i8*
 // CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata, i32 0, i32 2), i64 40, i64 7)
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, i64, %swift.refcounted\*, i8\* }>]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
@@ -59,6 +58,7 @@ bb0(%0 : $ObjCClass):
 // CHECK:   [[CONTEXT_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 2
 // CHECK:   store %swift.refcounted* %1, %swift.refcounted** [[CONTEXT_ADDR]], align 8
 // CHECK:   [[FN_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 3
+// CHECK:   [[CAST_FN:%.*]] = bitcast void (i64, %swift.refcounted*)* [[T0]] to i8*
 // CHECK:   store i8* [[CAST_FN]], i8** [[FN_ADDR]], align 8
 // CHECK:   [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* [[INDIRECT_PARTIAL_APPLY_STUB:@_T0TA[A-Za-z0-9_]*]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[OBJ]], 1
 // CHECK:   ret { i8*, %swift.refcounted* } [[RET]]

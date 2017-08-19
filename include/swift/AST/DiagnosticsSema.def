@@ -127,10 +127,6 @@ ERROR(init_candidate_inaccessible,none,
       "'%select{private|fileprivate|internal|%error|%error}1' protection level",
       (Type, Accessibility))
 
-ERROR(all_candidates_inaccessible,none,
-      "all %0 candidates are inaccessible",
-      (DeclName))
-
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
       (StringRef))
@@ -1012,8 +1008,8 @@ ERROR(attribute_requires_single_argument,none,
 ERROR(mutating_invalid_global_scope,none,
       "'mutating' is only valid on methods", ())
 ERROR(mutating_invalid_classes,none,
-      "'mutating' isn't valid on methods in classes or class-bound protocols",
-      ())
+      "'%select{|non}0mutating' isn't valid on methods in classes or class-bound protocols",
+      (bool))
 ERROR(functions_mutating_and_not,none,
       "method may not be declared both mutating and nonmutating", ())
 ERROR(static_functions_not_mutating,none,
@@ -2829,10 +2825,6 @@ NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
 
-// For Stmt
-ERROR(deprecated_c_style_for_stmt,none,
-      "C-style for statement has been removed in Swift 3", ())
-
 // ForEach Stmt
 ERROR(sequence_protocol_broken,none,
       "SequenceType protocol definition is broken", ())
@@ -2952,8 +2944,9 @@ WARNING(type_inferred_to_undesirable_type,none,
         "which may be unexpected", (Identifier, Type, bool))
 NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
-ERROR(isa_pattern_value,none,
-      "downcast pattern value of type %0 cannot be used", (Type))
+ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
+      "collection downcast in cast pattern is not implemented; use an explicit "
+      "downcast to %0 instead", (Type))
 
 WARNING(swift3_ignore_specialized_enum_element_call,none,
         "cannot specialize enum case; ignoring generic argument, "

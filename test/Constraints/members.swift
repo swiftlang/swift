@@ -429,3 +429,23 @@ struct Aardvark {
 
   func dig(_: inout Int, _: Int) {}
 }
+
+func rdar33914444() {
+  struct A {
+    enum R<E: Error> {
+      case e(E)
+      // expected-note@-1  {{did you mean 'e'}}
+    }
+
+    struct S {
+      enum E: Error {
+        case e1
+      }
+
+      let e: R<E>
+    }
+  }
+
+  _ = A.S(e: .e1)
+  // expected-error@-1 {{type 'A.R<A.S.E>' has no member 'e1'}}
+}

@@ -1629,6 +1629,7 @@ ${operatorComment(x.operator, False)}
 % for x in maskingShifts:
   // Heterogeneous non-masking shift in terms of shift-assignment
 ${operatorComment(x.nonMaskingOperator, False)}
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   public static func ${x.nonMaskingOperator}<RHS: BinaryInteger>(
     _ lhs: Self, _ rhs: RHS
   ) -> Self {
@@ -2168,6 +2169,7 @@ extension FixedWidthInteger {
   
   // Homogeneous masking shift
 ${operatorComment(x.operator, False)}
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
     var lhs = lhs
@@ -2178,6 +2180,7 @@ ${operatorComment(x.operator, False)}
 
   // Heterogeneous masking shift
 ${operatorComment(x.operator, False)}
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   public static func ${x.operator} <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Self {
@@ -2186,6 +2189,7 @@ ${operatorComment(x.operator, False)}
 
   // Heterogeneous masking shift assignment
 ${assignmentOperatorComment(x.operator, False)}
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func ${x.operator}= <
     Other : BinaryInteger
@@ -2230,6 +2234,7 @@ extension FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 ${operatorComment(x.nonMaskingOperator, True)}
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func ${x.nonMaskingOperator} <
     Other : BinaryInteger
@@ -2240,6 +2245,7 @@ ${operatorComment(x.nonMaskingOperator, True)}
   }
 
   @_transparent
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   public static func ${x.nonMaskingOperator}= <
     Other : BinaryInteger
   >(lhs: inout Self, rhs: Other) {
@@ -3342,6 +3348,7 @@ ${operatorComment(x.operator, True)}
 
 ${operatorComment(x.operator, True)}
   @available(swift, obsoleted: 4)
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func ${op.nonMaskingOperator}(
     lhs: ${Self}, rhs: ${Self}
@@ -3353,6 +3360,7 @@ ${operatorComment(x.operator, True)}
 
 ${assignmentOperatorComment(x.operator, True)}
   @available(swift, obsoleted: 4)
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func ${op.nonMaskingOperator}=(
     lhs: inout ${Self}, rhs: ${Self}
@@ -3476,6 +3484,7 @@ extension FixedWidthInteger {
 %   for op in maskingShifts:
 
   @available(swift, obsoleted: 4)
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func ${op.nonMaskingOperator}(
     lhs: Self, rhs: Self
@@ -3486,6 +3495,7 @@ extension FixedWidthInteger {
   }
 
   @available(swift, obsoleted: 4)
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func ${op.nonMaskingOperator}=(
     lhs: inout Self, rhs: Self

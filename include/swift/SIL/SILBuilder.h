@@ -867,21 +867,19 @@ public:
         getSILDebugLocation(Loc), op, destTy, F, OpenedArchetypes));
   }
 
-  UnconditionalCheckedCastAddrInst *createUnconditionalCheckedCastAddr(
-      SILLocation Loc, CastConsumptionKind consumption, SILValue src,
-      CanType sourceType, SILValue dest, CanType targetType) {
+  UnconditionalCheckedCastAddrInst *
+  createUnconditionalCheckedCastAddr(SILLocation Loc, SILValue src,
+                                     CanType sourceType, SILValue dest,
+                                     CanType targetType) {
     return insert(new (F.getModule()) UnconditionalCheckedCastAddrInst(
-        getSILDebugLocation(Loc), consumption, src, sourceType, dest,
-        targetType));
+        getSILDebugLocation(Loc), src, sourceType, dest, targetType));
   }
 
   UnconditionalCheckedCastValueInst *
   createUnconditionalCheckedCastValue(SILLocation Loc,
-                                      CastConsumptionKind consumption,
                                       SILValue op, SILType destTy) {
     return insert(UnconditionalCheckedCastValueInst::create(
-        getSILDebugLocation(Loc), consumption, op, destTy, F,
-        OpenedArchetypes));
+        getSILDebugLocation(Loc), op, destTy, F, OpenedArchetypes));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,

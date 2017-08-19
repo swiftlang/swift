@@ -190,10 +190,21 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $InheritsMutatingMethod to $@opened("{{.*}}") InheritsMutatingMethod
   // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened("{{.*}}") InheritsMutatingMethod
   // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod
+  // CHECK-NEXT: [[X_PAYLOAD_RELOADED:%.*]] = load [take] [[TEMPORARY]]
   // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") InheritsMutatingMethod, #HasMutatingMethod.mutatingCounter!getter.1 : <Self where Self : HasMutatingMethod> (Self) -> () -> Value, [[X_PAYLOAD]] : $@opened("{{.*}}") InheritsMutatingMethod : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
-  // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}") InheritsMutatingMethod>(%21) : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
-  // CHECK-NEXT: [[X_VALUE:%.*]] = load [take] [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod
+  //
+  // ** *NOTE* This extra copy is here since RValue invariants enforce that all
+  // ** loadable objects are actually loaded. So we form the RValue and
+  // ** load... only to then need to store the value back in a stack location to
+  // ** pass to an in_guaranteed method. PredictableMemOpts is able to handle this
+  // ** type of temporary codegen successfully.
+  // CHECK-NEXT: [[TEMPORARY_2:%.*]] = alloc_stack $@opened("{{.*}}") InheritsMutatingMethod
+  // CHECK-NEXT: store [[X_PAYLOAD_RELOADED:%.*]] to [init] [[TEMPORARY_2]]
+  // 
+  // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}") InheritsMutatingMethod>([[TEMPORARY_2]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
+  // CHECK-NEXT: [[X_VALUE:%.*]] = load [take] [[TEMPORARY_2]] : $*@opened("{{.*}}") InheritsMutatingMethod
   // CHECK-NEXT: destroy_value [[X_VALUE]] : $@opened("{{.*}}") InheritsMutatingMethod
+  // CHECK-NEXT: dealloc_stack  [[TEMPORARY_2]]
   // CHECK-NEXT: end_access [[X_ADDR]] : $*InheritsMutatingMethod
   // CHECK-NEXT: assign [[RESULT_VALUE]] to [[RESULT]] : $*Value
   // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod

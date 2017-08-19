@@ -65,7 +65,6 @@ SILValue emitSuccessfulScalarUnconditionalCast(
 
 bool emitSuccessfulIndirectUnconditionalCast(
     SILBuilder &B, ModuleDecl *M, SILLocation loc,
-    CastConsumptionKind consumption,
     SILValue src, CanType sourceType,
     SILValue dest, CanType targetType,
     SILInstruction *existingCast = nullptr);

@@ -1514,10 +1514,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   // If the source of a cast should be destroyed, emit a release.
   if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(Inst)) {
-    assert(UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways);
-    if (UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
-      Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
-    }
+    Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
   }
 
   if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(Inst)) {
@@ -1998,10 +1995,17 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
     // Since it is an addr cast, only address types are handled here.
     if (!Src->getType().isAddress() || !Dest->getType().isAddress()) {
       return nullptr;
-    } else if (!emitSuccessfulIndirectUnconditionalCast(
-                   Builder, Mod.getSwiftModule(), Loc,
-                   Inst->getConsumptionKind(), Src, SourceType, Dest,
-                   TargetType, Inst)) {
+    }
+    // For CopyOnSuccess casts, we could insert an explicit copy here, but this
+    // case does not happen in practice.
+    // Both TakeOnSuccess and TakeAlways can be reduced to an
+    // UnconditionalCheckedCast, since the failure path is irrelevant.
+    if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
+      return nullptr;
+
+    if (!emitSuccessfulIndirectUnconditionalCast(
+          Builder, Mod.getSwiftModule(), Loc, Src, SourceType, Dest,
+          TargetType, Inst)) {
       // No optimization was possible.
       return nullptr;
     }
@@ -2210,7 +2214,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
     }
     if (!CastedValue)
       CastedValue = Builder.createUnconditionalCheckedCastValue(
-          Loc, CastConsumptionKind::TakeAlways, Op, LoweredTargetType);
+          Loc, Op, LoweredTargetType);
   } else {
     // No need to cast.
     CastedValue = Op;
@@ -2636,17 +2640,13 @@ static bool optimizeStaticallyKnownProtocolConformance(
               Conformances);
           B.createCopyAddr(
               Loc, Src, ExistentialAddr,
-              (Inst->getConsumptionKind() != CastConsumptionKind::CopyOnSuccess)
-                  ? IsTake_t::IsTake
-                  : IsTake_t::IsNotTake,
+              IsTake_t::IsTake,
               IsInitialization_t::IsInitialization);
           break;
         }
         case ExistentialRepresentation::Class: {
           auto Value = B.createLoad(Loc, Src,
                                     swift::LoadOwnershipQualifier::Unqualified);
-          if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
-            B.createRetainValue(Loc, Value, B.getDefaultAtomicity());
           auto Existential =
               B.createInitExistentialRef(Loc, Dest->getType().getObjectType(),
                                          SourceType, Value, Conformances);
@@ -2661,8 +2661,6 @@ static bool optimizeStaticallyKnownProtocolConformance(
               B.createProjectExistentialBox(Loc, Src->getType(), AllocBox);
           auto Value = B.createLoad(Loc, Src,
                                     swift::LoadOwnershipQualifier::Unqualified);
-          if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
-            B.createRetainValue(Loc, Value, B.getDefaultAtomicity());
           B.createStore(Loc, Value, Projection,
                         swift::StoreOwnershipQualifier::Unqualified);
           B.createStore(Loc, AllocBox, Dest,
@@ -2754,16 +2752,8 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     }
 
     if (ResultNotUsed) {
-      switch (Inst->getConsumptionKind()) {
-        case CastConsumptionKind::TakeAlways:
-        case CastConsumptionKind::TakeOnSuccess: {
-          SILBuilder B(Inst);
-          B.createDestroyAddr(Inst->getLoc(), Inst->getSrc());
-          break;
-        }
-        case CastConsumptionKind::CopyOnSuccess:
-          break;
-      }
+      SILBuilder B(Inst);
+      B.createDestroyAddr(Inst->getLoc(), Inst->getSrc());
       if (DestroyDestInst)
         EraseInstAction(DestroyDestInst);
       EraseInstAction(Inst);
@@ -2772,7 +2762,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     }
 
     // Try to apply the bridged casts optimizations.
-    auto NewI = optimizeBridgedCasts(Inst, Inst->getConsumptionKind(),
+    auto NewI = optimizeBridgedCasts(Inst, CastConsumptionKind::TakeAlways,
                                      false, Src, Dest, SourceType,
                                      TargetType, nullptr, nullptr);
     if (NewI) {
@@ -2795,9 +2785,9 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
       return nullptr;
 
     SILBuilderWithScope Builder(Inst);
-    if (!emitSuccessfulIndirectUnconditionalCast(
-            Builder, Mod.getSwiftModule(), Loc, Inst->getConsumptionKind(), Src,
-            SourceType, Dest, TargetType, Inst)) {
+    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
+                                                 Loc, Src, SourceType, Dest,
+                                                 TargetType, Inst)) {
       // No optimization was possible.
       return nullptr;
     }

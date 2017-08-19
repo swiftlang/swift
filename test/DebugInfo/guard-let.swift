@@ -22,6 +22,10 @@ public func f(_ i : Int?)
   use(val)
 }
 
+// With large type optimizations the string is passed indirectly on i386 so
+// there is no shadow copy happening.
+// UNSUPPORTED: CPU=i386
+
 public func g(_ s : String?)
 {
   // CHECK2: define {{.*}}@_T04main1gySSSgF

@@ -1537,7 +1537,7 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
     TupleTypeElt TypeElts[] = {Elts[0].getType().getSwiftRValueType()};
     CanType ty =
         TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
-    return RValue::withPreExplodedElements(Elts, ty);
+    return RValue(SGF, Elts, ty);
   }
 
   // The string literal provides the data.
@@ -1582,7 +1582,7 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
 
   CanType ty =
     TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
-  return RValue::withPreExplodedElements(Elts, ty);
+  return RValue(SGF, Elts, ty);
 }
 
 /// Emit a raw apply operation, performing no additional lowering of
@@ -5271,7 +5271,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
 
   // (buffer, callbackStorage)  or (buffer, callbackStorage, indices) ->
   // Note that this "RValue" stores a mixed LValue/RValue tuple.
-  RValue args = [&] {
+  RValue args = [&] () -> RValue {
     SmallVector<ManagedValue, 4> elts;
 
     auto bufferPtr =
@@ -5284,7 +5284,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
     if (!subscripts.isNull()) {
       std::move(subscripts).getAll(elts);
     }
-    return RValue::withPreExplodedElements(elts, accessType.getInput());
+    return RValue(*this, elts, accessType.getInput());
   }();
   emission.addCallSite(loc, ArgumentSource(loc, std::move(args)), accessType);
   // (buffer, optionalCallback)

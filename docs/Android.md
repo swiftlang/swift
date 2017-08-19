@@ -145,7 +145,7 @@ $ sudo apt-get install android-tools-adb
 ```
 
 Once you have `adb` installed, verify your device is connected and is
-listed when you run the `adb devices` command, then run the following
+listed when you run the `adb devices` command - **currently this example works only in devices / emulators with at least Android 7.0, API 24** - then run the following
 commands to copy the Swift Android stdlib:
 
 ```
@@ -154,6 +154,14 @@ $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswi
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftSwiftOnoneSupport.so /data/local/tmp
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftRemoteMirror.so /data/local/tmp
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftSwiftExperimental.so /data/local/tmp
+```
+
+You will also need to push the icu libraries:
+
+```
+adb push /path/to/libicu-android/armeabi-v7a/libicudata.so /data/local/tmp
+adb push /path/to/libicu-android/armeabi-v7a/libicui18n.so /data/local/tmp
+adb push /path/to/libicu-android/armeabi-v7a/libicuuc.so /data/local/tmp
 ```
 
 In addition, you'll also need to copy the Android NDK's libc++:

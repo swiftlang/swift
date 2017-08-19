@@ -40,10 +40,6 @@ protected:
   /// completion. This declaration contained the code completion token.
   Decl *ParsedDecl = nullptr;
 
-  /// If code completion is done inside a controlling expression of a C-style
-  /// for loop statement, this is the declaration of the iteration variable.
-  Decl *CStyleForLoopIterationVariable = nullptr;
-
   /// True if code completion is done inside a raw value expression of an enum
   /// case.
   bool InEnumElementRawValue = false;
@@ -83,27 +79,6 @@ public:
   void setLeadingSequenceExprs(ArrayRef<Expr *> exprs) {
     leadingSequenceExprs.assign(exprs.begin(), exprs.end());
   }
-
-  class InCStyleForExprRAII {
-    CodeCompletionCallbacks *Callbacks;
-
-  public:
-    InCStyleForExprRAII(CodeCompletionCallbacks *Callbacks,
-                        Decl *IterationVariable)
-        : Callbacks(Callbacks) {
-      if (Callbacks)
-        Callbacks->CStyleForLoopIterationVariable = IterationVariable;
-    }
-
-    void finished() {
-      if (Callbacks)
-        Callbacks->CStyleForLoopIterationVariable = nullptr;
-    }
-
-    ~InCStyleForExprRAII() {
-      finished();
-    }
-  };
 
   class InEnumElementRawValueRAII {
     CodeCompletionCallbacks *Callbacks;

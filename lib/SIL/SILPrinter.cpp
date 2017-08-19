@@ -1282,16 +1282,14 @@ public:
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
-    *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
-          << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
+    *this << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetType() << " in "
           << getIDAndType(CI->getDest());
   }
 
   void visitUnconditionalCheckedCastValueInst(
       UnconditionalCheckedCastValueInst *CI) {
-    *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
-          << getIDAndType(CI->getOperand()) << " to " << CI->getType();
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
@@ -2448,8 +2446,19 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
         stripExternalFromLinkage(entry.Implementation->getLinkage())) {
       OS << getLinkageString(entry.Linkage);
     }
-    OS << entry.Implementation->getName()
-       << "\t// " << demangleSymbol(entry.Implementation->getName()) << "\n";
+    OS << entry.Implementation->getName();
+    switch (entry.TheKind) {
+    case SILVTable::Entry::Kind::Normal:
+      break;
+    case SILVTable::Entry::Kind::Inherited:
+      OS << " [inherited]";
+      break;
+    case SILVTable::Entry::Kind::Override:
+      OS << " [override]";
+      break;
+    }
+    OS << "\t// " << demangleSymbol(entry.Implementation->getName());
+    OS << "\n";
   }
   OS << "}\n\n";
 }

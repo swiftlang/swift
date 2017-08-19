@@ -411,6 +411,7 @@
           key.name: "test(arg1:)",
           key.offset: 732,
           key.length: 156,
+          key.typename: "Int",
           key.nameoffset: 737,
           key.namelength: 16,
           key.bodyoffset: 762,
@@ -613,6 +614,14 @@
       ],
       key.substructure: [
         {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "i",
+          key.offset: 1118,
+          key.length: 1,
+          key.nameoffset: 1118,
+          key.namelength: 1
+        },
+        {
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1129,
           key.length: 2,
@@ -624,29 +633,27 @@
       ]
     },
     {
-      key.kind: source.lang.swift.stmt.for,
+      key.kind: source.lang.swift.stmt.foreach,
       key.offset: 1132,
       key.length: 37,
       key.nameoffset: 0,
       key.namelength: 0,
       key.elements: [
         {
-          key.kind: source.lang.swift.structure.elem.init_expr,
+          key.kind: source.lang.swift.structure.elem.id,
           key.offset: 1136,
-          key.length: 17
-        },
-        {
-          key.kind: source.lang.swift.structure.elem.expr,
-          key.offset: 1155,
-          key.length: 6
-        },
-        {
-          key.kind: source.lang.swift.structure.elem.expr,
-          key.offset: 1163,
-          key.length: 3
+          key.length: 5
         }
       ],
       key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "i",
+          key.offset: 1140,
+          key.length: 1,
+          key.nameoffset: 1140,
+          key.namelength: 1
+        },
         {
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1167,
@@ -672,6 +679,22 @@
         }
       ],
       key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "v",
+          key.offset: 1180,
+          key.length: 1,
+          key.nameoffset: 1180,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "z",
+          key.offset: 1191,
+          key.length: 1,
+          key.nameoffset: 1191,
+          key.namelength: 1
+        },
         {
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1204,
@@ -722,6 +745,22 @@
         }
       ],
       key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "v",
+          key.offset: 1237,
+          key.length: 1,
+          key.nameoffset: 1237,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "z",
+          key.offset: 1248,
+          key.length: 1,
+          key.nameoffset: 1248,
+          key.namelength: 1
+        },
         {
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1261,
@@ -984,6 +1023,20 @@
       key.severity: source.diagnostic.severity.error,
       key.description: "getter/setter can only be defined for a single variable",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
+    },
+    {
+      key.line: 77,
+      key.column: 1,
+      key.filepath: main.swift,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "C-style for statement has been removed in Swift 3",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.ranges: [
+        {
+          key.offset: 1136,
+          key.length: 30
+        }
+      ]
     }
   ]
 }

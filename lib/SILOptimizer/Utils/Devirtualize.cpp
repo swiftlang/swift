@@ -484,9 +484,8 @@ getSubstitutionsForCallee(SILModule &M,
 SILFunction *swift::getTargetClassMethod(SILModule &M,
                                          SILType ClassOrMetatypeType,
                                          MethodInst *MI) {
-  assert((isa<ClassMethodInst>(MI) || isa<WitnessMethodInst>(MI) ||
-          isa<SuperMethodInst>(MI)) &&
-         "Only class_method and witness_method instructions are supported");
+  assert((isa<ClassMethodInst>(MI) || isa<SuperMethodInst>(MI)) &&
+         "Only class_method and super_method instructions are supported");
 
   SILDeclRef Member = MI->getMember();
   if (ClassOrMetatypeType.is<MetatypeType>())

@@ -1257,7 +1257,7 @@ public:
   bool typeCheckDestructorBodyUntil(DestructorDecl *DD,
                                     SourceLoc EndTypeCheckLoc);
 
-  void typeCheckClosureBody(ClosureExpr *closure);
+  bool typeCheckClosureBody(ClosureExpr *closure);
 
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 

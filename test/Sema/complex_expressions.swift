@@ -126,3 +126,18 @@ struct R32034560 {
     // expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
   }
 }
+
+// rdar://problem/33806601
+
+class P_33806601 {
+    var x : Int = 0
+    var y : Int = 1
+}
+
+func foo33806601<T>(_ n: T) -> T where T : FloatingPoint { fatalError() }
+func foo33806601(_ n: Double) -> Double { return 0.0 }
+
+let _: (P_33806601, P_33806601) -> Double = {
+  (p : P_33806601, s : P_33806601)  -> Double in
+    foo33806601(Double((p.x - s.x) * (p.x - s.x) + (p.y - s.y) * (p.y - s.y)))
+}

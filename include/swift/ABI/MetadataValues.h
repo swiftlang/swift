@@ -253,6 +253,7 @@ class GenericParameterDescriptorFlags {
   enum : int_type {
     HasParent        = 0x01,
     HasGenericParent = 0x02,
+    HasVTable        = 0x04,
   };
   int_type Data;
   
@@ -270,6 +271,11 @@ public:
                                              : (Data & ~HasGenericParent));
   }
 
+  constexpr GenericParameterDescriptorFlags withHasVTable(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasVTable)
+                                             : (Data & ~HasVTable));
+  }
+
   /// Does this type have a lexical parent type?
   ///
   /// For class metadata, if this is true, the storage for the parent type
@@ -285,6 +291,13 @@ public:
   /// the generic metadata access function.
   bool hasGenericParent() const {
     return Data & HasGenericParent;
+  }
+
+  /// If this type is a class, does it have a vtable?  If so, the number
+  /// of vtable entries immediately follows the generic requirement
+  /// descriptor.
+  bool hasVTable() const {
+    return Data & HasVTable;
   }
 
   int_type getIntValue() const {

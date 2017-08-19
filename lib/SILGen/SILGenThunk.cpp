@@ -73,7 +73,7 @@ SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
   return B.createFunctionRef(loc, F);
 }
 
-static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
+static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
                                        SILLocation loc,
                                        SILDeclRef thunk,
                                        SILValue selfArg,
@@ -86,24 +86,24 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
 
   // If the function is natively foreign, reference its foreign entry point.
   if (requiresForeignToNativeThunk(vd))
-    return gen.emitGlobalFunctionRef(loc, next);
+    return SGF.emitGlobalFunctionRef(loc, next);
 
   // If the thunk is a curry thunk for a direct method reference, we are
   // doing a direct dispatch (eg, a fragile 'super.foo()' call).
   if (thunk.isDirectReference)
-    return gen.emitGlobalFunctionRef(loc, next);
+    return SGF.emitGlobalFunctionRef(loc, next);
 
-  auto constantInfo = gen.SGM.Types.getConstantInfo(next);
+  auto constantInfo = SGF.SGM.Types.getConstantInfo(next);
 
   if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
     if (getMethodDispatch(func) == MethodDispatch::Class) {
       // Use the dynamic thunk if dynamic.
       if (vd->isDynamic()) {
-        auto dynamicThunk = gen.SGM.getDynamicThunk(next, constantInfo);
-        return gen.B.createFunctionRef(loc, dynamicThunk);
+        auto dynamicThunk = SGF.SGM.getDynamicThunk(next, constantInfo);
+        return SGF.B.createFunctionRef(loc, dynamicThunk);
       }
 
-      return gen.B.createClassMethod(loc, selfArg, next);
+      return SGF.B.createClassMethod(loc, selfArg, next);
     }
 
     // If the fully-uncurried reference is to a generic method, look up the
@@ -120,14 +120,14 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
       SILValue OpenedExistential;
       if (substSelfType->isOpenedExistential())
         OpenedExistential = selfArg;
-      return gen.B.createWitnessMethod(loc, substSelfType, *conformance, next,
+      return SGF.B.createWitnessMethod(loc, substSelfType, *conformance, next,
                                       constantInfo.getSILType(),
                                       OpenedExistential);
     }
   }
 
   // Otherwise, emit a direct call.
-  return gen.emitGlobalFunctionRef(loc, next);
+  return SGF.emitGlobalFunctionRef(loc, next);
 }
 
 void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
