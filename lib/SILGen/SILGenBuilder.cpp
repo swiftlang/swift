@@ -22,26 +22,6 @@ using namespace swift;
 using namespace Lowering;
 
 //===----------------------------------------------------------------------===//
-//                               CleanupCloner
-//===----------------------------------------------------------------------===//
-
-ManagedValue CleanupCloner::clone(SILValue value) const {
-  if (isLValue) {
-    return ManagedValue::forLValue(value);
-  }
-
-  if (!hasCleanup) {
-    return ManagedValue::forUnmanaged(value);
-  }
-
-  if (value->getType().isAddress()) {
-    return SGF.emitManagedBufferWithCleanup(value);
-  }
-
-  return SGF.emitManagedRValueWithCleanup(value);
-}
-
-//===----------------------------------------------------------------------===//
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
 
