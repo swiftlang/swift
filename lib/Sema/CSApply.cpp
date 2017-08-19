@@ -7803,11 +7803,15 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
 Expr *
 Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) const {
-  // FIXME: Cache name.
   auto &cs = getConstraintSystem();
+
+  // Load lvalues here.
+  expr = cs.coerceToRValue(expr);
+
   auto &tc = cs.getTypeChecker();
   auto &ctx = tc.Context;
-  auto type = cs.getType(expr)->getRValueType();
+
+  auto type = cs.getType(expr);
 
   // Member accesses are permitted to implicitly look through
   // ImplicitlyUnwrappedOptional<T>.
