@@ -1331,7 +1331,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
     ValueID listOfValues[] = {
-      toStableCastConsumptionKind(CI->getConsumptionKind()),
       S.addTypeRef(CI->getSourceType()),
       addValueRef(CI->getSrc()),
       S.addTypeRef(CI->getSrc()->getType().getSwiftRValueType()),
@@ -1351,7 +1350,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstCastLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstCastLayout::Code],
         (unsigned)SI.getKind(),
-        toStableCastConsumptionKind(CI->getConsumptionKind()),
+        /*attr*/ 0,
         S.addTypeRef(CI->getType().getSwiftRValueType()),
         (unsigned)CI->getType().getCategory(),
         S.addTypeRef(CI->getOperand()->getType().getSwiftRValueType()),

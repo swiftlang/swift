@@ -1996,15 +1996,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case ValueKind::UnconditionalCheckedCastValueInst: {
-    CastConsumptionKind consumption = getCastConsumptionKind(Attr);
     SILValue Val = getLocalValue(
         ValID, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
-    ResultVal =
-        Builder.createUnconditionalCheckedCastValue(Loc, consumption, Val, Ty);
+    ResultVal = Builder.createUnconditionalCheckedCastValue(Loc, Val, Ty);
     break;
   }
-  case ValueKind::UnconditionalCheckedCastAddrInst:
+  case ValueKind::UnconditionalCheckedCastAddrInst: {
+    // ignore attr.
+    CanType sourceType = MF->getType(ListOfValues[0])->getCanonicalType();
+    SILType srcAddrTy = getSILType(MF->getType(ListOfValues[2]),
+                                   (SILValueCategory)ListOfValues[3]);
+    SILValue src = getLocalValue(ListOfValues[1], srcAddrTy);
+
+    CanType targetType = MF->getType(ListOfValues[4])->getCanonicalType();
+    SILType destAddrTy =
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    SILValue dest = getLocalValue(ListOfValues[5], destAddrTy);
+
+    ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, src, sourceType,
+                                                           dest, targetType);
+    break;
+  }
   case ValueKind::CheckedCastAddrBranchInst: {
     CastConsumptionKind consumption = getCastConsumptionKind(ListOfValues[0]);
 
@@ -2018,13 +2031,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       getSILType(MF->getType(TyID), (SILValueCategory) TyCategory);
     SILValue dest = getLocalValue(ListOfValues[6], destAddrTy);
 
-    if (OpCode == (unsigned) ValueKind::UnconditionalCheckedCastAddrInst) {
-      ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, consumption,
-                                                             src, sourceType,
-                                                             dest, targetType);
-      break;
-    }
-
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
     ResultVal = Builder.createCheckedCastAddrBranch(Loc, consumption,
@@ -2035,6 +2041,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case ValueKind::UncheckedRefCastAddrInst: {
     CanType sourceType = MF->getType(ListOfValues[0])->getCanonicalType();
+    // ignore attr.
     SILType srcAddrTy = getSILType(MF->getType(ListOfValues[2]),
                                    (SILValueCategory)ListOfValues[3]);
     SILValue src = getLocalValue(ListOfValues[1], srcAddrTy);

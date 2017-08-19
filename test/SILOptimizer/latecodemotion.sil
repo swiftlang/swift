@@ -1247,7 +1247,7 @@ bb0(%0 : $F):
   %1 = alloc_stack $F
   store %0 to %1 : $*F
   strong_retain %0 : $F
-  unconditional_checked_cast_addr take_always F in %1 : $*F to G in %1 : $*F
+  unconditional_checked_cast_addr F in %1 : $*F to G in %1 : $*F
   strong_release %0 : $F
   dealloc_stack %1 : $*F
   %2 = tuple ()
@@ -1478,7 +1478,7 @@ bb0(%0 : $Builtin.NativeObject, %1: $Builtin.NativeObject):
   strong_retain %0: $Builtin.NativeObject
   %2 = function_ref @blocker : $@convention(thin) () -> ()
   apply %2() : $@convention(thin) () -> ()
-  %c = unconditional_checked_cast_value take_always %0 : $Builtin.NativeObject to $B
+  %c = unconditional_checked_cast_value %0 : $Builtin.NativeObject to $B
   strong_release %0: $Builtin.NativeObject
   %5 = tuple()
   return %5 : $()

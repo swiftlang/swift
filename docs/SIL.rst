@@ -4568,23 +4568,21 @@ unconditional_checked_cast
   // %1 will be of type $B or $*B
 
 Performs a checked scalar conversion, causing a runtime failure if the
-conversion fails.
+conversion fails. Casts that require changing representation or ownership are
+unsupported.
 
 unconditional_checked_cast_addr
 ```````````````````````````````
 ::
 
   sil-instruction ::= 'unconditional_checked_cast_addr'
-                       sil-cast-consumption-kind
                        sil-type 'in' sil-operand 'to'
                        sil-type 'in' sil-operand
-  sil-cast-consumption-kind ::= 'take_always'
-  sil-cast-consumption-kind ::= 'take_on_success'
-  sil-cast-consumption-kind ::= 'copy_on_success'
 
-  %1 = unconditional_checked_cast_addr take_on_success $A in %0 : $*@thick A to $B in $*@thick B
+  %1 = unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in $*@thick B
   // $A and $B must be both addresses
   // %1 will be of type $*B
+  // $A is destroyed during the conversion. There is no implicit copy.
 
 Performs a checked indirect conversion, causing a runtime failure if the
 conversion fails.
@@ -4594,19 +4592,19 @@ unconditional_checked_cast_value
 ::
 
   sil-instruction ::= 'unconditional_checked_cast_value'
-                       sil-cast-consumption-kind
                        sil-operand 'to' sil-type
-  sil-cast-consumption-kind ::= 'take_always'
-  sil-cast-consumption-kind ::= 'take_on_success'
-  sil-cast-consumption-kind ::= 'copy_on_success'
 
-  %1 = unconditional_checked_cast_value take_always %0 : $A to $B
+  %1 = unconditional_checked_cast_value %0 : $A to $B
   // $A must not be an address
   // $B must not be an address
   // %1 will be of type $B
+  // $A is destroyed during the conversion. There is no implicit copy.
 
-Performs a checked conversion, causing a runtime failure if the
-conversion fails.
+Performs a checked conversion, causing a runtime failure if the conversion
+fails. Unlike `unconditional_checked_cast`, this destroys its operand and
+creates a new value. Consequently, this supports bridging objects to values, as
+well as casting to a different ownership classification such as `$AnyObject` to
+`$T.Type`.
 
 Runtime Failures
 ~~~~~~~~~~~~~~~~

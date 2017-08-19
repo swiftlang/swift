@@ -1282,16 +1282,14 @@ public:
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
-    *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
-          << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
+    *this << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetType() << " in "
           << getIDAndType(CI->getDest());
   }
 
   void visitUnconditionalCheckedCastValueInst(
       UnconditionalCheckedCastValueInst *CI) {
-    *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
-          << getIDAndType(CI->getOperand()) << " to " << CI->getType();
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
