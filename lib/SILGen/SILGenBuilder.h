@@ -22,6 +22,7 @@
 #ifndef SWIFT_SILGEN_SILGENBUILDER_H
 #define SWIFT_SILGEN_SILGENBUILDER_H
 
+#include "Cleanup.h"
 #include "JumpDest.h"
 #include "ManagedValue.h"
 #include "RValue.h"
@@ -353,27 +354,6 @@ public:
 
 private:
   SILGenFunction &getSGF() const { return builder.getSILGenFunction(); }
-};
-
-class CleanupCloner {
-  SILGenFunction &SGF;
-  bool hasCleanup;
-  bool isLValue;
-
-public:
-  CleanupCloner(SILGenFunction &SGF, ManagedValue mv)
-      : SGF(SGF), hasCleanup(mv.hasCleanup()), isLValue(mv.isLValue()) {}
-
-  CleanupCloner(SILGenBuilder &builder, ManagedValue mv)
-      : CleanupCloner(builder.getSILGenFunction(), mv) {}
-
-  CleanupCloner(SILGenFunction &SGF, const RValue &rv)
-      : SGF(SGF), hasCleanup(rv.isPlusOne(SGF)), isLValue(false) {}
-
-  CleanupCloner(SILGenBuilder &builder, const RValue &rv)
-      : CleanupCloner(builder.getSILGenFunction(), rv) {}
-
-  ManagedValue clone(SILValue value) const;
 };
 
 } // namespace Lowering
