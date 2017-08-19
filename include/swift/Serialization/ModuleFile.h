@@ -697,6 +697,9 @@ public:
 
   virtual void loadAllMembers(Decl *D,
                               uint64_t contextData) override;
+private:
+  Decl* getOrFudgeOneMember(Decl *container, serialization::DeclID rawID);
+public:
 
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
