@@ -1393,11 +1393,16 @@ extension ${Self} {
 %   ThatBuiltinName = self_ty.builtin_name
 %   srcBits = self_ty.bits
 %   sign = 's' if self_ty.is_signed else 'u'
+<<<<<<< HEAD
   /// Creates the closest representable value to the given integer.
   ///
   /// - Parameter value: The integer to represent as a floating-point value.
   @_transparent
   public init(_ v: ${That}) {
+=======
+  ${'@_transparent' if self_ty.access == 'public' else ''}
+  ${self_ty.access} init(_ v: ${That}) {
+>>>>>>> apple/builtin-int128
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
   
@@ -1410,8 +1415,8 @@ extension ${Self} {
 %   if srcBits < SignificandBitCount:
   @available(*, message: "Converting ${That} to ${Self} will always succeed.")
 %   end
-  @inline(__always)
-  public init?(exactly value: ${That}) {
+  ${'@inline(__always)' if self_ty.access == 'public' else ''}
+  ${self_ty.access} init?(exactly value: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
 
 %   if srcBits < SignificandBitCount:

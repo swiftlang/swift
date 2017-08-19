@@ -16,12 +16,14 @@
     "StringCharacterView.swift",
     "StringComparable.swift",
     "StringCore.swift",
+    "StringCore2.swift",
     "StringHashable.swift",
     "StringIndex.swift",
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
     "StringLegacy.swift",
     "StringRangeReplaceableCollection.swift",
+    "StringStorage.swift",
     "StringUTF16.swift",
     "StringUTF8.swift",
     "StringUnicodeScalarView.swift",
@@ -42,6 +44,8 @@
   ],
   "Collection": [
     "Collection.swift",
+    "ContiguouslyStored.swift",
+    "Counted.swift",
     "BidirectionalCollection.swift",
     "RandomAccessCollection.swift",
     "MutableCollection.swift",
@@ -63,6 +67,7 @@
     "Existential.swift",
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
+    "BoundedBufferReference.swift",
     "UIntBuffer.swift",
     {
       "Type-erased": [
@@ -150,6 +155,7 @@
   ],
   "Misc": [
     "AnyHashable.swift",
+    "Function.swift",
     "Interval.swift",
     "Hashing.swift",
     "SipHash.swift",
@@ -176,6 +182,7 @@
     "Equatable.swift",
     "Comparable.swift",
     "Hashable.swift",
-    "Codable.swift"
+    "Codable.swift",
+    "ForwardingWrapper.swift"
   ]
 }

@@ -44,6 +44,7 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
   }
   
   @discardableResult
+  @inline(__always)
   public func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
@@ -54,7 +55,7 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
 extension _SequenceWrapper where Element == Base.Element {
   public func map<T>(
     _ transform: (Element) throws -> T
-) rethrows -> [T] {
+  ) rethrows -> [T] {
     return try _base.map(transform)
   }
   

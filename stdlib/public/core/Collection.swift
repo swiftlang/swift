@@ -297,6 +297,10 @@ public protocol _Indexable : _IndexableBase {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
+
+  func _withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
 }
 
 /// A type that iterates over a collection using its indices.
@@ -637,6 +641,32 @@ public protocol Collection : _Indexable, Sequence
   /// type.
   associatedtype Iterator = IndexingIterator<Self>
 
+  /// A type that provides access to sub-structure of the collection
+  associatedtype Segments : _Indexable = EmptyCollection<Self>
+  // where Segments : Collection, Segments.Iterator.Element : Collection,
+  // Segments.Iterator.Element.Iterator.Element == Iterator.Element
+
+  /// The collection's sub-structure, if any
+  ///
+  /// Anything for which a complete traversal can be most easily written using a
+  /// nested loop should provide segments.
+  var segments : Segments? { get }
+
+  /// Replaces the `target` elements with the contents of `replacement` if
+  /// possible and returns `true`, or returns `false` otherwise.
+  ///
+  /// - Note: `false` may be returned because `self` is truly immutable or
+  ///   because its length can't be changed appropriately.
+  //
+  // Note: this doesn't accept a Range<Index> for convenience of interoperation
+  // with AnyUnicodeIndex_, which needs to be an existential and thus can't
+  // conform to Comparable. We could fix that by having the things that traffic
+  // in AnyUnicodeIndex_ traffic in AnyUnicodeIndex instead.
+  mutating func _tryToReplaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Iterator.Element
+  
   // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
   // `IndexingIterator`. <rdar://problem/21539115>
@@ -992,6 +1022,10 @@ public protocol Collection : _Indexable, Sequence
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
+
+  func _withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R?
 }
 
 /// Default implementation for forward collections.
@@ -1297,6 +1331,21 @@ extension Collection where SubSequence == Self {
     let element = first!
     self = self[index(after: startIndex)..<endIndex]
     return element
+  }
+}
+
+/// Default implementation of Segments for collections that don't expose any
+/// sub-structure.
+extension Collection where Segments == EmptyCollection<Self> {
+  public var segments : Segments? { return Segments() }
+}
+
+extension Collection {
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    _: Range<Index>, with _: C
+  ) -> Bool
+  where C.Iterator.Element == Iterator.Element {
+    return false
   }
 }
 
@@ -1901,6 +1950,15 @@ extension Collection {
     _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try preprocess()
+  }
+}
+
+extension Collection {
+  public func _index<I: SignedInteger>(atOffset offset: I) -> Index {
+    return index(startIndex, offsetBy: numericCast(offset))
+  }
+  public func _offset(of i: Index) -> IndexDistance {
+    return distance(from: startIndex, to: i)
   }
 }
 

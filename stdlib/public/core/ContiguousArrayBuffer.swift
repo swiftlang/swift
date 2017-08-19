@@ -424,6 +424,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// just-initialized memory.
   @_inlineable
   @_versioned
+  @inline(__always)
   @discardableResult
   internal func _copyContents(
     subRange bounds: Range<Int>,

@@ -1,0 +1,120 @@
+//===--- ForwardingWrapper.swift.gyb --------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+%{import gyb}%
+
+//===--- ForwardingWrapper ------------------------------------------------===//
+
+/// A type that forwards its implementation to an instance of `Base`.
+///
+/// Typical usage is to create protocol extensions of ForwardingWrapper
+/// constrained on other conformances of `Self` and `Base`.
+public protocol _ForwardingWrapper {
+  associatedtype _Base
+  var _base: _Base { get }
+}
+
+//===--- Comparable forwarding --------------------------------------------===//
+
+/// Comparable -> Comparable wrappers just forward to the base implementation
+public extension _ForwardingWrapper 
+  where Self : Comparable, _Base : Comparable
+{
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    return lhs._base < rhs._base
+  }
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs._base == rhs._base
+  }
+}
+
+//===--- Collection forwarding -------------------------------===//
+
+// FIXME: introduce refinement, DGY (Don't Gyb Yourself)
+% for Bidirectional in '', 'Bidirectional':
+/// A type that wraps a `${Bidirectional}Collection` and forwards most or all of
+/// its API.
+///
+/// - Note: Some models of `${Bidirectional}CollectionWrapper` are themselves
+///   models `${Bidirectional}Collection`, but some are not.
+///
+/// - Note: works great for random access collections as well.
+///
+/// - Warning: A wrapper that presents a different abstraction from the `Base`
+///   collection (as opposed to merely having different `Index` types, for
+///   example) must explicitly implement defaults supplied by its other
+///   conformances to prevent them from having semantics that simply forward to
+///   the `Base`.
+public protocol _${Bidirectional}CollectionWrapper
+  : _ForwardingWrapper where _Base : ${Bidirectional}Collection {
+  var _base: _Base { get set }
+  associatedtype Index
+  associatedtype IndexDistance : SignedInteger
+  associatedtype Iterator = _Base.Iterator
+  func _wrap(_: _Base.Index) -> Index
+  func _unwrap(_: Index) -> _Base.Index
+}
+
+/// When the `Iterator` type matches, just forward it.
+extension _${Bidirectional}CollectionWrapper where Iterator == _Base.Iterator {
+  public func makeIterator() -> Iterator { return _base.makeIterator() }
+}
+
+/// When the `Index` type matches, wrapping/unwrapping is trivial
+public extension _${Bidirectional}CollectionWrapper where Index == _Base.Index {
+  func _wrap(_ i: _Base.Index) -> Index { return i }
+  func _unwrap(_ i: Index) -> _Base.Index { return i }
+}
+
+/// Forwards all the `_${Bidirectional}Collection` APIs from `_Base`, verbatim, but
+/// with whatever Index wrapping we have chosen.
+extension _${Bidirectional}CollectionWrapper {
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb',
+      base='_base',
+      bidirectional=(Bidirectional != ''), 
+      Element='_Base.Iterator.Element')}
+}
+
+/// When the model of _${Bidirectional}CollectionWrapper is itself a Collection,
+/// many of the defaults become redundant with defaults supplied by Indexable
+/// et. al., so repeat them with stricter constraints to resolve the ambiguity.
+extension _${Bidirectional}CollectionWrapper
+where Self : ${Bidirectional}Collection {
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb',
+      base='_base',
+      bidirectional=(Bidirectional != ''), 
+      Element='_Base.Iterator.Element')}
+}
+% end
+
+/// When the model of BidirectionalCollectionWrapper is itself a
+/// RandomAccessCollection, some of the defaults become redundant with defaults
+/// supplied by Indexable et. al., so repeat them with stricter constraints to
+/// resolve the ambiguity.
+extension _BidirectionalCollectionWrapper
+where Self : RandomAccessCollection {
+  public func index(
+    _ i: Index,
+    offsetBy n: IndexDistance,
+    limitedBy limit: Index
+  ) -> Index? {
+    return _base.index(
+      _unwrap(i),
+      offsetBy: numericCast(n),
+      limitedBy: _unwrap(limit)
+    ).map(_wrap)
+  }
+}
+
+
+

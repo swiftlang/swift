@@ -29,6 +29,16 @@ func _stdlib_binary_CFStringCreateCopy(
 }
 
 public // @testable
+func _stdlib_binary_CFStringCreateWithCharacters(
+  _ source: UnsafePointer<UInt16>, _ length: Int
+) -> _CocoaString {
+  let result = _swift_stdlib_CFStringCreateWithCharacters(nil, source, length)
+    as AnyObject
+  Builtin.release(result)
+  return result
+}
+
+public // @testable
 func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
 ) -> Int {
@@ -190,8 +200,7 @@ extension String {
 public class _SwiftNativeNSString {}
 
 @objc
-public protocol _NSStringCore :
-    _NSCopying, _NSFastEnumeration {
+public protocol _NSStringCore : _NSCopying {
 
   // The following methods should be overridden when implementing an
   // NSString subclass.
@@ -201,6 +210,7 @@ public protocol _NSStringCore :
   func characterAtIndex(_ index: Int) -> UInt16
 
   // We also override the following methods for efficiency.
+  func _fastCharacterContents() -> UnsafePointer<UInt16>?
 }
 
 /// An `NSString` built around a slice of contiguous Swift `String` storage.

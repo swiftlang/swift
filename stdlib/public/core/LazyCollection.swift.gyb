@@ -103,6 +103,7 @@ extension ${Self} : Sequence {
   }
 
   @_inlineable
+  @inline(__always)
   public func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
