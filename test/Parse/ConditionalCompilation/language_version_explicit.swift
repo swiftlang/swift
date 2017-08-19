@@ -22,9 +22,9 @@
 #endif
 
 #if swift(>=4.0.1)
+  let z = 1
+#else
   // This shouldn't emit any diagnostics.
   asdf asdf asdf asdf
-#else
-  let z = 1
 #endif
 
