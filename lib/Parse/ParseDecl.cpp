@@ -4035,7 +4035,8 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
 /// \brief Parse the brace-enclosed getter and setter for a variable.
 VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
                                     ParseDeclOptions Flags,
-                                    SourceLoc StaticLoc, bool hasInitializer,
+                                    SourceLoc StaticLoc, SourceLoc VarLoc,
+                                    bool hasInitializer,
                                     const DeclAttributes &Attributes,
                                     SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
@@ -4090,12 +4091,15 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
 
   // Reject accessors on 'let's after parsing them (for better recovery).
   if (PrimaryVar->isLet() && !Attributes.hasAttribute<SILStoredAttr>()) {
+    Diag<> DiagID;
     if (accessors.WillSet || accessors.DidSet)
-      diagnose(accessors.LBLoc, diag::let_cannot_be_observing_property);
+      DiagID = diag::let_cannot_be_observing_property;
     else if (accessors.Addressor || accessors.MutableAddressor)
-      diagnose(accessors.LBLoc, diag::let_cannot_be_addressed_property);
+      DiagID = diag::let_cannot_be_addressed_property;
     else
-      diagnose(accessors.LBLoc, diag::let_cannot_be_computed_property);
+      DiagID = diag::let_cannot_be_computed_property;
+
+    diagnose(accessors.LBLoc, DiagID).fixItReplace(VarLoc, "var");
     PrimaryVar->setSpecifier(VarDecl::Specifier::Var);
     Invalid = true;
   }
@@ -4598,7 +4602,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     } else if (Tok.is(tok::l_brace)) {
       HasAccessors = true;
       
-      if (auto *boundVar = parseDeclVarGetSet(pattern, Flags, StaticLoc,
+      if (auto *boundVar = parseDeclVarGetSet(pattern, Flags,
+                                              StaticLoc, VarLoc,
                                               PatternInit != nullptr,
                                               Attributes, Decls)) {
         if (PatternInit && !boundVar->hasStorage()) {

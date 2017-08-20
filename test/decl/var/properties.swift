@@ -1027,7 +1027,7 @@ struct PropertiesWithOwnershipTypes {
 
 // <rdar://problem/16608609> Assert (and incorrect error message) when defining a constant stored property with observers
 class Test16608609 {
-   let constantStored: Int = 0 {  // expected-error {{'let' declarations cannot be observing properties}}
+   let constantStored: Int = 0 {  // expected-error {{'let' declarations cannot be observing properties}} {{4-7=var}}
       willSet {
       }
       didSet {

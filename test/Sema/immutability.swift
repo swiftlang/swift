@@ -2,12 +2,12 @@
 
 func markUsed<T>(_ t: T) {}
 
-let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}}
+let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}} {{1-4=var}}
   get {
     return 42
   }
 }
-let bad_property_2: Int = 0 { // expected-error {{'let' declarations cannot be computed properties}} expected-error {{variable with getter/setter cannot have an initial value}}
+let bad_property_2: Int = 0 { // expected-error {{'let' declarations cannot be computed properties}} {{1-4=var}} expected-error {{variable with getter/setter cannot have an initial value}}
   get {
     return 42
   }
