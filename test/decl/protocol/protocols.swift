@@ -448,7 +448,7 @@ struct X4 : P1 { // expected-error{{type 'X4' does not conform to protocol 'P1'}
 
 protocol ShouldntCrash {
   // rdar://16109996
-  let fullName: String { get }  // expected-error {{'let' declarations cannot be computed properties}}
+  let fullName: String { get }  // expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
   
   // <rdar://problem/17200672> Let in protocol causes unclear errors and crashes
   let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
