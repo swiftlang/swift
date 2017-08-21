@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
 
 func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
   return arg
 }
 // CHECK-LABEL: sil hidden @_T019c_function_pointers6valuesS2iXCS2iXCF
-// CHECK:       bb0(%0 : $@convention(c) (Int) -> Int):
+// CHECK:       bb0(%0 : @trivial $@convention(c) (Int) -> Int):
 // CHECK:         return %0 : $@convention(c) (Int) -> Int
 
 @discardableResult
@@ -12,7 +12,7 @@ func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
   return arg(x)
 }
 // CHECK-LABEL: sil hidden @_T019c_function_pointers5callsS3iXC_SitF
-// CHECK:       bb0(%0 : $@convention(c) (Int) -> Int, %1 : $Int):
+// CHECK:       bb0(%0 : @trivial $@convention(c) (Int) -> Int, %1 : @trivial $Int):
 // CHECK:         [[RESULT:%.*]] = apply %0(%1)
 // CHECK:         return [[RESULT]]
 
@@ -27,7 +27,7 @@ func no_args() -> Int { return 42 }
 
 // CHECK-LABEL: sil hidden @_T019c_function_pointers0B19_to_swift_functionsySiF
 func pointers_to_swift_functions(_ x: Int) {
-// CHECK: bb0([[X:%.*]] : $Int):
+// CHECK: bb0([[X:%.*]] : @trivial $Int):
 
   func local(_ y: Int) -> Int { return y }
 

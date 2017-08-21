@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -O -primary-file %s > /dev/null
 // RUN: %target-swift-frontend -emit-ir -primary-file %s > /dev/null
 

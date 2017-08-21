@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func modify<T>(_ x: inout T) {}
 
@@ -8,7 +8,7 @@ public struct S {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_T017access_marker_gen5initSAA1SVyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> @owned S {
-// CHECK: bb0(%0 : $Optional<AnyObject>):
+// CHECK: bb0(%0 : @owned $Optional<AnyObject>):
 // CHECK: [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: [[MARKED_BOX:%.*]] = mark_uninitialized [var] [[BOX]] : ${ var S }
 // CHECK: [[ADDR:%.*]] = project_box [[MARKED_BOX]] : ${ var S }, 0
