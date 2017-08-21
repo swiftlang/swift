@@ -233,6 +233,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // current function (after optimizing any new callees).
   P.addDevirtualizer();
   P.addGenericSpecializer();
+  // Run devirtualizer after the specializer, because many
+  // class_method/witness_method instructions may use concrete types now.
+  P.addDevirtualizer();
 
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
