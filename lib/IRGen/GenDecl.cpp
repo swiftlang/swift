@@ -832,7 +832,8 @@ void IRGenerator::emitGlobalTopLevel() {
   bool isWholeModule = PrimaryIGM->getSILModule().isWholeModule();
   for (SILFunction &f : PrimaryIGM->getSILModule()) {
     // Only eagerly emit functions that are externally visible.
-    if (!isPossiblyUsedExternally(f.getLinkage(), isWholeModule))
+    if (!isPossiblyUsedExternally(f.getLinkage(), isWholeModule) &&
+        !f.hasSemanticsAttr("stdlib_binary_only"))
       continue;
 
     CurrentIGMPtr IGM = getGenModule(&f);
