@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 protocol P {
   func downgrade(_ m68k: Bool) -> Self
@@ -40,7 +40,7 @@ func PQtoP() {
 
 // CHECK-LABEL: sil hidden @_T019existential_erasure19openExistentialToP1yAA1P_pKF
 func openExistentialToP1(_ p: P) throws {
-// CHECK: bb0(%0 : $*P):
+// CHECK: bb0(%0 : @trivial $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
 // CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
@@ -48,13 +48,13 @@ func openExistentialToP1(_ p: P) throws {
 // CHECK:   [[FUNC:%.*]] = function_ref @_T019existential_erasure12throwingFuncSbyKF
 // CHECK:   try_apply [[FUNC]]()
 //
-// CHECK: bb1([[SUCCESS:%.*]] : $Bool):
+// CHECK: bb1([[SUCCESS:%.*]] : @trivial $Bool):
 // CHECK:   apply [[METHOD]]<[[OPEN_TYPE]]>([[RESULT_ADDR]], [[SUCCESS]], [[OPEN]])
 // CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   destroy_addr %0
 // CHECK:   return
 //
-// CHECK: bb2([[FAILURE:%.*]] : $Error):
+// CHECK: bb2([[FAILURE:%.*]] : @owned $Error):
 // CHECK:   deinit_existential_addr [[RESULT]]
 // CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   destroy_addr %0
@@ -65,7 +65,7 @@ func openExistentialToP1(_ p: P) throws {
 
 // CHECK-LABEL: sil hidden @_T019existential_erasure19openExistentialToP2yAA1P_pKF
 func openExistentialToP2(_ p: P) throws {
-// CHECK: bb0(%0 : $*P):
+// CHECK: bb0(%0 : @trivial $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
 // CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
@@ -77,7 +77,7 @@ func openExistentialToP2(_ p: P) throws {
 // CHECK:  destroy_addr %0
 // CHECK:  return
 //
-// CHECK: bb2([[FAILURE:%.*]]: $Error):
+// CHECK: bb2([[FAILURE:%.*]]: @owned $Error):
 // CHECK:  deinit_existential_addr [[RESULT]]
 // CHECK:  dealloc_stack [[RESULT]]
 // CHECK:  destroy_addr %0
@@ -96,7 +96,7 @@ extension Error {
 
 // CHECK-LABEL: sil hidden @_T019existential_erasure12errorHandlers5Error_psAC_pKF
 func errorHandler(_ e: Error) throws -> Error {
-// CHECK: bb0([[ARG:%.*]] : $Error):
+// CHECK: bb0([[ARG:%.*]] : @owned $Error):
 // CHECK:  debug_value [[ARG]] : $Error
 // CHECK:  [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:  [[OPEN:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $*[[OPEN_TYPE:@opened\(.*\) Error]]
@@ -109,7 +109,7 @@ func errorHandler(_ e: Error) throws -> Error {
 // CHECK:  destroy_value %0 : $Error
 // CHECK:  return [[RESULT]] : $Error
 //
-// CHECK: bb2([[FAILURE:%.*]] : $Error):
+// CHECK: bb2([[FAILURE:%.*]] : @owned $Error):
 // CHECK:  dealloc_existential_box [[RESULT]]
 // CHECK:  destroy_value %0 : $Error
 // CHECK:  throw [[FAILURE]] : $Error
