@@ -291,6 +291,11 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
     P.addEarlyCodeMotion();
 
   P.addRetainSinking();
+  // Retain sinking does not sink all retains in one round.
+  // Let it run one more time time, because it can be beneficial.
+  // FIXME: Improve the RetainSinking pass to sink more/all
+  // retains in one go.
+  P.addRetainSinking();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
   P.addRemovePins();
