@@ -158,8 +158,7 @@ ArrayTestSuite.test("${Kind}/append") {
 }
 % end
 
-ArrayTestSuite.test("ArraySlice/append") 
-  .xfail(.custom({true}, reason: "<rdar://problem/33997561>")).code {
+ArrayTestSuite.test("ArraySlice/append") {
   do {
     let a: [OpaqueValue<Int>] = [ 42, 2525, 3535, 42 ].map(OpaqueValue.init)
     var s = a[1..<2]
