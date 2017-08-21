@@ -613,7 +613,7 @@ static void tuple_destroyArray(OpaqueValue *array, size_t n,
 
 // The operation doesn't have to be initializeWithCopy, but they all
 // have basically the same type.
-typedef value_witness_types::initializeWithCopy *
+typedef value_witness_types::initializeWithCopy
   ValueWitnessTable::*forEachOperation;
 
 /// Perform an operation for each field of two tuples.
@@ -848,33 +848,37 @@ static int tuple_getExtraInhabitantIndex(const OpaqueValue *tuple,
 
 /// Various standard witness table for tuples.
 static const ValueWitnessTable tuple_witnesses_pod_inline = {
-#define TUPLE_WITNESS(NAME) &tuple_##NAME<true, true>,
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(TUPLE_WITNESS)
-#undef TUPLE_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<true, true>,
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
   0,
   ValueWitnessFlags(),
   0
 };
 static const ValueWitnessTable tuple_witnesses_nonpod_inline = {
-#define TUPLE_WITNESS(NAME) &tuple_##NAME<false, true>,
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(TUPLE_WITNESS)
-#undef TUPLE_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<false, true>,
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
   0,
   ValueWitnessFlags(),
   0
 };
 static const ValueWitnessTable tuple_witnesses_pod_noninline = {
-#define TUPLE_WITNESS(NAME) &tuple_##NAME<true, false>,
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(TUPLE_WITNESS)
-#undef TUPLE_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<true, false>,
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
   0,
   ValueWitnessFlags(),
   0
 };
 static const ValueWitnessTable tuple_witnesses_nonpod_noninline = {
-#define TUPLE_WITNESS(NAME) &tuple_##NAME<false, false>,
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(TUPLE_WITNESS)
-#undef TUPLE_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<false, false>,
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
   0,
   ValueWitnessFlags(),
   0
@@ -1009,10 +1013,11 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
       proposedWitnesses = &tuple_witnesses_nonpod_noninline;
     }
   }
-#define ASSIGN_TUPLE_WITNESS(NAME) \
-  Witnesses.NAME = proposedWitnesses->NAME;
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(ASSIGN_TUPLE_WITNESS)
-#undef ASSIGN_TUPLE_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  Witnesses.LOWER_ID = proposedWitnesses->LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
 
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.
@@ -1055,7 +1060,7 @@ namespace {
   struct pointer_function_cast_impl;
   
   template<typename OutRet, typename...OutArgs>
-  struct pointer_function_cast_impl<OutRet * (OutArgs *...)> {
+  struct pointer_function_cast_impl<OutRet * (*)(OutArgs *...)> {
     template<typename InRet, typename...InArgs>
     static constexpr auto perform(InRet * (*function)(InArgs *...))
       -> OutRet * (*)(OutArgs *...)
@@ -1067,7 +1072,7 @@ namespace {
   };
 
   template<typename...OutArgs>
-  struct pointer_function_cast_impl<void (OutArgs *...)> {
+  struct pointer_function_cast_impl<void (*)(OutArgs *...)> {
     template<typename...InArgs>
     static constexpr auto perform(void (*function)(InArgs *...))
       -> void (*)(OutArgs *...)
@@ -1084,7 +1089,7 @@ namespace {
 /// In any reasonable calling convention the input and output function types
 /// should be ABI-compatible.
 template<typename Out, typename In>
-static constexpr Out *pointer_function_cast(In *function) {
+static constexpr Out pointer_function_cast(In *function) {
   return pointer_function_cast_impl<Out>::perform(function);
 }
 
@@ -1191,13 +1196,17 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       // For uncommon layouts, use value witnesses that work with an arbitrary
       // size and alignment.
       if (flags.isInlineStorage()) {
-  #define INSTALL_POD_DIRECT_WITNESS(NAME) vwtable->NAME = pod_direct_##NAME;
-        FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_DIRECT_WITNESS)
-  #undef INSTALL_POD_DIRECT_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+        vwtable->LOWER_ID = pod_direct_##LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
       } else {
-  #define INSTALL_POD_INDIRECT_WITNESS(NAME) vwtable->NAME = pod_indirect_##NAME;
-        FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_INDIRECT_WITNESS)
-  #undef INSTALL_POD_INDIRECT_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+        vwtable->LOWER_ID = pod_indirect_##LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
       }
       return;
       
@@ -1223,10 +1232,12 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       commonVWT = &VALUE_WITNESS_SYM(Bi512_);
       break;
     }
-    
-  #define INSTALL_POD_COMMON_WITNESS(NAME) vwtable->NAME = commonVWT->NAME;
-    FOR_ALL_FUNCTION_VALUE_WITNESSES(INSTALL_POD_COMMON_WITNESS)
-  #undef INSTALL_POD_COMMON_WITNESS
+
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+    vwtable->LOWER_ID = commonVWT->LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
     
     return;
   }
@@ -1830,12 +1841,13 @@ ExistentialMetatypeValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   using Box = NonFixedExistentialMetatypeBox;
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
 
-#define STORE_VAR_EXISTENTIAL_METATYPE_WITNESS(WITNESS) \
-  Data.WITNESS = Witnesses::WITNESS;
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(STORE_VAR_EXISTENTIAL_METATYPE_WITNESS)
-  STORE_VAR_EXISTENTIAL_METATYPE_WITNESS(storeExtraInhabitant)
-  STORE_VAR_EXISTENTIAL_METATYPE_WITNESS(getExtraInhabitantIndex)
-#undef STORE_VAR_EXISTENTIAL_METATYPE_WITNESS
+#define WANT_REQUIRED_VALUE_WITNESSES 1
+#define WANT_EXTRA_INHABITANT_VALUE_WITNESSES 1
+#define WANT_ENUM_VALUE_WITNESSES 0
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  Data.LOWER_ID = Witnesses::LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
 
   Data.size = Box::Container::getSize(numWitnessTables);
   Data.flags = ValueWitnessFlags()
@@ -2023,10 +2035,11 @@ OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
   static_assert(!Witnesses::hasExtraInhabitants, "no extra inhabitants");
 
-#define STORE_VAR_OPAQUE_EXISTENTIAL_WITNESS(WITNESS) \
-  Data.WITNESS = Witnesses::WITNESS;
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(STORE_VAR_OPAQUE_EXISTENTIAL_WITNESS)
-#undef STORE_VAR_OPAQUE_EXISTENTIAL_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  Data.LOWER_ID = Witnesses::LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
 
   Data.size = Box::Container::getSize(numWitnessTables);
   Data.flags = ValueWitnessFlags()
@@ -2079,12 +2092,13 @@ ClassExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   using Box = NonFixedClassExistentialBox;
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
 
-#define STORE_VAR_CLASS_EXISTENTIAL_WITNESS(WITNESS) \
-  Data.WITNESS = Witnesses::WITNESS;
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(STORE_VAR_CLASS_EXISTENTIAL_WITNESS)
-  STORE_VAR_CLASS_EXISTENTIAL_WITNESS(storeExtraInhabitant)
-  STORE_VAR_CLASS_EXISTENTIAL_WITNESS(getExtraInhabitantIndex)
-#undef STORE_VAR_CLASS_EXISTENTIAL_WITNESS
+#define WANT_REQUIRED_VALUE_WITNESSES 1
+#define WANT_EXTRA_INHABITANT_VALUE_WITNESSES 1
+#define WANT_ENUM_VALUE_WITNESSES 0
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  Data.LOWER_ID = Witnesses::LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
 
   Data.size = Box::Container::getSize(numWitnessTables);
   Data.flags = ValueWitnessFlags()
