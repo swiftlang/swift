@@ -201,7 +201,8 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
 }
 
 // Perform classic SSA optimizations.
-void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
+void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel,
+                  const SILOptions &Options) {
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
 
@@ -319,11 +320,12 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addTempRValueOpt();
 }
 
-static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
+static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P,
+                                             const SILOptions &Options) {
   P.startPipeline("HighLevel+EarlyLoopOpt");
   // FIXME: update this to be a function pass.
   P.addEagerSpecializer();
-  addSSAPasses(P, OptimizationLevelKind::HighLevel);
+  addSSAPasses(P, OptimizationLevelKind::HighLevel, Options);
   addHighLevelLoopOptPasses(P);
 }
 
@@ -338,9 +340,10 @@ static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
   P.addStackPromotion();
 }
 
-static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
+static void addMidLevelPassPipeline(SILPassPipelinePlan &P,
+                                    const SILOptions &Options) {
   P.startPipeline("MidLevel");
-  addSSAPasses(P, OptimizationLevelKind::MidLevel);
+  addSSAPasses(P, OptimizationLevelKind::MidLevel, Options);
 
   // Specialize partially applied functions with dead arguments as a preparation
   // for CapturePropagation.
@@ -388,13 +391,14 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // optimizer after this.
 }
 
-static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
+static void addLowLevelPassPipeline(SILPassPipelinePlan &P,
+                                    const SILOptions &Options) {
   P.startPipeline("LowLevel");
 
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addReleaseDevirtualizer();
 
-  addSSAPasses(P, OptimizationLevelKind::LowLevel);
+  addSSAPasses(P, OptimizationLevelKind::LowLevel, Options);
   P.addDeadStoreElimination();
 
   // We've done a lot of optimizations on this function, attempt to FSO.
@@ -489,11 +493,11 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   addPerfEarlyModulePassPipeline(P);
 
   // Then run an iteration of the high-level SSA passes.
-  addHighLevelEarlyLoopOptPipeline(P);
+  addHighLevelEarlyLoopOptPipeline(P, Options);
   addMidModulePassesStackPromotePassPipeline(P);
 
   // Run an iteration of the mid-level SSA passes.
-  addMidLevelPassPipeline(P);
+  addMidLevelPassPipeline(P, Options);
 
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
@@ -501,7 +505,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches and constants propagated into closures
   // (CapturePropagation).
-  addLowLevelPassPipeline(P);
+  addLowLevelPassPipeline(P, Options);
 
   addLateLoopOptPassPipeline(P);
 
