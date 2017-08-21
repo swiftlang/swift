@@ -1418,26 +1418,6 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
-  void visitRetainValueInst(RetainValueInst *I) { visitRefCountingInst(I); }
-
-  void visitReleaseValueInst(ReleaseValueInst *I) { visitRefCountingInst(I); }
-
-  void visitRetainValueAddrInst(RetainValueAddrInst *I) {
-    visitRefCountingInst(I);
-  }
-
-  void visitReleaseValueAddrInst(ReleaseValueAddrInst *I) {
-    visitRefCountingInst(I);
-  }
-
-  void visitAutoreleaseValueInst(AutoreleaseValueInst *I) {
-    visitRefCountingInst(I);
-  }
-
-  void visitSetDeallocatingInst(SetDeallocatingInst *I) {
-    visitRefCountingInst(I);
-  }
-
   void visitStructInst(StructInst *SI) {
     *this << SI->getType() << " (";
     interleave(SI->getElements(),
@@ -1656,21 +1636,6 @@ public:
     if (I->isNonAtomic())
       *this << "[nonatomic] ";
     *this << getIDAndType(I->getOperand(0));
-  }
-  void visitStrongRetainInst(StrongRetainInst *RI) { visitRefCountingInst(RI); }
-  void visitStrongReleaseInst(StrongReleaseInst *RI) {
-    visitRefCountingInst(RI);
-  }
-  void visitStrongPinInst(StrongPinInst *PI) { visitRefCountingInst(PI); }
-  void visitStrongUnpinInst(StrongUnpinInst *UI) { visitRefCountingInst(UI); }
-  void visitStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
-    visitRefCountingInst(RI);
-  }
-  void visitUnownedRetainInst(UnownedRetainInst *RI) {
-    visitRefCountingInst(RI);
-  }
-  void visitUnownedReleaseInst(UnownedReleaseInst *RI) {
-    visitRefCountingInst(RI);
   }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
