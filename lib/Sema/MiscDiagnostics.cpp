@@ -2561,6 +2561,9 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     if (KPA->getKeyPath()->getType()->getAnyNominal()
           == C.getWritableKeyPathDecl())
       markStoredOrInOutExpr(KPA->getBase(), RK_Written|RK_Read);
+    if (KPA->getKeyPath()->getType()->getAnyNominal()
+          == C.getReferenceWritableKeyPathDecl())
+      markStoredOrInOutExpr(KPA->getBase(), RK_Read);
     return;
   }
   
