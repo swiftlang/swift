@@ -80,6 +80,11 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
   // If we can statically determine that the operation overflows,
   // warn about it if warnings are not disabled by ResultsInError being null.
   if (ResultsInError.hasValue() && Overflow && ReportOverflow) {
+    if (BI->getFunction()->isSpecialization()) {
+      // Do not report any constant propagation issues in specializations,
+      // because they are eventually not present in the original function.
+      return nullptr;
+    }
     // Try to infer the type of the constant expression that the user operates
     // on. If the intrinsic was lowered from a call to a function that takes
     // two arguments of the same type, use the type of the LHS argument.
