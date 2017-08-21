@@ -138,6 +138,215 @@ ArrayTestSuite.test("${Kind}/popLast") {
 }
 % end
 
+// Check how append affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/append") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 2 ].map(OpaqueValue.init))
+    let v = OpaqueValue(1)
+    a.append(v)
+    expectEqual(0, a.startIndex)
+    expectEqual(2, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 2 ].map(OpaqueValue.init))
+    let v = OpaqueValue(1)
+    a.append(v)
+    expectEqual(0, a.startIndex)
+    expectEqual(2, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/append") 
+  .xfail(.custom({true}, reason: "<rdar://problem/33997561>")).code {
+  do {
+    let a: [OpaqueValue<Int>] = [ 42, 2525, 3535, 42 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    let v = OpaqueValue(1515)
+    s.append(v)
+    expectEqual(1, s.startIndex)
+    expectEqual(3, s.endIndex)
+  }
+}
+
+// Check how insert(_:at:) affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/insert") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 2 ].map(OpaqueValue.init))
+    let v = OpaqueValue(1)
+    a.insert(v, at: 0)
+    expectEqual(0, a.startIndex)
+    expectEqual(2, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 2 ].map(OpaqueValue.init))
+    let v = OpaqueValue(1)
+    a.insert(v, at: 1)
+    expectEqual(0, a.startIndex)
+    expectEqual(2, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/insert") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 42, 2525, 3535, 42 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    let v = OpaqueValue(1515)
+    s.insert(v, at: 1)
+    expectEqual(1, s.startIndex)
+    expectEqual(3, s.endIndex)
+  }
+}
+
+// Check how partition(by:) affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/partition") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 10, 2, -33, 44, -5 ].map(OpaqueValue.init))
+    a.partition(by: { $0.value > 0 })
+    expectEqual(0, a.startIndex)
+    expectEqual(5, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 10, 2, -33, 44, -5 ].map(OpaqueValue.init))
+    a.partition(by: { $0.value > 100 })
+    expectEqual(0, a.startIndex)
+    expectEqual(5, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 10, 2, -33, 44, -5 ].map(OpaqueValue.init))
+    a.partition(by: { $0.value > 100 })
+    expectEqual(0, a.startIndex)
+    expectEqual(5, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/partition") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    s.removeFirst()
+    expectEqual(2, s.startIndex)
+    expectEqual(2, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
+    var s = a[1..<3]
+    s.removeFirst()
+    expectEqual(2, s.startIndex)
+    expectEqual(3, s.endIndex)
+  }
+}
+
+// Check how removeLast() affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/removeLast") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1 ].map(OpaqueValue.init))
+    a.removeLast()
+    expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
+    a.removeLast()
+    expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/removeLast") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    s.removeLast()
+    expectEqual(1, s.startIndex)
+    expectEqual(1, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
+    var s = a[1..<3]
+    s.removeLast()
+    expectEqual(1, s.startIndex)
+    expectEqual(2, s.endIndex)
+  }
+}
+
+// Check how remove(at:) affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/remove(at:)") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1 ].map(OpaqueValue.init))
+    a.remove(at: 0)
+    expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
+    a.remove(at: 1)
+    expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/remove(at:)") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    s.remove(at: 1)
+    expectEqual(1, s.startIndex)
+    expectEqual(1, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
+    var s = a[1..<3]
+    s.remove(at: 1)
+    expectEqual(1, s.startIndex)
+    expectEqual(2, s.endIndex)
+  }
+}
+
+// Check how removeAll(keepingCapacity:) affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/removeAll(keepingCapacity:)") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2, 3, ].map(OpaqueValue.init))
+    a.removeAll(keepingCapacity: true)
+    expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
+    a.removeAll(keepingCapacity: false)
+    expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/removeAll(keepingCapacity:)") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    s.removeAll(keepingCapacity: true)
+    expectEqual(1, s.startIndex)
+    expectEqual(1, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    s.removeAll(keepingCapacity: false)
+    expectEqual(0, s.endIndex)
+    expectEqual(0, s.endIndex)
+  }
+}
+
 // Check how removeFirst() affects indices.
 % for Kind in ['Array', 'ContiguousArray']:
 ArrayTestSuite.test("${Kind}/removeFirst") {
@@ -145,11 +354,13 @@ ArrayTestSuite.test("${Kind}/removeFirst") {
     var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1 ].map(OpaqueValue.init))
     a.removeFirst()
     expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
   }
   do {
     var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
     a.removeFirst()
     expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
   }
 }
 % end
@@ -158,16 +369,223 @@ ArrayTestSuite.test("ArraySlice/removeFirst") {
   do {
     let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
     var s = a[1..<2]
-    expectEqual(1, s.startIndex)
     s.removeFirst()
     expectEqual(2, s.startIndex)
+    expectEqual(2, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
+    var s = a[1..<3]
+    s.removeFirst()
+    expectEqual(2, s.startIndex)
+    expectEqual(3, s.endIndex)
+  }
+}
+
+// Check how removeFirst(_:) affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/removeFirst(_:)") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
+    a.removeFirst(2)
+    expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2, 3, 4 ].map(OpaqueValue.init))
+    a.removeFirst(2)
+    expectEqual(0, a.startIndex)
+    expectEqual(2, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/removeFirst(_:)") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1...2]
+    s.removeFirst(2)
+    expectEqual(3, s.startIndex)
+    expectEqual(3, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
+    var s = a[1...3]
+    s.removeFirst(2)
+    expectEqual(3, s.startIndex)
+    expectEqual(4, s.endIndex)
+  }
+}
+
+// Check how removeLast() affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/removeLast") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1 ].map(OpaqueValue.init))
+    a.removeLast()
+    expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
+    a.removeLast()
+    expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/removeLast") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    s.removeLast()
+    expectEqual(1, s.startIndex)
+    expectEqual(1, s.endIndex)
   }
   do {
     let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
     var s = a[1..<2]
+    s.removeLast()
     expectEqual(1, s.startIndex)
-    s.removeFirst()
-    expectEqual(2, s.startIndex)
+    expectEqual(1, s.endIndex)
+  }
+}
+
+// Check how removeSubrange(_:ClosedRange) affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/removeSubrange(_:ClosedRange)") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1 ].map(OpaqueValue.init))
+    a.removeSubrange(0..<1)
+    expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2, 3 ].map(OpaqueValue.init))
+    a.removeSubrange(0..<2)
+    expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2, 3 ].map(OpaqueValue.init))
+    a.removeSubrange(1..<3)
+    expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/removeSubrange(_:ClosedRange)") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    s.removeSubrange(1..<2)
+    expectEqual(1, s.startIndex)
+    expectEqual(1, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
+    var s = a[1..<3]
+    s.removeLast()
+    expectEqual(1, s.startIndex)
+    expectEqual(2, s.endIndex)
+  }
+}
+
+// Check how removeSubrange(_:Range) affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/removeSubrange(_:Range)") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
+    a.removeSubrange(0...1)
+    expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2, 3 ].map(OpaqueValue.init))
+    a.removeSubrange(0...1)
+    expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2, 3 ].map(OpaqueValue.init))
+    a.removeSubrange(1...2)
+    expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/removeSubrange(_:Range)") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1..<3]
+    s.removeSubrange(1...2)
+    expectEqual(1, s.startIndex)
+    expectEqual(1, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99, 44 ].map(OpaqueValue.init)
+    var s = a[1..<4]
+    s.removeSubrange(2...3)
+    expectEqual(1, s.startIndex)
+    expectEqual(2, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99, 44 ].map(OpaqueValue.init)
+    var s = a[1..<4]
+    s.removeSubrange(1...2)
+    expectEqual(1, s.startIndex)
+    expectEqual(2, s.endIndex)
+  }
+}
+
+// Check how filter() affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/removeSubrange(_:Range)") {
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
+    a.removeSubrange(0...1)
+    expectEqual(0, a.startIndex)
+    expectEqual(0, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2, 3 ].map(OpaqueValue.init))
+    a.removeSubrange(0...1)
+    expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
+  }
+  do {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2, 3 ].map(OpaqueValue.init))
+    a.removeSubrange(1...2)
+    expectEqual(0, a.startIndex)
+    expectEqual(1, a.endIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/removeSubrange(_:Range)") {
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1..<3]
+    s.removeSubrange(1...2)
+    expectEqual(1, s.startIndex)
+    expectEqual(1, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99, 44 ].map(OpaqueValue.init)
+    var s = a[1..<4]
+    s.removeSubrange(2...3)
+    expectEqual(1, s.startIndex)
+    expectEqual(2, s.endIndex)
+  }
+  do {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99, 44 ].map(OpaqueValue.init)
+    var s = a[1..<4]
+    s.removeSubrange(1...2)
+    expectEqual(1, s.startIndex)
+    expectEqual(2, s.endIndex)
   }
 }
 
