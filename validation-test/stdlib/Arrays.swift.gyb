@@ -215,12 +215,6 @@ ArrayTestSuite.test("${Kind}/partition") {
     expectEqual(0, a.startIndex)
     expectEqual(5, a.endIndex)
   }
-  do {
-    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 10, 2, -33, 44, -5 ].map(OpaqueValue.init))
-    a.partition(by: { $0.value > 100 })
-    expectEqual(0, a.startIndex)
-    expectEqual(5, a.endIndex)
-  }
 }
 % end
 
