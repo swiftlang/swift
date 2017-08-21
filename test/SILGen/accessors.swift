@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // Hold a reference to do to magically become non-POD.
 class Reference {}
@@ -26,7 +26,7 @@ func test0(_ ref: A) {
   ref.array[index0()] = ref.array[index1()]
 }
 // CHECK: sil hidden @_T09accessors5test0yAA1ACF : $@convention(thin) (@owned A) -> () {
-// CHECK: bb0([[ARG:%.*]] : $A):
+// CHECK: bb0([[ARG:%.*]] : @owned $A):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
@@ -64,7 +64,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 
-// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
+// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout A, @thick A.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $A
 // SEMANTIC SIL TODO: This is an issue caused by the callback for materializeForSet in the class case taking the value as @inout when it should really take it as @guaranteed.
@@ -100,7 +100,7 @@ func test1(_ ref: B) {
   ref.array[index0()] = ref.array[index1()]
 }
 // CHECK-LABEL: sil hidden @_T09accessors5test1yAA1BCF : $@convention(thin) (@owned B) -> () {
-// CHECK:    bb0([[ARG:%.*]] : $B):
+// CHECK:    bb0([[ARG:%.*]] : @owned $B):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
@@ -127,7 +127,7 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 //
-// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
+// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
 // CHECK-NEXT: store_borrow [[BORROWED_ARG_RHS]] to [[TEMP2]] : $*B
@@ -153,7 +153,7 @@ func test1(_ ref: B) {
 // CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 //
-// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
+// CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
 // CHECK-NEXT: store_borrow [[BORROWED_ARG_LHS]] to [[TEMP2]] : $*B

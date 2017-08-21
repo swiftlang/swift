@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=NEGATIVE
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen %s | %FileCheck %s --check-prefix=NEGATIVE
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main
@@ -180,7 +180,7 @@ func takeDefaultArgUnnamed(_ x: Int = 5) { }
 
 // CHECK-LABEL: sil hidden @_T017default_arguments25testTakeDefaultArgUnnamed{{[_0-9a-zA-Z]*}}F
 func testTakeDefaultArgUnnamed(_ i: Int) {
-  // CHECK: bb0([[I:%[0-9]+]] : $Int):
+  // CHECK: bb0([[I:%[0-9]+]] : @trivial $Int):
   // CHECK:   [[FN:%[0-9]+]] = function_ref @_T017default_arguments21takeDefaultArgUnnamedySiF : $@convention(thin) (Int) -> ()
   // CHECK:   apply [[FN]]([[I]]) : $@convention(thin) (Int) -> ()
   takeDefaultArgUnnamed(i)

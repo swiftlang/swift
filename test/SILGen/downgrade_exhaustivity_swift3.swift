@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 3 -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -swift-version 3 -enable-sil-ownership -emit-silgen %s | %FileCheck %s
 
 enum Downgradable {
   case spoon
@@ -17,7 +17,7 @@ func testDowngradableOmittedPatternIsUnreachable(pat : Downgradable?) {
   // CHECK: [[CASE2]]:
   case .hat:
     break
-  // CHECK: [[DEFAULT_CASE]]:
+  // CHECK: [[DEFAULT_CASE]]({{%.*}} : @trivial $Downgradable):
   // CHECK-NEXT:   unreachable
   }
   
@@ -32,15 +32,15 @@ func testDowngradableOmittedPatternIsUnreachable(pat : Downgradable?) {
     break
   case (.hat, .hat):
     break
-  // CHECK: [[TUPLE_DEFAULT_CASE_2]]:
+  // CHECK: [[TUPLE_DEFAULT_CASE_2]]({{%.*}} : @trivial $Downgradable):
   // CHECK-NEXT:   unreachable
     
   // CHECK: switch_enum [[Y]] : $Downgradable, case #Downgradable.spoon!enumelt: {{bb[0-9]+}}, case #Downgradable.hat!enumelt: {{bb[0-9]+}}, default [[TUPLE_DEFAULT_CASE_3:bb[0-9]+]]
     
-  // CHECK: [[TUPLE_DEFAULT_CASE_3]]:
+  // CHECK: [[TUPLE_DEFAULT_CASE_3]]({{%.*}} : @trivial $Downgradable):
   // CHECK-NEXT:   unreachable
     
-  // CHECK: [[TUPLE_DEFAULT_CASE_1]]:
+  // CHECK: [[TUPLE_DEFAULT_CASE_1]]({{%.*}} : @trivial $Downgradable):
   // CHECK-NEXT:   unreachable
   }
   
