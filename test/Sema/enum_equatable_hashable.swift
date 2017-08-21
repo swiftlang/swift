@@ -131,7 +131,7 @@ if GenericHashable<String>.A("a") == .B { }
 var genericHashableHash: Int = GenericHashable<String>.A("a").hashValue
 
 // But it should be an error if the generic argument doesn't have the necessary
-// constrants to satisfy the conditions for derivation.
+// constraints to satisfy the conditions for derivation.
 enum GenericNotHashable<T: Equatable>: Hashable { // expected-error {{does not conform}}
   case A(T)
   case B

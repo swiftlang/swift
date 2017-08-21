@@ -102,7 +102,7 @@ if GenericHashable<String>(value: "a") == GenericHashable<String>(value: "b") { 
 var genericHashableHash: Int = GenericHashable<String>(value: "a").hashValue
 
 // But it should be an error if the generic argument doesn't have the necessary
-// constrants to satisfy the conditions for derivation.
+// constraints to satisfy the conditions for derivation.
 struct GenericNotHashable<T: Equatable>: Hashable { // expected-error {{does not conform}}
   let value: T
 }
