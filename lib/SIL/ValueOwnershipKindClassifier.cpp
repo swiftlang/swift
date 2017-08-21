@@ -290,32 +290,22 @@ ValueOwnershipKindClassifier::visitSelectEnumInst(SelectEnumInst *SEI) {
   return visitForwardingInst(SEI, SEI->getAllOperands().drop_front());
 }
 
+// unchecked_bitwise_cast is a bitwise copy. It produces a trivial or unowned
+// result.
+//
+// If the operand is nontrivial and the result is trivial, then it is the
+// programmer's responsibility to use Builtin.fixLifetime.
+//
+// If both the operand and the result are nontrivial, then either the types must
+// be compatible so that TBAA doesn't allow the destroy to be hoisted above uses
+// of the cast, or the programmer must use Builtin.fixLifetime.
 ValueOwnershipKind ValueOwnershipKindClassifier::visitUncheckedBitwiseCastInst(
     UncheckedBitwiseCastInst *UBCI) {
-  ValueOwnershipKind OpOwnership = UBCI->getOperand().getOwnershipKind();
-  bool ResultTypeIsTrivial = UBCI->getType().isTrivial(UBCI->getModule());
 
-  // First check if our operand has a trivial value ownership kind...
-  if (OpOwnership == ValueOwnershipKind::Trivial) {
-    // If we do have a trivial value ownership kind, see if our result type is
-    // trivial or non-trivial. If it is trivial, then we have trivial
-    // ownership. Otherwise, we have unowned ownership since from an ownership
-    // perspective, the value has instantaneously come into existence and
-    // nothing has taken ownership of it.
-    if (ResultTypeIsTrivial) {
-      return ValueOwnershipKind::Trivial;
-    }
-    return ValueOwnershipKind::Unowned;
-  }
-
-  // If our operand has non-trivial ownership, but our result does, then of
-  // course the result has trivial ownership.
-  if (ResultTypeIsTrivial) {
+  if (UBCI->getType().isTrivial(UBCI->getModule()))
     return ValueOwnershipKind::Trivial;
-  }
 
-  // Otherwise, we forward our ownership.
-  return visitForwardingInst(UBCI);
+  return ValueOwnershipKind::Unowned;
 }
 
 ValueOwnershipKind

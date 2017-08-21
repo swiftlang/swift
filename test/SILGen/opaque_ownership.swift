@@ -33,6 +33,23 @@ public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
   return container.isAtEnd
 }
 
+// Test unsafe_bitwise_cast nontrivial ownership.
+// ---
+// CHECK-LABEL: sil @_T0s13unsafeBitCastq_x_q_m2totr0_lF : $@convention(thin) <T, U> (@in T, @thick U.Type) -> @out U {
+// CHECK: bb0(%0 : @owned $T, %1 : @trivial $@thick U.Type):
+// CHECK:   %4 = begin_borrow %0 : $T
+// CHECK:   %5 = copy_value %4 : $T
+// CHECK:   %6 = unchecked_bitwise_cast %5 : $T to $U
+// CHECK:   %7 = copy_value %6 : $U
+// CHECK:   destroy_value %5 : $T
+// CHECK:   end_borrow %4 from %0 : $T, $T
+// CHECK:   destroy_value %0 : $T
+// CHECK:   return %7 : $U
+// CHECK-LABEL: } // end sil function '_T0s13unsafeBitCastq_x_q_m2totr0_lF'
+public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
+  return Builtin.reinterpretCast(x)
+}
+
 public enum Optional<Wrapped> {
   case none
   case some(Wrapped)
