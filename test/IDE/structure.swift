@@ -229,3 +229,6 @@ protocol FooProtocol {
   associatedtype Baz: Equatable
   // CHECK:  <associatedtype>associatedtype <name>Baz</name>: Equatable</associatedtype>
 }
+
+a.b(c: d?.e?.f, g: h)
+// CHECK: <call><name>a.b</name>(<arg><name>c</name>: d?.e?.f</arg>, <arg><name>g</name>: h</arg>)</call>

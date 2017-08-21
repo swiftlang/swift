@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 1636,
+  key.length: 1670,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1043,6 +1043,38 @@
           key.length: 29,
           key.nameoffset: 1619,
           key.namelength: 3
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "a.b",
+      key.offset: 1648,
+      key.length: 21,
+      key.nameoffset: 1648,
+      key.namelength: 3,
+      key.bodyoffset: 1652,
+      key.bodylength: 16,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "c",
+          key.offset: 1652,
+          key.length: 10,
+          key.nameoffset: 1652,
+          key.namelength: 1,
+          key.bodyoffset: 1655,
+          key.bodylength: 7
+        },
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "h",
+          key.offset: 1664,
+          key.length: 4,
+          key.nameoffset: 1664,
+          key.namelength: 1,
+          key.bodyoffset: 1667,
+          key.bodylength: 1
         }
       ]
     }

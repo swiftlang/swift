@@ -458,10 +458,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBeforeInIfConfig(E))
     return {false, E};
 
-  if (E->isImplicit())
-    return { true, E };
-
-  if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
+  auto addCallArgExpr = [&](const Expr *Elem, TupleExpr *ParentTupleExpr) {
     if (isCurrentCallArgExpr(ParentTupleExpr)) {
       CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, E);
       SyntaxStructureNode SN;
@@ -479,7 +476,18 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
 
       pushStructureNode(SN, E);
     }
+  };
+
+  if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
+    addCallArgExpr(E, ParentTupleExpr);
+  } else if (auto *ParentOptionalExpr = dyn_cast_or_null<OptionalEvaluationExpr>(Parent.getAsExpr())) {
+    if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(ParentOptionalExpr->getSubExpr())) {
+      addCallArgExpr(E, ParentTupleExpr);
+    }
   }
+
+  if (E->isImplicit())
+    return { true, E };
 
   auto addExprElem = [&](const Expr *Elem, SyntaxStructureNode &SN) {
     if (isa<ErrorExpr>(Elem))
