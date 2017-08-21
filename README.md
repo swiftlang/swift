@@ -121,19 +121,19 @@ To build using Ninja, run:
 
     utils/build-script --release-debuginfo
 
-If you are interested in debugging the compiler, run:
+When developing Swift, it helps to build what you're working on in a debug
+configuration while building the rest of the project with optimizations. Below
+are some examples of using debug variants:
+
+    utils/build-script --release-debuginfo --debug-swift # Swift frontend built in debug
+    utils/build-script --release-debuginfo --debug-swift-stdlib # Standard library built in debug
+    utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
+
+Limiting the amount of debug code in the compiler has a very large impact on
+Swift compile times, and in turn the test execution time. If you want to build
+the entire project in debug, you can run:
 
     utils/build-script --debug
-
-However, the compiler will be slower when built in debug mode. When developing
-in a specific area of the compiler, it helps to build an optimized compiler and
-override specific projects to use the debug variant.
-
-Below are some examples of using debug variants:
-
-    utils/build-script --release-debuginfo --debug-swift
-    utils/build-script --release-debuginfo --debug-swift-stdlib
-    utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker
 
 For documentation of all available arguments, as well as additional usage
 information, see the inline help:
