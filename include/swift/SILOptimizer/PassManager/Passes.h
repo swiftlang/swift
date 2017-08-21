@@ -55,6 +55,12 @@ namespace swift {
   /// \brief Remove dead functions from \p M.
   void performSILDeadFunctionElimination(SILModule *M);
 
+  /// \brief Mark all reachable (i.e. currently live) functions from \p M as
+  /// "public". Here "public" does not mean the SIL linkage, but rather the
+  /// fact that these functions cannot be eliminated by a dead function
+  /// elimination any more.
+  void markAllReachableFunctionsAsAnchors(SILModule *M);
+
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
   ///

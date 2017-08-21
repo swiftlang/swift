@@ -95,6 +95,16 @@ protected:
 
   llvm::SmallPtrSet<void *, 32> AliveFunctionsAndTables;
 
+  bool skipIndirectMethodInvocations = false;
+
+  void setSkipIndirectMethodInvocations() {
+    skipIndirectMethodInvocations = true;
+  }
+
+  bool shouldSkipIndirectMethodInvocations() const {
+    return skipIndirectMethodInvocations;
+  }
+
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
 
@@ -121,6 +131,11 @@ protected:
                          << F->getName() << '\n');
       return true;
     }
+
+    // stdlib_binary_only functions should never be removed as they
+    // may be referenced externally.
+    if (F->hasSemanticsAttr("stdlib_binary_only"))
+      return true;
 
     return false;
   }
@@ -343,21 +358,26 @@ protected:
     // First scan all instructions of the function.
     for (SILBasicBlock &BB : *F) {
       for (SILInstruction &I : BB) {
-        if (auto *WMI = dyn_cast<WitnessMethodInst>(&I)) {
-          auto *funcDecl = cast<AbstractFunctionDecl>(WMI->getMember().getDecl());
-          assert(funcDecl == getBase(funcDecl));
-          MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ true);
-          ensureAliveProtocolMethod(mi);
-        } else if (auto *MI = dyn_cast<MethodInst>(&I)) {
-          auto *funcDecl = getBase(
-              cast<AbstractFunctionDecl>(MI->getMember().getDecl()));
-          assert(MI->getNumOperands() - MI->getNumTypeDependentOperands() == 1
-                 && "method insts except witness_method must have 1 operand");
-          ClassDecl *MethodCl = MI->getOperand(0)->getType().
-                                  getClassOrBoundGenericClass();
-          MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
-          ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
-        } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
+        if (!shouldSkipIndirectMethodInvocations()) {
+          if (auto *WMI = dyn_cast<WitnessMethodInst>(&I)) {
+            auto *funcDecl =
+                cast<AbstractFunctionDecl>(WMI->getMember().getDecl());
+            assert(funcDecl == getBase(funcDecl));
+            MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ true);
+            ensureAliveProtocolMethod(mi);
+          } else if (auto *MI = dyn_cast<MethodInst>(&I)) {
+            auto *funcDecl =
+                getBase(cast<AbstractFunctionDecl>(MI->getMember().getDecl()));
+            assert(MI->getNumOperands() - MI->getNumTypeDependentOperands() ==
+                       1 &&
+                   "method insts except witness_method must have 1 operand");
+            ClassDecl *MethodCl =
+                MI->getOperand(0)->getType().getClassOrBoundGenericClass();
+            MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
+            ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
+          }
+        }
+        if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());
         } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
           ensureKeyPathComponentsAreAlive(KPI->getPattern());
@@ -869,6 +889,95 @@ public:
   }
 };
 
+/// A helper class to mark all alive functions as anchors.
+class AliveFunctionsMarker : FunctionLivenessComputation {
+  /// AliveFunctionsMarker pass does not take functions
+  /// reachable via vtables and witness_tables into account when computing
+  /// a function liveness information. The only exceptions are external
+  /// transparent functions, because bodies of external transparent functions
+  /// should never be removed.
+  void findAnchorsInTables() override {
+    // Check vtable methods.
+    for (SILVTable &vTable : Module->getVTableList()) {
+      for (auto &entry : vTable.getEntries()) {
+        SILFunction *F = entry.Implementation;
+        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
+          ensureAlive(F);
+      }
+    }
+
+    // Check witness methods.
+    for (SILWitnessTable &WT : Module->getWitnessTableList()) {
+      isVisibleExternally(WT.getConformance()->getProtocol());
+      for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
+        if (entry.getKind() != SILWitnessTable::Method)
+          continue;
+
+        auto methodWitness = entry.getMethodWitness();
+        SILFunction *F = methodWitness.Witness;
+        if (!F)
+          continue;
+        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
+          ensureAlive(F);
+      }
+    }
+
+    // Check default witness methods.
+    for (SILDefaultWitnessTable &WT : Module->getDefaultWitnessTableList()) {
+      for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
+        if (!entry.isValid())
+          continue;
+
+        SILFunction *F = entry.getWitness();
+        if (F->isTransparent() && isAvailableExternally(F->getLinkage()))
+          ensureAlive(F);
+      }
+    }
+
+  }
+
+  bool findAliveFunctions() {
+    for (SILFunction &F : *Module) {
+      if (isAvailableExternally(F.getLinkage()))
+        continue;
+
+      for (SILBasicBlock &BB : F) {
+        for (SILInstruction &I : BB) {
+          if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
+            SILFunction *RefF = FRI->getReferencedFunction();
+            // FIXME: Bad usage of transparent
+            if (RefF->isTransparent() && RefF->isSerialized())
+              ensureAlive(RefF);
+          }
+        }
+      }
+    }
+
+    return FunctionLivenessComputation::findAliveFunctions();
+  }
+
+public:
+  AliveFunctionsMarker(SILModule *module)
+      : FunctionLivenessComputation(module) {}
+
+  /// Bodies of alive functions should not be removed, as LLVM may
+  /// still need them for analyzing their side-effects.
+  void markAliveFunctions() {
+    // Do not look through indirect method invocations.
+    setSkipIndirectMethodInvocations();
+    findAliveFunctions();
+    // Mark all alive functions as anchors if necessary.
+    for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
+      SILFunction *F = &*FI;
+      ++FI;
+      if (isAlive(F) && !isAvailableExternally(F->getLinkage())) {
+        F->setKeepAsAnchor(true);
+      }
+    }
+  }
+};
+
+
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -926,4 +1035,13 @@ void swift::performSILDeadFunctionElimination(SILModule *M) {
   llvm::SmallVector<PassKind, 1> Pass = {PassKind::DeadFunctionElimination};
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getPassPipelineForKinds(Pass));
+}
+
+/// \brief Mark all reachable (i.e. currently live) functions from \p M as
+/// "public". Here "public" does not mean the SIL linkage, but rather the
+/// fact that these functions cannot be eliminated by a dead function
+/// elimination any more.
+void swift::markAllReachableFunctionsAsAnchors(SILModule *M) {
+  AliveFunctionsMarker Marker(M);
+  Marker.markAliveFunctions();
 }
