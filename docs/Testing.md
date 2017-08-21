@@ -34,66 +34,31 @@ The testsuite is split into four subsets:
 * Unit tests, located under ``swift/unittests``.
 * Long tests, which are marked with ``REQUIRES: long_test``.
 
-Unlike other tests, every long test should also include either
-``REQUIRES: nonexecutable_test`` or ``REQUIRES: executable_test``.
-
 ### Running the LLVM lit-based testsuite
 
-It is recommended that you run the Swift test suites via ``utils/build-script``.
-For day-to-day work on the Swift compiler, using ``utils/build-script --test``
-should be sufficient.  The buildbot runs validation tests, so if those are
-accidentally broken, it should not go unnoticed.
+The simplest way to run the Swift test suite is with the ``--test`` switch to
+``utils/build-script``. This will run the primary test suite. The buildbot runs
+validation tests, so if those are accidentally broken, it should not go
+unnoticed.
 
 Before committing a large change to a compiler (especially a language change),
 or API changes to the standard library, it is recommended to run validation
 test suite, via ``utils/build-script --validation-test``.
 
-Although it is not recommended for day-to-day contributions, it is also
-technically possible to execute the tests directly via CMake. For example, if you have
-built Swift products at the directory ``build/Ninja-ReleaseAssert/swift-macosx-x86_64``,
-you may run the entire test suite directly using the following command:
+Using ``utils/build-script`` will rebuild all targets which can add substantial
+time to a debug cycle.
+
+#### Using lit.py
+
+Using `lit.py` directly can provide more control and faster feedback to your
+development cycle. To invoke LLVM's `lit.py` script directly, it must be
+configured to use your local build directory. For example:
 
 ```
-  cmake --build build/Ninja-ReleaseAssert/swift-macosx-x86_64 -- check-swift-macosx-x86_64
+    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_DIR}/test-iphonesimulator-i386/Parse/
 ```
 
-Note that ``check-swift`` is suffixed with a target operating system and architecture.
-Besides ``check-swift``, other targets are also available. Here's the full list:
-
-* ``check-swift``: Runs tests from the ``${SWIFT_SOURCE_ROOT}/test`` directory.
-* ``check-swift-only_validation``: Runs tests from the ``${SWIFT_SOURCE_ROOT}/validation-test`` directory.
-* ``check-swift-validation``: Runs the primary and validation tests, without the long tests.
-* ``check-swift-only_long``: Runs long tests only.
-* ``check-swift-all``: Runs all tests (primary, validation, and long).
-* ``SwiftUnitTests``: Builds all unit tests.  Executables are located under
-  ``${SWIFT_BUILD_ROOT}/unittests`` and must be run individually.
-
-For every target above, there are variants for different optimizations:
-
-* the target itself (e.g., ``check-swift``) -- runs all tests from the primary
-  testsuite.  The execution tests are run in ``-Onone`` mode.
-* the target with ``-optimize`` suffix (e.g., ``check-swift-optimize``) -- runs
-  execution tests in ``-O`` mode.  This target will only run tests marked as
-  ``executable_test``.
-* the target with ``-optimize-unchecked`` suffix (e.g.,
-  ``check-swift-optimize-unchecked``) -- runs execution tests in
-  ``-Ounchecked`` mode. This target will only run tests marked as
-  ``executable_test``.
-* the target with ``-executable`` suffix (e.g.,
-  ``check-swift-executable-iphoneos-arm64``) -- runs tests marked with
-  ``executable_test`` in ``-Onone`` mode.
-* the target with ``-non-executable`` suffix (e.g.,
-  ``check-swift-non-executable-iphoneos-arm64``) -- runs tests not marked with
-  ``executable_test`` in ``-Onone`` mode.
-
-If more control is required (e.g. to manually run certain tests), you can invoke
-LLVM's lit.py script directly. For example:
-
-```
-    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/Parse/
-```
-
-This runs the tests in the test/Parse/ directory targeting the 32-bit iOS
+This runs the tests in the 'test/Parse/' directory targeting the 32-bit iOS
 Simulator. The ``-sv`` options give you a nice progress bar and only show you
 output from the tests that fail.
 
@@ -106,7 +71,7 @@ testing configuration explicitly, which then allows you to test files
 regardless of location.
 
 ```
-    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
+    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_DIR}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
 ```
 
 For more complicated configuration, copy the invocation from one of the build
@@ -114,7 +79,7 @@ targets mentioned above and modify it as necessary. lit.py also has several
 useful features, like timing tests and providing a timeout. Check these features
 out with ``lit.py -h``. We document some of the more useful ones below:
 
-#### Extra lit.py invocation options
+##### Extra lit.py invocation options
 
 * ``-s`` reduces the amount of output that lit shows.
 * ``-v`` causes a test's commandline and output to be printed if the test fails.
@@ -140,6 +105,46 @@ out with ``lit.py -h``. We document some of the more useful ones below:
 * ``--param swift_test_mode=<MODE>`` drives the various suffix variations
   mentioned above. Again, it's best to get the invocation from the existing
   build system targets and modify it rather than constructing it yourself.
+
+#### CMake
+
+Although it is not recommended for day-to-day contributions, it is also
+technically possible to execute the tests directly via CMake. For example, if you have
+built Swift products at the directory ``build/Ninja-ReleaseAssert/swift-macosx-x86_64``,
+you may run the entire test suite directly using the following command:
+
+```
+  cmake --build build/Ninja-ReleaseAssert/swift-macosx-x86_64 -- check-swift-macosx-x86_64
+```
+
+Note that ``check-swift`` is suffixed with a target operating system and architecture.
+Besides ``check-swift``, other targets are also available. Here's the full list:
+
+* ``check-swift``: Runs tests from the ``${SWIFT_SOURCE_ROOT}/test`` directory.
+* ``check-swift-only_validation``: Runs tests from the ``${SWIFT_SOURCE_ROOT}/validation-test`` directory.
+* ``check-swift-validation``: Runs the primary and validation tests, without the long tests.
+* ``check-swift-only_long``: Runs long tests only.
+* ``check-swift-all``: Runs all tests (primary, validation, and long).
+* ``SwiftUnitTests``: Builds all unit tests.  Executables are located under
+  ``${SWIFT_BUILD_DIR}/unittests`` and must be run individually.
+
+For every target above, there are variants for different optimizations:
+
+* the target itself (e.g., ``check-swift``) -- runs all tests from the primary
+  testsuite.  The execution tests are run in ``-Onone`` mode.
+* the target with ``-optimize`` suffix (e.g., ``check-swift-optimize``) -- runs
+  execution tests in ``-O`` mode.  This target will only run tests marked as
+  ``executable_test``.
+* the target with ``-optimize-unchecked`` suffix (e.g.,
+  ``check-swift-optimize-unchecked``) -- runs execution tests in
+  ``-Ounchecked`` mode. This target will only run tests marked as
+  ``executable_test``.
+* the target with ``-executable`` suffix (e.g.,
+  ``check-swift-executable-iphoneos-arm64``) -- runs tests marked with
+  ``executable_test`` in ``-Onone`` mode.
+* the target with ``-non-executable`` suffix (e.g.,
+  ``check-swift-non-executable-iphoneos-arm64``) -- runs tests not marked with
+  ``executable_test`` in ``-Onone`` mode.
 
 ### Writing tests
 
@@ -186,6 +191,9 @@ standard library that only has a very basic set of APIs.
 
 If you write an executable test please add ``REQUIRES: executable_test`` to the
 test.
+
+Every long test must also include ``REQUIRES: nonexecutable_test`` or
+``REQUIRES: executable_test``.
 
 #### Substitutions in lit tests
 
