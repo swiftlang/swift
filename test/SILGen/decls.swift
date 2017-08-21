@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_T05decls11void_returnyyF
 // CHECK: = tuple
@@ -86,7 +86,7 @@ func tuple_patterns() {
 }
 
 // CHECK-LABEL: sil hidden @_T05decls16simple_arguments{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $Int, %1 : $Int):
+// CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $Int):
 // CHECK: [[X:%[0-9]+]] = alloc_box ${ var Int }
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: store %0 to [trivial] [[PBX]]
@@ -100,14 +100,14 @@ func simple_arguments(x: Int, y: Int) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_T05decls14tuple_argument{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $Int, %1 : $Float):
+// CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $Float):
 // CHECK: [[UNIT:%[0-9]+]] = tuple ()
 // CHECK: [[TUPLE:%[0-9]+]] = tuple (%0 : $Int, %1 : $Float, [[UNIT]] : $())
 func tuple_argument(x: (Int, Float, ())) {
 }
 
 // CHECK-LABEL: sil hidden @_T05decls14inout_argument{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $*Int, %1 : $Int):
+// CHECK: bb0(%0 : @trivial $*Int, %1 : @trivial $Int):
 // CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box ${ var Int }
 // CHECK: [[PBX:%.*]] = project_box [[X_LOCAL]]
 func inout_argument(x: inout Int, y: Int) {
