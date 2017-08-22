@@ -2093,8 +2093,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   }
 
   // Choose the swiftmodule output path.
-  if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
-      Output->getPrimaryOutputType() != types::TY_SwiftModuleFile) {
+  if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA)) {
     StringRef OFMModuleOutputPath;
     if (OutputMap) {
       auto iter = OutputMap->find(types::TY_SwiftModuleFile);
