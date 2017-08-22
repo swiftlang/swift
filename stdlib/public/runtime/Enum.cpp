@@ -119,9 +119,11 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
           || payloadVWT == &VALUE_WITNESS_SYM(BO)
 #endif
           )) {
-#define COPY_PAYLOAD_WITNESS(NAME) vwtable->NAME = payloadVWT->NAME;
-    FOR_ALL_FUNCTION_VALUE_WITNESSES(COPY_PAYLOAD_WITNESS)
-#undef COPY_PAYLOAD_WITNESS
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+    vwtable->LOWER_ID = payloadVWT->LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
   } else {
 #endif
     installCommonValueWitnesses(vwtable);
