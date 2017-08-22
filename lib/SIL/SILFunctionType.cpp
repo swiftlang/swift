@@ -1546,7 +1546,8 @@ namespace {
       }
 
       auto type = tl.getLoweredType().getSwiftRValueType();
-      if (type->hasRetainablePointerRepresentation())
+      if (type->hasRetainablePointerRepresentation()
+          || (type->getSwiftNewtypeUnderlyingType() && !tl.isTrivial()))
         return ResultConvention::Autoreleased;
 
       return ResultConvention::Unowned;
