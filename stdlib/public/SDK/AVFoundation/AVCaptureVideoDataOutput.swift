@@ -21,7 +21,7 @@ extension AVCaptureVideoDataOutput {
   @available(macOS, introduced: 10.7)
   @available(iOS, introduced: 5.0)
   @nonobjc
-  public var availableVideoCVPixelFormatTypes: [NSNumber]! {
+  public var availableVideoCVPixelFormatTypes: [Any]! {
     return __availableVideoCVPixelFormatTypes
   }
   
