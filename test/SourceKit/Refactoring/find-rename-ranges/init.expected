@@ -1,0 +1,7 @@
+source.edit.kind.active:
+  37:3-37:7 source.refactoring.range.kind.keyword-basename
+  37:8-37:9 source.refactoring.range.kind.decl-argument-label arg-index=0
+  37:9-37:9 source.refactoring.range.kind.parameter-and-whitespace arg-index=0
+source.edit.kind.active:
+  39:10-39:11 source.refactoring.range.kind.call-argument-label arg-index=0
+  39:11-39:13 source.refactoring.range.kind.call-argument-colon arg-index=0

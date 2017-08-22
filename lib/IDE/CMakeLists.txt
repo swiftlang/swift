@@ -3,6 +3,7 @@ add_swift_library(swiftIDE STATIC
   CodeCompletionCache.cpp
   CommentConversion.cpp
   Formatting.cpp
+  Refactoring.cpp
   ModuleInterfacePrinting.cpp
   TypeReconstruction.cpp
   REPLCodeCompletion.cpp

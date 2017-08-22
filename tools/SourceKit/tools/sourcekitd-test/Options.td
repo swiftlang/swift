@@ -61,6 +61,10 @@ def req_opts : CommaJoined<["-"], "req-opts=">,
   HelpText<"Pass the comma separated options in <arg> as request specific options">,
   MetaVarName<"<arg>">;
 
+def rename_spec : Separate<["-"], "rename-spec">,
+  HelpText<"The JSON format rename spec file (req=syntactic-rename)">;
+def rename_spec_EQ : Joined<["-"], "rename-spec=">, Alias<rename_spec>;
+
 def check_interface_is_ascii : Flag<["-"], "check-interface-ascii">,
   HelpText<"Check that the module interface text is ASCII">;
 
@@ -105,6 +109,9 @@ def swift_name : Separate<["-"], "swift-name">,
 
 def objc_name : Separate<["-"], "objc-name">,
   HelpText<"Objective-C name to translate from">;
+
+def name : Separate<["-"], "name">,
+  HelpText<"The preferred name when performing semantic refactoring">;
 
 def objc_selector : Separate<["-"], "objc-selector">,
   HelpText<"Objective-C selector name to translate from">;
