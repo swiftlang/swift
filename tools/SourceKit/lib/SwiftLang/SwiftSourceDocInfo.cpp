@@ -27,6 +27,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDE/Refactoring.h"
 #include "swift/Markup/XMLUtils.h"
 #include "swift/Sema/IDETypeChecking.h"
 
@@ -614,6 +615,51 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   return false;
 }
 
+static void
+collectAvailableRenameInfo(const ValueDecl *VD,
+                           std::vector<UIdent> &RefactoringIds,
+                           DelayedStringRetriever &RefactroingNameOS,
+                           DelayedStringRetriever &RefactoringReasonOS) {
+  std::vector<ide::RenameAvailabiliyInfo> Scratch;
+  for (auto Info : ide::collectRenameAvailabilityInfo(VD, Scratch)) {
+    RefactoringIds.push_back(SwiftLangSupport::
+      getUIDForRefactoringKind(Info.Kind));
+    RefactroingNameOS.startPiece();
+    RefactroingNameOS << ide::getDescriptiveRefactoringKindName(Info.Kind);
+    RefactroingNameOS.endPiece();
+    RefactoringReasonOS.startPiece();
+    RefactoringReasonOS << ide::getDescriptiveRenameUnavailableReason(Info.
+      AvailableKind);
+    RefactoringReasonOS.endPiece();
+  }
+}
+
+static void
+serializeRefactoringKinds(ArrayRef<RefactoringKind> AllKinds,
+                          std::vector<UIdent> &RefactoringIds,
+                          DelayedStringRetriever &RefactroingNameOS,
+                          DelayedStringRetriever &RefactoringReasonOS) {
+  for (auto Kind : AllKinds) {
+    RefactoringIds.push_back(SwiftLangSupport::getUIDForRefactoringKind(Kind));
+    RefactroingNameOS.startPiece();
+    RefactroingNameOS << ide::getDescriptiveRefactoringKindName(Kind);
+    RefactroingNameOS.endPiece();
+    RefactoringReasonOS.startPiece();
+    RefactoringReasonOS.endPiece();
+  }
+}
+
+static void
+collectAvailableRefactoringsOtherThanRename(SourceFile *SF, SemaToken Tok,
+                                            std::vector<UIdent> &RefactoringIds,
+                                      DelayedStringRetriever &RefactroingNameOS,
+                                  DelayedStringRetriever &RefactoringReasonOS) {
+  std::vector<RefactoringKind> Scratch;
+  serializeRefactoringKinds(collectAvailableRefactorings(SF, Tok, Scratch,
+    /*ExcludeRename*/true), RefactoringIds, RefactroingNameOS,
+    RefactoringReasonOS);
+}
+
 static Optional<unsigned>
 getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   if (Cursor.isInvalid())
@@ -644,13 +690,17 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
 }
 
 /// Returns true for failure to resolve.
-static bool passCursorInfoForDecl(const ValueDecl *VD,
+static bool passCursorInfoForDecl(SourceFile* SF,
+                                  const ValueDecl *VD,
                                   const ModuleDecl *MainModule,
                                   const Type Ty,
                                   const Type ContainerTy,
                                   bool IsRef,
+                                  bool RetrieveRefactoring,
+                                  SemaToken TheTok,
                                   Optional<unsigned> OrigBufferID,
                                   SourceLoc CursorLoc,
+                        ArrayRef<RefactoringInfo> KownRefactoringInfoFromRange,
                                   SwiftLangSupport &Lang,
                                   const CompilerInvocation &Invok,
                             ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps,
@@ -755,6 +805,16 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
     ide::getLocalizationKey(VD, OS);
   }
   unsigned LocalizationEnd = SS.size();
+
+  std::vector<UIdent> RefactoringIds;
+  DelayedStringRetriever RefactoringNameOS(SS);
+  DelayedStringRetriever RefactoringReasonOS(SS);
+  if (RetrieveRefactoring) {
+    collectAvailableRenameInfo(VD, RefactoringIds, RefactoringNameOS,
+                               RefactoringReasonOS);
+    collectAvailableRefactoringsOtherThanRename(SF, TheTok, RefactoringIds,
+      RefactoringNameOS, RefactoringReasonOS);
+  }
 
   DelayedStringRetriever OverUSRsStream(SS);
 
@@ -861,6 +921,17 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   SmallVector<StringRef, 4> AnnotatedRelatedDecls;
   RelDeclsStream.retrieve([&](StringRef S) { AnnotatedRelatedDecls.push_back(S); });
 
+  SmallVector<RefactoringInfo, 4> RefactoringInfoBuffer;
+  for (unsigned I = 0, N = RefactoringIds.size(); I < N; I ++) {
+    RefactoringInfoBuffer.push_back({RefactoringIds[I], RefactoringNameOS[I],
+                                     RefactoringReasonOS[I]});
+  }
+
+  // Add available refactoring inheritted from range.
+  RefactoringInfoBuffer.insert(RefactoringInfoBuffer.end(),
+    KownRefactoringInfoFromRange.begin(),
+    KownRefactoringInfoFromRange.end());
+
   bool IsSystem = VD->getModuleContext()->isSystemModule();
   std::string TypeInterface;
 
@@ -884,6 +955,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.LocalizationKey = LocalizationKey;
   Info.IsSystem = IsSystem;
   Info.TypeInterface = StringRef();
+  Info.AvailableActions = llvm::makeArrayRef(RefactoringInfoBuffer);
   Info.ParentNameOffset = getParamParentNameOffset(VD, CursorLoc);
   Receiver(Info);
   return false;
@@ -1139,10 +1211,10 @@ static void resolveCursor(SwiftLangSupport &Lang,
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
       ModuleDecl *MainModule = CompIns.getMainModule();
-
+      SourceManager &SM = CompIns.getSourceMgr();
       unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
       SourceLoc Loc =
-        Lexer::getLocForStartOfToken(CompIns.getSourceMgr(), BufferID, Offset);
+        Lexer::getLocForStartOfToken(SM, BufferID, Offset);
       if (Loc.isInvalid()) {
         Receiver({});
         return;
@@ -1157,13 +1229,59 @@ static void resolveCursor(SwiftLangSupport &Lang,
                        {std::make_pair("Offset", std::to_string(Offset))});
       }
 
+      // Sanitize length.
+      if (Length) {
+        SourceLoc TokEnd = Lexer::getLocForEndOfToken(SM, Loc);
+        SourceLoc EndLoc = SM.getLocForOffset(BufferID, Offset + Length);
+
+        // If TokEnd is not before the given EndLoc, the EndLoc contains no
+        // more stuff than this token, so set the length to 0.
+        if (SM.isBeforeInBuffer(EndLoc, TokEnd) || TokEnd == EndLoc)
+          Length = 0;
+      }
+
+      // Retrive relevant actions on the code under selection.
+      std::vector<RefactoringInfo> AvailableRefactorings;
+      if (Actionables && Length) {
+        std::vector<RefactoringKind> Scratch;
+        RangeConfig Range;
+        Range.BufferId = BufferID;
+        auto Pair = SM.getLineAndColumn(Loc);
+        Range.Line = Pair.first;
+        Range.Column = Pair.second;
+        Range.Length = Length;
+        bool RangeStartMayNeedRename = false;
+        for (RefactoringKind Kind :
+             collectAvailableRefactorings(&AstUnit->getPrimarySourceFile(),
+                                Range, RangeStartMayNeedRename, Scratch, {})) {
+          AvailableRefactorings.push_back({
+            SwiftLangSupport::getUIDForRefactoringKind(Kind),
+            getDescriptiveRefactoringKindName(Kind),
+            /*UnavailableReason*/ StringRef()
+          });
+        }
+        if (!RangeStartMayNeedRename) {
+          CursorInfo Info;
+
+          // FIXME: This Kind does not mean anything.
+          Info.Kind = SwiftLangSupport::getUIDForModuleRef();
+          Info.AvailableActions = llvm::makeArrayRef(AvailableRefactorings);
+
+          // If Length is given, then the cursor-info request should only about
+          // collecting available refactorings for the range.
+          Receiver(Info);
+          return;
+        }
+        // If the range start may need rename, we fall back to a regular cursor
+        // info request to get the available rename kinds.
+      }
+
       SemaLocResolver Resolver(AstUnit->getPrimarySourceFile());
       SemaToken SemaTok = Resolver.resolve(Loc);
       if (SemaTok.isInvalid()) {
         Receiver({});
         return;
       }
-
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
@@ -1174,11 +1292,15 @@ static void resolveCursor(SwiftLangSupport &Lang,
         return;
       case SemaTokenKind::ValueRef: {
         ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
-        bool Failed = passCursorInfoForDecl(VD, MainModule,
+        bool Failed = passCursorInfoForDecl(&AstUnit->getPrimarySourceFile(),
+                                            VD, MainModule,
                                             SemaTok.ContainerType,
                                             SemaTok.ContainerType,
-                                            SemaTok.IsRef, BufferID, Loc, Lang,
-                                            CompInvok, getPreviousASTSnaps(),
+                                            SemaTok.IsRef, Actionables, SemaTok,
+                                            BufferID, Loc,
+                                            AvailableRefactorings,
+                                            Lang, CompInvok,
+                                            getPreviousASTSnaps(),
                                             Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
@@ -1194,6 +1316,29 @@ static void resolveCursor(SwiftLangSupport &Lang,
       }
       case SemaTokenKind::ExprStart:
       case SemaTokenKind::StmtStart: {
+        if (Actionables) {
+          SmallString<64> SS;
+          std::vector<UIdent> RefactoringIds;
+          DelayedStringRetriever NameRetriever(SS);
+          DelayedStringRetriever ReasonRetriever(SS);
+          collectAvailableRefactoringsOtherThanRename(
+            &AstUnit->getPrimarySourceFile(), SemaTok, RefactoringIds,
+            NameRetriever, ReasonRetriever);
+          if (auto Size = RefactoringIds.size()) {
+            CursorInfo Info;
+
+            // FIXME: This Kind does not mean anything.
+            Info.Kind = SwiftLangSupport::getUIDForModuleRef();
+            for (unsigned I = 0; I < Size; I ++) {
+              AvailableRefactorings.push_back({RefactoringIds[I],
+                NameRetriever[I], ReasonRetriever[I]});
+            }
+            Info.AvailableActions = llvm::makeArrayRef(AvailableRefactorings);
+            Receiver(Info);
+            return;
+          }
+        }
+
         Receiver({});
         return;
       }
@@ -1426,7 +1571,7 @@ void SwiftLangSupport::getCursorInfo(
                      SwiftArgs, OpArgs);
     }
 
-    IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Receiver] {
+    IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Actionables, Receiver] {
       SwiftInterfaceGenContext::ResolvedEntity Entity;
       Entity = IFaceGenRef->resolveEntityForOffset(Offset);
       if (Entity.isResolved()) {
@@ -1439,8 +1584,10 @@ void SwiftLangSupport::getCursorInfo(
           // FIXME: Should pass the main module for the interface but currently
           // it's not necessary.
           passCursorInfoForDecl(
-              Entity.Dcl, /*MainModule*/ nullptr, Type(), Type(), Entity.IsRef,
-              /*OrigBufferID=*/None, SourceLoc(), *this, Invok, {}, Receiver);
+              /*SourceFile*/nullptr, Entity.Dcl, /*MainModule*/ nullptr, Type(),
+              Type(), Entity.IsRef, Actionables, SemaToken(),
+              /*OrigBufferID=*/None, SourceLoc(),
+              {}, *this, Invok, {}, Receiver);
         }
       } else {
         Receiver({});
@@ -1627,9 +1774,10 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
           selfTy = VD->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
         }
         bool Failed =
-            passCursorInfoForDecl(VD, MainModule, selfTy, Type(),
-                                  /*IsRef=*/false, BufferID, SourceLoc(), Lang,
-                                  CompInvok, PreviousASTSnaps, Receiver);
+            passCursorInfoForDecl(/*SourceFile*/nullptr, VD, MainModule, selfTy,
+                                  Type(), /*IsRef=*/false, false, SemaToken(),
+                                  BufferID, SourceLoc(), {}, Lang, CompInvok,
+                                  PreviousASTSnaps, Receiver);
         if (Failed) {
           if (!PreviousASTSnaps.empty()) {
             // Attempt again using the up-to-date AST.
@@ -1853,4 +2001,71 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
   static const char OncePerASTToken = 0;
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
   ASTMgr->processASTAsync(Invok, std::move(Consumer), Once);
+}
+
+//===----------------------------------------------------------------------===//
+// SwiftLangSupport::semanticRefactoring
+//===----------------------------------------------------------------------===//
+
+static RefactoringKind getIDERefactoringKind(SemanticRefactoringInfo Info) {
+  switch(Info.Kind) {
+    case SemanticRefactoringKind::None: return RefactoringKind::None;
+#define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
+    case SemanticRefactoringKind::KIND: return RefactoringKind::KIND;
+#include "swift/IDE/RefactoringKinds.def"
+  }
+}
+
+void SwiftLangSupport::
+semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
+                    ArrayRef<const char*> Args,
+                    CategorizedEditsReceiver Receiver) {
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, Filename, Error);
+  if (!Invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver({}, Error);
+    return;
+  }
+  assert(Invok);
+
+  class SemaRefactoringConsumer : public SwiftASTConsumer {
+    SemanticRefactoringInfo Info;
+    CategorizedEditsReceiver Receiver;
+
+  public:
+    SemaRefactoringConsumer(SemanticRefactoringInfo Info,
+                            CategorizedEditsReceiver Receiver) : Info(Info),
+                                                Receiver(std::move(Receiver)) {}
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &CompIns = AstUnit->getCompilerInstance();
+      ModuleDecl *MainModule = CompIns.getMainModule();
+      RefactoringOptions Opts(getIDERefactoringKind(Info));
+      Opts.Range.BufferId =  AstUnit->getPrimarySourceFile().getBufferID().
+        getValue();
+      Opts.Range.Line = Info.Line;
+      Opts.Range.Column = Info.Column;
+      Opts.Range.Length = Info.Length;
+      Opts.PreferredName = Info.PreferredName;
+
+      RequestRefactoringEditConsumer EditConsumer(Receiver);
+      refactorSwiftModule(MainModule, Opts, EditConsumer, EditConsumer);
+    }
+
+    void cancelled() override {
+      Receiver({}, "The refactoring is canceled.");
+    }
+
+    void failed(StringRef Error) override {
+      Receiver({}, Error);
+    }
+  };
+
+  auto Consumer = std::make_shared<SemaRefactoringConsumer>(Info, Receiver);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  getASTManager().processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
 }
