@@ -306,10 +306,13 @@ namespace swift {
       return CustomConditionalCompilationFlags;
     }
 
-    /// Whether our effective Swift version is in the Swift 3 family
-    bool isSwiftVersion3() const {
-      return EffectiveLanguageVersion.isVersion3();
+    /// Whether our effective Swift version is less than "X.Y"
+    bool isSwiftVersionLessThan(unsigned major, unsigned minor = 0) const {
+      return version::Version({major, minor}) >= EffectiveLanguageVersion;
     }
+
+    /// Whether our effective Swift version is in the Swift 3 family
+    bool isSwiftVersion3() const { return isSwiftVersionLessThan(4); }
 
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
