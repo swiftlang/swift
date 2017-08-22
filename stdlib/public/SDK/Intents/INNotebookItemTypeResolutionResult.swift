@@ -17,9 +17,9 @@ import Foundation
 @available(iOS 11.0, watchOS 4.0, *)
 extension INNotebookItemTypeResolutionResult {
     @nonobjc public
-    static func disambiguation(with valuesToDisambiguate: [INNotebookItemType]) -> Self {
-        let numbers = valuesToDisambiguate.map { NSNumber(value: $0.rawValue) }
-        return __disambiguationWithValues(toDisambiguate: numbers)
+    static func disambiguation(with notebookItemTypesToDisambiguate: [INNotebookItemType]) -> Self {
+        let numbers = notebookItemTypesToDisambiguate.map { NSNumber(value: $0.rawValue) }
+        return __disambiguationWithNotebookItemTypes(toDisambiguate: numbers)
     }
 }
 #endif
