@@ -109,6 +109,7 @@ KNOWN_SETTINGS=(
     skip-build-linux            ""               "set to skip building Swift stdlibs for Linux"
     skip-build-freebsd          ""               "set to skip building Swift stdlibs for FreeBSD"
     skip-build-cygwin           ""               "set to skip building Swift stdlibs for Cygwin"
+    skip-build-haiku            ""               "set to skip building Swift stdlibs for Haiku"
     skip-build-osx              ""               "set to skip building Swift stdlibs for OS X"
     skip-build-ios-device       ""               "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
     skip-build-ios-simulator    ""               "set to skip building Swift stdlibs for iOS simulators (i.e. build devices only)"
@@ -141,6 +142,7 @@ KNOWN_SETTINGS=(
     skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
     skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
+    skip-test-haiku            ""                "set to skip testing Swift stdlibs for Haiku"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OS X"
     skip-test-ios-32bit-simulator     ""         "set to skip testing Swift stdlibs for iOS 32bit simulators"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
@@ -424,6 +426,11 @@ function set_build_options_for_host() {
         cygwin-x86_64)
             SWIFT_HOST_VARIANT="cygwin"
             SWIFT_HOST_VARIANT_SDK="CYGWIN"
+            SWIFT_HOST_VARIANT_ARCH="x86_64"
+            ;;
+        haiku-x86_64)
+            SWIFT_HOST_VARIANT="haiku"
+            SWIFT_HOST_VARIANT_SDK="HAIKU"
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
         linux-*)
@@ -1333,6 +1340,11 @@ function calculate_targets_for_host() {
                 swift_sdk="CYGWIN"
                 build_for_this_target=$(not ${SKIP_BUILD_CYGWIN})
                 test_this_target=$(not ${SKIP_TEST_CYGWIN})
+                ;;
+            haiku-*)
+                swift_sdk="HAIKU"
+                build_for_this_target=$(not ${SKIP_BUILD_HAIKU})
+                test_this_target=$(not ${SKIP_TEST_HAIKU})
                 ;;
             macosx-*)
                 swift_sdk="OSX"
@@ -2337,6 +2349,24 @@ for host in "${ALL_HOSTS[@]}"; do
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
                         )
                         ;;
+                    haiku-*)
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                            -DLLDB_ALLOW_STATIC_BINDINGS=1
+                        )
+                        ;;
                     macosx-*)
                         # Set up flags to pass to xcodebuild
                         set_lldb_xcodebuild_options
@@ -2619,6 +2649,8 @@ for host in "${ALL_HOSTS[@]}"; do
             if [[ "$(uname -s)" == "Darwin" ]] ; then
               HOST_CXX_DIR=$(dirname ${HOST_CXX})
               HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
+            elif [[ "$(uname -s)" == "Haiku" ]] ; then
+              HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
             else # Linux
               HOST_CXX_HEADERS_DIR="/usr/include/c++"
             fi
@@ -3040,6 +3072,8 @@ for host in "${ALL_HOSTS[@]}"; do
                         ;;
                     cygwin-*)
                         ;;
+                    haiku-*)
+                        ;;
                     macosx-*)
                         set_lldb_build_mode
                         with_pushd ${LLDB_SOURCE_DIR} \
@@ -3080,6 +3114,9 @@ for host in "${ALL_HOSTS[@]}"; do
                         ;;
                     cygwin-*)
                         LIB_TARGET="windows"
+                        ;;
+                    haiku-*)
+                        LIB_TARGET="haiku"
                         ;;
                     *)
                         echo "error: --install-xctest is not supported on this platform"
@@ -3229,6 +3266,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     FreeBSD)
                         ;;
                     CYGWIN_NT-10.0)
+                        ;;
+                    Haiku)
                         ;;
                     Darwin)
                         pushd "${PLAYGROUNDSUPPORT_SOURCE_DIR}"

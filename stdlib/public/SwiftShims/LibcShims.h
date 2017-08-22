@@ -121,6 +121,8 @@ typedef unsigned int __swift_thread_key_t;
 typedef int __swift_thread_key_t;
 #elif defined(_WIN32)
 typedef unsigned long __swift_thread_key_t;
+#elif defined(__HAIKU__)
+typedef int __swift_thread_key_t;
 #else
 typedef unsigned long __swift_thread_key_t;
 #endif

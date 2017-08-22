@@ -158,7 +158,10 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return malloc_size(ptr);
 }
-#elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__)
+#elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
+#if defined(__HAIKU__)
+#define _GNU_SOURCE
+#endif
 #include <malloc.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
 size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
