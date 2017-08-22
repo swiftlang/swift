@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-astscope-lookup  -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-astscope-lookup  -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_T015local_recursionAAySi_Si1ytF : $@convention(thin) (Int, Int) -> () {
-// CHECK:       bb0([[X:%0]] : $Int, [[Y:%1]] : $Int):
+// CHECK:       bb0([[X:%0]] : @trivial $Int, [[Y:%1]] : @trivial $Int):
 func local_recursion(_ x: Int, y: Int) {
   func self_recursive(_ a: Int) {
     self_recursive(x + a)
@@ -77,25 +77,25 @@ func local_recursion(_ x: Int, y: Int) {
 }
 
 // CHECK: sil private [[SELF_RECURSIVE]]
-// CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):
+// CHECK: bb0([[A:%0]] : @trivial $Int, [[X:%1]] : @trivial $Int):
 // CHECK:   [[SELF_REF:%.*]] = function_ref [[SELF_RECURSIVE]]
 // CHECK:   apply [[SELF_REF]]({{.*}}, [[X]])
 
 // CHECK: sil private [[MUTUALLY_RECURSIVE_1]]
-// CHECK: bb0([[A:%0]] : $Int, [[Y:%1]] : $Int, [[X:%2]] : $Int):
+// CHECK: bb0([[A:%0]] : @trivial $Int, [[Y:%1]] : @trivial $Int, [[X:%2]] : @trivial $Int):
 // CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_2:@_T015local_recursionAAySi_Si1ytF20mutually_recursive_2L_ySiF]]
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[X]], [[Y]])
 // CHECK: sil private [[MUTUALLY_RECURSIVE_2]]
-// CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : $Int, [[Y:%2]] : $Int):
+// CHECK: bb0([[B:%0]] : @trivial $Int, [[X:%1]] : @trivial $Int, [[Y:%2]] : @trivial $Int):
 // CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1]]
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[Y]], [[X]])
 
 
 // CHECK: sil private [[TRANS_CAPTURE_1:@_T015local_recursionAAySi_Si1ytF20transitive_capture_1L_S2iF]]
-// CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):
+// CHECK: bb0([[A:%0]] : @trivial $Int, [[X:%1]] : @trivial $Int):
 
 // CHECK: sil private [[TRANS_CAPTURE]]
-// CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : $Int, [[Y:%2]] : $Int):
+// CHECK: bb0([[B:%0]] : @trivial $Int, [[X:%1]] : @trivial $Int, [[Y:%2]] : @trivial $Int):
 // CHECK:   [[TRANS_CAPTURE_1_REF:%.*]] = function_ref [[TRANS_CAPTURE_1]]
 // CHECK:   apply [[TRANS_CAPTURE_1_REF]]({{.*}}, [[X]])
 

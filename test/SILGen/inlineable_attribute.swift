@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
 
 // CHECK-LABEL: sil [serialized] @_T020inlineable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @_inlineable public func fragileFunction() {
