@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 import Swift // just for Optional
 
@@ -42,18 +42,18 @@ class SomeClass {
   // -- Instance methods use 'method' cc
 
   // CHECK-LABEL: sil hidden @_T09functions9SomeClassC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
-  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
+  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @trivial $Builtin.Int64, %2 : @trivial $@thick SomeClass.Type):
 
   // CHECK-LABEL: sil hidden @_T09functions9SomeClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> @owned SomeClass
-  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
+  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @trivial $Builtin.Int64, %2 : @owned $SomeClass):
   init(x:Int, y:Int) {}
 
   // CHECK-LABEL: sil hidden @_T09functions9SomeClassC6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> () 
-  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $SomeClass):
+  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @guaranteed $SomeClass):
   func method(_ x: Int) {}
 
   // CHECK-LABEL: sil hidden @_T09functions9SomeClassC13static_method{{[_0-9a-zA-Z]*}}FZ : $@convention(method) (Builtin.Int64, @thick SomeClass.Type) -> ()
-  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $@thick SomeClass.Type):
+  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @trivial $@thick SomeClass.Type):
   class func static_method(_ x: Int) {}
 
   var someProperty: Int {
@@ -101,7 +101,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   var i = i
   var j = j
   var k = k
-  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
+  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @trivial $Builtin.Int64, %2 : @trivial $Builtin.Int64):
   // CHECK: [[IBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
   // CHECK: [[IADDR:%.*]] = project_box [[IBOX]]
   // CHECK: [[JBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
@@ -152,9 +152,11 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
-  // CHECK: apply [[METHOD]]([[I]], [[C]])
+  // CHECK: apply [[METHOD]]([[I]], [[BORROWED_C]])
+  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
   c.method(i)
 
@@ -167,9 +169,11 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
-  // CHECK: apply [[METHOD]]([[I]], [[C]])
+  // CHECK: apply [[METHOD]]([[I]], [[BORROWED_C]])
+  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
   SomeClass.method(c)(i)
 
@@ -190,7 +194,9 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[GETTER:%[0-9]+]] = class_method {{.*}} : $SomeClass, #SomeClass.someProperty!getter.1
-  // CHECK: apply [[GETTER]]([[C]])
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
+  // CHECK: apply [[GETTER]]([[BORROWED_C]])
+  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
   i = c.someProperty
 
@@ -199,7 +205,9 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.someProperty!setter.1 : (SomeClass) -> (Builtin.Int64) -> ()
-  // CHECK: apply [[SETTER]]([[I]], [[C]])
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
+  // CHECK: apply [[SETTER]]([[I]], [[BORROWED_C]])
+  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
   c.someProperty = i
 
@@ -210,7 +218,9 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[READK:%.*]] = begin_access [read] [unknown] [[KADDR]]
   // CHECK: [[K:%[0-9]+]] = load [trivial] [[READK]]
   // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64, $@convention(method) (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> Builtin.Int64
-  // CHECK: apply [[GETTER]]([[J]], [[K]], [[C]])
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
+  // CHECK: apply [[GETTER]]([[J]], [[K]], [[BORROWED_C]])
+  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
   i = c[j, k]
 
@@ -223,7 +233,9 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[READK:%.*]] = begin_access [read] [unknown] [[KADDR]]
   // CHECK: [[K:%[0-9]+]] = load [trivial] [[READK]]
   // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> (), $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
-  // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
+  // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[BORROWED_C]])
+  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
   c[i, j] = k
 
@@ -273,8 +285,10 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.method!1
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[TMPI:%.*]] = alloc_stack $Builtin.Int64
-  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPI]], [[G]])
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPI]], [[BORROWED_G]])
+  // CHECK: end_borrow [[BORROWED_G]] from [[G]]
   // CHECK: destroy_value [[G]]
   g.method(i)
 
@@ -282,8 +296,10 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.generic!1
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[TMPJ:%.*]] = alloc_stack $Builtin.Int64
-  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPJ]], [[G]])
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPJ]], [[BORROWED_G]])
+  // CHECK: end_borrow [[BORROWED_G]] from [[G]]
   // CHECK: destroy_value [[G]]
   g.generic(j)
 
@@ -291,8 +307,10 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.generic!1
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[TMPK:%.*]] = alloc_stack $Builtin.Int64
-  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPK]], [[C]])
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPK]], [[BORROWED_C]])
+  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
   c.generic(k)
 
@@ -352,7 +370,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 // CHECK:   return [[CURRIED]]
 
 // CHECK-LABEL: sil shared [thunk] @_T09functions9SomeClassC6method{{[_0-9a-zA-Z]*}}FTc : $@convention(thin) (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
-// CHECK: bb0(%0 : $SomeClass):
+// CHECK: bb0(%0 : @owned $SomeClass):
 // CHECK:   class_method %0 : $SomeClass, #SomeClass.method!1 : (SomeClass) -> (Builtin.Int64) -> ()
 // CHECK:   %2 = partial_apply %1(%0)
 // CHECK:   return %2
@@ -447,7 +465,7 @@ final class r17828355Class {
 
 // The curry thunk for the method should not include a class_method instruction.
 // CHECK-LABEL: sil shared [thunk] @_T09functions14r17828355ClassC6method
-// CHECK: bb0(%0 : $r17828355Class):
+// CHECK: bb0(%0 : @owned $r17828355Class):
 // CHECK-NEXT: // function_ref functions.r17828355Class.method(Builtin.Int64) -> ()
 // CHECK-NEXT:  %1 = function_ref @_T09functions14r17828355ClassC6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  partial_apply %1(%0) : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()

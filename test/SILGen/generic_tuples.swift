@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 
 func dup<T>(_ x: T) -> (T, T) { return (x,x) }
 // CHECK-LABEL:      sil hidden @_T014generic_tuples3dup{{[_0-9a-zA-Z]*}}F
-// CHECK:      ([[RESULT_0:%.*]] : $*T, [[RESULT_1:%.*]] : $*T, [[XVAR:%.*]] : $*T):
+// CHECK:      ([[RESULT_0:%.*]] : @trivial $*T, [[RESULT_1:%.*]] : @trivial $*T, [[XVAR:%.*]] : @trivial $*T):
 // CHECK-NEXT: debug_value_addr [[XVAR]] : $*T, let, name "x"
 // CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_0]]
 // CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_1]]
