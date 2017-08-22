@@ -59,3 +59,22 @@ extension ARCamera {
         }
     }
 }
+
+@available(iOS, introduced: 11.0)
+extension ARPointCloud {
+    /**
+     The 3D points comprising the point cloud.
+     */
+    @nonobjc public var points: [vector_float3] {
+        let buffer = UnsafeBufferPointer(start: __points, count: Int(__count))
+        return Array(buffer)
+    }
+    
+    /**
+     The 3D point identifiers comprising the point cloud.
+     */
+    @nonobjc public var identifiers: [UInt64] {
+        let buffer = UnsafeBufferPointer(start: __identifiers, count: Int(__count))
+        return Array(buffer)
+    }
+}
