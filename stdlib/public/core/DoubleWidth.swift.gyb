@@ -297,6 +297,11 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     return (result, didCarry || hadPositiveOverflow)
   }
 
+  // Specialize for the most popular types.
+  @_specialize(where Base == Int)
+  @_specialize(where Base == UInt)
+  @_specialize(where Base == Int64)
+  @_specialize(where Base == UInt64)
   public func quotientAndRemainder(dividingBy other: DoubleWidth)
     -> (quotient: DoubleWidth, remainder: DoubleWidth) {
     let isNegative = (self < (0 as DoubleWidth)) != (other < (0 as DoubleWidth))

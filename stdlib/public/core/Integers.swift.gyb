@@ -1633,6 +1633,7 @@ ${operatorComment(x.operator, False)}
   // Heterogeneous non-masking shift in terms of shift-assignment
 ${operatorComment(x.nonMaskingOperator, False)}
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @_inlineable
   public static func ${x.nonMaskingOperator}<RHS: BinaryInteger>(
     _ lhs: Self, _ rhs: RHS
   ) -> Self {
@@ -2184,6 +2185,7 @@ ${operatorComment(x.operator, False)}
   // Heterogeneous masking shift
 ${operatorComment(x.operator, False)}
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @_inlineable
   public static func ${x.operator} <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Self {
