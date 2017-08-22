@@ -51,7 +51,14 @@ let boxedPixelFormat = NSNumber(value: kCVPixelFormatType_420YpCbCr8BiPlanarFull
 if #available(iOS 5, *) {
   AVFoundationTests.test("AVCaptureVideoDataOutput.availableVideoCVPixelFormatTypes") {
     func f(v: AVCaptureVideoDataOutput) -> Bool {
-      return v.availableVideoCVPixelFormatTypes.contains(boxedPixelFormat)
+      return v.availableVideoCVPixelFormatTypes.contains(where: { e in
+        if let e = e as? NSNumber, e == boxedPixelFormat {
+          return true
+        }
+        else {
+          return false
+        }
+      })
     }
   }
 }
