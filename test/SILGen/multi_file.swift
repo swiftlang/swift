@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -18,7 +18,7 @@ func lazyPropertiesAreNotStored(_ container: LazyContainer) {
 
 // CHECK-LABEL: sil hidden @_T010multi_file29lazyRefPropertiesAreNotStored{{[_0-9a-zA-Z]*}}F
 func lazyRefPropertiesAreNotStored(_ container: LazyContainerClass) {
-  // CHECK: bb0([[ARG:%.*]] : $LazyContainerClass):
+  // CHECK: bb0([[ARG:%.*]] : @owned $LazyContainerClass):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   {{%[0-9]+}} = class_method [[BORROWED_ARG]] : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : (LazyContainerClass) -> () -> Int, $@convention(method) (@guaranteed LazyContainerClass) -> Int
   markUsed(container.lazyVar)
@@ -26,7 +26,7 @@ func lazyRefPropertiesAreNotStored(_ container: LazyContainerClass) {
 
 // CHECK-LABEL: sil hidden @_T010multi_file25finalVarsAreDevirtualizedyAA18FinalPropertyClassCF
 func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
-  // CHECK: bb0([[ARG:%.*]] : $FinalPropertyClass):
+  // CHECK: bb0([[ARG:%.*]] : @owned $FinalPropertyClass):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   ref_element_addr [[BORROWED_ARG]] : $FinalPropertyClass, #FinalPropertyClass.foo
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]

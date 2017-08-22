@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 
@@ -44,7 +44,7 @@ func test2() {
 // The closure just returns its value, which it captured directly.
 
 // CHECK: sil private @_T09let_decls5test2yyFSiycfU_ : $@convention(thin) (Int) -> Int
-// CHECK: bb0(%0 : $Int):
+// CHECK: bb0(%0 : @trivial $Int):
 // CHECK:  return %0 : $Int
 
 // Verify that we can close over let decls of tuple type.
@@ -94,7 +94,7 @@ struct AddressOnlyStruct<T> {
 func produceAddressOnlyStruct<T>(_ x : T) -> AddressOnlyStruct<T> {}
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructString
-// CHECK: bb0([[FUNC_ARG:%.*]] : $*T):
+// CHECK: bb0([[FUNC_ARG:%.*]] : @trivial $*T):
 func testAddressOnlyStructString<T>(_ a : T) -> String {
   return produceAddressOnlyStruct(a).str
   
@@ -191,7 +191,7 @@ struct GenericTestStruct<T> {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}pass_address_only_rvalue_result
-// CHECK: bb0(%0 : $*T,
+// CHECK: bb0(%0 : @trivial $*T,
 // CHECK: [[FN:%[0-9]+]] = function_ref @{{.*}}GenericTestStructV9subscript{{.*}}fg
 // CHECK: apply [[FN]]<T>(%0,
 
@@ -208,7 +208,7 @@ func produceNMSubscriptableRValue() -> NonMutableSubscriptable {}
 
 
 // CHECK-LABEL: sil hidden @{{.*}}test_nm_subscript_get
-// CHECK: bb0(%0 : $Int):
+// CHECK: bb0(%0 : @trivial $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
 // CHECK: [[GETFN:%[0-9]+]] = function_ref @_T09let_decls23NonMutableSubscriptableV9subscript{{[_0-9a-zA-Z]*}}fg
@@ -219,7 +219,7 @@ func test_nm_subscript_get(_ a : Int) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}test_nm_subscript_set
-// CHECK: bb0(%0 : $Int):
+// CHECK: bb0(%0 : @trivial $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
 // CHECK: [[SETFN:%[0-9]+]] = function_ref @_T09let_decls23NonMutableSubscriptableV9subscript{{[_0-9a-zA-Z]*}}fs
@@ -262,7 +262,7 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
 
 
 // CHECK-LABEL: sil hidden @{{.*}}generic_identity
-// CHECK: bb0(%0 : $*T, %1 : $*T):
+// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $*T):
 // CHECK-NEXT: debug_value_addr %1 : $*T
 // CHECK-NEXT: copy_addr %1 to [initialization] %0 : $*T
 // CHECK-NEXT: destroy_addr %1
@@ -293,7 +293,7 @@ protocol SimpleProtocol {
 // methods on protocol and archetypes calls.
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetProtocolBases
-// CHECK: bb0(%0 : $*SimpleProtocol):
+// CHECK: bb0(%0 : @trivial $*SimpleProtocol):
 func testLetProtocolBases(_ p : SimpleProtocol) {
   // CHECK-NEXT: debug_value_addr
   // CHECK-NEXT: open_existential_addr
@@ -312,7 +312,7 @@ func testLetProtocolBases(_ p : SimpleProtocol) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetArchetypeBases
-// CHECK: bb0(%0 : $*T):
+// CHECK: bb0(%0 : @trivial $*T):
 func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
   // CHECK-NEXT: debug_value_addr
   // CHECK-NEXT: witness_method $T
@@ -328,7 +328,7 @@ func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}testDebugValue
-// CHECK: bb0(%0 : $Int, %1 : $*SimpleProtocol):
+// CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $*SimpleProtocol):
 // CHECK-NEXT: debug_value %0 : $Int, let, name "a"
 // CHECK-NEXT: debug_value_addr %1 : $*SimpleProtocol, let, name "b"
 func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
@@ -348,7 +348,7 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
-// CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
+// CHECK:       bb0(%0 : @trivial $*SimpleProtocol, %1 : @trivial $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr [take] %0 to [initialization] %3 : $*SimpleProtocol
@@ -377,7 +377,7 @@ func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> (Int
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
-// CHECK: bb0([[CLOSURE:%.*]] : $@callee_owned () -> Bool):
+// CHECK: bb0([[CLOSURE:%.*]] : @owned $@callee_owned () -> Bool):
 // CHECK:   [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
 // CHECK:   [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
 // CHECK:   apply [[CLOSURE_COPY]]() : $@callee_owned () -> Bool
@@ -408,7 +408,7 @@ struct StructMemberTest {
     return i
   }
   // CHECK-LABEL: sil hidden @_T09let_decls16StructMemberTestV07testIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
-  // CHECK: bb0([[ARG:%.*]] : $StructMemberTest):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
   // CHECK:  debug_value [[ARG]] : $StructMemberTest, let, name "self"
   // CHECK:  [[TRIVIAL_VALUE:%.*]] = struct_extract [[ARG]] : $StructMemberTest, #StructMemberTest.i
   // CHECK-NOT:  destroy_value [[ARG]] : $StructMemberTest
@@ -420,7 +420,7 @@ struct StructMemberTest {
     return s.i
   }
   // CHECK-LABEL: sil hidden @_T09let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
-  // CHECK: bb0([[ARG:%.*]] : $StructMemberTest):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
   // CHECK:  %3 = struct_extract %2 : $AnotherStruct, #AnotherStruct.i
@@ -431,7 +431,7 @@ struct StructMemberTest {
     return t.1.i
   }
   // CHECK-LABEL: sil hidden @_T09let_decls16StructMemberTestV09testTupleD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
-  // CHECK: bb0(%0 : $StructMemberTest):
+  // CHECK: bb0(%0 : @guaranteed $StructMemberTest):
   // CHECK-NEXT:   debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK-NEXT:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
   // CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 0
@@ -449,7 +449,7 @@ struct GenericStruct<T> {
     return a
   }
   // CHECK-LABEL: sil hidden @{{.*}}GenericStructV4getA{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> @out T
-  // CHECK: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
+  // CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>, let, name "self"
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
   // CHECK-NEXT: copy_addr %3 to [initialization] %0 : $*T
@@ -461,7 +461,7 @@ struct GenericStruct<T> {
   }
   
   // CHECK-LABEL: sil hidden @{{.*}}GenericStructV4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
-  // CHECK: bb0([[SELF_ADDR:%.*]] : $*GenericStruct<T>):
+  // CHECK: bb0([[SELF_ADDR:%.*]] : @trivial $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self"
   // CHECK-NEXT: [[PROJ_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*GenericStruct<T>, #GenericStruct.b
   // CHECK-NEXT: [[PROJ_VAL:%.*]] = load [trivial] [[PROJ_ADDR]] : $*Int
@@ -476,7 +476,7 @@ struct LetPropertyStruct {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetPropertyAccessOnLValueBase
-// CHECK: bb0(%0 : $LetPropertyStruct):
+// CHECK: bb0(%0 : @trivial $LetPropertyStruct):
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
@@ -494,7 +494,7 @@ func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
 var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 
 // CHECK-LABEL: sil hidden @_T09let_decls018testAddressOnlyGetE14GlobalPropertyAA14SimpleProtocol_pyF
-// CHECK: bb0(%0 : $*SimpleProtocol):
+// CHECK: bb0(%0 : @trivial $*SimpleProtocol):
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:  %1 = function_ref @_T09let_decls014addressOnlyGetD14GlobalPropertyAA14SimpleProtocol_pfg
 // CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) () -> @out SimpleProtocol
