@@ -194,11 +194,16 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     BaseBenefit = BaseBenefit / 2;
   }
 
+  // It is always OK to inline a simple call.
+  // TODO: May be consider also the size of the callee?
+  if (isPureCall(AI, SEA))
+    return true;
+
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
   // to inlining of generics.
   if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions())) {
-    return isPureCall(AI, SEA);
+    return false;
   }
 
   SILLoopInfo *LI = LA->get(Callee);
@@ -338,7 +343,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     // Only inline trivial functions into thunks (which will not increase the
     // code size).
     if (CalleeCost > TrivialFunctionThreshold) {
-      return isPureCall(AI, SEA);
+      return false;
     }
 
     DEBUG(
@@ -359,7 +364,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
   // This is the final inlining decision.
   if (CalleeCost > Benefit) {
-    return isPureCall(AI, SEA);
+    return false;
   }
 
   NumCallerBlocks += Callee->size();

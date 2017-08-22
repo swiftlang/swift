@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 
@@ -185,12 +186,24 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
 
   // We can unroll a loop if we can duplicate the instructions it holds.
   uint64_t Cost = 0;
+  // Average number of instructions per basic block.
+  // It is used to estimate the cost of the callee
+  // inside a loop.
+  const uint64_t InsnsPerBB = 4;
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
       if (!Loop->canDuplicate(&Inst))
         return false;
       if (instructionInlineCost(Inst) != InlineCost::Free)
         ++Cost;
+      if (auto AI = FullApplySite::isa(&Inst)) {
+        auto Callee = AI.getCalleeFunction();
+        if (Callee && getEligibleFunction(AI, InlineSelection::Everything)) {
+          // If callee is rather big and potentialy inlineable, it may be better
+          // not to unroll, so that the body of the calle can be inlined later.
+          Cost += Callee->size() * InsnsPerBB;
+        }
+      }
       if (Cost * TripCount > SILLoopUnrollThreshold)
         return false;
   }
