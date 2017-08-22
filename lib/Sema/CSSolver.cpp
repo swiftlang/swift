@@ -1706,6 +1706,44 @@ void ConstraintSystem::collectDisjunctions(
   }
 }
 
+/// \brief Check if the given disjunction choice should be attempted by solver.
+static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
+                                        DisjunctionChoice &choice,
+                                        Optional<Score> &bestNonGenericScore) {
+  if (choice->isDisabled()) {
+    auto &TC = cs.TC;
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+      log.indent(cs.solverState->depth)
+      << "(skipping ";
+      choice->print(log, &TC.Context.SourceMgr);
+      log << '\n';
+    }
+
+    return true;
+  }
+
+  // Don't attempt to solve for generic operators if we already have
+  // a non-generic solution.
+
+  // FIXME: Less-horrible but still horrible hack to attempt to
+  //        speed things up. Skip the generic operators if we
+  //        already have a solution involving non-generic operators,
+  //        but continue looking for a better non-generic operator
+  //        solution.
+  if (bestNonGenericScore && choice.isGenericOperatorOrUnavailable()) {
+    auto &score = bestNonGenericScore->Data;
+    // Let's skip generic overload choices only in case if
+    // non-generic score indicates that there were no forced
+    // unwrappings of optional(s) and no unavailable overload
+    // choices present in the solution.
+    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0)
+      return true;
+  }
+
+  return false;
+}
+
 bool ConstraintSystem::solveSimplified(
     SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
@@ -1789,8 +1827,7 @@ bool ConstraintSystem::solveSimplified(
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
   CG.removeConstraint(disjunction);
 
-  Score initialScore = CurrentScore;
-  Optional<DisjunctionChoice> lastSolvedChoice;
+  Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
   Optional<Score> bestNonGenericScore;
 
   ++solverState->NumDisjunctions;
@@ -1798,38 +1835,21 @@ bool ConstraintSystem::solveSimplified(
   // Try each of the constraints within the disjunction.
   for (auto index : indices(constraints)) {
     auto currentChoice = DisjunctionChoice(this, constraints[index]);
-    if (currentChoice.isDisabled()) {
-      if (TC.getLangOpts().DebugConstraintSolver) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
-        log.indent(solverState->depth)
-          << "(skipping ";
-        currentChoice->print(log, &TC.Context.SourceMgr);
-        log << '\n';
-      }
+    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
       continue;
-    }
-
-    // Don't attempt to solve for generic operators if we already have
-    // a non-generic solution.
-
-    // FIXME: Less-horrible but still horrible hack to attempt to
-    //        speed things up. Skip the generic operators if we
-    //        already have a solution involving non-generic operators,
-    //        but continue looking for a better non-generic operator
-    //        solution.
-    if (bestNonGenericScore && currentChoice.isGenericOperatorOrUnavailable()) {
-      // If non-generic solution increased the score by applying any
-      // fixes or restrictions to the solution, let's not skip generic
-      // overloads because they could produce a better solution.
-      if (bestNonGenericScore <= initialScore)
-        continue;
-    }
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
     if (lastSolvedChoice) {
-      auto *lastChoice = lastSolvedChoice->getConstraint();
-      if (shortCircuitDisjunctionAt(&currentChoice, lastChoice,
+      auto *lastChoice = lastSolvedChoice->first.getConstraint();
+      auto &score = lastSolvedChoice->second;
+      bool hasUnavailableOverloads = score.Data[SK_Unavailable] > 0;
+
+      // Attempt to short-circuit disjunction only if
+      // score indicates that there are no unavailable
+      // overload choices present in the solution.
+      if (!hasUnavailableOverloads &&
+          shortCircuitDisjunctionAt(&currentChoice, lastChoice,
                                     getASTContext()))
         break;
     }
@@ -1864,7 +1884,7 @@ bool ConstraintSystem::solveSimplified(
           bestNonGenericScore = score;
       }
 
-      lastSolvedChoice = currentChoice;
+      lastSolvedChoice = {currentChoice, *score};
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
       // FIXME: This should be more general.
@@ -1894,8 +1914,24 @@ Optional<Score>
 DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
                          FreeTypeVariableBinding allowFreeTypeVariables) {
   CS->simplifyDisjunctionChoice(Choice);
-  bool failed = CS->solveRec(solutions, allowFreeTypeVariables);
-  return failed ? None : Optional<Score>(CS->CurrentScore);
+
+  if (CS->solveRec(solutions, allowFreeTypeVariables))
+    return None;
+
+  assert (!solutions.empty());
+
+  Score bestScore = solutions.front().getFixedScore();
+
+  if (solutions.size() == 1)
+    return bestScore;
+
+  for (unsigned i = 1, n = solutions.size(); i != n; ++i) {
+    auto &score = solutions[i].getFixedScore();
+    if (score < bestScore)
+      bestScore = score;
+  }
+
+  return bestScore;
 }
 
 bool DisjunctionChoice::isGenericOperatorOrUnavailable() const {
