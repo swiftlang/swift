@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -emit-silgen -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -33,7 +33,7 @@ hasNoPrototype()
 
 // -- Native Swift thunk for NSAnse
 // CHECK: sil shared [serialized] [thunk] @_T0SC6NSAnseSQySo7AnsibleCGADFTO : $@convention(thin) (@owned Optional<Ansible>) -> @owned Optional<Ansible> {
-// CHECK: bb0(%0 : $Optional<Ansible>):
+// CHECK: bb0(%0 : @owned $Optional<Ansible>):
 // CHECK:   %1 = function_ref @NSAnse : $@convention(c) (Optional<Ansible>) -> @autoreleased Optional<Ansible>
 // CHECK:   %2 = apply %1(%0) : $@convention(c) (Optional<Ansible>) -> @autoreleased Optional<Ansible>
 // CHECK:   destroy_value %0 : $Optional<Ansible>

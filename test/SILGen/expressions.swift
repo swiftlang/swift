@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -I%t -disable-access-control | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -enable-sil-ownership %s -I%t -disable-access-control | %FileCheck %s
 
 import Swift
 import FooBar
@@ -247,7 +247,7 @@ struct Generic<T> {
 
 // CHECK-LABEL: sil hidden @_T011expressions18generic_member_ref{{[_0-9a-zA-Z]*}}F
 func generic_member_ref<T>(_ x: Generic<T>) -> Int {
-  // CHECK: bb0([[XADDR:%[0-9]+]] : $*Generic<T>):
+  // CHECK: bb0([[XADDR:%[0-9]+]] : @trivial $*Generic<T>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
   // CHECK: load [trivial] [[MEMBER_ADDR]]
@@ -256,7 +256,7 @@ func generic_member_ref<T>(_ x: Generic<T>) -> Int {
 // CHECK-LABEL: sil hidden @_T011expressions24bound_generic_member_ref{{[_0-9a-zA-Z]*}}F
 func bound_generic_member_ref(_ x: Generic<UnicodeScalar>) -> Int {
   var x = x
-  // CHECK: bb0([[XADDR:%[0-9]+]] : $Generic<Unicode.Scalar>):
+  // CHECK: bb0([[XADDR:%[0-9]+]] : @trivial $Generic<Unicode.Scalar>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
   // CHECK: load [trivial] [[MEMBER_ADDR]]
@@ -505,9 +505,9 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBZ]]
   // CHECK:   [[ZVAL:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[ZVAL]] : $Int)
-  // CHECK: [[CONT_B]]([[B_RES:%[0-9]+]] : $Int):
+  // CHECK: [[CONT_B]]([[B_RES:%[0-9]+]] : @trivial $Int):
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[B_RES]] : $Int)
-  // CHECK: [[CONT_A]]([[A_RES:%[0-9]+]] : $Int):
+  // CHECK: [[CONT_A]]([[A_RES:%[0-9]+]] : @trivial $Int):
   // CHECK:   return [[A_RES]]
 }
 
@@ -559,7 +559,7 @@ func dynamicTypePlusZero(_ a : Super1) -> Super1.Type {
   return type(of: a)
 }
 // CHECK-LABEL: dynamicTypePlusZero
-// CHECK: bb0([[ARG:%.*]] : $Super1):
+// CHECK: bb0([[ARG:%.*]] : @owned $Super1):
 // CHECK-NOT: copy_value
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NOT: copy_value
@@ -573,7 +573,7 @@ func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
   return type(of: a)
 }
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
-// CHECK: bb0(%0 : $NonTrivialStruct):
+// CHECK: bb0(%0 : @owned $NonTrivialStruct):
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: begin_borrow
 // CHECK-NEXT: end_borrow
@@ -584,10 +584,10 @@ func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
 
 // <rdar://problem/18851497> Swiftc fails to compile nested destructuring tuple binding
 // CHECK-LABEL: sil hidden @_T011expressions21implodeRecursiveTupleySi_Sit_SitSgF
-// CHECK: bb0(%0 : $Optional<((Int, Int), Int)>):
+// CHECK: bb0(%0 : @trivial $Optional<((Int, Int), Int)>):
 func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
 
-  // CHECK: bb2([[WHOLE:%.*]] : $((Int, Int), Int)):
+  // CHECK: bb2([[WHOLE:%.*]] : @trivial $((Int, Int), Int)):
   // CHECK-NEXT: [[X:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
   // CHECK-NEXT: [[X0:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 0
   // CHECK-NEXT: [[X1:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 1
