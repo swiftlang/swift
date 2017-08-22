@@ -20,6 +20,8 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
@@ -72,13 +74,17 @@ class SILGlobalOpt {
   // Keep track of cold blocks.
   ColdBlockInfo ColdBlocks;
 
+  NominalTypeDecl *ArrayDecl;
+  int GlobIdx = 0;
+
   // Whether we see a "once" call to callees that we currently don't handle.
   bool UnhandledOnceCallee = false;
   // Record number of times a globalinit_func is called by "once".
   llvm::DenseMap<SILFunction*, unsigned> InitializerCount;
 public:
-  SILGlobalOpt(SILModule *M, DominanceAnalysis *DA): Module(M), DA(DA),
-                                                     ColdBlocks(DA) {}
+  SILGlobalOpt(SILModule *M, DominanceAnalysis *DA)
+      : Module(M), DA(DA), ColdBlocks(DA),
+        ArrayDecl(M->getASTContext().getArrayDecl()) {}
 
   bool run();
 
@@ -87,6 +93,20 @@ protected:
   void collectGlobalLoad(LoadInst *SI, SILGlobalVariable *SILG);
   void collectGlobalStore(StoreInst *SI, SILGlobalVariable *SILG);
   void collectGlobalAccess(GlobalAddrInst *GAI);
+
+  bool isCOWType(SILType type) {
+    return type.getNominalOrBoundGenericNominal() == ArrayDecl;
+  }
+
+  bool isValidUseOfObject(SILInstruction *Val, bool isCOWObject);
+
+  bool getObjectInitVals(SILValue Val,
+                         llvm::DenseMap<VarDecl *, StoreInst *> &MemberStores,
+                         llvm::SmallVectorImpl<StoreInst *> &TailStores);
+  bool handleTailAddr(int TailIdx, SILInstruction *I,
+                      llvm::SmallVectorImpl<StoreInst *> &TailStores);
+
+  void optimizeObjectAllocation(AllocRefInst *ARI);
   SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
   bool isInLoop(SILBasicBlock *CurBB);
   void placeInitializers(SILFunction *InitF, ArrayRef<ApplyInst*> Calls);
@@ -974,6 +994,293 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   }
 }
 
+/// Get all stored properties of a class, including it's super classes.
+static void getFields(ClassDecl *Cl, SmallVectorImpl<VarDecl *> &Fields) {
+  if (ClassDecl *SuperCl = Cl->getSuperclassDecl()) {
+    getFields(SuperCl, Fields);
+  }
+  for (VarDecl *Field : Cl->getStoredProperties()) {
+    Fields.push_back(Field);
+  }
+}
+
+/// Check if \p V is a valid instruction for a static initializer, including
+/// all it's operands.
+static bool isValidInitVal(SILValue V) {
+  if (SILInstruction *I = dyn_cast<SILInstruction>(V)) {
+    if (!SILGlobalVariable::isValidStaticInitializerInst(I))
+      return false;
+
+    for (Operand &Op : I->getAllOperands()) {
+      if (!isValidInitVal(Op.get()))
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/// Check if a use of an object may prevent outlining the object.
+///
+/// If \p isCOWObject is true, then the object reference is wrapped into a
+/// COW container. Currently this is just Array<T>.
+bool SILGlobalOpt::isValidUseOfObject(SILInstruction *I, bool isCOWObject) {
+  switch (I->getKind()) {
+    case ValueKind::DebugValueAddrInst:
+    case ValueKind::DebugValueInst:
+    case ValueKind::LoadInst:
+    case ValueKind::DeallocRefInst:
+    case ValueKind::StrongRetainInst:
+    case ValueKind::StrongReleaseInst:
+      return true;
+
+    case ValueKind::ReturnInst:
+    case ValueKind::ApplyInst:
+    case ValueKind::TryApplyInst:
+    case ValueKind::PartialApplyInst:
+    case ValueKind::StoreInst:
+      /// We don't have a representation for COW objects in SIL, so we do some
+      /// ad-hoc testing: We can ignore uses of a COW object if any use after
+      /// this will do a uniqueness checking before the object is modified.
+      return isCOWObject;
+
+    case ValueKind::StructInst:
+      if (isCOWType(I->getType())) {
+        // The object is wrapped into a COW container.
+        isCOWObject = true;
+      }
+      break;
+
+    case ValueKind::UncheckedRefCastInst:
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::AddressToPointerInst:
+      assert(!isCOWObject && "instruction cannot have a COW object as operand");
+      break;
+
+    case ValueKind::TupleInst:
+    case ValueKind::TupleExtractInst:
+    case ValueKind::EnumInst:
+      break;
+
+    case ValueKind::StructExtractInst:
+      // To be on the safe side we don't consider the object as COW if it is
+      // extracted again from the COW container: the uniqueness check may be
+      // optimized away in this case.
+      isCOWObject = false;
+      break;
+
+    case ValueKind::BuiltinInst: {
+      // Handle the case for comparing addresses. This occurs when the Array
+      // comparison function is inlined.
+      auto *BI = cast<BuiltinInst>(I);
+      BuiltinValueKind K = BI->getBuiltinInfo().ID;
+      if (K == BuiltinValueKind::ICMP_EQ || K == BuiltinValueKind::ICMP_NE)
+        return true;
+      return false;
+    }
+
+    default:
+      return false;
+  }
+
+  for (Operand *Use : getNonDebugUses(I)) {
+    if (!isValidUseOfObject(Use->getUser(), isCOWObject))
+      return false;
+  }
+  return true;
+}
+
+/// Handle the address of a tail element.
+bool SILGlobalOpt::handleTailAddr(int TailIdx, SILInstruction *TailAddr,
+                              llvm::SmallVectorImpl<StoreInst *> &TailStores) {
+  if (TailIdx >= 0 && TailIdx < (int)TailStores.size()) {
+    if (auto *SI = dyn_cast<StoreInst>(TailAddr)) {
+      if (!isValidInitVal(SI->getSrc()) || TailStores[TailIdx])
+        return false;
+      TailStores[TailIdx] = SI;
+      return true;
+    }
+  }
+  return isValidUseOfObject(TailAddr, /*isCOWObject*/false);
+}
+
+/// Get the init values for an object's stored properties and its tail elements.
+bool SILGlobalOpt::getObjectInitVals(SILValue Val,
+                        llvm::DenseMap<VarDecl *, StoreInst *> &MemberStores,
+                        llvm::SmallVectorImpl<StoreInst *> &TailStores) {
+  for (Operand *Use : Val->getUses()) {
+    SILInstruction *User = Use->getUser();
+    if (auto *UC = dyn_cast<UpcastInst>(User)) {
+      // Upcast is transparent.
+      if (!getObjectInitVals(UC, MemberStores, TailStores))
+        return false;
+    } else if (auto *REA = dyn_cast<RefElementAddrInst>(User)) {
+      // The address of a stored property.
+      for (Operand *ElemAddrUse : REA->getUses()) {
+        SILInstruction *ElemAddrUser = ElemAddrUse->getUser();
+        if (auto *SI = dyn_cast<StoreInst>(ElemAddrUser)) {
+          if (!isValidInitVal(SI->getSrc()) || MemberStores[REA->getField()])
+            return false;
+          MemberStores[REA->getField()] = SI;
+        } else if (!isValidUseOfObject(ElemAddrUser, /*isCOWObject*/false)) {
+          return false;
+        }
+      }
+    } else if (auto *RTA = dyn_cast<RefTailAddrInst>(User)) {
+      // The address of a tail element.
+      for (Operand *TailUse : RTA->getUses()) {
+        SILInstruction *TailUser = TailUse->getUser();
+        if (auto *IA = dyn_cast<IndexAddrInst>(TailUser)) {
+          // An index_addr yields the address of any tail element. Only if the
+          // second operand (the index) is an integer literal we can figure out
+          // which tail element is refereneced.
+          int TailIdx = -1;
+          if (auto *Index = dyn_cast<IntegerLiteralInst>(IA->getIndex()))
+            TailIdx = Index->getValue().getZExtValue();
+
+          for (Operand *IAUse : IA->getUses()) {
+            if (!handleTailAddr(TailIdx, IAUse->getUser(), TailStores))
+              return false;
+          }
+        // Without an index_addr it's the first tail element.
+        } else if (!handleTailAddr(/*TailIdx*/0, TailUser, TailStores)) {
+          return false;
+        }
+      }
+    } else if (!isValidUseOfObject(User, /*isCOWObject*/false)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+class GlobalVariableMangler : public Mangle::ASTMangler {
+public:
+  std::string mangleOutlinedVariable(SILFunction *Context, int Idx) {
+    beginManglingWithoutPrefix();
+    appendOperator(Context->getName());
+    appendOperator("Tv", Index(Idx));
+    return finalize();
+  }
+};
+
+/// Try to convert an object allocation into a statically initialized object.
+///
+/// In general this works for any class, but in practice it will only kick in
+/// for array buffer objects. The use cases are array literals in a function.
+/// For example:
+///     func getarray() -> [Int] {
+///       return [1, 2, 3]
+///     }
+void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
+  // Check how many tail allocated elements are on the object.
+  ArrayRef<Operand> TailCounts = ARI->getTailAllocatedCounts();
+  SILType TailType;
+  unsigned NumTailElems = 0;
+  if (TailCounts.size() > 0) {
+    // We only support a single tail allocated array.
+    if (TailCounts.size() > 1)
+      return;
+    // The number of tail allocated elements must be constant.
+    if (auto *ILI = dyn_cast<IntegerLiteralInst>(TailCounts[0].get())) {
+      if (ILI->getValue().getActiveBits() > 20)
+        return;
+      NumTailElems = ILI->getValue().getZExtValue();
+      TailType = ARI->getTailAllocatedTypes()[0];
+    } else {
+      return;
+    }
+  }
+  SILType Ty = ARI->getType();
+  ClassDecl *Cl = Ty.getClassOrBoundGenericClass();
+  if (!Cl)
+    return;
+  llvm::SmallVector<VarDecl *, 16> Fields;
+  getFields(Cl, Fields);
+
+  // Get the initialization stores of the object's properties and tail
+  // allocated elements. Also check if there are any "bad" uses of the object.
+  llvm::DenseMap<VarDecl *, StoreInst *> MemberStores;
+  llvm::SmallVector<StoreInst *, 16> TailStores;
+  TailStores.resize(NumTailElems);
+  if (!getObjectInitVals(ARI, MemberStores, TailStores))
+    return;
+
+  // Is there a store for all the class properties?
+  if (MemberStores.size() != Fields.size())
+    return;
+
+  // Is there a store for all tail allocated elements?
+  for (SILValue V : TailStores) {
+    if (!V)
+      return;
+  }
+
+  DEBUG(llvm::dbgs() << "Outline global variable in " <<
+        ARI->getFunction()->getName() << '\n');
+
+  // Create a name for the outlined global variable.
+  GlobalVariableMangler Mangler;
+  std::string GlobName;
+  do {
+    GlobName = Mangler.mangleOutlinedVariable(ARI->getFunction(), GlobIdx++);
+  } while (Module->lookUpGlobalVariable(GlobName));
+
+  SILGlobalVariable *Glob =
+    SILGlobalVariable::create(*Module, SILLinkage::Private, IsNotSerialized,
+                              GlobName, ARI->getType());
+
+  // Schedule all init values for cloning into the initializer of Glob.
+  StaticInitCloner Cloner(Glob);
+  for (VarDecl *Field : Fields) {
+    StoreInst *MemberStore = MemberStores[Field];
+    Cloner.add(cast<SILInstruction>(MemberStore->getSrc()));
+  }
+  for (StoreInst *TailStore : TailStores) {
+    Cloner.add(cast<SILInstruction>(TailStore->getSrc()));
+  }
+
+  // Create the class property initializers
+  llvm::SmallVector<SILValue, 16> ObjectArgs;
+  for (VarDecl *Field : Fields) {
+    StoreInst *MemberStore = MemberStores[Field];
+    assert(MemberStore);
+    ObjectArgs.push_back(Cloner.clone(
+                                 cast<SILInstruction>(MemberStore->getSrc())));
+    MemberStore->eraseFromParent();
+  }
+  // Create the initializers for the tail elements.
+  unsigned NumBaseElements = ObjectArgs.size();
+  for (StoreInst *TailStore : TailStores) {
+    ObjectArgs.push_back(Cloner.clone(
+                                   cast<SILInstruction>(TailStore->getSrc())));
+    TailStore->eraseFromParent();
+  }
+  // Create the initializer for the object itself.
+  SILBuilder StaticInitBuilder(Glob);
+  StaticInitBuilder.createObject(ArtificialUnreachableLocation(),
+                                 ARI->getType(), ObjectArgs, NumBaseElements);
+
+  // Replace the alloc_ref by global_value + strong_retain instructions.
+  SILBuilder B(ARI);
+  GlobalValueInst *GVI = B.createGlobalValue(ARI->getLoc(), Glob);
+  B.createStrongRetain(ARI->getLoc(), GVI, B.getDefaultAtomicity());
+  while (!ARI->use_empty()) {
+    Operand *Use = *ARI->use_begin();
+    SILInstruction *User = Use->getUser();
+    switch (User->getKind()) {
+      case ValueKind::DeallocRefInst:
+        User->eraseFromParent();
+        break;
+      default:
+        Use->set(GVI);
+    }
+  }
+  ARI->eraseFromParent();
+
+  HasChanged = true;
+}
+
 /// Optimize access to the global variable, which is known
 /// to have a constant value. Replace all loads from the
 /// global address by invocations of a getter that returns
@@ -1024,17 +1331,31 @@ bool SILGlobalOpt::run() {
 
     // Cache cold blocks per function.
     ColdBlockInfo ColdBlocks(DA);
+    GlobIdx = 0;
     for (auto &BB : F) {
       bool IsCold = ColdBlocks.isCold(&BB);
-      for (auto &I : BB)
-        if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
+      auto Iter = BB.begin();
+      while (Iter != BB.end()) {
+        SILInstruction *I = &*Iter;
+        Iter++;
+        if (auto *BI = dyn_cast<BuiltinInst>(I)) {
           collectOnceCall(BI);
-        } else if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+        } else if (auto *AI = dyn_cast<ApplyInst>(I)) {
           if (!IsCold)
             collectGlobalInitCall(AI);
-        } else if (auto *GAI = dyn_cast<GlobalAddrInst>(&I)) {
-            collectGlobalAccess(GAI);
+        } else if (auto *GAI = dyn_cast<GlobalAddrInst>(I)) {
+          collectGlobalAccess(GAI);
+        } else if (auto *ARI = dyn_cast<AllocRefInst>(I)) {
+          if (!F.isSerialized()) {
+            // Currently we cannot serialize a function which refers to a
+            // statically initialized global. So we don't do the optimization
+            // for serializable functions.
+            // TODO: We may do the optimization _after_ serialization in the
+            // pass pipeline.
+            optimizeObjectAllocation(ARI);
+          }
         }
+      }
     }
   }
 

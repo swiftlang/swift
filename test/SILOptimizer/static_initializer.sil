@@ -3,25 +3,39 @@
 import Builtin
 import Swift
 
+struct Inner {
+  let x: Int32
+}
+
+struct Outer {
+  let a: Int32
+  let b: Inner
+  let c: Int32
+}
+
 // Check that token0 gets eliminated as it is not used after removing the once call.
 // CHECK-NOT: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
 
-// CHECK: sil_global @_Tv2ch1xSi : $Int32 = {
+// CHECK: sil_global @_Tv2ch1xSi : $Outer = {
 // CHECK-NEXT:   %0 = integer_literal $Builtin.Int32, 2
-// CHECK-NEXT:   %initval = struct $Int32 (%0 : $Builtin.Int32)
+// CHECK-NEXT:   %1 = struct $Int32 (%0 : $Builtin.Int32)
+// CHECK-NEXT:   %2 = struct $Inner (%1 : $Int32)
+// CHECK-NEXT:   %initval = struct $Outer (%1 : $Int32, %2 : $Inner, %1 : $Int32)
 // CHECK-NEXT: }
-sil_global @_Tv2ch1xSi : $Int32
+sil_global @_Tv2ch1xSi : $Outer
 
 // CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {
 sil private @globalinit_func0 : $@convention(thin) () -> () {
 bb0:
-  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %0 = global_addr @_Tv2ch1xSi : $*Outer
   %1 = integer_literal $Builtin.Int32, 2
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  store %2 to %0 : $*Int32
-  %4 = tuple ()
-  return %4 : $()
+  %3 = struct $Inner (%2 : $Int32)
+  %4 = struct $Outer (%2 : $Int32, %3 : $Inner, %2 : $Int32)
+  store %4 to %0 : $*Outer
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
@@ -29,7 +43,7 @@ bb0:
 // CHECK-NOT: global_addr @globalinit_token0
 // CHECK-NEXT: address_to_pointer
 // CHECK: function_ref @globalinit_func0 : $@convention(thin) () -> ()
-// CHECK-NEXT: global_addr @_Tv2ch1xSi : $*Int32
+// CHECK-NEXT: global_addr @_Tv2ch1xSi : $*Outer
 // CHECK-NEXT: address_to_pointer
 // CHECK-NEXT: return
 sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
@@ -38,17 +52,17 @@ bb0:
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@convention(thin) () -> ()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
-  %6 = global_addr @_Tv2ch1xSi : $*Int32
-  %7 = address_to_pointer %6 : $*Int32 to $Builtin.RawPointer
+  %6 = global_addr @_Tv2ch1xSi : $*Outer
+  %7 = address_to_pointer %6 : $*Outer to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
-sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
+// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@convention(thin) () -> Outer {
+sil @_TF2ch1fFT_Si : $@convention(thin) () -> Outer {
 bb0:
   %0 = function_ref @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
-  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int32
-  %3 = load %2 : $*Int32
-  return %3 : $Int32
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Outer
+  %3 = load %2 : $*Outer
+  return %3 : $Outer
 }
