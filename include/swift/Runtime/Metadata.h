@@ -1094,6 +1094,12 @@ struct GenericParameterDescriptor {
   // TODO: add meaningful descriptions of the generic requirements.
 };
 
+template <typename Runtime>
+struct TargetMethodDescriptor {
+  /// The method implementation.
+  TargetRelativeDirectPointer<Runtime, void *> Impl;
+};
+
 /// Header for a class vtable descriptor. This is a variable-sized
 /// structure that describes how to find and parse a vtable
 /// within the type metadata for a class.
@@ -1227,7 +1233,7 @@ struct TargetNominalTypeDescriptor {
   ///
   /// Not all type metadata have access functions.
   TargetRelativeDirectPointer<Runtime, NonGenericMetadataAccessFunction,
-                              /*nullable*/ true> AccessFunction;
+                              /*Nullable*/ true> AccessFunction;
 
   /// A pointer to the generic metadata pattern that is used to instantiate
   /// instances of this type. Zero if the type is not generic.
@@ -1959,7 +1965,7 @@ struct TargetLiteralProtocolDescriptorList
   {}
 };
 using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
-  
+
 /// A protocol descriptor. This is not type metadata, but is referenced by
 /// existential type metadata records to describe a protocol constraint.
 /// Its layout is compatible with the Objective-C runtime's 'protocol_t' record
@@ -2000,20 +2006,23 @@ struct TargetProtocolDescriptor {
   /// Only meaningful if ProtocolDescriptorFlags::IsResilient is set.
   uint16_t MinimumWitnessTableSizeInWords;
 
-  /// The maximum amount to copy from the default requirements in words.
-  /// If any requirements beyond MinimumWitnessTableSizeInWords are present
+  /// The maximum amount to copy from the default requirements in units of
+  /// 4 bytes.
+  ///
+  /// If any requirements beyond NumDefaultWitnessTableEntries are present
   /// in the witness table template, they will be not be overwritten with
   /// defaults.
   ///
   /// Only meaningful if ProtocolDescriptorFlags::IsResilient is set.
-  uint16_t DefaultWitnessTableSizeInWords;
+  uint16_t NumDefaultWitnessTableEntries;
 
-  /// Reserved. Really just here to zero-pad the structure on 64-bit.
-  uint32_t Reserved;
+  using MethodDescriptor = TargetMethodDescriptor<Runtime>;
+
+  MethodDescriptor DefaultWitnessTable[];
 
   /// Default requirements are tail-allocated here.
-  void **getDefaultWitnesses() const {
-    return (void **) (this + 1);
+  void *getDefaultWitness(unsigned index) const {
+    return DefaultWitnessTable[index].Impl.get();
   }
 
   constexpr TargetProtocolDescriptor<Runtime>(const char *Name,
@@ -2027,7 +2036,7 @@ struct TargetProtocolDescriptor {
       DescriptorSize(sizeof(TargetProtocolDescriptor<Runtime>)),
       Flags(Flags),
       MinimumWitnessTableSizeInWords(0),
-      DefaultWitnessTableSizeInWords(0)
+      NumDefaultWitnessTableEntries(0)
   {}
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
