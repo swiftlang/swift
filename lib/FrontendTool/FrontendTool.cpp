@@ -375,7 +375,8 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
 static void countStatsPostSema(UnifiedStatsReporter &Stats,
                                CompilerInstance& Instance) {
   auto &C = Stats.getFrontendCounters();
-  C.NumSourceBuffers = Instance.getSourceMgr().getLLVMSourceMgr().getNumBuffers();
+  auto &SM = Instance.getSourceMgr();
+  C.NumSourceBuffers = SM.getLLVMSourceMgr().getNumBuffers();
   C.NumLinkLibraries = Instance.getLinkLibraries().size();
 
   auto const &AST = Instance.getASTContext();
@@ -402,6 +403,12 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
     C.NumPrefixOperators = SF->PrefixOperators.size();
     C.NumPrecedenceGroups = SF->PrecedenceGroups.size();
     C.NumUsedConformances = SF->getUsedConformances().size();
+
+    auto bufID = SF->getBufferID();
+    if (bufID.hasValue()) {
+      C.NumSourceLines =
+        SM.getEntireTextForBuffer(bufID.getValue()).count('\n');
+    }
   }
 }
 
