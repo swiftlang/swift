@@ -1219,7 +1219,7 @@ SIL representation of a global variable.
 Global variable access is performed by the ``alloc_global``, ``global_addr``
 and ``global_value`` instructions.
 
-A global can have a static initializer if it's initial value can be
+A global can have a static initializer if its initial value can be
 composed of literals. The static initializer is represented as a list of
 literal and aggregate instructions where the last instruction is the top-level
 value of the static initializer::
