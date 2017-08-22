@@ -7155,10 +7155,21 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
 
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   // Coerce the input to whatever type is specified by the CoerceExpr.
-  if (!typeCheckChildIndependently(CE->getSubExpr(),
-                                   CE->getCastTypeLoc().getType(),
-                                   CTP_CoerceOperand))
+  auto expr = typeCheckChildIndependently(CE->getSubExpr(),
+                                          CE->getCastTypeLoc().getType(),
+                                          CTP_CoerceOperand);
+  if (!expr)
     return true;
+
+  auto ref = expr->getReferencedDecl();
+  if (auto *decl = ref.getDecl()) {
+    // Without explicit coercion we might end up
+    // type-checking sub-expression as unavaible
+    // declaration, let's try to diagnose that here.
+    if (AvailableAttr::isUnavailable(decl))
+      return CS.TC.diagnoseExplicitUnavailability(
+          decl, expr->getSourceRange(), CS.DC, dyn_cast<ApplyExpr>(expr));
+  }
 
   return false;
 }
