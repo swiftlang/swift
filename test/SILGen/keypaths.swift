@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-keypath-components -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-keypath-components -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 struct S<T> {
   var x: T

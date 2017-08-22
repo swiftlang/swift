@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_T014metatype_casts6t_is_u{{[_0-9a-zA-Z]*}}F
 // CHECK:         checked_cast_br {{.*}} $@thick T.Type to $@thick U.Type
