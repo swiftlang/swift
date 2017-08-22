@@ -233,6 +233,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // current function (after optimizing any new callees).
   P.addDevirtualizer();
   P.addGenericSpecializer();
+  // Run devirtualizer after the specializer, because many
+  // class_method/witness_method instructions may use concrete types now.
+  P.addDevirtualizer();
 
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
@@ -287,6 +290,11 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   } else
     P.addEarlyCodeMotion();
 
+  P.addRetainSinking();
+  // Retain sinking does not sink all retains in one round.
+  // Let it run one more time time, because it can be beneficial.
+  // FIXME: Improve the RetainSinking pass to sink more/all
+  // retains in one go.
   P.addRetainSinking();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
