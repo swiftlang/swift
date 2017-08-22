@@ -1105,12 +1105,9 @@ struct ValueWitnessTableGenerator;
 
 template <class Witnesses> struct ValueWitnessTableGenerator<Witnesses, false> {
   static constexpr const ValueWitnessTable table = {
-#define EACH_WITNESS(ID) Witnesses::ID,
-    FOR_ALL_FUNCTION_VALUE_WITNESSES(EACH_WITNESS)
-#undef EACH_WITNESS
-    Witnesses::size,
-    Witnesses::flags,
-    Witnesses::stride,
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) Witnesses::LOWER_ID,
+#include "swift/ABI/ValueWitness.def"
   };
 };
 
@@ -1118,16 +1115,13 @@ template <class Witnesses> struct ValueWitnessTableGenerator<Witnesses, false> {
 template <class Witnesses> struct ValueWitnessTableGenerator<Witnesses, true> {
   static constexpr const ExtraInhabitantsValueWitnessTable table = {
     {
-#define EACH_WITNESS(ID) Witnesses::ID,
-      FOR_ALL_FUNCTION_VALUE_WITNESSES(EACH_WITNESS)
-#undef EACH_WITNESS
-      Witnesses::size,
-      Witnesses::flags,
-      Witnesses::stride,
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) Witnesses::LOWER_ID,
+#include "swift/ABI/ValueWitness.def"
     },
-    Witnesses::extraInhabitantFlags,
-    Witnesses::storeExtraInhabitant,
-    Witnesses::getExtraInhabitantIndex,
+#define WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) Witnesses::LOWER_ID,
+#include "swift/ABI/ValueWitness.def"
   };
 };
 

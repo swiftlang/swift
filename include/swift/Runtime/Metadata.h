@@ -311,257 +311,27 @@ public:
 
 namespace value_witness_types {
 
+// Note that, for now, we aren't strict about 'const'.
+#define WANT_ALL_VALUE_WITNESSES
+#define DATA_VALUE_WITNESS(lowerId, upperId, type)
+#define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes) \
+  typedef returnType (*lowerId) paramTypes;
+#define MUTABLE_VALUE_TYPE OpaqueValue *
+#define IMMUTABLE_VALUE_TYPE const OpaqueValue *
+#define MUTABLE_BUFFER_TYPE ValueBuffer *
+#define IMMUTABLE_BUFFER_TYPE const ValueBuffer *
+#define TYPE_TYPE const Metadata *
+#define SIZE_TYPE size_t
+#define INT_TYPE int
+#define VOID_TYPE void
+#include "swift/ABI/ValueWitness.def"
 
-/// Given an unallocated buffer, initialize it as a copy of the
-/// object in the source buffer.  This can be decomposed as:
-///
-///   self->initializeBufferWithCopy(dest, self->projectBuffer(src), self)
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Preconditions:
-///   'dest' is an unallocated buffer
-/// Postconditions:
-///   'dest' is an initialized buffer
-/// Invariants:
-///   'src' is an initialized buffer
-typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
-                                                      ValueBuffer *src,
-                                                      const Metadata *self);
-
-/// Given an initialized object, destroy it.
-///
-/// Preconditions:
-///   'object' is an initialized object
-/// Postconditions:
-///   'object' is an uninitialized object
-typedef void destroy(OpaqueValue *object,
-                     const Metadata *self);
-
-/// Given an uninitialized object and an initialized object, copy
-/// the value.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized object
-/// Postconditions:
-///   'dest' is an initialized object
-/// Invariants:
-///   'src' is an initialized object
-typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
-                                        OpaqueValue *src,
-                                        const Metadata *self);
-
-/// Given two initialized objects, copy the value from one to the
-/// other.
-///
-/// This operation must be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Invariants:
-///   'dest' is an initialized object
-///   'src' is an initialized object
-typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
-                                    OpaqueValue *src,
-                                    const Metadata *self);
-
-/// Given an uninitialized object and an initialized object, move
-/// the value from one to the other, leaving the source object
-/// uninitialized.
-///
-/// There is no need for an initializeBufferWithTakeOfBuffer, because that
-/// can simply be a pointer-aligned memcpy of sizeof(ValueBuffer)
-/// bytes.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized object
-///   'src' is an initialized object
-/// Postconditions:
-///   'dest' is an initialized object
-///   'src' is an uninitialized object
-typedef OpaqueValue *initializeWithTake(OpaqueValue *dest,
-                                        OpaqueValue *src,
-                                        const Metadata *self);
-
-/// Given an initialized object and an initialized object, move
-/// the value from one to the other, leaving the source object
-/// uninitialized.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// Therefore this can be decomposed as:
-///
-///   self->destroy(dest, self);
-///   self->initializeWithTake(dest, src, self);
-///
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'src' is an initialized object
-/// Postconditions:
-///   'src' is an uninitialized object
-/// Invariants:
-///   'dest' is an initialized object
-typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
-                                    OpaqueValue *src,
-                                    const Metadata *self);
-
-/// Given an unallocated buffer and an initialized buffer, move the
-/// value from one buffer to the other, leaving the source buffer
-/// unallocated.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// Therefore this can be decomposed as:
-///
-///   self->initializeBufferWithTake(dest, self->projectBuffer(src), self)
-///   self->deallocateBuffer(src, self)
-///
-/// However, it may be more efficient because values stored out-of-line
-/// may be moved by simply moving the buffer.
-///
-/// If the value is bitwise-takable or stored out of line, this is
-/// equivalent to a memcpy of the buffers.
-///
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an unallocated buffer
-///   'src' is an initialized buffer
-/// Postconditions:
-///   'dest' is an initialized buffer
-///   'src' is an unallocated buffer
-typedef OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                      ValueBuffer *src,
-                                                      const Metadata *self);
-  
-/// Given an initialized array of objects, destroy it.
-///
-/// Preconditions:
-///   'object' is an initialized array of n objects
-/// Postconditions:
-///   'object' is an uninitialized array of n objects
-typedef void destroyArray(OpaqueValue *array, size_t n,
-                          const Metadata *self);
-  
-/// Given an uninitialized array and an initialized array, copy
-/// the value.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized array of n objects
-/// Postconditions:
-///   'dest' is an initialized array of n objects
-/// Invariants:
-///   'src' is an initialized array of n objects
-typedef OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
-                                             OpaqueValue *src,
-                                             size_t n,
-                                             const Metadata *self);
-  
-/// Given an uninitialized array and an initialized array, move
-/// the values from one to the other, leaving the source array
-/// uninitialized.
-///
-/// This operation does not need to be safe against 'dest' and 'src' fully
-/// overlapping. 'dest' may partially overlap the head of 'src', because the
-/// values are taken as if in front-to-back order.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized array of n objects
-///   'src' is an initialized array of n objects
-/// Postconditions:
-///   'dest' is an initialized array of n objects
-///   'src' is an uninitialized array of n objects
-typedef OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
-                                                        OpaqueValue *src,
-                                                        size_t n,
-                                                        const Metadata *self);
-  
-/// Given an uninitialized array and an initialized array, move
-/// the values from one to the other, leaving the source array
-/// uninitialized.
-///
-/// This operation does not need to be safe against 'dest' and 'src' fully
-/// overlapping. 'dest' may partially overlap the tail of 'src', because the
-/// values are taken as if in back-to-front order.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized array of n objects
-///   'src' is an initialized array of n objects
-/// Postconditions:
-///   'dest' is an initialized array of n objects
-///   'src' is an uninitialized array of n objects
-typedef OpaqueValue *initializeArrayWithTakeBackToFront(OpaqueValue *dest,
-                                                        OpaqueValue *src,
-                                                        size_t n,
-                                                        const Metadata *self);
-  
-/// The number of bytes required to store an object of this type.
-/// This value may be zero.  This value is not necessarily a
-/// multiple of the alignment.
-typedef size_t size;
-
-/// Flags which apply to the type here.
-typedef ValueWitnessFlags flags;
-
-/// When allocating an array of objects of this type, the number of bytes
-/// between array elements.  This value may be zero.  This value is always
-/// a multiple of the alignment.
-typedef size_t stride;
-
-/// Flags which describe extra inhabitants.
-typedef ExtraInhabitantFlags extraInhabitantFlags;
-  
-/// Store an extra inhabitant, named by a unique positive or zero index,
-/// into the given uninitialized storage for the type.
-typedef void storeExtraInhabitant(OpaqueValue *dest,
-                                  int index,
-                                  const Metadata *self);
-  
-/// Get the extra inhabitant index for the bit pattern stored at the given
-/// address, or return -1 if there is a valid value at the address.
-typedef int getExtraInhabitantIndex(const OpaqueValue *src,
-                                    const Metadata *self);
-
-/// Given a valid object of this enum type, extracts the tag value indicating
-/// which case of the enum is inhabited. Returned values are in the range
-/// [-ElementsWithPayload..ElementsWithNoPayload-1].
-///
-/// The tag value can be used to index into the array returned by the
-/// NominalTypeDescriptor's GetCaseTypes function to get the payload type
-/// and check if the payload is indirect.
-typedef int getEnumTag(const OpaqueValue *src,
-                       const Metadata *self);
-
-/// Given a valid object of this enum type, destructively strips the tag
-/// bits, leaving behind a value of the inhabited case payload type.
-/// If the case is indirect, the payload can then be projected from the box
-/// with swift_projectBox().
-typedef void destructiveProjectEnumData(OpaqueValue *src,
-                                        const Metadata *self);
-
-/// Given a valid object of an enum case payload's type, destructively add
-/// the tag bits for the given case, leaving behind a fully-formed value of
-/// the enum type. If the enum case does not have a payload, the initial
-/// state of the value can be undefined. The given tag value must be in
-/// the range [-ElementsWithPayload..ElementsWithNoPayload-1].
-typedef void destructiveInjectEnumTag(OpaqueValue *src,
-                                      int tag,
-                                      const Metadata *self);
+  // Handle the data witnesses explicitly so we can use more specific
+  // types for the flags enums.
+  typedef size_t size;
+  typedef ValueWitnessFlags flags;
+  typedef size_t stride;
+  typedef ExtraInhabitantFlags extraInhabitantFlags;
 
 } // end namespace value_witness_types
 
@@ -571,19 +341,6 @@ SWIFT_RUNTIME_EXPORT
 OpaqueValue *swift_copyPOD(OpaqueValue *dest,
                            OpaqueValue *src,
                            const Metadata *self);
-
-#define FOR_ALL_FUNCTION_VALUE_WITNESSES(MACRO) \
-  MACRO(initializeBufferWithCopyOfBuffer) \
-  MACRO(destroy) \
-  MACRO(initializeWithCopy) \
-  MACRO(assignWithCopy) \
-  MACRO(initializeWithTake) \
-  MACRO(assignWithTake) \
-  MACRO(initializeBufferWithTakeOfBuffer) \
-  MACRO(destroyArray) \
-  MACRO(initializeArrayWithCopy) \
-  MACRO(initializeArrayWithTakeFrontToBack) \
-  MACRO(initializeArrayWithTakeBackToFront)
 
 struct TypeLayout;
 
@@ -595,14 +352,10 @@ struct ValueWitnessTable {
   // For the meaning of all of these witnesses, consult the comments
   // on their associated typedefs, above.
 
-#define DECLARE_WITNESS(NAME) \
-  value_witness_types::NAME *NAME;
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(DECLARE_WITNESS)
-#undef DECLARE_WITNESS
-
-  value_witness_types::size size;
-  value_witness_types::flags flags;
-  value_witness_types::stride stride;
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  value_witness_types::LOWER_ID LOWER_ID;
+#include "swift/ABI/ValueWitness.def"
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
@@ -686,9 +439,10 @@ struct ValueWitnessTable {
 /// These entry points are available only if the HasExtraInhabitants flag bit is
 /// set in the 'flags' field.
 struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
-  value_witness_types::extraInhabitantFlags extraInhabitantFlags;
-  value_witness_types::storeExtraInhabitant *storeExtraInhabitant;
-  value_witness_types::getExtraInhabitantIndex *getExtraInhabitantIndex;
+#define WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  value_witness_types::LOWER_ID LOWER_ID;
+#include "swift/ABI/ValueWitness.def"
 
 #define SET_WITNESS(NAME) base.NAME,
 
@@ -699,17 +453,12 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
   constexpr ExtraInhabitantsValueWitnessTable(
                             const ValueWitnessTable &base,
                             value_witness_types::extraInhabitantFlags eif,
-                            value_witness_types::storeExtraInhabitant *sei,
-                            value_witness_types::getExtraInhabitantIndex *geii)
-    : ValueWitnessTable{
-      FOR_ALL_FUNCTION_VALUE_WITNESSES(SET_WITNESS)
-      base.size,
-      base.flags,
-      base.stride
-    }, extraInhabitantFlags(eif),
+                            value_witness_types::storeExtraInhabitant sei,
+                            value_witness_types::getExtraInhabitantIndex geii)
+    : ValueWitnessTable(base),
+      extraInhabitantFlags(eif),
       storeExtraInhabitant(sei),
       getExtraInhabitantIndex(geii) {}
-#undef SET_WITNESS
 
   static bool classof(const ValueWitnessTable *table) {
     return table->flags.hasExtraInhabitants();
@@ -720,9 +469,10 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
 /// These entry points are available only if the HasEnumWitnesses flag bit is
 /// set in the 'flags' field.
 struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
-  value_witness_types::getEnumTag *getEnumTag;
-  value_witness_types::destructiveProjectEnumData *destructiveProjectEnumData;
-  value_witness_types::destructiveInjectEnumTag *destructiveInjectEnumTag;
+#define WANT_ONLY_ENUM_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  value_witness_types::LOWER_ID LOWER_ID;
+#include "swift/ABI/ValueWitness.def"
 
   constexpr EnumValueWitnessTable()
     : ExtraInhabitantsValueWitnessTable(),
@@ -731,9 +481,9 @@ struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
       destructiveInjectEnumTag(nullptr) {}
   constexpr EnumValueWitnessTable(
           const ExtraInhabitantsValueWitnessTable &base,
-          value_witness_types::getEnumTag *getEnumTag,
-          value_witness_types::destructiveProjectEnumData *destructiveProjectEnumData,
-          value_witness_types::destructiveInjectEnumTag *destructiveInjectEnumTag)
+          value_witness_types::getEnumTag getEnumTag,
+          value_witness_types::destructiveProjectEnumData destructiveProjectEnumData,
+          value_witness_types::destructiveInjectEnumTag destructiveInjectEnumTag)
     : ExtraInhabitantsValueWitnessTable(base),
       getEnumTag(getEnumTag),
       destructiveProjectEnumData(destructiveProjectEnumData),
@@ -931,7 +681,7 @@ namespace {
   template<typename T> struct _ResultOf;
   
   template<typename R, typename...A>
-  struct _ResultOf<R(A...)> {
+  struct _ResultOf<R(*)(A...)> {
     using type = R;
   };
 }
@@ -1139,14 +889,15 @@ public:
   
   // Define forwarders for value witnesses. These invoke this metadata's value
   // witness table with itself as the 'self' parameter.
-  #define FORWARD_WITNESS(WITNESS)                                         \
+  #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+  #define FUNCTION_VALUE_WITNESS(WITNESS, UPPER, RET_TYPE, PARAM_TYPES)    \
     template<typename...A>                                                 \
     _ResultOf<value_witness_types::WITNESS>::type                          \
     vw_##WITNESS(A &&...args) const {                                      \
       return getValueWitnesses()->WITNESS(std::forward<A>(args)..., this); \
     }
-  FOR_ALL_FUNCTION_VALUE_WITNESSES(FORWARD_WITNESS)
-  #undef FORWARD_WITNESS
+  #define DATA_VALUE_WITNESS(LOWER, UPPER, TYPE)
+  #include "swift/ABI/ValueWitness.def"
 
   int vw_getExtraInhabitantIndex(const OpaqueValue *value) const  {
     return getValueWitnesses()->_asXIVWT()->getExtraInhabitantIndex(value, this);
@@ -1156,7 +907,7 @@ public:
   }
 
   int vw_getEnumTag(const OpaqueValue *value) const {
-    return getValueWitnesses()->_asEVWT()->getEnumTag(value, this);
+    return getValueWitnesses()->_asEVWT()->getEnumTag(const_cast<OpaqueValue*>(value), this);
   }
   void vw_destructiveProjectEnumData(OpaqueValue *value) const {
     getValueWitnesses()->_asEVWT()->destructiveProjectEnumData(value, this);
