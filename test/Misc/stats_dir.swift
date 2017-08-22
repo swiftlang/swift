@@ -15,6 +15,7 @@
 // RUN: %FileCheck -input-file %t/driver.csv %s
 // RUN: %utils/process-stats-dir.py --compare-to-csv-baseline %t/driver.csv %t
 
+// CHECK: {{"AST.NumSourceLines"	[1-9][0-9]*$}}
 // CHECK: {{"IRModule.NumIRFunctions"	[1-9][0-9]*$}}
 // CHECK: {{"LLVM.NumLLVMBytesOutput"	[1-9][0-9]*$}}
 
