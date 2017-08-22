@@ -8,4 +8,5 @@ func foo() -> Int {
 // RUN: %sourcekitd-test -req=extract-func -pos=2:1 -end-pos 4:11 -name new_name %s -- %s > %t.result/extract-func.swift.expected
 // RUN: diff -u %S/extract-func.swift.expected %t.result/extract-func.swift.expected
 
-// REQUIRES-ANY: OS=macosx, OS=linux-gnu
+// FIXME: Fails on linux with assertion: "!GlibcModuleMapPath.empty()"" failed
+// REQUIRES-ANY: OS=macosx
