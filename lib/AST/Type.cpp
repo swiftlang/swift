@@ -786,21 +786,23 @@ void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
   switch (type->getKind()) {
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
-    
-    // FIXME: In the weird case where we have a tuple type that should
-    // be wrapped in a ParenType but isn't, just... forget it happened.
-    if (paramList && tupleTy->getNumElements() != paramList->size() &&
-        paramList->size() == 1)
+
+    // Arguments and parameters are not guaranteed to always line-up
+    // perfectly, e.g. failure diagnostics tries to match argument type
+    // to different "candidate" parameters.
+    if (paramList && tupleTy->getNumElements() != paramList->size())
       paramList = nullptr;
-    
+
     for (auto i : range(0, tupleTy->getNumElements())) {
-      outDefaultMap.push_back(paramList && paramList->get(i)->isDefaultArgument());
+      outDefaultMap.push_back(paramList &&
+                              paramList->get(i)->isDefaultArgument());
     }
     break;
   }
       
   case TypeKind::Paren: {
-    outDefaultMap.push_back(paramList && paramList->get(0)->isDefaultArgument());
+    outDefaultMap.push_back(paramList && paramList->size() == 1 &&
+                            paramList->get(0)->isDefaultArgument());
     break;
   }
       
