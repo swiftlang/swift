@@ -863,8 +863,13 @@ public:
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
   
+  /// Whether our effective Swift version is less than the given version
+  bool isSwiftVersionLessThan(unsigned major, unsigned minor = 0) const {
+    return LangOpts.isSwiftVersionLessThan(major, minor);
+  }
+
   /// Whether our effective Swift version is in the Swift 3 family
-  bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
+  bool isSwiftVersion3() const { return isSwiftVersionLessThan(4); }
 
 private:
   friend Decl;
