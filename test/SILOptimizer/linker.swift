@@ -7,13 +7,13 @@ doSomething()
 
 // Make sure we are not linking doSomething2 because it is marked with 'noimport'
 
-// CHECK: sil [_semantics "stdlib_binary_only"] @_T0s12doSomething2yyF : $@convention(thin) () -> ()
+// CHECK: sil [serialized] [_semantics "stdlib_binary_only"] @_T0s12doSomething2yyF : $@convention(thin) () -> ()
 // CHECK-NOT: return
 doSomething2()
 
 // CHECK: sil public_external [serialized] [noinline] @{{.*}}callDoSomething3{{.*}}
 
-// CHECK: sil @unknown
+// CHECK: sil [serialized] @unknown
 
 // CHECK: sil [serialized] [noinline] [_semantics "stdlib_binary_only"] @{{.*}}doSomething3{{.*}}
 // CHECK-NOT: return

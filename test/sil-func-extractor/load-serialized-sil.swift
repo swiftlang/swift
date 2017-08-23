@@ -11,7 +11,7 @@
 // CHECK-NEXT:  init
 // CHECK-NEXT: }
 
-// CHECK: sil @unknown : $@convention(thin) () -> ()
+// CHECK: sil [serialized] @unknown : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil hidden [serialized] @_T0s1XV4testyyF : $@convention(method) (X) -> ()
 // CHECK: bb0
