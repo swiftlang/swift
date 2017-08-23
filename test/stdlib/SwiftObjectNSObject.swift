@@ -24,11 +24,14 @@ import Foundation
 class C { 
   @objc func cInstanceMethod() { }
   @objc class func cClassMethod() { }
+  @objc func cInstanceOverride() { }
+  @objc class func cClassOverride() { }
 }
 class D : C {
   @objc func dInstanceMethod() { }
   @objc class func dClassMethod() { }
-
+  @objc override func cInstanceOverride() { }
+  @objc override class func cClassOverride() { }
 }
 
 @_silgen_name("TestSwiftObjectNSObject") 
