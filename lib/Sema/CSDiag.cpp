@@ -2259,6 +2259,7 @@ private:
   bool visitCoerceExpr(CoerceExpr *CE);
   bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
+  bool visitCaptureListExpr(CaptureListExpr *CLE);
   bool visitClosureExpr(ClosureExpr *CE);
   bool visitKeyPathExpr(KeyPathExpr *KPE);
 };
@@ -7243,6 +7244,11 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics
   // because of how sema injects this node into the type checker.
   return false;
+}
+
+bool FailureDiagnosis::visitCaptureListExpr(CaptureListExpr *CLE) {
+  // Always walk into the closure of a capture list expression.
+  return visitClosureExpr(CLE->getClosureBody());
 }
 
 static bool isInvalidClosureResultType(Type resultType) {

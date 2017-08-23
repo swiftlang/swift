@@ -10,6 +10,7 @@ _ = myMap(intArray, { x -> String in String(x) } )
 // Closures with too few parameters.
 func foo(_ x: (Int, Int) -> Int) {}
 foo({$0}) // expected-error{{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
+foo({ [intArray] in $0}) // expected-error{{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
 struct X {}
 func mySort(_ array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
