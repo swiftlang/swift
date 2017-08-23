@@ -276,16 +276,16 @@ public:
   Callee(const Callee &) = delete;
   Callee &operator=(const Callee &) = delete;
 private:
-  ManagedValue IndirectValue;
-  SILDeclRef Constant;
-  SILValue SelfValue;
-  AbstractionPattern OrigFormalInterfaceType;
-  CanFunctionType SubstFormalInterfaceType;
-  SubstitutionList Substitutions;
-  Optional<SmallVector<ManagedValue, 2>> Captures;
+  ManagedValue indirectValue;
+  SILDeclRef constant;
+  SILValue selfValue;
+  AbstractionPattern origFormalInterfaceType;
+  CanFunctionType substFormalInterfaceType;
+  SubstitutionList substitutions;
+  Optional<SmallVector<ManagedValue, 2>> captures;
 
   // The pointer back to the AST node that produced the callee.
-  SILLocation Loc;
+  SILLocation loc;
 
   static CanFunctionType
   getSubstFormalInterfaceType(CanAnyFunctionType substFormalType,
@@ -304,22 +304,22 @@ private:
          CanFunctionType substFormalType,
          SILLocation l)
     : kind(Kind::IndirectValue),
-      IndirectValue(indirectValue),
-      OrigFormalInterfaceType(origFormalType),
-      SubstFormalInterfaceType(substFormalType),
-      Loc(l)
+      indirectValue(indirectValue),
+      origFormalInterfaceType(origFormalType),
+      substFormalInterfaceType(substFormalType),
+      loc(l)
   {}
 
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
          AbstractionPattern origFormalType,
          CanAnyFunctionType substFormalType,
          SubstitutionList subs, SILLocation l)
-    : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
-      OrigFormalInterfaceType(origFormalType),
-      SubstFormalInterfaceType(getSubstFormalInterfaceType(substFormalType,
+    : kind(Kind::StandaloneFunction), constant(standaloneFunction),
+      origFormalInterfaceType(origFormalType),
+      substFormalInterfaceType(getSubstFormalInterfaceType(substFormalType,
                                                            subs)),
-      Substitutions(subs),
-      Loc(l)
+      substitutions(subs),
+      loc(l)
   {
   }
 
@@ -331,12 +331,12 @@ private:
          CanAnyFunctionType substFormalType,
          SubstitutionList subs,
          SILLocation l)
-    : kind(methodKind), Constant(methodName), SelfValue(selfValue),
-      OrigFormalInterfaceType(origFormalType),
-      SubstFormalInterfaceType(getSubstFormalInterfaceType(substFormalType,
+    : kind(methodKind), constant(methodName), selfValue(selfValue),
+      origFormalInterfaceType(origFormalType),
+      substFormalInterfaceType(getSubstFormalInterfaceType(substFormalType,
                                                            subs)),
-      Substitutions(subs),
-      Loc(l)
+      substitutions(subs),
+      loc(l)
   {
   }
 
@@ -432,25 +432,25 @@ public:
   Callee &operator=(Callee &&) = default;
 
   void setCaptures(SmallVectorImpl<ManagedValue> &&captures) {
-    Captures = std::move(captures);
+    captures = std::move(captures);
   }
   
   ArrayRef<ManagedValue> getCaptures() const {
-    if (Captures)
-      return *Captures;
+    if (captures)
+      return *captures;
     return {};
   }
   
   bool hasCaptures() const {
-    return Captures.hasValue();
+    return captures.hasValue();
   }
 
   AbstractionPattern getOrigFormalType() const {
-    return AbstractionPattern(OrigFormalInterfaceType);
+    return AbstractionPattern(origFormalInterfaceType);
   }
 
   CanFunctionType getSubstFormalType() const {
-    return SubstFormalInterfaceType;
+    return substFormalInterfaceType;
   }
 
   unsigned getNaturalUncurryLevel() const {
@@ -464,7 +464,7 @@ public:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
-      return Constant.getUncurryLevel();
+      return constant.getUncurryLevel();
     }
 
     llvm_unreachable("Unhandled Kind in switch.");
@@ -472,7 +472,7 @@ public:
 
   EnumElementDecl *getEnumElementDecl() {
     assert(kind == Kind::EnumElement);
-    return cast<EnumElementDecl>(Constant.getDecl());
+    return cast<EnumElementDecl>(constant.getDecl());
   }
 
   std::tuple<ManagedValue, CanSILFunctionType,
@@ -482,36 +482,36 @@ public:
     ApplyOptions options = ApplyOptions::None;
     Optional<SILDeclRef> constant = None;
 
-    if (!Constant) {
+    if (!constant) {
       assert(level == 0 && "can't curry indirect function");
     } else {
-      unsigned uncurryLevel = Constant.getUncurryLevel();
+      unsigned uncurryLevel = constant.getUncurryLevel();
       assert(level <= uncurryLevel
              && "uncurrying past natural uncurry level of standalone function");
       if (level < uncurryLevel) {
         assert(level == 0);
-        constant = Constant.asCurried();
+        constant = constant.asCurried();
       } else {
-        constant = Constant;
+        constant = constant;
       }
     }
 
     switch (kind) {
     case Kind::IndirectValue:
-      mv = IndirectValue;
-      assert(Substitutions.empty());
+      mv = indirectValue;
+      assert(substitutions.empty());
       break;
 
     case Kind::StandaloneFunction: {
       // If we're currying a direct reference to a class-dispatched method,
       // make sure we emit the right set of thunks.
-      if (constant->isCurried && Constant.hasDecl())
-        if (auto func = Constant.getAbstractFunctionDecl())
+      if (constant->isCurried && constant.hasDecl())
+        if (auto func = constant.getAbstractFunctionDecl())
           if (getMethodDispatch(func) == MethodDispatch::Class)
             constant = constant->asDirectReference(true);
       
       auto constantInfo = SGF.getConstantInfo(*constant);
-      SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
+      SILValue ref = SGF.emitGlobalFunctionRef(loc, *constant, constantInfo);
       mv = ManagedValue::forUnmanaged(ref);
       break;
     }
@@ -522,7 +522,7 @@ public:
       // applied.
       assert(constant->isCurried);
 
-      SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
+      SILValue ref = SGF.emitGlobalFunctionRef(loc, *constant, constantInfo);
       mv = ManagedValue::forUnmanaged(ref);
       break;
     }
@@ -531,14 +531,14 @@ public:
 
       // If the call is curried, emit a direct call to the curry thunk.
       if (constant->isCurried) {
-        SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
+        SILValue ref = SGF.emitGlobalFunctionRef(loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         break;
       }
 
       // Otherwise, do the dynamic dispatch inline.
-      SILValue methodVal = SGF.B.createClassMethod(Loc,
-                                                   SelfValue,
+      SILValue methodVal = SGF.B.createClassMethod(loc,
+                                                   selfValue,
                                                    *constant,
                                                    /*volatile*/
                                                      constant->isForeign);
@@ -550,17 +550,17 @@ public:
       assert(!constant->isCurried);
 
       SILValue castValue, borrowedValue;
-      std::tie(castValue, borrowedValue) = castToOriginalSelfType(SGF.B, Loc, SelfValue);
+      std::tie(castValue, borrowedValue) = castToOriginalSelfType(SGF.B, loc, selfValue);
 
       auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
-      auto methodVal = SGF.B.createSuperMethod(Loc, castValue,
+      auto methodVal = SGF.B.createSuperMethod(loc, castValue,
                                                *constant,
                                                constantInfo.getSILType(),
                                                /*volatile*/
                                                  constant->isForeign);
       if (borrowedValue) {
-        SGF.B.createEndBorrow(Loc, borrowedValue, SelfValue);
+        SGF.B.createEndBorrow(loc, borrowedValue, selfValue);
       }
       mv = ManagedValue::forUnmanaged(methodVal);
       break;
@@ -570,7 +570,7 @@ public:
 
       // If the call is curried, emit a direct call to the curry thunk.
       if (constant->isCurried) {
-        SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
+        SILValue ref = SGF.emitGlobalFunctionRef(loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         break;
       }
@@ -603,14 +603,14 @@ public:
 
       auto closureType =
         replaceSelfTypeForDynamicLookup(SGF.getASTContext(), fnType,
-                                SelfValue->getType().getSwiftRValueType(),
-                                Constant);
+                                selfValue->getType().getSwiftRValueType(),
+                                constant);
 
       SILValue fn = SGF.B.createDynamicMethod(Loc,
-                          SelfValue,
+                          selfValue,
                           *constant,
                           SILType::getPrimitiveObjectType(closureType),
-                          /*volatile*/ Constant.isForeign);
+                          /*volatile*/ constant.isForeign);
       mv = ManagedValue::forUnmanaged(fn);
       break;
     }
@@ -626,17 +626,17 @@ public:
 
     auto substFnType =
       mv.getType().castTo<SILFunctionType>()->substGenericArgs(
-        SGF.SGM.M, Substitutions);
+        SGF.SGM.M, substitutions);
 
     return std::make_tuple(mv, substFnType, foreignError, foreignSelf, options);
   }
 
   SubstitutionList getSubstitutions() const {
-    return Substitutions;
+    return substitutions;
   }
 
   SILDeclRef getMethodName() const {
-    return Constant;
+    return constant;
   }
 
   /// Return a specialized emission function if this is a function with a known
@@ -650,7 +650,7 @@ public:
 
     switch (kind) {
     case Kind::StandaloneFunction: {
-      return SpecializedEmitter::forDecl(SGM, Constant);
+      return SpecializedEmitter::forDecl(SGM, constant);
     }
     case Kind::EnumElement:
     case Kind::IndirectValue:
