@@ -8005,6 +8005,23 @@ figureOutTheDeclarationContextToImportInto(Decl *D, DeclContext *&DC,
   return ext;
 }
 
+
+static void loadMembersOfBaseImportedFromClang(ExtensionDecl *ext) {
+  const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
+  auto *clangBase = base->getClangDecl();
+  if (!clangBase)
+    return;
+  base->loadAllMembers();
+  
+  // Sanity check: make sure we don't jump over to a category /while/
+  // loading the original class's members. Right now we only check if this
+  // happens on the first member.
+  if (auto *clangContainer = dyn_cast<clang::ObjCContainerDecl>(clangBase))
+    assert((clangContainer->decls_empty() || !base->getMembers().empty()) &&
+           "can't load extension members before base has finished");
+}
+
+
 void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
                                                                   Decl *D, const clang::ObjCContainerDecl *objcContainer) {
   clang::PrettyStackTraceDecl trace(objcContainer, clang::SourceLocation(),
@@ -8016,20 +8033,7 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
   if (ExtensionDecl *ext =
       figureOutTheDeclarationContextToImportInto(D, DC, IDC)) {
    // If the base is also imported from Clang, load its members first.
-    const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
-    if (auto *clangBase = base->getClangDecl()) {
-      base->loadAllMembers();
-
-      // Sanity check: make sure we don't jump over to a category /while/
-      // loading the original class's members. Right now we only check if this
-      // happens on the first member.
-      if (auto *clangContainer = dyn_cast<clang::ObjCContainerDecl>(clangBase)){
-        if (!clangContainer->decls_empty()) {
-          assert(!base->getMembers().empty() &&
-                 "can't load extension members before base has finished");
-        }
-      }
-    }
+    loadMembersOfBaseImportedFromClang(ext);
   }
 
   ImportingEntityRAII Importing(*this);
