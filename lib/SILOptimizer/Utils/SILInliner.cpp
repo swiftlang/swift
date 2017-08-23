@@ -440,6 +440,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::SelectEnumInst:
     case ValueKind::SelectValueInst:
     case ValueKind::KeyPathInst:
+    case ValueKind::GlobalValueInst:
       return InlineCost::Expensive;
 
     case ValueKind::BuiltinInst: {
@@ -461,6 +462,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::MarkUninitializedInst:
     case ValueKind::MarkUninitializedBehaviorInst:
       llvm_unreachable("not valid in canonical sil");
+    case ValueKind::ObjectInst:
+      llvm_unreachable("not valid in a function");
   }
 
   llvm_unreachable("Unhandled ValueKind in switch.");

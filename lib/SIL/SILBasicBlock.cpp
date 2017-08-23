@@ -44,13 +44,18 @@ SILBasicBlock::~SILBasicBlock() {
 
   dropAllReferences();
 
-  // Notify the delete handlers that the instructions in this block are
-  // being deleted.
-  auto &M = getModule();
+  SILModule *M = nullptr;
+  if (getParent())
+    M = &getParent()->getModule();
+
   for (auto I = begin(), E = end(); I != E;) {
     auto Inst = &*I;
     ++I;
-    M.notifyDeleteHandlers(Inst);
+    if (M) {
+      // Notify the delete handlers that the instructions in this block are
+      // being deleted.
+      M->notifyDeleteHandlers(Inst);
+    }
     erase(Inst);
   }
 

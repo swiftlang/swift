@@ -80,6 +80,17 @@ SWIFT_RUNTIME_EXPORT
 HeapObject *swift_initStackObject(HeapMetadata const *metadata,
                                   HeapObject *object);
 
+/// Initializes the object header of a static object which is statically
+/// allocated in the data section.
+///
+/// \param metadata - the object's metadata which is stored in the header
+/// \param object - the address of the object in the data section. It is assumed
+///        that at offset -1 there is a swift_once token allocated.
+/// \returns the passed object pointer.
+SWIFT_RUNTIME_EXPORT
+HeapObject *swift_initStaticObject(HeapMetadata const *metadata,
+                                   HeapObject *object);
+
 /// Performs verification that the lifetime of a stack allocated object has
 /// ended. It aborts if the reference counts of the object indicate that the
 /// object did escape to some other location.

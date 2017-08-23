@@ -854,7 +854,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   SILOpenedArchetypesTracker *OldOpenedArchetypesTracker =
       Builder.getOpenedArchetypesTracker();
 
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(*AI.getFunction());
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(AI.getFunction());
 
   if (ConcreteType->isOpenedExistential()) {
     // Prepare a mini-mapping for opened archetypes.

@@ -247,6 +247,13 @@ public:
   bool addFields(llvm::MutableArrayRef<ElementLayout> fields,
                  LayoutStrategy strategy);
 
+  /// Add a field to the layout.  The field layout needs
+  /// only have the TypeInfo set; the rest will be filled out.
+  ///
+  /// Returns true if the field may have increased the storage
+  /// requirements of the layout.
+  bool addField(ElementLayout &elt, LayoutStrategy strategy);
+
   /// Return whether the layout is known to be empty.
   bool empty() const { return IsFixedLayout && CurSize == Size(0); }
 

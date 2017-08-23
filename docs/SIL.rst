@@ -1210,16 +1210,35 @@ Global Variables
 ::
 
   decl ::= sil-global-variable
+  static-initializer ::= '=' '{' sil-instruction-def* '}'
   sil-global-variable ::= 'sil_global' sil-linkage identifier ':' sil-type
+                             (static-initializer)?
 
 SIL representation of a global variable.
 
-Global variable access is performed by the ``alloc_global`` and ``global_addr``
-SIL instructions. Prior to performing any access on the global, the
-``alloc_global`` instruction must be performed to initialize the storage.
+Global variable access is performed by the ``alloc_global``, ``global_addr``
+and ``global_value`` instructions.
 
+A global can have a static initializer if its initial value can be
+composed of literals. The static initializer is represented as a list of
+literal and aggregate instructions where the last instruction is the top-level
+value of the static initializer::
+
+  sil_global hidden @_T04test3varSiv : $Int {
+    %0 = integer_literal $Builtin.Int64, 27
+    %initval = struct $Int (%0 : $Builtin.Int64)
+  }
+
+If a global does not have a static initializer, the ``alloc_global``
+instruction must be performed prior an access to initialize the storage.
 Once a global's storage has been initialized, ``global_addr`` is used to
 project the value.
+
+If the last instruction in the static initializer is an ``object`` instruction
+the global variable is a statically initialized object. In this case the
+variable cannot be used as l-value, i.e. the reference to the object cannot be
+modified. As a consequence the variable cannot be accessed with ``global_addr``
+but only with ``global_value``.
 
 Dataflow Errors
 ---------------
@@ -2851,7 +2870,20 @@ global_addr
 Creates a reference to the address of a global variable which has been
 previously initialized by ``alloc_global``. It is undefined behavior to
 perform this operation on a global variable which has not been
-initialized.
+initialized, except the global variable has a static initializer.
+
+global_value
+`````````````
+::
+
+  sil-instruction ::= 'global_value' sil-global-name ':' sil-type
+
+  %1 = global_value @v : $T
+
+Returns the value of a global variable which has been previously initialized
+by ``alloc_global``. It is undefined behavior to perform this operation on a
+global variable which has not been initialized, except the global variable
+has a static initializer.
 
 integer_literal
 ```````````````
@@ -3531,6 +3563,20 @@ struct_element_addr
 Given the address of a struct value in memory, derives the address of a
 physical field within the value.
 
+object
+``````
+::
+
+  sil-instruction ::= 'object' sil-type '(' (sil-operand (',' sil-operand)*)? ')'
+
+  object $T (%a : $A, %b : $B, ...)
+  // $T must be a non-generic or bound generic reference type
+  // The first operands must match the stored properties of T
+  // Optionally there may be more elements, which are tail-allocated to T
+
+Constructs a statically initialized object. This instruction can only appear
+as final instruction in a global variable static initializer list.
+  
 ref_element_addr
 ````````````````
 ::

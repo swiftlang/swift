@@ -61,7 +61,7 @@ bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
     if (getOpenedArchetypeDef(archetypeTy))
       return;
 
-    auto *CurF = const_cast<SILFunction *>(&this->getFunction());
+    auto *CurF = const_cast<SILFunction *>(this->getFunction());
     auto &SILMod = CurF->getModule();
     // Create a placeholder representing a forward definition.
     // Add the placeholder at the beginning of the entry block.
@@ -90,7 +90,7 @@ bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
 // inside a function.
 bool SILOpenedArchetypesTracker::registerOpenedArchetypes(
     const SILInstruction *I) {
-  assert((!I->getParent() || I->getFunction() == &F) &&
+  assert((!I->getParent() || I->getFunction() == getFunction()) &&
          "Instruction does not belong to a proper SILFunction");
   auto Archetype = getOpenedArchetypeOf(I);
   if (!Archetype)
@@ -103,7 +103,7 @@ bool SILOpenedArchetypesTracker::registerOpenedArchetypes(
 // the typedef operands of this instruction.
 bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(
     const SILInstruction *I) {
-  assert((!I->getParent() || I->getFunction() == &F) &&
+  assert((!I->getParent() || I->getFunction() == getFunction()) &&
          "Instruction does not belong to a proper SILFunction");
   bool Registered = false;
   for (auto &Op : I->getTypeDependentOperands()) {
@@ -120,7 +120,7 @@ bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(
 // Should be only called when this instruction is to be removed.
 void SILOpenedArchetypesTracker::unregisterOpenedArchetypes(
     const SILInstruction *I) {
-  assert(I->getFunction() == &F &&
+  assert(I->getFunction() == getFunction() &&
          "Instruction does not belong to a proper SILFunction");
   auto Archetype = getOpenedArchetypeOf(I);
   // Remove the archetype definition if it was registered before.
@@ -135,7 +135,7 @@ void SILOpenedArchetypesTracker::unregisterOpenedArchetypes(
 void SILOpenedArchetypesTracker::handleDeleteNotification(
     swift::ValueBase *Value) {
   if (auto I = dyn_cast<SILInstruction>(Value))
-    if (I->getFunction() == &F)
+    if (I->getFunction() == getFunction())
       unregisterOpenedArchetypes(I);
 }
 
@@ -192,8 +192,8 @@ SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(
 
 void SILOpenedArchetypesTracker::dump() const {
   llvm::dbgs() << "SILOpenedArchetypesTracker {\n";
-  llvm::dbgs() << "Tracks open archetypes for function: " << F.getName()
-               << "\n";
+  llvm::dbgs() << "Tracks open archetypes for function: "
+               << getFunction()->getName() << "\n";
   llvm::dbgs() << "Open archetype operands and their definitions:\n";
   for (auto &KV : OpenedArchetypeDefs) {
     auto Archetype = KV.first;

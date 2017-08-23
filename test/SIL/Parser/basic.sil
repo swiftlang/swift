@@ -11,6 +11,28 @@ import Swift
 // CHECK: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
 
+class TestArrayStorage {
+  @sil_stored var count: Int32
+  init()
+}
+
+struct TestArray {
+  var storage : TestArrayStorage
+}
+
+// CHECK-LABEL: sil_global @static_array : $TestArrayStorage = {
+// CHECK:         %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
+// CHECK-NEXT:  }
+sil_global @static_array : $TestArrayStorage = {
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = integer_literal $Builtin.Int64, 20
+  %3 = struct $Int32 (%0 : $Builtin.Int32)
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %5 = struct $Int64 (%2 : $Builtin.Int64)
+  %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
+}
+
 // Linkage types.
 
 // CHECK-LABEL: sil shared @clang_thunk : $@convention(thin) () -> ()
@@ -40,7 +62,6 @@ class Class2 {
 }
 
 sil @type_ref1 : $(Class1, Int) -> ()  // CHECK-LABEL: sil @type_ref1 : $@convention(thin) (Class1, Int)
-
 
 // Instructions
 
@@ -547,6 +568,15 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 
 sil_global @x : $Int
 sil @global_callee : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
+
+// CHECK-LABEL: sil @return_static_array
+sil @return_static_array : $@convention(thin) () -> TestArray {
+bb0:
+  // CHECK: %0 = global_value @static_array : $TestArrayStorage
+  %0 = global_value @static_array : $TestArrayStorage
+  %1 = struct $TestArray (%0 : $TestArrayStorage)
+  return %1 : $TestArray
+}
 
 // CHECK-LABEL: @global_code : $@convention(thin) () -> ()
 sil private @global_code : $() -> () {

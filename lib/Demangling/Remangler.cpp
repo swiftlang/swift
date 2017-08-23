@@ -1067,6 +1067,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::GenericSpecializationNotReAbstracted:
       case Node::Kind::GenericPartialSpecialization:
       case Node::Kind::GenericPartialSpecializationNotReAbstracted:
+      case Node::Kind::OutlinedVariable:
       case Node::Kind::ObjCAttribute:
       case Node::Kind::NonObjCAttribute:
       case Node::Kind::DynamicAttribute:
@@ -1731,6 +1732,11 @@ void Remangler::mangleOutlinedRetain(Node *node) {
 void Remangler::mangleOutlinedRelease(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Ws";
+}
+
+void Remangler::mangleOutlinedVariable(Node *node) {
+  Buffer << "Tv";
+  mangleIndex(node->getIndex());
 }
 
 void Remangler::mangleSILBoxTypeWithLayout(Node *node) {

@@ -100,6 +100,7 @@ static bool isFunctionAttr(Node::Kind kind) {
     case Node::Kind::VTableAttribute:
     case Node::Kind::PartialApplyForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
+    case Node::Kind::OutlinedVariable:
     case Node::Kind::MergedFunction:
       return true;
     default:
@@ -1304,6 +1305,12 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       } else {
         return createWithChildren(nodeKind, sigOrDecl, type);
       }
+    }
+    case 'v': {
+      int Idx = demangleIndex();
+      if (Idx < 0)
+        return nullptr;
+      return createNode(Node::Kind::OutlinedVariable, Idx);
     }
     default:
       return nullptr;

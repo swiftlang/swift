@@ -19,7 +19,9 @@
 #include "swift/AST/Pattern.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/IRGen/Linking.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Module.h"
 
 #include "DebugTypeInfo.h"
 #include "Explosion.h"
@@ -34,7 +36,7 @@ using namespace swift;
 using namespace irgen;
 
 /// Emit a global variable.
-Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
+void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   auto &ti = getTypeInfo(var->getLoweredType());
   
   // If the variable is empty in all resilience domains, don't actually emit it;
@@ -46,20 +48,12 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
           nullptr, var->getDecl()->getName().str(), "", DbgTy,
           var->getLinkage() != SILLinkage::Public, SILLocation(var->getDecl()));
     }
-    return ti.getUndefAddress();
+    return;
   }
 
-  /// Get the global variable.
-  Address addr = getAddrOfSILGlobalVariable(var, ti,
+  /// Create the global variable.
+  getAddrOfSILGlobalVariable(var, ti,
                      var->isDefinition() ? ForDefinition : NotForDefinition);
-  
-  /// Add a zero initializer.
-  if (var->isDefinition()) {
-    auto gvar = cast<llvm::GlobalVariable>(addr.getAddress());
-    gvar->setInitializer(llvm::Constant::getNullValue(gvar->getValueType()));
-  }
-
-  return addr;
 }
 
 StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
