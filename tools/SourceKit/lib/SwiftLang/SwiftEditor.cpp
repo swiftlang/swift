@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
@@ -1089,10 +1090,17 @@ public:
   }
 
   StringRef getObjCRuntimeName(const Decl *D, SmallString<64> &Buf) {
-    if (!D)
+    if (!D || D->isInvalid())
       return StringRef();
     if (!isa<ClassDecl>(D) && !isa<ProtocolDecl>(D))
       return StringRef();
+    auto *VD = cast<ValueDecl>(D);
+    if (!VD->hasName())
+      return StringRef();
+    auto ident = VD->getBaseName().getIdentifier().str();
+    if (ident.empty() || Mangle::isDigit(ident.front()))
+      return StringRef();
+
     // We don't support getting the runtime name for nested classes.
     // This would require typechecking or at least name lookup, if the nested
     // class is in an extension.
