@@ -8072,11 +8072,9 @@ void ClangImporter::Implementation::collectMembersToAdd(
                                                         SmallVectorImpl<Decl *> &members) {
   for (const clang::Decl *m : objcContainer->decls()) {
     auto nd = dyn_cast<clang::NamedDecl>(m);
-    if (!nd || nd != nd->getCanonicalDecl() ||
-        nd->getDeclContext() != objcContainer) {
-      continue;
-    }
-    insertMembersAndAlternates(nd, members);
+    if (nd && nd == nd->getCanonicalDecl() &&
+        nd->getDeclContext() == objcContainer)
+      insertMembersAndAlternates(nd, members);
   }
 
   SwiftDeclConverter converter(*this, CurrentVersion);
