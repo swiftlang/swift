@@ -72,6 +72,9 @@ public:
 #define KIND(NAME, CONTENT) static LazySKDUID Kind##NAME(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
 
+#define REFACTORING(KIND, NAME, ID) static LazySKDUID Kind##Refactoring##KIND("source.refactoring.kind."#ID);
+#include "swift/IDE/RefactoringKinds.def"
+
 static void onDocumentUpdateNotification(StringRef DocumentName) {
   static UIdent DocumentUpdateNotificationUID(
       "source.notification.editor.documentupdate");
@@ -205,6 +208,29 @@ editorFindInterfaceDoc(StringRef ModuleName, ArrayRef<const char *> Args);
 
 static sourcekitd_response_t
 editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args);
+
+static bool
+buildRenameLocationsFromDict(RequestDict &Req, bool UseNewName,
+                             std::vector<RenameLocations> &RenameLocations,
+                             llvm::SmallString<64> &Error);
+
+static sourcekitd_response_t
+createCategorizedEditsResponse(ArrayRef<CategorizedEdits> AllEdits,
+                               StringRef Error);
+
+static sourcekitd_response_t
+syntacticRename(llvm::MemoryBuffer *InputBuf,
+                ArrayRef<RenameLocations> RenameLocations,
+                ArrayRef<const char*> Args);
+
+static sourcekitd_response_t
+createCategorizedRenameRangesResponse(ArrayRef<CategorizedRenameRanges> Ranges,
+                                      StringRef Error);
+
+static sourcekitd_response_t
+findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                 ArrayRef<RenameLocations> RenameLocations,
+                 ArrayRef<const char *> Args);
 
 static bool isSemanticEditorDisabled();
 
@@ -529,6 +555,30 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     return Rec(editorFindModuleGroups(*ModuleName, Args));
   }
 
+  if (ReqUID == RequestSyntacticRename) {
+    std::unique_ptr<llvm::MemoryBuffer>
+    InputBuf = getInputBufForRequest(SourceFile, SourceText, ErrBuf);
+    if (!InputBuf)
+      return Rec(createErrorRequestFailed(ErrBuf.c_str()));
+
+    std::vector<RenameLocations> RenameLocations;
+    if (buildRenameLocationsFromDict(Req, true, RenameLocations, ErrBuf))
+      return Rec(createErrorRequestFailed(ErrBuf.c_str()));
+    return Rec(syntacticRename(InputBuf.get(), RenameLocations, Args));
+  }
+
+  if (ReqUID == RequestFindRenameRanges) {
+    std::unique_ptr<llvm::MemoryBuffer> InputBuf =
+        getInputBufForRequest(SourceFile, SourceText, ErrBuf);
+    if (!InputBuf)
+      return Rec(createErrorRequestFailed(ErrBuf.c_str()));
+
+    std::vector<RenameLocations> RenameLocations;
+    if (buildRenameLocationsFromDict(Req, false, RenameLocations, ErrBuf))
+      return Rec(createErrorRequestFailed(ErrBuf.c_str()));
+    return Rec(findRenameRanges(InputBuf.get(), RenameLocations, Args));
+  }
+
   if (ReqUID == RequestCodeCompleteClose) {
     // Unlike opening code completion, this is not a semantic request.
     Optional<StringRef> Name = Req.getString(KeyName);
@@ -711,7 +761,7 @@ handleSemanticRequest(RequestDict Req,
       int64_t Length = 0;
       Req.getInt64(KeyLength, Length, /*isOptional=*/true);
       int64_t Actionables = false;
-      Req.getInt64(KeyActionable, Actionables, /*isOptional=*/true);
+      Req.getInt64(KeyRetrieveRefactorActions, Actionables, /*isOptional=*/true);
       return Lang.getCursorInfo(
           *SourceFile, Offset, Length, Actionables, CancelOnSubsequentRequest,
           Args, [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
@@ -744,6 +794,58 @@ handleSemanticRequest(RequestDict Req,
 
     return Rec(createErrorRequestInvalid(
       "'key.offset' or 'key.length' is required"));
+  }
+
+  if (ReqUID == RequestSemanticRefactoring) {
+    int64_t Line = 0;
+    int64_t Column = 0;
+    int64_t Length = 0;
+    auto KA = Req.getUID(KeyActionUID);
+    if (!KA) {
+      return Rec(createErrorRequestInvalid("'key.actionuid' is required"));
+    }
+    SemanticRefactoringInfo Info;
+    Info.Kind = SemanticRefactoringKind::None;
+
+#define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
+  if (KA == KindRefactoring##KIND) Info.Kind = SemanticRefactoringKind::KIND;
+#include "swift/IDE/RefactoringKinds.def"
+
+    if (Info.Kind == SemanticRefactoringKind::None)
+      return Rec(createErrorRequestInvalid("'key.actionuid' isn't recognized"));
+
+    if (!Req.getInt64(KeyLine, Line, /*isOptional=*/false)) {
+      if (!Req.getInt64(KeyColumn, Column, /*isOptional=*/false)) {
+        Req.getInt64(KeyLength, Length, /*isOptional=*/true);
+        if (auto N = Req.getString(KeyName))
+          Info.PreferredName = *N;
+        LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+        Info.Line = Line;
+        Info.Column = Column;
+        Info.Length = Length;
+        return Lang.semanticRefactoring(*SourceFile, Info, Args,
+          [Rec](ArrayRef<CategorizedEdits> CategorizedEdits, StringRef Error) {
+            Rec(createCategorizedEditsResponse(CategorizedEdits, Error));
+        });
+      }
+    }
+    return Rec(createErrorRequestInvalid("'key.line' or 'key.column' are required"));
+  }
+
+  if (ReqUID == RequestFindLocalRenameRanges) {
+    int64_t Line = 0, Column = 0, Length = 0;
+    if (Req.getInt64(KeyLine, Line, /*isOptional=*/false))
+      return Rec(createErrorRequestInvalid("'key.line' is required"));
+    if (Req.getInt64(KeyColumn, Column, /*isOptional=*/false))
+      return Rec(createErrorRequestInvalid("'key.column' is required"));
+    Req.getInt64(KeyLength, Length, /*isOptional=*/true);
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    return Lang.findLocalRenameRanges(
+        *SourceFile, Line, Column, Length, Args,
+        [Rec](ArrayRef<CategorizedRenameRanges> Ranges, StringRef Error) {
+          Rec(createCategorizedRenameRangesResponse(Ranges, Error));
+        });
   }
 
   if (ReqUID == RequestNameTranslation) {
@@ -1400,10 +1502,13 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     }
   }
   if (!Info.AvailableActions.empty()) {
-    auto Actions = Elem.setArray(KeyActionable);
-    for (auto Name : Info.AvailableActions) {
+    auto Actions = Elem.setArray(KeyRefactorActions);
+    for (auto Info : Info.AvailableActions) {
       auto Entry = Actions.appendDictionary();
-      Entry.set(KeyActionName, Name);
+      Entry.set(KeyActionUID, Info.Kind);
+      Entry.set(KeyActionName, Info.KindName);
+      if (!Info.UnavailableReason.empty())
+        Entry.set(KeyActionUnavailableReason, Info.UnavailableReason);
     }
   }
   if (Info.ParentNameOffset) {
@@ -2316,6 +2421,183 @@ editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args) {
     Resp = RespBuilder.createResponse();
   });
   return Resp;
+}
+
+static bool
+buildRenameLocationsFromDict(RequestDict &Req, bool UseNewName,
+                             std::vector<RenameLocations> &RenameLocations,
+                             llvm::SmallString<64> &Error) {
+  bool Failed = Req.dictionaryArrayApply(KeyRenameLocations,
+                                         [&](RequestDict RenameLocation) {
+    int64_t IsFunctionLike = false;
+    if (RenameLocation.getInt64(KeyIsFunctionLike, IsFunctionLike, false)) {
+      Error = "missing key.is_function_like";
+      return true;
+    }
+
+    int64_t IsNonProtocolType = false;
+    if (RenameLocation.getInt64(KeyIsNonProtocolType, IsNonProtocolType, false)) {
+      Error = "missing key.is_non_protocol_type";
+      return true;
+    }
+
+    Optional<StringRef> OldName = RenameLocation.getString(KeyName);
+    if (!OldName.hasValue()) {
+      Error = "missing key.name";
+      return true;
+    }
+
+    Optional<StringRef> NewName;
+    if (UseNewName) {
+      NewName = RenameLocation.getString(KeyNewName);
+      if (!NewName.hasValue()) {
+        Error = "missing key.newname";
+        return true;
+      }
+    }
+
+    RenameLocations.push_back({*OldName,
+                               UseNewName ? *NewName : "",
+                               static_cast<bool>(IsFunctionLike),
+                               static_cast<bool>(IsNonProtocolType),
+                               {}});
+    auto &LineCols = RenameLocations.back().LineColumnLocs;
+    bool Failed = RenameLocation.dictionaryArrayApply(KeyLocations,
+                                                      [&](RequestDict LineAndCol) {
+      int64_t Line = 0;
+      int64_t Column = 0;
+
+      if (LineAndCol.getInt64(KeyLine, Line, false)) {
+        Error = "missing key.line";
+        return true;
+      }
+      if (LineAndCol.getInt64(KeyColumn, Column, false)) {
+        Error = "missing key.column";
+        return true;
+      }
+
+      sourcekitd_uid_t NameType = LineAndCol.getUID(KeyNameType);
+      if (!NameType) {
+        Error = "missing key.nametype";
+        return true;
+      }
+      RenameType RenameType = RenameType::Unknown;
+      if (NameType == KindDefinition) {
+        RenameType = RenameType::Definition;
+      } else if (NameType == KindReference) {
+        RenameType = RenameType::Reference;
+      } else if (NameType == KindCall) {
+        RenameType = RenameType::Call;
+      } else if (NameType != KindUnknown) {
+        Error = "invalid value for 'key.nametype'";
+        return true;
+      }
+      LineCols.push_back({static_cast<unsigned>(Line),
+        static_cast<unsigned>(Column), RenameType});
+      return false;
+    });
+    if (Failed && Error.empty()) {
+      Error = "invalid key.locations";
+    }
+    return Failed;
+  });
+  if (Failed && Error.empty()) {
+    Error = "invalid key.renamelocations";
+  }
+  return Failed;
+}
+
+static sourcekitd_response_t
+createCategorizedEditsResponse(ArrayRef<CategorizedEdits> AllEdits,
+                               StringRef Error) {
+  if (!Error.empty()) {
+    return createErrorRequestFailed(Error.str().c_str());
+  }
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  auto Arr = Dict.setArray(KeyCategorizedEdits);
+  for (auto &TheEdit : AllEdits) {
+    auto Entry = Arr.appendDictionary();
+    Entry.set(KeyCategory, TheEdit.Category);
+    auto Edits = Entry.setArray(KeyEdits);
+    for(auto E: TheEdit.Edits) {
+      auto Edit = Edits.appendDictionary();
+      Edit.set(KeyLine, E.StartLine);
+      Edit.set(KeyColumn, E.StartColumn);
+      Edit.set(KeyEndLine, E.EndLine);
+      Edit.set(KeyEndColumn, E.EndColumn);
+      Edit.set(KeyText, E.NewText);
+      if (!E.RegionsWithNote.empty()) {
+        auto Notes = Edit.setArray(KeyRangesWorthNote);
+        for (auto R : E.RegionsWithNote) {
+          auto N = Notes.appendDictionary();
+          N.set(KeyKind, R.Kind);
+          N.set(KeyLine, R.StartLine);
+          N.set(KeyColumn, R.StartColumn);
+          N.set(KeyEndLine, R.EndLine);
+          N.set(KeyEndColumn, R.EndColumn);
+          if (R.ArgIndex)
+            N.set(KeyArgIndex, *R.ArgIndex);
+        }
+      }
+    }
+  }
+  return RespBuilder.createResponse();
+}
+
+static sourcekitd_response_t
+syntacticRename(llvm::MemoryBuffer *InputBuf,
+                ArrayRef<RenameLocations> RenameLocations,
+                ArrayRef<const char*> Args) {
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  sourcekitd_response_t Result;
+  Lang.syntacticRename(InputBuf, RenameLocations, Args,
+    [&](ArrayRef<CategorizedEdits> AllEdits, StringRef Error) {
+      Result = createCategorizedEditsResponse(AllEdits, Error);
+  });
+  return Result;
+}
+
+static sourcekitd_response_t
+createCategorizedRenameRangesResponse(ArrayRef<CategorizedRenameRanges> Ranges,
+                                      StringRef Error) {
+  if (!Error.empty()) {
+    return createErrorRequestFailed(Error.str().c_str());
+  }
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  auto Arr = Dict.setArray(KeyCategorizedRanges);
+  for (const auto &CategorizedRange : Ranges) {
+    auto Entry = Arr.appendDictionary();
+    Entry.set(KeyCategory, CategorizedRange.Category);
+    auto Ranges = Entry.setArray(KeyRanges);
+    for (const auto &R : CategorizedRange.Ranges) {
+      auto Range = Ranges.appendDictionary();
+      Range.set(KeyLine, R.StartLine);
+      Range.set(KeyColumn, R.StartColumn);
+      Range.set(KeyEndLine, R.EndLine);
+      Range.set(KeyEndColumn, R.EndColumn);
+      Range.set(KeyKind, R.Kind);
+      if (R.ArgIndex) {
+        Range.set(KeyArgIndex, *R.ArgIndex);
+      }
+    }
+  }
+  return RespBuilder.createResponse();
+}
+
+static sourcekitd_response_t
+findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                 ArrayRef<RenameLocations> RenameLocations,
+                 ArrayRef<const char *> Args) {
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  sourcekitd_response_t Result;
+  Lang.findRenameRanges(
+      InputBuf, RenameLocations, Args,
+      [&](ArrayRef<CategorizedRenameRanges> Ranges, StringRef Error) {
+        Result = createCategorizedRenameRangesResponse(Ranges, Error);
+      });
+  return Result;
 }
 
 static bool isSemanticEditorDisabled() {
