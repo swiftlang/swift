@@ -156,12 +156,6 @@ swift_install_symlink_component(clang-resource-dir-symlink
   TARGET ../clang/${CLANG_VERSION}
   DESTINATION "lib/swift")
 
-# Adding link to "llvm" at install time.
-swift_install_symlink_component(llvm-resource-dir-symlink
-  LINK_NAME llvm
-  TARGET ../
-  DESTINATION "lib/swift")
-
 # Possibly install Clang headers under Clang's resource directory in case we
 # need to use a different version of the headers than the installed Clang. This
 # should be used in conjunction with clang-resource-dir-symlink.
