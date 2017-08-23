@@ -7987,8 +7987,12 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
     return;
   }
+  loadAllMembersOfObjcContainer(D, objcContainer);
+}
 
 
+void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
+                                                                  Decl *D, const clang::ObjCContainerDecl *objcContainer) {
   clang::PrettyStackTraceDecl trace(objcContainer, clang::SourceLocation(),
                                     Instance->getSourceManager(),
                                     "loading members for");

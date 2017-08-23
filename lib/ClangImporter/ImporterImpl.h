@@ -1118,6 +1118,11 @@ public:
 
   virtual void
   loadAllMembers(Decl *D, uint64_t unused) override;
+private:
+  void
+  loadAllMembersOfObjcContainer(Decl *D,
+                                const clang::ObjCContainerDecl *objcContainer);
+public:
 
   void
   loadAllConformances(
