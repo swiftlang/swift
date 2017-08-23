@@ -411,12 +411,6 @@ protected:
         ensureAlive(&F);
       }
     }
-
-    for (SILGlobalVariable &G : Module->getSILGlobalList()) {
-      if (SILFunction *initFunc = G.getInitializer()) {
-        ensureAlive(initFunc);
-      }
-    }
   }
 
 public:

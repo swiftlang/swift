@@ -647,7 +647,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
           Caller->size() << "] " << Callee->getName() << "\n";
     );
 
-    SILOpenedArchetypesTracker OpenedArchetypesTracker(*Caller);
+    SILOpenedArchetypesTracker OpenedArchetypesTracker(Caller);
     Caller->getModule().registerDeleteNotificationHandler(&OpenedArchetypesTracker);
     // The callee only needs to know about opened archetypes used in
     // the substitution list.

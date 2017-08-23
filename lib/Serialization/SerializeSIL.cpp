@@ -573,6 +573,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
+  case ValueKind::ObjectInst:
+    llvm_unreachable("static initializers of sil_global are not serialized");
+
   case ValueKind::DebugValueInst:
   case ValueKind::DebugValueAddrInst:
     // Currently we don't serialize debug variable infos, so it doesn't make
@@ -874,16 +877,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
             Ctx.getIdentifier(AGI->getReferencedGlobal()->getName())));
     break;
   }
-  case ValueKind::GlobalAddrInst: {
+  case ValueKind::GlobalAddrInst:
+  case ValueKind::GlobalValueInst: {
     // Format: Name and type. Use SILOneOperandLayout.
-    const GlobalAddrInst *GAI = cast<GlobalAddrInst>(&SI);
+    const GlobalAccessInst *GI = cast<GlobalAccessInst>(&SI);
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0,
-        S.addTypeRef(GAI->getType().getSwiftRValueType()),
-        (unsigned)GAI->getType().getCategory(),
+        S.addTypeRef(GI->getType().getSwiftRValueType()),
+        (unsigned)GI->getType().getCategory(),
         S.addDeclBaseNameRef(
-            Ctx.getIdentifier(GAI->getReferencedGlobal()->getName())));
+            Ctx.getIdentifier(GI->getReferencedGlobal()->getName())));
     break;
   }
   case ValueKind::BranchInst: {

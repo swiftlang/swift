@@ -18,6 +18,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Once.h"
 #include "swift/ABI/System.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
@@ -92,7 +93,35 @@ swift::swift_initStackObject(HeapMetadata const *metadata,
   object->refCounts.initForNotFreeing();
 
   return object;
+}
 
+struct InitStaticObjectContext {
+  HeapObject *object;
+  HeapMetadata const *metadata;
+};
+
+// Callback for swift_once.
+static void initStaticObjectWithContext(void *OpaqueCtx) {
+  InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
+  Ctx->object->metadata = Ctx->metadata;
+  Ctx->object->refCounts.initForNotFreeing();
+}
+
+// TODO: We could generate inline code for the fast-path, i.e. the metadata
+// pointer is already set. That would be a performance/codesize tradeoff.
+HeapObject *
+swift::swift_initStaticObject(HeapMetadata const *metadata,
+                              HeapObject *object) {
+  // The token is located at a negative offset from the object header.
+  swift_once_t *token = ((swift_once_t *)object) - 1;
+
+  // We have to initialize the header atomically. Otherwise we could reset the
+  // refcount to 1 while another thread already incremented it - and would
+  // decrement it to 0 afterwards.
+  InitStaticObjectContext Ctx = { object, metadata };
+  swift_once(token, initStaticObjectWithContext, &Ctx);
+
+  return object;
 }
 
 void

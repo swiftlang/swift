@@ -412,6 +412,7 @@ private:
     case Node::Kind::OutlinedConsume:
     case Node::Kind::OutlinedRetain:
     case Node::Kind::OutlinedRelease:
+    case Node::Kind::OutlinedVariable:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -793,6 +794,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::OutlinedRelease:
     Printer << "outlined release of ";
     print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedVariable:
+    Printer << "outlined variable #" << Node->getIndex() << " of ";
     return nullptr;
   case Node::Kind::Directness:
     Printer << toString(Directness(Node->getIndex())) << " ";

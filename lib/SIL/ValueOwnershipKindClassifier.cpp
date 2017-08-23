@@ -45,6 +45,7 @@ CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
 CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
+CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -272,6 +273,7 @@ FORWARDING_OWNERSHIP_INST(OpenExistentialValue)
 FORWARDING_OWNERSHIP_INST(OpenExistentialBoxValue)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(SelectValue)
+FORWARDING_OWNERSHIP_INST(Object)
 FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)
 FORWARDING_OWNERSHIP_INST(UncheckedRefCast)

@@ -566,7 +566,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   LocalValues.clear();
   ForwardLocalValues.clear();
 
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(*fn);
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(fn);
   SILBuilder Builder(*fn);
   // Track the archetypes just like SILGen. This
   // is required for adding typedef operands to instructions.
@@ -1206,7 +1206,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createAllocGlobal(Loc, g);
     break;
   }
-  case ValueKind::GlobalAddrInst: {
+  case ValueKind::GlobalAddrInst:
+  case ValueKind::GlobalValueInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     auto Ty = MF->getType(TyID);
     Identifier Name = MF->getIdentifier(ValID);
@@ -1214,12 +1215,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Find the global variable.
     SILGlobalVariable *g = getGlobalForReference(Name.str());
     assert(g && "Can't deserialize global variable");
-    assert(g->getLoweredType().getAddressType() ==
-           getSILType(Ty, (SILValueCategory)TyCategory) &&
+    SILType expectedType = ((ValueKind)OpCode == ValueKind::GlobalAddrInst ?
+                            g->getLoweredType().getAddressType() :
+                            g->getLoweredType());
+    assert(expectedType == getSILType(Ty, (SILValueCategory)TyCategory) &&
            "Type of a global variable does not match GlobalAddr.");
     (void)Ty;
-
-    ResultVal = Builder.createGlobalAddr(Loc, g);
+    if ((ValueKind)OpCode == ValueKind::GlobalAddrInst) {
+      ResultVal = Builder.createGlobalAddr(Loc, g);
+    } else {
+      ResultVal = Builder.createGlobalValue(Loc, g);
+    }
     break;
   }
   case ValueKind::DeallocStackInst: {
@@ -1653,6 +1659,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(Ty, (SILValueCategory)TyCategory),
                     OpList);
     break;
+  }
+  case ValueKind::ObjectInst: {
+    llvm_unreachable("Serialization of global initializers not supported");
   }
   case ValueKind::BranchInst: {
     SmallVector<SILValue, 4> Args;

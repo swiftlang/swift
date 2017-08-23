@@ -34,6 +34,7 @@ class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
   friend class SILFunction;
+  friend class SILGlobalVariable;
 public:
   using InstListType = llvm::iplist<SILInstruction>;
 private:

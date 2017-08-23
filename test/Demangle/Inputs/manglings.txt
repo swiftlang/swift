@@ -265,4 +265,6 @@ _T0s30ReversedRandomAccessCollectionVyxGTfq3nnpf_nTfq1cn_nTfq4x_n ---> _T0s30Rev
 _T03abc6testitySiFTm ---> merged abc.testit(Swift.Int) -> ()
 _T04main4TestCACSi1x_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test
 _T0SqWy.17 ---> outlined copy of Swift.Optional with unmangled suffix ".17"
+_T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
+_T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
 

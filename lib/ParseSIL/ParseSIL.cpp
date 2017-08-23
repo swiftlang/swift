@@ -354,7 +354,7 @@ namespace {
     bool parseScopeRef(SILDebugScope *&DS);
     bool parseSILDebugLocation(SILLocation &L, SILBuilder &B,
                                bool parsedComma = false);
-    bool parseSILInstruction(SILBasicBlock *BB, SILBuilder &B);
+    bool parseSILInstruction(SILBuilder &B);
     bool parseCallInstruction(SILLocation InstLoc,
                               ValueKind Opcode, SILBuilder &B,
                               SILInstruction *&ResultVal);
@@ -1798,7 +1798,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
 
 /// sil-instruction-def ::= (sil-value-name '=')? sil-instruction
 ///                         (',' sil-scope-ref)? (',' sil-loc)?
-bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
+bool SILParser::parseSILInstruction(SILBuilder &B) {
   // We require SIL instructions to be at the start of a line to assist
   // recovery.
   if (!P.Tok.isAtStartOfLine()) {
@@ -1826,7 +1826,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   if (parseSILOpcode(Opcode, OpcodeLoc, OpcodeName))
     return true;
 
-  B.setInsertionPoint(BB);
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
   SILType Ty;
@@ -3607,7 +3606,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
 
     auto I1Ty =
-      SILType::getBuiltinIntegerType(1, BB->getParent()->getASTContext());
+      SILType::getBuiltinIntegerType(1, SILMod.getASTContext());
     SILValue CondVal = getLocalValue(Cond, I1Ty, InstLoc, B);
     ResultVal = B.createCondBranch(InstLoc, CondVal,
                                    getBBForReference(BBName, NameLoc),
@@ -3760,15 +3759,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     ResultVal = B.createBindMemory(InstLoc, Val, IndexVal, EltTy);
     break;
   }
+  case ValueKind::ObjectInst:
   case ValueKind::StructInst: {
-    SILType StructTy;
-    if (parseSILType(StructTy) ||
+    SILType Ty;
+    if (parseSILType(Ty) ||
         P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
       return true;
 
     // Parse a list of SILValue.
+    unsigned NumBaseElems = 0;
     if (P.Tok.isNot(tok::r_paren)) {
       do {
+        if (Opcode == ValueKind::ObjectInst) {
+          bool StartOfTailElems = false;
+          if (parseSILOptional(StartOfTailElems, *this, "tail_elems"))
+            return true;
+          if (StartOfTailElems) {
+            if (NumBaseElems)
+              return true;
+            NumBaseElems = OpList.size();
+          }
+        }
         if (parseTypedValueRef(Val, B)) return true;
         OpList.push_back(Val);
       } while (P.consumeIf(tok::comma));
@@ -3778,7 +3789,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createStruct(InstLoc, StructTy, OpList);
+    if (Opcode == ValueKind::StructInst) {
+      ResultVal = B.createStruct(InstLoc, Ty, OpList);
+    } else {
+      ResultVal = B.createObject(InstLoc, Ty, OpList, NumBaseElems);
+    }
     break;
   }
   case ValueKind::StructElementAddrInst:
@@ -3918,7 +3933,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     ResultVal = B.createAllocGlobal(InstLoc, global);
     break;
   }
-  case ValueKind::GlobalAddrInst: {
+  case ValueKind::GlobalAddrInst:
+  case ValueKind::GlobalValueInst: {
     Identifier GlobalName;
     SourceLoc IdLoc;
     SILType Ty;
@@ -3936,14 +3952,21 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
     }
 
-    if (global->getLoweredType().getAddressType() != Ty) {
+    SILType expectedType = (Opcode == ValueKind::GlobalAddrInst ?
+                            global->getLoweredType().getAddressType() :
+                            global->getLoweredType());
+    if (expectedType != Ty) {
       P.diagnose(IdLoc, diag::sil_value_use_type_mismatch, GlobalName.str(),
                  global->getLoweredType().getSwiftRValueType(),
                  Ty.getSwiftRValueType());
       return true;
     }
 
-    ResultVal = B.createGlobalAddr(InstLoc, global);
+    if (Opcode == ValueKind::GlobalAddrInst) {
+      ResultVal = B.createGlobalAddr(InstLoc, global);
+    } else {
+      ResultVal = B.createGlobalValue(InstLoc, global);
+    }
     break;
   }
   case ValueKind::SelectEnumInst:
@@ -4684,8 +4707,9 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   if (AssumeUnqualifiedOwnershipWhenParsing) {
     F->setUnqualifiedOwnership();
   }
+  B.setInsertionPoint(BB);
   do {
-    if (parseSILInstruction(BB, B))
+    if (parseSILInstruction(B))
       return true;
     // Evaluate how the just parsed instruction effects this functions Ownership
     // Qualification. For more details, see the comment on the
@@ -4791,7 +4815,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
 
       // Parse the basic block list.
       FunctionState.OwnershipEvaluator.reset(FunctionState.F);
-      SILOpenedArchetypesTracker OpenedArchetypesTracker(*FunctionState.F);
+      SILOpenedArchetypesTracker OpenedArchetypesTracker(FunctionState.F);
       SILBuilder B(*FunctionState.F, /*isParsing*/ true);
       // Track the archetypes just like SILGen. This
       // is required for adding typedef operands to instructions.
@@ -4833,13 +4857,6 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   // If SIL parsing succeeded, verify the generated SIL.
   if (!P.Diags.hadAnyError())
     FunctionState.F->verify();
-
-  // Link the static initializer for global variables.
-  for (SILGlobalVariable &v : FunctionState.SILMod.getSILGlobals()) {
-    if (v.getInitializer())
-      if (FnName.str() == v.getInitializer()->getName())
-        v.setInitializer(FunctionState.F);
-  }
 
   return false;
 }
@@ -4917,22 +4934,11 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
 
   GV->setLet(isLet);
   // Parse static initializer if exists.
-  if (State.P.consumeIf(tok::comma)) {
-    Identifier Name;
-    SILType Ty;
-    SourceLoc Loc = State.P.Tok.getLoc();
-    if (State.parseGlobalName(Name) ||
-        State.P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-        State.parseSILType(Ty))
-      return true;
-
-    auto FnTy = Ty.getAs<SILFunctionType>();
-    if (!FnTy || !Ty.isObject()) {
-      State.P.diagnose(Loc, diag::expected_sil_function_type);
-      return true;
-    }
-
-    GV->setInitializer(State.getGlobalNameForReference(Name, FnTy, Loc));
+  if (State.P.consumeIf(tok::equal) && State.P.consumeIf(tok::l_brace)) {
+    SILBuilder B(GV);
+    do {
+      State.parseSILInstruction(B);
+    } while (! State.P.consumeIf(tok::r_brace));
   }
   return false;
 }

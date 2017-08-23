@@ -49,10 +49,13 @@ public:
   }
 
   explicit SILCloner(SILFunction &F)
-      : Builder(F), InsertBeforeBB(nullptr),
-        OpenedArchetypesTracker(F) {
+      : Builder(F), InsertBeforeBB(nullptr), OpenedArchetypesTracker(&F) {
     Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
+
+  explicit SILCloner(SILGlobalVariable *GlobVar)
+      : Builder(GlobVar), InsertBeforeBB(nullptr),
+        OpenedArchetypesTracker(nullptr) { }
 
   /// Clients of SILCloner who want to know about any newly created
   /// instructions can install a SmallVector into the builder to collect them.
@@ -639,6 +642,15 @@ SILCloner<ImplClass>::visitGlobalAddrInst(GlobalAddrInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createGlobalAddr(getOpLocation(Inst->getLoc()),
                                   Inst->getReferencedGlobal()));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitGlobalValueInst(GlobalValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createGlobalValue(getOpLocation(Inst->getLoc()),
+                                    Inst->getReferencedGlobal()));
 }
 
 template<typename ImplClass>
@@ -1335,6 +1347,16 @@ SILCloner<ImplClass>::visitSetDeallocatingInst(SetDeallocatingInst *Inst) {
     getBuilder().createSetDeallocating(getOpLocation(Inst->getLoc()),
                                        getOpValue(Inst->getOperand()),
                                        Inst->getAtomicity()));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitObjectInst(ObjectInst *Inst) {
+  auto Elements = getOpValueArray<8>(Inst->getAllElements());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createObject(getOpLocation(Inst->getLoc()), Inst->getType(),
+                              Elements, Inst->getBaseElements().size()));
 }
 
 template<typename ImplClass>

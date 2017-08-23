@@ -39,6 +39,11 @@ llvm::Constant *emitConstantStruct(IRGenModule &IGM, StructInst *SI);
 
 /// Construct a struct literal from a TupleInst containing constant values.
 llvm::Constant *emitConstantTuple(IRGenModule &IGM, TupleInst *TI);
+
+/// Construct an object (with a HeapObject header) from an ObjectInst
+/// containing constant values.
+llvm::Constant *emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
+                                   StructLayout *ClassLayout);
 }
 }
 
