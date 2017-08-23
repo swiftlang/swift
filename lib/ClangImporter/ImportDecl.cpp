@@ -7991,6 +7991,20 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 }
 
 
+static ExtensionDecl *
+figureOutTheDeclarationContextToImportInto(Decl *D, DeclContext *&DC,
+                                           IterableDeclContext *&IDC) {
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
+    DC = nominal;
+    IDC = nominal;
+    return nullptr;
+  }
+  ExtensionDecl *ext = cast<ExtensionDecl>(D);
+  DC = ext;
+  IDC = ext;
+  return ext;
+}
+
 void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
                                                                   Decl *D, const clang::ObjCContainerDecl *objcContainer) {
   clang::PrettyStackTraceDecl trace(objcContainer, clang::SourceLocation(),
@@ -7999,18 +8013,9 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
 
   DeclContext *DC;
   IterableDeclContext *IDC;
-
-  // Figure out the declaration context we're importing into.
-  if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
-    DC = nominal;
-    IDC = nominal;
-  } else {
-    auto ext = cast<ExtensionDecl>(D);
-    DC = ext;
-    IDC = ext;
-
-
-    // If the base is also imported from Clang, load its members first.
+  if (ExtensionDecl *ext =
+      figureOutTheDeclarationContextToImportInto(D, DC, IDC)) {
+   // If the base is also imported from Clang, load its members first.
     const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
     if (auto *clangBase = base->getClangDecl()) {
       base->loadAllMembers();
@@ -8094,7 +8099,6 @@ void ClangImporter::Implementation::collectMembersToAdd(
                = dyn_cast<clang::ObjCProtocolDecl>(objcContainer)) {
     objcContainer = clangProto->getDefinition();
   }
-
   // Import mirrored declarations for protocols to which this category
   // or extension conforms.
   // FIXME: This is supposed to be a short-term hack.
