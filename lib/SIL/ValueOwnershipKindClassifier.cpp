@@ -132,6 +132,10 @@ CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
+// Because of CoW existentials, ownership cannot be transfered to the opened
+// value. Opening the value requires borrowing the existential and copying the
+// opened value.
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, OpenExistentialValue)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
@@ -269,7 +273,6 @@ FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
-FORWARDING_OWNERSHIP_INST(OpenExistentialValue)
 FORWARDING_OWNERSHIP_INST(OpenExistentialBoxValue)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(SelectValue)

@@ -197,7 +197,6 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::StructInst:
   case ValueKind::EnumInst:
   case ValueKind::OpenExistentialRefInst:
-  case ValueKind::OpenExistentialValueInst:
   case ValueKind::UpcastInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::ConvertFunctionInst:
@@ -467,6 +466,7 @@ NO_OPERAND_INST(KeyPath)
             UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \
   }
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
+CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocExistentialBox)
@@ -682,7 +682,6 @@ FORWARD_ANY_OWNERSHIP_INST(Struct)
 FORWARD_ANY_OWNERSHIP_INST(Object)
 FORWARD_ANY_OWNERSHIP_INST(Enum)
 FORWARD_ANY_OWNERSHIP_INST(OpenExistentialRef)
-FORWARD_ANY_OWNERSHIP_INST(OpenExistentialValue)
 FORWARD_ANY_OWNERSHIP_INST(Upcast)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedRefCast)
 FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)

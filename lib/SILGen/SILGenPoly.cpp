@@ -1360,7 +1360,7 @@ namespace {
             output = SGF.emitManagedRetain(Loc, output.getValue());
           }
 
-          if (output.getOwnershipKind() == ValueOwnershipKind::Owned) {
+          if (output.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
             output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
           }
 

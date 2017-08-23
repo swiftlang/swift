@@ -1,5 +1,11 @@
 // RUN: %target-swift-frontend -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
 
+public typealias AnyObject = Builtin.AnyObject
+
+precedencegroup CastingPrecedence {}
+
+public protocol _ObjectiveCBridgeable {}
+
 public protocol UnkeyedDecodingContainer {
   var isAtEnd: Builtin.Int1 { get }
 }
@@ -48,6 +54,13 @@ public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
 // CHECK-LABEL: } // end sil function '_T0s13unsafeBitCastq_x_q_m2totr0_lF'
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
+}
+
+// Test open_existential_value used in a conversion context.
+// ---
+// 
+public func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
+  return any as AnyObject
 }
 
 public enum Optional<Wrapped> {
