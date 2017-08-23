@@ -7999,7 +7999,6 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
 
   DeclContext *DC;
   IterableDeclContext *IDC;
-  SmallVector<ProtocolDecl *, 4> protos;
 
   // Figure out the declaration context we're importing into.
   if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
@@ -8031,7 +8030,19 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
   ImportingEntityRAII Importing(*this);
 
   SmallVector<Decl *, 16> members;
-  llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
+  collectMembersToAdd(objcContainer, D, DC, members);
+
+  // Add the members now, before ~ImportingEntityRAII does work that might
+  // involve them.
+  for (auto member : members) {
+    IDC->addMember(member);
+  }
+}
+
+void ClangImporter::Implementation::collectMembersToAdd(
+                                                        const clang::ObjCContainerDecl *objcContainer,
+                                                        Decl *D, DeclContext *DC,
+                                                        SmallVectorImpl<Decl *> &members) {
   for (const clang::Decl *m : objcContainer->decls()) {
     auto nd = dyn_cast<clang::NamedDecl>(m);
     if (!nd || nd != nd->getCanonicalDecl() ||
@@ -8039,6 +8050,7 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
       continue;
     }
 
+    llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
     forEachDistinctName(nd,
                         [&](ImportedName name, ImportNameVersion nameVersion) {
       auto member = importDecl(nd, nameVersion);
@@ -8064,7 +8076,7 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
 
   SwiftDeclConverter converter(*this, CurrentVersion);
 
-  protos = takeImportedProtocols(D);
+  SmallVector<ProtocolDecl *, 4> protos = takeImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
     auto swiftClass = cast<ClassDecl>(D);
     objcContainer = clangClass = clangClass->getDefinition();
@@ -8085,12 +8097,6 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
   // FIXME: This is supposed to be a short-term hack.
   converter.importMirroredProtocolMembers(objcContainer, DC,
                                           protos, members, SwiftContext);
-
-  // Add the members now, before ~ImportingEntityRAII does work that might
-  // involve them.
-  for (auto member : members) {
-    IDC->addMember(member);
-  }
 }
 
 void ClangImporter::Implementation::loadAllConformances(
