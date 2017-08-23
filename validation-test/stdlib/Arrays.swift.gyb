@@ -173,7 +173,7 @@ public struct ArrayIndexTest<T: Collection> {
     self.expectedEnd = expectedEnd
     self.operation = operation
     self.range = range
-    self.loc = SourceLoc(file, line, comment: "dropFirst() test data")
+    self.loc = SourceLoc(file, line, comment: "Array index test data")
   }
 }
 
