@@ -527,7 +527,7 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// less than zero, the minimum representable `UInt8` value:
   ///
   ///     var x: UInt8 = 21
-  ///     x - 50                  
+  ///     x - 50
   ///     // Overflow error
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
@@ -538,7 +538,7 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The value to subtract from `lhs`.
 """,
         '*': """\
-  /// Multiplies two values and stores the result in the left-hand-side 
+  /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
   ///
 """ + ("""\
@@ -547,7 +547,7 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// the maximum representable `Int8` value:
   ///
   ///     var x: Int8 = 21
-  ///     x * 21                  
+  ///     x * 21
   ///     // Overflow error
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
@@ -585,7 +585,7 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///     y %= -5
   ///     // y == 2
   ///
-  ///     var z = -22 
+  ///     var z = -22
   ///     z %= -5
   ///     // z == -2
   ///
@@ -1549,7 +1549,7 @@ ${assignmentOperatorComment(x.nonMaskingOperator, False)}
   static func ${x.nonMaskingOperator}=<RHS: BinaryInteger>(
     _ lhs: inout Self, _ rhs: RHS)
 % end
- 
+
   /// Returns the quotient and remainder of this value divided by the given
   /// value.
   ///
@@ -1579,25 +1579,6 @@ extension BinaryInteger {
   @_transparent
   public init() {
     self = 0
-  }
-
-  /// Creates an integer from the given floating-point value, if it can be
-  /// represented exactly.
-  ///
-  /// If the value passed as `source` is not representable exactly, the result
-  /// is `nil`. In the following example, the constant `x` is successfully
-  /// created from a value of `21.0`, while the attempt to initialize the
-  /// constant `y` from `21.5` fails:
-  ///
-  ///     let x = Int(exactly: 21.0)
-  ///     // x == Optional(21)
-  ///     let y = Int(exactly: 21.5)
-  ///     // y == nil
-  ///
-  /// - Parameter source: A floating-point value to convert to an integer.
-  public init?<T : BinaryFloatingPoint>(exactly source: T) {
-    // FIXME(integers): implement
-    fatalError()
   }
 
   @_transparent
@@ -2144,7 +2125,7 @@ extension FixedWidthInteger {
     self = value.byteSwapped
 #endif
   }
-  
+
   public init(bigEndian value: Self) {
 #if _endian(big)
     self = value
@@ -2152,7 +2133,7 @@ extension FixedWidthInteger {
     self = value.byteSwapped
 #endif
   }
-  
+
   public var littleEndian: Self {
 #if _endian(little)
     return self
@@ -2160,7 +2141,7 @@ extension FixedWidthInteger {
     return byteSwapped
 #endif
   }
-  
+
   public var bigEndian: Self {
 #if _endian(big)
     return self
@@ -2168,9 +2149,9 @@ extension FixedWidthInteger {
     return byteSwapped
 #endif
   }
-  
+
   % for x in maskingShifts:
-  
+
   // Homogeneous masking shift
 ${operatorComment(x.operator, False)}
   @_semantics("optimize.sil.specialize.generic.partial.never")
@@ -2290,6 +2271,93 @@ ${operatorComment(x.nonMaskingOperator, True)}
 }
 
 extension FixedWidthInteger {
+  @_semantics("optimize.sil.specialize.generic.partial.never")
+  public // @testable
+  static func _convert<Source : BinaryFloatingPoint>(
+    from source: Source
+  ) -> (value: Self?, exact: Bool) {
+    guard _fastPath(!source.isZero) else { return (0, true) }
+    guard _fastPath(source.isFinite) else { return (nil, false) }
+    guard Self.isSigned || source > 0 else { return (nil, false) }
+    let exponent = source.exponent
+    if _slowPath(Self.bitWidth <= exponent) { return (nil, false) }
+    let minBitWidth = source.significandWidth
+    let isExact = (minBitWidth <= exponent)
+    let bitPattern = source.significandBitPattern
+    // `RawSignificand.bitWidth` is not available if `RawSignificand` does not
+    // conform to `FixedWidthInteger`; we can compute this value as follows if
+    // `source` is finite:
+    let bitWidth = minBitWidth &+ bitPattern.trailingZeroBitCount
+    let shift = exponent - Source.Exponent(bitWidth)
+    // Use `Self.Magnitude` to prevent sign extension if `shift < 0`.
+    let shiftedBitPattern = Self.Magnitude.bitWidth > bitWidth
+      ? Self.Magnitude(truncatingIfNeeded: bitPattern) << shift
+      : Self.Magnitude(truncatingIfNeeded: bitPattern << shift)
+    if _slowPath(Self.isSigned && Self.bitWidth &- 1 == exponent) {
+      return source < 0 && shiftedBitPattern == 0
+        ? (Self.min, isExact)
+        : (nil, false)
+    }
+    let magnitude = ((1 as Self.Magnitude) << exponent) | shiftedBitPattern
+    return (
+      Self.isSigned && source < 0 ? 0 &- Self(magnitude) : Self(magnitude),
+      isExact)
+  }
+
+  /// Creates an integer from the given floating-point value, rounding toward
+  /// zero. Any fractional part of the value passed as `source` is removed.
+  ///
+  ///     let x = Int(21.5)
+  ///     // x == 21
+  ///     let y = Int(-21.5)
+  ///     // y == -21
+  ///
+  /// If `source` is outside the bounds of this type after rounding toward
+  /// zero, a runtime error may occur.
+  ///
+  ///     let z = UInt(-21.5)
+  ///     // Error: ...the result would be less than UInt.min
+  ///
+  /// - Parameter source: A floating-point value to convert to an integer.
+  ///   `source` must be representable in this type after rounding toward
+  ///   zero.
+  @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inline(__always)
+  public init<T : BinaryFloatingPoint>(_ source: T) {
+    guard let value = Self._convert(from: source).value else {
+      fatalError("""
+        \(T.self) value cannot be converted to \(Self.self) because it is \
+        infinite or NaN, or because the result would be greater than \
+        \(Self.self).max or less than \(Self.self).min
+        """)
+    }
+    self = value
+  }
+
+  /// Creates an integer from the given floating-point value, if it can be
+  /// represented exactly.
+  ///
+  /// If the value passed as `source` is not representable exactly, the result
+  /// is `nil`. In the following example, the constant `x` is successfully
+  /// created from a value of `21.0`, while the attempt to initialize the
+  /// constant `y` from `21.5` fails:
+  ///
+  ///     let x = Int(exactly: 21.0)
+  ///     // x == Optional(21)
+  ///     let y = Int(exactly: 21.5)
+  ///     // y == nil
+  ///
+  /// - Parameter source: A floating-point value to convert to an integer.
+  @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inline(__always)
+  public init?<T : BinaryFloatingPoint>(exactly source: T) {
+    let (temporary, exact) = Self._convert(from: source)
+    guard exact, let value = temporary else {
+      return nil
+    }
+    self = value
+  }
+
   /// Creates a new instance with the representable value that's closest to the
   /// given integer.
   ///
@@ -2311,7 +2379,7 @@ extension FixedWidthInteger {
   ///
   /// - Parameter source: An integer to convert to this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  public init<Other: BinaryInteger>(clamping source: Other) {
+  public init<Other : BinaryInteger>(clamping source: Other) {
     if _slowPath(source < Self.min) {
       self = Self.min
     }
@@ -3218,47 +3286,6 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 }
 %# end of concrete type: ${Self}
-
-extension ${Self} {
-  /// Creates an integer from the given floating-point value, rounding toward
-  /// zero.
-  ///
-  /// Any fractional part of the value passed as `source` is removed, rounding
-  /// the value toward zero.
-  ///
-  ///     let x = Int(21.5)
-  ///     // x == 21
-  ///     let y = Int(-21.5)
-  ///     // y == -21
-  ///
-  /// If `source` is outside the bounds of this type after rounding toward
-  /// zero, a runtime error may occur.
-  ///
-  ///     let z = UInt(-21.5)
-  ///     // Error: ...the result would be less than UInt.min
-  ///
-  /// - Parameter source: A floating-point value to convert to an integer.
-  ///   `source` must be representable in this type after rounding toward
-  ///   zero.
-  // FIXME(integers): implement me in a less terrible way
-  public init<T : BinaryFloatingPoint>(_ source: T) {
-%   for (FloatType, FloatBits) in [
-%     ('Float', 32), ('Double', 64), ('Float80', 80)]:
-%     if FloatType == 'Float80':
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-%     end
-    if source is ${FloatType} {
-      self.init(source as! ${FloatType})
-      return
-    }
-%     if FloatType == 'Float80':
-#endif
-%     end
-%   end
-    _preconditionFailure("Conversion is not supported")
-  }
-}
-
 
 extension ${Self} : Hashable {
   /// The integer's hash value.
