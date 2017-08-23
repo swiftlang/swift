@@ -780,10 +780,10 @@ swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
 
-    // FIXME: In the weird case where we have a tuple type that should
-    // be wrapped in a ParenType but isn't, just... forget it happened.
-    if (paramList && tupleTy->getNumElements() != paramList->size() &&
-        paramList->size() == 1)
+    // Arguments and parameters are not guaranteed to always line-up
+    // perfectly, e.g. failure diagnostics tries to match argument type
+    // to different "candidate" parameters.
+    if (paramList && tupleTy->getNumElements() != paramList->size())
       paramList = nullptr;
 
     for (auto i : range(0, tupleTy->getNumElements())) {
@@ -804,7 +804,8 @@ swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
     CallArgParam argParam;
     argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
     argParam.HasDefaultArgument =
-        paramList && paramList->get(0)->isDefaultArgument();
+        paramList && paramList->size() == 1 &&
+        paramList->get(0)->isDefaultArgument();
     result.push_back(argParam);
     break;
   }
