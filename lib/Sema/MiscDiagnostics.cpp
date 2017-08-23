@@ -3357,6 +3357,10 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
             }
           }
 
+          // Bail out if type checking failed on this segment.
+          if (!segment->getType())
+            continue;
+          
           // Bail out if we don't have an optional.
           if (!segment->getType()->getRValueType()->getOptionalObjectType()) {
             continue;
