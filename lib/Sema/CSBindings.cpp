@@ -204,13 +204,25 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
-    case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
       // Constraints from which we can't do anything.
       continue;
+
+    case ConstraintKind::DynamicTypeOf: {
+      // Direct binding of the left-hand side could result
+      // in `DynamicTypeOf` failure if right-hand side is
+      // bound (because 'Bind' requires equal types to
+      // succeed), or left is bound to Any which is not an
+      // [existential] metatype.
+      if (constraint->getFirstType()->isEqual(typeVar))
+        return {};
+
+      // This is right-hand side, let's continue.
+      continue;
+    }
 
     case ConstraintKind::Defaultable:
       // Do these in a separate pass.
