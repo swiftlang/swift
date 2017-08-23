@@ -1499,22 +1499,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     parseExclusivityEnforcementOptions(A, Opts, Diags);
   }
 
-  // FIXME: Support early serializaiton of any Swift module, not only stdlib.
-  // SILModule needs to be serialized.
-  if (!FEOpts.ModuleOutputPath.empty() && FEOpts.ModuleName == STDLIB_NAME) {
-    // Mark functions as anchors (from the dead function elimination point of
-    // view) and perform SIL serialization after high-level optimizations if
-    // required.
-    Opts.SILSerializeAfterHighLevelOptz = true;
-  }
-
-  // If a module name is provided, it means that this module was serialized
-  // before.
-  if (FEOpts.ModuleName == STDLIB_NAME) {
-    // Mark functions as anchors (from the dead function elimination point of
-    // view).
-    Opts.SILSerializeAfterHighLevelOptz = true;
-  }
+  Opts.SILSerializeAfterHighLevelOptz |= Args.hasArg(OPT_sil_serialize_early);
 
   return false;
 }

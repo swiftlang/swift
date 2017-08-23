@@ -9,6 +9,7 @@ if(SWIFT_BUILD_STATIC_SDK_OVERLAY)
 endif()
 
 list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "${STDLIB_SIL_SERIALIZE_WITNESS_TABLES}")
+list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "${STDLIB_SIL_SERIALIZE_EARLY}")
 
 set(all_overlays "Accelerate;AppKit;ARKit;AssetsLibrary;AVFoundation;CallKit;CloudKit;Contacts;CoreAudio;CoreData;CoreFoundation;CoreGraphics;CoreImage;CoreLocation;CoreMedia;CryptoTokenKit;Dispatch;Foundation;GameplayKit;GLKit;HomeKit;IOKit;Intents;MapKit;MediaPlayer;ModelIO;ObjectiveC;OpenCL;os;Photos;QuartzCore;SafariServices;SceneKit;simd;SpriteKit;UIKit;Vision;WatchKit;XCTest;XPC")
 

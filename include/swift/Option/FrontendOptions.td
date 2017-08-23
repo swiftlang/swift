@@ -379,6 +379,9 @@ def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
 def sil_serialize_witness_tables : Flag<["-"], "sil-serialize-witness-tables">,
   HelpText<"Serialize eligible SIL witness tables">;
 
+def sil_serialize_early : Flag<["-"], "sil-serialize-early">,
+  HelpText<"Serialize SIL module early, while SIL is still in a high-level form">;
+
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
 
