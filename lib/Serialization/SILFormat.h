@@ -268,7 +268,7 @@ namespace sil_block {
                      BCFixed<1>,  // global_init
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // side effect info.
-                     BCFixed<2>,  // number of specialize attributes
+                     BCFixed<16>,  // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
                      TypeIDField, // SILFunctionType
                      GenericEnvironmentIDField,
