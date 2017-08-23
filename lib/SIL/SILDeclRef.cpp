@@ -579,6 +579,11 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
     return IsSerialized;
 
+  // If module is fragile, everything inside it is fragile.
+  if (dc->getParentModule()->getResilienceStrategy() ==
+      ResilienceStrategy::Fragile)
+    return IsSerialized;
+
   return IsNotSerialized;
 }
 
