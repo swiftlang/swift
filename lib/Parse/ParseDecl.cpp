@@ -2291,6 +2291,10 @@ Parser::parseDecl(ParseDeclOptions Flags,
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
         continue;
       }
+      if (Tok.isContextualKeyword("__consuming")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
+        continue;
+      }
       if (Tok.isContextualKeyword("convenience")) {
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Convenience);
         continue;
@@ -3489,7 +3493,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   case AccessorKind::IsWillSet:
   case AccessorKind::IsDidSet:
     if (D->isInstanceMember())
-      D->setMutating();
+      D->setSelfAccessKind(SelfAccessKind::Mutating);
     break;
 
   case AccessorKind::IsMaterializeForSet:
@@ -3738,6 +3742,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
       } else if (Tok.isContextualKeyword("nonmutating")) {
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
+      } else if (Tok.isContextualKeyword("__consuming")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
       }
 
       AccessorKind Kind;
@@ -3835,6 +3841,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
     } else if (Tok.isContextualKeyword("nonmutating")) {
       parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
+    } else if (Tok.isContextualKeyword("__consuming")) {
+      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
     }
     
     bool isImplicitGet = false;

@@ -2526,6 +2526,9 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
           Printer.printKeyword("mutating");
           Printer << " ";
+        } else if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
+          Printer.printKeyword("__consuming");
+          Printer << " ";
         }
         Printer << tok::kw_func << " ";
       }

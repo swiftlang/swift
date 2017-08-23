@@ -1923,6 +1923,20 @@ static uint8_t getRawStableAccessibility(Accessibility access) {
   llvm_unreachable("Unhandled AccessibilityKind in switch.");
 }
 
+static serialization::SelfAccessKind
+getStableSelfAccessKind(swift::SelfAccessKind MM) {
+  switch (MM) {
+  case swift::SelfAccessKind::NonMutating:
+    return serialization::SelfAccessKind::NonMutating;
+  case swift::SelfAccessKind::Mutating:
+    return serialization::SelfAccessKind::Mutating;
+  case swift::SelfAccessKind::__Consuming:
+    return serialization::SelfAccessKind::__Consuming;
+  }
+
+  llvm_unreachable("Unhandled StaticSpellingKind in switch.");
+}
+
 #ifndef NDEBUG
 #define DEF_VERIFY_ATTR(DECL)\
 static void verifyAttrSerializable(const DECL ## Decl *D) {\
@@ -2954,7 +2968,8 @@ void Serializer::writeDecl(const Decl *D) {
                            uint8_t(
                              getStableStaticSpelling(fn->getStaticSpelling())),
                            fn->isObjC(),
-                           fn->isMutating(),
+                           uint8_t(
+                             getStableSelfAccessKind(fn->getSelfAccessKind())),
                            fn->hasDynamicSelf(),
                            fn->hasThrows(),
                            fn->getParameterLists().size(),

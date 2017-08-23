@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 359; // Last change: object, global_value
+const uint16_t VERSION_MINOR = 360; // Last change: '__consuming'
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -237,6 +237,15 @@ enum class AddressorKind : uint8_t {
   NotAddressor, Unsafe, Owning, NativeOwning, NativePinning
 };
 using AddressorKindField = BCFixed<3>;
+ 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class SelfAccessKind : uint8_t {
+  NonMutating = 0,
+  Mutating,
+  __Consuming,
+};
+using SelfAccessKindField = BCFixed<2>;
   
 /// Translates an operator DeclKind to a Serialization fixity, whose values are
 /// guaranteed to be stable.
@@ -933,7 +942,7 @@ namespace decls_block {
     BCFixed<1>,   // is 'static' or 'class'?
     StaticSpellingKindField, // spelling of 'static' or 'class'
     BCFixed<1>,   // explicitly objc?
-    BCFixed<1>,   // mutating?
+    SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // throws?
     BCVBR<5>,     // number of parameter patterns

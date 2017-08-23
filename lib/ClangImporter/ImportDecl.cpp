@@ -619,7 +619,8 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   setterDecl->setInterfaceType(type);
 
   setterDecl->setAccessibility(Accessibility::Public);
-  setterDecl->setMutating();
+  setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+
 
   return setterDecl;
 }
@@ -5377,7 +5378,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
 
   result->setAccessibility(Accessibility::Public);
   if (selfIsInOut)
-    result->setMutating();
+    result->setSelfAccessKind(SelfAccessKind::Mutating);
   if (selfIdx) {
     result->setSelfIndex(selfIdx.getValue());
   } else {

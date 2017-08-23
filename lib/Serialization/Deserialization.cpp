@@ -1930,6 +1930,19 @@ getActualAddressorKind(uint8_t raw) {
   return None;
 }
 
+static Optional<swift::SelfAccessKind>
+getActualSelfAccessKind(uint8_t raw) {
+  switch (serialization::SelfAccessKind(raw)) {
+  case serialization::SelfAccessKind::NonMutating:
+    return swift::SelfAccessKind::NonMutating;
+  case serialization::SelfAccessKind::Mutating:
+    return swift::SelfAccessKind::Mutating;
+  case serialization::SelfAccessKind::__Consuming:
+    return swift::SelfAccessKind::__Consuming;
+  }
+  return None;
+}
+
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   unsigned rawStorageKind,
                                   serialization::DeclID getter,
@@ -2808,8 +2821,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     bool isImplicit;
     bool isStatic;
-    uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind;
-    bool isObjC, isMutating, hasDynamicSelf, throws;
+    uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind, rawMutModifier;
+    bool isObjC, hasDynamicSelf, throws;
     unsigned numParamPatterns, numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
@@ -2821,7 +2834,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                         isStatic, rawStaticSpelling, isObjC,
-                                        isMutating, hasDynamicSelf, throws,
+                                        rawMutModifier, hasDynamicSelf, throws,
                                         numParamPatterns, genericEnvID,
                                         interfaceTypeID,
                                         associatedDeclID, overriddenID,
@@ -2918,6 +2931,13 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       error();
       return nullptr;
     }
+    
+    if (auto SelfAccessKind = getActualSelfAccessKind(rawMutModifier)) {
+      fn->setSelfAccessKind(*SelfAccessKind);
+    } else {
+      error();
+      return nullptr;
+    }
 
     if (Decl *associated = getDecl(associatedDeclID)) {
       if (auto op = dyn_cast<OperatorDecl>(associated)) {
@@ -2957,7 +2977,6 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     fn->setStatic(isStatic);
     if (isImplicit)
       fn->setImplicit();
-    fn->setMutating(isMutating);
     fn->setDynamicSelf(hasDynamicSelf);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
     break;

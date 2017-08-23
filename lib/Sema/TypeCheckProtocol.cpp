@@ -211,6 +211,12 @@ namespace {
     
     /// \brief The witness did not match because of mutating conflicts.
     MutatingConflict,
+    
+    /// \brief The witness did not match because of nonmutating conflicts.
+    NonMutatingConflict,
+    
+    /// \brief The witness did not match because of __consuming conflicts.
+    ConsumingConflict,
 
     /// The witness is not rethrows, but the requirement is.
     RethrowsConflict,
@@ -407,6 +413,8 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
+      case MatchKind::NonMutatingConflict:
+      case MatchKind::ConsumingConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
       case MatchKind::NonObjC:
@@ -432,6 +440,8 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
+      case MatchKind::NonMutatingConflict:
+      case MatchKind::ConsumingConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
       case MatchKind::NonObjC:
@@ -818,6 +828,10 @@ matchWitness(TypeChecker &tc,
     // Check that the mutating bit is ok.
     if (checkMutating(funcReq, funcWitness, funcWitness))
       return RequirementMatch(witness, MatchKind::MutatingConflict);
+    if (funcWitness->isNonMutating() && funcReq->isConsuming())
+      return RequirementMatch(witness, MatchKind::NonMutatingConflict);
+    if (funcWitness->isConsuming() && !funcReq->isConsuming())
+      return RequirementMatch(witness, MatchKind::ConsumingConflict);
 
     // If the requirement is rethrows, the witness must either be
     // rethrows or be non-throwing.
@@ -2388,7 +2402,21 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
   case MatchKind::MutatingConflict:
     // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness, diag::protocol_witness_mutating_conflict);
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_mutation_modifier_conflict,
+                   unsigned(SelfAccessKind::Mutating));
+    break;
+  case MatchKind::NonMutatingConflict:
+    // FIXME: Could emit a Fix-It here.
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_mutation_modifier_conflict,
+                   unsigned(SelfAccessKind::NonMutating));
+    break;
+  case MatchKind::ConsumingConflict:
+    // FIXME: Could emit a Fix-It here.
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_mutation_modifier_conflict,
+                   unsigned(SelfAccessKind::__Consuming));
     break;
   case MatchKind::RethrowsConflict:
     // FIXME: Could emit a Fix-It here.

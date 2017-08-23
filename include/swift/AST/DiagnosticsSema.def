@@ -1006,12 +1006,17 @@ ERROR(attribute_requires_single_argument,none,
       "'%0' requires a function with one argument", (StringRef))
 
 ERROR(mutating_invalid_global_scope,none,
-      "'mutating' is only valid on methods", ())
+      "'%select{nonmutating|mutating|__consuming}0' is only valid on methods",
+      (unsigned))
 ERROR(mutating_invalid_classes,none,
-      "'%select{|non}0mutating' isn't valid on methods in classes or class-bound protocols",
-      (bool))
+      "'%select{nonmutating|mutating|__consuming}0' isn't valid on methods in "
+      "classes or class-bound protocols", (bool))
+
 ERROR(functions_mutating_and_not,none,
-      "method may not be declared both mutating and nonmutating", ())
+      "method may not be declared both "
+      "%select{nonmutating|mutating|__consuming}0 and "
+      "%select{nonmutating|mutating|__consuming}1",
+      (unsigned, unsigned))
 ERROR(static_functions_not_mutating,none,
       "static functions may not be declared mutating", ())
 
@@ -1572,8 +1577,9 @@ NOTE(protocol_witness_static_conflict,none,
 NOTE(protocol_witness_prefix_postfix_conflict,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))
-NOTE(protocol_witness_mutating_conflict,none,
-     "candidate is marked 'mutating' but protocol does not allow it", ())
+NOTE(protocol_witness_mutation_modifier_conflict,none,
+     "candidate is marked '%select{nonmutating|mutating|__consuming}0' but "
+     "protocol does not allow it", (unsigned))
 NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_rethrows_conflict,none,

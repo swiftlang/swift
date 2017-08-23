@@ -181,6 +181,7 @@ public:
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
   void visitNonMutatingAttr(NonMutatingAttr *attr) { visitMutationAttr(attr); }
+  void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
 
   void visitOwnershipAttr(OwnershipAttr *attr) {
@@ -284,21 +285,65 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
 void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
 
-  // Verify we don't have both mutating and nonmutating.
-  if (FD->getAttrs().hasAttribute<MutatingAttr>() &&
-      FD->getAttrs().getAttribute<NonMutatingAttr>()) {
-    TC.diagnose(attr->getLocation(), diag::functions_mutating_and_not);
-    attr->setInvalid();
+  SelfAccessKind attrModifier;
+  switch (attr->getKind()) {
+  case DeclAttrKind::DAK_Consuming:
+    attrModifier = SelfAccessKind::__Consuming;
+    break;
+  case DeclAttrKind::DAK_Mutating:
+    attrModifier = SelfAccessKind::Mutating;
+    break;
+  case DeclAttrKind::DAK_NonMutating:
+    attrModifier = SelfAccessKind::NonMutating;
+    break;
+  default:
+    llvm_unreachable("unhandled attribute kind");
   }
 
+  // mutation attributes may only appear in type context.
   auto contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
   if (!contextTy)
-    return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
+    return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope,
+                                 unsigned(attrModifier));
 
-  if (contextTy->hasReferenceSemantics())
-    return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
-                                 isa<NonMutatingAttr>(attr));
+  // 'mutating' and 'nonmutating' are not valid on types
+  // with reference semantics.
+  if (contextTy->hasReferenceSemantics()) {
+    if (attrModifier != SelfAccessKind::__Consuming)
+      return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
+                                   unsigned(attrModifier));
+  }
+  
+  // Verify we don't have more than one of mutating, nonmutating,
+  // and __consuming.
+  if ((FD->getAttrs().hasAttribute<MutatingAttr>() +
+          FD->getAttrs().hasAttribute<NonMutatingAttr>() +
+          FD->getAttrs().hasAttribute<ConsumingAttr>()) > 1) {
+    if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
+      if (attrModifier != SelfAccessKind::NonMutating) {
+        diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not,
+                              unsigned(SelfAccessKind::NonMutating),
+                              unsigned(attrModifier));
+      }
+    }
 
+    if (auto *MUA = FD->getAttrs().getAttribute<MutatingAttr>()) {
+      if (attrModifier != SelfAccessKind::Mutating) {
+        diagnoseAndRemoveAttr(MUA, diag::functions_mutating_and_not,
+                                unsigned(SelfAccessKind::Mutating),
+                                unsigned(attrModifier));
+      }
+    }
+
+    if (auto *CSA = FD->getAttrs().getAttribute<ConsumingAttr>()) {
+      if (attrModifier != SelfAccessKind::__Consuming) {
+        diagnoseAndRemoveAttr(CSA, diag::functions_mutating_and_not,
+                              unsigned(SelfAccessKind::__Consuming),
+                              unsigned(attrModifier));
+      }
+    }
+  }
+  
   // Verify that we don't have a static function.
   if (FD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
@@ -742,6 +787,7 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     IGNORED_ATTR(Alignment)
+    IGNORED_ATTR(Consuming)
     IGNORED_ATTR(Convenience)
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Effects)
