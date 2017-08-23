@@ -275,13 +275,38 @@ public:
   // Move, don't copy.
   Callee(const Callee &) = delete;
   Callee &operator=(const Callee &) = delete;
+
 private:
+  /// An IndirectValue callee represents something like a swift closure or a c
+  /// function pointer where we have /no/ information at all on what the callee
+  /// is. This contrasts with a class method, where we may not know the exact
+  /// method that is being called, but we have some information from the type
+  /// system that we have an actual method.
+  ///
+  /// *NOTE* This will never be non-null if Constant is non-null.
   ManagedValue IndirectValue;
+
+  /// If we are trying to call a specific method or function, this field is set
+  /// to the decl ref information for that callee.
+  ///
+  /// *NOTE* This should never be non-null if IndirectValue is non-null.
   SILDeclRef Constant;
+
+  /// This field is set if we are calling to a SuperMethod or ClassMethod and
+  /// thus need to pass self to get the correct implementation.
   SILValue SelfValue;
+
+  /// The abstraction pattern of the callee.
   AbstractionPattern OrigFormalInterfaceType;
+
+  /// The callee's formal type with substitutions applied.
   CanFunctionType SubstFormalInterfaceType;
+
+  /// The substitutions applied to OrigFormalInterfaceType to produce
+  /// SubstFormalInterfaceType.
   SubstitutionList Substitutions;
+
+  /// The list of values captured by our callee.
   Optional<SmallVector<ManagedValue, 2>> Captures;
 
   // The pointer back to the AST node that produced the callee.
