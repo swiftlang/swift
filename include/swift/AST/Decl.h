@@ -5107,7 +5107,13 @@ public:
 
 class OperatorDecl;
 
-
+/// Note: These align with '%select's in diagnostics.
+enum class SelfAccessKind : uint8_t {
+  NonMutating = 0,
+  Mutating    = 1,
+  __Consuming = 2,
+};
+  
 /// FuncDecl - 'func' declaration.
 class FuncDecl final : public AbstractFunctionDecl,
     private llvm::TrailingObjects<FuncDecl, ParameterList *> {
@@ -5126,9 +5132,9 @@ class FuncDecl final : public AbstractFunctionDecl,
   /// Whether this function has a dynamic Self return type.
   unsigned HasDynamicSelf : 1;
 
-  /// Whether this function is a 'mutating' method.
-  unsigned Mutating : 1;
-
+  /// Backing bits for 'self' access kind.
+  unsigned SelfAccess : 2;
+      
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
@@ -5157,9 +5163,9 @@ class FuncDecl final : public AbstractFunctionDecl,
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
 
-    Mutating = false;
     HasDynamicSelf = false;
     ForcedStaticDispatch = false;
+    SelfAccess = static_cast<unsigned>(SelfAccessKind::NonMutating);
   }
 
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
@@ -5210,17 +5216,28 @@ public:
   void setStatic(bool IsStatic = true) {
     FuncDeclBits.IsStatic = IsStatic;
   }
+      
   bool isMutating() const {
-    return Mutating;
+    return getSelfAccessKind() == SelfAccessKind::Mutating;
   }
-  void setMutating(bool mutating = true) {
-    Mutating = mutating;
+  bool isNonMutating() const {
+    return getSelfAccessKind() == SelfAccessKind::NonMutating;
+  }
+  bool isConsuming() const {
+    return getSelfAccessKind() == SelfAccessKind::__Consuming;
   }
 
   TypeLoc getReturnTypeLoc() const {
     return FnRetType;
   }
   
+  SelfAccessKind getSelfAccessKind() const {
+    return static_cast<SelfAccessKind>(SelfAccess);
+  }
+  void setSelfAccessKind(SelfAccessKind mod) {
+    SelfAccess = static_cast<unsigned>(mod);
+  }
+      
   /// \brief Returns the parameter lists(s) for the function definition.
   ///
   /// The number of "top-level" elements will match the number of argument names

@@ -174,6 +174,8 @@ SIMPLE_DECL_ATTR(objcMembers, ObjCMembers, OnClass, 34)
 
 // Non-serialized attributes.
 
+SIMPLE_DECL_ATTR(__consuming, Consuming, OnFunc | DeclModifier | NotSerialized,
+                 /* Not serialized */ 40)
 SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier | NotSerialized,
                  /* Not serialized */ 41)
 SIMPLE_DECL_ATTR(nonmutating, NonMutating, OnFunc | DeclModifier | NotSerialized,

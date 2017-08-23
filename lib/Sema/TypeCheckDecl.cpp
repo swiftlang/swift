@@ -5066,14 +5066,16 @@ public:
     // Validate the mutating attribute if present, and install it into the bit
     // on funcdecl (instead of just being a DeclAttribute).
     if (FD->getAttrs().hasAttribute<MutatingAttr>())
-      FD->setMutating(true);
+      FD->setSelfAccessKind(SelfAccessKind::Mutating);
     else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
-      FD->setMutating(false);
+      FD->setSelfAccessKind(SelfAccessKind::NonMutating);
+    else if (FD->getAttrs().hasAttribute<ConsumingAttr>())
+      FD->setSelfAccessKind(SelfAccessKind::__Consuming);
 
     if (FD->isMutating()) {
       Type contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
       if (contextTy->hasReferenceSemantics())
-        FD->setMutating(false);
+        FD->setSelfAccessKind(SelfAccessKind::NonMutating);
     }
 
     // Check whether the return type is dynamic 'Self'.
@@ -6124,6 +6126,7 @@ public:
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(CDecl)
+    UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(GKInspectable)
