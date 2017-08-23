@@ -1098,18 +1098,27 @@ template <typename Runtime>
 struct TargetMethodDescriptor {
   /// The method implementation.
   TargetRelativeDirectPointer<Runtime, void *> Impl;
+
+  // TODO: add method types or anything else needed for reflection.
 };
 
 /// Header for a class vtable descriptor. This is a variable-sized
 /// structure that describes how to find and parse a vtable
 /// within the type metadata for a class.
-struct VTableDescriptor {
+template <typename Runtime>
+struct TargetVTableDescriptor {
   /// The offset of the vtable for this class in its metadata, if any.
   uint32_t VTableOffset;
   /// The number of vtable entries, in words.
   uint32_t VTableSize;
 
-  // TODO: add meaningful descriptions of the virtual methods.
+  using MethodDescriptor = TargetMethodDescriptor<Runtime>;
+
+  MethodDescriptor VTable[];
+
+  void *getMethod(unsigned index) const {
+    return VTable[index].Impl.get();
+  }
 };
 
 struct ClassTypeDescriptor;
@@ -1253,6 +1262,8 @@ struct TargetNominalTypeDescriptor {
   int32_t offsetToNameOffset() const {
     return offsetof(TargetNominalTypeDescriptor<Runtime>, Name);
   }
+
+  using VTableDescriptor = TargetVTableDescriptor<Runtime>;
 
   const VTableDescriptor *getVTableDescriptor() const {
     if (getKind() != NominalTypeKind::Class ||
