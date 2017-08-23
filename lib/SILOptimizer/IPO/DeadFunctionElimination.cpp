@@ -107,6 +107,10 @@ protected:
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
       return true;
 
+    // If function is marked as "keep-as-anchor", don't remove it.
+    if (F->isKeepAsAnchor())
+      return true;
+
     // If function is marked as "keep-as-public", don't remove it.
     // Change its linkage to public, so that other applications can refer to it.
     // It is important that this transformation is done at the end of

@@ -160,9 +160,14 @@ private:
   unsigned Linkage : NumSILLinkageBits;
 
   /// This flag indicates if a function can be eliminated by dead function
-  /// elimination. If it is unset, DFE will preserve the function and make
+  /// elimination. If it is set, DFE will preserve the function and make
   /// it public.
   unsigned KeepAsPublic : 1;
+
+  /// This flag indicates if a function can be eliminated by dead function
+  /// elimination. If it is set, DFE will treat this function as anchor and
+  /// preserve it.
+  unsigned KeepAsAnchor : 1;
 
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
@@ -251,7 +256,8 @@ public:
   }
 
   bool canBeDeleted() const {
-    return !getRefCount() && !isZombie() && !isKeepAsPublic();
+    return !getRefCount() && !isZombie() && !isKeepAsPublic() &&
+           !isKeepAsAnchor();
   }
 
   /// Return the number of entities referring to this function (other
@@ -538,6 +544,9 @@ public:
 
   bool isKeepAsPublic() const { return KeepAsPublic; }
   void setKeepAsPublic(bool keep) { KeepAsPublic = keep; }
+
+  bool isKeepAsAnchor() const { return KeepAsAnchor; }
+  void setKeepAsAnchor(bool keep) { KeepAsAnchor = keep; }
 
   /// Return whether this function has a foreign implementation which can
   /// be emitted on demand.
