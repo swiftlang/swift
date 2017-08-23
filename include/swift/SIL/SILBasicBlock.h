@@ -386,6 +386,14 @@ public:
       I.dropAllReferences();
   }
 
+  void eraseInstructions() {
+   for (auto It = begin(); It != end();) {
+      auto *Inst = &*It++;
+      Inst->replaceAllUsesWithUndef();
+      Inst->eraseFromParent();
+    }
+  }
+
 private:
   friend class SILArgument;
 
