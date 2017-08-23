@@ -701,47 +701,47 @@ public:
 
   /// The apply callee that abstractly represents the entry point that is being
   /// called.
-  Optional<Callee> ApplyCallee;
+  Optional<Callee> applyCallee;
 
   /// The lvalue or rvalue representing the argument source of self.
-  ArgumentSource SelfParam;
-  Expr *SelfApplyExpr = nullptr;
-  Type SelfType;
-  std::vector<ApplyExpr*> CallSites;
-  Expr *SideEffect = nullptr;
+  ArgumentSource selfParam;
+  Expr *selfApplyExpr = nullptr;
+  Type selfType;
+  std::vector<ApplyExpr*> callSites;
+  Expr *sideEffect = nullptr;
 
   /// When visiting expressions, sometimes we need to emit self before we know
   /// what the actual callee is. In such cases, we assume that we are passing
   /// self at +0 and then after we know what the callee is, we check if the
   /// self is passed at +1. If so, we add an extra retain.
-  bool AssumedPlusZeroSelf = false;
+  bool assumedPlusZeroSelf = false;
 
   SILGenApply(SILGenFunction &SGF)
     : SGF(SGF)
   {}
 
   void setCallee(Callee &&c) {
-    assert(!ApplyCallee && "already set callee!");
-    ApplyCallee.emplace(std::move(c));
+    assert(!applyCallee && "already set callee!");
+    applyCallee.emplace(std::move(c));
   }
 
   void setSideEffect(Expr *sideEffectExpr) {
-    assert(!SideEffect && "already set side effect!");
-    SideEffect = sideEffectExpr;
+    assert(!sideEffect && "already set side effect!");
+    sideEffect = sideEffectExpr;
   }
 
   void setSelfParam(ArgumentSource &&theSelfParam, Expr *theSelfApplyExpr) {
-    assert(!SelfParam && "already set this!");
-    SelfParam = std::move(theSelfParam);
-    SelfApplyExpr = theSelfApplyExpr;
-    SelfType = theSelfApplyExpr->getType();
+    assert(!selfParam && "already set this!");
+    selfParam = std::move(theSelfParam);
+    selfApplyExpr = theSelfApplyExpr;
+    selfType = theSelfApplyExpr->getType();
   }
 
   void setSelfParam(ArgumentSource &&theSelfParam, Type selfType) {
-    assert(!SelfParam && "already set this!");
-    SelfParam = std::move(theSelfParam);
-    SelfApplyExpr = nullptr;
-    SelfType = selfType;
+    assert(!selfParam && "already set this!");
+    selfParam = std::move(theSelfParam);
+    selfApplyExpr = nullptr;
+    selfType = selfType;
   }
 
   void decompose(Expr *e) {
@@ -772,7 +772,7 @@ public:
     if (applyInitDelegation(e))
       return;
 
-    CallSites.push_back(e);
+    callSites.push_back(e);
     visit(e->getFn());
   }
 
@@ -822,9 +822,9 @@ public:
 
   void processProtocolDecl(DeclRefExpr *e, AbstractFunctionDecl *afd,
                            ProtocolDecl *proto) {
-    assert(!CallSites.empty());
-    ApplyExpr *thisCallSite = CallSites.back();
-    CallSites.pop_back();
+    assert(!callSites.empty());
+    ApplyExpr *thisCallSite = callSites.back();
+    callSites.pop_back();
 
     ArgumentSource selfValue = thisCallSite->getArg();
 
@@ -856,7 +856,7 @@ public:
     // Prepare the callee.  This can modify both selfValue and subs.
     Callee theCallee = Callee::forArchetype(SGF, selfValue.getSubstRValueType(),
                                             constant, subs, e);
-    AssumedPlusZeroSelf =
+    assumedPlusZeroSelf =
         selfValue.isRValue() &&
         selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
 
@@ -908,7 +908,7 @@ public:
     if (isa<FuncDecl>(afd) && isDynamicallyDispatched) {
       kind = SILDeclRef::Kind::Func;
     } else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
-      ApplyExpr *thisCallSite = CallSites.back();
+      ApplyExpr *thisCallSite = callSites.back();
       // Required constructors are dynamically dispatched when the 'self'
       // value is not statically derived.
       if (ctor->isRequired() &&
@@ -933,8 +933,8 @@ public:
 
     // At this point, we know for sure that we are actually dynamically
     // dispatched.
-    ApplyExpr *thisCallSite = CallSites.back();
-    CallSites.pop_back();
+    ApplyExpr *thisCallSite = callSites.back();
+    callSites.pop_back();
 
     // Emit the rvalue for self, allowing for guaranteed plus zero if we
     // have a func.
@@ -947,7 +947,7 @@ public:
     // then we assumed that self could be passed at +0. We will check later
     // if the actual callee passes self at +1 later when we know its actual
     // type.
-    AssumedPlusZeroSelf =
+    assumedPlusZeroSelf =
         AllowPlusZero && self.peekIsPlusZeroRValueOrTrivial();
 
     // If we require a dynamic allocation of the object here, do so now.
@@ -1022,7 +1022,7 @@ public:
         SmallVector<ManagedValue, 4> captures;
         SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
                          captures);
-        ApplyCallee->setCaptures(std::move(captures));
+        applyCallee->setCaptures(std::move(captures));
       }
     }
   }
@@ -1054,7 +1054,7 @@ public:
       SmallVector<ManagedValue, 4> captures;
       SGF.emitCaptures(e, e, CaptureEmission::ImmediateApplication,
                        captures);
-      ApplyCallee->setCaptures(std::move(captures));
+      applyCallee->setCaptures(std::move(captures));
     }
   }
   
@@ -1300,7 +1300,7 @@ public:
     // that's the only thing that's witnessed. For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
-    if (SelfParam.getSubstRValueType()->getRValueInstanceType()
+    if (selfParam.getSubstRValueType()->getRValueInstanceType()
           ->is<ArchetypeType>()
         && isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
       // Look up the witness for the constructor.
@@ -1342,8 +1342,8 @@ public:
   }
 
   Callee getCallee() {
-    assert(ApplyCallee && "did not find callee?!");
-    return std::move(*ApplyCallee);
+    assert(applyCallee && "did not find callee?!");
+    return std::move(*applyCallee);
   }
 
   /// Ignore parentheses and implicit conversions.
@@ -1402,7 +1402,7 @@ public:
 
     // Since we'll be collapsing this call site, make sure there's another
     // call site that will actually perform the invocation.
-    if (CallSites.empty())
+    if (callSites.empty())
       return false;
 
     // Only @objc methods can be forced.
@@ -4498,23 +4498,23 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
   apply.decompose(e);
 
   // Evaluate and discard the side effect if present.
-  if (apply.SideEffect)
-    SGF.emitRValue(apply.SideEffect);
+  if (apply.sideEffect)
+    SGF.emitRValue(apply.sideEffect);
 
   // Build the call.
   // Pass the writeback scope on to CallEmission so it can thread scopes through
   // nested calls.
   CallEmission emission(SGF, apply.getCallee(), std::move(writebacks),
-                        apply.AssumedPlusZeroSelf);
+                        apply.assumedPlusZeroSelf);
 
   // Apply 'self' if provided.
-  if (apply.SelfParam) {
-    emission.addCallSite(RegularLocation(e), std::move(apply.SelfParam),
-                         apply.SelfType->getCanonicalType(), /*throws*/ false);
+  if (apply.selfParam) {
+    emission.addCallSite(RegularLocation(e), std::move(apply.selfParam),
+                         apply.selfType->getCanonicalType(), /*throws*/ false);
   }
 
   // Apply arguments from call sites, innermost to outermost.
-  for (auto site = apply.CallSites.rbegin(), end = apply.CallSites.rend();
+  for (auto site = apply.callSites.rbegin(), end = apply.callSites.rend();
        site != end;
        ++site) {
     emission.addCallSite(*site);
