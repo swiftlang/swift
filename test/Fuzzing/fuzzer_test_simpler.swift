@@ -3,6 +3,7 @@
 // CHECK: Crash!
 // REQUIRES: CPU=x86_64
 // REQUIRES: executable_test
+// REQUIRES: no_asan
 // XFAIL: OS=ios
 // XFAIL: OS=tvos
 // XFAIL: OS=watchos
