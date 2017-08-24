@@ -7937,13 +7937,8 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(Decl *D, uint64_
   auto table = findLookupTable(topLevelModule);
   if (!table) return;
   
-  StringRef traceName;
-  if (topLevelModule)
-    traceName = topLevelModule->getTopLevelModuleName();
-  else
-    traceName = "(bridging header)";
   PrettyStackTraceStringAction trace("loading import-as-members from",
-                                     traceName);
+                                     topLevelModule ? topLevelModule->getTopLevelModuleName() : "(bridging header)");
   PrettyStackTraceDecl trace2("...for", nominal);
   
   // Dig out the effective Clang context for this nominal type.
