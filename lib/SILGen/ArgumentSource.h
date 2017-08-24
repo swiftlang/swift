@@ -290,6 +290,10 @@ public:
   void forwardInto(SILGenFunction &SGF, AbstractionPattern origFormalType,
                    Initialization *dest, const TypeLowering &destTL) &&;
 
+  /// If we have an rvalue, borrow the rvalue into a new ArgumentSource and
+  /// return the ArgumentSource. Otherwise, assert.
+  ArgumentSource borrow(SILGenFunction &SGF) const &;
+
   ManagedValue materialize(SILGenFunction &SGF) &&;
 
   /// Emit this value to memory so that it follows the abstraction
