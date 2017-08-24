@@ -7968,6 +7968,8 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(Decl *D, uint64_
   }
 }
 
+static Decl *findMemberThatWillLandInAnExtensionContext(Decl *member);
+
 void ClangImporter::Implementation::addMemberAndAlternatesToExtension(clang::NamedDecl *decl, ImportedName newName, ImportNameVersion nameVersion, ExtensionDecl *ext) {
   // Quickly check the context and bail out if it obviously doesn't
   // belong here.
@@ -7979,14 +7981,8 @@ void ClangImporter::Implementation::addMemberAndAlternatesToExtension(clang::Nam
   auto *member = importDecl(decl, nameVersion);
   if (!member) return;
   
-  // Find the member that will land in an extension context.
-  while (!isa<ExtensionDecl>(member->getDeclContext())) {
-    auto nominal = dyn_cast<NominalTypeDecl>(member->getDeclContext());
-    if (!nominal) return;
-    
-    member = nominal;
-    if (member->hasClangNode()) return;
-  }
+  member = findMemberThatWillLandInAnExtensionContext(member);
+  if (!member) return;
   
   if (member->getDeclContext() != ext) return;
   ext->addMember(member);
@@ -7995,6 +7991,18 @@ void ClangImporter::Implementation::addMemberAndAlternatesToExtension(clang::Nam
     if (alternate->getDeclContext() == ext)
       ext->addMember(alternate);
   }
+}
+
+static Decl *findMemberThatWillLandInAnExtensionContext(Decl *member) {
+  // Find the member that will land in an extension context.
+  while (!isa<ExtensionDecl>(member->getDeclContext())) {
+    auto nominal = dyn_cast<NominalTypeDecl>(member->getDeclContext());
+    if (!nominal) return nullptr;
+    
+    member = nominal;
+    if (member->hasClangNode()) return nullptr;
+  }
+  return member;
 }
 
 
