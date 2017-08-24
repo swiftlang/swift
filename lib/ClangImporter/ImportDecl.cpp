@@ -7918,62 +7918,62 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     loadAllMembersOfObjcContainer(D, objcContainer);
     return;
   }
-    // We have extension.
-    auto ext = cast<ExtensionDecl>(D);
-    auto nominal = ext->getExtendedType()->getAnyNominal();
-
-    // The submodule of the extension is encoded in the extra data.
-    clang::Module *submodule = reinterpret_cast<clang::Module *>(
-                                 static_cast<uintptr_t>(extra));
-
-    // Find the lookup table.
-    auto topLevelModule = submodule;
-    if (topLevelModule)
-      topLevelModule = topLevelModule->getTopLevelModule();
-    auto table = findLookupTable(topLevelModule);
-    if (!table) return;
-
-    StringRef traceName;
-    if (topLevelModule)
-      traceName = topLevelModule->getTopLevelModuleName();
-    else
-      traceName = "(bridging header)";
-    PrettyStackTraceStringAction trace("loading import-as-members from",
-                                       traceName);
-    PrettyStackTraceDecl trace2("...for", nominal);
-
-    // Dig out the effective Clang context for this nominal type.
-    auto effectiveClangContext = getEffectiveClangContext(nominal);
-    if (!effectiveClangContext) return;
-
-    // Get ready to actually load the members.
-    ImportingEntityRAII Importing(*this);
-
-    // Load the members.
-    for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
-      auto decl = entry.get<clang::NamedDecl *>();
-
-      // Only include members in the same submodule as this extension.
-      if (getClangSubmoduleForDecl(decl) != submodule)
-        continue;
-
-      forEachDistinctName(decl, [&](ImportedName newName,
-                                    ImportNameVersion nameVersion) {
-        // Quickly check the context and bail out if it obviously doesn't
-        // belong here.
-        if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
-          if (importDC->isTranslationUnit())
-            return;
-
-        // Then try to import the decl under the specified name.
-        auto *member = importDecl(decl, nameVersion);
-        if (!member) return;
-
-        // Find the member that will land in an extension context.
-        while (!isa<ExtensionDecl>(member->getDeclContext())) {
-          auto nominal = dyn_cast<NominalTypeDecl>(member->getDeclContext());
-          if (!nominal) return;
-
+  // We have extension.
+  auto ext = cast<ExtensionDecl>(D);
+  auto nominal = ext->getExtendedType()->getAnyNominal();
+  
+  // The submodule of the extension is encoded in the extra data.
+  clang::Module *submodule = reinterpret_cast<clang::Module *>(
+                                                               static_cast<uintptr_t>(extra));
+  
+  // Find the lookup table.
+  auto topLevelModule = submodule;
+  if (topLevelModule)
+    topLevelModule = topLevelModule->getTopLevelModule();
+  auto table = findLookupTable(topLevelModule);
+  if (!table) return;
+  
+  StringRef traceName;
+  if (topLevelModule)
+    traceName = topLevelModule->getTopLevelModuleName();
+  else
+    traceName = "(bridging header)";
+  PrettyStackTraceStringAction trace("loading import-as-members from",
+                                     traceName);
+  PrettyStackTraceDecl trace2("...for", nominal);
+  
+  // Dig out the effective Clang context for this nominal type.
+  auto effectiveClangContext = getEffectiveClangContext(nominal);
+  if (!effectiveClangContext) return;
+  
+  // Get ready to actually load the members.
+  ImportingEntityRAII Importing(*this);
+  
+  // Load the members.
+  for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
+    auto decl = entry.get<clang::NamedDecl *>();
+    
+    // Only include members in the same submodule as this extension.
+    if (getClangSubmoduleForDecl(decl) != submodule)
+      continue;
+    
+    forEachDistinctName(decl, [&](ImportedName newName,
+                                  ImportNameVersion nameVersion) {
+      // Quickly check the context and bail out if it obviously doesn't
+      // belong here.
+      if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
+        if (importDC->isTranslationUnit())
+          return;
+      
+      // Then try to import the decl under the specified name.
+      auto *member = importDecl(decl, nameVersion);
+      if (!member) return;
+      
+      // Find the member that will land in an extension context.
+      while (!isa<ExtensionDecl>(member->getDeclContext())) {
+        auto nominal = dyn_cast<NominalTypeDecl>(member->getDeclContext());
+        if (!nominal) return;
+        
           member = nominal;
           if (member->hasClangNode()) return;
         }
