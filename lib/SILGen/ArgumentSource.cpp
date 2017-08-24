@@ -275,6 +275,25 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF, Initialization *dest) && {
   llvm_unreachable("bad kind");
 }
 
+// FIXME: Once uncurrying is removed, get rid of this constructor.
+ArgumentSource::ArgumentSource(SILLocation loc, RValue &&rv, Kind kind)
+    : Storage(), StoredKind(kind) {
+  Storage.emplaceAggregate<RValueStorage>(StoredKind, std::move(rv), loc);
+}
+
+ArgumentSource ArgumentSource::delayedBorrow(SILGenFunction &SGF) const & {
+  assert(isRValue() && "Can only perform a delayed borrow on an rvalue");
+  // We are doing something evil here since we know that we are going to perform
+  // a borrow.
+  //
+  // Once uncurrying is removed from the compiler, we will no longer need to
+  // perform delayed borrows and this evilness can be expunged.
+  const RValue &rv = asKnownRValue();
+  return ArgumentSource(getKnownRValueLocation(),
+                        RValue(&SGF, rv.values, rv.type),
+                        Kind::DelayedBorrowedRValue);
+}
+
 ArgumentSource ArgumentSource::borrow(SILGenFunction &SGF) const & {
   switch (StoredKind) {
   case Kind::Invalid:

@@ -41,8 +41,9 @@ class GY<T> : GX<[T]> { }
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
 // CHECK:   [[BORROWED_Y:%.*]] = begin_borrow [[Y]]
 // CHECK:   [[Y_COPY:%.*]] = copy_value [[BORROWED_Y]]
-// CHECK:   [[Y_AS_X_COPY:%[0-9]+]] = upcast [[Y_COPY]] : $Y to $X  
-// CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X_COPY]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X, $@convention(method) (@guaranteed X) -> @owned X
+// CHECK:   [[Y_AS_X_COPY:%[0-9]+]] = upcast [[Y_COPY]] : $Y to $X
+// CHECK:   [[BORROWED_Y_AS_X_COPY:%.*]] = begin_borrow [[Y_AS_X_COPY]]
+// CHECK:   [[X_F:%[0-9]+]] = class_method [[BORROWED_Y_AS_X_COPY]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X, $@convention(method) (@guaranteed X) -> @owned X
 // => SEMANTIC SIL TODO: This argument here needs to be borrowed.
 // CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X_COPY]]) : $@convention(method) (@guaranteed X) -> @owned X
 // CHECK:   destroy_value [[Y_AS_X_COPY]]
@@ -60,7 +61,8 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK:   [[BORROWED_GY:%.*]] = begin_borrow [[GY]]
   // CHECK:   [[GY_COPY:%.*]] = copy_value [[BORROWED_GY]]
   // CHECK:   [[GY_AS_GX_COPY:%[0-9]+]] = upcast [[GY_COPY]] : $GY<Int> to $GX<Array<Int>>
-  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX_COPY]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T>, $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   [[BORROWED_GY_AS_GX_COPY:%.*]] = begin_borrow [[GY_AS_GX_COPY]]
+  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[BORROWED_GY_AS_GX_COPY]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T>, $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   destroy_value [[GY_AS_GX_COPY]]
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
@@ -133,7 +135,8 @@ func testObjCInit(meta: ObjCInit.Type) {
 // CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
 // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
 // CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
-// CHECK:   [[INIT:%[0-9]+]] = class_method [volatile] [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit, $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
+// CHECK:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
+// CHECK:   [[INIT:%[0-9]+]] = class_method [volatile] [[BORROWED_OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit, $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[OBJ]]) : $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
@@ -165,7 +168,9 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK:      [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:      [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:      [[CAST_COPY_ARG:%.*]] = upcast [[COPY_ARG]]
-// CHECK:      [[T0:%.*]] = class_method [[CAST_COPY_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult?, $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
+// CHECK:      [[BORROWED_CAST_COPY_ARG:%.*]] = begin_borrow [[CAST_COPY_ARG]]
+// CHECK:      [[T0:%.*]] = class_method [[BORROWED_CAST_COPY_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult?, $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
+// CHECK-NEXT: end_borrow [[BORROWED_CAST_COPY_ARG]] from [[CAST_COPY_ARG]]
 // CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[CAST_COPY_ARG]])
 // CHECK:      switch_enum [[RES]] : $Optional<OptionalResult>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]]
 // CHECK: [[SOME_BB]]([[T1:%.*]] : $OptionalResult):

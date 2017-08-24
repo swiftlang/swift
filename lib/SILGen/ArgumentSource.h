@@ -343,6 +343,9 @@ public:
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
 private:
+  /// Private helper constructor for delayed borrowed rvalues.
+  ArgumentSource(SILLocation loc, RValue &&rv, Kind kind);
+
   /// Returns true if this ArgumentSource stores a delayed borrowed RValue.
   ///
   /// This is private since we do not want users to be able to determine if the
