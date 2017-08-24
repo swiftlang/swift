@@ -7992,9 +7992,7 @@ void ClangImporter::Implementation::addMemberAndAlternatesToExtension(clang::Nam
   if (!member) return;
   
   member = findMemberThatWillLandInAnExtensionContext(member);
-  if (!member) return;
-  
-  if (member->getDeclContext() != ext) return;
+  if (!member  ||  member->getDeclContext() != ext) return;
   ext->addMember(member);
   
   for (auto alternate : getAlternateDecls(member)) {
