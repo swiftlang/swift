@@ -1437,7 +1437,11 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   // If we don't have more than one component, just solve the whole
   // system.
   if (numComponents < 2) {
-    return solveSimplified(solutions, allowFreeTypeVariables);
+    SmallVector<Constraint *, 8> disjunctions;
+    collectDisjunctions(disjunctions);
+
+    return solveSimplified(selectDisjunction(disjunctions), solutions,
+                           allowFreeTypeVariables);
   }
 
   if (TC.Context.LangOpts.DebugConstraintSolver) {
@@ -1902,10 +1906,10 @@ static float scoreType(ConstraintSystem &cs, Type type,
   return components == 0 ? score : score / components;
 }
 
-Optional<Constraint *> ConstraintSystem::selectDisjunction(
-    llvm::SmallVectorImpl<Constraint *> &disjunctions) {
+Constraint *ConstraintSystem::selectDisjunction(
+    SmallVectorImpl<Constraint *> &disjunctions) {
   if (disjunctions.empty())
-    return None;
+    return nullptr;
 
   if (disjunctions.size() == 1) {
     auto disjunction = disjunctions[0];
@@ -1913,7 +1917,7 @@ Optional<Constraint *> ConstraintSystem::selectDisjunction(
     // have any choices enabled, that means that system won't have
     // solution and this disjunction can't be picked.
     if (disjunction->countActiveNestedConstraints() == 0)
-      return None;
+      return nullptr;
 
     return disjunction;
   }
@@ -1995,11 +1999,8 @@ Optional<Constraint *> ConstraintSystem::selectDisjunction(
 }
 
 bool ConstraintSystem::solveSimplified(
-    SmallVectorImpl<Solution> &solutions,
+    Constraint *disjunction, SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
-
-  SmallVector<Constraint *, 4> disjunctions;
-  collectDisjunctions(disjunctions);
 
   TypeVariableType *bestTypeVar = nullptr;
   PotentialBindings bestBindings;
@@ -2007,8 +2008,8 @@ bool ConstraintSystem::solveSimplified(
 
   // If we have a binding that does not involve type variables, or we have
   // no other option, go ahead and try the bindings for this type variable.
-  if (bestBindings && 
-      (disjunctions.empty() ||
+  if (bestBindings &&
+      (!disjunction ||
        (!bestBindings.InvolvesTypeVariables && !bestBindings.FullyBound &&
         bestBindings.LiteralBinding == LiteralBindingKind::None))) {
     return tryTypeVariableBindings(solverState->depth, bestTypeVar,
@@ -2018,7 +2019,7 @@ bool ConstraintSystem::solveSimplified(
 
   // If there are no disjunctions we can't solve this system unless we have
   // free type variables and are allowing them in the solution.
-  if (disjunctions.empty()) {
+  if (!disjunction) {
     if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow ||
         !hasFreeTypeVariables())
       return true;
@@ -2050,13 +2051,6 @@ bool ConstraintSystem::solveSimplified(
     return false;
   }
 
-  auto choice = selectDisjunction(disjunctions);
-  // If no viable choice could be determined, it means that
-  // constraint system doesn't have any solutions.
-  if (!choice)
-    return true;
-
-  auto disjunction = *choice;
   // Remove this disjunction constraint from the list.
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
   CG.removeConstraint(disjunction);

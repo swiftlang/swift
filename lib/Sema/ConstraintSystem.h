@@ -2658,13 +2658,17 @@ private:
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///
+  /// \param disjunction The disjunction to try and solve using simplified
+  /// constraint system.
+  ///
   /// \param solutions The set of solutions to this system of constraints.
   ///
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool solveSimplified(SmallVectorImpl<Solution> &solutions,
+  bool solveSimplified(Constraint *disjunction,
+                       SmallVectorImpl<Solution> &solutions,
                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
@@ -2683,9 +2687,8 @@ private:
   /// \param disjunctions A collection of disjunctions to examine.
   ///
   /// \returns The disjunction with most weight relative to others, based
-  /// on the number of constraints associated with it.
-  Optional<Constraint *>
-  selectDisjunction(SmallVectorImpl<Constraint *> &disjunctions);
+  /// on the number of constraints associated with it, or nullptr otherwise.
+  Constraint *selectDisjunction(SmallVectorImpl<Constraint *> &disjunctions);
 
   bool simplifyForConstraintPropagation();
   void collectNeighboringBindOverloadDisjunctions(
@@ -3081,7 +3084,7 @@ private:
 /// as well as its partial solving and result tracking.
 class ConstraintBucket {
   ConstraintList Constraints;
-  unsigned NumDisjunctions = 0;
+  SmallVector<Constraint *, 8> Disjunctions;
 
 public:
   void reinstateTo(ConstraintList &workList) {
@@ -3089,9 +3092,9 @@ public:
   }
 
   void record(Constraint *constraint) {
-    if (constraint->getKind() == ConstraintKind::Disjunction)
-      ++NumDisjunctions;
     Constraints.push_back(constraint);
+    if (constraint->getKind() == ConstraintKind::Disjunction)
+      Disjunctions.push_back(constraint);
   }
 
   bool solve(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions,
@@ -3108,7 +3111,8 @@ public:
       llvm::SaveAndRestore<ConstraintSystem::SolverScope *>
           partialSolutionScope(cs.solverState->PartialSolutionScope, &scope);
 
-      failed = cs.solveSimplified(solutions, allowFreeTypeVariables);
+      failed = cs.solveSimplified(cs.selectDisjunction(Disjunctions), solutions,
+                                  allowFreeTypeVariables);
     }
 
     // Put the constraints back into their original bucket.
@@ -3117,8 +3121,11 @@ public:
   }
 
   bool operator<(const ConstraintBucket &other) const {
-    return NumDisjunctions < other.NumDisjunctions;
+    return disjunctionCount() < other.disjunctionCount();
   }
+
+private:
+  unsigned disjunctionCount() const { return Disjunctions.size(); }
 };
 } // end namespace constraints
 
