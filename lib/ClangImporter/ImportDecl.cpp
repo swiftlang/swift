@@ -7974,19 +7974,19 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
         auto nominal = dyn_cast<NominalTypeDecl>(member->getDeclContext());
         if (!nominal) return;
         
-          member = nominal;
-          if (member->hasClangNode()) return;
-        }
-
-        if (member->getDeclContext() != ext) return;
-        ext->addMember(member);
-        
-        for (auto alternate : getAlternateDecls(member)) {
-          if (alternate->getDeclContext() == ext)
-            ext->addMember(alternate);
-        }
-      });
-    }
+        member = nominal;
+        if (member->hasClangNode()) return;
+      }
+      
+      if (member->getDeclContext() != ext) return;
+      ext->addMember(member);
+      
+      for (auto alternate : getAlternateDecls(member)) {
+        if (alternate->getDeclContext() == ext)
+          ext->addMember(alternate);
+      }
+    });
+  }
 }
 
 
