@@ -322,6 +322,20 @@ static NSString *_getClassDescription(Class cls) {
   return class_respondsToSelector(self, sel);
 }
 
+
++ (IMP)methodForSelector:(SEL)sel {
+  return class_getMethodImplementation(object_getClass((id)self), sel);
+}
+
+- (IMP)methodForSelector:(SEL)sel {
+  return class_getMethodImplementation(object_getClass(self), sel);
+}
+
++ (IMP)instanceMethodForSelector:(SEL)sel {
+  return class_getMethodImplementation(self, sel);
+}
+
+
 - (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
   auto selfClass = (Class) _swift_getClassOfAllocated(self);
