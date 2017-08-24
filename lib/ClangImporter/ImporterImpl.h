@@ -1127,6 +1127,7 @@ private:
                            SmallVectorImpl<Decl *> &members);
   void insertMembersAndAlternates(const clang::NamedDecl *nd,
                                   SmallVectorImpl<Decl *> &members);
+  void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
   
 public:
   void

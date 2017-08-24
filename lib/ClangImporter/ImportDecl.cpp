@@ -7918,6 +7918,10 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     loadAllMembersOfObjcContainer(D, objcContainer);
     return;
   }
+  loadAllMembersIntoExtension(D, extra);
+}
+
+void ClangImporter::Implementation::loadAllMembersIntoExtension(Decl *D, uint64_t extra) {
   // We have extension.
   auto ext = cast<ExtensionDecl>(D);
   auto nominal = ext->getExtendedType()->getAnyNominal();
