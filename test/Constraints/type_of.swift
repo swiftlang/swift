@@ -36,3 +36,23 @@ let _: Q.Type = Swift.type(of: Q())
 let _: R = Swift.type(of: Q()) // expected-error{{}}
 let _: Q.Type = main.type(of: Q()) // expected-error{{}}
 let _: R = main.type(of: Q()) 
+
+// Let's make sure that binding of the left-hand side
+// of the dynamic-type-of constraint is not attempted.
+
+class C {
+   typealias T = Int
+}
+
+class D : C {
+   typealias T = Float
+}
+
+func foo(_: Any...) {}
+
+func bar() -> Int { return 42 }    // expected-note {{found this candidate}}
+func bar() -> Float { return 0.0 } // expected-note {{found this candidate}}
+
+foo(type(of: D.T.self)) // Ok
+let _: Any = type(of: D.T.self) // Ok
+foo(type(of: bar())) // expected-error {{ambiguous use of 'bar()'}}
