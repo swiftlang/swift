@@ -8039,6 +8039,33 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
   }
 }
 
+void ClangImporter::Implementation::insertMembersAndAlternates(
+                                                               const clang::NamedDecl *nd, SmallVectorImpl<Decl *> &members) {
+  llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
+  forEachDistinctName(
+                      nd, [&](ImportedName name, ImportNameVersion nameVersion) {
+                        auto member = importDecl(nd, nameVersion);
+                        if (!member)
+                          return;
+                        
+                        // If there are alternate declarations for this member, add them.
+                        for (auto alternate : getAlternateDecls(member)) {
+                          if (alternate->getDeclContext() == member->getDeclContext() &&
+                              knownAlternateMembers.insert(alternate).second) {
+                            members.push_back(alternate);
+                          }
+                        }
+                        
+                        // If this declaration shouldn't be visible, don't add it to
+                        // the list.
+                        if (shouldSuppressDeclImport(nd))
+                          return;
+                        
+                        members.push_back(member);
+                      });
+}
+
+
 void ClangImporter::Implementation::collectMembersToAdd(
                                                         const clang::ObjCContainerDecl *objcContainer,
                                                         Decl *D, DeclContext *DC,
@@ -8049,29 +8076,7 @@ void ClangImporter::Implementation::collectMembersToAdd(
         nd->getDeclContext() != objcContainer) {
       continue;
     }
-
-    llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
-    forEachDistinctName(nd,
-                        [&](ImportedName name, ImportNameVersion nameVersion) {
-      auto member = importDecl(nd, nameVersion);
-      if (!member)
-        return;
-
-      // If there are alternate declarations for this member, add them.
-      for (auto alternate : getAlternateDecls(member)) {
-        if (alternate->getDeclContext() == member->getDeclContext() &&
-            knownAlternateMembers.insert(alternate).second) {
-          members.push_back(alternate);
-        }
-      }
-
-      // If this declaration shouldn't be visible, don't add it to
-      // the list.
-      if (shouldSuppressDeclImport(nd))
-        return;
-
-      members.push_back(member);
-    });
+    insertMembersAndAlternates(nd, members);
   }
 
   SwiftDeclConverter converter(*this, CurrentVersion);

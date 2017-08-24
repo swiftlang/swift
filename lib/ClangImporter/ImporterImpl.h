@@ -1125,8 +1125,10 @@ private:
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,
                            SmallVectorImpl<Decl *> &members);
+  void insertMembersAndAlternates(const clang::NamedDecl *nd,
+                                  SmallVectorImpl<Decl *> &members);
+  
 public:
-
   void
   loadAllConformances(
     const Decl *D, uint64_t contextData,
