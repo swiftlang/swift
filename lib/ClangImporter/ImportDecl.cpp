@@ -7963,6 +7963,12 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(Decl *D, uint64_
     
     forEachDistinctName(decl, [&](ImportedName newName,
                                   ImportNameVersion nameVersion) {
+      addMemberAndAlternatesToExtension(decl, newName, nameVersion, ext);
+    });
+  }
+}
+
+void ClangImporter::Implementation::addMemberAndAlternatesToExtension(clang::NamedDecl *decl, ImportedName newName, ImportNameVersion nameVersion, ExtensionDecl *ext) {
       // Quickly check the context and bail out if it obviously doesn't
       // belong here.
       if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
@@ -7989,8 +7995,6 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(Decl *D, uint64_
         if (alternate->getDeclContext() == ext)
           ext->addMember(alternate);
       }
-    });
-  }
 }
 
 

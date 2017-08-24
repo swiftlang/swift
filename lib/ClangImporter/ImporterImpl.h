@@ -1128,6 +1128,7 @@ private:
   void insertMembersAndAlternates(const clang::NamedDecl *nd,
                                   SmallVectorImpl<Decl *> &members);
   void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
+  void addMemberAndAlternatesToExtension(clang::NamedDecl *decl,importer::ImportedName newName, importer::ImportNameVersion nameVersion, ExtensionDecl *ext);
   
 public:
   void
