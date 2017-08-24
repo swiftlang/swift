@@ -846,6 +846,9 @@ SILGenFunction::emitOpenExistential(
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
   case ExistentialRepresentation::Opaque: {
+    // With CoW existentials we can't consume the boxed value inside of
+    // the existential. (We could only do so after a uniqueness check on
+    // the box holding the value).
     canConsume = false;
     if (existentialType.isAddress()) {
       OpenedExistentialAccess allowedAccess =
@@ -857,14 +860,8 @@ SILGenFunction::emitOpenExistential(
         loweredOpenedType = loweredOpenedType.getAddressType();
       }
       SILValue archetypeValue =
-          B.createOpenExistentialAddr(loc, existentialValue.forward(*this),
-                                      loweredOpenedType, allowedAccess);
-      if (existentialValue.hasCleanup()) {
-        // With CoW existentials we can't consume the boxed value inside of
-        // the existential. (We could only do so after a uniqueness check on
-        // the box holding the value).
-        enterDestroyCleanup(existentialValue.getValue());
-      }
+        B.createOpenExistentialAddr(loc, existentialValue.getValue(),
+                                    loweredOpenedType, allowedAccess);
       archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
     } else {
       // borrow the existential and return an unmanaged opened value.
