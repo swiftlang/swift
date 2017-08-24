@@ -21,14 +21,14 @@ var TestSuiteChildCrashes = TestSuite("TestSuiteChildCrashes")
 
 TestSuiteChildCrashes.test("passes") {
   atexit {
-    fatalError("crash at exit")
+    fatalError("Crash at exit")
   }
 }
 
 // CHECK: [ RUN      ] TestSuiteChildCrashes.passes
 // CHECK: [       OK ] TestSuiteChildCrashes.passes
 // CHECK: TestSuiteChildCrashes: All tests passed
-// CHECK: stderr>>> fatal error: crash at exit:
+// CHECK: stderr>>> Fatal error: Crash at exit:
 // CHECK: stderr>>> CRASHED: SIG
 // CHECK: The child process failed during shutdown, aborting.
 // CHECK: abort()

@@ -63,7 +63,7 @@ static SWIFT_CC(swift) void deinitTestObject(SWIFT_CONTEXT HeapObject *_object) 
     // URC increment OK
     // URC decrement OK
     ASSERT_DEATH(swift_unownedCheck(object),
-                 "attempted to read an unowned reference");
+                 "Attempted to read an unowned reference");
     swift_unownedRetain(object);
     swift_unownedRetain(object);
     swift_unownedRelease(object);
@@ -162,7 +162,7 @@ TEST(LongRefcountingTest, retain_overflow_DeathTest) {
   retainALot<true>(object, deallocated, maxRC - 1);
   EXPECT_EQ(0u, deallocated);
   ASSERT_DEATH(swift_retain(object),
-               "object was retained too many times");
+               "Object was retained too many times");
 }
 
 TEST(LongRefcountingTest, nonatomic_retain_max) {
@@ -186,7 +186,7 @@ TEST(LongRefcountingTest, nonatomic_retain_overflow_DeathTest) {
   retainALot<false>(object, deallocated, maxRC - 1);
   EXPECT_EQ(0u, deallocated);
   ASSERT_DEATH(swift_nonatomic_retain(object),
-               "object was retained too many times");
+               "Object was retained too many times");
 }
 
 
@@ -310,7 +310,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_no_side_DeathTest) {
   // URC increment can't happen
   // URC decrement OK
   ASSERT_DEATH(swift_unownedCheck(object),
-               "attempted to read an unowned reference");
+               "Attempted to read an unowned reference");
   swift_unownedRelease(object);
   EXPECT_ALLOCATED(object);
 
@@ -519,7 +519,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
   // URC increment can't happen
   // URC decrement OK
   ASSERT_DEATH(swift_unownedCheck(object),
-               "attempted to read an unowned reference");
+               "Attempted to read an unowned reference");
   swift_unownedRelease(object);
   EXPECT_ALLOCATED(object);
   EXPECT_ALLOCATED(side);
@@ -759,7 +759,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   // URC increment can't happen
   // URC decrement OK
   ASSERT_DEATH(swift_unownedCheck(object),
-               "attempted to read an unowned reference");
+               "Attempted to read an unowned reference");
   swift_unownedRelease(object);
   EXPECT_ALLOCATED(object);
   EXPECT_ALLOCATED(side);
