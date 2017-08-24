@@ -1,8 +1,9 @@
-// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -module-name TSanUninstrumented -emit-module -emit-module-path %T/TSanUninstrumented.swiftmodule -parse-as-library
-// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -c -module-name TSanUninstrumented -parse-as-library -o %T/TSanUninstrumented.o
-// RUN: %target-swiftc_driver %s %T/TSanUninstrumented.o -target %sanitizers-target-triple -I%T -L%T -g -sanitize=thread -o %t_tsan-binary
-// RUN: not env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
-// RUN: not env %env-TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s --check-prefix CHECK-INTERCEPTORS-ACCESSES
+// RUN: rm -rf %t && mkdir -p %t && cd %t
+// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -module-name TSanUninstrumented -emit-module -emit-module-path %t/TSanUninstrumented.swiftmodule -parse-as-library
+// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -c -module-name TSanUninstrumented -parse-as-library -o %t/TSanUninstrumented.o
+// RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -target %sanitizers-target-triple -I%t -L%t -g -sanitize=thread -o %t/tsan-binary
+// RUN: not env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s
+// RUN: not env %env-TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s --check-prefix CHECK-INTERCEPTORS-ACCESSES
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
