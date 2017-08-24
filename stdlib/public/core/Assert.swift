@@ -46,7 +46,7 @@ public func assert(
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
-      _assertionFailure("assertion failed", message(), file: file, line: line,
+      _assertionFailure("Assertion failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
   }
@@ -88,7 +88,7 @@ public func precondition(
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
-      _assertionFailure("precondition failed", message(), file: file, line: line,
+      _assertionFailure("Precondition failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
@@ -128,7 +128,7 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailure("fatal error", message(), file: file, line: line,
+    _assertionFailure("Fatal error", message(), file: file, line: line,
       flags: _fatalErrorFlags())
   }
   else if _isFastAssertConfiguration() {
@@ -167,7 +167,7 @@ public func preconditionFailure(
 ) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    _assertionFailure("fatal error", message(), file: file, line: line,
+    _assertionFailure("Fatal error", message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
     Builtin.int_trap()
@@ -188,7 +188,7 @@ public func fatalError(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  _assertionFailure("fatal error", message(), file: file, line: line,
+  _assertionFailure("Fatal error", message(), file: file, line: line,
     flags: _fatalErrorFlags())
 }
 
@@ -206,7 +206,7 @@ public func _precondition(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
-      _fatalErrorMessage("fatal error", message, file: file, line: line,
+      _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
@@ -235,7 +235,7 @@ public func _overflowChecked<T>(
   let (result, error) = args
   if _isDebugAssertConfiguration() {
     if _branchHint(error, expected: false) {
-      _fatalErrorMessage("fatal error", "Overflow/underflow", 
+      _fatalErrorMessage("Fatal error", "Overflow/underflow", 
         file: file, line: line, flags: _fatalErrorFlags())
     }
   } else {
@@ -260,7 +260,7 @@ public func _debugPrecondition(
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
-      _fatalErrorMessage("fatal error", message, file: file, line: line,
+      _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   }
@@ -290,7 +290,7 @@ public func _sanityCheck(
 ) {
 #if INTERNAL_CHECKS_ENABLED
   if !_branchHint(condition(), expected: true) {
-    _fatalErrorMessage("fatal error", message, file: file, line: line,
+    _fatalErrorMessage("Fatal error", message, file: file, line: line,
       flags: _fatalErrorFlags())
   }
 #endif

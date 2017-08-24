@@ -99,15 +99,15 @@ void
 swift::swift_verifyEndOfLifetime(HeapObject *object) {
   if (object->refCounts.getCount() != 0)
     swift::fatalError(/* flags = */ 0,
-                      "fatal error: stack object escaped\n");
+                      "Fatal error: Stack object escaped\n");
   
   if (object->refCounts.getUnownedCount() != 1)
     swift::fatalError(/* flags = */ 0,
-                      "fatal error: unowned reference to stack object\n");
+                      "Fatal error: Unowned reference to stack object\n");
   
   if (object->refCounts.getWeakCount() != 0)
     swift::fatalError(/* flags = */ 0,
-                      "fatal error: weak reference to stack object\n");
+                      "Fatal error: Weak reference to stack object\n");
 }
 
 /// \brief Allocate a reference-counted object on the heap that

@@ -1200,7 +1200,7 @@ internal struct KeyPathBuffer {
 
     func validateReservedBits() {
       _precondition(_value & Header.reservedMask == 0,
-                    "reserved bits set to an unexpected bit pattern")
+                    "Reserved bits set to an unexpected bit pattern")
     }
   }
 
