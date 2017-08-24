@@ -283,6 +283,11 @@ public:
   /// it.
   ManagedValue createStore(SILLocation loc, ManagedValue value,
                            SILValue address, StoreOwnershipQualifier qualifier);
+
+  using SILBuilder::createSuperMethod;
+  ManagedValue createSuperMethod(SILLocation loc, ManagedValue operand,
+                                 SILDeclRef member, SILType methodTy,
+                                 bool isVolatile = false);
 };
 
 class SwitchCaseFullExpr;

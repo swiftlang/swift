@@ -647,6 +647,16 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
   return cloner.clone(address);
 }
 
+ManagedValue SILGenBuilder::createSuperMethod(SILLocation loc,
+                                              ManagedValue operand,
+                                              SILDeclRef member,
+                                              SILType methodTy,
+                                              bool isVolatile) {
+  SILValue v = SILBuilder::createSuperMethod(loc, operand.getValue(), member,
+                                             methodTy, isVolatile);
+  return ManagedValue::forUnmanaged(v);
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//

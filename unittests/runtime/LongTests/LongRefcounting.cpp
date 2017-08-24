@@ -102,7 +102,7 @@ static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
   ClassFlags::UsesSwift1Refcounting, nullptr, 0, 0, 0, 0, 0 }
 };
 
-/// Create an object that, when deallocated, stores the given value to
+/// Create an object that, when deinited, stores the given value to
 /// the given pointer.
 static TestObject *allocTestObject(size_t *addr, size_t value) {
   auto buf = swift_allocObject(&TestClassObjectMetadata,
@@ -113,27 +113,27 @@ static TestObject *allocTestObject(size_t *addr, size_t value) {
 }
 
 
-////////////////////////////////////////////
-// Max retain count and overflow checking //
-////////////////////////////////////////////
+///////////////////////////////////////////////////
+// Max strong retain count and overflow checking //
+///////////////////////////////////////////////////
 
 template <bool atomic>
-static void retainALot(TestObject *object, size_t &deallocated,
+static void retainALot(TestObject *object, size_t &deinited,
                        uint64_t count) {
   for (uint64_t i = 0; i < count; i++) {
     if (atomic) swift_retain(object);
     else swift_nonatomic_retain(object);
-    EXPECT_EQ(0u, deallocated);
+    EXPECT_EQ(0u, deinited);
   }
 }
 
 template <bool atomic>
-static void releaseALot(TestObject *object, size_t &deallocated,
+static void releaseALot(TestObject *object, size_t &deinited,
                         uint64_t count) {
   for (uint64_t i = 0; i < count; i++) {
     if (atomic) swift_release(object);
     else swift_nonatomic_release(object);
-    EXPECT_EQ(0u, deallocated);
+    EXPECT_EQ(0u, deinited);
   }
 }
 
@@ -142,51 +142,191 @@ static void releaseALot(TestObject *object, size_t &deallocated,
 const uint64_t maxRC = 1ULL << (32 - 2);
 
 TEST(LongRefcountingTest, retain_max) {
-  size_t deallocated = 0;
-  auto object = allocTestObject(&deallocated, 1);
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = "true";
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
 
   // RC is 1.
   // Retain to maxRC, release back to 1, then release and verify deallocation.
-  retainALot<true>(object, deallocated, maxRC - 1);
-  releaseALot<true>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(0u, deallocated);
+  EXPECT_EQ(swift_retainCount(object), 1u);
+  retainALot<true>(object, deinited, maxRC - 1);
+  EXPECT_EQ(swift_retainCount(object), maxRC);
+  releaseALot<true>(object, deinited, maxRC - 1);
+  EXPECT_EQ(swift_retainCount(object), 1u);
+  EXPECT_EQ(0u, deinited);
   swift_release(object);
-  EXPECT_EQ(1u, deallocated);
+  EXPECT_EQ(1u, deinited);
 }
 
 TEST(LongRefcountingTest, retain_overflow_DeathTest) {
-  size_t deallocated = 0;
-  auto object = allocTestObject(&deallocated, 1);
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = "true";
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
 
   // RC is 1. Retain to maxRC, then retain again and verify overflow error.
-  retainALot<true>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(0u, deallocated);
+  retainALot<true>(object, deinited, maxRC - 1);
+  EXPECT_EQ(0u, deinited);
   ASSERT_DEATH(swift_retain(object),
                "object was retained too many times");
 }
 
 TEST(LongRefcountingTest, nonatomic_retain_max) {
-  size_t deallocated = 0;
-  auto object = allocTestObject(&deallocated, 1);
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = "true";
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
 
   // RC is 1.
   // Retain to maxRC, release back to 1, then release and verify deallocation.
-  retainALot<false>(object, deallocated, maxRC - 1);
-  releaseALot<false>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(0u, deallocated);
+  EXPECT_EQ(swift_retainCount(object), 1u);
+  retainALot<false>(object, deinited, maxRC - 1);
+  EXPECT_EQ(swift_retainCount(object), maxRC);
+  releaseALot<false>(object, deinited, maxRC - 1);
+  EXPECT_EQ(swift_retainCount(object), 1u);
+  EXPECT_EQ(0u, deinited);
   swift_nonatomic_release(object);
-  EXPECT_EQ(1u, deallocated);
+  EXPECT_EQ(1u, deinited);
 }
 
 TEST(LongRefcountingTest, nonatomic_retain_overflow_DeathTest) {
-  size_t deallocated = 0;
-  auto object = allocTestObject(&deallocated, 1);
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = "true";
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
 
   // RC is 1. Retain to maxRC, then retain again and verify overflow error.
-  retainALot<false>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(0u, deallocated);
+  retainALot<false>(object, deinited, maxRC - 1);
+  EXPECT_EQ(0u, deinited);
   ASSERT_DEATH(swift_nonatomic_retain(object),
                "object was retained too many times");
+}
+
+
+///////////////////////////////////////////////////
+// Max unowned retain count and overflow checking //
+///////////////////////////////////////////////////
+
+template <bool atomic>
+static void unownedRetainALot(TestObject *object, uint64_t count) {
+  for (uint64_t i = 0; i < count; i++) {
+    if (atomic) swift_unownedRetain(object);
+    else swift_nonatomic_unownedRetain(object);
+    EXPECT_ALLOCATED(object);
+  }
+}
+
+template <bool atomic>
+static void unownedReleaseALot(TestObject *object, uint64_t count) {
+  for (uint64_t i = 0; i < count; i++) {
+    if (atomic) swift_unownedRelease(object);
+    else swift_nonatomic_unownedRelease(object);
+    EXPECT_ALLOCATED(object);
+  }
+}
+
+// Maximum legal unowned retain count. 31 bits with no implicit +1.
+// (FIXME 32-bit architecture has 7 bit inline count;
+// that bound does not yet have its own tests.)
+const uint64_t maxURC = (1ULL << (32 - 1)) - 1;
+
+TEST(LongRefcountingTest, unowned_retain_max) {
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = "true";
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
+
+  // RC is 1. URC is 1.
+  // Unowned-retain to maxURC.
+  // Release and verify deinited and not deallocated.
+  // Unowned-release back to 1, then unowned-release and verify deallocated.
+  EXPECT_EQ(swift_retainCount(object), 1u);
+  EXPECT_EQ(swift_unownedRetainCount(object), 1u);
+  unownedRetainALot<true>(object, maxURC - 1);
+  EXPECT_EQ(swift_unownedRetainCount(object), maxURC);
+
+  EXPECT_EQ(0u, deinited);
+  EXPECT_ALLOCATED(object);
+  swift_release(object);
+  EXPECT_EQ(1u, deinited);
+  EXPECT_ALLOCATED(object);
+  // Strong release decremented unowned count by 1.
+  EXPECT_EQ(swift_unownedRetainCount(object), maxURC - 1);
+
+  unownedReleaseALot<true>(object, maxURC - 2);
+  EXPECT_EQ(swift_unownedRetainCount(object), 1u);
+
+  EXPECT_ALLOCATED(object);
+  swift_unownedRelease(object);
+  EXPECT_UNALLOCATED(object);
+}
+
+TEST(LongRefcountingTest, unowned_retain_overflow_DeathTest) {
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = "true";
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
+
+  // URC is 1. Retain to maxURC, then retain again and verify overflow error.
+  unownedRetainALot<true>(object, maxURC - 1);
+  EXPECT_EQ(0u, deinited);
+  EXPECT_ALLOCATED(object);
+  ASSERT_DEATH(swift_unownedRetain(object),
+               "object's unowned reference was retained too many times");
+}
+
+TEST(LongRefcountingTest, nonatomic_unowned_retain_max) {
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = "true";
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
+
+  // RC is 1. URC is 1.
+  // Unowned-retain to maxURC.
+  // Release and verify deinited and not deallocated.
+  // Unowned-release back to 1, then unowned-release and verify deallocated.
+  EXPECT_EQ(swift_retainCount(object), 1u);
+  EXPECT_EQ(swift_unownedRetainCount(object), 1u);
+  unownedRetainALot<false>(object, maxURC - 1);
+  EXPECT_EQ(swift_unownedRetainCount(object), maxURC);
+
+  EXPECT_EQ(0u, deinited);
+  EXPECT_ALLOCATED(object);
+  swift_release(object);
+  EXPECT_EQ(1u, deinited);
+  EXPECT_ALLOCATED(object);
+  // Strong release decremented unowned count by 1.
+  EXPECT_EQ(swift_unownedRetainCount(object), maxURC - 1);
+
+  unownedReleaseALot<false>(object, maxURC - 2);
+  EXPECT_EQ(swift_unownedRetainCount(object), 1u);
+
+  EXPECT_ALLOCATED(object);
+  swift_unownedRelease(object);
+  EXPECT_UNALLOCATED(object);
+}
+
+TEST(LongRefcountingTest, nonatomic_unowned_retain_overflow_DeathTest) {
+  // Don't generate millions of failures if something goes wrong.
+  ::testing::FLAGS_gtest_break_on_failure = "true";
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
+
+  // URC is 1. Retain to maxURC, then retain again and verify overflow error.
+  unownedRetainALot<false>(object, maxURC - 1);
+  EXPECT_EQ(0u, deinited);
+  EXPECT_ALLOCATED(object);
+  ASSERT_DEATH(swift_nonatomic_unownedRetain(object),
+               "object's unowned reference was retained too many times");
 }
 
 
