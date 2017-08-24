@@ -655,30 +655,6 @@ static bool shouldContractEdge(ConstraintKind kind) {
   }
 }
 
-/// We use this function to determine if a subtype constraint is set
-/// between two (possibly sugared) type variables, one of which is wrapped
-/// in an inout type.
-static bool isStrictInoutSubtypeConstraint(Constraint *constraint) {
-  if (constraint->getKind() != ConstraintKind::Subtype)
-    return false;
-
-  auto t1 = constraint->getFirstType()->getDesugaredType();
-
-  if (auto tt = t1->getAs<TupleType>()) {
-    if (tt->getNumElements() != 1)
-      return false;
-
-    t1 = tt->getElementType(0).getPointer();
-  }
-
-  auto iot = t1->getAs<InOutType>();
-
-  if (!iot)
-    return false;
-
-  return !iot->getObjectType()->isTypeVariableOrMember();
-}
-
 bool ConstraintGraph::contractEdges() {
   llvm::SetVector<std::pair<TypeVariableType *,
                             TypeVariableType *>> contractions;
@@ -714,25 +690,13 @@ bool ConstraintGraph::contractEdges() {
 
         auto isParamBindingConstraint = kind == ConstraintKind::BindParam;
 
-        // We need to take special care not to directly contract parameter
-        // binding constraints if there is an inout subtype constraint on the
-        // type variable. The constraint solver depends on multiple constraints
-        // being present in this case, so it can generate the appropriate lvalue
-        // wrapper for the argument type.
-        if (isParamBindingConstraint) {
-          auto node = tyvar1->getImpl().getGraphNode();
-          auto hasDependentConstraint = false;
-
-          for (auto t1Constraint : node->getConstraints()) {
-            if (isStrictInoutSubtypeConstraint(t1Constraint)) {
-              hasDependentConstraint = true;
-              break;
-            }
-          }
-
-          if (hasDependentConstraint)
-            continue;
-        }
+        // If the parameter is allowed to bind to `inout` let's not
+        // try to contract the edge connecting parameter declaration to
+        // it's use in the body. If parameter declaration is bound to
+        // `inout` it's use has to be bound to `l-value`, which can't
+        // happen once equivalence classes of parameter and argument are merged.
+        if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut())
+          continue;
 
         auto rep1 = CS.getRepresentative(tyvar1);
         auto rep2 = CS.getRepresentative(tyvar2);
@@ -765,10 +729,12 @@ bool ConstraintGraph::contractEdges() {
 }
 
 void ConstraintGraph::removeEdge(Constraint *constraint) {
+  bool isExistingConstraint = false;
 
   for (auto &active : CS.ActiveConstraints) {
     if (&active == constraint) {
       CS.ActiveConstraints.erase(constraint);
+      isExistingConstraint = true;
       break;
     }
   }
@@ -776,12 +742,17 @@ void ConstraintGraph::removeEdge(Constraint *constraint) {
   for (auto &inactive : CS.InactiveConstraints) {
     if (&inactive == constraint) {
       CS.InactiveConstraints.erase(constraint);
+      isExistingConstraint = true;
       break;
     }
   }
 
-  if (CS.solverState)
-    CS.solverState->removeGeneratedConstraint(constraint);
+  if (CS.solverState) {
+    if (isExistingConstraint)
+      CS.solverState->retireConstraint(constraint);
+    else
+      CS.solverState->removeGeneratedConstraint(constraint);
+  }
 
   removeConstraint(constraint);
 }
