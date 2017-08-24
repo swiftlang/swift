@@ -5265,11 +5265,10 @@ namespace {
         B.addInt16(DefaultWitnesses->getMinimumWitnessTableSize());
         B.addInt16(DefaultWitnesses->getDefaultWitnessTableSize());
 
-        // Unused padding
-        B.addInt32(0);
-
         for (auto entry : DefaultWitnesses->getResilientDefaultEntries()) {
-          B.add(IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition));
+          auto *witness = IGM.getAddrOfSILFunction(entry.getWitness(),
+                                                   NotForDefinition);
+          B.addRelativeAddress(witness);
         }
       } else {
         B.addInt16(0);
