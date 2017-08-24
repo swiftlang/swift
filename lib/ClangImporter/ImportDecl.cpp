@@ -7969,15 +7969,15 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(Decl *D, uint64_
 }
 
 static Decl *findMemberThatWillLandInAnExtensionContext(Decl *member) {
-  // Find the member that will land in an extension context.
-  while (!isa<ExtensionDecl>(member->getDeclContext())) {
-    auto nominal = dyn_cast<NominalTypeDecl>(member->getDeclContext());
+  Decl *result = member;
+  while (!isa<ExtensionDecl>(result->getDeclContext())) {
+    auto nominal = dyn_cast<NominalTypeDecl>(result->getDeclContext());
     if (!nominal) return nullptr;
     
-    member = nominal;
-    if (member->hasClangNode()) return nullptr;
+    result = nominal;
+    if (result->hasClangNode()) return nullptr;
   }
-  return member;
+  return result;
 }
 
 void ClangImporter::Implementation::addMemberAndAlternatesToExtension(clang::NamedDecl *decl, ImportedName newName, ImportNameVersion nameVersion, ExtensionDecl *ext) {
