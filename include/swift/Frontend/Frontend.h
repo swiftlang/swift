@@ -426,7 +426,9 @@ public:
 
   /// Parses the input file but does no type-checking or module imports.
   /// Note that this only supports parsing an invocation with a single file.
-  void performParseOnly();
+  ///
+  ///
+  void performParseOnly(bool EvaluateConditionals = false);
 
   /// Frees up the ASTContext and SILModule objects that this instance is
   /// holding on.

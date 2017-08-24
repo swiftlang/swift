@@ -98,7 +98,9 @@ public:
   };
 
   bool InPoundLineEnvironment = false;
-
+  // FIXME: When condition evaluation moves to a later phase, remove this bit
+  // and adjust the client call 'performParseOnly'.
+  bool PerformConditionEvaluation = true;
 private:
   ScopeInfo ScopeInfo;
   typedef llvm::DenseMap<AbstractFunctionDecl *,
