@@ -66,7 +66,7 @@ xcrun swift -apinotes -yaml-to-binary -target i386-apple-ios7.0 -o $SWIFT_EXEC/l
 
 ### iOS Simulator (64-bit)
 ```
-xcrun swift -apinotes -yaml-to-binary -target x64_64-apple-ios7.0 -o $SWIFT_EXEC/lib/swift/iphonesimulator/$MODULE.apinotesc $MODULE.apinotes
+xcrun swift -apinotes -yaml-to-binary -target x86_64-apple-ios7.0 -o $SWIFT_EXEC/lib/swift/iphonesimulator/$MODULE.apinotesc $MODULE.apinotes
 ```
 
 To add API notes for a system module `$MODULE` that does not have them yet,
