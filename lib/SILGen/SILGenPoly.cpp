@@ -1274,6 +1274,64 @@ namespace {
       tupleInit.finishInitialization(SGF);
     }
 
+    // Translate into a temporary.
+    void translateIndirect(AbstractionPattern inputOrigType,
+                           CanType inputSubstType,
+                           AbstractionPattern outputOrigType,
+                           CanType outputSubstType, ManagedValue input,
+                           SILType resultTy) {
+      auto &outputTL = SGF.getTypeLowering(resultTy);
+      auto temp = SGF.emitTemporary(Loc, outputTL);
+      translateSingleInto(inputOrigType, inputSubstType, outputOrigType,
+                          outputSubstType, input, *temp);
+      Outputs.push_back(temp->getManagedAddress());
+    }
+
+    // Translate into an owned argument.
+    void translateIntoOwned(AbstractionPattern inputOrigType,
+                            CanType inputSubstType,
+                            AbstractionPattern outputOrigType,
+                            CanType outputSubstType, ManagedValue input) {
+      auto output = translatePrimitive(inputOrigType, inputSubstType,
+                                       outputOrigType, outputSubstType, input);
+
+      // If our output is guaranteed or unowned, we need to create a copy here.
+      if (output.getOwnershipKind() != ValueOwnershipKind::Owned)
+        output = output.copyUnmanaged(SGF, Loc);
+
+      Outputs.push_back(output);
+    }
+
+    // Translate into a guaranteed argument.
+    void translateIntoGuaranteed(AbstractionPattern inputOrigType,
+                                 CanType inputSubstType,
+                                 AbstractionPattern outputOrigType,
+                                 CanType outputSubstType, ManagedValue input) {
+      auto output = translatePrimitive(inputOrigType, inputSubstType,
+                                       outputOrigType, outputSubstType, input);
+
+      // If our output value is not guaranteed, we need to:
+      //
+      // 1. Unowned - Copy + Borrow.
+      // 2. Owned - Borrow.
+      // 3. Trivial - do nothing.
+      //
+      // This means we can first transition unowned => owned and then handle
+      // the new owned value using the same code path as values that are
+      // initially owned.
+      if (output.getOwnershipKind() == ValueOwnershipKind::Unowned) {
+        assert(!output.hasCleanup());
+        output = SGF.emitManagedRetain(Loc, output.getValue());
+      }
+
+      // If the output is unowned or owned, create a borrow.
+      if (output.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
+        output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
+      }
+
+      Outputs.push_back(output);
+    }
+
     /// Translate a single value and add it as an output.
     void translateSingle(AbstractionPattern inputOrigType,
                          CanType inputSubstType,
@@ -1290,46 +1348,15 @@ namespace {
       switch (result.getConvention()) {
       // Direct translation is relatively easy.
       case ParameterConvention::Direct_Owned:
-      case ParameterConvention::Direct_Unowned: {
-        auto output =
-            translatePrimitive(inputOrigType, inputSubstType, outputOrigType,
-                               outputSubstType, input);
-        assert(output.getType() == SGF.getSILType(result));
-
-        // If our output is guaranteed, we need to create a copy here.
-        if (output.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
-          output = output.copyUnmanaged(SGF, Loc);
-        Outputs.push_back(output);
+      case ParameterConvention::Direct_Unowned:
+        translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
+                           outputSubstType, input);
+        assert(Outputs.back().getType() == SGF.getSILType(result));
         return;
-      }
-      case ParameterConvention::Direct_Guaranteed: {
-        auto output = translatePrimitive(inputOrigType, inputSubstType,
-                                         outputOrigType, outputSubstType,
-                                         input);
-        assert(output.getType() == SGF.getSILType(result));
-
-        // If our output value is not guaranteed, we need to:
-        //
-        // 1. Unowned - Copy + Borrow.
-        // 2. Owned - Borrow.
-        // 3. Trivial - do nothing.
-        //
-        // This means we can first transition unowned => owned and then handle
-        // the new owned value using the same code path as values that are
-        // initially owned.
-        if (output.getOwnershipKind() == ValueOwnershipKind::Unowned) {
-          assert(!output.hasCleanup());
-          output = SGF.emitManagedRetain(Loc, output.getValue());
-        }
-
-        if (output.getOwnershipKind() == ValueOwnershipKind::Owned) {
-          output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
-        }
-
-        Outputs.push_back(output);
+      case ParameterConvention::Direct_Guaranteed:
+        translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
+                                outputSubstType, input);
         return;
-      }
-
       case ParameterConvention::Indirect_Inout: {
         // If it's inout, we need writeback.
         llvm::errs() << "inout writeback in abstraction difference thunk "
@@ -1340,32 +1367,26 @@ namespace {
         abort();
       }
       case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_In_Constant:
+      case ParameterConvention::Indirect_In_Constant: {
+        if (SGF.silConv.useLoweredAddresses()) {
+          translateIndirect(inputOrigType, inputSubstType, outputOrigType,
+                            outputSubstType, input, SGF.getSILType(result));
+          return;
+        }
+        translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
+                           outputSubstType, input);
+        assert(Outputs.back().getType() == SGF.getSILType(result));
+        return;
+      }
       case ParameterConvention::Indirect_In_Guaranteed: {
         if (SGF.silConv.useLoweredAddresses()) {
-          // We need to translate into a temporary.
-          auto &outputTL = SGF.getTypeLowering(SGF.getSILType(result));
-          auto temp = SGF.emitTemporary(Loc, outputTL);
-          translateSingleInto(inputOrigType, inputSubstType, outputOrigType,
-                              outputSubstType, input, *temp);
-          Outputs.push_back(temp->getManagedAddress());
-        } else {
-          auto output =
-              translatePrimitive(inputOrigType, inputSubstType, outputOrigType,
-                                 outputSubstType, input);
-          assert(output.getType() == SGF.getSILType(result));
-
-          if (output.getOwnershipKind() == ValueOwnershipKind::Unowned) {
-            assert(!output.hasCleanup());
-            output = SGF.emitManagedRetain(Loc, output.getValue());
-          }
-
-          if (output.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-            output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
-          }
-
-          Outputs.push_back(output);
+          translateIndirect(inputOrigType, inputSubstType, outputOrigType,
+                            outputSubstType, input, SGF.getSILType(result));
+          return;
         }
+        translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
+                                outputSubstType, input);
+        assert(Outputs.back().getType() == SGF.getSILType(result));
         return;
       }
       case ParameterConvention::Indirect_InoutAliasable: {
