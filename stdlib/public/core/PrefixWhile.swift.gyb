@@ -175,9 +175,9 @@ public struct ${Self}<
   }
 
   public func index(after i: Index) -> Index {
-    _precondition(i != endIndex, "can't advance past endIndex")
+    _precondition(i != endIndex, "Can't advance past endIndex")
     guard case .index(let i) = i._value else {
-      _preconditionFailure("invalid index passed to index(after:)")
+      _preconditionFailure("Invalid index passed to index(after:)")
     }
     let nextIndex = _base.index(after: i)
     guard nextIndex != _base.endIndex && _predicate(_base[nextIndex]) else {
@@ -191,7 +191,7 @@ public struct ${Self}<
   public func index(before i: Index) -> Index {
     switch i._value {
     case .index(let i):
-      _precondition(i != _base.startIndex, "can't move before startIndex")
+      _precondition(i != _base.startIndex, "Can't move before startIndex")
       return LazyPrefixWhileIndex(_base.index(before: i))
     case .pastEnd:
       // Look for the position of the last element in a non-empty

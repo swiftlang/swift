@@ -232,5 +232,5 @@ func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
-  _assertionFailure("fatal error", message(), file: file, line: line, flags: 0)
+  _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
 }

@@ -659,7 +659,7 @@ public struct Set<Element : Hashable> :
   /// - Returns: A member of the set.
   @discardableResult
   public mutating func removeFirst() -> Element {
-    _precondition(!isEmpty, "can't removeFirst from an empty Set")
+    _precondition(!isEmpty, "Can't removeFirst from an empty Set")
     return remove(at: startIndex)
   }
 
@@ -2887,7 +2887,7 @@ public func _dictionaryBridgeFromObjectiveC<
 ) -> Dictionary<SwiftKey, SwiftValue> {
   let result: Dictionary<SwiftKey, SwiftValue>? =
     _dictionaryBridgeFromObjectiveCConditional(source)
-  _precondition(result != nil, "dictionary cannot be bridged from Objective-C")
+  _precondition(result != nil, "Dictionary cannot be bridged from Objective-C")
   return result!
 }
 
@@ -3636,7 +3636,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _precondition(i.offset >= 0 && i.offset < capacity)
     _precondition(
       isInitializedEntry(at: i.offset),
-      "attempting to access ${Self} elements using an invalid Index")
+      "Attempting to access ${Self} elements using an invalid Index")
     let key = self.key(at: i.offset)
 %if Self == 'Set':
     return key
@@ -3820,7 +3820,7 @@ extension _Native${Self}Buffer
 
   internal func assertingGet(_ key: Key) -> Value {
     let (i, found) = _find(key, startBucket: _bucket(key))
-    _precondition(found, "key not found")
+    _precondition(found, "Key not found")
 %if Self == 'Set':
     return self.key(at: i.offset)
 %elif Self == 'Dictionary':
@@ -4359,14 +4359,14 @@ internal struct _Cocoa${Self}Buffer : _HashBuffer {
       }
     }
     _sanityCheck(keyIndex >= 0,
-        "key was found in fast path, but not found later?")
+        "Key was found in fast path, but not found later?")
     return Index(cocoa${Self}, allKeys, keyIndex)
   }
 
   internal func assertingGet(_ i: Index) -> SequenceElement {
 %if Self == 'Set':
     let value: Value? = i.allKeys[i.currentKeyIndex]
-    _sanityCheck(value != nil, "item not found in underlying NS${Self}")
+    _sanityCheck(value != nil, "Item not found in underlying NS${Self}")
     return value!
 %elif Self == 'Dictionary':
     let key: Key = i.allKeys[i.currentKeyIndex]
@@ -4379,11 +4379,11 @@ internal struct _Cocoa${Self}Buffer : _HashBuffer {
   internal func assertingGet(_ key: Key) -> Value {
 %if Self == 'Set':
     let value: Value? = cocoa${Self}.member(key)
-    _precondition(value != nil, "member not found in underlying NS${Self}")
+    _precondition(value != nil, "Member not found in underlying NS${Self}")
     return value!
 %elif Self == 'Dictionary':
     let value: Value? = cocoa${Self}.objectFor(key)
-    _precondition(value != nil, "key not found in underlying NS${Self}")
+    _precondition(value != nil, "Key not found in underlying NS${Self}")
     return value!
 %end
   }
@@ -5423,7 +5423,7 @@ internal struct _Cocoa${Self}Index : Comparable {
   internal func successor() -> _Cocoa${Self}Index {
     // FIXME: swift-3-indexing-model: remove this method.
     _precondition(
-      currentKeyIndex < allKeys.value, "cannot increment endIndex")
+      currentKeyIndex < allKeys.value, "Cannot increment endIndex")
     return _Cocoa${Self}Index(cocoa${Self}, allKeys, currentKeyIndex + 1)
   }
 }
@@ -5556,7 +5556,7 @@ extension ${Self}.Index {
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
   #endif
     default:
-      _preconditionFailure("comparing indexes from different sets")
+      _preconditionFailure("Comparing indexes from different sets")
     }
   }
 
@@ -5578,7 +5578,7 @@ extension ${Self}.Index {
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
   #endif
     default:
-      _preconditionFailure("comparing indexes from different sets")
+      _preconditionFailure("Comparing indexes from different sets")
     }
   }
 }
@@ -5842,9 +5842,9 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
 
   public mutating func take() -> ${Self}<${TypeParameters}> {
     _precondition(_actualCount >= 0,
-      "cannot take the result twice")
+      "Cannot take the result twice")
     _precondition(_actualCount == _requestedCount,
-      "the number of members added does not match the promised count")
+      "The number of members added does not match the promised count")
 
     // Finish building the `${Self}`.
     _nativeBuffer.count = _requestedCount

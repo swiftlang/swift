@@ -1489,7 +1489,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Returns: The element that was removed.
   @_inlineable
   public mutating func _customRemoveLast() -> Element? {
-    _precondition(count > 0, "can't removeLast from an empty ${Self}")
+    _precondition(count > 0, "Can't removeLast from an empty ${Self}")
     // FIXME(performance): if `self` is uniquely referenced, we should remove
     // the element as shown below (this will deallocate the element and
     // decrease memory use).  If `self` is not uniquely referenced, the code

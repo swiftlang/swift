@@ -2340,7 +2340,7 @@ ${unsafeOperationComment(x.operator)}
 
     if overflow {
       if (_isDebugAssertConfiguration()) {
-        _preconditionFailure("overflow in unsafe${capitalize(x.name)}")
+        _preconditionFailure("Overflow in unsafe${capitalize(x.name)}")
       }
       else {
         Builtin.conditionallyUnreachable()

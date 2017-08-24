@@ -64,7 +64,7 @@ SetTraps.test("RemoveFirstFromEmpty")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "can't removeFirst from an empty Set" : "")
+    "Can't removeFirst from an empty Set" : "")
   .code {
   var s = Set<Int>()
   expectCrashLater()

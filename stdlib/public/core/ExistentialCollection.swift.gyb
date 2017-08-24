@@ -971,7 +971,7 @@ extension AnyIndex : Comparable {
   ///   - rhs: Another index to compare.
   @_inlineable
   public static func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    _precondition(lhs._typeID == rhs._typeID, "Base index types differ")
     return lhs._box._isEqual(to: rhs._box)
   }
 
@@ -985,7 +985,7 @@ extension AnyIndex : Comparable {
   ///   - rhs: Another index to compare.
   @_inlineable
   public static func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    _precondition(lhs._typeID == rhs._typeID, "Base index types differ")
     return lhs._box._isLess(than: rhs._box)
   }
 }
