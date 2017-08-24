@@ -284,7 +284,7 @@ func beginsWith3<S0: P2, S1: P2>(_ seq1: S0, _ seq2: S1) -> Bool
 // Bogus requirements
 //===----------------------------------------------------------------------===//
 func nonTypeReq<T>(_: T) where T : Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
-func badProtocolReq<T>(_: T) where T : Int {} // expected-error{{type 'T' constrained to non-protocol type 'Int'}}
+func badProtocolReq<T>(_: T) where T : Int {} // expected-error{{type 'T' constrained to non-protocol, non-class type 'Int'}}
 
 func nonTypeSameType<T>(_: T) where T == Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
 func nonTypeSameType2<T>(_: T) where Wibble == T {} // expected-error{{use of undeclared type 'Wibble'}}
