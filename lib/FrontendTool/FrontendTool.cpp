@@ -429,10 +429,32 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
       const CompilerInvocation &Invocation,
       CompilerInstance &Instance);
 
+static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
+                                   CompilerInstance &Instance,
+                                   SourceFile *SF) {
+  auto &C = Stats.getFrontendCounters();
+  auto &SM = Instance.getSourceMgr();
+  C.NumDecls += SF->Decls.size();
+  C.NumLocalTypeDecls += SF->LocalTypeDecls.size();
+  C.NumObjCMethods += SF->ObjCMethods.size();
+  C.NumInfixOperators += SF->InfixOperators.size();
+  C.NumPostfixOperators += SF->PostfixOperators.size();
+  C.NumPrefixOperators += SF->PrefixOperators.size();
+  C.NumPrecedenceGroups += SF->PrecedenceGroups.size();
+  C.NumUsedConformances += SF->getUsedConformances().size();
+
+  auto bufID = SF->getBufferID();
+  if (bufID.hasValue()) {
+    C.NumSourceLines +=
+      SM.getEntireTextForBuffer(bufID.getValue()).count('\n');
+  }
+}
+
 static void countStatsPostSema(UnifiedStatsReporter &Stats,
                                CompilerInstance& Instance) {
   auto &C = Stats.getFrontendCounters();
-  C.NumSourceBuffers = Instance.getSourceMgr().getLLVMSourceMgr().getNumBuffers();
+  auto &SM = Instance.getSourceMgr();
+  C.NumSourceBuffers = SM.getLLVMSourceMgr().getNumBuffers();
   C.NumLinkLibraries = Instance.getLinkLibraries().size();
 
   auto const &AST = Instance.getASTContext();
@@ -451,14 +473,14 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
   }
 
   if (auto *SF = Instance.getPrimarySourceFile()) {
-    C.NumDecls = SF->Decls.size();
-    C.NumLocalTypeDecls = SF->LocalTypeDecls.size();
-    C.NumObjCMethods = SF->ObjCMethods.size();
-    C.NumInfixOperators = SF->InfixOperators.size();
-    C.NumPostfixOperators = SF->PostfixOperators.size();
-    C.NumPrefixOperators = SF->PrefixOperators.size();
-    C.NumPrecedenceGroups = SF->PrecedenceGroups.size();
-    C.NumUsedConformances = SF->getUsedConformances().size();
+    countStatsOfSourceFile(Stats, Instance, SF);
+  } else if (auto *M = Instance.getMainModule()) {
+    // No primary source file, but a main module; this is WMO-mode
+    for (auto *F : M->getFiles()) {
+      if (auto *SF = dyn_cast<SourceFile>(F)) {
+        countStatsOfSourceFile(Stats, Instance, SF);
+      }
+    }
   }
 }
 
