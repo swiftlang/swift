@@ -7914,7 +7914,10 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     dyn_cast_or_null<clang::ObjCContainerDecl>(D->getClangDecl());
 
   // If not, we're importing globals-as-members into an extension.
-  if (!objcContainer) {
+  if (objcContainer) {
+    loadAllMembersOfObjcContainer(D, objcContainer);
+    return;
+  }
     // We have extension.
     auto ext = cast<ExtensionDecl>(D);
     auto nominal = ext->getExtendedType()->getAnyNominal();
@@ -7984,10 +7987,6 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
         }
       });
     }
-
-    return;
-  }
-  loadAllMembersOfObjcContainer(D, objcContainer);
 }
 
 
