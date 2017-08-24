@@ -22,17 +22,17 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 void EpilogueARCContext::initializeDataflow() {
-  for (auto &B : *F) {
+  for (auto *BB : PO->getPostOrder()) {
     // Find the exit blocks.
-    if (isInterestedFunctionExitingBlock(&B)) {
-      ExitBlocks.insert(&B);
+    if (isInterestedFunctionExitingBlock(BB)) {
+      ExitBlocks.insert(BB);
     }
-    // Allocate the storage.
-    EpilogueARCBlockStates[&B] =
-              new (BPA.Allocate()) EpilogueARCBlockState();
+
+    // Allocate state for this block.
+    IndexToStateMap.emplace_back();
   }
 
-  // Split the SILargument into local arguments to each specific basic block.
+  // Split the SILArgument into local arguments to each specific basic block.
   llvm::SmallVector<SILValue, 4> ToProcess;
   llvm::DenseSet<SILValue> Processed;
   ToProcess.push_back(Arg);
@@ -45,10 +45,11 @@ void EpilogueARCContext::initializeDataflow() {
     Processed.insert(CArg);
     if (auto *A = dyn_cast<SILPHIArgument>(CArg)) {
       // Find predecessor and break the SILArgument to predecessors.
-      for (auto X : A->getParent()->getPredecessorBlocks()) {
+      for (auto *X : A->getParent()->getPredecessorBlocks()) {
         // Try to find the predecessor edge-value.
         SILValue IA = A->getIncomingValue(X);
-        EpilogueARCBlockStates[X]->LocalArg = IA;
+        getState(X).LocalArg = IA;
+
         // Maybe the edge value is another SILArgument.
         ToProcess.push_back(IA);
       }
@@ -63,15 +64,15 @@ bool EpilogueARCContext::convergeDataflow() {
     Changed = false;
     // Iterate until the data flow converges.
     for (SILBasicBlock *B : PO->getPostOrder()) {
-      auto BS = EpilogueARCBlockStates[B];
+      auto &BS = getState(B);
       // Merge in all the successors.
       bool BBSetOut = false;
       if (!B->succ_empty()) {
         auto Iter = B->succ_begin();
-        BBSetOut = EpilogueARCBlockStates[*Iter]->BBSetIn;
+        BBSetOut = getState(*Iter).BBSetIn;
         Iter = std::next(Iter);
         for (auto E = B->succ_end(); Iter != E; ++Iter) {
-          BBSetOut &= EpilogueARCBlockStates[*Iter]->BBSetIn;
+          BBSetOut &= getState(*Iter).BBSetIn;
         }
       } else if (isExitBlock(B)) {
         // We set the BBSetOut for exit blocks.
@@ -99,8 +100,8 @@ bool EpilogueARCContext::convergeDataflow() {
       }
 
       // Update BBSetIn.
-      Changed |= (BS->BBSetIn != BBSetOut);
-      BS->BBSetIn = BBSetOut;
+      Changed |= (BS.BBSetIn != BBSetOut);
+      BS.BBSetIn = BBSetOut;
     }
   } while (Changed);
   return true;
@@ -121,10 +122,10 @@ bool EpilogueARCContext::computeEpilogueARC() {
       // not have an epilogue ARC instruction, which means the data flow has 
       // failed.
       auto Iter = B->succ_begin();
-      auto Base = EpilogueARCBlockStates[*Iter]->BBSetIn;
+      auto Base = getState(*Iter).BBSetIn;
       Iter = std::next(Iter);
       for (auto E = B->succ_end(); Iter != E; ++Iter) {
-        if (EpilogueARCBlockStates[*Iter]->BBSetIn != Base)
+        if (getState(*Iter).BBSetIn != Base)
           return false;
       }
       BBSetOut = Base;
