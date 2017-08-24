@@ -7969,32 +7969,32 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(Decl *D, uint64_
 }
 
 void ClangImporter::Implementation::addMemberAndAlternatesToExtension(clang::NamedDecl *decl, ImportedName newName, ImportNameVersion nameVersion, ExtensionDecl *ext) {
-      // Quickly check the context and bail out if it obviously doesn't
-      // belong here.
-      if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
-        if (importDC->isTranslationUnit())
-          return;
-      
-      // Then try to import the decl under the specified name.
-      auto *member = importDecl(decl, nameVersion);
-      if (!member) return;
-      
-      // Find the member that will land in an extension context.
-      while (!isa<ExtensionDecl>(member->getDeclContext())) {
-        auto nominal = dyn_cast<NominalTypeDecl>(member->getDeclContext());
-        if (!nominal) return;
-        
-        member = nominal;
-        if (member->hasClangNode()) return;
-      }
-      
-      if (member->getDeclContext() != ext) return;
-      ext->addMember(member);
-      
-      for (auto alternate : getAlternateDecls(member)) {
-        if (alternate->getDeclContext() == ext)
-          ext->addMember(alternate);
-      }
+  // Quickly check the context and bail out if it obviously doesn't
+  // belong here.
+  if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
+    if (importDC->isTranslationUnit())
+      return;
+  
+  // Then try to import the decl under the specified name.
+  auto *member = importDecl(decl, nameVersion);
+  if (!member) return;
+  
+  // Find the member that will land in an extension context.
+  while (!isa<ExtensionDecl>(member->getDeclContext())) {
+    auto nominal = dyn_cast<NominalTypeDecl>(member->getDeclContext());
+    if (!nominal) return;
+    
+    member = nominal;
+    if (member->hasClangNode()) return;
+  }
+  
+  if (member->getDeclContext() != ext) return;
+  ext->addMember(member);
+  
+  for (auto alternate : getAlternateDecls(member)) {
+    if (alternate->getDeclContext() == ext)
+      ext->addMember(alternate);
+  }
 }
 
 
