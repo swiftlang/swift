@@ -7921,45 +7921,50 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   loadAllMembersIntoExtension(D, extra);
 }
 
-void ClangImporter::Implementation::loadAllMembersIntoExtension(Decl *D, uint64_t extra) {
+void ClangImporter::Implementation::loadAllMembersIntoExtension(
+    Decl *D, uint64_t extra) {
   // We have extension.
   auto ext = cast<ExtensionDecl>(D);
   auto nominal = ext->getExtendedType()->getAnyNominal();
-  
+
   // The submodule of the extension is encoded in the extra data.
-  clang::Module *submodule = reinterpret_cast<clang::Module *>(
-                                                               static_cast<uintptr_t>(extra));
-  
+  clang::Module *submodule =
+      reinterpret_cast<clang::Module *>(static_cast<uintptr_t>(extra));
+
   // Find the lookup table.
   auto topLevelModule = submodule;
   if (topLevelModule)
     topLevelModule = topLevelModule->getTopLevelModule();
   auto table = findLookupTable(topLevelModule);
-  if (!table) return;
-  
-  PrettyStackTraceStringAction trace("loading import-as-members from",
-                                     topLevelModule ? topLevelModule->getTopLevelModuleName() : "(bridging header)");
+  if (!table)
+    return;
+
+  PrettyStackTraceStringAction trace(
+      "loading import-as-members from",
+      topLevelModule ? topLevelModule->getTopLevelModuleName()
+                     : "(bridging header)");
   PrettyStackTraceDecl trace2("...for", nominal);
-  
+
   // Dig out the effective Clang context for this nominal type.
   auto effectiveClangContext = getEffectiveClangContext(nominal);
-  if (!effectiveClangContext) return;
-  
+  if (!effectiveClangContext)
+    return;
+
   // Get ready to actually load the members.
   ImportingEntityRAII Importing(*this);
-  
+
   // Load the members.
   for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
     auto decl = entry.get<clang::NamedDecl *>();
-    
+
     // Only include members in the same submodule as this extension.
     if (getClangSubmoduleForDecl(decl) != submodule)
       continue;
-    
-    forEachDistinctName(decl, [&](ImportedName newName,
-                                  ImportNameVersion nameVersion) {
-      addMemberAndAlternatesToExtension(decl, newName, nameVersion, ext);
-    });
+
+    forEachDistinctName(
+        decl, [&](ImportedName newName, ImportNameVersion nameVersion) {
+          addMemberAndAlternatesToExtension(decl, newName, nameVersion, ext);
+        });
   }
 }
 
@@ -7967,35 +7972,40 @@ static Decl *findMemberThatWillLandInAnExtensionContext(Decl *member) {
   Decl *result = member;
   while (!isa<ExtensionDecl>(result->getDeclContext())) {
     auto nominal = dyn_cast<NominalTypeDecl>(result->getDeclContext());
-    if (!nominal) return nullptr;
-    
+    if (!nominal)
+      return nullptr;
+
     result = nominal;
-    if (result->hasClangNode()) return nullptr;
+    if (result->hasClangNode())
+      return nullptr;
   }
   return result;
 }
 
-void ClangImporter::Implementation::addMemberAndAlternatesToExtension(clang::NamedDecl *decl, ImportedName newName, ImportNameVersion nameVersion, ExtensionDecl *ext) {
+void ClangImporter::Implementation::addMemberAndAlternatesToExtension(
+    clang::NamedDecl *decl, ImportedName newName, ImportNameVersion nameVersion,
+    ExtensionDecl *ext) {
   // Quickly check the context and bail out if it obviously doesn't
   // belong here.
   if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
     if (importDC->isTranslationUnit())
       return;
-  
+
   // Then try to import the decl under the specified name.
   auto *member = importDecl(decl, nameVersion);
-  if (!member) return;
-  
+  if (!member)
+    return;
+
   member = findMemberThatWillLandInAnExtensionContext(member);
-  if (!member  ||  member->getDeclContext() != ext) return;
+  if (!member || member->getDeclContext() != ext)
+    return;
   ext->addMember(member);
-  
+
   for (auto alternate : getAlternateDecls(member)) {
     if (alternate->getDeclContext() == ext)
       ext->addMember(alternate);
   }
 }
-
 
 static ExtensionDecl *
 figureOutTheDeclarationContextToImportInto(Decl *D, DeclContext *&DC,
@@ -8011,14 +8021,13 @@ figureOutTheDeclarationContextToImportInto(Decl *D, DeclContext *&DC,
   return ext;
 }
 
-
 static void loadMembersOfBaseImportedFromClang(ExtensionDecl *ext) {
   const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
   auto *clangBase = base->getClangDecl();
   if (!clangBase)
     return;
   base->loadAllMembers();
-  
+
   // Sanity check: make sure we don't jump over to a category /while/
   // loading the original class's members. Right now we only check if this
   // happens on the first member.
@@ -8027,9 +8036,8 @@ static void loadMembersOfBaseImportedFromClang(ExtensionDecl *ext) {
            "can't load extension members before base has finished");
 }
 
-
 void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
-                                                                  Decl *D, const clang::ObjCContainerDecl *objcContainer) {
+    Decl *D, const clang::ObjCContainerDecl *objcContainer) {
   clang::PrettyStackTraceDecl trace(objcContainer, clang::SourceLocation(),
                                     Instance->getSourceManager(),
                                     "loading members for");
@@ -8037,8 +8045,8 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
   DeclContext *DC;
   IterableDeclContext *IDC;
   if (ExtensionDecl *ext =
-      figureOutTheDeclarationContextToImportInto(D, DC, IDC)) {
-   // If the base is also imported from Clang, load its members first.
+          figureOutTheDeclarationContextToImportInto(D, DC, IDC)) {
+    // If the base is also imported from Clang, load its members first.
     loadMembersOfBaseImportedFromClang(ext);
   }
 
@@ -8055,36 +8063,34 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
 }
 
 void ClangImporter::Implementation::insertMembersAndAlternates(
-                                                               const clang::NamedDecl *nd, SmallVectorImpl<Decl *> &members) {
+    const clang::NamedDecl *nd, SmallVectorImpl<Decl *> &members) {
   llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
   forEachDistinctName(
-                      nd, [&](ImportedName name, ImportNameVersion nameVersion) {
-                        auto member = importDecl(nd, nameVersion);
-                        if (!member)
-                          return;
-                        
-                        // If there are alternate declarations for this member, add them.
-                        for (auto alternate : getAlternateDecls(member)) {
-                          if (alternate->getDeclContext() == member->getDeclContext() &&
-                              knownAlternateMembers.insert(alternate).second) {
-                            members.push_back(alternate);
-                          }
-                        }
-                        
-                        // If this declaration shouldn't be visible, don't add it to
-                        // the list.
-                        if (shouldSuppressDeclImport(nd))
-                          return;
-                        
-                        members.push_back(member);
-                      });
+      nd, [&](ImportedName name, ImportNameVersion nameVersion) {
+        auto member = importDecl(nd, nameVersion);
+        if (!member)
+          return;
+
+        // If there are alternate declarations for this member, add them.
+        for (auto alternate : getAlternateDecls(member)) {
+          if (alternate->getDeclContext() == member->getDeclContext() &&
+              knownAlternateMembers.insert(alternate).second) {
+            members.push_back(alternate);
+          }
+        }
+
+        // If this declaration shouldn't be visible, don't add it to
+        // the list.
+        if (shouldSuppressDeclImport(nd))
+          return;
+
+        members.push_back(member);
+      });
 }
 
-
 void ClangImporter::Implementation::collectMembersToAdd(
-                                                        const clang::ObjCContainerDecl *objcContainer,
-                                                        Decl *D, DeclContext *DC,
-                                                        SmallVectorImpl<Decl *> &members) {
+    const clang::ObjCContainerDecl *objcContainer, Decl *D, DeclContext *DC,
+    SmallVectorImpl<Decl *> &members) {
   for (const clang::Decl *m : objcContainer->decls()) {
     auto nd = dyn_cast<clang::NamedDecl>(m);
     if (nd && nd == nd->getCanonicalDecl() &&
