@@ -45,6 +45,45 @@ namespace swift {
       CompilationTimersEnabled = State::Enabled;
     }
   };
+
+  /// A SharedTimer for recursive routines.
+  /// Declare as a static, and use as below:
+  /// void example() {
+  ///     static RecursiveSharedTimer timer("lookupDirect");
+  ///     auto guard = RecursiveSharedTimer::Guard(timer);
+  ///     (void)guard;
+  ///   ...
+  /// }
+
+  class RecursiveSharedTimer {
+  private:
+    int recursionCount = 0;
+    const StringRef name;
+    llvm::Optional<SharedTimer> timer;
+
+    void enterRecursiveFunction() {
+      assert(recursionCount >= 0  &&  "too many exits");
+      if (recursionCount++ == 0)
+        timer.emplace(name);
+    }
+    void exitRecursiveFunction() {
+      assert(recursionCount > 0  &&  "too many exits");
+      if (--recursionCount == 0)
+        timer.reset();
+    }
+
+  public:
+    RecursiveSharedTimer(StringRef name) : name(name) {}
+
+    struct Guard {
+      RecursiveSharedTimer &recursiveTimer;
+      Guard &operator=(Guard &) = delete;
+      Guard(RecursiveSharedTimer &rst) : recursiveTimer(rst) {
+        recursiveTimer.enterRecursiveFunction();
+      }
+      ~Guard() { recursiveTimer.exitRecursiveFunction(); }
+    };
+  };
 } // end namespace swift
 
 #endif // SWIFT_BASIC_TIMER_H
