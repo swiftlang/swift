@@ -107,6 +107,9 @@ ERROR(could_not_use_type_member_on_protocol_metatype,none,
 ERROR(could_not_use_instance_member_on_type,none,
       "instance member %1 cannot be used on type %0",
       (Type, DeclName))
+ERROR(could_not_use_instance_member_of_outer_type_on_nested_type,none,
+      "instance member %1 of type %0 cannot be used on instance of nested type %2",
+      (Type, DeclName, Type))
 ERROR(could_not_use_member_on_existential,none,
       "member %1 cannot be used on value of protocol type %0; use a generic"
       " constraint instead",

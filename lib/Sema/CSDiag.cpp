@@ -2698,7 +2698,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
                instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
-    case MemberLookupResult::UR_InstanceMemberOnType:
+    case MemberLookupResult::UR_InstanceMemberOnType: {
       // If the base is an implicit self type reference, and we're in a
       // an initializer, then the user wrote something like:
       //
@@ -2744,11 +2744,24 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
           return;
         }
       }
-        
+
+      // Check whether the instance member is declared on parent context and if so
+      // provide more specialized message
+      auto memberTypeContext = member->getDeclContext()->getInnermostTypeContext();
+      auto currentTypeContext = CS.DC->getInnermostTypeContext();
+      if (memberTypeContext->getSyntacticDepth() < currentTypeContext->getSyntacticDepth()) {
+        diagnose(loc, diag::could_not_use_instance_member_of_outer_type_on_nested_type,
+                 memberTypeContext->getDeclaredTypeOfContext(), memberName,
+                 currentTypeContext->getDeclaredTypeOfContext()
+         ).highlight(baseRange).highlight(nameLoc.getSourceRange());
+        return;
+      }
+
       diagnose(loc, diag::could_not_use_instance_member_on_type,
                instanceTy, memberName)
-        .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
+    }
 
     case MemberLookupResult::UR_TypeMemberOnInstance:
       diagnoseTypeMemberOnInstanceLookup(baseObjTy, baseExpr,
