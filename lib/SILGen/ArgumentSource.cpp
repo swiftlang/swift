@@ -256,6 +256,27 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF, Initialization *dest) && {
   llvm_unreachable("bad kind");
 }
 
+ArgumentSource ArgumentSource::borrow(SILGenFunction &SGF) const & {
+  switch (StoredKind) {
+  case Kind::Invalid:
+    llvm_unreachable("argument source is invalid");
+  case Kind::LValue:
+    llvm_unreachable("cannot borrow an l-value");
+  case Kind::RValue: {
+    auto loc = getKnownRValueLocation();
+    return ArgumentSource(loc, asKnownRValue().borrow(SGF, loc));
+  }
+  case Kind::Expr: {
+    llvm_unreachable("cannot borrow an expression");
+  }
+  case Kind::Tuple: {
+    // FIXME: We can if we check the sub argument sources.
+    llvm_unreachable("cannot borrow a tuple");
+  }
+  }
+  llvm_unreachable("bad kind");
+}
+
 ManagedValue ArgumentSource::materialize(SILGenFunction &SGF) && {
   if (isRValue()) {
     auto loc = getKnownRValueLocation();
