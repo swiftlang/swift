@@ -52,6 +52,7 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "MetadataLayout.h"
+#include "ProtocolInfo.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "StructMetadataVisitor.h"
@@ -5208,7 +5209,7 @@ namespace {
       addObjCCompatibilityTables();
       addSize();
       addFlags();
-      addDefaultWitnessTable();
+      addRequirements();
 
       B.suggestType(IGM.ProtocolDescriptorStructTy);
     }
@@ -5295,24 +5296,131 @@ namespace {
       B.addInt32(flags.getIntValue());
     }
 
-    void addDefaultWitnessTable() {
-      // The runtime ignores these fields if the IsResilient flag is not set.
-      if (DefaultWitnesses) {
-        B.addInt16(DefaultWitnesses->getMinimumWitnessTableSize());
-        B.addInt16(DefaultWitnesses->getDefaultWitnessTableSize());
+    void addRequirements() {
+      auto &pi = IGM.getProtocolInfo(Protocol);
 
-        for (auto entry : DefaultWitnesses->getResilientDefaultEntries()) {
-          auto *witness = IGM.getAddrOfSILFunction(entry.getWitness(),
-                                                   NotForDefinition);
-          B.addRelativeAddress(witness);
-        }
-      } else {
-        B.addInt16(0);
-        B.addInt16(0);
+      B.addInt16(DefaultWitnesses
+                   ? DefaultWitnesses->getMinimumWitnessTableSize()
+                   : pi.getNumWitnesses());
+      B.addInt16(pi.getNumWitnesses());
 
-        // Unused padding
-        B.addInt32(0);
+      // If there are no entries, just add a null reference and return.
+      if (pi.getNumWitnesses() == 0) {
+        B.addInt(IGM.RelativeAddressTy, 0);
+        return;
       }
+
+#ifndef NDEBUG
+      unsigned numDefaultWitnesses = 0;
+#endif
+
+      ConstantInitBuilder reqtBuilder(IGM);
+      auto reqtsArray = reqtBuilder.beginArray(IGM.ProtocolRequirementStructTy);
+      for (auto &entry : pi.getWitnessEntries()) {
+        auto reqt = reqtsArray.beginStruct(IGM.ProtocolRequirementStructTy);
+
+        auto info = getRequirementInfo(entry);
+
+        // Flags.
+        reqt.addInt32(info.Flags.getIntValue());
+
+        // Default implementation.
+        reqt.addRelativeAddressOrNull(info.DefaultImpl);
+#ifndef NDEBUG
+        assert((info.DefaultImpl || numDefaultWitnesses == 0) &&
+               "adding mandatory witness after defaulted witness");
+        if (info.DefaultImpl) numDefaultWitnesses++;
+#endif
+
+        reqt.finishAndAddTo(reqtsArray);
+      }
+
+#ifndef NDEBUG
+      if (DefaultWitnesses) {
+        assert(numDefaultWitnesses
+                 == DefaultWitnesses->getDefaultWitnessTableSize() &&
+               "didn't use all the default witnesses!");
+      } else {
+        assert(numDefaultWitnesses == 0);
+      }
+#endif
+
+      auto global =
+        reqtsArray.finishAndCreateGlobal("", Alignment(4), /*constant*/ true,
+                                         llvm::GlobalVariable::InternalLinkage);
+      global->setUnnamedAddr(llvm::GlobalVariable::UnnamedAddr::Global);
+      B.addRelativeOffset(IGM.Int32Ty, global);
+    }
+
+    struct RequirementInfo {
+      ProtocolRequirementFlags Flags;
+      llvm::Constant *DefaultImpl;
+    };
+
+    /// Build the information which will go into a ProtocolRequirement entry.
+    RequirementInfo getRequirementInfo(const WitnessTableEntry &entry) {
+      using Flags = ProtocolRequirementFlags;
+      if (entry.isBase()) {
+        assert(entry.isOutOfLineBase());
+        auto flags = Flags(Flags::Kind::BaseProtocol);
+        return { flags, nullptr };
+      }
+
+      if (entry.isAssociatedType()) {
+        auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
+        return { flags, nullptr };
+      }
+
+      if (entry.isAssociatedConformance()) {
+        auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
+        return { flags, nullptr };
+      }
+
+      assert(entry.isFunction());
+      auto func = entry.getFunction();
+
+      // Classify the function.
+      auto kind = [&] {
+        if (isa<ConstructorDecl>(func))
+          return Flags::Kind::Init;
+
+        switch (cast<FuncDecl>(func)->getAccessorKind()) {
+        case AccessorKind::NotAccessor:
+          return (func->isStatic()
+                    ? Flags::Kind::StaticMethod
+                    : Flags::Kind::InstanceMethod);
+        case AccessorKind::IsGetter:
+          return Flags::Kind::Getter;
+        case AccessorKind::IsSetter:
+          return Flags::Kind::Setter;
+        case AccessorKind::IsMaterializeForSet:
+          return Flags::Kind::MaterializeForSet;
+        case AccessorKind::IsWillSet:
+        case AccessorKind::IsDidSet:
+        case AccessorKind::IsAddressor:
+        case AccessorKind::IsMutableAddressor:
+          llvm_unreachable("these accessors never appear in protocols");
+        }
+        llvm_unreachable("bad kind");
+      }();
+      auto flags = Flags(kind);
+
+      // Look for a default witness.
+      llvm::Constant *defaultImpl = findDefaultWitness(func);
+
+      return { flags, defaultImpl };
+    }
+
+    llvm::Constant *findDefaultWitness(AbstractFunctionDecl *func) {
+      if (!DefaultWitnesses) return nullptr;
+
+      for (auto &entry : DefaultWitnesses->getResilientDefaultEntries()) {
+        if (entry.getRequirement().getDecl() != func)
+          continue;
+        return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
+      }
+
+      return nullptr;
     }
   };
 } // end anonymous namespace
