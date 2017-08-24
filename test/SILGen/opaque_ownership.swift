@@ -56,12 +56,14 @@ public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
 }
 
+#if os(OSX)
 // Test open_existential_value used in a conversion context.
 // ---
 // 
 public func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   return any as AnyObject
 }
+#endif
 
 public enum Optional<Wrapped> {
   case none
