@@ -70,7 +70,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   FILE *cmdline = fopen("/proc/self/cmdline", "rb");
   if (!cmdline) {
     swift::fatalError(0,
-            "fatal error: Unable to open interface to '/proc/self/cmdline'.\n");
+            "Fatal error: Unable to open interface to '/proc/self/cmdline'.\n");
   }
   char *arg = nullptr;
   size_t size = 0;
@@ -137,7 +137,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
     }
   }
   if (!argPtr)
-    swift::fatalError(0, "fatal error: could not retrieve commandline "
+    swift::fatalError(0, "Fatal error: Could not retrieve commandline "
                          "arguments: sysctl: %s.\n", strerror(errno));
 
   char *curPtr = argPtr;
@@ -164,7 +164,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   }
   
   swift::fatalError(0,
-      "fatal error: Command line arguments not supported on this platform.\n");
+      "Fatal error: Command line arguments not supported on this platform.\n");
 }
 #endif
 

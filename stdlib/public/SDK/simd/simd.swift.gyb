@@ -111,16 +111,16 @@ public struct ${vectype} {
   public subscript(index: Int) -> ${scalar} {
     @_transparent
     get {
-      _precondition(index >= 0, "vector index out of range")
-      _precondition(index < ${count}, "vector index out of range")
+      _precondition(index >= 0, "Vector index out of range")
+      _precondition(index < ${count}, "Vector index out of range")
       let elt = Builtin.${extractelement}(_vector,
         Int32(index)._value)
       return ${scalar}(_bits: elt)
     }
     @_transparent
     set(value) {
-      _precondition(index >= 0, "vector index out of range")
-      _precondition(index < ${count}, "vector index out of range")
+      _precondition(index >= 0, "Vector index out of range")
+      _precondition(index < ${count}, "Vector index out of range")
       _vector = Builtin.${insertelement}(_vector,
         value._value,
         Int32(index)._value)
@@ -279,55 +279,55 @@ extension ${vectype} {
   @available(*, unavailable, renamed: "&+",
              message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
   public static func +(x: ${vectype}, y: ${vectype}) -> ${vectype} {
-    fatalError("unavailable function cannot be called")
+    fatalError("Unavailable function cannot be called")
   }
 
   @available(*, unavailable, renamed: "&-",
              message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
   public static func -(x: ${vectype}, y: ${vectype}) -> ${vectype} {
-    fatalError("unavailable function cannot be called")
+    fatalError("Unavailable function cannot be called")
   }
 
   @available(*, unavailable, renamed: "&*",
              message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
   public static func *(x: ${vectype}, y: ${vectype}) -> ${vectype} {
-    fatalError("unavailable function cannot be called")
+    fatalError("Unavailable function cannot be called")
   }
 
   @available(*, unavailable, renamed: "&*",
              message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
   public static func *(x: ${vectype}, y: ${scalar}) -> ${vectype} {
-    fatalError("unavailable function cannot be called")
+    fatalError("Unavailable function cannot be called")
   }
 
   @available(*, unavailable, renamed: "&*",
              message: "integer vector types do not support checked arithmetic; use the wrapping operations instead")
   public static func *(x: ${scalar}, y: ${vectype}) -> ${vectype} {
-    fatalError("unavailable function cannot be called")
+    fatalError("Unavailable function cannot be called")
   }
 
   @available(*, unavailable,
              message: "integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &+ y' instead")
   public static func +=(x: inout ${vectype}, y: ${vectype}) {
-    fatalError("unavailable function cannot be called")
+    fatalError("Unavailable function cannot be called")
   }
 
   @available(*, unavailable,
              message: "integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &- y' instead")
   public static func -=(x: inout ${vectype}, y: ${vectype}) {
-    fatalError("unavailable function cannot be called")
+    fatalError("Unavailable function cannot be called")
   }
 
   @available(*, unavailable,
              message: "integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
   public static func *=(x: inout ${vectype}, y: ${vectype}) {
-    fatalError("unavailable function cannot be called")
+    fatalError("Unavailable function cannot be called")
   }
 
   @available(*, unavailable,
              message: "integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
   public static func *=(x: inout ${vectype}, y: ${scalar}) {
-    fatalError("unavailable function cannot be called")
+    fatalError("Unavailable function cannot be called")
   }
 %  end
 }
