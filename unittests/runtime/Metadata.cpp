@@ -948,23 +948,29 @@ static void witnessTableInstantiator(WitnessTable *instantiatedTable,
   ((void **) instantiatedTable)[2] = (void *) 345;
 }
 
+static void fakeDefaultWitness1() {}
+static void fakeDefaultWitness2() {}
+
 // A mock protocol descriptor with some default witnesses at the end.
 //
 // Note: It is not standards-compliant to compare function pointers for
 // equality, so we just use fake addresses instead.
 struct TestProtocol {
   ProtocolDescriptor descriptor;
-  const void *witnesses[2] = {
-    (void *) 996633,
-    (void *) 336699
-  };
+  int32_t witnesses[2] = {0, 0};
 
   TestProtocol()
     : descriptor("TestProtocol",
                  nullptr,
                  ProtocolDescriptorFlags().withResilient(true)) {
     descriptor.MinimumWitnessTableSizeInWords = 3;
-    descriptor.DefaultWitnessTableSizeInWords = 2;
+    descriptor.NumDefaultWitnessTableEntries = 2;
+    initializeRelativePointer(
+      (int32_t *) &descriptor.DefaultWitnessTable[0],
+      fakeDefaultWitness1);
+    initializeRelativePointer(
+      (int32_t *) &descriptor.DefaultWitnessTable[1],
+      fakeDefaultWitness2);
   }
 };
 
@@ -987,10 +993,10 @@ const void *witnesses[] = {
 TEST(WitnessTableTest, getGenericWitnessTable) {
   EXPECT_EQ(sizeof(GenericWitnessTableStorage), sizeof(GenericWitnessTable));
 
-  EXPECT_EQ(testProtocol.descriptor.getDefaultWitnesses()[0],
-            (void *) 996633);
-  EXPECT_EQ(testProtocol.descriptor.getDefaultWitnesses()[1],
-            (void *) 336699);
+  EXPECT_EQ(testProtocol.descriptor.getDefaultWitness(0),
+            (void *) fakeDefaultWitness1);
+  EXPECT_EQ(testProtocol.descriptor.getDefaultWitness(1),
+            (void *) fakeDefaultWitness2);
 
   // Conformance provides all requirements, and we don't have an
   // instantiator, so we can just return the pattern.
@@ -1070,7 +1076,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
         EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
         EXPECT_EQ(((void **) instantiatedTable)[2], (void *) 345);
         EXPECT_EQ(((void **) instantiatedTable)[3], (void *) 456);
-        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) 336699);
+        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) fakeDefaultWitness2);
 
         return instantiatedTable;
       });
@@ -1100,8 +1106,8 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
         EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
         EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
         EXPECT_EQ(((void **) instantiatedTable)[2], (void *) 345);
-        EXPECT_EQ(((void **) instantiatedTable)[3], (void *) 996633);
-        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) 336699);
+        EXPECT_EQ(((void **) instantiatedTable)[3], (void *) fakeDefaultWitness1);
+        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) fakeDefaultWitness2);
 
         return instantiatedTable;
       });
