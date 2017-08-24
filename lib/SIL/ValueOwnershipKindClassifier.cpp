@@ -132,7 +132,25 @@ CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
+// OpenExistentialValue opens the boxed value inside an existential
+// CoW box. The semantics of an existential CoW box implies that we
+// can only consume the projected value inside the box if the box is
+// unique. Since we do not know in general if the box is unique
+// without additional work, in SIL we require opened archetypes to
+// be borrowed sub-objects of the parent CoW box.
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, OpenExistentialValue)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
+
+// unchecked_bitwise_cast is a bitwise copy. It produces a trivial or unowned
+// result.
+//
+// If the operand is nontrivial and the result is trivial, then it is the
+// programmer's responsibility to use Builtin.fixLifetime.
+//
+// If both the operand and the result are nontrivial, then either the types must
+// be compatible so that TBAA doesn't allow the destroy to be hoisted above uses
+// of the cast, or the programmer must use Builtin.fixLifetime.
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Unowned, UncheckedBitwiseCast)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 // These are instructions that do not have any result, so we should never reach
@@ -269,7 +287,6 @@ FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
-FORWARDING_OWNERSHIP_INST(OpenExistentialValue)
 FORWARDING_OWNERSHIP_INST(OpenExistentialBoxValue)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(SelectValue)
@@ -288,34 +305,6 @@ ValueOwnershipKindClassifier::visitSelectEnumInst(SelectEnumInst *SEI) {
   // We handle this specially, since a select enum forwards only its case
   // values. We drop the first element since that is the condition element.
   return visitForwardingInst(SEI, SEI->getAllOperands().drop_front());
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitUncheckedBitwiseCastInst(
-    UncheckedBitwiseCastInst *UBCI) {
-  ValueOwnershipKind OpOwnership = UBCI->getOperand().getOwnershipKind();
-  bool ResultTypeIsTrivial = UBCI->getType().isTrivial(UBCI->getModule());
-
-  // First check if our operand has a trivial value ownership kind...
-  if (OpOwnership == ValueOwnershipKind::Trivial) {
-    // If we do have a trivial value ownership kind, see if our result type is
-    // trivial or non-trivial. If it is trivial, then we have trivial
-    // ownership. Otherwise, we have unowned ownership since from an ownership
-    // perspective, the value has instantaneously come into existence and
-    // nothing has taken ownership of it.
-    if (ResultTypeIsTrivial) {
-      return ValueOwnershipKind::Trivial;
-    }
-    return ValueOwnershipKind::Unowned;
-  }
-
-  // If our operand has non-trivial ownership, but our result does, then of
-  // course the result has trivial ownership.
-  if (ResultTypeIsTrivial) {
-    return ValueOwnershipKind::Trivial;
-  }
-
-  // Otherwise, we forward our ownership.
-  return visitForwardingInst(UBCI);
 }
 
 ValueOwnershipKind

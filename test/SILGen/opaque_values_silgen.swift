@@ -129,14 +129,13 @@ enum AddressOnlyEnum {
 // ---
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2 {
 // CHECK: bb0([[ARG0:%.*]] : $P2, [[ARG1:%.*]] : $@callee_owned (@in P) -> TrivialStruct):
-// CHECK:   [[OPENED_ARG:%.*]] = open_existential_value [[ARG0]] : $P2 to $@opened({{.*}}) P2
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG0]] : $P2
+// CHECK:   [[OPENED_ARG:%.*]] = open_existential_value [[BORROWED_ARG]] : $P2 to $@opened({{.*}}) P2
 // CHECK:   [[COPIED_VAL:%.*]] = copy_value [[OPENED_ARG]]
 // CHECK:   [[INIT_P:%.*]] = init_existential_value [[COPIED_VAL]] : $@opened({{.*}}) P2, $@opened({{.*}}) P2, $P
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[INIT_P]]
-// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_ARG]]) : $@callee_owned (@in P) -> TrivialStruct
+// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[INIT_P]]) : $@callee_owned (@in P) -> TrivialStruct
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[INIT_P]] : $P, $P
-// CHECK:   destroy_value [[COPIED_VAL]]
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG0]] : $P2, $P2
 // CHECK:   destroy_value [[ARG0]]
 // CHECK:   return [[RETVAL]] : $P2
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR'
@@ -154,11 +153,8 @@ enum AddressOnlyEnum {
 // CHECK:   [[ENUM_S:%.*]] = enum $Optional<P>, #Optional.some!enumelt.1, [[INIT_S]] : $P
 // CHECK:   br bb3([[ENUM_S]] : $Optional<P>)
 // CHECK: bb3([[OPT_S:%.*]] : $Optional<P>):
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[OPT_S]]
-// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_ARG]]) : $@callee_owned (@in Optional<P>) -> TrivialStruct
+// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[OPT_S]]) : $@callee_owned (@in Optional<P>) -> TrivialStruct
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[OPT_S]] : $Optional<P>, $Optional<P>
-// CHECK:   destroy_value [[OPT_S]]
 // CHECK:   return [[RETVAL]] : $P2
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pSgAA13TrivialStructVIxid_AESgAA2P2_pIxyr_TR'
 
@@ -456,9 +452,11 @@ func s190___return_foo_var() -> Foo {
 // CHECK:   [[GLOBAL:%.*]] = global_addr {{.*}} : $*Foo
 // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*Foo
 // CHECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[READ]] : $*Foo
-// CHECK:   [[OPEN_VAR:%.*]] = open_existential_value [[LOAD_GLOBAL]] : $Foo
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[LOAD_GLOBAL]] : $Foo
+// CHECK:   [[OPEN_VAR:%.*]] = open_existential_value [[BORROW]] : $Foo
 // CHECK:   [[WITNESS:%.*]] = witness_method $@opened
 // CHECK:   apply [[WITNESS]]
+// CHECK:   end_borrow [[BORROW]]
 // CHECK:   destroy_value [[LOAD_GLOBAL]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s200______use_foo_varyyF'
@@ -1059,15 +1057,16 @@ protocol ConvertibleToP {
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s500_______getAnyHashAA1P_pSgAA14ConvertibleToP_pSgF : $@convention(thin) (@in Optional<ConvertibleToP>) -> @out Optional<P> {
 // CHECK: bb0(%0 : $Optional<ConvertibleToP>):
-// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Optional<ConvertibleToP>
-// CHECK: [[COPY:%.*]] = copy_value [[BORROW]] : $Optional<ConvertibleToP>
+// CHECK: [[BORROW_ARG:%.*]] = begin_borrow %0 : $Optional<ConvertibleToP>
+// CHECK: [[COPY:%.*]] = copy_value [[BORROW_ARG]] : $Optional<ConvertibleToP>
 // CHECK: [[DATA:%.*]] = unchecked_enum_data [[COPY]] : $Optional<ConvertibleToP>, #Optional.some!enumelt.1
-// CHECK: [[VAL:%.*]] = open_existential_value [[DATA]] : $ConvertibleToP to $@opened("{{.*}}") ConvertibleToP
-// CHECK: [[WT:%.*]] = witness_method $@opened("{{.*}}") ConvertibleToP, #ConvertibleToP.asP!1 : <Self where Self : ConvertibleToP> (Self) -> () -> P, %12 : $@opened("{{.*}}") ConvertibleToP : $@convention(witness_method) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
-// CHECK: [[AS_P:%.*]] = apply [[WT]]<@opened("{{.*}}") ConvertibleToP>(%12) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
+// CHECK: [[BORROW_DATA:%.*]] = begin_borrow [[DATA]] : $ConvertibleToP
+// CHECK: [[VAL:%.*]] = open_existential_value [[BORROW_DATA]] : $ConvertibleToP to $@opened("{{.*}}") ConvertibleToP
+// CHECK: [[WT:%.*]] = witness_method $@opened("{{.*}}") ConvertibleToP, #ConvertibleToP.asP!1 : <Self where Self : ConvertibleToP> (Self) -> () -> P, [[VAL]] : $@opened("{{.*}}") ConvertibleToP : $@convention(witness_method) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
+// CHECK: [[AS_P:%.*]] = apply [[WT]]<@opened("{{.*}}") ConvertibleToP>([[VAL]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
 // CHECK: [[ENUM:%.*]] = enum $Optional<P>, #Optional.some!enumelt.1, [[AS_P]] : $P
 // CHECK: destroy_value [[DATA]] : $ConvertibleToP
-// CHECK: end_borrow [[BORROW]] from %0 : $Optional<ConvertibleToP>, $Optional<ConvertibleToP>
+// CHECK: end_borrow [[BORROW_ARG]] from %0 : $Optional<ConvertibleToP>, $Optional<ConvertibleToP>
 // CHECK: br bb{{.*}}([[ENUM]] : $Optional<P>)
 // CHECK: // end sil function '_T020opaque_values_silgen21s500_______getAnyHashAA1P_pSgAA14ConvertibleToP_pSgF'
 func s500_______getAnyHash(_ value: ConvertibleToP?) -> P? {
