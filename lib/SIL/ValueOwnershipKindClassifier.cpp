@@ -132,11 +132,25 @@ CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
-// Because of CoW existentials, ownership cannot be transfered to the opened
-// value. Opening the value requires borrowing the existential and copying the
-// opened value.
+// OpenExistentialValue opens the boxed value inside an existential
+// CoW box. The semantics of an existential CoW box implies that we
+// can only consume the projected value inside the box if the box is
+// unique. Since we do not know in general if the box is unique
+// without additional work, in SIL we require opened archetypes to
+// be borrowed sub-objects of the parent CoW box.
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, OpenExistentialValue)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
+
+// unchecked_bitwise_cast is a bitwise copy. It produces a trivial or unowned
+// result.
+//
+// If the operand is nontrivial and the result is trivial, then it is the
+// programmer's responsibility to use Builtin.fixLifetime.
+//
+// If both the operand and the result are nontrivial, then either the types must
+// be compatible so that TBAA doesn't allow the destroy to be hoisted above uses
+// of the cast, or the programmer must use Builtin.fixLifetime.
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Unowned, UncheckedBitwiseCast)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 // These are instructions that do not have any result, so we should never reach
@@ -291,24 +305,6 @@ ValueOwnershipKindClassifier::visitSelectEnumInst(SelectEnumInst *SEI) {
   // We handle this specially, since a select enum forwards only its case
   // values. We drop the first element since that is the condition element.
   return visitForwardingInst(SEI, SEI->getAllOperands().drop_front());
-}
-
-// unchecked_bitwise_cast is a bitwise copy. It produces a trivial or unowned
-// result.
-//
-// If the operand is nontrivial and the result is trivial, then it is the
-// programmer's responsibility to use Builtin.fixLifetime.
-//
-// If both the operand and the result are nontrivial, then either the types must
-// be compatible so that TBAA doesn't allow the destroy to be hoisted above uses
-// of the cast, or the programmer must use Builtin.fixLifetime.
-ValueOwnershipKind ValueOwnershipKindClassifier::visitUncheckedBitwiseCastInst(
-    UncheckedBitwiseCastInst *UBCI) {
-
-  if (UBCI->getType().isTrivial(UBCI->getModule()))
-    return ValueOwnershipKind::Trivial;
-
-  return ValueOwnershipKind::Unowned;
 }
 
 ValueOwnershipKind
