@@ -1117,7 +1117,8 @@ public:
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     Expr *arg = apply->getArg();
-    ManagedValue super;
+    RValue super;
+    CanType superFormalType = arg->getType()->getCanonicalType();
 
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
@@ -1133,23 +1134,27 @@ public:
       assert(SGF.SelfInitDelegationState ==
              SILGenFunction::WillSharedBorrowSelf);
       SGF.SelfInitDelegationState = SILGenFunction::WillExclusiveBorrowSelf;
-      super = SGF.emitRValueAsSingleValue(arg);
+      super = SGF.emitRValue(arg);
       assert(SGF.SelfInitDelegationState ==
              SILGenFunction::DidExclusiveBorrowSelf);
 
+      // We know that we have a single ManagedValue rvalue for self.
+      ManagedValue superMV = std::move(super).getScalarValue();
+
       // Check if super is not the same as our base type. This means that we
       // performed an upcast. Set SuperInitDelegationState to super.
-      if (super.getValue() != SGF.InitDelegationSelf.getValue()) {
-        assert(super.getCleanup() == SGF.InitDelegationSelf.getCleanup());
+      if (superMV.getValue() != SGF.InitDelegationSelf.getValue()) {
         SILValue underlyingSelf = SGF.InitDelegationSelf.forward(SGF);
         SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
         CleanupHandle newWriteback = SGF.enterDelegateInitSelfWritebackCleanup(
             SGF.InitDelegationLoc.getValue(), SGF.InitDelegationSelfBox,
-            super.getValue());
+            superMV.getValue());
         SGF.SuperInitDelegationSelf =
-            ManagedValue(super.getValue(), newWriteback);
-        super = SGF.SuperInitDelegationSelf;
+            ManagedValue(superMV.getValue(), newWriteback);
+        super = RValue(SGF, SGF.InitDelegationLoc.getValue(), superFormalType,
+                       SGF.SuperInitDelegationSelf);
       }
+
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
       constant = SILDeclRef(declRef->getDecl())
@@ -1157,23 +1162,22 @@ public:
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
-      super = SGF.emitRValueAsSingleValue(arg);
+      super = SGF.emitRValue(arg);
     } else {
       llvm_unreachable("invalid super callee");
     }
 
-    CanType superFormalType = arg->getType()->getCanonicalType();
-    setSelfParam(ArgumentSource(arg, RValue(SGF, apply, superFormalType, super)),
-                 apply);
+    // *NOTE* Temporary staging variable for refactoring.
+    SILValue superValue = super.peekScalarValue();
+    setSelfParam(ArgumentSource(arg, std::move(super)), apply);
 
     if (!canUseStaticDispatch(SGF, constant)) {
       // ObjC super calls require dynamic dispatch.
-      setCallee(Callee::forSuperMethod(SGF, super.getValue(), constant,
-                                       substitutions, fn));
+      setCallee(
+          Callee::forSuperMethod(SGF, superValue, constant, substitutions, fn));
     } else {
       // Native Swift super calls to final methods are direct.
-      setCallee(Callee::forDirect(SGF, constant,
-                                  substitutions, fn));
+      setCallee(Callee::forDirect(SGF, constant, substitutions, fn));
     }
   }
 
