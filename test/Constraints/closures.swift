@@ -575,3 +575,25 @@ extension A_SR_5030 {
     // expected-error@-1 {{cannot convert value of type '(idx: (Int))' to closure result type 'Int'}}
   }
 }
+
+// rdar://problem/33296619
+let u = rdar33296619().element //expected-error {{use of unresolved identifier 'rdar33296619'}}
+
+[1].forEach { _ in
+  _ = "\(u)"
+  _ = 1 + "hi" // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}}
+  // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists}}
+}
+
+class SR5666 {
+  var property: String?
+}
+
+func testSR5666(cs: [SR5666?]) -> [String?] {
+  return cs.map({ c in
+      let a = c.propertyWithTypo ?? "default"
+      // expected-error@-1 {{value of type 'SR5666?' has no member 'propertyWithTypo'}}
+      let b = "\(a)"
+      return b
+    })
+}

@@ -3325,6 +3325,10 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return { false, E };
 
+      if (auto *CE = dyn_cast<AbstractClosureExpr>(E))
+        if (!CE->hasSingleExpressionBody())
+          return { false, E };
+
       if (auto *coercion = dyn_cast<CoerceExpr>(E)) {
         if (E->getType()->isAny() && isa<ErasureExpr>(coercion->getSubExpr()))
           ErasureCoercedToAny.insert(coercion->getSubExpr());
