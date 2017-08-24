@@ -159,6 +159,12 @@ public:
   /// will be exploded.
   RValue(SILGenFunction &SGF, SILLocation l, CanType type, ManagedValue v);
 
+  /// Create an RValue from a single value. If the value is of tuple type, it
+  /// will be exploded. Use the CanType from the ManagedValue as the underlying
+  /// type of the RValue.
+  RValue(SILGenFunction &SGF, SILLocation l, ManagedValue v)
+      : RValue(SGF, l, v.getType().getSwiftRValueType(), v) {}
+
   /// Create a complete RValue from a pre-exploded set of elements.
   ///
   /// Since the RValue is assumed to be complete, no further values can be
