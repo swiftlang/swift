@@ -2759,7 +2759,7 @@ private:
 
         auto loc = arg.getKnownRValueLocation();
         SmallVector<RValue, 4> elts;
-        std::move(arg).asKnownRValue().extractElements(elts);
+        std::move(arg).asKnownRValue(SGF).extractElements(elts);
         for (auto i : indices(substArgType.getElementTypes())) {
           emit({ loc, std::move(elts[i]) },
                origParamType.getTupleElementType(i));
@@ -2769,7 +2769,7 @@ private:
 
       auto loc = arg.getKnownRValueLocation();
       SmallVector<RValue, 1> elts;
-      std::move(arg).asKnownRValue().extractElements(elts);
+      std::move(arg).asKnownRValue(SGF).extractElements(elts);
       emit({ loc, std::move(elts[0]) },
            origParamType.getTupleElementType(0));
       return;
@@ -2877,8 +2877,8 @@ private:
       // for one.)  The onus is on the caller to ensure that formal
       // access semantics are honored.
       } else if (arg.isRValue()) {
-        auto address = std::move(arg).asKnownRValue()
-          .getAsSingleValue(SGF, arg.getKnownRValueLocation());
+        auto address = std::move(arg).asKnownRValue(SGF).getAsSingleValue(
+            SGF, arg.getKnownRValueLocation());
         assert(address.isLValue());
         auto substObjectType = cast<InOutType>(substType).getObjectType();
         return LValue::forAddress(address, None,

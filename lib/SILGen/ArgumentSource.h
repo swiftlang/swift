@@ -52,6 +52,8 @@ class ArgumentSource {
   enum class Kind : unsigned char {
     Invalid,
     RValue,
+    // An RValue that will be borrowed when emitted.
+    DelayedBorrowedRValue,
     LValue,
     Expr,
     Tuple,
@@ -88,7 +90,9 @@ class ArgumentSource {
   static StorageMembers::Index getStorageIndexForKind(Kind kind) {
     switch (kind) {
     case Kind::Invalid: return StorageMembers::indexOf<void>();
-    case Kind::RValue: return StorageMembers::indexOf<RValueStorage>();
+    case Kind::RValue:
+    case Kind::DelayedBorrowedRValue:
+      return StorageMembers::indexOf<RValueStorage>();
     case Kind::LValue: return StorageMembers::indexOf<LValueStorage>();
     case Kind::Expr: return StorageMembers::indexOf<Expr*>();
     case Kind::Tuple: return StorageMembers::indexOf<TupleStorage>();
@@ -143,6 +147,7 @@ public:
     case Kind::Invalid:
       return false;
     case Kind::RValue:
+    case Kind::DelayedBorrowedRValue:
       return !asKnownRValue().isNull();
     case Kind::LValue:
       return asKnownLValue().isValid();
@@ -159,6 +164,7 @@ public:
     case Kind::Invalid:
       llvm_unreachable("argument source is invalid");
     case Kind::RValue:
+    case Kind::DelayedBorrowedRValue:
       return asKnownRValue().getType();
     case Kind::LValue:
       return CanInOutType::get(asKnownLValue().getSubstFormalType());
@@ -177,6 +183,7 @@ public:
     case Kind::Invalid:
       llvm_unreachable("argument source is invalid");
     case Kind::RValue:
+    case Kind::DelayedBorrowedRValue:
       return asKnownRValue().getType();
     case Kind::LValue:
       return asKnownLValue().getSubstFormalType();
@@ -193,7 +200,9 @@ public:
   bool hasLValueType() const & {
     switch (StoredKind) {
     case Kind::Invalid: llvm_unreachable("argument source is invalid");
-    case Kind::RValue: return false;
+    case Kind::RValue:
+    case Kind::DelayedBorrowedRValue:
+      return false;
     case Kind::LValue: return true;
     case Kind::Expr: return asKnownExpr()->isSemanticallyInOutExpr();
     case Kind::Tuple: return false;
@@ -206,6 +215,7 @@ public:
     case Kind::Invalid:
       llvm_unreachable("argument source is invalid");
     case Kind::RValue:
+    case Kind::DelayedBorrowedRValue:
       return getKnownRValueLocation();
     case Kind::LValue:
       return getKnownLValueLocation();
@@ -218,15 +228,24 @@ public:
   }
 
   bool isExpr() const & { return StoredKind == Kind::Expr; }
-  bool isRValue() const & { return StoredKind == Kind::RValue; }
+  bool isRValue() const & {
+    return StoredKind == Kind::RValue ||
+           StoredKind == Kind::DelayedBorrowedRValue;
+  }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
   bool isTuple() const & { return StoredKind == Kind::Tuple; }
 
   /// Given that this source is storing an RValue, extract and clear
   /// that value.
-  RValue &&asKnownRValue() && {
+  RValue &&asKnownRValue(SILGenFunction &SGF) && {
+    if (isDelayedBorrowedRValue()) {
+      std::move(Storage.get<RValueStorage>(StoredKind).Value)
+          .borrow(SGF, getKnownRValueLocation());
+    }
+
     return std::move(Storage.get<RValueStorage>(StoredKind).Value);
   }
+
   SILLocation getKnownRValueLocation() const & {
     return Storage.get<RValueStorage>(StoredKind).Loc;
   }
@@ -294,6 +313,15 @@ public:
   /// return the ArgumentSource. Otherwise, assert.
   ArgumentSource borrow(SILGenFunction &SGF) const &;
 
+  /// If we have an rvalue, return an Argument Source that when the RValue is
+  /// retrieved, the RValue is always borrowed first.
+  ///
+  /// This allows us to specify when creating callees that a value must be
+  /// borrowed, but emit the actual borrow once the callee is evaluated later in
+  /// SILGenApply. Ideally, the callee would always eagerly borrow, but since we
+  /// still have uncurrying, we can not do that.
+  ArgumentSource delayedBorrow(SILGenFunction &SGF) const &;
+
   ManagedValue materialize(SILGenFunction &SGF) &&;
 
   /// Emit this value to memory so that it follows the abstraction
@@ -315,6 +343,14 @@ public:
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
 private:
+  /// Returns true if this ArgumentSource stores a delayed borrowed RValue.
+  ///
+  /// This is private since we do not want users to be able to determine if the
+  /// given ArgumentSource is a normal RValue or a delayed borrow rvalue.
+  bool isDelayedBorrowedRValue() const & {
+    return StoredKind == Kind::DelayedBorrowedRValue;
+  }
+
   // Make the non-move accessors private to make it more difficult
   // to accidentally re-emit values.
   const RValue &asKnownRValue() const & {
