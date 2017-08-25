@@ -12,15 +12,16 @@
 
 #define DEBUG_TYPE "generic-specializer"
 
+#include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Strings.h"
-#include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/SILOptimizer/Utils/GenericCloner.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/AST/GenericSignatureBuilder.h"
-#include "swift/AST/GenericEnvironment.h"
+#include "swift/SILOptimizer/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "swift/Strings.h"
 
 using namespace swift;
 
@@ -662,7 +663,8 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     unsigned IdxForResult = 0;
     for (SILResultInfo RI : SubstitutedType->getIndirectFormalResults()) {
       assert(RI.isFormalIndirect());
-      if (substConv.getSILType(RI).isLoadable(M) && !RI.getType()->isVoid()) {
+      if (substConv.getSILType(RI).isLoadable(M) && !RI.getType()->isVoid() &&
+          shouldExpand(M, substConv.getSILType(RI).getObjectType())) {
         Conversions.set(IdxForResult);
         break;
       }
