@@ -1202,7 +1202,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
-  case Kind::FieldOffset:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
@@ -1220,6 +1219,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       return SILLinkage::Shared;
     }
 
+  case Kind::FieldOffset:
   case Kind::AssociatedTypeMetadataAccessFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::GenericProtocolWitnessTableCache:
