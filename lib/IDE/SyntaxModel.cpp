@@ -970,6 +970,15 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
                             SubscriptD->getElementTypeLoc().getSourceRange());
     pushStructureNode(SN, SubscriptD);
+  } else if (auto *AssociatedTypeD = dyn_cast<AssociatedTypeDecl>(D)) {
+    SyntaxStructureNode SN;
+    setDecl(SN, D);
+    SN.Kind = SyntaxStructureKind::AssociatedType;
+    SN.Range = charSourceRangeFromSourceRange(SM,
+                                            AssociatedTypeD->getSourceRange());
+    SN.NameRange = CharSourceRange(AssociatedTypeD->getNameLoc(),
+                                   AssociatedTypeD->getName().getLength());
+    pushStructureNode(SN, AssociatedTypeD);
   }
 
   return true;
