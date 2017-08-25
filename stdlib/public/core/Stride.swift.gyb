@@ -23,6 +23,12 @@
 }%
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
+///
+/// - Important: The `Strideable` protocol provides default implementations for
+///   the equal-to (`==`) and less-than (`<`) operators that depend on the
+///   `Stride` type's implementations. If a type conforming to `Strideable`
+///   is its own `Stride` type, it must provide concrete implementations of
+///   the two operators to avoid infinite recursion.
 public protocol ${Self} : ${Conformance} {
 %   if Self == '_Strideable':
   /// A type that represents the distance between two values of `Self`.
@@ -54,6 +60,24 @@ public protocol ${Self} : ${Conformance} {
 }
 
 % end
+
+extension Strideable where Stride == Self {
+  @available(*, deprecated, message: "Strideable conformance where 'Stride == Self' requires user-defined implementation of the '<' operator")
+  public static func < (x: Self, y: Self) -> Bool {
+    fatalError("""
+      Strideable conformance where 'Stride == Self' requires user-defined \
+      implementation of the '<' operator
+      """)
+  }
+
+  @available(*, deprecated, message: "Strideable conformance where 'Stride == Self' requires user-defined implementation of the '==' operator")
+  public static func == (x: Self, y: Self) -> Bool {
+    fatalError("""
+      Strideable conformance where 'Stride == Self' requires user-defined \
+      implementation of the '==' operator
+      """)
+  }
+}
 
 extension Strideable {
   @_inlineable
