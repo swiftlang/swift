@@ -30,9 +30,9 @@
 // CHECK-SAME:   i16 0,
 // CHECK-SAME:   i32 152,
 // CHECK-SAME:   i32 16,
-// CHECK-SAME:   %swift.type* null,
-// CHECK-SAME:   void (%swift.opaque*, [[A]]*)* @_T013generic_types1AC3run{{[_0-9a-zA-Z]*}}F
-// CHECK-SAME:   %T13generic_types1AC* (i64, %T13generic_types1AC*)* @_T013generic_types1ACACyxGSi1y_tcfc
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null
 // CHECK-SAME: }
 // CHECK-LABEL: @_T013generic_types1BCMP = internal global
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_B,
