@@ -157,23 +157,3 @@ public struct EnumeratedSequence<Base : Sequence> : Sequence {
   }
 }
 
-@available(*, unavailable, renamed: "EnumeratedIterator")
-public struct EnumerateGenerator<Base : IteratorProtocol> { }
-
-@available(*, unavailable, renamed: "EnumeratedSequence")
-public struct EnumerateSequence<Base : Sequence> {}
-
-extension EnumeratedIterator {
-  @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
-  public init(_ base: Base) {
-    Builtin.unreachable()
-  }
-}
-
-extension EnumeratedSequence {
-  @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
-  public init(_ base: Base) {
-    Builtin.unreachable()
-  }
-}
-

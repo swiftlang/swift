@@ -195,13 +195,3 @@ extension LazySequenceProtocol {
     return self
   }
 }
-
-@available(*, unavailable, renamed: "LazySequenceProtocol")
-public typealias LazySequenceType = LazySequenceProtocol
-
-extension LazySequenceProtocol {
-  @available(*, unavailable, message: "Please use Array initializer instead.")
-  public var array: [Element] {
-    Builtin.unreachable()
-  }
-}

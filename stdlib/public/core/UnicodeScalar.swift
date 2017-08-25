@@ -425,11 +425,6 @@ extension Unicode.Scalar {
   public init() {
     Builtin.unreachable()
   }
-
-  @available(*, unavailable, renamed: "escaped(asASCII:)")
-  public func escape(asASCII forceASCII: Bool) -> String {
-    Builtin.unreachable()
-  }
 }
 
 // @available(swift, obsoleted: 4.0, renamed: "Unicode.Scalar")

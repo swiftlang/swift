@@ -131,13 +131,3 @@ extension CollectionOfOne : CustomReflectable {
     return Mirror(self, children: ["element": _element])
   }
 }
-
-@available(*, unavailable, renamed: "IteratorOverOne")
-public struct GeneratorOfOne<Element> {}
-
-extension IteratorOverOne {
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> IteratorOverOne<Element> {
-    Builtin.unreachable()
-  }
-}

@@ -99,9 +99,6 @@ public protocol TextOutputStreamable {
   func write<Target : TextOutputStream>(to target: inout Target)
 }
 
-@available(*, unavailable, renamed: "TextOutputStreamable")
-typealias Streamable = TextOutputStreamable
-
 /// A type with a customized textual representation.
 ///
 /// Types that conform to the `CustomStringConvertible` protocol can provide

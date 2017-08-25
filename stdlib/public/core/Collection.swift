@@ -1904,53 +1904,6 @@ extension Collection {
   }
 }
 
-@available(*, unavailable, message: "Bit enum has been removed. Please use Int instead.")
-public enum Bit {}
-
-@available(*, unavailable, renamed: "IndexingIterator")
-public struct IndexingGenerator<Elements : _IndexableBase> {}
-
-@available(*, unavailable, renamed: "Collection")
-public typealias CollectionType = Collection
-
-extension Collection {
-  @available(*, unavailable, renamed: "Iterator")
-  public typealias Generator = Iterator
-
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> Iterator {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "getter:underestimatedCount()")
-  public func underestimateCount() -> Int {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:whereSeparator:) instead")
-  public func split(
-    _ maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [SubSequence] {
-    Builtin.unreachable()
-  }
-}
-
-extension Collection where Element : Equatable {
-  @available(*, unavailable, message: "Please use split(separator:maxSplits:omittingEmptySubsequences:) instead")
-  public func split(
-    _ separator: Element,
-    maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false
-  ) -> [SubSequence] {
-    Builtin.unreachable()
-  }
-}
-
-@available(*, unavailable, message: "PermutationGenerator has been removed in Swift 3")
-public struct PermutationGenerator<C : Collection, Indices : Sequence> {}
-
 extension _IndexableBase {
   @available(swift, deprecated: 3.2, renamed: "Element")
   public typealias _Element = Element

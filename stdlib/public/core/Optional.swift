@@ -675,19 +675,6 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
   }
 }
 
-extension Optional {
-
-  @available(*, unavailable, renamed: "none")
-  public static var None: Optional<Wrapped> {
-    return .none
-  }
-  @available(*, unavailable, renamed: "some")
-  public static func Some(_ x: Wrapped) -> Optional<Wrapped> {
-    return .some(x)
-  }
-
-}
-
 //===----------------------------------------------------------------------===//
 // Bridging
 //===----------------------------------------------------------------------===//

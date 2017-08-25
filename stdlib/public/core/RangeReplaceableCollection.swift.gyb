@@ -1236,39 +1236,3 @@ extension RangeReplaceableCollection {
     return try Self(self.lazy.filter(isIncluded))
   }
 }
-
-@available(*, unavailable, renamed: "RangeReplaceableCollection")
-public typealias RangeReplaceableCollectionType = RangeReplaceableCollection
-
-extension RangeReplaceableCollection {
-  @available(*, unavailable, renamed: "replaceSubrange(_:with:)")
-  public mutating func replaceRange<C>(
-    _ subrange: Range<Index>,
-    with newElements: C
-  ) where C : Collection, C.Element == Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "remove(at:)")
-  public mutating func removeAtIndex(_ i: Index) -> Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "removeSubrange")
-  public mutating func removeRange(_ subrange: Range<Index>) {
-  }
-
-  @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Element == Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "insert(contentsOf:at:)")
-  public mutating func insertContentsOf<C : Collection>(
-    _ newElements: C, at i: Index
-  ) where C.Element == Element {
-    Builtin.unreachable()
-  }
-}
-
