@@ -589,6 +589,15 @@ ERROR(sil_keypath_no_components,none,
       "keypath must have at least one component", ())
 ERROR(sil_keypath_no_root,none,
       "keypath must have a root component declared",())
+ERROR(sil_keypath_index_not_hashable,none,
+      "key path index type %0 does not conform to Hashable", (Type))
+ERROR(sil_keypath_index_operand_type_conflict,none,
+      "conflicting types for key path operand %0: %1 vs. %2",
+      (unsigned, Type, Type))
+ERROR(sil_keypath_no_use_of_operand_in_pattern,none,
+      "operand %0 is not referenced by any component in the pattern",
+      (unsigned))
+
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
       "expected basic block name or '}'", ())

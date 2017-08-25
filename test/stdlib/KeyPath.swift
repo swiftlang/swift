@@ -546,4 +546,56 @@ keyPath.test("IUO and key paths") {
   expectEqual(kp1.hashValue, kp2.hashValue)
 }
 
+struct Subscripts<T: Hashable> {
+  var value: Int
+  subscript() -> Int {
+    get {
+      return value
+    }
+    set {
+      value = newValue
+    }
+  }
+  subscript(x: Int, y: Int) -> Int {
+    return x + y
+  }
+
+  subscript<U: Hashable>(x: T, y: U) -> (T, U) {
+    return (x, y)
+  }
+}
+
+func fullGenericContext<T: Hashable, U: Hashable>(x: T, y: U) -> KeyPath<Subscripts<T>, (T, U)>) {
+  return \Subscripts<T>.[x, y]
+}
+
+func halfGenericContext<U: Hashable>(x: String, y: U) -> KeyPath<Subscripts<String>, (String, U)> {
+  return \Subscripts<String>.[x, y]
+}
+
+func nonGenericContext(x: String, y: Int) -> KeyPath<Subscripts<String>, (String, Int)> {
+  return \Subscripts<String>.[x, y]
+}
+
+keyPath.test("subscripts") {
+  let a = fullGenericContext("hey", 1738)
+  let b = halfGenericContext("hey", 1738)
+  let c = nonGenericContext("hey", 1738)
+
+  expectEqual(a, b)
+  expectEqual(a, c)
+  expectEqual(b, a)
+  expectEqual(b, c)
+  expectEqual(c, a)
+  expectEqual(c, b)
+  expectEqual(a.hashValue, b.hashValue)
+  expectEqual(a.hashValue, c.hashValue)
+  expectEqual(b.hashValue, a.hashValue)
+  expectEqual(b.hashValue, c.hashValue)
+  expectEqual(c.hashValue, a.hashValue)
+  expectEqual(c.hashValue, b.hashValue)
+}
+
+
 runAllTests()
+
