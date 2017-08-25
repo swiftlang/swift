@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
-// RUN: %target-swift-frontend -Osize -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=OSIZE
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -Osize %s -emit-ir | %FileCheck %s --check-prefix=OSIZE
 
 // REQUIRES: CPU=x86_64
 
@@ -40,9 +40,9 @@ import Swift
 // --       nominal type descriptor
 // CHECK-SAME:   @_T015generic_classes11RootGenericCMn
 // --       vtable
-// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
-// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
-// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
 // --       field offset placeholders
 // CHECK-SAME:   i64 16, i64 0, i64 0
 // CHECK-SAME: }>
@@ -95,15 +95,15 @@ import Swift
 // --       template fill function
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_GenericInheritsGeneric
 // --       RootGeneric vtable
-// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
-// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
-// CHECK-SAME:   @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
 // --       RootGeneric field offset placeholders
 // CHECK-SAME:   i64 16, i64 0, i64 0
 // --       GenericInheritsGeneric vtable
-// CHECK-SAME:   @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_,
-// CHECK-SAME:   @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_,
-// CHECK-SAME:   @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
 // --       GenericInheritsGeneric field offset placeholder
 // CHECK-SAME:   i64 0
 // CHECK-SAME: }
@@ -179,9 +179,9 @@ sil @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_ : $@c
 sil @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_ : $@convention(method) <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
 
 sil_vtable GenericInheritsGeneric {
-  #RootGeneric.foo!1: _TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_
-  #RootGeneric.bar!1: _TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_
-  #RootGeneric.bas!1: _TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_
+  #RootGeneric.foo!1: _TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_ [inherited]
+  #RootGeneric.bar!1: _TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ [inherited]
+  #RootGeneric.bas!1: _TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ [inherited]
   #GenericInheritsGeneric.zippity!1: _TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_
   #GenericInheritsGeneric.doo!1: _TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_
   #GenericInheritsGeneric.dah!1: _TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_
@@ -234,7 +234,7 @@ entry:
 sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> RootGeneric<F> -> UInt8 {
 entry(%c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.x
-  %x = load %p : $*UInt8
+  %x = load_borrow %p : $*UInt8
   return %x : $UInt8
 }
 
@@ -276,7 +276,7 @@ entry(%z : $*Int, %c : $RootGeneric<Int>):
 sil @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> RootGeneric<F> -> UInt8 {
 entry(%c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.z
-  %z = load %p : $*UInt8
+  %z = load_borrow %p : $*UInt8
   return %z : $UInt8
 }
 
@@ -287,7 +287,7 @@ entry(%c : $RootGeneric<F>):
 sil @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $RootGeneric<Int> -> UInt8 {
 entry(%c : $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.z
-  %z = load %p : $*UInt8
+  %z = load_borrow %p : $*UInt8
   return %z : $UInt8
 }
 
@@ -296,11 +296,11 @@ entry(%c : $RootGeneric<Int>):
 sil @RootGeneric_concrete_fragile_fixed_member_access : $RootGeneric<Int32> -> (UInt8, Int32, UInt8) {
 entry(%c : $RootGeneric<Int32>):
   %p = ref_element_addr %c : $RootGeneric<Int32>, #RootGeneric.x
-  %x = load %p : $*UInt8
+  %x = load_borrow %p : $*UInt8
   %q = ref_element_addr %c : $RootGeneric<Int32>, #RootGeneric.y
-  %y = load %q : $*Int32
+  %y = load_borrow %q : $*Int32
   %r = ref_element_addr %c : $RootGeneric<Int32>, #RootGeneric.z
-  %z = load %r : $*UInt8
+  %z = load_borrow %r : $*UInt8
   %t = tuple (%x : $UInt8, %y : $Int32, %z : $UInt8)
   return %t : $(UInt8, Int32, UInt8)
 }

@@ -1411,15 +1411,15 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
 #endif
 
   const ClassMetadata *theSuperclass = theClass->SuperClass;
-  if (theSuperclass == nullptr)
-    return theClass;
 
   // Relocate the metadata if necessary.
   //
   // For now, we assume that relocation is only required when the parent
   // class has prefix matter we didn't know about.  This isn't consistent
   // with general class resilience, however.
-  if (theSuperclass->isTypeMetadata()) {
+  //
+  // FIXME: This part isn't used right now.
+  if (theSuperclass && theSuperclass->isTypeMetadata()) {
     auto superAP = theSuperclass->getClassAddressPoint();
     auto oldClassAP = theClass->getClassAddressPoint();
     if (superAP > oldClassAP) {
@@ -1450,8 +1450,30 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
     }
   }
 
-  // If any ancestor classes have generic parameters or field offset
-  // vectors, inherit them.
+  // Copy the class's immediate methods from the nominal type descriptor
+  // to the class metadata.
+  {
+    auto &description = theClass->getDescription();
+    auto &genericParams = description->GenericParams;
+
+    auto *classWords = reinterpret_cast<void **>(theClass);
+
+    if (genericParams.Flags.hasVTable()) {
+      auto *vtable = description->getVTableDescriptor();
+      for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
+        classWords[vtable->VTableOffset + i] = vtable->getMethod(i);
+      }
+    }
+  }
+
+  if (theSuperclass == nullptr)
+    return theClass;
+
+  // If any ancestor classes have generic parameters, field offset vectors
+  // or virtual methods, inherit them.
+  //
+  // Note that the caller is responsible for installing overrides of
+  // superclass methods; here we just copy them verbatim.
   auto ancestor = theSuperclass;
   auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
   auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
