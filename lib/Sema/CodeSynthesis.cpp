@@ -271,13 +271,14 @@ static void maybeMarkTransparent(FuncDecl *accessor,
   // FIXME: Revisit this if we ever get 'real' default implementations.
   if (isa<ProtocolDecl>(nominalDecl))
     return;
-
+#if 0
   // Accessors for classes with @objc ancestry are not @_transparent,
   // since they use a field offset variable which is not exported.
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
       return;
-
+#endif
+  
   accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
 

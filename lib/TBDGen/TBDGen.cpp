@@ -260,30 +260,12 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
   }
 
-  // Some members of classes get extra handling, beyond members of struct/enums,
-  // so let's walk over them manually.
-  for (auto *member : CD->getMembers()) {
-    auto value = dyn_cast<ValueDecl>(member);
-    if (!value)
-      continue;
+  // The non-allocating forms of the destructors.
+  auto dtor = CD->getDestructor();
 
-    auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
-    if (hasFieldOffset) {
-      // FIXME: a field only has one sort of offset, but it is moderately
-      // non-trivial to compute which one. Including both is less painful than
-      // missing the correct one (for now), so we do that.
-      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
-      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/true));
-    }
-
-    // The non-allocating forms of the destructors.
-    if (auto dtor = dyn_cast<DestructorDecl>(value)) {
-      // ObjC classes don't have a symbol for their destructor.
-      if (!isObjC)
-        addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
-    }
-  }
+  // ObjC classes don't have a symbol for their destructor.
+  if (!isObjC)
+    addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
 
   visitNominalTypeDecl(CD);
 }
