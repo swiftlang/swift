@@ -2,8 +2,7 @@
 
 // SR-139:
 // Infinite recursion parsing bitwise operators
-// FIXME: SR-4714 tracks re-enabling this
-// let x = UInt32(0x1FF)&0xFF << 24 | UInt32(0x1FF)&0xFF << 16 | UInt32(0x1FF)&0xFF << 8 | (UInt32(0x1FF)&0xFF);
+let x = UInt32(0x1FF)&0xFF << 24 | UInt32(0x1FF)&0xFF << 16 | UInt32(0x1FF)&0xFF << 8 | (UInt32(0x1FF)&0xFF);
 
 // SR-838:
 // expression test_seconds() was too complex to be solved in reasonable time
@@ -123,7 +122,6 @@ struct R32034560 {
   private var R32034560: Array<Array<UInt32>>
   private func foo(x: UInt32) -> UInt32 {
     return ((self.R32034560[0][Int(x >> 24) & 0xFF] &+ self.R32034560[1][Int(x >> 16) & 0xFF]) ^ self.R32034560[2][Int(x >> 8) & 0xFF]) &+ self.R32034560[3][Int(x & 0xFF)]
-    // expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
   }
 }
 
