@@ -223,6 +223,12 @@ protected:
         case KeyPathPatternComponent::ComputedPropertyId::Property:
           break;
         }
+        
+        if (auto equals = component.getComputedPropertyIndexEquals())
+          ensureAlive(equals);
+        if (auto hash = component.getComputedPropertyIndexHash())
+          ensureAlive(hash);
+
         continue;
       }
       case KeyPathPatternComponent::Kind::StoredProperty:

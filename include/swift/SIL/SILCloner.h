@@ -2298,10 +2298,15 @@ void SILCloner<ImplClass>::visitObjCProtocolInst(ObjCProtocolInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  SmallVector<SILValue, 4> opValues;
+  for (auto &op : Inst->getAllOperands())
+    opValues.push_back(getOpValue(op.get()));
+  
   doPostProcess(Inst, getBuilder().createKeyPath(
                           getOpLocation(Inst->getLoc()),
                           Inst->getPattern(),
                           getOpSubstitutions(Inst->getSubstitutions()),
+                          opValues,
                           getOpType(Inst->getType())));
 }
 

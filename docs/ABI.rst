@@ -830,6 +830,10 @@ types where the metadata itself has unknown layout.)
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
   global ::= type type generic-signature? 'T' REABSTRACT-THUNK-TYPE   // reabstraction thunk helper function
+  global ::= entity generic-signature? type type* 'TK' // key path getter
+  global ::= entity generic-signature? type type* 'Tk' // key path setter
+  global ::= type generic-signature 'TH' // key path equality
+  global ::= type generic-signature 'Th' // key path hasher
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk

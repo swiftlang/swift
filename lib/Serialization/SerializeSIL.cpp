@@ -1852,6 +1852,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(0);
     }
     
+    SmallVector<ProtocolConformanceRef, 4> hashableConformances;
+    
     for (auto &component : pattern->getComponents()) {
       auto handleComponentCommon = [&](KeyPathComponentKindEncoding kind) {
         ListOfValues.push_back((unsigned)kind);
@@ -1876,6 +1878,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
           break;
         }
       };
+      auto handleComputedIndices
+        = [&](const KeyPathPatternComponent &component) {
+          auto indices = component.getComputedPropertyIndices();
+          ListOfValues.push_back(indices.size());
+          for (auto &index : indices) {
+            ListOfValues.push_back(index.Operand);
+            ListOfValues.push_back(S.addTypeRef(index.FormalType));
+            ListOfValues.push_back(
+              S.addTypeRef(index.LoweredType.getSwiftRValueType()));
+            ListOfValues.push_back((unsigned)index.LoweredType.getCategory());
+            hashableConformances.push_back(index.Hashable);
+          }
+          if (!indices.empty()) {
+            ListOfValues.push_back(
+              addSILFunctionRef(component.getComputedPropertyIndexEquals()));
+            ListOfValues.push_back(
+              addSILFunctionRef(component.getComputedPropertyIndexHash()));
+          }
+        };
     
       switch (component.getKind()) {
       case KeyPathPatternComponent::Kind::StoredProperty:
@@ -1887,8 +1908,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         handleComputedId(component.getComputedPropertyId());
         ListOfValues.push_back(
                       addSILFunctionRef(component.getComputedPropertyGetter()));
-        assert(component.getComputedPropertyIndices().empty()
-               && "indices not implemented");
+        handleComputedIndices(component);
         break;
       case KeyPathPatternComponent::Kind::SettableProperty:
         handleComponentCommon(KeyPathComponentKindEncoding::SettableProperty);
@@ -1897,8 +1917,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                       addSILFunctionRef(component.getComputedPropertyGetter()));
         ListOfValues.push_back(
                       addSILFunctionRef(component.getComputedPropertySetter()));
-        assert(component.getComputedPropertyIndices().empty()
-               && "indices not implemented");
+        handleComputedIndices(component);
         break;
       case KeyPathPatternComponent::Kind::OptionalChain:
         handleComponentCommon(KeyPathComponentKindEncoding::OptionalChain);
@@ -1912,12 +1931,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       }
     }
     
-    assert(KPI->getAllOperands().empty() && "operands not implemented yet");
+    for (auto &operand : KPI->getAllOperands()) {
+      auto value = operand.get();
+      ListOfValues.push_back(addValueRef(value));
+      ListOfValues.push_back(S.addTypeRef(value->getType().getSwiftRValueType()));
+      ListOfValues.push_back((unsigned)value->getType().getCategory());
+    }
+    
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
          SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
          S.addTypeRef(KPI->getType().getSwiftRValueType()),
          (unsigned)KPI->getType().getCategory(),
          ListOfValues);
+    for (auto conformance : hashableConformances) {
+      S.writeConformance(conformance, SILAbbrCodes);
+    }
     S.writeGenericRequirements(reqts, SILAbbrCodes);
     S.writeSubstitutions(KPI->getSubstitutions(), SILAbbrCodes);
 

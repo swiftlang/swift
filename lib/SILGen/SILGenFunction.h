@@ -1140,15 +1140,16 @@ public:
                            AccessSemantics semantics,
                            SGFContext C = SGFContext());
 
-  /// Produce an RValue for a load from the specified property.
-  RValue emitRValueForPropertyLoad(SILLocation loc,
-                                   ManagedValue base,
-                                   CanType baseFormalType,
-                                   bool isSuper, VarDecl *property,
-                                   SubstitutionList substitutions,
-                                   AccessSemantics semantics, Type propTy,
-                                   SGFContext C,
-                                   bool isGuaranteedValid = false);
+  /// Produce a singular RValue for a load from the specified property.
+  RValue emitRValueForStorageLoad(SILLocation loc,
+                                  ManagedValue base,
+                                  CanType baseFormalType,
+                                  bool isSuper, AbstractStorageDecl *storage,
+                                  RValue indexes,
+                                  SubstitutionList substitutions,
+                                  AccessSemantics semantics, Type propTy,
+                                  SGFContext C,
+                                  bool isGuaranteedValid = false);
 
   void emitCaptures(SILLocation loc,
                     AnyFunctionRef TheClosure,
