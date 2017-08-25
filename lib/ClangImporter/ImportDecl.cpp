@@ -122,6 +122,7 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
 static std::pair<VarDecl *, PatternBindingDecl *>
 createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
                      VarDecl::Specifier specifier, bool isImplicit,
+                     Accessibility accessibility,
                      Accessibility setterAccessibility) {
   // Create a variable to store the underlying value.
   auto var = new (cxt) VarDecl(
@@ -132,7 +133,7 @@ createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
   if (isImplicit)
     var->setImplicit();
   var->setInterfaceType(ty);
-  var->setAccessibility(Accessibility::Public);
+  var->setAccessibility(accessibility);
   var->setSetterAccessibility(setterAccessibility);
 
   // Create a pattern binding to describe the variable.
@@ -499,7 +500,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
 
 // Build the rawValue getter for a bridged, swift_newtype'd type.
 //   struct SomeType: RawRepresentable {
-//     var _rawValue: ObjCType
+//     private var _rawValue: ObjCType
 //     var rawValue: SwiftType {
 //       return _rawValue as SwiftType
 //     }
@@ -1290,6 +1291,7 @@ static void makeStructRawValued(
       cxt, structDecl, cxt.Id_rawValue, underlyingType,
       specifier,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
+      Accessibility::Public,
       setterAccessibility);
 
   structDecl->setHasDelayedMembers();
@@ -1378,7 +1380,9 @@ static void makeStructRawValuedWithBridge(
   PatternBindingDecl *storedPatternBinding;
   std::tie(storedVar, storedPatternBinding) = createVarWithPattern(
       cxt, structDecl, storedVarName, storedUnderlyingType,
-      VarDecl::Specifier::Var, /*isImplicit=*/true, Accessibility::Private);
+      VarDecl::Specifier::Var, /*isImplicit=*/true,
+      Accessibility::Private,
+      Accessibility::Private);
 
   //
   // Create a computed value variable
