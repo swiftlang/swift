@@ -1119,6 +1119,21 @@ public:
   virtual void
   loadAllMembers(Decl *D, uint64_t unused) override;
 
+private:
+  void
+  loadAllMembersOfObjcContainer(Decl *D,
+                                const clang::ObjCContainerDecl *objcContainer);
+  void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
+                           Decl *D, DeclContext *DC,
+                           SmallVectorImpl<Decl *> &members);
+  void insertMembersAndAlternates(const clang::NamedDecl *nd,
+                                  SmallVectorImpl<Decl *> &members);
+  void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
+  void addMemberAndAlternatesToExtension(
+      clang::NamedDecl *decl, importer::ImportedName newName,
+      importer::ImportNameVersion nameVersion, ExtensionDecl *ext);
+
+public:
   void
   loadAllConformances(
     const Decl *D, uint64_t contextData,
