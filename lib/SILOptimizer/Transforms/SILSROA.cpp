@@ -18,13 +18,15 @@
 #define DEBUG_TYPE "sil-sroa"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/Projection.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
@@ -294,7 +296,8 @@ static bool runSROAOnFunction(SILFunction &Fn) {
     for (auto &I : BB)
       // If the instruction is an alloc stack inst, add it to the worklist.
       if (auto *AI = dyn_cast<AllocStackInst>(&I))
-        Worklist.push_back(AI);
+        if (shouldExpand(Fn.getModule(), AI->getElementType()))
+          Worklist.push_back(AI);
 
   while (!Worklist.empty()) {
     AllocStackInst *AI = Worklist.back();
