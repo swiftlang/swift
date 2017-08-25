@@ -78,7 +78,7 @@ struct Pair<T, U> : P, Q {}
 // GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @_T023associated_type_witness8ComputedVyxq_GAA8AssockedAAr0_l5AssocAA1QPWT to i8*)
 // GLOBAL-SAME:  ]
 //   Generic witness table cache for Computed : Assocked.
-// GLOBAL-LABEL: @_T023associated_type_witness8ComputedVyxq_GAA8AssockedAAr0_lWG = internal global %swift.generic_witness_table_cache {
+// GLOBAL-LABEL: @_T023associated_type_witness8ComputedVyxq_GAA8AssockedAAr0_lWG = internal constant %swift.generic_witness_table_cache {
 // GLOBAL-SAME:    i16 3,
 // GLOBAL-SAME:    i16 1,
 //    Relative reference to protocol
@@ -87,8 +87,10 @@ struct Pair<T, U> : P, Q {}
 // GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([3 x i8*]* @_T023associated_type_witness8ComputedVyxq_GAA8AssockedAAr0_lWP to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @_T023associated_type_witness8ComputedVyxq_GAA8AssockedAAr0_lWG, i32 0, i32 3) to i64)) to i32),
 //    No instantiator function
 // GLOBAL-SAME:    i32 0,
-// GLOBAL-SAME:    [16 x i8*] zeroinitializer
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* [[PRIVATE:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @_T023associated_type_witness8ComputedVyxq_GAA8AssockedAAr0_lWG, i32 0, i32 5) to i64)) to i32)
 // GLOBAL-SAME:  }
+// GLOBAL:       [[PRIVATE]] = internal global [16 x i8*] zeroinitializer
+
 struct Computed<T, U> : Assocked {
   typealias Assoc = Pair<T, U>
 }
@@ -132,7 +134,7 @@ protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
 //   Generic witness table pattern for GenericComputed : DerivedFromSimpleAssoc.
 // GLOBAL-LABEL: @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWP = hidden constant [1 x i8*] zeroinitializer
 //   Generic witness table cache for GenericComputed : DerivedFromSimpleAssoc.
-// GLOBAL-LABEL: @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWG = internal global %swift.generic_witness_table_cache {
+// GLOBAL-LABEL: @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWG = internal constant %swift.generic_witness_table_cache {
 // GLOBAL-SAME:    i16 1,
 // GLOBAL-SAME:    i16 0,
 //   Relative reference to protocol
@@ -141,7 +143,7 @@ protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
 // GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([1 x i8*]* @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWP to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWG, i32 0, i32 3) to i64)) to i32),
 //   Relative reference to instantiator function
 // GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWI to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWG, i32 0, i32 4) to i64)) to i32),
-// GLOBAL-SAME:    [16 x i8*] zeroinitializer
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* {{@.*}} to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWG, i32 0, i32 5) to i64)) to i32)
 // GLOBAL-SAME:  }
 struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
   typealias Assoc = PBox<T>

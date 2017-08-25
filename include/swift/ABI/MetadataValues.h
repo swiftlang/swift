@@ -407,6 +407,36 @@ public:
   }
 };
 
+class ProtocolRequirementFlags {
+public:
+  typedef uint32_t int_type;
+  enum class Kind {
+    BaseProtocol,
+    InstanceMethod,
+    StaticMethod,
+    Init,
+    Getter,
+    Setter,
+    MaterializeForSet,
+    AssociatedTypeAccessFunction,
+    AssociatedConformanceAccessFunction,
+  };
+
+private:
+  enum : int_type {
+    KindMask = 0x1F,                // 32 kinds should be enough for anybody
+  };
+
+  int_type Value;
+
+public:
+  ProtocolRequirementFlags(Kind kind) : Value(unsigned(kind)) {}
+
+  Kind getKind() const { return Kind(Value & KindMask); }
+
+  int_type getIntValue() const { return Value; }
+};
+
 /// Flags in an existential type metadata record.
 class ExistentialTypeFlags {
   typedef size_t int_type;

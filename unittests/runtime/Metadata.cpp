@@ -924,7 +924,7 @@ struct GenericWitnessTableStorage {
   int32_t Protocol;
   int32_t Pattern;
   int32_t Instantiator;
-  void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
+  int32_t PrivateData;
 };
 
 template<typename T>
@@ -957,19 +957,35 @@ static void fakeDefaultWitness2() {}
 // equality, so we just use fake addresses instead.
 struct TestProtocol {
   ProtocolDescriptor descriptor;
-  int32_t witnesses[2] = {0, 0};
+  union {
+    ProtocolRequirement requirements[5];
+  };
 
   TestProtocol()
     : descriptor("TestProtocol",
                  nullptr,
                  ProtocolDescriptorFlags().withResilient(true)) {
-    descriptor.MinimumWitnessTableSizeInWords = 3;
-    descriptor.NumDefaultWitnessTableEntries = 2;
+    descriptor.NumMandatoryRequirements = 3;
+    descriptor.NumRequirements = 5;
     initializeRelativePointer(
-      (int32_t *) &descriptor.DefaultWitnessTable[0],
+      (int32_t *) &descriptor.Requirements,
+      requirements);
+
+    using Flags = ProtocolRequirementFlags;
+
+    requirements[0].Flags = Flags(Flags::Kind::InstanceMethod);
+    requirements[0].DefaultImplementation = nullptr;
+    requirements[1].Flags = Flags(Flags::Kind::InstanceMethod);
+    requirements[1].DefaultImplementation = nullptr;
+    requirements[2].Flags = Flags(Flags::Kind::InstanceMethod);
+    requirements[2].DefaultImplementation = nullptr;
+    requirements[3].Flags = Flags(Flags::Kind::InstanceMethod);
+    initializeRelativePointer(
+      (int32_t *) &requirements[3].DefaultImplementation,
       fakeDefaultWitness1);
+    requirements[4].Flags = Flags(Flags::Kind::InstanceMethod);
     initializeRelativePointer(
-      (int32_t *) &descriptor.DefaultWitnessTable[1],
+      (int32_t *) &requirements[4].DefaultImplementation,
       fakeDefaultWitness2);
   }
 };
@@ -981,6 +997,10 @@ GenericWitnessTableStorage tableStorage1;
 GenericWitnessTableStorage tableStorage2;
 GenericWitnessTableStorage tableStorage3;
 GenericWitnessTableStorage tableStorage4;
+GenericWitnessTable::PrivateDataType tablePrivateData1;
+GenericWitnessTable::PrivateDataType tablePrivateData2;
+GenericWitnessTable::PrivateDataType tablePrivateData3;
+GenericWitnessTable::PrivateDataType tablePrivateData4;
 
 const void *witnesses[] = {
   (void *) 123,
@@ -993,9 +1013,9 @@ const void *witnesses[] = {
 TEST(WitnessTableTest, getGenericWitnessTable) {
   EXPECT_EQ(sizeof(GenericWitnessTableStorage), sizeof(GenericWitnessTable));
 
-  EXPECT_EQ(testProtocol.descriptor.getDefaultWitness(0),
+  EXPECT_EQ(testProtocol.descriptor.getDefaultWitness(3),
             (void *) fakeDefaultWitness1);
-  EXPECT_EQ(testProtocol.descriptor.getDefaultWitness(1),
+  EXPECT_EQ(testProtocol.descriptor.getDefaultWitness(4),
             (void *) fakeDefaultWitness2);
 
   // Conformance provides all requirements, and we don't have an
@@ -1006,6 +1026,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     initializeRelativePointer(&tableStorage1.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage1.Pattern, witnesses);
     initializeRelativePointer(&tableStorage1.Instantiator, nullptr);
+    initializeRelativePointer(&tableStorage1.PrivateData, &tablePrivateData1);
 
     GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
         &tableStorage1);
@@ -1029,6 +1050,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     initializeRelativePointer(&tableStorage2.Pattern, witnesses);
     initializeRelativePointer(&tableStorage2.Instantiator,
                               (const void *) witnessTableInstantiator);
+    initializeRelativePointer(&tableStorage2.PrivateData, &tablePrivateData2);
 
     GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
         &tableStorage2);
@@ -1059,6 +1081,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     initializeRelativePointer(&tableStorage3.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage3.Pattern, witnesses);
     initializeRelativePointer(&tableStorage3.Instantiator, witnessTableInstantiator);
+    initializeRelativePointer(&tableStorage3.PrivateData, &tablePrivateData3);
 
     GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
         &tableStorage3);
@@ -1090,6 +1113,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
     initializeRelativePointer(&tableStorage4.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage4.Pattern, witnesses);
     initializeRelativePointer(&tableStorage4.Instantiator, witnessTableInstantiator);
+    initializeRelativePointer(&tableStorage4.PrivateData, &tablePrivateData4);
 
     GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
         &tableStorage4);

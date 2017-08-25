@@ -1977,6 +1977,17 @@ struct TargetLiteralProtocolDescriptorList
 };
 using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
 
+template <typename Runtime>
+struct TargetProtocolRequirement {
+  ProtocolRequirementFlags Flags;
+  // TODO: name, type
+
+  /// The optional default implementation of the protocol.
+  RelativeDirectPointer<void(), /*nullable*/ true> DefaultImplementation;
+};
+
+using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
+
 /// A protocol descriptor. This is not type metadata, but is referenced by
 /// existential type metadata records to describe a protocol constraint.
 /// Its layout is compatible with the Objective-C runtime's 'protocol_t' record
@@ -2008,37 +2019,26 @@ struct TargetProtocolDescriptor {
   /// Additional flags.
   ProtocolDescriptorFlags Flags;
 
-  /// The minimum size of any conforming witness table, in words.
-  ///
-  /// When a conformance is ultimately instantiated from a GenericWitnessTable,
-  /// this value must be greater than or equal to the GenericWitnessTable's
-  /// WitnessTableSizeInWords.
-  ///
-  /// Only meaningful if ProtocolDescriptorFlags::IsResilient is set.
-  uint16_t MinimumWitnessTableSizeInWords;
+  /// The number of non-defaultable requirements in the protocol.
+  uint16_t NumMandatoryRequirements;
 
-  /// The maximum amount to copy from the default requirements in units of
-  /// 4 bytes.
-  ///
-  /// If any requirements beyond NumDefaultWitnessTableEntries are present
+  /// The number of requirements described by the Requirements array.
+  /// If any requirements beyond MinimumWitnessTableSizeInWords are present
   /// in the witness table template, they will be not be overwritten with
   /// defaults.
-  ///
-  /// Only meaningful if ProtocolDescriptorFlags::IsResilient is set.
-  uint16_t NumDefaultWitnessTableEntries;
+  uint16_t NumRequirements;
 
-  using MethodDescriptor = TargetMethodDescriptor<Runtime>;
+  /// Requirement descriptions.
+  RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
 
-  MethodDescriptor DefaultWitnessTable[];
-
-  /// Default requirements are tail-allocated here.
   void *getDefaultWitness(unsigned index) const {
-    return DefaultWitnessTable[index].Impl.get();
+    return (void*) Requirements.get()[index].DefaultImplementation.get();
   }
 
+  // This is only used in unittests/Metadata.cpp.
   constexpr TargetProtocolDescriptor<Runtime>(const char *Name,
-                        const TargetProtocolDescriptorList<Runtime> *Inherited,
-                        ProtocolDescriptorFlags Flags)
+                      const TargetProtocolDescriptorList<Runtime> *Inherited,
+                      ProtocolDescriptorFlags Flags)
     : _ObjC_Isa(nullptr), Name(Name), InheritedProtocols(Inherited),
       _ObjC_InstanceMethods(nullptr), _ObjC_ClassMethods(nullptr),
       _ObjC_OptionalInstanceMethods(nullptr),
@@ -2046,8 +2046,9 @@ struct TargetProtocolDescriptor {
       _ObjC_InstanceProperties(nullptr),
       DescriptorSize(sizeof(TargetProtocolDescriptor<Runtime>)),
       Flags(Flags),
-      MinimumWitnessTableSizeInWords(0),
-      NumDefaultWitnessTableEntries(0)
+      NumMandatoryRequirements(0),
+      NumRequirements(0),
+      Requirements(nullptr)
   {}
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
@@ -2388,7 +2389,11 @@ struct TargetGenericWitnessTable {
                              void * const *instantiationArgs),
                         /*nullable*/ true> Instantiator;
 
-  void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
+  using PrivateDataType = void *[swift::NumGenericMetadataPrivateDataWords];
+
+  /// Private data for the instantiator.  Out-of-line so that the rest
+  /// of this structure can be constant.
+  RelativeDirectPointer<PrivateDataType> PrivateData;
 };
 using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 
