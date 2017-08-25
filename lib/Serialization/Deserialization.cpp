@@ -4512,6 +4512,7 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
       members.push_back(next.get());
     }
     else {
+      Decl *suppliedMissingMember = nullptr;
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(next.takeError());
 
@@ -4526,13 +4527,13 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
             containingClass->setHasMissingVTableEntries();
 
           if (error.getName().getBaseName() == getContext().Id_init) {
-            members.push_back(MissingMemberDecl::forInitializer(
+            suppliedMissingMember = MissingMemberDecl::forInitializer(
                 getContext(), containingClass, error.getName(),
-                error.needsVTableEntry(), error.needsAllocatingVTableEntry()));
+                error.needsVTableEntry(), error.needsAllocatingVTableEntry());
           } else if (error.needsVTableEntry()) {
-            members.push_back(MissingMemberDecl::forMethod(
+            suppliedMissingMember = MissingMemberDecl::forMethod(
                 getContext(), containingClass, error.getName(),
-                error.needsVTableEntry()));
+                error.needsVTableEntry());
           }
           // FIXME: Handle other kinds of missing members: properties,
           // subscripts, and methods that don't need vtable entries.
@@ -4546,13 +4547,13 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
             containingProto->setHasMissingRequirements(true);
 
           if (error.getName().getBaseName() == getContext().Id_init) {
-            members.push_back(MissingMemberDecl::forInitializer(
+            suppliedMissingMember = MissingMemberDecl::forInitializer(
                 getContext(), containingProto, error.getName(),
-                error.needsVTableEntry(), error.needsAllocatingVTableEntry()));
+                error.needsVTableEntry(), error.needsAllocatingVTableEntry());
           } else if (error.needsVTableEntry()) {
-            members.push_back(MissingMemberDecl::forMethod(
+            suppliedMissingMember = MissingMemberDecl::forMethod(
                 getContext(), containingProto, error.getName(),
-                error.needsVTableEntry()));
+                error.needsVTableEntry());
           }
           // FIXME: Handle other kinds of missing members: properties,
           // subscripts, and methods that don't need vtable entries.
@@ -4561,7 +4562,8 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
       } else {
         llvm::consumeError(next.takeError());
       }
-      continue;
+      if (suppliedMissingMember)
+        members.push_back(suppliedMissingMember);
     }
   }
 
