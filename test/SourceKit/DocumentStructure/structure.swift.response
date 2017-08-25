@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 1553,
+  key.length: 1636,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1011,6 +1011,38 @@
               key.attribute: source.decl.attribute.objc.name
             }
           ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "FooProtocol",
+      key.offset: 1554,
+      key.length: 81,
+      key.runtime_name: "_TtP13StructureTest11FooProtocol_",
+      key.nameoffset: 1563,
+      key.namelength: 11,
+      key.bodyoffset: 1576,
+      key.bodylength: 58,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.associatedtype,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "Bar",
+          key.offset: 1581,
+          key.length: 18,
+          key.nameoffset: 1596,
+          key.namelength: 3
+        },
+        {
+          key.kind: source.lang.swift.decl.associatedtype,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "Baz",
+          key.offset: 1604,
+          key.length: 29,
+          key.nameoffset: 1619,
+          key.namelength: 3
         }
       ]
     }

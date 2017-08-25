@@ -99,3 +99,8 @@ class ClassObjcAttr2 : NSObject {
     @objc(Foo)
     func m() {}
 }
+
+protocol FooProtocol {
+    associatedtype Bar
+    associatedtype Baz: Equatable
+}
