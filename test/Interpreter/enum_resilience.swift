@@ -1,12 +1,13 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c %S/../Inputs/resilient_struct.swift -o %t/resilient_struct.o
-// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_struct.swift -o %t/resilient_struct.o
+// RUN: %target-build-swift -emit-module -parse-as-library -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -emit-library -o %t/libresilient_struct.%target-dylib-extension
+// RUN: %target-build-swift -emit-module -parse-as-library -Xfrontend -enable-resilience %S/../Inputs/resilient_enum.swift -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -emit-library -o %t/libresilient_enum.%target-dylib-extension -I %t -L %t -lresilient_struct
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_enum -o %t/main
+// RUN: %target-run %t/main
 
-// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c %S/../Inputs/resilient_enum.swift -I %t/ -o %t/resilient_enum.o
-// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_enum.swift -I %t/ -o %t/resilient_enum.o
-
-// RUN: %target-build-swift %s -Xlinker %t/resilient_struct.o -Xlinker %t/resilient_enum.o -I %t -L %t -o %t/main
+// RUN: %target-build-swift -emit-module -parse-as-library -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -emit-library -o %t/libresilient_struct.%target-dylib-extension -whole-module-optimization
+// RUN: %target-build-swift -emit-module -parse-as-library -Xfrontend -enable-resilience %S/../Inputs/resilient_enum.swift -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -emit-library -o %t/libresilient_enum.%target-dylib-extension -I %t -L %t -lresilient_struct -whole-module-optimization
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_enum -o %t/main
 // RUN: %target-run %t/main
 
 // REQUIRES: executable_test

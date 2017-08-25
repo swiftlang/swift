@@ -1,8 +1,15 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
 
 // <rdar://problem/17405715> lazy property crashes silgen of implicit memberwise initializer
-// CHECK-LABEL: // lazy_properties.StructWithLazyField.init
-// CHECK-NEXT: sil hidden @_T015lazy_properties19StructWithLazyFieldVACSiSg4once_tcfC : $@convention(method) (Optional<Int>, @thin StructWithLazyField.Type) -> @owned StructWithLazyField {
+
+// CHECK-LABEL: sil hidden @_T015lazy_properties19StructWithLazyFieldV4onceSifg : $@convention(method) (@inout StructWithLazyField) -> Int
+
+// CHECK-LABEL: sil hidden @_T015lazy_properties19StructWithLazyFieldV4onceSifs : $@convention(method) (Int, @inout StructWithLazyField) -> ()
+
+// CHECK-LABEL: sil hidden [transparent] @_T015lazy_properties19StructWithLazyFieldV4onceSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout StructWithLazyField) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+
+// CHECK-LABEL: sil hidden @_T015lazy_properties19StructWithLazyFieldVACSiSg4once_tcfC : $@convention(method) (Optional<Int>, @thin StructWithLazyField.Type) -> @owned StructWithLazyField
+
 struct StructWithLazyField {
   lazy var once : Int = 42
   let someProp = "Some value"
@@ -17,7 +24,12 @@ func test21057425() {
 // Anonymous closure parameters in lazy initializer crash SILGen
 
 // CHECK-LABEL: sil hidden @_T015lazy_properties22HasAnonymousParametersV1xSifg : $@convention(method) (@inout HasAnonymousParameters) -> Int
+
 // CHECK-LABEL: sil private @_T015lazy_properties22HasAnonymousParametersV1xSifgS2icfU_ : $@convention(thin) (Int) -> Int
+
+// CHECK-LABEL: sil hidden @_T015lazy_properties22HasAnonymousParametersV1xSifs : $@convention(method) (Int, @inout HasAnonymousParameters) -> ()
+
+// CHECK-LABEL: sil hidden [transparent] @_T015lazy_properties22HasAnonymousParametersV1xSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasAnonymousParameters) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 
 struct HasAnonymousParameters {
   lazy var x = { $0 }(0)

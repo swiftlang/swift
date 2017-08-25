@@ -707,8 +707,6 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
   SourceLoc loc = storage->getLoc();
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
 
-  maybeMarkTransparent(getter, storage, TC);
-
   // Record the getter as an override, which can happen with addressors.
   if (auto *baseASD = storage->getOverriddenDecl())
     if (baseASD->isAccessibleFrom(storage->getDeclContext()))
@@ -732,8 +730,6 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storage,
                                             setterBody, TC);
   setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
-
-  maybeMarkTransparent(setter, storage, TC);
 
   // Record the setter as an override, which can happen with addressors.
   if (auto *baseASD = storage->getOverriddenDecl()) {
@@ -800,10 +796,12 @@ static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // Synthesize the body of the getter.
   synthesizeTrivialGetter(getter, storage, TC);
+  maybeMarkTransparent(getter, storage, TC);
 
   if (setter) {
     // Synthesize the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
+    maybeMarkTransparent(setter, storage, TC);
   }
 
   // We've added some members to our containing context, add them to
@@ -829,6 +827,7 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
   // Synthesize the body of the setter.
   VarDecl *valueParamDecl = getFirstParamDecl(setter);
   synthesizeTrivialSetter(setter, storage, valueParamDecl, TC);
+  maybeMarkTransparent(setter, storage, TC);
 }
 
 /// Add a materializeForSet accessor to the given declaration.
@@ -928,6 +927,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // a call of a superclass getter if this is an override.
   auto *Get = VD->getGetter();
   synthesizeTrivialGetter(Get, VD, TC);
+  maybeMarkTransparent(Get, VD, TC);
 
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
