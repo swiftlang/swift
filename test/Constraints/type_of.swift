@@ -44,15 +44,37 @@ class C {
    typealias T = Int
 }
 
+// We need at least 4 classes here because type(of:)
+// has 3 declarations in this file, and we need to
+// try and make it so type(of:) picked as first overload.
+
 class D : C {
+   typealias T = Float
+}
+
+class E : D {
+   typealias T = Double
+}
+
+class F : E {
+   typealias T = UInt
+}
+
+class G : F {
    typealias T = Float
 }
 
 func foo(_: Any...) {}
 
-func bar() -> Int { return 42 }    // expected-note {{found this candidate}}
-func bar() -> Float { return 0.0 } // expected-note {{found this candidate}}
+// It's imperative for bar() to have more overloads
+// the that of type(of:) to make sure that latter is
+// picked first.
 
-foo(type(of: D.T.self)) // Ok
-let _: Any = type(of: D.T.self) // Ok
+func bar() -> Int {}    // expected-note {{found this candidate}}
+func bar() -> Float {}  // expected-note {{found this candidate}}
+func bar() -> String {} // expected-note {{found this candidate}}
+func bar() -> UInt {}   // expected-note {{found this candidate}}
+
+foo(type(of: G.T.self)) // Ok
+let _: Any = type(of: G.T.self) // Ok
 foo(type(of: bar())) // expected-error {{ambiguous use of 'bar()'}}
