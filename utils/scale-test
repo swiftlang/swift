@@ -184,19 +184,19 @@ def is_somewhat_small(x):
 
 
 def tup_add(t1, t2):
-    return tuple([a + b for (a, b) in zip(t1, t2)])
+    return tuple(a + b for (a, b) in zip(t1, t2))
 
 
 def tup_sub(t1, t2):
-    return tuple([a - b for (a, b) in zip(t1, t2)])
+    return tuple(a - b for (a, b) in zip(t1, t2))
 
 
 def tup_mul(s, t):
-    return tuple([s * v for v in t])
+    return tuple(s * v for v in t)
 
 
 def tup_distance(t1, t2):
-    return math.sqrt(sum([(a - b) ** 2 for (a, b) in zip(t1, t2)]))
+    return math.sqrt(sum((a - b) ** 2 for (a, b) in zip(t1, t2)))
 
 
 def centroid(tuples):
@@ -210,7 +210,7 @@ def centroid(tuples):
 
 
 def converged(ctr, simplex, epsilon):
-    return max([tup_distance(ctr, p.loc) for p in simplex]) < epsilon
+    return max(tup_distance(ctr, p.loc) for p in simplex) < epsilon
 
 
 def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
@@ -224,7 +224,7 @@ def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
     def f(tup):
         return objective(named(tup))
 
-    locs = [tuple([random.uniform(*b) for b in bounds])
+    locs = [tuple(random.uniform(*b) for b in bounds)
             for _ in range(ndim + 1)]
     SimplexPoint = namedtuple("SimplexPoint", ["loc", "val"])
     simplex = [SimplexPoint(loc=l, val=f(l)) for l in locs]
@@ -306,7 +306,7 @@ def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
 
     assert(len(ys) > 0)
     mean_y = sum(ys) / len(ys)
-    ss_total = sum([(y - mean_y) ** 2 for y in ys])
+    ss_total = sum((y - mean_y) ** 2 for y in ys)
     data = zip(xs, ys)
 
     def inner(ps):
@@ -335,7 +335,7 @@ def fit_polynomial_model(xs, ys):
     PolynomialParams = namedtuple('PolynomialParams',
                                   ['const', 'coeff', 'exp'])
     params = PolynomialParams(const=0.0, coeff=1.0, exp=1.0)
-    mag = max([abs(y) for y in ys])
+    mag = max(abs(y) for y in ys)
     bounds = PolynomialParams(const=(0, mag),
                               coeff=(0, mag),
                               exp=(0.25, 3.0))
@@ -358,7 +358,7 @@ def fit_exponential_model(xs, ys):
     ExponentialParams = namedtuple('ExponentialParams',
                                    ['base', 'coeff', 'const'])
     params = ExponentialParams(base=1.0, const=1.0, coeff=1.0)
-    mag = max([abs(y) for y in ys])
+    mag = max(abs(y) for y in ys)
     bounds = ExponentialParams(base=(0.0, 10.0),
                                coeff=(-mag, mag),
                                const=(-mag, mag))
