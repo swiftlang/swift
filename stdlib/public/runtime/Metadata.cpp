@@ -2718,11 +2718,11 @@ using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
 static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
   // Keep this assert even if you change the representation above.
   static_assert(sizeof(LazyGenericWitnessTableCache) <=
-                sizeof(GenericWitnessTable::PrivateData),
+                sizeof(GenericWitnessTable::PrivateDataType),
                 "metadata cache is larger than the allowed space");
 
   auto lazyCache =
-    reinterpret_cast<LazyGenericWitnessTableCache*>(gen->PrivateData);
+    reinterpret_cast<LazyGenericWitnessTableCache*>(gen->PrivateData.get());
   return lazyCache->get();
 }
 
@@ -2737,10 +2737,8 @@ static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
 static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
   if (genericTable->Instantiator.isNull() &&
       genericTable->WitnessTablePrivateSizeInWords == 0 &&
-      (genericTable->Protocol.isNull() ||
-       genericTable->WitnessTableSizeInWords -
-       genericTable->Protocol->MinimumWitnessTableSizeInWords ==
-       genericTable->Protocol->NumDefaultWitnessTableEntries)) {
+      genericTable->WitnessTableSizeInWords ==
+        genericTable->Protocol->NumRequirements) {
     return true;
   }
 
@@ -2754,29 +2752,26 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
                      MetadataAllocator &allocator,
                      const void *args[],
                      size_t numGenericArgs) {
-
-  // Number of bytes for any private storage used by the conformance itself.
-  size_t privateSize = genericTable->WitnessTablePrivateSizeInWords;
-
-  size_t minWitnessTableSize, expectedWitnessTableSize;
-  size_t actualWitnessTableSize = genericTable->WitnessTableSizeInWords;
+  // The number of witnesses provided by the table pattern.
+  size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
 
   auto protocol = genericTable->Protocol.get();
 
-  if (protocol != nullptr && protocol->Flags.isResilient()) {
-    // The protocol and conforming type are in different resilience domains.
-    // Allocate the witness table with the correct size, and fill in default
-    // requirements at the end as needed.
-    minWitnessTableSize = protocol->MinimumWitnessTableSizeInWords;
-    expectedWitnessTableSize = (protocol->MinimumWitnessTableSizeInWords +
-                                protocol->NumDefaultWitnessTableEntries);
-    assert(actualWitnessTableSize >= minWitnessTableSize &&
-           actualWitnessTableSize <= expectedWitnessTableSize);
-  } else {
-    // The protocol and conforming type are in the same resilience domain.
-    // Trust that the witness table template already has the correct size.
-    minWitnessTableSize = expectedWitnessTableSize = actualWitnessTableSize;
-  }
+  // The number of mandatory requirements, i.e. requirements lacking
+  // default implementations.
+  size_t numMandatoryRequirements = protocol->NumMandatoryRequirements;
+  assert(numPatternWitnesses >= numMandatoryRequirements);
+
+  // The total number of requirements.
+  size_t numRequirements = protocol->NumRequirements;
+  assert(numPatternWitnesses <= numRequirements);
+
+  // Number of bytes for any private storage used by the conformance itself.
+  size_t privateSize =
+    genericTable->WitnessTablePrivateSizeInWords * sizeof(void *);
+
+  // Number of bytes for the full witness table.
+  size_t expectedWitnessTableSize = numRequirements * sizeof(void *);
 
   // Create a new entry for the cache.
   auto entry = WitnessTableCacheEntry::allocate(
@@ -2790,18 +2785,21 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
-  auto *table = entry->get(genericTable);
+  auto table = (void **) entry->get(genericTable);
+  auto pattern = (void * const *) &*genericTable->Pattern;
+  auto requirements = protocol->Requirements.get();
 
   // Fill in the provided part of the requirements from the pattern.
-  memcpy(table, (void * const *) &*genericTable->Pattern,
-         actualWitnessTableSize * sizeof(void *));
+  for (size_t i = 0, e = numPatternWitnesses; i < e; ++i) {
+    table[i] = pattern[i];
+  }
 
-  // If this is a resilient conformance, copy in the rest.
-  if (protocol != nullptr && protocol->Flags.isResilient()) {
-    for (unsigned i = actualWitnessTableSize,
-                  e = expectedWitnessTableSize; i < e; ++i) {
-      ((void **) table)[i] = protocol->getDefaultWitness(i - minWitnessTableSize);
-    }
+  // Fill in any default requirements.
+  for (size_t i = numPatternWitnesses, e = numRequirements; i < e; ++i) {
+    auto defaultImpl = (void*) requirements[i].DefaultImplementation.get();
+    assert(defaultImpl &&
+           "no default implementation for missing requirement");
+    table[i] = defaultImpl;
   }
 
   return entry;

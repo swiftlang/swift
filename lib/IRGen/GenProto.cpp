@@ -1615,13 +1615,10 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   // is non-dependent.
   // TODO: the conformance might be conditional.
   llvm::Constant *instantiationFn;
-  llvm::Value *instantiationArgs =
-    llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy);
   if (SpecializedBaseConformances.empty()) {
-    instantiationFn = llvm::ConstantInt::get(IGM.RelativeAddressTy, 0);    
+    instantiationFn = nullptr;
   } else {
-    llvm::Constant *fn = buildInstantiationFunction();
-    instantiationFn = IGM.emitDirectRelativeReference(fn, cache, { 4 });
+    instantiationFn = buildInstantiationFunction();
   }
 
   auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
@@ -1630,22 +1627,35 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   // Fill in the global.
   auto cacheTy = cast<llvm::StructType>(cache->getValueType());
-  llvm::Constant *cacheData[] = {
-    // WitnessTableSizeInWords
-    llvm::ConstantInt::get(IGM.Int16Ty, TableSize),
-    // WitnessTablePrivateSizeInWords
-    llvm::ConstantInt::get(IGM.Int16Ty, NextCacheIndex),
-    // RelativeIndirectablePointer<ProtocolDescriptor>
-    IGM.emitRelativeReference(descriptorRef, cache, { 2 }),
-    // RelativePointer<WitnessTable>
-    IGM.emitDirectRelativeReference(wtable, cache, { 3 }),
-    // Instantiation function
-    instantiationFn,
-    // Private data
-    llvm::Constant::getNullValue(cacheTy->getStructElementType(5))
-  };
-  cache->setInitializer(llvm::ConstantStruct::get(cacheTy, cacheData));
+  ConstantInitBuilder cacheInitBuilder(IGM);
+  auto cacheData = cacheInitBuilder.beginStruct(cacheTy);
+  // WitnessTableSizeInWords
+  cacheData.addInt(IGM.Int16Ty, TableSize);
+  // WitnessTablePrivateSizeInWords
+  cacheData.addInt(IGM.Int16Ty, NextCacheIndex);
+  // RelativeIndirectablePointer<ProtocolDescriptor>
+  cacheData.addRelativeAddress(descriptorRef);
+  // RelativePointer<WitnessTable>
+  cacheData.addRelativeAddress(wtable);
+  // Instantiation function
+  cacheData.addRelativeAddressOrNull(instantiationFn);
+  // Private data
+  {
+    auto privateDataTy =
+      llvm::ArrayType::get(IGM.Int8PtrTy,
+                           swift::NumGenericMetadataPrivateDataWords);
+    auto privateDataInit = llvm::Constant::getNullValue(privateDataTy);
+    auto privateData =
+      new llvm::GlobalVariable(IGM.Module, privateDataTy, /*constant*/ false,
+                               llvm::GlobalVariable::InternalLinkage,
+                               privateDataInit, "");
+    cacheData.addRelativeAddress(privateData);
+  }
+  cacheData.finishAndSetAsInitializer(cache);
+  cache->setConstant(true);
 
+  llvm::Value *instantiationArgs =
+    llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy);
   auto call = IGF.Builder.CreateCall(IGM.getGetGenericWitnessTableFn(),
                                      { cache, metadata, instantiationArgs });
   call->setDoesNotThrow();

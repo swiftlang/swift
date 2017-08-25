@@ -3385,7 +3385,7 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
       // Instantiator
       RelativeAddressTy,
       // PrivateData
-      llvm::ArrayType::get(Int8PtrTy, swift::NumGenericMetadataPrivateDataWords)
+      RelativeAddressTy
     }, "swift.generic_witness_table_cache");
   return GenericWitnessTableCacheTy;
 }
