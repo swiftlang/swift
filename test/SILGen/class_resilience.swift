@@ -32,3 +32,17 @@ public func finalPropertyOfMine(_ other: MyResilientClass) {
   _ = other.finalProperty
 }
 
+class SubclassOfOutsideChild : ResilientOutsideChild {
+  override func method() {}
+
+  func newMethod() {}
+}
+
+// Note: no entries for [inherited] methods
+
+// CHECK-LABEL: sil_vtable SubclassOfOutsideChild {
+// CHECK-NEXT:  #ResilientOutsideParent.init!initializer.1: (ResilientOutsideParent.Type) -> () -> ResilientOutsideParent : _T016class_resilience22SubclassOfOutsideChildCACycfc [override]
+// CHECK-NEXT:  #ResilientOutsideParent.method!1: (ResilientOutsideParent) -> () -> () : _T016class_resilience22SubclassOfOutsideChildC6methodyyF [override]
+// CHECK-NEXT:  #SubclassOfOutsideChild.newMethod!1: (SubclassOfOutsideChild) -> () -> () : _T016class_resilience22SubclassOfOutsideChildC9newMethodyyF
+// CHECK-NEXT:  #SubclassOfOutsideChild.deinit!deallocator: _T016class_resilience22SubclassOfOutsideChildCfD
+// CHECK-NEXT: }
