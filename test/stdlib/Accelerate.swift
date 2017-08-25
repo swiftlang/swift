@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// UNSUPPORTED: OS=watchos
 // XFAIL: linux
 
 import StdlibUnittest
