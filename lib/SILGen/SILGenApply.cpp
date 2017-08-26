@@ -4022,17 +4022,21 @@ namespace {
                             ImportAsMemberStatus foreignSelf,
                             Optional<ForeignErrorConvention> foreignError,
                             SGFContext C);
-
-    AbstractionPattern
-    getUncurriedOrigFormalType(AbstractionPattern origFormalType) {
-      for (unsigned i = 0, e = uncurriedSites.size(); i < e; ++i) {
-        claimNextParamClause(origFormalType);
-      }
-
-      return origFormalType;
-    }
   };
 } // end anonymous namespace
+
+/// This function claims param clauses from the passed in formal type until the
+/// type is completely uncurried. This will be the final result type for a
+/// normal call.
+static AbstractionPattern
+getUncurriedOrigFormalResultType(AbstractionPattern origFormalType,
+                                 unsigned numUncurriedSites) {
+  for (unsigned i = 0, e = numUncurriedSites; i < e; ++i) {
+    claimNextParamClause(origFormalType);
+  }
+
+  return origFormalType;
+}
 
 RValue CallEmission::applyFirstLevelCallee(
     CanFunctionType &formalType,
@@ -4094,7 +4098,8 @@ RValue CallEmission::applyNormalCall(
   }
 
   CalleeTypeInfo calleeTypeInfo(
-      substFnType, getUncurriedOrigFormalType(origFormalType),
+      substFnType,
+      getUncurriedOrigFormalResultType(origFormalType, uncurriedSites.size()),
       uncurriedSites.back().getSubstResultType(), foreignError);
   ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
       SGF, calleeTypeInfo, uncurriedSites.back().Loc, uncurriedContext);
@@ -4371,9 +4376,9 @@ void CallEmission::emitArgumentsForNormalApply(
     Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType) {
   SmallVector<SmallVector<ManagedValue, 4>, 2> args;
   SmallVector<DelayedArgument, 2> delayedArgs;
-  auto expectedUncurriedOrigFormalType =
-      getUncurriedOrigFormalType(origFormalType);
-  (void)expectedUncurriedOrigFormalType;
+  auto expectedUncurriedOrigResultFormalType =
+      getUncurriedOrigFormalResultType(origFormalType, uncurriedSites.size());
+  (void)expectedUncurriedOrigResultFormalType;
 
   args.reserve(uncurriedSites.size());
   {
@@ -4417,9 +4422,9 @@ void CallEmission::emitArgumentsForNormalApply(
   assert(uncurriedLoc);
   assert(formalApplyType);
   assert(origFormalType.getType() ==
-             expectedUncurriedOrigFormalType.getType() &&
-         "getUncurriedOrigFormalType and emitArgumentsForNormalCall are out of "
-         "sync");
+             expectedUncurriedOrigResultFormalType.getType() &&
+         "expectedUncurriedOrigResultFormalType and emitArgumentsForNormalCall "
+         "are out of sync");
 
   // Emit any delayed arguments: formal accesses to inout arguments, etc.
   if (!delayedArgs.empty()) {
