@@ -1123,9 +1123,19 @@ static SILBasicBlock *getTrampolineDest(SILBasicBlock *SBB) {
   if (!BI)
     return nullptr;
 
-  // Disallow infinite loops.
-  if (BI->getDestBB() == SBB)
-    return nullptr;
+  // Disallow infinite loops through SBB.
+  llvm::SmallPtrSet<SILBasicBlock *, 8> VisitedBBs;
+  BranchInst *NextBI = BI;
+  do {
+    SILBasicBlock *NextBB = NextBI->getDestBB();
+    // We don't care about infinite loops after SBB.
+    if (!VisitedBBs.insert(NextBB).second)
+      break;
+    // Only if the infinite loop goes through SBB directly we bail.
+    if (NextBB == SBB)
+      return nullptr;
+    NextBI = dyn_cast<BranchInst>(NextBB->getTerminator());
+  } while (NextBI);
 
   auto BrArgs = BI->getArgs();
   if (BrArgs.size() != SBB->getNumArguments())
