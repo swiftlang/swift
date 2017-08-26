@@ -4016,7 +4016,6 @@ namespace {
     RValue
     applyEnumElementConstructor(CanFunctionType &formalType,
                                 Optional<ForeignErrorConvention> &foreignError,
-                                ImportAsMemberStatus &foreignSelf,
                                 unsigned uncurryLevel, SGFContext C);
 
     RValue applyNormalCall(CanFunctionType &formalType,
@@ -4068,8 +4067,7 @@ RValue CallEmission::applyFirstLevelCallee(
   }
 
   if (isEnumElementConstructor()) {
-    return applyEnumElementConstructor(formalType,
-                                       foreignError, foreignSelf, uncurryLevel,
+    return applyEnumElementConstructor(formalType, foreignError, uncurryLevel,
                                        C);
   }
 
@@ -4148,9 +4146,8 @@ RValue CallEmission::applyNormalCall(
 }
 
 RValue CallEmission::applyEnumElementConstructor(
-    CanFunctionType &formalType,
-    Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+    CanFunctionType &formalType, Optional<ForeignErrorConvention> &foreignError,
+    unsigned uncurryLevel, SGFContext C) {
   assert(!assumedPlusZeroSelf);
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
 
