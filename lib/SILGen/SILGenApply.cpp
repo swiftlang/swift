@@ -3981,11 +3981,23 @@ namespace {
     CallEmission(const CallEmission &) = delete;
     CallEmission &operator=(const CallEmission &) = delete;
 
-    void emitArgumentsForNormalApply(
+    /// Emit all of the arguments for a normal apply. This means an apply that
+    /// is not:
+    ///
+    /// 1. A specialized emitter (e.g. an emitter for a builtin).
+    /// 2. A partially applied super method.
+    /// 3. An enum element constructor.
+    ///
+    /// It is though all other initial calls and subsequent callees that we feed
+    /// the first callee into.
+    ///
+    /// This returns whether or not any arguments were able to throw in
+    /// ApplyOptions.
+    ApplyOptions emitArgumentsForNormalApply(
         CanFunctionType &formalType, AbstractionPattern &origFormalType,
         CanSILFunctionType substFnType,
         Optional<ForeignErrorConvention> &foreignError,
-        ImportAsMemberStatus &foreignSelf, ApplyOptions &initialOptions,
+        ImportAsMemberStatus &foreignSelf,
         SmallVectorImpl<ManagedValue> &uncurriedArgs,
         Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType);
 
@@ -4073,7 +4085,6 @@ RValue CallEmission::applyNormalCall(
   // outermost call.
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
   ManagedValue mv;
-  ApplyOptions initialOptions = ApplyOptions::None;
 
   formalType = callee.getSubstFormalType();
   auto origFormalType = callee.getOrigFormalType();
@@ -4123,14 +4134,16 @@ RValue CallEmission::applyNormalCall(
   SmallVector<ManagedValue, 4> uncurriedArgs;
   Optional<SILLocation> uncurriedLoc;
   CanFunctionType formalApplyType;
-  emitArgumentsForNormalApply(formalType, origFormalType,
-                              substFnType, foreignError, foreignSelf,
-                              initialOptions, uncurriedArgs, uncurriedLoc,
-                              formalApplyType);
+
+  // *NOTE* We pass in initial options as a reference so that we can pass to
+  // emitApply if any of the arguments could have thrown.
+  ApplyOptions options = emitArgumentsForNormalApply(
+      formalType, origFormalType, substFnType, foreignError, foreignSelf,
+      uncurriedArgs, uncurriedLoc, formalApplyType);
   // Emit the uncurried call.
   return SGF.emitApply(std::move(resultPlan), std::move(argScope),
                        uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
-                       uncurriedArgs, calleeTypeInfo, initialOptions,
+                       uncurriedArgs, calleeTypeInfo, options,
                        uncurriedContext);
 }
 
@@ -4206,8 +4219,6 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
     Optional<ForeignErrorConvention> &foreignError,
     ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
 
-  ApplyOptions initialOptions = ApplyOptions::None;
-
   assert(uncurryLevel == 0);
 
   // We want to emit the arguments as fully-substituted values
@@ -4234,10 +4245,10 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
   SmallVector<ManagedValue, 4> uncurriedArgs;
   Optional<SILLocation> uncurriedLoc;
   CanFunctionType formalApplyType;
-  emitArgumentsForNormalApply(formalType, origFormalType,
-                              substFnType, foreignError, foreignSelf,
-                              initialOptions, uncurriedArgs, uncurriedLoc,
-                              formalApplyType);
+  ApplyOptions options = emitArgumentsForNormalApply(
+      formalType, origFormalType, substFnType, foreignError, foreignSelf,
+      uncurriedArgs, uncurriedLoc, formalApplyType);
+  (void)options;
 
   // Emit the uncurried call.
   assert(uncurriedArgs.size() == 1 && "Can only partially apply the "
@@ -4288,7 +4299,6 @@ RValue CallEmission::applySpecializedEmitter(
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
 
   ManagedValue mv;
-  ApplyOptions initialOptions = ApplyOptions::None;
 
   assert(uncurryLevel == 0);
 
@@ -4338,10 +4348,9 @@ RValue CallEmission::applySpecializedEmitter(
   SmallVector<ManagedValue, 4> uncurriedArgs;
   Optional<SILLocation> uncurriedLoc;
   CanFunctionType formalApplyType;
-  emitArgumentsForNormalApply(formalType, origFormalType,
-                              substFnType, foreignError, foreignSelf,
-                              initialOptions, uncurriedArgs, uncurriedLoc,
-                              formalApplyType);
+  emitArgumentsForNormalApply(formalType, origFormalType, substFnType,
+                              foreignError, foreignSelf, uncurriedArgs,
+                              uncurriedLoc, formalApplyType);
 
   // Emit the uncurried call.
   if (specializedEmitter.isLateEmitter()) {
@@ -4367,13 +4376,15 @@ RValue CallEmission::applySpecializedEmitter(
                 SGF.emitManagedRValueWithCleanup(resultVal));
 }
 
-void CallEmission::emitArgumentsForNormalApply(
+ApplyOptions CallEmission::emitArgumentsForNormalApply(
     CanFunctionType &formalType, AbstractionPattern &origFormalType,
     CanSILFunctionType substFnType,
     Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus &foreignSelf, ApplyOptions &initialOptions,
+    ImportAsMemberStatus &foreignSelf,
     SmallVectorImpl<ManagedValue> &uncurriedArgs,
     Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType) {
+  ApplyOptions options = ApplyOptions::None;
+
   SmallVector<SmallVector<ManagedValue, 4>, 2> args;
   SmallVector<DelayedArgument, 2> delayedArgs;
   auto expectedUncurriedOrigResultFormalType =
@@ -4388,7 +4399,7 @@ void CallEmission::emitArgumentsForNormalApply(
            (uncurriedSites.size() == 2 && substFnType->hasSelfParam()));
 
     if (!uncurriedSites.back().throws()) {
-      initialOptions |= ApplyOptions::DoesNotThrow;
+      options |= ApplyOptions::DoesNotThrow;
     }
 
     // Collect the captures, if any.
@@ -4443,6 +4454,8 @@ void CallEmission::emitArgumentsForNormalApply(
                        uncurriedArgs.end() - 1, uncurriedArgs.end());
     uncurriedArgs[foreignSelf.getSelfIndex()] = selfArg;
   }
+
+  return options;
 }
 
 RValue CallEmission::applyRemainingCallSites(
@@ -4495,11 +4508,9 @@ RValue CallEmission::applyRemainingCallSites(
       emitDelayedArguments(SGF, delayedArgs, siteArgs);
     }
 
-    ApplyOptions options = ApplyOptions::None;
-
     result = SGF.emitApply(std::move(resultPtr), std::move(argScope), loc,
-                           functionMV, {}, siteArgs, calleeTypeInfo, options,
-                           context);
+                           functionMV, {}, siteArgs, calleeTypeInfo,
+                           ApplyOptions::None, context);
   }
 
   return std::move(result);
