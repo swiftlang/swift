@@ -1997,6 +1997,20 @@ public:
   Type getResultType(const AbstractClosureExpr *E);
 
 private:
+  /// Determine if the given constraint represents explicit conversion,
+  /// e.g. coercion constraint "as X" which forms a disjunction.
+  bool isExplicitConversionConstraint(Constraint *constraint) const {
+    if (constraint->getKind() != ConstraintKind::Disjunction)
+      return false;
+
+    if (auto locator = constraint->getLocator()) {
+      if (auto anchor = locator->getAnchor())
+        return isa<CoerceExpr>(anchor);
+    }
+
+    return false;
+  }
+
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
@@ -2972,11 +2986,13 @@ void simplifyLocator(Expr *&anchor,
 
 class DisjunctionChoice {
   ConstraintSystem *CS;
+  Constraint *Disjunction;
   Constraint *Choice;
 
 public:
-  DisjunctionChoice(ConstraintSystem *const cs, Constraint *constraint)
-      : CS(cs), Choice(constraint) {}
+  DisjunctionChoice(ConstraintSystem *const cs, Constraint *disjunction,
+                    Constraint *choice)
+      : CS(cs), Disjunction(disjunction), Choice(choice) {}
 
   Constraint *operator&() const { return Choice; }
 
@@ -2997,6 +3013,10 @@ public:
                         FreeTypeVariableBinding allowFreeTypeVariables);
 
 private:
+  /// \brief If associated disjunction is an explicit conversion,
+  /// let's try to propagate its type early to prune search space.
+  void propagateConversionInfo() const;
+
   static ValueDecl *getOperatorDecl(Constraint *constraint) {
     if (constraint->getKind() != ConstraintKind::BindOverload)
       return nullptr;
