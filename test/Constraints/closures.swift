@@ -597,3 +597,6 @@ func testSR5666(cs: [SR5666?]) -> [String?] {
       return b
     })
 }
+
+// Ensure that we still do the appropriate pointer conversion here.
+_ = "".withCString { UnsafeMutableRawPointer(mutating: $0) }
