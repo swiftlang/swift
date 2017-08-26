@@ -486,10 +486,9 @@ public:
   }
 
   std::tuple<ManagedValue, CanSILFunctionType, Optional<ForeignErrorConvention>,
-             ImportAsMemberStatus, ApplyOptions>
+             ImportAsMemberStatus>
   getAtUncurryLevel(SILGenFunction &SGF, unsigned level) const & {
     ManagedValue mv;
-    ApplyOptions options = ApplyOptions::None;
     Optional<SILDeclRef> constant = None;
 
     if (!Constant) {
@@ -639,7 +638,7 @@ public:
       mv.getType().castTo<SILFunctionType>()->substGenericArgs(
         SGF.SGM.M, Substitutions);
 
-    return std::make_tuple(mv, substFnType, foreignError, foreignSelf, options);
+    return std::make_tuple(mv, substFnType, foreignError, foreignSelf);
   }
 
   SubstitutionList getSubstitutions() const {
@@ -4078,7 +4077,7 @@ RValue CallEmission::applyNormalCall(
   CanSILFunctionType substFnType;
 
   // Get the callee type information.
-  std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
+  std::tie(mv, substFnType, foreignError, foreignSelf) =
       callee.getAtUncurryLevel(SGF, uncurryLevel);
 
   // In C language modes, substitute the type of the AbstractionPattern
@@ -4569,8 +4568,8 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   CanSILFunctionType substFnType;
   Optional<ForeignErrorConvention> foreignError;
   ImportAsMemberStatus foreignSelf;
-  ApplyOptions options;
-  std::tie(mv, substFnType, foreignError, foreignSelf, options) =
+  ApplyOptions options = ApplyOptions::None;
+  std::tie(mv, substFnType, foreignError, foreignSelf) =
       callee.getAtUncurryLevel(*this, 0);
 
   assert(!foreignError);
