@@ -2943,3 +2943,38 @@ bb3:
   %z = integer_literal $Builtin.Int1, 0
   br bb2(%z : $Builtin.Int1)
 }
+
+// CHECK-LABEL: sil @dont_hang
+// CHECK:      bb6:
+// CHECK:        integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:   br bb5
+// CHECK-NEXT: }
+sil @dont_hang : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb4
+
+bb1:
+  %0 = integer_literal $Builtin.Int64, 1
+  cond_br undef, bb2, bb6
+
+bb2:
+  br bb3
+
+bb3:
+  br bb5
+
+bb4:
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb3
+
+bb5:
+  br bb2
+
+bb6:
+  %2 = integer_literal $Builtin.Int64, 1
+  br bb7
+
+bb7:
+  br bb5
+}
+
