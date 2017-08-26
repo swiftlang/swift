@@ -1950,6 +1950,11 @@ RValue RValueEmitter::visitCovariantReturnConversionExpr(
   ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
   SILType resultType = SGF.getLoweredType(e->getType());
 
+  // DynamicSelfType lowers as its self type, so no SIL-level conversion
+  // is required in this case.
+  if (resultType == original.getType())
+    return RValue(SGF, e, original);
+
   ManagedValue result = SGF.B.createUncheckedRefCast(e, original, resultType);
 
   return RValue(SGF, e, result);

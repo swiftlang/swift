@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift -swift-version 5
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -35,6 +35,10 @@ extension TriviallyConstructible {
     }
     self.init(inner: x)
   }
+
+  init(assignToSelf x: LifetimeTracked) {
+    self = Self(inner: x)
+  }
 }
 
 class TrivialClass : TriviallyConstructible {
@@ -51,6 +55,10 @@ class TrivialClass : TriviallyConstructible {
     try self.init(throwingMiddle: x, shouldThrow: shouldThrow)
   }
 
+  convenience init(delegates x: LifetimeTracked) {
+    self.init(assignToSelf: x)
+  }
+
   required init(inner tracker: LifetimeTracked) {
     self.tracker = tracker
   }
@@ -60,6 +68,7 @@ class TrivialClass : TriviallyConstructible {
 
 ProtocolInitTestSuite.test("ProtocolInit_Trivial") {
   _ = TrivialClass(outer: LifetimeTracked(0))
+  _ = TrivialClass(delegates: LifetimeTracked(0))
 }
 
 ProtocolInitTestSuite.test("ProtocolInit_Failable") {
@@ -84,6 +93,17 @@ ProtocolInitTestSuite.test("ProtocolInit_Throwing") {
     let result = try TrivialClass(throwingOuter: LifetimeTracked(5), shouldThrow: true)
     preconditionFailure("Expected error")
   } catch {}
+}
+
+class TrivialSubclass : TrivialClass {}
+
+func makeSubclass() -> TrivialClass {
+  return TrivialSubclass(delegates: LifetimeTracked(0))
+}
+
+ProtocolInitTestSuite.test("ProtocolInit_Subclass") {
+  let t = makeSubclass()
+  assert(t is TrivialSubclass)
 }
 
 runAllTests()
