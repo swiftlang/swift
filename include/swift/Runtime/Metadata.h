@@ -1099,6 +1099,9 @@ struct TargetMethodDescriptor {
   /// The method implementation.
   TargetRelativeDirectPointer<Runtime, void> Impl;
 
+  /// Flags describing the method.
+  MethodDescriptorFlags Flags;
+
   // TODO: add method types or anything else needed for reflection.
 };
 

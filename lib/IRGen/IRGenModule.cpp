@@ -291,6 +291,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   NominalTypeDescriptorPtrTy
     = NominalTypeDescriptorTy->getPointerTo(DefaultAS);
 
+  MethodDescriptorStructTy
+    = createStructType(*this, "swift.method_descriptor", {
+      RelativeAddressTy,
+      Int32Ty
+    });
+
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
       RelativeAddressTy,

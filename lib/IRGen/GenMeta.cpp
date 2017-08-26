@@ -2083,6 +2083,31 @@ void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
 /** Nominal Type Descriptor Emission *****************************************/
 /*****************************************************************************/
 
+template <class Kind>
+static Kind classifyMethodKind(ValueDecl *fn) {
+  if (isa<ConstructorDecl>(fn))
+    return Kind::Init;
+
+  switch (cast<FuncDecl>(fn)->getAccessorKind()) {
+  case AccessorKind::NotAccessor:
+    return (fn->isStatic()
+              ? Kind::StaticMethod
+              : Kind::InstanceMethod);
+  case AccessorKind::IsGetter:
+    return Kind::Getter;
+  case AccessorKind::IsSetter:
+    return Kind::Setter;
+  case AccessorKind::IsMaterializeForSet:
+    return Kind::MaterializeForSet;
+  case AccessorKind::IsWillSet:
+  case AccessorKind::IsDidSet:
+  case AccessorKind::IsAddressor:
+  case AccessorKind::IsMutableAddressor:
+    llvm_unreachable("these accessors never appear in protocols or v-tables");
+  }
+  llvm_unreachable("bad kind");
+}
+
 namespace {  
   template<class Impl>
   class NominalTypeDescriptorBuilderBase {
@@ -2416,6 +2441,19 @@ namespace {
     void addMethod(SILDeclRef fn) {
       assert(VTable && "no vtable?!");
 
+      auto descriptor = B.beginStruct(IGM.MethodDescriptorStructTy);
+
+      // Classify the method.
+      using Flags = MethodDescriptorFlags;
+      Flags::Kind kind = classifyMethodKind<Flags::Kind>(fn.getDecl());
+      auto flags = MethodDescriptorFlags(kind);
+
+      // Remember if the declaration was dynamic.
+      if (fn.getDecl()->isDynamic())
+        flags = flags.withIsDynamic(true);
+
+      // TODO: final? open?
+
       auto *dc = fn.getDecl()->getDeclContext();
       assert(!isa<ExtensionDecl>(dc));
 
@@ -2424,13 +2462,17 @@ namespace {
           assert(entry->TheKind == SILVTable::Entry::Kind::Normal);
           auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
                                                   NotForDefinition);
-          B.addRelativeAddress(implFn);
+          descriptor.addRelativeAddress(implFn);
         } else {
           // The method is removed by dead method elimination.
           // It should be never called. We add a pointer to an error function.
-          B.addRelativeAddressOrNull(nullptr);
+          descriptor.addRelativeAddressOrNull(nullptr);
         }
       }
+
+      descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
+
+      descriptor.finishAndAddTo(B);
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
@@ -5380,29 +5422,7 @@ namespace {
       auto func = entry.getFunction();
 
       // Classify the function.
-      auto kind = [&] {
-        if (isa<ConstructorDecl>(func))
-          return Flags::Kind::Init;
-
-        switch (cast<FuncDecl>(func)->getAccessorKind()) {
-        case AccessorKind::NotAccessor:
-          return (func->isStatic()
-                    ? Flags::Kind::StaticMethod
-                    : Flags::Kind::InstanceMethod);
-        case AccessorKind::IsGetter:
-          return Flags::Kind::Getter;
-        case AccessorKind::IsSetter:
-          return Flags::Kind::Setter;
-        case AccessorKind::IsMaterializeForSet:
-          return Flags::Kind::MaterializeForSet;
-        case AccessorKind::IsWillSet:
-        case AccessorKind::IsDidSet:
-        case AccessorKind::IsAddressor:
-        case AccessorKind::IsMutableAddressor:
-          llvm_unreachable("these accessors never appear in protocols");
-        }
-        llvm_unreachable("bad kind");
-      }();
+      auto kind = classifyMethodKind<Flags::Kind>(func);
       auto flags = Flags(kind);
 
       // Look for a default witness.
