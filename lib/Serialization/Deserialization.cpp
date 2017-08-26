@@ -4534,6 +4534,9 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   }
 }
 
+static Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
+                                                    llvm::Error &&error,
+                                                    ClassDecl *containingClass);
 static Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
                                                     llvm::Error &&error,
                                                     ProtocolDecl *containingProto);
@@ -4544,6 +4547,20 @@ Decl *handleErrorAndSupplyMissingMember(ASTContext& context, Decl *container, ll
   // Drop the member if it had a problem.
   // FIXME: Handle overridable members in class extensions too, someday.
   if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
+    suppliedMissingMember = handleErrorAndSupplyMissingClassMember(context, std::move(error), containingClass);
+  } else if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
+    suppliedMissingMember = handleErrorAndSupplyMissingProtoMember(context, std::move(error), containingProto);
+  }
+  else {
+    suppliedMissingMember = handleErrorAndSupplyMissingMiscMember(std::move(error));
+  }
+  return suppliedMissingMember;
+}
+
+Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
+                                             llvm::Error &&error,
+                                             ClassDecl *containingClass) {
+  Decl *suppliedMissingMember = nullptr;
     auto handleMissingClassMember =
     [&](const DeclDeserializationError &error) {
       if (error.isDesignatedInitializer())
@@ -4564,14 +4581,9 @@ Decl *handleErrorAndSupplyMissingMember(ASTContext& context, Decl *container, ll
       // subscripts, and methods that don't need vtable entries.
     };
     llvm::handleAllErrors(std::move(error), handleMissingClassMember);
-  } else if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
-    suppliedMissingMember = handleErrorAndSupplyMissingProtoMember(context, std::move(error), containingProto);
-  }
-  else {
-    suppliedMissingMember = handleErrorAndSupplyMissingMiscMember(std::move(error));
-  }
   return suppliedMissingMember;
 }
+  
 
 Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
                                              llvm::Error &&error,
