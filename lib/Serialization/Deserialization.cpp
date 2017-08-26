@@ -4473,87 +4473,6 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   return typeOrOffset;
 }
 
-static Decl *handleErrorAndSupplyMissingMember(ASTContext& context, Decl *container, llvm::Error &&error);
-
-void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
-  PrettyStackTraceDecl trace("loading members for", container);
-  ++NumMemberListsLoaded;
-
-  IterableDeclContext *IDC;
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(container))
-    IDC = nominal;
-  else
-    IDC = cast<ExtensionDecl>(container);
-
-  BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(contextData);
-  auto entry = DeclTypeCursor.advance();
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    error();
-    return;
-  }
-
-  SmallVector<uint64_t, 16> memberIDBuffer;
-
-  unsigned kind = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
-  assert(kind == decls_block::MEMBERS);
-  (void)kind;
-
-  ArrayRef<uint64_t> rawMemberIDs;
-  decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
-
-  if (rawMemberIDs.empty())
-    return;
-
-  SmallVector<Decl *, 16> members;
-  members.reserve(rawMemberIDs.size());
-  for (DeclID rawID : rawMemberIDs) {
-    Expected<Decl *> next = getDeclChecked(rawID);
-    if (next) {
-      assert(next.get() && "unchecked error deserializing next member");
-      members.push_back(next.get());
-    }
-    else {
-      if (!getContext().LangOpts.EnableDeserializationRecovery)
-        fatal(next.takeError());
-
-      Decl *suppliedMissingMember = handleErrorAndSupplyMissingMember(getContext(), container, next.takeError());
-      if (suppliedMissingMember)
-        members.push_back(suppliedMissingMember);
-    }
-  }
-
-  for (auto member : members)
-    IDC->addMember(member);
-
-  if (auto *proto = dyn_cast<ProtocolDecl>(container)) {
-    PrettyStackTraceDecl trace("reading default witness table for", proto);
-    bool Err = readDefaultWitnessTable(proto);
-    assert(!Err && "unable to read default witness table");
-    (void)Err;
-  }
-}
-
-static Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
-                                                    llvm::Error &&error,
-                                                    ClassDecl *containingClass);
-static Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
-                                                    llvm::Error &&error,
-                                                    ProtocolDecl *containingProto);
-static Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error);
-
-Decl *handleErrorAndSupplyMissingMember(ASTContext& context, Decl *container, llvm::Error &&error) {
-  // Drop the member if it had a problem.
-  // FIXME: Handle overridable members in class extensions too, someday.
-  if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
-    return handleErrorAndSupplyMissingClassMember(context, std::move(error), containingClass);
-  }
-  if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
-    return handleErrorAndSupplyMissingProtoMember(context, std::move(error), containingProto);
-  }
-  return handleErrorAndSupplyMissingMiscMember(std::move(error));
-}
-
 Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
                                              llvm::Error &&error,
                                              ClassDecl *containingClass) {
@@ -4613,6 +4532,80 @@ Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) {
   llvm::consumeError(std::move(error));
   return nullptr;
 }
+
+
+Decl *handleErrorAndSupplyMissingMember(ASTContext& context, Decl *container, llvm::Error &&error) {
+  // Drop the member if it had a problem.
+  // FIXME: Handle overridable members in class extensions too, someday.
+  if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
+    return handleErrorAndSupplyMissingClassMember(context, std::move(error), containingClass);
+  }
+  if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
+    return handleErrorAndSupplyMissingProtoMember(context, std::move(error), containingProto);
+  }
+  return handleErrorAndSupplyMissingMiscMember(std::move(error));
+}
+
+
+void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
+  PrettyStackTraceDecl trace("loading members for", container);
+  ++NumMemberListsLoaded;
+
+  IterableDeclContext *IDC;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(container))
+    IDC = nominal;
+  else
+    IDC = cast<ExtensionDecl>(container);
+
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(contextData);
+  auto entry = DeclTypeCursor.advance();
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    error();
+    return;
+  }
+
+  SmallVector<uint64_t, 16> memberIDBuffer;
+
+  unsigned kind = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
+  assert(kind == decls_block::MEMBERS);
+  (void)kind;
+
+  ArrayRef<uint64_t> rawMemberIDs;
+  decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
+
+  if (rawMemberIDs.empty())
+    return;
+  
+  SmallVector<Decl *, 16> members;
+  members.reserve(rawMemberIDs.size());
+  for (DeclID rawID : rawMemberIDs) {
+    Expected<Decl *> next = getDeclChecked(rawID);
+    if (next) {
+      assert(next.get() && "unchecked error deserializing next member");
+      members.push_back(next.get());
+    }
+    else {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(next.takeError());
+      
+      Decl *suppliedMissingMember = handleErrorAndSupplyMissingMember(getContext(), container, next.takeError());
+      if (suppliedMissingMember)
+        members.push_back(suppliedMissingMember);
+    }
+  }
+  
+  for (auto member : members)
+    IDC->addMember(member);
+  
+  if (auto *proto = dyn_cast<ProtocolDecl>(container)) {
+    PrettyStackTraceDecl trace("reading default witness table for", proto);
+    bool Err = readDefaultWitnessTable(proto);
+    assert(!Err && "unable to read default witness table");
+    (void)Err;
+  }
+}
+
 
 
 void
