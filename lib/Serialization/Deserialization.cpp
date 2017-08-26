@@ -4534,6 +4534,11 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   }
 }
 
+static Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
+                                                    llvm::Error &&error,
+                                                    ProtocolDecl *containingProto);
+static Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error);
+
 Decl *handleErrorAndSupplyMissingMember(ASTContext& context, Decl *container, llvm::Error &&error) {
   Decl *suppliedMissingMember = nullptr;
   // Drop the member if it had a problem.
@@ -4560,6 +4565,19 @@ Decl *handleErrorAndSupplyMissingMember(ASTContext& context, Decl *container, ll
     };
     llvm::handleAllErrors(std::move(error), handleMissingClassMember);
   } else if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
+    suppliedMissingMember = handleErrorAndSupplyMissingProtoMember(context, std::move(error), containingProto);
+  }
+  else {
+    suppliedMissingMember = handleErrorAndSupplyMissingMiscMember(std::move(error));
+  }
+  return suppliedMissingMember;
+}
+
+Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
+                                             llvm::Error &&error,
+                                             ProtocolDecl *containingProto) {
+  Decl *suppliedMissingMember = nullptr;
+
     auto handleMissingProtocolMember =
     [&](const DeclDeserializationError &error) {
       assert(!error.needsAllocatingVTableEntry());
@@ -4579,10 +4597,12 @@ Decl *handleErrorAndSupplyMissingMember(ASTContext& context, Decl *container, ll
       // subscripts, and methods that don't need vtable entries.
     };
     llvm::handleAllErrors(std::move(error), handleMissingProtocolMember);
-  } else {
-    llvm::consumeError(std::move(error));
-  }
   return suppliedMissingMember;
+}
+
+Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) {
+  llvm::consumeError(std::move(error));
+  return nullptr;
 }
 
 
