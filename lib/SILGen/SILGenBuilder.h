@@ -267,6 +267,10 @@ public:
   ManagedValue createUncheckedRefCast(SILLocation loc, ManagedValue original,
                                       SILType type);
 
+  using SILBuilder::createUncheckedBitCast;
+  ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
+                                      SILType type);
+
   using SILBuilder::createOpenExistentialRef;
   ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
                                         SILType openedType);

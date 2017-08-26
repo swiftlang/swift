@@ -475,10 +475,7 @@ ManagedValue Transform::transform(ManagedValue v,
 
     if (outputSubstType->isExactSuperclassOf(inputSubstType)) {
       // Upcast to a superclass.
-      return ManagedValue(SGF.B.createUpcast(Loc,
-                                             v.getValue(),
-                                             loweredResultTy),
-                          v.getCleanup());
+      return SGF.B.createUpcast(Loc, v, loweredResultTy);
     } else {
       // Unchecked-downcast to a covariant return type.
       assert(inputSubstType->isExactSuperclassOf(outputSubstType)
@@ -493,10 +490,7 @@ ManagedValue Transform::transform(ManagedValue v,
       if (archetypeType->getSuperclass()) {
         // Replace the cleanup with a new one on the superclass value so we
         // always use concrete retain/release operations.
-        return ManagedValue(SGF.B.createUpcast(Loc,
-                                               v.getValue(),
-                                               loweredResultTy),
-                            v.getCleanup());
+        return SGF.B.createUpcast(Loc, v, loweredResultTy);
       }
     }
   }
@@ -1090,9 +1084,7 @@ namespace {
                                        outputOrigType, outputTupleType,
                                        loweredTy);
 
-        auto optional = SGF.B.createEnum(Loc, payload.getValue(),
-                                         someDecl, optionalTy);
-        return ManagedValue(optional, payload.getCleanup());
+        return SGF.B.createEnum(Loc, payload, someDecl, optionalTy);
       } else {
         auto optionalBuf = SGF.emitTemporaryAllocation(Loc, optionalTy);
         auto tupleBuf = SGF.B.createInitEnumDataAddr(Loc, optionalBuf, someDecl,
