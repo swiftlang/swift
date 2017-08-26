@@ -2796,7 +2796,7 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
 
   // Fill in any default requirements.
   for (size_t i = numPatternWitnesses, e = numRequirements; i < e; ++i) {
-    auto defaultImpl = (void*) requirements[i].DefaultImplementation.get();
+    void *defaultImpl = requirements[i].DefaultImplementation.get();
     assert(defaultImpl &&
            "no default implementation for missing requirement");
     table[i] = defaultImpl;
