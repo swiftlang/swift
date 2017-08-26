@@ -1597,7 +1597,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(A->getValue()));
   }
 
-  if (getTriple().getOS() == llvm::Triple::Linux && !getTriple().isAndroid()) {
+  if (getTriple().getOS() == llvm::Triple::Linux && job.getKind() != LinkKind::DynamicLibrary) {
     Arguments.push_back("-pie");
   }
 
