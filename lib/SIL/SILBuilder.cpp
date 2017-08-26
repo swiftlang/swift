@@ -104,6 +104,7 @@ SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
 SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
                                                    SILValue Op,
                                                    SILType Ty) {
+  assert(Op->getType() != Ty);
   if (Ty.isTrivial(getModule()))
     return insert(UncheckedTrivialBitCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
