@@ -4715,10 +4715,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
     ManagedValue v = std::move(result).getAsSingleValue(SGF, loc);
     CanType canOverriddenSelfType = overriddenSelfType->getCanonicalType();
     SILType loweredResultTy = SGF.getLoweredType(canOverriddenSelfType);
-    v = ManagedValue(SGF.B.createUncheckedRefCast(loc,
-                                                  v.getValue(),
-                                                  loweredResultTy),
-                     v.getCleanup());
+    v = SGF.B.createUncheckedRefCast(loc, v, loweredResultTy);
     result = RValue(SGF, loc, canOverriddenSelfType, v);
   }
 

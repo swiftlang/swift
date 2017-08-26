@@ -470,10 +470,7 @@ ManagedValue Transform::transform(ManagedValue v,
     // CF <-> Objective-C via toll-free bridging.
     if ((class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType) ^
         (class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType)) {
-       return ManagedValue(SGF.B.createUncheckedRefCast(Loc,
-                                                        v.getValue(),
-                                                        loweredResultTy),
-                           v.getCleanup());
+      return SGF.B.createUncheckedRefCast(Loc, v, loweredResultTy);
     }
 
     if (outputSubstType->isExactSuperclassOf(inputSubstType)) {
@@ -486,8 +483,7 @@ ManagedValue Transform::transform(ManagedValue v,
       // Unchecked-downcast to a covariant return type.
       assert(inputSubstType->isExactSuperclassOf(outputSubstType)
              && "should be inheritance relationship between input and output");
-      return SGF.emitManagedRValueWithCleanup(
-        SGF.B.createUncheckedRefCast(Loc, v.forward(SGF), loweredResultTy));      
+      return SGF.B.createUncheckedRefCast(Loc, v, loweredResultTy);
     }
   }
 
