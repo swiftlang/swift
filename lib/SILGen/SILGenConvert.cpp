@@ -745,10 +745,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // opaque values mode: This is a case of an opaque value that we can
       // "treat" as a by-value one
       ManagedValue sub = F(SGFContext());
-      SILValue v = B.createInitExistentialValue(
+      return B.createInitExistentialValue(
           loc, existentialTL.getLoweredType(), concreteFormalType,
-          sub.getValue(), conformances);
-      return ManagedValue(v, sub.getCleanup());
+          sub, conformances);
     }
 
     // Allocate the existential.

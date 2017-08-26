@@ -1116,6 +1116,30 @@ func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
   }
 }
 
+// Make sure that we insert a destroy of the box even though we used an Int type.
+// CHECK-LABEL: sil @_T020opaque_values_silgen22s020_______assignToVaryyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[Y_BOX:%.*]] = alloc_box ${ var Int }, var, name "y"
+// CHECK:   [[PROJECT_Y_BOX:%.*]] = project_box [[Y_BOX]] : ${ var Int }, 0
+// CHECK:   [[X_BOX:%.*]] = alloc_box ${ var Any }, var, name "x"
+// CHECK:   [[PROJECT_X_BOX:%.*]] = project_box [[X_BOX]] : ${ var Any }, 0
+// CHECK:   [[ACCESS_PROJECT_Y_BOX:%.*]] = begin_access [read] [unknown] [[PROJECT_Y_BOX]] : $*Int
+// CHECK:   [[Y:%.*]] = load [trivial] [[ACCESS_PROJECT_Y_BOX]] : $*Int
+// CHECK:   [[Y_ANY_FOR_X:%.*]] = init_existential_value [[Y]] : $Int, $Int, $Any
+// CHECK:   store [[Y_ANY_FOR_X]] to [init] [[PROJECT_X_BOX]]
+// CHECK:   [[ACCESS_PROJECT_Y_BOX:%.*]] = begin_access [read] [unknown] [[PROJECT_Y_BOX]] : $*Int
+// CHECK:   [[Y:%.*]] = load [trivial] [[ACCESS_PROJECT_Y_BOX]] : $*Int
+// CHECK:   [[Y_ANY_FOR_Z:%.*]] = init_existential_value [[Y]] : $Int, $Int, $Any
+// CHECK:   destroy_value [[Y_ANY_FOR_Z]]
+// CEHCK:   destroy_value [[X_BOX]]
+// CHECK:   destroy_value [[Y_BOX]]
+// CHECK: } // end sil function '_T020opaque_values_silgen22s020_______assignToVaryyF'
+public func s020_______assignToVar() {
+  var y: Int = 3
+  var x: Any = y
+  let z: Any = y
+}
+
 // s250_________testBoxT continued Test Implicit Value Construction under Opaque value mode
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen3BoxVACyxGx1t_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T> {
