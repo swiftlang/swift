@@ -12,7 +12,7 @@ import Swift
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [32 x i8] c"15generic_classes11RootGenericC\00"
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private constant [7 x i8] c"x\00y\00z\00\00"
-// CHECK: @_T015generic_classes11RootGenericCMn = hidden constant <{ {{.*}} i32 }> <{
+// CHECK: @_T015generic_classes11RootGenericCMn = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
 // --       name
 // CHECK-SAME:   [32 x i8]* [[ROOTGENERIC_NAME]]
 // --       num fields

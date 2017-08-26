@@ -486,6 +486,7 @@ public:
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
   llvm::StructType *NominalTypeDescriptorTy;
   llvm::PointerType *NominalTypeDescriptorPtrTy;
+  llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
