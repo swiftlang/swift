@@ -123,7 +123,8 @@ func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
   // CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
   // CHECK: [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]] : $RefSubclass
   // CHECK: [[R_SUP:%[0-9]+]] = upcast [[ARG1_COPY]] : $RefSubclass to $Ref
-  // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> (), $@convention(method) (Int, @guaranteed Ref) -> ()
+  // CHECK: [[BORROWED_R_SUP:%.*]] = begin_borrow [[R_SUP]]
+  // CHECK: [[FN:%[0-9]+]] = class_method [[BORROWED_R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> (), $@convention(method) (Int, @guaranteed Ref) -> ()
   // CHECK: apply [[FN]]([[ARG2]], [[R_SUP]]) :
   // CHECK: destroy_value [[R_SUP]]
   // CHECK: end_borrow [[BORROWED_ARG1]] from [[ARG1]]
@@ -159,8 +160,8 @@ func physical_class_rvalue() -> Int {
   return class_rvalue().y
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T010properties12class_rvalueAA3RefCyF
   // CHECK: [[CLASS:%[0-9]+]] = apply [[FUNC]]()
-
-  // CHECK: [[FN:%[0-9]+]] = class_method [[CLASS]] : $Ref, #Ref.y!getter.1
+  // CHECK: [[BORROWED_CLASS:%.*]] = begin_borrow [[CLASS]]
+  // CHECK: [[FN:%[0-9]+]] = class_method [[BORROWED_CLASS]] : $Ref, #Ref.y!getter.1
   // CHECK: [[RET:%[0-9]+]] = apply [[FN]]([[CLASS]])
   // CHECK: return [[RET]]
 }
@@ -733,7 +734,9 @@ class rdar16151899Derived : rdar16151899Base {
         // CHECK:  [[BASEPTR:%[0-9]+]] = upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
         // CHECK: load{{.*}}Int
         // CHECK-NEXT: end_access {{.*}} : $*Int
+        // CHECK-NEXT: begin_borrow {{.*}} : $rdar16151899Base
         // CHECK-NEXT: [[SETTER:%[0-9]+]] = class_method {{.*}} : $rdar16151899Base, #rdar16151899Base.x!setter.1 : (rdar16151899Base)
+        // CHECK-NEXT: end_borrow
         // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]]) 
     }
 }
@@ -1188,14 +1191,16 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   [[C:%.*]] = load [copy] [[C_INOUT:%.*]] : $*ReferenceType
 // CHECK-NEXT:   end_access [[C_INOUT]] : $*ReferenceType
 // CHECK-NEXT:   [[C_FIELD_BOX:%.*]] = alloc_stack $NonmutatingProtocol
-// CHECK-NEXT:   [[GETTER:%.*]] = class_method [[C]] : $ReferenceType, #ReferenceType.p!getter.1 : (ReferenceType) -> () -> NonmutatingProtocol, $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
+// CHECK-NEXT:   [[BORROWED_C:%.*]] = begin_borrow [[C]]
+// CHECK-NEXT:   [[GETTER:%.*]] = class_method [[BORROWED_C]] : $ReferenceType, #ReferenceType.p!getter.1 : (ReferenceType) -> () -> NonmutatingProtocol, $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
+// CHECK-NEXT:   end_borrow
 // CHECK-NEXT:   apply [[GETTER]]([[C_FIELD_BOX]], [[C]]) : $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
 // CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
 // CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*NonmutatingProtocol to $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [initialization] [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
-// CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}") NonmutatingProtocol, #NonmutatingProtocol.x!getter.1 : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, %11 : $*@opened("{{.*}}") NonmutatingProtocol : $@convention(witness_method) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}") NonmutatingProtocol, #NonmutatingProtocol.x!getter.1 : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}") NonmutatingProtocol : $@convention(witness_method) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}") NonmutatingProtocol>([[C_FIELD_COPY]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   assign [[RESULT_VALUE]] to [[UNINIT]] : $*Int
