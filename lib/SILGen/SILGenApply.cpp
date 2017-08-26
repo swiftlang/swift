@@ -4004,7 +4004,7 @@ namespace {
     RValue
     applySpecializedEmitter(CanFunctionType &formalType,
                             Optional<ForeignErrorConvention> &foreignError,
-                            ImportAsMemberStatus &foreignSelf,
+                            ImportAsMemberStatus foreignSelf,
                             SpecializedEmitter &specializedEmitter,
                             unsigned uncurryLevel, SGFContext C);
 
@@ -4289,9 +4289,8 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
 }
 
 RValue CallEmission::applySpecializedEmitter(
-    CanFunctionType &formalType,
-    Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus &foreignSelf, SpecializedEmitter &specializedEmitter,
+    CanFunctionType &formalType, Optional<ForeignErrorConvention> &foreignError,
+    ImportAsMemberStatus foreignSelf, SpecializedEmitter &specializedEmitter,
     unsigned uncurryLevel, SGFContext C) {
 
   // We use the context emit-into initialization only for the
