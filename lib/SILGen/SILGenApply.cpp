@@ -4011,7 +4011,7 @@ namespace {
     RValue applyPartiallyAppliedSuperMethod(
         CanFunctionType &formalType,
         Optional<ForeignErrorConvention> &foreignError,
-        ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C);
+        ImportAsMemberStatus foreignSelf, unsigned uncurryLevel, SGFContext C);
 
     RValue
     applyEnumElementConstructor(CanFunctionType &formalType,
@@ -4215,9 +4215,8 @@ RValue CallEmission::applyEnumElementConstructor(
 }
 
 RValue CallEmission::applyPartiallyAppliedSuperMethod(
-    CanFunctionType &formalType,
-    Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+    CanFunctionType &formalType, Optional<ForeignErrorConvention> &foreignError,
+    ImportAsMemberStatus foreignSelf, unsigned uncurryLevel, SGFContext C) {
 
   assert(uncurryLevel == 0);
 
