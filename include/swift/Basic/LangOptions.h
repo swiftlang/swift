@@ -311,6 +311,15 @@ namespace swift {
       return EffectiveLanguageVersion.isVersion3();
     }
 
+    /// Whether our effective Swift version is at least 'major'.
+    ///
+    /// This is usually the check you want; for example, when introducing
+    /// a new language feature which is only visible in Swift 5, you would
+    /// check for isSwiftVersionAtLeast(5).
+    bool isSwiftVersionAtLeast(unsigned major) const {
+      return EffectiveLanguageVersion.isVersionAtLeast(major);
+    }
+
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///

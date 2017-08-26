@@ -862,9 +862,18 @@ public:
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
-  
-  /// Whether our effective Swift version is in the Swift 3 family
+
+  /// Whether our effective Swift version is in the Swift 3 family.
   bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
+
+  /// Whether our effective Swift version is at least 'major'.
+  ///
+  /// This is usually the check you want; for example, when introducing
+  /// a new language feature which is only visible in Swift 5, you would
+  /// check for isSwiftVersionAtLeast(5).
+  bool isSwiftVersionAtLeast(unsigned major) const {
+    return LangOpts.isSwiftVersionAtLeast(major);
+  }
 
 private:
   friend Decl;

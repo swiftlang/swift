@@ -629,6 +629,15 @@ ManagedValue SILGenBuilder::createUncheckedRefCast(SILLocation loc,
   return cloner.clone(cast);
 }
 
+ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
+                                                   ManagedValue value,
+                                                   SILType type) {
+  CleanupCloner cloner(*this, value);
+  SILValue cast =
+      SILBuilder::createUncheckedBitCast(loc, value.forward(SGF), type);
+  return cloner.clone(cast);
+}
+
 ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
                                                      ManagedValue original,
                                                      SILType type) {

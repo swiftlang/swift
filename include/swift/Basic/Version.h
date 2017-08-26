@@ -110,6 +110,12 @@ public:
   /// Whether this version is in the Swift 3 family
   bool isVersion3() const { return !empty() && Components[0] == 3; }
 
+  /// Whether this version is greater than or equal to the given major version
+  /// number.
+  bool isVersionAtLeast(unsigned major) const {
+    return !empty() && Components[0] >= major;
+  }
+
   /// Return this Version struct with minor and sub-minor components stripped
   Version asMajorVersion() const;
 
