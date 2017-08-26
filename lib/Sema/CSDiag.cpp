@@ -1540,8 +1540,8 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     auto decl = declRefExpr->getDecl();
     candidates.push_back({ decl, getCalleeLevel(decl) });
     
-    if (auto fTy = decl->getInterfaceType()->getAs<AnyFunctionType>())
-      declName = fTy->getInput()->getRValueInstanceType()->getString()+".init";
+    if (auto selfTy = decl->getDeclContext()->getSelfInterfaceType())
+      declName = selfTy.getString() + ".init";
     else
       declName = "init";
     return;
@@ -1657,7 +1657,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     if (UDE->getName().getBaseName() == CS.TC.Context.Id_init) {
       auto selfTy = CS.getType(UDE->getBase())->getWithoutSpecifierType();
       if (!selfTy->hasTypeVariable())
-        declName = selfTy.getString() + "." + declName;
+        declName = selfTy->eraseDynamicSelfType().getString() + "." + declName;
     }
 
     // Otherwise, look for a disjunction constraint explaining what the set is.

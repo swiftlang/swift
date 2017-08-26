@@ -473,7 +473,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
   // CHECK-NEXT: end_borrow [[BORROWED_CAST_ARG2_LOADED]] from [[CAST_ARG2_LOADED]]
-  // CHECK-NEXT: destroy_value [[ARG2_LOADED]]
+  // CHECK-NEXT: destroy_value [[CAST_ARG2_LOADED]]
   // CHECK-NEXT: return [[TUPLE]]
 
   // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP6heightSifmZTW : {{.*}} {
@@ -518,7 +518,7 @@ class CrashableBase {
 // CHECK-NEXT: apply [[FN]]([[BORROWED_BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: end_borrow [[BORROWED_BASE]] from [[BASE]]
-// CHECK-NEXT: destroy_value [[SELF]] : $GenericCrashable<τ_0_0>
+// CHECK-NEXT: destroy_value [[BASE]] : $CrashableBase
 // CHECK-NEXT: dealloc_stack [[BOX]] : $*GenericCrashable<τ_0_0>
 // CHECK-NEXT: return [[RESULT]] : $()
 
