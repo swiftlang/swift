@@ -4543,18 +4543,15 @@ static Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
 static Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error);
 
 Decl *handleErrorAndSupplyMissingMember(ASTContext& context, Decl *container, llvm::Error &&error) {
-  Decl *suppliedMissingMember = nullptr;
   // Drop the member if it had a problem.
   // FIXME: Handle overridable members in class extensions too, someday.
   if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
-    suppliedMissingMember = handleErrorAndSupplyMissingClassMember(context, std::move(error), containingClass);
-  } else if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
-    suppliedMissingMember = handleErrorAndSupplyMissingProtoMember(context, std::move(error), containingProto);
+    return handleErrorAndSupplyMissingClassMember(context, std::move(error), containingClass);
   }
-  else {
-    suppliedMissingMember = handleErrorAndSupplyMissingMiscMember(std::move(error));
+  if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
+    return handleErrorAndSupplyMissingProtoMember(context, std::move(error), containingProto);
   }
-  return suppliedMissingMember;
+  return handleErrorAndSupplyMissingMiscMember(std::move(error));
 }
 
 Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
