@@ -77,3 +77,19 @@ class ClassWithDeinitMember {
 
 let instanceWithDeinitMember = ClassWithDeinitMember()
 _ = instanceWithDeinitMember.deinit
+
+
+// SR-5715 : Fix variable name in nested static value
+struct SR5715 {
+    struct A {
+        struct B {}
+    }
+}
+
+extension SR5715.A.B {
+    private static let x: Int = 5
+    
+    func f() -> Int {
+        return x  // expected-error {{static member 'x' cannot be used on instance of type 'SR5715.A.B'}} {{16-16=SR5715.A.B.}}
+    }
+}
