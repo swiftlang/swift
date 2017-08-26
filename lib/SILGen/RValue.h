@@ -30,6 +30,7 @@
 namespace swift {
 namespace Lowering {
 
+class ArgumentSource;
 class Initialization;
 class Scope;
 class SILGenFunction;
@@ -69,6 +70,7 @@ class TypeLowering;
 /// require considering resilience, a job we want to delegate to IRGen.
 class RValue {
   friend class swift::Lowering::Scope;
+  friend class swift::Lowering::ArgumentSource;
 
   std::vector<ManagedValue> values;
   CanType type;

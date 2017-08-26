@@ -459,7 +459,7 @@ public class Sub : Base {
   // CHECK:     [[BORROWED_CASTED_VALUE_COPY:%.*]] = begin_borrow [[CASTED_VALUE_COPY]]
   // CHECK:     [[DOWNCAST_FOR_SUPERMETHOD:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_VALUE_COPY]]
   // CHECK:     [[SUPER:%.*]] = super_method [volatile] [[DOWNCAST_FOR_SUPERMETHOD]] : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool, $@convention(objc_method) (Base) -> ObjCBool
-  // CHECK:     end_borrow [[BORROWED_CASTED_VALUE_COPY]] from [[CASTED_VALUE_COPY]]
+  // CHECK:     end_borrow [[BORROWED_CASTED_VALUE_COPY]]
   // CHECK:     = apply [[SUPER]]([[CASTED_VALUE_COPY]])
   // CHECK:     destroy_value [[VALUE_COPY]]
   // CHECK:     end_borrow [[BORROWED_VALUE]] from [[VALUE]]
