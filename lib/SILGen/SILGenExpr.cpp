@@ -3353,7 +3353,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                 RebindSelfInConstructorExpr *E, SGFContext C) {
   auto selfDecl = E->getSelf();
   auto ctorDecl = cast<ConstructorDecl>(selfDecl->getDeclContext());
-  auto selfTy = selfDecl->getType()->getInOutObjectType();
+  auto selfIfaceTy = ctorDecl->getDeclContext()->getSelfInterfaceType();
+  auto selfTy = ctorDecl->mapTypeIntoContext(selfIfaceTy);
   
   auto newSelfTy = E->getSubExpr()->getType();
   OptionalTypeKind failability;
@@ -3365,8 +3366,6 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   OptionalTypeKind extraFailability;
   if (auto objTy = newSelfTy->getAnyOptionalObjectType(extraFailability))
     newSelfTy = objTy;
-
-  bool requiresDowncast = !newSelfTy->isEqual(selfTy);
 
   // The subexpression consumes the current 'self' binding.
   assert(SGF.SelfInitDelegationState == SILGenFunction::NormalSelf
@@ -3410,13 +3409,9 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   }
   
   // If we called a constructor that requires a downcast, perform the downcast.
-  if (requiresDowncast) {
-    assert(newSelf.getType().isObject() &&
-           newSelf.getType().hasReferenceSemantics() &&
-           "ctor type mismatch for non-reference type?!");
-
-    auto destTy = SGF.getLoweredLoadableType(
-                    E->getSelf()->getType()->getInOutObjectType());
+  auto destTy = SGF.getLoweredType(selfTy);
+  if (newSelf.getType() != destTy) {
+    assert(newSelf.getType().isObject() && destTy.isObject());
 
     // Assume that the returned 'self' is the appropriate subclass
     // type (or a derived class thereof). Only Objective-C classes can
@@ -3463,8 +3458,16 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   //
   // TODO: Remove this when failable initializers are fully implemented.
   auto classDecl = selfTy->getClassOrBoundGenericClass();
-  if (classDecl && !E->getSubExpr()->isImplicit() &&
+
+  // Dig out the constructor reference to check if it is an explicit
+  // 'self.init' or 'super.init' call.
+  bool isChainToSuper = false;
+  auto *calledCtor = E->getCalledConstructor(isChainToSuper);
+
+  if (classDecl &&
+      !calledCtor->isImplicit() &&
       usesObjCAllocator(classDecl)) {
+
     // Check whether the new self is null.
     SILValue isNonnullSelf = SGF.B.createIsNonnull(E, newSelf.getValue());
     Condition cond = SGF.emitCondition(isNonnullSelf, E, 
