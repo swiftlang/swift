@@ -2559,7 +2559,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
       ->getAsNominalTypeOrNominalTypeExtensionContext();
   SmallString<32> typeName;
   llvm::raw_svector_ostream typeNameStream(typeName);
-  typeNameStream << nominal->getName() << ".";
+  typeNameStream << nominal->getDeclaredInterfaceType() << ".";
 
   Diag->fixItInsert(loc, typeNameStream.str());
   return;
