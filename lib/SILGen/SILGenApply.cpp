@@ -3997,7 +3997,7 @@ namespace {
         CanFunctionType &formalType, AbstractionPattern &origFormalType,
         CanSILFunctionType substFnType,
         Optional<ForeignErrorConvention> &foreignError,
-        ImportAsMemberStatus &foreignSelf,
+        ImportAsMemberStatus foreignSelf,
         SmallVectorImpl<ManagedValue> &uncurriedArgs,
         Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType);
 
@@ -4380,7 +4380,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     CanFunctionType &formalType, AbstractionPattern &origFormalType,
     CanSILFunctionType substFnType,
     Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus &foreignSelf,
+    ImportAsMemberStatus foreignSelf,
     SmallVectorImpl<ManagedValue> &uncurriedArgs,
     Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType) {
   ApplyOptions options = ApplyOptions::None;
