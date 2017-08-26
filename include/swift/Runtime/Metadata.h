@@ -1097,7 +1097,7 @@ struct GenericParameterDescriptor {
 template <typename Runtime>
 struct TargetMethodDescriptor {
   /// The method implementation.
-  TargetRelativeDirectPointer<Runtime, void *> Impl;
+  TargetRelativeDirectPointer<Runtime, void> Impl;
 
   // TODO: add method types or anything else needed for reflection.
 };
@@ -1983,7 +1983,7 @@ struct TargetProtocolRequirement {
   // TODO: name, type
 
   /// The optional default implementation of the protocol.
-  RelativeDirectPointer<void(), /*nullable*/ true> DefaultImplementation;
+  RelativeDirectPointer<void, /*nullable*/ true> DefaultImplementation;
 };
 
 using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
@@ -2032,7 +2032,7 @@ struct TargetProtocolDescriptor {
   RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
 
   void *getDefaultWitness(unsigned index) const {
-    return (void*) Requirements.get()[index].DefaultImplementation.get();
+    return Requirements.get()[index].DefaultImplementation.get();
   }
 
   // This is only used in unittests/Metadata.cpp.
