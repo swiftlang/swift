@@ -395,7 +395,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
   // build.
   auto foreignError = calleeTypeInfo.foreignError;
   if (!foreignError) {
-    return build(init, calleeTypeInfo.origResultType,
+    return build(init, calleeTypeInfo.origResultType.getValue(),
                  calleeTypeInfo.substResultType);
   }
 
@@ -428,7 +428,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
   }
   }
 
-  ResultPlanPtr subPlan = build(init, calleeTypeInfo.origResultType,
+  ResultPlanPtr subPlan = build(init, calleeTypeInfo.origResultType.getValue(),
                                 calleeTypeInfo.substResultType);
   return ResultPlanPtr(new ForeignErrorInitializationPlan(
       SGF, loc, calleeTypeInfo, std::move(subPlan)));
