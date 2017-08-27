@@ -623,7 +623,7 @@ do {
 }
 
 enum Enum {
-  case two(Int, Int) // expected-note 5 {{'two' declared here}}
+  case two(Int, Int) // expected-note 6 {{'two' declared here}}
   case tuple((Int, Int))
   case labeledTuple(x: (Int, Int))
 }
@@ -631,6 +631,7 @@ enum Enum {
 do {
   _ = Enum.two(3, 4)
   _ = Enum.two((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = Enum.two(3 > 4 ? 3 : 4) // expected-error {{missing argument for parameter #2 in call}}
 
   _ = Enum.tuple(3, 4) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
   _ = Enum.tuple((3, 4))
