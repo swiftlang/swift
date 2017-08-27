@@ -93,3 +93,15 @@ extension SR5715.A.B {
     return x  // expected-error {{static member 'x' cannot be used on instance of type 'SR5715.A.B'}} {{12-12=SR5715.A.B.}}
   }
 }
+
+// Static function in protocol should have `Self.` instead of its protocol name
+protocol P {}
+
+extension P {
+  static func f() {}
+
+  func g() {
+    f()   // expected-error {{static member 'f' cannot be used on instance of type 'Self'}} {{12-12=Self.}}
+  }
+}
+
