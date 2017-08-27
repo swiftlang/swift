@@ -4001,23 +4001,19 @@ namespace {
 
     RValue
     applySpecializedEmitter(CanFunctionType &formalType,
-                            Optional<ForeignErrorConvention> &foreignError,
                             ImportAsMemberStatus foreignSelf,
                             SpecializedEmitter &specializedEmitter,
                             unsigned uncurryLevel, SGFContext C);
 
     RValue applyPartiallyAppliedSuperMethod(
         CanFunctionType &formalType,
-        Optional<ForeignErrorConvention> &foreignError,
         ImportAsMemberStatus foreignSelf, unsigned uncurryLevel, SGFContext C);
 
     RValue
     applyEnumElementConstructor(CanFunctionType &formalType,
-                                Optional<ForeignErrorConvention> &foreignError,
                                 unsigned uncurryLevel, SGFContext C);
 
     RValue applyNormalCall(CanFunctionType &formalType,
-                           Optional<ForeignErrorConvention> &foreignError,
                            ImportAsMemberStatus &foreignSelf,
                            unsigned uncurryLevel, SGFContext C);
 
@@ -4048,33 +4044,29 @@ getUncurriedOrigFormalResultType(AbstractionPattern origFormalType,
 RValue CallEmission::applyFirstLevelCallee(
     CanFunctionType &formalType,
     ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
-  Optional<ForeignErrorConvention> foreignError;
-
   // Check for a specialized emitter.
   if (auto emitter = callee.getSpecializedEmitter(SGF.SGM, uncurryLevel)) {
-    return applySpecializedEmitter(formalType,
-                                   foreignError, foreignSelf,
-                                   emitter.getValue(), uncurryLevel, C);
+    return applySpecializedEmitter(formalType, foreignSelf, emitter.getValue(),
+                                   uncurryLevel, C);
   }
 
   if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
-    return applyPartiallyAppliedSuperMethod(formalType, foreignError,
-                                            foreignSelf, uncurryLevel, C);
+    return applyPartiallyAppliedSuperMethod(formalType, foreignSelf,
+                                            uncurryLevel, C);
   }
 
   if (isEnumElementConstructor()) {
-    return applyEnumElementConstructor(formalType, foreignError, uncurryLevel,
-                                       C);
+    return applyEnumElementConstructor(formalType, uncurryLevel, C);
   }
 
-  return applyNormalCall(formalType, foreignError,
-                         foreignSelf, uncurryLevel, C);
+  return applyNormalCall(formalType, foreignSelf, uncurryLevel, C);
 }
 
 RValue CallEmission::applyNormalCall(
     CanFunctionType &formalType,
-    Optional<ForeignErrorConvention> &foreignError,
     ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+  Optional<ForeignErrorConvention> foreignError;
+
   // We use the context emit-into initialization only for the
   // outermost call.
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
@@ -4141,9 +4133,9 @@ RValue CallEmission::applyNormalCall(
                        uncurriedContext);
 }
 
-RValue CallEmission::applyEnumElementConstructor(
-    CanFunctionType &formalType, Optional<ForeignErrorConvention> &foreignError,
-    unsigned uncurryLevel, SGFContext C) {
+RValue CallEmission::applyEnumElementConstructor(CanFunctionType &formalType,
+                                                 unsigned uncurryLevel,
+                                                 SGFContext C) {
   assert(!assumedPlusZeroSelf);
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
 
@@ -4208,9 +4200,8 @@ RValue CallEmission::applyEnumElementConstructor(
 }
 
 RValue CallEmission::applyPartiallyAppliedSuperMethod(
-    CanFunctionType &formalType, Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus foreignSelf, unsigned uncurryLevel, SGFContext C) {
-
+    CanFunctionType &formalType, ImportAsMemberStatus foreignSelf,
+    unsigned uncurryLevel, SGFContext C) {
   assert(uncurryLevel == 0);
 
   // We want to emit the arguments as fully-substituted values
@@ -4238,8 +4229,9 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
   Optional<SILLocation> uncurriedLoc;
   CanFunctionType formalApplyType;
   ApplyOptions options = emitArgumentsForNormalApply(
-      formalType, origFormalType, substFnType, foreignError, foreignSelf,
-      uncurriedArgs, uncurriedLoc, formalApplyType);
+      formalType, origFormalType, substFnType,
+      Optional<ForeignErrorConvention>(), foreignSelf, uncurriedArgs,
+      uncurriedLoc, formalApplyType);
   (void)options;
 
   // Emit the uncurried call.
@@ -4280,11 +4272,11 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
                 ManagedValue::forUnmanaged(partialApply));
 }
 
-RValue CallEmission::applySpecializedEmitter(
-    CanFunctionType &formalType, Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus foreignSelf, SpecializedEmitter &specializedEmitter,
-    unsigned uncurryLevel, SGFContext C) {
-
+RValue
+CallEmission::applySpecializedEmitter(CanFunctionType &formalType,
+                                      ImportAsMemberStatus foreignSelf,
+                                      SpecializedEmitter &specializedEmitter,
+                                      unsigned uncurryLevel, SGFContext C) {
   // We use the context emit-into initialization only for the
   // outermost call.
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
@@ -4340,8 +4332,8 @@ RValue CallEmission::applySpecializedEmitter(
   Optional<SILLocation> uncurriedLoc;
   CanFunctionType formalApplyType;
   emitArgumentsForNormalApply(formalType, origFormalType, substFnType,
-                              foreignError, foreignSelf, uncurriedArgs,
-                              uncurriedLoc, formalApplyType);
+                              Optional<ForeignErrorConvention>(), foreignSelf,
+                              uncurriedArgs, uncurriedLoc, formalApplyType);
 
   // Emit the uncurried call.
   if (specializedEmitter.isLateEmitter()) {
