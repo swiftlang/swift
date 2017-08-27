@@ -3949,11 +3949,9 @@ namespace {
 
       // Emit the first level of call.
       CanFunctionType formalType;
-      Optional<ForeignErrorConvention> foreignError;
       ImportAsMemberStatus foreignSelf;
       RValue result =
-          applyFirstLevelCallee(formalType,
-                                foreignError, foreignSelf, uncurryLevel, C);
+          applyFirstLevelCallee(formalType, foreignSelf, uncurryLevel, C);
 
       // End of the initial writeback scope.
       initialWritebackScope.verify();
@@ -4024,7 +4022,6 @@ namespace {
                            unsigned uncurryLevel, SGFContext C);
 
     RValue applyFirstLevelCallee(CanFunctionType &formalType,
-                                 Optional<ForeignErrorConvention> &foreignError,
                                  ImportAsMemberStatus &foreignSelf,
                                  unsigned uncurryLevel, SGFContext C);
 
@@ -4050,8 +4047,8 @@ getUncurriedOrigFormalResultType(AbstractionPattern origFormalType,
 
 RValue CallEmission::applyFirstLevelCallee(
     CanFunctionType &formalType,
-    Optional<ForeignErrorConvention> &foreignError,
     ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+  Optional<ForeignErrorConvention> foreignError;
 
   // Check for a specialized emitter.
   if (auto emitter = callee.getSpecializedEmitter(SGF.SGM, uncurryLevel)) {
