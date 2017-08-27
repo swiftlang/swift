@@ -332,6 +332,12 @@ def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
 # Fit a 3-parameter polynomial model f(x) = const + coeff * x^exp to a set
 # of data (lists of xs and ys). Returns (exp, coeff, fit).
 def fit_polynomial_model(xs, ys):
+
+    # Don't bother running a simplex around a flat landscape if the input is
+    # constant.
+    if all(y == ys[0] for y in ys):
+        return (0.0, 0.0, 1.0)
+
     PolynomialParams = namedtuple('PolynomialParams',
                                   ['const', 'coeff', 'exp'])
     params = PolynomialParams(const=0.0, coeff=1.0, exp=1.0)
