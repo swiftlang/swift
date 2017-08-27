@@ -683,7 +683,7 @@ struct X : Q {
 f(X()) // okay: X conforms to P through the conformance of Q to P
 ```
 
-This is an extremely powerful feature: is allows one to map the abstractions of one domain into another domain (e.g., every `Matrix` is a `Graph`). However, similar to private conformances, it puts a major burden on the dynamic-casting runtime to chase down arbitrarily long and potentially cyclic chains of conformances, which makes efficient implementation nearly impossible.
+This is an extremely powerful feature: it allows one to map the abstractions of one domain into another domain (e.g., every `Matrix` is a `Graph`). However, similar to private conformances, it puts a major burden on the dynamic-casting runtime to chase down arbitrarily long and potentially cyclic chains of conformances, which makes efficient implementation nearly impossible.
 
 ## Potential removals
 
