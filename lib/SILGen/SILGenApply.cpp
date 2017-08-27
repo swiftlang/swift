@@ -3961,7 +3961,7 @@ namespace {
 
       // Then handle the remaining call sites.
       result = applyRemainingCallSites(std::move(result), formalType,
-                                       foreignSelf, foreignError, C);
+                                       foreignSelf, C);
       return result;
     }
 
@@ -4031,7 +4031,6 @@ namespace {
     RValue
     applyRemainingCallSites(RValue &&result, CanFunctionType formalType,
                             ImportAsMemberStatus foreignSelf,
-                            Optional<ForeignErrorConvention> foreignError,
                             SGFContext C);
   };
 } // end anonymous namespace
@@ -4453,10 +4452,10 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
   return options;
 }
 
-RValue CallEmission::applyRemainingCallSites(
-    RValue &&result, CanFunctionType formalType,
-    ImportAsMemberStatus foreignSelf,
-    Optional<ForeignErrorConvention> foreignError, SGFContext C) {
+RValue CallEmission::applyRemainingCallSites(RValue &&result,
+                                             CanFunctionType formalType,
+                                             ImportAsMemberStatus foreignSelf,
+                                             SGFContext C) {
   // Fast path out if we don't have an extra call sites.
   if (extraSites.empty()) return std::move(result);
 
@@ -4481,7 +4480,6 @@ RValue CallEmission::applyRemainingCallSites(
     // TODO: foreign errors for block or function pointer values?
     assert(substFnType->hasErrorResult() ||
            !cast<FunctionType>(formalType)->getExtInfo().throws());
-    foreignError = None;
 
     AbstractionPattern origParamType = claimNextParamClause(origFormalType);
     AbstractionPattern origResultType = origFormalType;
@@ -4491,14 +4489,14 @@ RValue CallEmission::applyRemainingCallSites(
     // Create the callee type info and initialize our indirect results.
     CalleeTypeInfo calleeTypeInfo(substFnType, origResultType,
                                   extraSites[i].getSubstResultType(),
-                                  foreignError);
+                                  Optional<ForeignErrorConvention>());
     ResultPlanPtr resultPtr =
         ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
     ArgumentScope argScope(SGF, loc);
 
     std::move(extraSites[i])
         .emit(SGF, origParamType, paramLowering, siteArgs, delayedArgs,
-              foreignError, foreignSelf);
+              calleeTypeInfo.foreignError, foreignSelf);
     if (!delayedArgs.empty()) {
       emitDelayedArguments(SGF, delayedArgs, siteArgs);
     }
