@@ -1692,7 +1692,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     CalleeTypeInfo calleeTypeInfo(
         fnType, AbstractionPattern(nativeFnTy->getGenericSignature(),
                                    bridgedFormalResultType),
-        nativeFormalResultType, foreignError);
+        nativeFormalResultType, foreignError, ImportAsMemberStatus());
 
     auto init = indirectResult
                 ? useBufferAsTemporary(indirectResult,
