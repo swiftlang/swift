@@ -3957,9 +3957,13 @@ namespace {
       initialWritebackScope.verify();
       initialWritebackScope.pop();
 
+      AbstractionPattern origFormalType =
+          getIndirectApplyAbstractionPattern(SGF, formalType);
+      bool formalTypeThrows =
+          !cast<FunctionType>(formalType)->getExtInfo().throws();
       // Then handle the remaining call sites.
-      result = applyRemainingCallSites(std::move(result), formalType,
-                                       foreignSelf, C);
+      result = applyRemainingCallSites(std::move(result), origFormalType,
+                                       foreignSelf, C, formalTypeThrows);
       return result;
     }
 
@@ -4021,10 +4025,10 @@ namespace {
                                  ImportAsMemberStatus &foreignSelf,
                                  unsigned uncurryLevel, SGFContext C);
 
-    RValue
-    applyRemainingCallSites(RValue &&result, CanFunctionType formalType,
-                            ImportAsMemberStatus foreignSelf,
-                            SGFContext C);
+    RValue applyRemainingCallSites(RValue &&result,
+                                   AbstractionPattern origFormalType,
+                                   ImportAsMemberStatus foreignSelf,
+                                   SGFContext C, bool formalTypeThrows);
   };
 } // end anonymous namespace
 
@@ -4442,14 +4446,12 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
 }
 
 RValue CallEmission::applyRemainingCallSites(RValue &&result,
-                                             CanFunctionType formalType,
+                                             AbstractionPattern origFormalType,
                                              ImportAsMemberStatus foreignSelf,
-                                             SGFContext C) {
+                                             SGFContext C,
+                                             bool formalTypeThrows) {
   // Fast path out if we don't have an extra call sites.
   if (extraSites.empty()) return std::move(result);
-
-  AbstractionPattern origFormalType =
-    getIndirectApplyAbstractionPattern(SGF, formalType);
 
   // Apply the remaining call sites to the result function.
   // Each chained call gets its own writeback scope.
@@ -4467,8 +4469,7 @@ RValue CallEmission::applyRemainingCallSites(RValue &&result,
     SmallVector<DelayedArgument, 2> delayedArgs;
 
     // TODO: foreign errors for block or function pointer values?
-    assert(substFnType->hasErrorResult() ||
-           !cast<FunctionType>(formalType)->getExtInfo().throws());
+    assert(substFnType->hasErrorResult() || formalTypeThrows);
 
     AbstractionPattern origParamType = claimNextParamClause(origFormalType);
     AbstractionPattern origResultType = origFormalType;
