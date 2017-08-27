@@ -69,7 +69,7 @@ significant modes are:
 
   - **Primary-file** vs. **whole-module**: this varies depending on whether the
     driver is run with the flag `-wmo`, `-whole-module-optimization` or
-    `force-single-frontend-invocation` (all these options are synonymous).
+    `-force-single-frontend-invocation` (all these options are synonymous).
 
   - **Optimizing** vs. **non-optimizing**: this varies depending on whether the
     driver (and thus each frontend) is run with the flags `-O`, `-Osize`, or
