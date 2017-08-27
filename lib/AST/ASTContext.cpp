@@ -2816,11 +2816,13 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     isStatic = FD->isStatic();
     isMutating = FD->isMutating();
 
-    // Methods returning 'Self' have a dynamic 'self'.
+    // All class methods have a dynamic 'self'.
     //
-    // FIXME: All methods of non-final classes should have this.
-    if (wantDynamicSelf && FD->hasDynamicSelf())
-      isDynamicSelf = true;
+    // FIXME: Remove FuncDecl::hasDynamicSelf().
+    if (wantDynamicSelf)
+      if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
+        if (!classDecl->isFinal() || FD->hasDynamicSelf())
+          isDynamicSelf = true;
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
