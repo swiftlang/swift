@@ -486,11 +486,29 @@ public:
     return cast<EnumElementDecl>(Constant.getDecl());
   }
 
+  CalleeTypeInfo createCalleeTypeInfo(SILGenFunction &SGF,
+                                      Optional<SILDeclRef> constant,
+                                      SILType formalFnType) const & {
+    CalleeTypeInfo result;
+
+    result.substFnType =
+        formalFnType.castTo<SILFunctionType>()->substGenericArgs(SGF.SGM.M,
+                                                                 Substitutions);
+
+    if (!constant || !constant->isForeign)
+      return result;
+
+    auto func = cast<AbstractFunctionDecl>(constant->getDecl());
+    result.foreignError = func->getForeignErrorConvention();
+    result.foreignSelf = func->getImportAsMemberStatus();
+
+    return result;
+  }
+
   std::tuple<ManagedValue, CalleeTypeInfo>
   getAtUncurryLevel(SILGenFunction &SGF, unsigned level) const & {
     ManagedValue mv;
     Optional<SILDeclRef> constant = None;
-    CalleeTypeInfo calleeTypeInfo;
 
     if (!Constant) {
       assert(level == 0 && "can't curry indirect function");
@@ -510,7 +528,7 @@ public:
     case Kind::IndirectValue:
       mv = IndirectValue;
       assert(Substitutions.empty());
-      break;
+      return {mv, createCalleeTypeInfo(SGF, constant, mv.getType())};
 
     case Kind::StandaloneFunction: {
       // If we're currying a direct reference to a class-dispatched method,
@@ -523,7 +541,7 @@ public:
       auto constantInfo = SGF.getConstantInfo(*constant);
       SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
       mv = ManagedValue::forUnmanaged(ref);
-      break;
+      return {mv, createCalleeTypeInfo(SGF, constant, mv.getType())};
     }
     case Kind::EnumElement: {
       auto constantInfo = SGF.getConstantInfo(*constant);
@@ -534,7 +552,7 @@ public:
 
       SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
       mv = ManagedValue::forUnmanaged(ref);
-      break;
+      return {mv, createCalleeTypeInfo(SGF, constant, mv.getType())};
     }
     case Kind::ClassMethod: {
       auto constantInfo = SGF.getConstantInfo(*constant);
@@ -543,7 +561,7 @@ public:
       if (constant->isCurried) {
         SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
-        break;
+        return {mv, createCalleeTypeInfo(SGF, constant, mv.getType())};
       }
 
       // Otherwise, do the dynamic dispatch inline.
@@ -554,9 +572,8 @@ public:
           SGF.B.createClassMethod(Loc, borrowedSelf.getValue(), *constant,
                                   /*volatile*/
                                   constant->isForeign);
-
       mv = ManagedValue::forUnmanaged(methodVal);
-      break;
+      return {mv, createCalleeTypeInfo(SGF, constant, mv.getType())};
     }
     case Kind::SuperMethod: {
       assert(!constant->isCurried);
@@ -572,7 +589,7 @@ public:
                                    constantInfo.getSILType(),
                                    /*volatile*/
                                    constant->isForeign);
-      break;
+      return {mv, createCalleeTypeInfo(SGF, constant, mv.getType())};
     }
     case Kind::WitnessMethod: {
       auto constantInfo = SGF.getConstantInfo(*constant);
@@ -581,7 +598,7 @@ public:
       if (constant->isCurried) {
         SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
-        break;
+        return {mv, createCalleeTypeInfo(SGF, constant, mv.getType())};
       }
 
       auto proto = Constant.getDecl()->getDeclContext()
@@ -596,7 +613,7 @@ public:
                                   constantInfo.getSILType(),
                                   constant->isForeign);
       mv = ManagedValue::forUnmanaged(fn);
-      break;
+      return {mv, createCalleeTypeInfo(SGF, constant, mv.getType())};
     }
     case Kind::DynamicMethod: {
       assert(!constant->isCurried);
@@ -623,26 +640,9 @@ public:
           SILType::getPrimitiveObjectType(closureType),
           /*volatile*/ Constant.isForeign);
       mv = ManagedValue::forUnmanaged(fn);
-      break;
+      return {mv, createCalleeTypeInfo(SGF, constant, mv.getType())};
     }
     }
-
-    Optional<ForeignErrorConvention> foreignError;
-    ImportAsMemberStatus foreignSelf;
-    if (constant && constant->isForeign) {
-      auto func = cast<AbstractFunctionDecl>(constant->getDecl());
-      foreignError = func->getForeignErrorConvention();
-      foreignSelf = func->getImportAsMemberStatus();
-    }
-
-    auto substFnType =
-      mv.getType().castTo<SILFunctionType>()->substGenericArgs(
-        SGF.SGM.M, Substitutions);
-
-    calleeTypeInfo.substFnType = substFnType;
-    calleeTypeInfo.foreignError = foreignError;
-    calleeTypeInfo.foreignSelf = foreignSelf;
-    return {mv, calleeTypeInfo};
   }
 
   SubstitutionList getSubstitutions() const {
