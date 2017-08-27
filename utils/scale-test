@@ -479,8 +479,24 @@ def report(args, rng, runs):
     for k in keys:
         vals = [r[k] for r in runs]
         bounded = [max(v, 1) for v in vals]
-        p_b, p_a, p_r2 = fit_polynomial_model(rng, bounded)
-        e_b, e_a, e_r2 = fit_exponential_model(rng, bounded)
+        one_fit = False
+        p_b, p_a, p_r2 = (1.0, 1.0, 0.0)
+        e_b, e_a, e_r2 = (1.0, 1.0, 0.0)
+        try:
+            p_b, p_a, p_r2 = fit_polynomial_model(rng, bounded)
+            if p_r2 > 0.9:
+                one_fit = True
+        except ValueError:
+            pass
+        try:
+            e_b, e_a, e_r2 = fit_exponential_model(rng, bounded)
+            if e_r2 > 0.9:
+                one_fit = True
+        except ValueError:
+            pass
+        if not one_fit:
+            print("failed to fit either polynomial or exponential model")
+            return True
         if p_r2 >= e_r2:
             # polynomial is best
             rows.append((False, p_b, k, vals))
