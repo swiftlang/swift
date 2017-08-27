@@ -894,14 +894,46 @@ getting slower between versions:
      study. If the problem is _blindingly obvious_ at this point, stop and fix
      the bug, otherwise proceed to narrowing the problem.
 
-  8. Reduce the testcase. You can do this manually by deleting chunks of it and
-     re-checking to see if the problem persists, or you can use `creduce` in
-     conjunction with `perf`, which will mechanically reduce it. See the section
-     on `creduce` for details.
+  8. Reduce the testcase. That is, figure out the smallest input file that
+     causes the regression you're observing. If the problem you're looking at
+     occurs in the frontend, you might be able to do this manually by running
+     the input with `-Xfrontend -debug-time-function-bodies` and deleting all
+     but the most expensive function, or reduce even further from a function to
+     a single expression via `-Xfrontend -debug-time-expression-type-checking`;
+     but keep in mind these options only track the time spent _typechecking_ a
+     given function or expression; they do not help in reduction of testcases
+     for problems that occur in other subsystems of the compiler. For general
+     reduction, the normal approach is "bisection", also called
+     "delta-debugging": repeatedly delete half the remaining contents of the
+     file, and see if the regression remains. If so, repeat the process in the
+     remaining half; if not, restore the half you deleted and switch your
+     attention to it. This process -- along with several other reduction
+     heuristics that are sensitive to the structure of the code -- can also be
+     automated with the tool `creduce`. See the section on `creduce` for
+     details.
 
-  9. Bisect the regression range. You can do this manually by trial and error,
-     or by downloading pre-built snapshot compilers from swift.org, or with the
-     assistance of `git bisect`, which can semi-automate or totally-automate the
+  9. Bisect the regression range. That is, figure out the smallest range of
+     changes to the compiler (typically a single revision in the git history)
+     that caused the regression. If you have more network bandwidth than compute
+     power available, you might want to begin this part by downloading snapshots
+     of the compiler from swift.org. While only a handful of recent snapshots
+     are linked on the swift.org webpage, all historical snapshots remain
+     available to download by substituting the appropriate timestamp into the
+     snapshot URL. For example, the master-branch, macOS snapshot from June 9
+     2017 is available
+     at
+     [https://swift.org/builds/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a-osx.pkg](https://swift.org/builds/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a-osx.pkg),
+     and the July 10 2017, swift-4.0-branch Linux snapshot is
+     at
+     [https://swift.org/builds/swift-4.0-branch/ubuntu1604/swift-4.0-DEVELOPMENT-SNAPSHOT-2017-07-10-a/swift-4.0-DEVELOPMENT-SNAPSHOT-2017-07-10-a-ubuntu16.04.tar.gz](https://swift.org/builds/swift-4.0-branch/ubuntu1604/swift-4.0-DEVELOPMENT-SNAPSHOT-2017-07-10-a/swift-4.0-DEVELOPMENT-SNAPSHOT-2017-07-10-a-ubuntu16.04.tar.gz).
+     While such snapshots have asserts enabled -- so they do not entirely match
+     the performance characteristics of release compilers -- it is often the
+     case that a regression in a release compiler will still show up in an
+     assert compiler, and downloading snapshots to narrow a regression range can
+     often be much faster than building multiple compilers. Once you've narrowed
+     a regression range to within a few days (or however far you can get with
+     snapshots alone), you will likely also need to switch to bisection using
+     `git bisect`, which can semi-automate or totally-automate the remaining
      search, depending on how much shell scripting you want to do and how
      precisely you're able to measure the difference. See the section on
      `git-bisect` for details.
