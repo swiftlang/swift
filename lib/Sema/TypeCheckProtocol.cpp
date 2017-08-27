@@ -69,9 +69,49 @@ namespace {
   /// generic requirements. See the \c Witness class for more information about
   /// this synthetic environment.
   class RequirementEnvironment {
+    /// A generic signature that combines the generic parameters of the
+    /// concrete conforming type with the generic parameters of the
+    /// requirement.
+    ///
+    ///
+    /// For example, if you have:
+    ///
+    /// protocol P { func f<T>(_: T) }
+    /// struct S<A, B> : P { func f<T>(_: T) }
+    ///
+    /// The requirement and witness signatures are, respectively:
+    ///
+    /// <Self : P, T>
+    /// <A, B, T>
+    ///
+    /// The synthetic signature in this case is just the witness signature.
+    ///
+    /// It may be that the witness is more generic than the requirement,
+    /// for example:
+    ///
+    /// protocol P { func f(_: Int) }
+    /// struct S<A, B> : P { func f<T>(_: T) { } }
+    ///
+    /// Here, the requirement signature and witness signatures are:
+    ///
+    /// <Self : P>
+    /// <A, B, T>
+    ///
+    /// The synthetic signature is just:
+    ///
+    /// <A, B>
+    ///
+    /// The witness thunk emitted by SILGen uses the synthetic signature.
+    /// Therefore one invariant we preserve is that the witness thunk is
+    /// ABI compatible with the requirement's function type.
     GenericSignature *syntheticSignature = nullptr;
     GenericEnvironment *syntheticEnvironment = nullptr;
+
+    /// The generic signature of the protocol requirement member.
     GenericSignature *reqSig = nullptr;
+
+    /// A substitution map mapping the requirement signature to the
+    /// generic parameters of the synthetic signature.
     SubstitutionMap reqToSyntheticEnvMap;
 
   public:
