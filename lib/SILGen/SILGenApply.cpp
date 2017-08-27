@@ -3996,7 +3996,7 @@ namespace {
     ApplyOptions emitArgumentsForNormalApply(
         CanFunctionType &formalType, AbstractionPattern &origFormalType,
         CanSILFunctionType substFnType,
-        Optional<ForeignErrorConvention> &foreignError,
+        const Optional<ForeignErrorConvention> &foreignError,
         ImportAsMemberStatus foreignSelf,
         SmallVectorImpl<ManagedValue> &uncurriedArgs,
         Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType);
@@ -4374,7 +4374,7 @@ RValue CallEmission::applySpecializedEmitter(
 ApplyOptions CallEmission::emitArgumentsForNormalApply(
     CanFunctionType &formalType, AbstractionPattern &origFormalType,
     CanSILFunctionType substFnType,
-    Optional<ForeignErrorConvention> &foreignError,
+    const Optional<ForeignErrorConvention> &foreignError,
     ImportAsMemberStatus foreignSelf,
     SmallVectorImpl<ManagedValue> &uncurriedArgs,
     Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType) {
