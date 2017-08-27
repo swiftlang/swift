@@ -1080,6 +1080,8 @@ ERROR(cdecl_throws,none,
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
+NOTE(access_control_in_protocol_detailed_info,none,
+      "protocol requirements implicitly have the same access as the protocol", ())
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 ERROR(access_control_setter,none,

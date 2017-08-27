@@ -654,6 +654,7 @@ bool AttributeEarlyChecker::visitAbstractAccessibilityAttr(
 
   // Or within protocols.
   if (isa<ProtocolDecl>(D->getDeclContext())) {
+    diagnoseAndRemoveAttr(attr, diag::access_control_in_protocol_detailed_info);
     diagnoseAndRemoveAttr(attr, diag::access_control_in_protocol, attr);
     return true;
   }
