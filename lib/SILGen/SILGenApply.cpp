@@ -3695,7 +3695,7 @@ namespace {
     ClaimedParamsRef
     claimParams(AbstractionPattern origParamType, CanType substParamType,
                 const Optional<ForeignErrorConvention> &foreignError,
-                const ImportAsMemberStatus &foreignSelf) {
+                ImportAsMemberStatus foreignSelf) {
       unsigned count = getFlattenedValueCount(origParamType, substParamType,
                                               foreignSelf);
       if (foreignError) count++;
@@ -3796,7 +3796,7 @@ namespace {
               ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
               SmallVectorImpl<DelayedArgument> &delayedArgs,
               const Optional<ForeignErrorConvention> &foreignError,
-              const ImportAsMemberStatus &foreignSelf) && {
+              ImportAsMemberStatus foreignSelf) && {
       auto params = lowering.claimParams(origParamType, getSubstArgType(),
                                          foreignError, foreignSelf);
 
@@ -3997,26 +3997,25 @@ namespace {
         CanFunctionType &formalType, AbstractionPattern &origFormalType,
         CanSILFunctionType substFnType,
         Optional<ForeignErrorConvention> &foreignError,
-        ImportAsMemberStatus &foreignSelf,
+        ImportAsMemberStatus foreignSelf,
         SmallVectorImpl<ManagedValue> &uncurriedArgs,
         Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType);
 
     RValue
     applySpecializedEmitter(CanFunctionType &formalType,
                             Optional<ForeignErrorConvention> &foreignError,
-                            ImportAsMemberStatus &foreignSelf,
+                            ImportAsMemberStatus foreignSelf,
                             SpecializedEmitter &specializedEmitter,
                             unsigned uncurryLevel, SGFContext C);
 
     RValue applyPartiallyAppliedSuperMethod(
         CanFunctionType &formalType,
         Optional<ForeignErrorConvention> &foreignError,
-        ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C);
+        ImportAsMemberStatus foreignSelf, unsigned uncurryLevel, SGFContext C);
 
     RValue
     applyEnumElementConstructor(CanFunctionType &formalType,
                                 Optional<ForeignErrorConvention> &foreignError,
-                                ImportAsMemberStatus &foreignSelf,
                                 unsigned uncurryLevel, SGFContext C);
 
     RValue applyNormalCall(CanFunctionType &formalType,
@@ -4068,8 +4067,7 @@ RValue CallEmission::applyFirstLevelCallee(
   }
 
   if (isEnumElementConstructor()) {
-    return applyEnumElementConstructor(formalType,
-                                       foreignError, foreignSelf, uncurryLevel,
+    return applyEnumElementConstructor(formalType, foreignError, uncurryLevel,
                                        C);
   }
 
@@ -4148,9 +4146,8 @@ RValue CallEmission::applyNormalCall(
 }
 
 RValue CallEmission::applyEnumElementConstructor(
-    CanFunctionType &formalType,
-    Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+    CanFunctionType &formalType, Optional<ForeignErrorConvention> &foreignError,
+    unsigned uncurryLevel, SGFContext C) {
   assert(!assumedPlusZeroSelf);
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
 
@@ -4215,9 +4212,8 @@ RValue CallEmission::applyEnumElementConstructor(
 }
 
 RValue CallEmission::applyPartiallyAppliedSuperMethod(
-    CanFunctionType &formalType,
-    Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+    CanFunctionType &formalType, Optional<ForeignErrorConvention> &foreignError,
+    ImportAsMemberStatus foreignSelf, unsigned uncurryLevel, SGFContext C) {
 
   assert(uncurryLevel == 0);
 
@@ -4289,9 +4285,8 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
 }
 
 RValue CallEmission::applySpecializedEmitter(
-    CanFunctionType &formalType,
-    Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus &foreignSelf, SpecializedEmitter &specializedEmitter,
+    CanFunctionType &formalType, Optional<ForeignErrorConvention> &foreignError,
+    ImportAsMemberStatus foreignSelf, SpecializedEmitter &specializedEmitter,
     unsigned uncurryLevel, SGFContext C) {
 
   // We use the context emit-into initialization only for the
@@ -4380,7 +4375,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     CanFunctionType &formalType, AbstractionPattern &origFormalType,
     CanSILFunctionType substFnType,
     Optional<ForeignErrorConvention> &foreignError,
-    ImportAsMemberStatus &foreignSelf,
+    ImportAsMemberStatus foreignSelf,
     SmallVectorImpl<ManagedValue> &uncurriedArgs,
     Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType) {
   ApplyOptions options = ApplyOptions::None;
