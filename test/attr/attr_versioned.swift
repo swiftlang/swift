@@ -41,6 +41,7 @@ protocol VersionedProtocol {
 
   public func publicRequirement() -> T
   // expected-error@-1 {{'public' modifier cannot be used in protocols}}
+  // expected-note@-2 {{protocol requirements implicitly have the same access as the protocol itself}}
 
   @_versioned func versionedRequirement() -> T
   // expected-error@-1 {{'@_versioned' attribute cannot be used in protocols}}
