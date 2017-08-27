@@ -2425,7 +2425,7 @@ ${unsafeOperationComment(x.operator)}
 % end
 
   /// Creates a new instance from the bit pattern of the given instance by
-  /// sign-extending or truncating to fit this type.
+  /// truncating or sign-extending if needed to fit this type.
   ///
   /// When the bit width of `T` (the type of `source`) is equal to or greater
   /// than this type's bit width, the result is the truncated
@@ -2435,7 +2435,7 @@ ${unsafeOperationComment(x.operator)}
   ///
   ///     let p: Int16 = -500
   ///     // 'p' has a binary representation of 11111110_00001100
-  ///     let q = Int8(extendingOrTruncating: p)
+  ///     let q = Int8(truncatingIfNeeded: p)
   ///     // q == 12
   ///     // 'q' has a binary representation of 00001100
   ///
@@ -2446,16 +2446,16 @@ ${unsafeOperationComment(x.operator)}
   ///
   ///     let u: Int8 = 21
   ///     // 'u' has a binary representation of 00010101
-  ///     let v = Int16(extendingOrTruncating: u)
+  ///     let v = Int16(truncatingIfNeeded: u)
   ///     // v == 21
   ///     // 'v' has a binary representation of 00000000_00010101
   ///
   ///     let w: Int8 = -21
   ///     // 'w' has a binary representation of 11101011
-  ///     let x = Int16(extendingOrTruncating: w)
+  ///     let x = Int16(truncatingIfNeeded: w)
   ///     // x == -21
   ///     // 'x' has a binary representation of 11111111_11101011
-  ///     let y = UInt16(extendingOrTruncating: w)
+  ///     let y = UInt16(truncatingIfNeeded: w)
   ///     // y == 65515
   ///     // 'y' has a binary representation of 11111111_11101011
   ///
@@ -2472,7 +2472,7 @@ ${unsafeOperationComment(x.operator)}
       let width = Self(_truncatingBits: Self.bitWidth._lowWord)
       for word in source.words {
         guard shift < width else { break }
-        // masking shift is OK here because we have already ensured
+        // Masking shift is OK here because we have already ensured
         // that shift < Self.bitWidth. Not masking results in
         // infinite recursion.
         result ^= Self(_truncatingBits: neg ? ~word : word) &<< shift
