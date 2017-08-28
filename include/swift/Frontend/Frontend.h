@@ -458,13 +458,18 @@ private:
                          PersistentParserState &PersistentState,
                          DelayedParsingCallbacks *DelayedParseCB);
   
+  void parseMainAndTypeCheckTopLevelFiles(PersistentParserState &PersistentState,
+                                          DelayedParsingCallbacks *DelayedParseCB);
+  
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
   
-  void parseTheMainFile(PersistentParserState &PersistentState,
+  void parseAndTypeCheckTheMainFile(PersistentParserState &PersistentState,
                         DelayedParsingCallbacks *DelayedParseCB,
                         const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void performTypeCheckingAndDelayedParsing();
   void typeCheckTopLevelInputsExcludingMain(PersistentParserState &PersistentState,
                                             const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void typeCheckMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performWholeModuleTypeCheckingOnMainModule();
   void finishTypeCheckingMainModule();
 };

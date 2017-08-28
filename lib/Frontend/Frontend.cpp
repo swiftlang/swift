@@ -379,30 +379,8 @@ void CompilerInstance::performSema() {
 
   if (hadLoadError)
     return;
-
-  OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
- 
-  // Parse the main file last.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    parseTheMainFile(PersistentState, DelayedCB.get(), TypeCheckOptions);
-  }
-
-  typeCheckTopLevelInputsExcludingMain(PersistentState, TypeCheckOptions);
- 
-  // Even if there were no source files, we should still record known
-  // protocols.
-  if (auto *stdlib = Context->getStdlibModule())
-    Context->recordKnownProtocols(stdlib);
-
-  if (DelayedCB) {
-    performDelayedParsing(MainModule, PersistentState,
-                          Invocation.getCodeCompletionFactory());
-  }
-
-  if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
-    performWholeModuleTypeCheckingOnMainModule();
-  }
-  finishTypeCheckingMainModule();
+  
+  parseMainAndTypeCheckTopLevelFiles(PersistentState, DelayedCB.get());
 }
 
 void CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport() {
@@ -582,7 +560,30 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   return TypeCheckOptions;
 }
 
-void CompilerInstance::parseTheMainFile(PersistentParserState &PersistentState,
+void CompilerInstance::parseMainAndTypeCheckTopLevelFiles(PersistentParserState &PersistentState,
+                                                          DelayedParsingCallbacks *DelayedParseCB) {
+  OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
+  
+  // Parse the main file last.
+  if (MainBufferID != NO_SUCH_BUFFER) {
+    parseAndTypeCheckTheMainFile(PersistentState, DelayedParseCB, TypeCheckOptions);
+  }
+  
+  typeCheckTopLevelInputsExcludingMain(PersistentState, TypeCheckOptions);
+  
+  // Even if there were no source files, we should still record known
+  // protocols.
+  if (auto *stdlib = Context->getStdlibModule())
+    Context->recordKnownProtocols(stdlib);
+  
+  if (DelayedParseCB) {
+    performDelayedParsing(MainModule, PersistentState,
+                          Invocation.getCodeCompletionFactory());
+  }
+  typeCheckMainModule(TypeCheckOptions);
+}
+
+void CompilerInstance::parseAndTypeCheckTheMainFile(PersistentParserState &PersistentState,
                                         DelayedParsingCallbacks *DelayedParseCB,
                                         const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   bool mainIsPrimary =
@@ -643,6 +644,13 @@ void CompilerInstance::typeCheckTopLevelInputsExcludingMain(PersistentParserStat
                             options.WarnLongFunctionBodies,
                             options.WarnLongExpressionTypeChecking,
                             options.SolverExpressionTimeThreshold);
+}
+
+void CompilerInstance::typeCheckMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions) {
+  if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
+    performWholeModuleTypeCheckingOnMainModule();
+  }
+  finishTypeCheckingMainModule();
 }
 
 void CompilerInstance::performWholeModuleTypeCheckingOnMainModule() {
