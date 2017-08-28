@@ -436,23 +436,19 @@ public:
   void freeContextAndSIL();
   
 private:
-  void loadStdlibAndMaybeSwiftOnoneSupport(FrontendOptions::ActionType requestedAction);
+  void loadStdlibAndMaybeSwiftOnoneSupport();
   ModuleDecl *importUnderlyingModule(ClangImporter *clangImporter);
-  ModuleDecl *importBridgingHeader(const StringRef &implicitHeaderPath, ClangImporter *clangImporter);
+  ModuleDecl *importBridgingHeader(ClangImporter *clangImporter);
   
-  void fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules,
-                                                          const std::vector<std::string> &implicitImportedModuleNames);
+  void fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules);
   std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();
 
-  void ensureMainFileComesFirst(const InputFileKind Kind,
-                                SourceFile::ImplicitModuleImportKind modImpKind,
+  void ensureMainFileComesFirst(SourceFile::ImplicitModuleImportKind modImpKind,
                                 ModuleDecl *underlying,
                                 ModuleDecl *importedHeaderModule,
                                 SmallVectorImpl<ModuleDecl *> &importModules);
-  SourceFile::ImplicitModuleImportKind createSILModuleIfNecessary(const FrontendOptions &options,
-                                                                  const std::vector<unsigned> &BufferIDs,
-                                                                  unsigned MainBufferID,
-                                                                  const InputFileKind Kind);
+  SourceFile::ImplicitModuleImportKind createSILModuleIfNecessary(const std::vector<unsigned> &BufferIDs,
+                                                                  unsigned MainBufferID);
 
   void parseALibraryFile(unsigned BufferID,
                          SourceFile::ImplicitModuleImportKind modImpKind,
@@ -462,15 +458,13 @@ private:
                          PersistentParserState &PersistentState,
                          DelayedParsingCallbacks *DelayedParseCB);
   
-  OptionSet<TypeCheckingFlags> computeTypeCheckingOptions(const FrontendOptions &options);
+  OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
   
   void parseTheMainFile(PersistentParserState &PersistentState,
                         DelayedParsingCallbacks *DelayedParseCB,
-                        const OptionSet<TypeCheckingFlags> TypeCheckOptions,
-                        const FrontendOptions &options);
+                        const OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void typeCheckTopLevelInputsExcludingMain(PersistentParserState &PersistentState,
-                                            const OptionSet<TypeCheckingFlags> TypeCheckOptions,
-                                            const FrontendOptions &options);
+                                            const OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performWholeModuleTypeCheckingOnMainModule();
   void finishTypeCheckingMainModule();
 };
