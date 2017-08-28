@@ -347,36 +347,12 @@ void CompilerInstance::performSema() {
 
   ensureMainFileComesFirst(implicitModuleImportKind, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules, );
 
-  bool hadLoadError = false;
-
-  // Parse all the partial modules first.
-  for (auto &PM : PartialModules) {
-    assert(PM.ModuleBuffer);
-    if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
-                      std::move(PM.ModuleDocBuffer)))
-      hadLoadError = true;
-  }
-
-  // Then parse all the library files.
-  for (auto BufferID : BufferIDs) {
-    if (BufferID != MainBufferID)
-      parseALibraryFile(BufferID,
-                        implicitModuleImportKind,
-                        objCModuleUnderlyingMixedFramework,
-                        importedHeaderModule,
-                        importModules,
-                        PersistentState,
-                        DelayedCB.get());
-  }
-
-  if (Invocation.isCodeCompletion()) {
-    // When we are doing code completion, make sure to emit at least one
-    // diagnostic, so that ASTContext is marked as erroneous.  In this case
-    // various parts of the compiler (for example, AST verifier) have less
-    // strict assumptions about the AST.
-    Diagnostics.diagnose(SourceLoc(), diag::error_doing_code_completion);
-  }
-
+  bool hadLoadError = parsePartialModulesAndLibraryFiles(implicitModuleImportKind,
+                                                         objCModuleUnderlyingMixedFramework,
+                                                         importedHeaderModule,
+                                                         importModules,
+                                                         PersistentState,
+                                                         DelayedCB.get());
   if (hadLoadError)
     return;
   
@@ -558,6 +534,43 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
     TypeCheckOptions |= TypeCheckingFlags::DebugTimeExpressions;
   }
   return TypeCheckOptions;
+}
+
+// Return true if had load error
+bool CompilerInstance::parsePartialModulesAndLibraryFiles(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
+                                                          ModuleDecl *objCModuleUnderlyingMixedFramework,
+                                                          ModuleDecl *importedHeaderModule,
+                                                          SmallVectorImpl<ModuleDecl *> &importModules,
+                                                          PersistentParserState &PersistentState,
+                                                          DelayedParsingCallbacks *DelayedParseCB) {
+  bool hadLoadError = false;
+  // Parse all the partial modules first.
+  for (auto &PM : PartialModules) {
+    assert(PM.ModuleBuffer);
+    if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
+                      std::move(PM.ModuleDocBuffer)))
+      hadLoadError = true;
+  }
+  
+  // Then parse all the library files.
+  for (auto BufferID : BufferIDs) {
+    if (BufferID != MainBufferID)
+      parseALibraryFile(BufferID,
+                        implicitModuleImportKind,
+                        objCModuleUnderlyingMixedFramework,
+                        importedHeaderModule,
+                        importModules,
+                        PersistentState,
+                        DelayedParseCB);
+  }
+  if (Invocation.isCodeCompletion()) {
+    // When we are doing code completion, make sure to emit at least one
+    // diagnostic, so that ASTContext is marked as erroneous.  In this case
+    // various parts of the compiler (for example, AST verifier) have less
+    // strict assumptions about the AST.
+    Diagnostics.diagnose(SourceLoc(), diag::error_doing_code_completion);
+  }
+  return hadLoadError;
 }
 
 void CompilerInstance::parseMainAndTypeCheckTopLevelFiles(PersistentParserState &PersistentState,
