@@ -81,3 +81,10 @@ func f1() {
 // CHECK: bar(a : {}}, <#T##d: () -> ()##() -> ()#>)
 
 foo(withDuration: 1, animations: <#T##() -> Void#>)
+
+if true {
+  withtrail(<#T##() -> ()#>)
+// CHECK:   withtrail {
+// CHECK-NEXT: <#code#>
+}
+}
