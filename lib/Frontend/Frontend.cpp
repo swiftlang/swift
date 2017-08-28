@@ -484,21 +484,8 @@ void CompilerInstance::performSema() {
   if (hadLoadError)
     return;
 
-  // Compute the options we want to use for type checking.
-  OptionSet<TypeCheckingFlags> TypeCheckOptions;
-  if (PrimaryBufferID == NO_SUCH_BUFFER) {
-    TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
-  }
-  if (options.DebugTimeFunctionBodies) {
-    TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
-  }
-  if (options.actionIsImmediate()) {
-    TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
-  }
-  if (options.DebugTimeExpressionTypeChecking) {
-    TypeCheckOptions |= TypeCheckingFlags::DebugTimeExpressions;
-  }
-
+  OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions(options);
+ 
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {
     parseTheMainFile(PersistentState, DelayedCB.get(), TypeCheckOptions, options);
@@ -520,6 +507,23 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions(const FrontendOptions &options) {
+  OptionSet<TypeCheckingFlags> TypeCheckOptions;
+  if (PrimaryBufferID == NO_SUCH_BUFFER) {
+    TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
+  }
+  if (options.DebugTimeFunctionBodies) {
+    TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
+  }
+  if (options.actionIsImmediate()) {
+    TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
+  }
+  if (options.DebugTimeExpressionTypeChecking) {
+    TypeCheckOptions |= TypeCheckingFlags::DebugTimeExpressions;
+  }
+  return TypeCheckOptions;
 }
 
 void CompilerInstance::parseTheMainFile(PersistentParserState &PersistentState,

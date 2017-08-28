@@ -436,6 +436,8 @@ public:
   void freeContextAndSIL();
   
 private:
+  OptionSet<TypeCheckingFlags> computeTypeCheckingOptions(const FrontendOptions &options);
+  
   void parseTheMainFile(PersistentParserState &PersistentState,
                         DelayedParsingCallbacks *DelayedParseCB,
                         const OptionSet<TypeCheckingFlags> TypeCheckOptions,
