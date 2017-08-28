@@ -287,6 +287,19 @@ static void addAdditionalInitialImportsTo(SourceFile *SF,
   SF->addImports(additionalImports);
 }
 
+// Implicitly import the SwiftOnoneSupport module in non-optimized
+// builds. This allows for use of popular specialized functions
+// from the standard library, which makes the non-optimized builds
+// execute much faster.
+static bool shouldImplicityImportSwiftOnoneSupportModule(SILOptions::SILOptMode optimization, FrontendOptions::ActionType requestedAction) {
+  return ((optimization <= SILOptions::SILOptMode::None &&
+           (requestedAction == FrontendOptions::EmitObject ||
+            requestedAction == FrontendOptions::Immediate ||
+            requestedAction == FrontendOptions::EmitSIL)) ||
+          (optimization == SILOptions::SILOptMode::None &&
+           requestedAction >= FrontendOptions::EmitSILGen));
+}
+
 
 void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
@@ -314,18 +327,7 @@ void CompilerInstance::performSema() {
              "Module failed to load but nothing was diagnosed?");
       return;
     }
-
-    const auto &silOptions = Invocation.getSILOptions();
-    if ((silOptions.Optimization <= SILOptions::SILOptMode::None &&
-         (options.RequestedAction == FrontendOptions::EmitObject ||
-          options.RequestedAction == FrontendOptions::Immediate ||
-          options.RequestedAction == FrontendOptions::EmitSIL)) ||
-        (silOptions.Optimization == SILOptions::SILOptMode::None &&
-         options.RequestedAction >= FrontendOptions::EmitSILGen)) {
-      // Implicitly import the SwiftOnoneSupport module in non-optimized
-      // builds. This allows for use of popular specialized functions
-      // from the standard library, which makes the non-optimized builds
-      // execute much faster.
+    if (shouldImplicityImportSwiftOnoneSupportModule(Invocation.getSILOptions().Optimization, options.RequestedAction)) {
       Invocation.getFrontendOptions()
                 .ImplicitImportModuleNames.push_back(SWIFT_ONONE_SUPPORT);
     }
