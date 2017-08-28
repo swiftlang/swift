@@ -336,16 +336,7 @@ void CompilerInstance::performSema() {
   auto clangImporter =
     static_cast<ClangImporter *>(Context->getClangModuleLoader());
 
-  ModuleDecl *underlying = nullptr;
-  if (options.ImportUnderlyingModule) {
-    underlying = clangImporter->loadModule(SourceLoc(),
-                                           std::make_pair(MainModule->getName(),
-                                                          SourceLoc()));
-    if (!underlying) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
-                           MainModule->getName());
-    }
-  }
+  ModuleDecl *underlying = options.ImportUnderlyingModule ? importUnderlyingModule(clangImporter) : nullptr;
 
   ModuleDecl *importedHeaderModule = importBridgingHeader(options.ImplicitObjCHeaderPath, clangImporter);
 
@@ -430,6 +421,17 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+ModuleDecl *CompilerInstance::importUnderlyingModule(ClangImporter *clangImporter) {
+  ModuleDecl *underlying = clangImporter->loadModule(SourceLoc(),
+                                                     std::make_pair(MainModule->getName(),
+                                                                    SourceLoc()));
+  if (underlying)
+    return underlying;
+  Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
+                       MainModule->getName());
+  return nullptr;
 }
 
 ModuleDecl *CompilerInstance::importBridgingHeader(const StringRef &implicitHeaderPath, ClangImporter* clangImporter) {

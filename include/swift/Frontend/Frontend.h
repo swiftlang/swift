@@ -436,6 +436,7 @@ public:
   void freeContextAndSIL();
   
 private:
+  ModuleDecl *importUnderlyingModule(ClangImporter *clangImporter);
   ModuleDecl *importBridgingHeader(const StringRef &implicitHeaderPath, ClangImporter *clangImporter);
   
   void fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules,
