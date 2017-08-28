@@ -443,37 +443,14 @@ void CompilerInstance::performSema() {
 
   // Then parse all the library files.
   for (auto BufferID : BufferIDs) {
-    if (BufferID == MainBufferID)
-      continue;
-
-    auto *NextInput = new (*Context) SourceFile(*MainModule,
-                                                SourceFileKind::Library,
-                                                BufferID,
-                                                modImpKind,
-                                                Invocation.getLangOptions().KeepTokensInSourceFile);
-    MainModule->addFile(*NextInput);
-    addAdditionalInitialImportsTo(NextInput, underlying, importedHeaderModule, importModules);
-
-    if (BufferID == PrimaryBufferID)
-      setPrimarySourceFile(NextInput);
-
-    auto &Diags = NextInput->getASTContext().Diags;
-    auto DidSuppressWarnings = Diags.getSuppressWarnings();
-    auto IsPrimary
-      = PrimaryBufferID == NO_SUCH_BUFFER || BufferID == PrimaryBufferID;
-    Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
-
-    bool Done;
-    do {
-      // Parser may stop at some erroneous constructions like #else, #endif
-      // or '}' in some cases, continue parsing until we are done
-      parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
-                          &PersistentState, DelayedCB.get());
-    } while (!Done);
-
-    Diags.setSuppressWarnings(DidSuppressWarnings);
-
-    performNameBinding(*NextInput);
+    if (BufferID != MainBufferID)
+      parseALibraryFile(BufferID,
+                        modImpKind,
+                        underlying,
+                        importedHeaderModule,
+                        importModules,
+                        PersistentState,
+                        DelayedCB.get());
   }
 
   if (Invocation.isCodeCompletion()) {
@@ -510,6 +487,44 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+void CompilerInstance::parseALibraryFile(unsigned BufferID,
+                                         SourceFile::ImplicitModuleImportKind modImpKind,
+                                         ModuleDecl *underlying,
+                                         ModuleDecl *importedHeaderModule,
+                                         SmallVectorImpl<ModuleDecl *> &importModules,
+                                         PersistentParserState &PersistentState,
+                                         DelayedParsingCallbacks *DelayedParseCB) {
+  
+  auto *NextInput = new (*Context) SourceFile(*MainModule,
+                                              SourceFileKind::Library,
+                                              BufferID,
+                                              modImpKind,
+                                              Invocation.getLangOptions().KeepTokensInSourceFile);
+  MainModule->addFile(*NextInput);
+  addAdditionalInitialImportsTo(NextInput, underlying, importedHeaderModule, importModules);
+  
+  if (BufferID == PrimaryBufferID)
+    setPrimarySourceFile(NextInput);
+  
+  auto &Diags = NextInput->getASTContext().Diags;
+  auto DidSuppressWarnings = Diags.getSuppressWarnings();
+  auto IsPrimary
+  = PrimaryBufferID == NO_SUCH_BUFFER || BufferID == PrimaryBufferID;
+  Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
+  
+  bool Done;
+  do {
+    // Parser may stop at some erroneous constructions like #else, #endif
+    // or '}' in some cases, continue parsing until we are done
+    parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
+                        &PersistentState, DelayedParseCB);
+  } while (!Done);
+  
+  Diags.setSuppressWarnings(DidSuppressWarnings);
+  
+  performNameBinding(*NextInput);
 }
 
 OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions(const FrontendOptions &options) {
