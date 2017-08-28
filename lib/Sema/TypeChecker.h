@@ -1039,7 +1039,7 @@ public:
   /// Perform just enough validation for looking up names using the Decl.
   void validateDeclForNameLookup(ValueDecl *D);
 
-  /// Resolves the accessibility of the given declaration.
+  /// Resolves the access control of the given declaration.
   void validateAccessControl(ValueDecl *D);
 
   /// Validate the given extension declaration, ensuring that it

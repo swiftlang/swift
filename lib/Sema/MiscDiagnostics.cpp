@@ -3444,19 +3444,19 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
   }
 
   DeclAttributes &attrs = VD->getAttrs();
-  AbstractAccessibilityAttr *attr;
+  AbstractAccessControlAttr *attr;
   if (isForSetter) {
-    attr = attrs.getAttribute<SetterAccessibilityAttr>();
+    attr = attrs.getAttribute<SetterAccessAttr>();
     cast<AbstractStorageDecl>(VD)->overwriteSetterAccess(desiredAccess);
   } else {
-    attr = attrs.getAttribute<AccessibilityAttr>();
+    attr = attrs.getAttribute<AccessControlAttr>();
     VD->overwriteAccess(desiredAccess);
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD)) {
       if (auto *getter = ASD->getGetter())
         getter->overwriteAccess(desiredAccess);
 
-      if (auto *setterAttr = attrs.getAttribute<SetterAccessibilityAttr>()) {
+      if (auto *setterAttr = attrs.getAttribute<SetterAccessAttr>()) {
         if (setterAttr->getAccess() > desiredAccess)
           fixItAccess(diag, VD, desiredAccess, true);
       } else {

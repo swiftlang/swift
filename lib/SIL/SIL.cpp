@@ -67,7 +67,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
     return FormalLinkage::HiddenUnique;
   }
 
-  llvm_unreachable("Unhandled Accessibility in switch.");
+  llvm_unreachable("Unhandled access level in switch.");
 }
 
 FormalLinkage swift::getTypeLinkage(CanType type) {

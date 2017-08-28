@@ -332,14 +332,14 @@ using LibraryKindField = BCFixed<1>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
-enum class AccessibilityKind : uint8_t {
+enum class AccessLevel : uint8_t {
   Private = 0,
   FilePrivate,
   Internal,
   Public,
   Open,
 };
-using AccessibilityKindField = BCFixed<3>;
+using AccessLevelField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -793,7 +793,7 @@ namespace decls_block {
     TypeIDField, // interface type (no longer used)
     BCFixed<1>,  // implicit flag
     GenericEnvironmentIDField, // generic environment
-    AccessibilityKindField // accessibility
+    AccessLevelField // access level
     // Trailed by generic parameters (if any).
   >;
 
@@ -821,7 +821,7 @@ namespace decls_block {
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
     GenericEnvironmentIDField, // generic environment
-    AccessibilityKindField, // accessibility
+    AccessLevelField, // access level
     BCVBR<4>,               // number of conformances
     BCArray<TypeIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
@@ -835,7 +835,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit flag
     GenericEnvironmentIDField, // generic environment
     TypeIDField,            // raw type
-    AccessibilityKindField, // accessibility
+    AccessLevelField, // access level
     BCVBR<4>,               // number of conformances
     BCVBR<4>,               // number of inherited types
     BCArray<TypeIDField>    // inherited types, followed by dependency types
@@ -852,7 +852,7 @@ namespace decls_block {
     BCFixed<1>,        // requires stored property initial values
     GenericEnvironmentIDField, // generic environment
     TypeIDField,       // superclass
-    AccessibilityKindField, // accessibility
+    AccessLevelField, // access level
     BCVBR<4>,               // number of conformances
     BCArray<TypeIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
@@ -867,7 +867,7 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     GenericEnvironmentIDField, // generic environment
-    AccessibilityKindField, // accessibility
+    AccessLevelField, // access level
     BCArray<DeclIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
     // the default witness table record
@@ -892,7 +892,7 @@ namespace decls_block {
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
     DeclIDField, // overridden decl
-    AccessibilityKindField, // accessibility
+    AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // 'required' but overridden is not (used for recovery)
     BCVBR<5>,     // number of parameter name components
@@ -921,8 +921,8 @@ namespace decls_block {
     DeclIDField,  // willset
     DeclIDField,  // didset
     DeclIDField,  // overridden decl
-    AccessibilityKindField, // accessibility
-    AccessibilityKindField, // setter accessibility, if applicable
+    AccessLevelField, // access level
+    AccessLevelField, // setter access, if applicable
     BCArray<TypeIDField> // dependencies
   >;
 
@@ -954,7 +954,7 @@ namespace decls_block {
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
                   // components plus one
     AddressorKindField, // addressor kind
-    AccessibilityKindField, // accessibility
+    AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
@@ -1030,8 +1030,8 @@ namespace decls_block {
     DeclIDField, // willSet
     DeclIDField, // didSet
     DeclIDField, // overridden decl
-    AccessibilityKindField, // accessibility
-    AccessibilityKindField, // setter accessibility, if applicable
+    AccessLevelField, // access level
+    AccessLevelField, // setter access, if applicable
     BCVBR<5>,    // number of parameter name components
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
@@ -1351,9 +1351,8 @@ namespace decls_block {
   // Stub layouts, unused.
   using OwnershipDeclAttrLayout = BCRecordLayout<Ownership_DECL_ATTR>;
   using RawDocCommentDeclAttrLayout = BCRecordLayout<RawDocComment_DECL_ATTR>;
-  using AccessibilityDeclAttrLayout = BCRecordLayout<Accessibility_DECL_ATTR>;
-  using SetterAccessibilityDeclAttrLayout =
-    BCRecordLayout<SetterAccessibility_DECL_ATTR>;
+  using AccessControlDeclAttrLayout = BCRecordLayout<AccessControl_DECL_ATTR>;
+  using SetterAccessDeclAttrLayout = BCRecordLayout<SetterAccess_DECL_ATTR>;
   using ObjCBridgedDeclAttrLayout = BCRecordLayout<ObjCBridged_DECL_ATTR>;
   using SynthesizedProtocolDeclAttrLayout
     = BCRecordLayout<SynthesizedProtocol_DECL_ATTR>;

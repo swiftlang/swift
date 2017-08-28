@@ -41,7 +41,7 @@ enum NLOptions : unsigned {
   /// allow lookups to find members of all classes.
   NL_DynamicLookup = 0x10,
 
-  /// Don't check accessibility when doing lookup into a type.
+  /// Don't check access when doing lookup into a type.
   ///
   /// This option is not valid when performing lookup into a module.
   NL_IgnoreAccessControl = 0x20,

@@ -454,7 +454,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printAccess(const ValueDecl *D) {
     if (!Options.PrintAccess || !D->hasAccess() ||
-        D->getAttrs().hasAttribute<AccessibilityAttr>())
+        D->getAttrs().hasAttribute<AccessControlAttr>())
       return;
 
     printAccess(D->getFormalAccess());

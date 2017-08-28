@@ -1377,7 +1377,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
   if (isFragile) {
     // Fragile functions/globals must be visible from outside, regardless of
-    // their accessibility. If a caller is also fragile and inlined into another
+    // their access level. If a caller is also fragile and inlined into another
     // module it must be able to access this (not-inlined) function/global.
     switch (linkage) {
     case SILLinkage::Hidden:

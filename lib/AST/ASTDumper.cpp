@@ -46,7 +46,7 @@ static const TerminalColor NAME##Color = { llvm::raw_ostream::COLOR, BOLD };
 
 DEF_COLOR(Func, YELLOW, false)
 DEF_COLOR(Range, YELLOW, false)
-DEF_COLOR(Accessibility, YELLOW, false)
+DEF_COLOR(AccessLevel, YELLOW, false)
 DEF_COLOR(ASTNode, YELLOW, true)
 DEF_COLOR(Parameter, YELLOW, false)
 DEF_COLOR(Extension, MAGENTA, false)
@@ -725,7 +725,7 @@ namespace {
       }
 
       if (VD->hasAccess()) {
-        PrintWithColorRAII(OS, AccessibilityColor) << " access="
+        PrintWithColorRAII(OS, AccessLevelColor) << " access="
           << getAccessLevelString(VD->getFormalAccess());
       }
 
@@ -1758,7 +1758,7 @@ public:
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getDeclRef());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessibilityColor)
+      PrintWithColorRAII(OS, AccessLevelColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
     PrintWithColorRAII(OS, ExprModifierColor)
       << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
@@ -1821,7 +1821,7 @@ public:
       << " decl=";
     E->getMember().dump(OS);
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessibilityColor)
+      PrintWithColorRAII(OS, AccessLevelColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
     if (E->isSuper())
       OS << " super";
@@ -1906,7 +1906,7 @@ public:
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessibilityColor)
+      PrintWithColorRAII(OS, AccessLevelColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
     if (E->isSuper())
       OS << " super";

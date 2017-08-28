@@ -541,15 +541,15 @@ SkipUnavailable("skip-unavailable",
 
 static llvm::cl::opt<AccessLevel>
 AccessFilter(
-    llvm::cl::desc("Accessibility filter:"),
+    llvm::cl::desc("Access filter:"),
     llvm::cl::cat(Category),
     llvm::cl::init(AccessLevel::Private),
     llvm::cl::values(
-        clEnumValN(AccessLevel::Private, "accessibility-filter-private",
+        clEnumValN(AccessLevel::Private, "access-filter-private",
             "Print all declarations"),
-        clEnumValN(AccessLevel::Internal, "accessibility-filter-internal",
+        clEnumValN(AccessLevel::Internal, "access-filter-internal",
             "Print internal and public declarations"),
-        clEnumValN(AccessLevel::Public, "accessibility-filter-public",
+        clEnumValN(AccessLevel::Public, "access-filter-public",
             "Print public declarations")));
 
 static llvm::cl::opt<bool>

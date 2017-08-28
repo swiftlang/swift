@@ -1912,7 +1912,7 @@ bool ValueDecl::isVersionedInternalDecl() const {
   return false;
 }
 
-/// Return the accessibility of an internal or public declaration
+/// Return the access level of an internal or public declaration
 /// that's been testably imported.
 static AccessLevel getTestableAccess(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
@@ -2027,7 +2027,7 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
     return AccessScope::getPublic();
   }
 
-  llvm_unreachable("unknown accessibility level");
+  llvm_unreachable("unknown access level");
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {

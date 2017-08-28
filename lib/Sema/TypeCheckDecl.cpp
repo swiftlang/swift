@@ -1316,8 +1316,8 @@ protected:
     if (!VD || isa<GenericTypeParamDecl>(VD))
       return true;
 
-    // FIXME: Figure out why AssociatedTypeDecls don't always have
-    // accessibility here.
+    // FIXME: Figure out why AssociatedTypeDecls don't always have an access
+    // level here.
     if (!VD->hasAccess()) {
       if (isa<AssociatedTypeDecl>(VD))
         return true;
@@ -1484,12 +1484,12 @@ void TypeChecker::computeDefaultAccessLevel(ExtensionDecl *ED) {
   }
 
   AccessLevel defaultAccess;
-  if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
+  if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
     defaultAccess = std::max(AA->getAccess(), AccessLevel::FilePrivate);
   else
     defaultAccess = AccessLevel::Internal;
 
-  // Don't set the max or default accessibility to 'open'.  This should
+  // Don't set the max or default access level to 'open'.  This should
   // be diagnosed as invalid anyway.
   defaultAccess = std::min(defaultAccess, AccessLevel::Public);
   maxAccess = std::min(maxAccess, AccessLevel::Public);
@@ -1511,8 +1511,8 @@ void TypeChecker::computeAccessLevel(ValueDecl *D) {
   if (D->hasAccess())
     return;
 
-  // Check if the decl has an explicit accessibility attribute.
-  if (auto *AA = D->getAttrs().getAttribute<AccessibilityAttr>()) {
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>()) {
     D->setAccess(AA->getAccess());
 
   } else if (auto fn = dyn_cast<FuncDecl>(D)) {
@@ -1580,7 +1580,7 @@ void TypeChecker::computeAccessLevel(ValueDecl *D) {
   }
 
   if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
-    if (auto *AA = D->getAttrs().getAttribute<SetterAccessibilityAttr>())
+    if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
       ASD->setSetterAccess(AA->getAccess());
     else
       ASD->setSetterAccess(ASD->getFormalAccess());
@@ -1806,9 +1806,9 @@ static void checkGenericParamAccess(TypeChecker &TC,
 
   // This must stay in sync with diag::generic_param_access.
   enum {
-    AEK_Parameter = 0,
-    AEK_Requirement
-  } accessibilityErrorKind;
+    ACEK_Parameter = 0,
+    ACEK_Requirement
+  } accessControlErrorKind;
   auto minAccessScope = AccessScope::getPublic();
   const TypeRepr *complainRepr = nullptr;
   auto downgradeToWarning = DowngradeToWarning::Yes;
@@ -1829,7 +1829,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
-        accessibilityErrorKind = AEK_Parameter;
+        accessControlErrorKind = ACEK_Parameter;
         downgradeToWarning = thisDowngrade;
       }
     });
@@ -1846,7 +1846,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
-        accessibilityErrorKind = AEK_Requirement;
+        accessControlErrorKind = ACEK_Requirement;
         downgradeToWarning = thisDowngrade;
       }
     };
@@ -1891,7 +1891,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
   auto minAccess = minAccessScope.accessLevelForDiagnostics();
 
   bool isExplicit =
-    owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
+    owner->getAttrs().hasAttribute<AccessControlAttr>() ||
     owner->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
   auto diagID = diag::generic_param_access;
   if (downgradeToWarning == DowngradeToWarning::Yes)
@@ -1900,7 +1900,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
                           owner->getDescriptiveKind(), isExplicit,
                           contextAccess, minAccess,
                           isa<FileUnit>(owner->getDeclContext()),
-                          accessibilityErrorKind);
+                          accessControlErrorKind);
   highlightOffendingType(TC, diag, complainRepr);
 }
 
@@ -1911,8 +1911,8 @@ static void checkGenericParamAccess(TypeChecker &TC,
                           owner->getFormalAccess());
 }
 
-/// Checks the given declaration's accessibility to make sure it is valid given
-/// the way it is defined.
+/// Checks the given declaration's access to make sure it is valid given the way
+/// it is defined.
 ///
 /// \p D must be a ValueDecl or a Decl that can appear in a type context.
 static void checkAccessControl(TypeChecker &TC, const Decl *D) {
@@ -1933,10 +1933,10 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
   case DeclKind::Param:
   case DeclKind::GenericTypeParam:
   case DeclKind::MissingMember:
-    llvm_unreachable("does not have accessibility");
+    llvm_unreachable("does not have access control");
 
   case DeclKind::IfConfig:
-    // Does not have accessibility.
+    // Does not have access control.
   case DeclKind::EnumCase:
     // Handled at the EnumElement level.
   case DeclKind::Var:
@@ -1966,7 +1966,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                             DowngradeToWarning downgradeToWarning) {
           auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
           bool isExplicit =
-            theVar->getAttrs().hasAttribute<AccessibilityAttr>();
+            theVar->getAttrs().hasAttribute<AccessControlAttr>();
           auto theVarAccess = isExplicit
             ? theVar->getFormalAccess()
             : typeAccessScope.requiredAccessForDiagnostics();
@@ -1989,9 +1989,9 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
       if (!TP)
         return;
 
-      // FIXME: We need an accessibility value to check against, so we pull
-      // one out of some random VarDecl in the pattern. They're all going to
-      // be the same, but still, ick.
+      // FIXME: We need an access level to check against, so we pull one out of
+      // some random VarDecl in the pattern. They're all going to be the same,
+      // but still, ick.
       const VarDecl *anyVar = nullptr;
       TP->forEachVariable([&](VarDecl *V) {
         seenVars.insert(V);
@@ -2006,7 +2006,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                           DowngradeToWarning downgradeToWarning) {
         auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
         bool isExplicit =
-          anyVar->getAttrs().hasAttribute<AccessibilityAttr>() ||
+          anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
           anyVar->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
         auto diagID = diag::pattern_type_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
@@ -2035,7 +2035,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
       auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-      bool isExplicit = TAD->getAttrs().hasAttribute<AccessibilityAttr>();
+      bool isExplicit = TAD->getAttrs().hasAttribute<AccessControlAttr>();
       auto diagID = diag::type_alias_underlying_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::type_alias_underlying_type_access_warn;
@@ -2053,9 +2053,9 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
 
     // This must stay in sync with diag::associated_type_access.
     enum {
-      AEK_DefaultDefinition = 0,
-      AEK_Requirement
-    } accessibilityErrorKind;
+      ACEK_DefaultDefinition = 0,
+      ACEK_Requirement
+    } accessControlErrorKind;
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
@@ -2072,7 +2072,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
              typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
-          accessibilityErrorKind = AEK_Requirement;
+          accessControlErrorKind = ACEK_Requirement;
           downgradeToWarning = downgradeDiag;
         }
       });
@@ -2086,7 +2086,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
-        accessibilityErrorKind = AEK_DefaultDefinition;
+        accessControlErrorKind = ACEK_DefaultDefinition;
         downgradeToWarning = downgradeDiag;
       }
     });
@@ -2098,7 +2098,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         diagID = diag::associated_type_access_warn;
       auto diag = TC.diagnose(assocType, diagID,
                               assocType->getFormalAccess(),
-                              minAccess, accessibilityErrorKind);
+                              minAccess, accessControlErrorKind);
       highlightOffendingType(TC, diag, complainRepr);
     }
     return;
@@ -2125,7 +2125,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
         auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-        bool isExplicit = ED->getAttrs().hasAttribute<AccessibilityAttr>();
+        bool isExplicit = ED->getAttrs().hasAttribute<AccessControlAttr>();
         auto diagID = diag::enum_raw_type_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::enum_raw_type_access_warn;
@@ -2166,7 +2166,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
         auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-        bool isExplicit = CD->getAttrs().hasAttribute<AccessibilityAttr>();
+        bool isExplicit = CD->getAttrs().hasAttribute<AccessControlAttr>();
         auto diagID = diag::class_super_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::class_super_access_warn;
@@ -2206,7 +2206,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
 
     if (!minAccessScope.isPublic()) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
-      bool isExplicit = proto->getAttrs().hasAttribute<AccessibilityAttr>();
+      bool isExplicit = proto->getAttrs().hasAttribute<AccessControlAttr>();
       auto diagID = diag::protocol_refine_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::protocol_refine_access_warn;
@@ -2258,7 +2258,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     if (!minAccessScope.isPublic()) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
       bool isExplicit =
-        SD->getAttrs().hasAttribute<AccessibilityAttr>() ||
+        SD->getAttrs().hasAttribute<AccessControlAttr>() ||
         SD->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
       auto diagID = diag::subscript_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
@@ -2337,7 +2337,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         ? FK_Initializer
         : isTypeContext ? FK_Method : FK_Function;
       bool isExplicit =
-        fn->getAttrs().hasAttribute<AccessibilityAttr>() ||
+        fn->getAttrs().hasAttribute<AccessControlAttr>() ||
         fn->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
       auto diagID = diag::function_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
@@ -5916,7 +5916,7 @@ public:
         }
       }
 
-      // Check that the override has the required accessibility.
+      // Check that the override has the required access level.
       // Overrides have to be at least as accessible as what they
       // override, except:
       //   - they don't have to be more accessible than their class and
@@ -6122,7 +6122,7 @@ public:
 #define UNINTERESTING_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
-    UNINTERESTING_ATTR(Accessibility)
+    UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
@@ -6154,7 +6154,7 @@ public:
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)
-    UNINTERESTING_ATTR(SetterAccessibility)
+    UNINTERESTING_ATTR(SetterAccess)
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(Versioned)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
@@ -6663,7 +6663,7 @@ public:
     // synthesize bodies for derived conformances
     if (!IsFirstPass) {
       TC.computeDefaultAccessLevel(ED);
-      if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>()) {
+      if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>()) {
         const auto access = AA->getAccess();
         AccessScope desiredAccessScope = AccessScope::getPublic();
         switch (access) {

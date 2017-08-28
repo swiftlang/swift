@@ -870,7 +870,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
     return SubclassScope::External;
   }
 
-  llvm_unreachable("Unhandled Accessibility in switch.");
+  llvm_unreachable("Unhandled access level in switch.");
 }
 
 unsigned SILDeclRef::getUncurryLevel() const {

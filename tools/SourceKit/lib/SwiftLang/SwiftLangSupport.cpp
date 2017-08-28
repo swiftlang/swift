@@ -640,9 +640,9 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
       continue;
     }
 
-    // We handle accessibility explicitly.
-    case DAK_Accessibility:
-    case DAK_SetterAccessibility:
+    // We handle access control explicitly.
+    case DAK_AccessControl:
+    case DAK_SetterAccess:
     // Ignore these.
     case DAK_ShowInInterface:
     case DAK_RawDocComment:

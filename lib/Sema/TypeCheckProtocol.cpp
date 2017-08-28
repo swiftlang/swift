@@ -264,11 +264,11 @@ namespace {
     Success,
 
     /// The witness is less accessible than the requirement.
-    Accessibility,
+    Access,
 
     /// The witness is storage whose setter is less accessible than the
     /// requirement.
-    AccessibilityOfSetter,
+    AccessOfSetter,
 
     /// The witness is less available than the requirement.
     Availability,
@@ -1539,8 +1539,8 @@ checkWitness(AccessScope requiredAccessScope,
   if (checkWitnessAccess(requiredAccessScope, requirement, match.Witness,
                          &isSetter)) {
     CheckKind kind = (isSetter
-                      ? CheckKind::AccessibilityOfSetter
-                      : CheckKind::Accessibility);
+                      ? CheckKind::AccessOfSetter
+                      : CheckKind::Access);
     return RequirementCheck(kind, requiredAccessScope);
   }
 
@@ -2933,8 +2933,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     case CheckKind::Success:
       break;
 
-    case CheckKind::Accessibility:
-    case CheckKind::AccessibilityOfSetter: {
+    case CheckKind::Access:
+    case CheckKind::AccessOfSetter: {
       // Avoid relying on the lifetime of 'this'.
       const DeclContext *DC = this->DC;
       diagnoseOrDefer(requirement, false,
@@ -2950,7 +2950,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto diagKind = protoForcesAccess
                           ? diag::witness_not_accessible_proto
                           : diag::witness_not_accessible_type;
-        bool isSetter = (check.Kind == CheckKind::AccessibilityOfSetter);
+        bool isSetter = (check.Kind == CheckKind::AccessOfSetter);
 
         auto &diags = DC->getASTContext().Diags;
         auto diag = diags.diagnose(
@@ -5982,7 +5982,7 @@ static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
   // Don't warn if the potential witness has been explicitly given less
   // visibility than the conformance.
   if (witness->getFormalAccess() < access) {
-    if (auto attr = witness->getAttrs().getAttribute<AccessibilityAttr>())
+    if (auto attr = witness->getAttrs().getAttribute<AccessControlAttr>())
       if (!attr->isImplicit()) return false;
   }
 
@@ -6039,7 +6039,7 @@ static void diagnosePotentialWitness(TypeChecker &tc,
 
   // If adding 'private', 'fileprivate', or 'internal' can help, suggest that.
   if (access > AccessLevel::FilePrivate &&
-      !witness->getAttrs().hasAttribute<AccessibilityAttr>()) {
+      !witness->getAttrs().hasAttribute<AccessControlAttr>()) {
     tc.diagnose(witness, diag::optional_req_near_match_access,
                 witness->getFullName(), access)
       .fixItInsert(witness->getAttributeInsertionLoc(true), "private ");
@@ -6111,7 +6111,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
     return;
 
-  // Determine the accessibility of this conformance.
+  // Determine the access level of this conformance.
   Decl *currentDecl = nullptr;
   AccessLevel defaultAccess;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {

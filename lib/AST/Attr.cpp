@@ -337,7 +337,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:
 #include "swift/AST/Attr.def"
   case DAK_Inline:
-  case DAK_Accessibility:
+  case DAK_AccessControl:
   case DAK_Ownership:
   case DAK_Effects:
     if (DeclAttribute::isDeclModifier(getKind())) {
@@ -347,7 +347,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     return true;
 
-  case DAK_SetterAccessibility:
+  case DAK_SetterAccess:
     Printer.printKeyword(getAttrName());
     Printer << "(set)";
     return true;
@@ -588,9 +588,9 @@ StringRef DeclAttribute::getAttrName() const {
       case EffectsKind::Unspecified:
         return "effects(unspecified)";
     }
-  case DAK_Accessibility:
-  case DAK_SetterAccessibility:
-    switch (cast<AbstractAccessibilityAttr>(this)->getAccess()) {
+  case DAK_AccessControl:
+  case DAK_SetterAccess:
+    switch (cast<AbstractAccessControlAttr>(this)->getAccess()) {
     case AccessLevel::Private:
       return "private";
     case AccessLevel::FilePrivate:
@@ -602,7 +602,7 @@ StringRef DeclAttribute::getAttrName() const {
     case AccessLevel::Open:
       return "open";
     }
-    llvm_unreachable("bad accessibility kind");
+    llvm_unreachable("bad access level");
 
   case DAK_Ownership:
     switch (cast<OwnershipAttr>(this)->get()) {

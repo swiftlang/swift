@@ -1907,11 +1907,11 @@ getStableStaticSpelling(swift::StaticSpellingKind SS) {
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");
 }
 
-static uint8_t getRawStableAccessLevel(AccessLevel access) {
+static uint8_t getRawStableAccessLevel(swift::AccessLevel access) {
   switch (access) {
 #define CASE(NAME) \
-  case AccessLevel::NAME: \
-    return static_cast<uint8_t>(serialization::AccessibilityKind::NAME);
+  case swift::AccessLevel::NAME: \
+    return static_cast<uint8_t>(serialization::AccessLevel::NAME);
   CASE(Private)
   CASE(FilePrivate)
   CASE(Internal)
@@ -1920,7 +1920,7 @@ static uint8_t getRawStableAccessLevel(AccessLevel access) {
 #undef CASE
   }
 
-  llvm_unreachable("Unhandled AccessibilityKind in switch.");
+  llvm_unreachable("Unhandled AccessLevel in switch.");
 }
 
 static serialization::SelfAccessKind
@@ -1994,8 +1994,8 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   switch (DA->getKind()) {
   case DAK_RawDocComment:
   case DAK_Ownership: // Serialized as part of the type.
-  case DAK_Accessibility:
-  case DAK_SetterAccessibility:
+  case DAK_AccessControl:
+  case DAK_SetterAccess:
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
   case DAK_Implements:
@@ -2438,7 +2438,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   if (auto *value = dyn_cast<ValueDecl>(D)) {
     if (value->hasAccess() &&
-        value->getFormalAccess() <= AccessLevel::FilePrivate &&
+        value->getFormalAccess() <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext()) {
       // FIXME: We shouldn't need to encode this for /all/ private decls.
       // In theory we can follow the same rules as mangling and only include
@@ -4245,7 +4245,7 @@ static void writeDeclCommentTable(
         // we want to take the testability state into account
         // and emit documentation if and only if they are visible to clients
         // (which means public ordinarily, but public+internal when testing enabled).
-        if (VD->getEffectiveAccess() < AccessLevel::Public)
+        if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
           return true;
       }
 
@@ -4408,7 +4408,7 @@ static void collectInterestingNestedDeclarations(
     }
 
     if (auto nestedType = dyn_cast<TypeDecl>(member)) {
-      if (nestedType->getEffectiveAccess() > AccessLevel::FilePrivate) {
+      if (nestedType->getEffectiveAccess() > swift::AccessLevel::FilePrivate) {
         if (!nominalParent) {
           const DeclContext *DC = member->getDeclContext();
           nominalParent = DC->getAsNominalTypeOrNominalTypeExtensionContext();

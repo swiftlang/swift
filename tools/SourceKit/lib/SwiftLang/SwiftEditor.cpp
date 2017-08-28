@@ -910,15 +910,15 @@ static UIdent getAccessLevelUID(AccessLevel Access) {
     return AccessOpen;
   }
 
-  llvm_unreachable("Unhandled Accessibility in switch.");
+  llvm_unreachable("Unhandled access level in switch.");
 }
 
 static Optional<AccessLevel> getAccessLevelStrictly(const ExtensionDecl *ED) {
   if (ED->hasDefaultAccessLevel())
     return ED->getDefaultAccessLevel();
 
-  // Check if the decl has an explicit accessibility attribute.
-  if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
 
   return None;
@@ -932,16 +932,16 @@ static AccessLevel inferDefaultAccessLevel(const ExtensionDecl *ED) {
   return AccessLevel::Internal;
 }
 
-/// If typechecking was performed we use the computed accessibility, otherwise
-/// we fallback to inferring accessibility syntactically. This may not be as
+/// If typechecking was performed we use the computed access level, otherwise
+/// we fallback to inferring access syntactically. This may not be as
 /// accurate but it's only until we have typechecked the AST.
 static AccessLevel inferAccessLevel(const ValueDecl *D) {
   assert(D);
   if (D->hasAccess())
     return D->getFormalAccess();
 
-  // Check if the decl has an explicit accessibility attribute.
-  if (auto *AA = D->getAttrs().getAttribute<AccessibilityAttr>())
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
 
   DeclContext *DC = D->getDeclContext();
@@ -982,7 +982,7 @@ inferSetterAccessLevel(const AbstractStorageDecl *D) {
   // FIXME: Have the parser detect as read-only the syntactic form of generated
   // interfaces, which is "var foo : Int { get }"
 
-  if (auto *AA = D->getAttrs().getAttribute<SetterAccessibilityAttr>())
+  if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
     return AA->getAccess();
   else
     return inferAccessLevel(D);

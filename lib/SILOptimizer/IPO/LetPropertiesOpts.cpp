@@ -279,9 +279,9 @@ static bool compareInsnSequences(SmallVectorImpl<SILInstruction *> &LHS,
 
 /// Check if a given let property can be assigned externally.
 static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
-  AccessLevel accessibility = Property->getEffectiveAccess();
+  AccessLevel access = Property->getEffectiveAccess();
   SILLinkage linkage;
-  switch (accessibility) {
+  switch (access) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
     linkage = SILLinkage::Private;

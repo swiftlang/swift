@@ -132,9 +132,9 @@ class GlobalPropertyOpt {
   }
 
   bool isVisibleExternally(VarDecl *decl) {
-    AccessLevel accessibility = decl->getEffectiveAccess();
+    AccessLevel access = decl->getEffectiveAccess();
     SILLinkage linkage;
-    switch (accessibility) {
+    switch (access) {
       case AccessLevel::Private:
       case AccessLevel::FilePrivate:
         linkage = SILLinkage::Private;

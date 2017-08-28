@@ -1309,7 +1309,7 @@ static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
   case AccessLevel::Open:
     return true;
   }
-  llvm_unreachable("bad Accessibility");
+  llvm_unreachable("bad access level");
 }
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
@@ -1321,7 +1321,7 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
 
   // If a stored property does not have a setter, it is still settable from the
   // designated initializer constructor. In this case, don't check setter
-  // accessibility, it is not set.
+  // access; it is not set.
   if (hasStorage() && !isSettable(nullptr))
     return true;
   

@@ -52,7 +52,7 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve the accessibility of a value.
+  /// Resolve the access of a value.
   ///
   /// It does no type-checking.
   virtual void resolveAccessControl(ValueDecl *VD) = 0;

@@ -583,7 +583,7 @@ bool DeclContext::isInnermostContextGeneric() const {
 bool
 DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   // FIXME: This is explicitly checking for attributes in some cases because
-  // it can be called before accessibility is computed.
+  // it can be called before access control is computed.
   switch (getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
     break;
@@ -633,7 +633,7 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
     if (extension->hasDefaultAccessLevel())
       return extension->getDefaultAccessLevel() > AccessLevel::FilePrivate;
     // FIXME: duplicated from computeDefaultAccessLevel in TypeCheckDecl.cpp.
-    if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
+    if (auto *AA = extension->getAttrs().getAttribute<AccessControlAttr>())
       return AA->getAccess() > AccessLevel::FilePrivate;
     if (Type extendedTy = extension->getExtendedType()) {
 

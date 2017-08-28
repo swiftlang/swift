@@ -250,7 +250,7 @@ struct PrintOptions {
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
-  /// Whether to print accessibility information on all value decls.
+  /// Whether to print access control information on all value decls.
   bool PrintAccess = false;
 
   /// If \c PrintAccess is true, this determines whether to print

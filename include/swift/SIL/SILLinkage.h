@@ -259,7 +259,7 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
 // We allow a 'public' member of an extension to witness a public
 // protocol requirement, even if the extended type is not public;
 // then SILGen gives the member private linkage, ignoring the more
-// visible accessibility it was given in the AST.
+// visible access level it was given in the AST.
 inline bool
 fixmeWitnessHasLinkageThatNeedsToBePublic(SILLinkage witnessLinkage) {
   return !hasPublicVisibility(witnessLinkage) &&

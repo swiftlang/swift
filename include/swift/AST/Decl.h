@@ -1709,7 +1709,7 @@ public:
 
   void setDefaultAndMaxAccess(AccessLevel defaultAccess,
                               AccessLevel maxAccess) {
-    assert(!hasDefaultAccessLevel() && "default accessibility already set");
+    assert(!hasDefaultAccessLevel() && "default access level already set");
     assert(maxAccess >= defaultAccess);
     assert(maxAccess != AccessLevel::Private && "private not valid");
     assert(defaultAccess != AccessLevel::Private && "private not valid");
@@ -2167,7 +2167,7 @@ public:
   /// \sa getFormalAccessScope
   AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
                               bool respectVersionedAttr = false) const {
-    assert(hasAccess() && "accessibility not computed yet");
+    assert(hasAccess() && "access not computed yet");
     AccessLevel result = TypeAndAccess.getInt().getValue();
     if (respectVersionedAttr &&
         result == AccessLevel::Internal &&
@@ -2206,12 +2206,13 @@ public:
   AccessLevel getEffectiveAccess() const;
 
   void setAccess(AccessLevel access) {
-    assert(!hasAccess() && "accessibility already set");
+    assert(!hasAccess() && "access already set");
     overwriteAccess(access);
   }
 
-  /// Overwrite the accessibility of this declaration.
-  // This is needed in the LLDB REPL.
+  /// Overwrite the access of this declaration.
+  ///
+  /// This is needed in the LLDB REPL.
   void overwriteAccess(AccessLevel access) {
     TypeAndAccess.setInt(access);
   }

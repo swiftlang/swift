@@ -364,9 +364,9 @@ protected:
 
   /// Retrieve the visibility information from the AST.
   bool isVisibleExternally(const ValueDecl *decl) {
-    AccessLevel accessibility = decl->getEffectiveAccess();
+    AccessLevel access = decl->getEffectiveAccess();
     SILLinkage linkage;
-    switch (accessibility) {
+    switch (access) {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
       linkage = SILLinkage::Private;
@@ -526,7 +526,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         if (// A conservative approach: if any of the overridden functions is
             // visible externally, we mark the whole method as alive.
             isPossiblyUsedExternally(entry.Linkage, Module->isWholeModule())
-            // We also have to check the method declaration's accessibility.
+            // We also have to check the method declaration's access level.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).
             || isVisibleExternally(fd)

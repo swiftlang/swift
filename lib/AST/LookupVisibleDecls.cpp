@@ -128,7 +128,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
     TypeResolver->resolveAccessControl(Member);
   }
 
-  // Check accessibility when relevant.
+  // Check access when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
       !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member) &&
       FromContext->getASTContext().LangOpts.EnableAccessControl) {

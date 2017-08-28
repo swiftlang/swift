@@ -130,7 +130,7 @@ class Ty0 : Class, NonClass {
 
 // Attributes that should be reported by parser as unknown
 // See rdar://19533915
-@__accessibility struct S__accessibility {} // expected-error{{unknown attribute '__accessibility'}}
+@__setterAccess struct S__accessibility {} // expected-error{{unknown attribute '__setterAccess'}}
 @__raw_doc_comment struct S__raw_doc_comment {} // expected-error{{unknown attribute '__raw_doc_comment'}}
 @__objc_bridged struct S__objc_bridged {} // expected-error{{unknown attribute '__objc_bridged'}}
 

@@ -2005,7 +2005,7 @@ public:
       if (!VD->hasAccess() && !VD->getDeclContext()->isLocalContext() &&
           !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
         dumpRef(VD);
-        Out << " does not have accessibility";
+        Out << " does not have access";
         abort();
       }
 
@@ -2038,8 +2038,8 @@ public:
         auto setterAccess = ASD->getSetterFormalAccess();
         if (ASD->getSetter() &&
             ASD->getSetter()->getFormalAccess() != setterAccess) {
-          Out << "AbstractStorageDecl's setter accessibility is out of sync"
-                 " with the accessibility actually on the setter";
+          Out << "AbstractStorageDecl's setter access is out of sync"
+                 " with the access actually on the setter";
           abort();
         }
       }

@@ -1883,10 +1883,10 @@ static bool isDeclAttrRecord(unsigned ID) {
 }
 
 static Optional<swift::AccessLevel> getActualAccessLevel(uint8_t raw) {
-  switch (serialization::AccessibilityKind(raw)) {
+  switch (serialization::AccessLevel(raw)) {
 #define CASE(NAME) \
-  case serialization::AccessibilityKind::NAME: \
-    return AccessLevel::NAME;
+  case serialization::AccessLevel::NAME: \
+    return swift::AccessLevel::NAME;
   CASE(Private)
   CASE(FilePrivate)
   CASE(Internal)
