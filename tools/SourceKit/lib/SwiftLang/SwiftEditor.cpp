@@ -1481,8 +1481,13 @@ private:
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (!EnclosingCall && !isa<BraceStmt>(S))
-            OuterStmt = S;
+          if (!EnclosingCall) {
+            if (isa<BraceStmt>(S))
+              // In case OuterStmt is already set, we should clear it to nullptr.
+              OuterStmt = nullptr;
+            else
+              OuterStmt = S;
+          }
         }
         return true;
       }
