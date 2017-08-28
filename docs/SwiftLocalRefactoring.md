@@ -1,11 +1,3 @@
----
-layout: post
-published: true
-date: 2017-08-22 09:45:00
-title: Swift Local Refactoring
-author: nkcsgexi
----
-
 Xcode 9 includes a brand new refactoring engine. It can transform code locally
 within a single Swift source file, or globally, such as renaming a method or property
 that occurs in multiple files and even different languages. The logic behind local refactorings is
