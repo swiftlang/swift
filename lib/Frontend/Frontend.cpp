@@ -326,11 +326,7 @@ void CompilerInstance::performSema() {
   fillInModulesToImportFromImplicitImportModuleNames(importModules);
 
   if (Invocation.getInputKind() == InputFileKind::IFK_Swift_REPL) {
-    auto *SingleInputFile =
-      new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
-                                None, implicitModuleImportKind, Invocation.getLangOptions().KeepTokensInSourceFile);
-    MainModule->addFile(*SingleInputFile);
-    addAdditionalInitialImportsTo(SingleInputFile, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
+    supplyREPLFileWithImports(implicitModuleImportKind, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
     return;
   }
 
@@ -417,6 +413,17 @@ void CompilerInstance::fillInModulesToImportFromImplicitImportModuleNames(SmallV
                            ImplicitImportModuleName, false);
     }
   }
+}
+
+void CompilerInstance::supplyREPLFileWithImports(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
+                                                 ModuleDecl *objCModuleUnderlyingMixedFramework,
+                                                 ModuleDecl *importedHeaderModule,
+                                                 SmallVectorImpl<ModuleDecl *> &importModules) {
+  auto *SingleInputFile =
+  new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
+                            None, implicitModuleImportKind, Invocation.getLangOptions().KeepTokensInSourceFile);
+  MainModule->addFile(*SingleInputFile);
+  addAdditionalInitialImportsTo(SingleInputFile, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
 }
 
 
