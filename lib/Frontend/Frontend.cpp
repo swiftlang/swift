@@ -549,16 +549,8 @@ void CompilerInstance::performSema() {
     }
   }
 
-  // Type-check each top-level input besides the main source file.
-  for (auto File : MainModule->getFiles())
-    if (auto SF = dyn_cast<SourceFile>(File))
-      if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
-        performTypeChecking(*SF, PersistentState.getTopLevelContext(),
-                            TypeCheckOptions, /*curElem*/ 0,
-                            options.WarnLongFunctionBodies,
-                            options.WarnLongExpressionTypeChecking,
-                            options.SolverExpressionTimeThreshold);
-
+  typeCheckTopLevelInputsExcludingMain(PersistentState, TypeCheckOptions, options);
+ 
   // Even if there were no source files, we should still record known
   // protocols.
   if (auto *stdlib = Context->getStdlibModule())
@@ -573,6 +565,19 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+void CompilerInstance::typeCheckTopLevelInputsExcludingMain(PersistentParserState &PersistentState,
+                                                            const OptionSet<TypeCheckingFlags> TypeCheckOptions,
+                                                            const FrontendOptions &options) {
+  for (auto File : MainModule->getFiles())
+    if (auto SF = dyn_cast<SourceFile>(File))
+      if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
+        performTypeChecking(*SF, PersistentState.getTopLevelContext(),
+                            TypeCheckOptions, /*curElem*/ 0,
+                            options.WarnLongFunctionBodies,
+                            options.WarnLongExpressionTypeChecking,
+                            options.SolverExpressionTimeThreshold);
 }
 
 void CompilerInstance::performWholeModuleTypeCheckingOnMainModule() {
