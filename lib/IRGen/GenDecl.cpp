@@ -1353,7 +1353,7 @@ bool LinkEntity::isFragile(ForDefinition_t isDefinition) const {
 static std::tuple<llvm::GlobalValue::LinkageTypes,
                   llvm::GlobalValue::VisibilityTypes,
                   llvm::GlobalValue::DLLStorageClassTypes>
-getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
+getIRLinkage(const UniversalLinkageInfo &info, const LinkEntity *entity, SILLinkage linkage,
              bool isFragile, bool isSILOnly, ForDefinition_t isDefinition,
              bool isWeakImported) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
@@ -1382,14 +1382,18 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
     switch (linkage) {
     case SILLinkage::Hidden:
     case SILLinkage::Private:
-      linkage = SILLinkage::Public;
+      // The accessibility of functions should not be affected.
+      if (!entity || !entity->isSILFunction())
+        linkage = SILLinkage::Public;
       break;
-
     case SILLinkage::HiddenExternal:
     case SILLinkage::PrivateExternal:
       linkage = SILLinkage::PublicExternal;
+      // Emit bodies of non-public external functions into the client.
+      if (entity && entity->isSILFunction() &&
+          entity->getSILFunction()->isDefinition())
+        linkage = SILLinkage::SharedExternal;
       break;
-
     case SILLinkage::Public:
     case SILLinkage::Shared:
     case SILLinkage::PublicExternal:
@@ -1473,7 +1477,7 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   // entire linkage computation.
   UniversalLinkageInfo linkInfo(IGM);
   auto linkage =
-      getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
+      getIRLinkage(linkInfo, &entity, entity.getLinkage(ForDefinition),
                    entity.isFragile(ForDefinition), entity.isSILOnly(),
                    ForDefinition, entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(std::get<0>(linkage));
@@ -1505,7 +1509,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   entity.mangle(result.Name);
 
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
+      getIRLinkage(linkInfo, &entity, entity.getLinkage(isDefinition),
                    entity.isFragile(isDefinition), entity.isSILOnly(),
                    isDefinition, entity.isWeakImported(swiftModule));
 
@@ -1525,7 +1529,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   
   result.Name += name;
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-    getIRLinkage(linkInfo, linkage, isFragile, isSILOnly,
+    getIRLinkage(linkInfo, nullptr, linkage, isFragile, isSILOnly,
                  isDefinition, isWeakImported);
   result.ForDefinition = isDefinition;
   return result;

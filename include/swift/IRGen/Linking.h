@@ -576,7 +576,11 @@ public:
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
   }
-  
+
+  bool isSILFunction() const {
+    return getKind() == Kind::SILFunction;
+  }
+
   SILFunction *getSILFunction() const {
     assert(getKind() == Kind::SILFunction);
     return reinterpret_cast<SILFunction*>(Pointer);
