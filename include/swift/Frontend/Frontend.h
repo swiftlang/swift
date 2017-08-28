@@ -441,6 +441,10 @@ private:
   ModuleDecl *importBridgingHeader(ClangImporter *clangImporter);
   
   void fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules);
+  void supplyREPLFileWithImports(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
+                                 ModuleDecl *objCModuleUnderlyingMixedFramework,
+                                 ModuleDecl *importedHeaderModule,
+                                 SmallVectorImpl<ModuleDecl *> &importModules);
   std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();
 
   void ensureMainFileComesFirst(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
