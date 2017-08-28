@@ -31,6 +31,14 @@ STATISTIC(NumEliminatedExternalDefs, "Number of external function definitions el
 
 namespace {
 
+/// Returns true if a function should be SIL serialized or emitted by IRGen.
+static bool shouldBeSerializedOrEmitted(SILFunction *F) {
+  if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()) &&
+      !F->isTransparent())
+    return false;
+  return true;
+}
+
 /// This is a base class for passes that are based on function liveness
 /// computations like e.g. dead function elimination.
 /// It provides a common logic for computing live (i.e. reachable) functions.
@@ -102,6 +110,11 @@ protected:
     if (isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule()))
       return true;
 
+    // Do not consider public_external functions that do not need to be emitted
+    // into the client as anchors.
+    if (!shouldBeSerializedOrEmitted(F))
+      return false;
+
     // ObjC functions are called through the runtime and are therefore alive
     // even if not referenced inside SIL.
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
@@ -117,6 +130,10 @@ protected:
                          << F->getName() << '\n');
       return true;
     }
+
+    // @_semantics("stdlib_binary_only") function are always anchors.
+    if (F->hasSemanticsAttr("stdlib_binary_only"))
+      return true;
 
     return false;
   }
@@ -333,7 +350,6 @@ protected:
 
   /// Scans all references inside a function.
   void scanFunction(SILFunction *F) {
-
     DEBUG(llvm::dbgs() << "    scan function " << F->getName() << '\n');
 
     // First scan all instructions of the function.
