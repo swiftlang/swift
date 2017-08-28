@@ -37,6 +37,7 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
@@ -435,6 +436,9 @@ public:
   void freeContextAndSIL();
   
 private:
+  void typeCheckTopLevelInputsExcludingMain(PersistentParserState &PersistentState,
+                                            const OptionSet<TypeCheckingFlags> TypeCheckOptions,
+                                            const FrontendOptions &options);
   void performWholeModuleTypeCheckingOnMainModule();
   void finishTypeCheckingMainModule();
 };
