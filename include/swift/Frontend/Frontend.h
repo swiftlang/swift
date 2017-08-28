@@ -436,6 +436,8 @@ public:
   void freeContextAndSIL();
   
 private:
+  ModuleDecl *importBridgingHeader(const StringRef &implicitHeaderPath, ClangImporter *clangImporter);
+  
   void fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules,
                                                                             const FrontendOptions &options);
   std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();

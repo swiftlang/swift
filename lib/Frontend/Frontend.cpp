@@ -347,14 +347,7 @@ void CompilerInstance::performSema() {
     }
   }
 
-  ModuleDecl *importedHeaderModule = nullptr;
-  StringRef implicitHeaderPath = options.ImplicitObjCHeaderPath;
-  if (!implicitHeaderPath.empty()) {
-    if (!clangImporter->importBridgingHeader(implicitHeaderPath, MainModule)) {
-      importedHeaderModule = clangImporter->getImportedHeaderModule();
-      assert(importedHeaderModule);
-    }
-  }
+  ModuleDecl *importedHeaderModule = importBridgingHeader(options.ImplicitObjCHeaderPath, clangImporter);
 
   SmallVector<ModuleDecl *, 4> importModules;
   fillInModulesToImportFromImplicitImportModuleNames(importModules, options);
@@ -437,6 +430,14 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+ModuleDecl *CompilerInstance::importBridgingHeader(const StringRef &implicitHeaderPath, ClangImporter* clangImporter) {
+  if (implicitHeaderPath.empty()  ||  clangImporter->importBridgingHeader(implicitHeaderPath, MainModule))
+    return nullptr;
+  ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
+  assert(importedHeaderModule);
+  return importedHeaderModule;
 }
 
 
