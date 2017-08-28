@@ -436,6 +436,7 @@ public:
   void freeContextAndSIL();
   
 private:
+  void loadStdlibAndMaybeSwiftOnoneSupport(FrontendOptions::ActionType requestedAction);
   ModuleDecl *importUnderlyingModule(ClangImporter *clangImporter);
   ModuleDecl *importBridgingHeader(const StringRef &implicitHeaderPath, ClangImporter *clangImporter);
   

@@ -306,33 +306,15 @@ void CompilerInstance::performSema() {
   const InputFileKind Kind = Invocation.getInputKind();
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
-  const auto modImpKind = createSILModuleIfNecessary(options, BufferIDs, MainBufferID, Kind);
+  const SourceFile::ImplicitModuleImportKind modImpKind = createSILModuleIfNecessary(options, BufferIDs, MainBufferID, Kind);
 
   switch (modImpKind) {
-  case SourceFile::ImplicitModuleImportKind::None:
-  case SourceFile::ImplicitModuleImportKind::Builtin:
-    break;
-  case SourceFile::ImplicitModuleImportKind::Stdlib: {
-    ModuleDecl *M = Context->getStdlibModule(true);
-
-    if (!M) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_stdlib_not_found,
-                           Invocation.getTargetTriple());
-      return;
-    }
-
-    // If we failed to load, we should have already diagnosed
-    if (M->failedToLoad()) {
-      assert(Diagnostics.hadAnyError() &&
-             "Module failed to load but nothing was diagnosed?");
-      return;
-    }
-    if (shouldImplicityImportSwiftOnoneSupportModule(Invocation.getSILOptions().Optimization, options.RequestedAction)) {
-      Invocation.getFrontendOptions()
-                .ImplicitImportModuleNames.push_back(SWIFT_ONONE_SUPPORT);
-    }
-    break;
-  }
+    case SourceFile::ImplicitModuleImportKind::None:
+    case SourceFile::ImplicitModuleImportKind::Builtin:
+      break;
+    case SourceFile::ImplicitModuleImportKind::Stdlib:
+      loadStdlibAndMaybeSwiftOnoneSupport(options.RequestedAction);
+      break;
   }
 
   auto clangImporter =
@@ -423,6 +405,27 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+void CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport(FrontendOptions::ActionType requestedAction) {
+  ModuleDecl *M = Context->getStdlibModule(true);
+  
+  if (!M) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_stdlib_not_found,
+                         Invocation.getTargetTriple());
+    return;
+  }
+  
+  // If we failed to load, we should have already diagnosed
+  if (M->failedToLoad()) {
+    assert(Diagnostics.hadAnyError() &&
+           "Module failed to load but nothing was diagnosed?");
+    return;
+  }
+  if (shouldImplicityImportSwiftOnoneSupportModule(Invocation.getSILOptions().Optimization, requestedAction)) {
+    Invocation.getFrontendOptions()
+    .ImplicitImportModuleNames.push_back(SWIFT_ONONE_SUPPORT);
+  }
 }
 
 ModuleDecl *CompilerInstance::importUnderlyingModule(ClangImporter *clangImporter) {
@@ -520,7 +523,8 @@ SourceFile::ImplicitModuleImportKind CompilerInstance::createSILModuleIfNecessar
     // Assume WMO, if a -primary-file option was not provided.
     createSILModule(!options.PrimaryInput.hasValue());
     return SourceFile::ImplicitModuleImportKind::None;
-  } else if (Invocation.getParseStdlib()) {
+  }
+  if (Invocation.getParseStdlib()) {
     return SourceFile::ImplicitModuleImportKind::Builtin;
   }
   return SourceFile::ImplicitModuleImportKind::Stdlib;
