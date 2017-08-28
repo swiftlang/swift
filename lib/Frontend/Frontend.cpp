@@ -400,26 +400,7 @@ void CompilerInstance::performSema() {
 
   PersistentParserState PersistentState;
 
-  // Make sure the main file is the first file in the module. This may only be
-  // a source file, or it may be a SIL file, which requires pumping the parser.
-  // We parse it last, though, to make sure that it can use decls from other
-  // files in the module.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
-
-    if (Kind == InputFileKind::IFK_Swift)
-      SourceMgr.setHashbangBufferID(MainBufferID);
-
-    auto *MainFile = new (*Context) SourceFile(*MainModule,
-                                               Invocation.getSourceFileKind(),
-                                               MainBufferID, modImpKind,
-                                               Invocation.getLangOptions().KeepTokensInSourceFile);
-    MainModule->addFile(*MainFile);
-    addAdditionalInitialImportsTo(MainFile, underlying, importedHeaderModule, importModules);
-
-    if (MainBufferID == PrimaryBufferID)
-      setPrimarySourceFile(MainFile);
-  }
+  ensureMainFileComesFirst(Kind, modImpKind, underlying, importedHeaderModule, importModules);
 
   bool hadLoadError = false;
 
@@ -477,6 +458,33 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+// Make sure the main file is the first file in the module. This may only be
+// a source file, or it may be a SIL file, which requires pumping the parser.
+// We parse it last, though, to make sure that it can use decls from other
+// files in the module.
+void CompilerInstance::ensureMainFileComesFirst(const InputFileKind Kind,
+                                                SourceFile::ImplicitModuleImportKind modImpKind,
+                                                ModuleDecl *underlying,
+                                                ModuleDecl *importedHeaderModule,
+                                                SmallVectorImpl<ModuleDecl *> &importModules) {
+  if (MainBufferID != NO_SUCH_BUFFER) {
+    assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
+    
+    if (Kind == InputFileKind::IFK_Swift)
+      SourceMgr.setHashbangBufferID(MainBufferID);
+    
+    auto *MainFile = new (*Context) SourceFile(*MainModule,
+                                               Invocation.getSourceFileKind(),
+                                               MainBufferID, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
+    MainModule->addFile(*MainFile);
+    addAdditionalInitialImportsTo(MainFile, underlying, importedHeaderModule, importModules);
+    
+    if (MainBufferID == PrimaryBufferID)
+      setPrimarySourceFile(MainFile);
+  }
+
 }
 
 SourceFile::ImplicitModuleImportKind CompilerInstance::createSILModuleIfNecessary(const FrontendOptions &options,
