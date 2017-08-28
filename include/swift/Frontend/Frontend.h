@@ -436,6 +436,14 @@ public:
   void freeContextAndSIL();
   
 private:
+  void parseALibraryFile(unsigned BufferID,
+                         SourceFile::ImplicitModuleImportKind modImpKind,
+                         ModuleDecl *underlying,
+                         ModuleDecl *importedHeaderModule,
+                         SmallVectorImpl<ModuleDecl *> &importModules,
+                         PersistentParserState &PersistentState,
+                         DelayedParsingCallbacks *DelayedParseCB);
+  
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions(const FrontendOptions &options);
   
   void parseTheMainFile(PersistentParserState &PersistentState,
