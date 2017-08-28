@@ -1,18 +1,45 @@
 # Swift Compiler Performance
 
-This document is a guide to:
-  - Understanding Swift compilation performance
-  - Known problem areas
-  - How to diagnose compilation performance problems
-  - How to report bugs most usefully
-  - How to help out if you want to improve compile times
+This document is a guide to understanding, diagnosing and reporting
+compilation-performance problems in the swift compiler. That is: the speed
+at which the compiler compiles code, not the speed at which that code runs.
 
 While this guide is lengthy, it should all be relatively
 straightforward. Performance analysis is largely a matter of patience,
 thoroughness and perseverance, measuring carefully and consistently, and
 gradually eliminating noise and focusing on a signal.
 
-## Understanding Swift compilation performance
+## Table of Contents
+
+- [Swift Compiler Performance](#swift-compiler-performance)
+  * [Outline of processes and factors affecting compilation performance](#outline-of-processes-and-factors-affecting-compilation-performance)
+    + [Compilation modes](#compilation-modes)
+      - [Primary-file vs. WMO](#primary-file-vs-wmo)
+      - [Amount of optimization](#amount-of-optimization)
+    + [Workload variability, approximation and laziness](#workload-variability-approximation-and-laziness)
+      - [Incremental compilation](#incremental-compilation)
+      - [Lazy resolution](#lazy-resolution)
+    + [Summing up: high level picture of compilation performance](#summing-up-high-level-picture-of-compilation-performance)
+  * [Known problem areas](#known-problem-areas)
+  * [How to diagnose compilation performance problems](#how-to-diagnose-compilation-performance-problems)
+    + [Tools and options](#tools-and-options)
+      - [Profilers](#profilers)
+        * [Instruments.app](#instrumentsapp)
+        * [Perf](#perf)
+      - [Diagnostic options](#diagnostic-options)
+      - [Post-processing tools for diagnostics](#post-processing-tools-for-diagnostics)
+      - [Artifact-analysis tools](#artifact-analysis-tools)
+      - [Minimizers](#minimizers)
+        * [Git bisect](#git-bisect)
+        * [Creduce](#creduce)
+    + [Isolating a regression](#isolating-a-regression)
+      - [Driver diagnosis](#driver-diagnosis)
+    + [Finding areas in need of general improvement](#finding-areas-in-need-of-general-improvement)
+      - [Scale-test](#scale-test)
+  * [How to report bugs most usefully](#how-to-report-bugs-most-usefully)
+  * [How else to help out if you want to improve compile times](#how-else-to-help-out-if-you-want-to-improve-compile-times)
+
+## Outline of processes and factors affecting compilation performance
 
 This section is intended to provide a high-level orientation around what the
 compiler is doing when it's run -- beyond the obvious "compiling" -- and what
