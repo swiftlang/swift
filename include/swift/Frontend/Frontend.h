@@ -439,7 +439,7 @@ private:
   ModuleDecl *importBridgingHeader(const StringRef &implicitHeaderPath, ClangImporter *clangImporter);
   
   void fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules,
-                                                                            const FrontendOptions &options);
+                                                          const std::vector<std::string> &implicitImportedModuleNames);
   std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();
 
   void ensureMainFileComesFirst(const InputFileKind Kind,

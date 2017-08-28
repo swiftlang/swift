@@ -350,7 +350,7 @@ void CompilerInstance::performSema() {
   ModuleDecl *importedHeaderModule = importBridgingHeader(options.ImplicitObjCHeaderPath, clangImporter);
 
   SmallVector<ModuleDecl *, 4> importModules;
-  fillInModulesToImportFromImplicitImportModuleNames(importModules, options);
+  fillInModulesToImportFromImplicitImportModuleNames(importModules, options.ImplicitImportModuleNames);
 
   if (Kind == InputFileKind::IFK_Swift_REPL) {
     auto *SingleInputFile =
@@ -442,8 +442,8 @@ ModuleDecl *CompilerInstance::importBridgingHeader(const StringRef &implicitHead
 
 
 void CompilerInstance::fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules,
-                                                                          const FrontendOptions &options) {
-  for (auto &ImplicitImportModuleName : options.ImplicitImportModuleNames) {
+                                                                          const std::vector<std::string> &implicitImportedModuleNames) {
+  for (auto &ImplicitImportModuleName : implicitImportedModuleNames) {
     if (Lexer::isIdentifier(ImplicitImportModuleName)) {
       auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
       ModuleDecl *importModule = Context->getModule(std::make_pair(moduleID,
