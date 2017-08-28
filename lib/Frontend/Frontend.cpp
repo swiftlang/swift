@@ -302,32 +302,30 @@ static bool shouldImplicityImportSwiftOnoneSupportModule(SILOptions::SILOptMode 
 
 
 void CompilerInstance::performSema() {
-  const FrontendOptions &options = Invocation.getFrontendOptions();
-  const InputFileKind Kind = Invocation.getInputKind();
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
-  const SourceFile::ImplicitModuleImportKind modImpKind = createSILModuleIfNecessary(options, BufferIDs, MainBufferID, Kind);
+  const SourceFile::ImplicitModuleImportKind modImpKind = createSILModuleIfNecessary(BufferIDs, MainBufferID);
 
   switch (modImpKind) {
     case SourceFile::ImplicitModuleImportKind::None:
     case SourceFile::ImplicitModuleImportKind::Builtin:
       break;
     case SourceFile::ImplicitModuleImportKind::Stdlib:
-      loadStdlibAndMaybeSwiftOnoneSupport(options.RequestedAction);
+      loadStdlibAndMaybeSwiftOnoneSupport();
       break;
   }
 
   auto clangImporter =
     static_cast<ClangImporter *>(Context->getClangModuleLoader());
 
-  ModuleDecl *objCModuleUnderlyingMixedFramework = options.ImportUnderlyingModule ? importUnderlyingModule(clangImporter) : nullptr;
+  ModuleDecl *objCModuleUnderlyingMixedFramework = Invocation.getFrontendOptions().ImportUnderlyingModule ? importUnderlyingModule(clangImporter) : nullptr;
 
-  ModuleDecl *importedHeaderModule = importBridgingHeader(options.ImplicitObjCHeaderPath, clangImporter);
+  ModuleDecl *importedHeaderModule = importBridgingHeader(clangImporter);
 
   SmallVector<ModuleDecl *, 4> importModules;
-  fillInModulesToImportFromImplicitImportModuleNames(importModules, options.ImplicitImportModuleNames);
+  fillInModulesToImportFromImplicitImportModuleNames(importModules);
 
-  if (Kind == InputFileKind::IFK_Swift_REPL) {
+  if (Invocation.getInputKind() == InputFileKind::IFK_Swift_REPL) {
     auto *SingleInputFile =
       new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
                                 None, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
@@ -347,7 +345,7 @@ void CompilerInstance::performSema() {
 
   PersistentParserState PersistentState;
 
-  ensureMainFileComesFirst(Kind, modImpKind, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
+  ensureMainFileComesFirst(modImpKind, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
 
   bool hadLoadError = false;
 
@@ -382,14 +380,14 @@ void CompilerInstance::performSema() {
   if (hadLoadError)
     return;
 
-  OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions(options);
+  OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
  
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    parseTheMainFile(PersistentState, DelayedCB.get(), TypeCheckOptions, options);
+    parseTheMainFile(PersistentState, DelayedCB.get(), TypeCheckOptions);
   }
 
-  typeCheckTopLevelInputsExcludingMain(PersistentState, TypeCheckOptions, options);
+  typeCheckTopLevelInputsExcludingMain(PersistentState, TypeCheckOptions);
  
   // Even if there were no source files, we should still record known
   // protocols.
@@ -407,7 +405,7 @@ void CompilerInstance::performSema() {
   finishTypeCheckingMainModule();
 }
 
-void CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport(FrontendOptions::ActionType requestedAction) {
+void CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport() {
   ModuleDecl *M = Context->getStdlibModule(true);
   
   if (!M) {
@@ -422,7 +420,7 @@ void CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport(FrontendOptions::Acti
            "Module failed to load but nothing was diagnosed?");
     return;
   }
-  if (shouldImplicityImportSwiftOnoneSupportModule(Invocation.getSILOptions().Optimization, requestedAction)) {
+  if (shouldImplicityImportSwiftOnoneSupportModule(Invocation.getSILOptions().Optimization, Invocation.getFrontendOptions().RequestedAction)) {
     Invocation.getFrontendOptions()
     .ImplicitImportModuleNames.push_back(SWIFT_ONONE_SUPPORT);
   }
@@ -439,7 +437,8 @@ ModuleDecl *CompilerInstance::importUnderlyingModule(ClangImporter *clangImporte
   return nullptr;
 }
 
-ModuleDecl *CompilerInstance::importBridgingHeader(const StringRef &implicitHeaderPath, ClangImporter* clangImporter) {
+ModuleDecl *CompilerInstance::importBridgingHeader(ClangImporter* clangImporter) {
+  const StringRef &implicitHeaderPath = Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
   if (implicitHeaderPath.empty()  ||  clangImporter->importBridgingHeader(implicitHeaderPath, MainModule))
     return nullptr;
   ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
@@ -448,9 +447,8 @@ ModuleDecl *CompilerInstance::importBridgingHeader(const StringRef &implicitHead
 }
 
 
-void CompilerInstance::fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules,
-                                                                          const std::vector<std::string> &implicitImportedModuleNames) {
-  for (auto &ImplicitImportModuleName : implicitImportedModuleNames) {
+void CompilerInstance::fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules) {
+  for (auto &ImplicitImportModuleName : Invocation.getFrontendOptions().ImplicitImportModuleNames) {
     if (Lexer::isIdentifier(ImplicitImportModuleName)) {
       auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
       ModuleDecl *importModule = Context->getModule(std::make_pair(moduleID,
@@ -490,38 +488,36 @@ std::unique_ptr<DelayedParsingCallbacks> &&CompilerInstance::computeDelayedParsi
 // a source file, or it may be a SIL file, which requires pumping the parser.
 // We parse it last, though, to make sure that it can use decls from other
 // files in the module.
-void CompilerInstance::ensureMainFileComesFirst(const InputFileKind Kind,
-                                                SourceFile::ImplicitModuleImportKind modImpKind,
+void CompilerInstance::ensureMainFileComesFirst(SourceFile::ImplicitModuleImportKind modImpKind,
                                                 ModuleDecl *objCModuleUnderlyingMixedFramework,
                                                 ModuleDecl *importedHeaderModule,
                                                 SmallVectorImpl<ModuleDecl *> &importModules) {
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
-    
-    if (Kind == InputFileKind::IFK_Swift)
-      SourceMgr.setHashbangBufferID(MainBufferID);
-    
-    auto *MainFile = new (*Context) SourceFile(*MainModule,
-                                               Invocation.getSourceFileKind(),
-                                               MainBufferID, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
-    MainModule->addFile(*MainFile);
-    addAdditionalInitialImportsTo(MainFile, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
-    
-    if (MainBufferID == PrimaryBufferID)
-      setPrimarySourceFile(MainFile);
-  }
-
+  if (MainBufferID == NO_SUCH_BUFFER)
+    return;
+  
+  const InputFileKind Kind = Invocation.getInputKind();
+  assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
+  
+  if (Kind == InputFileKind::IFK_Swift)
+    SourceMgr.setHashbangBufferID(MainBufferID);
+  
+  auto *MainFile = new (*Context) SourceFile(*MainModule,
+                                             Invocation.getSourceFileKind(),
+                                             MainBufferID, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
+  MainModule->addFile(*MainFile);
+  addAdditionalInitialImportsTo(MainFile, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
+  
+  if (MainBufferID == PrimaryBufferID)
+    setPrimarySourceFile(MainFile);
 }
 
-SourceFile::ImplicitModuleImportKind CompilerInstance::createSILModuleIfNecessary(const FrontendOptions &options,
-                                                                                  const std::vector<unsigned> &BufferIDs,
-                                                                                  unsigned MainBufferID,
-                                                                                  const InputFileKind Kind) {
-  if (Kind == InputFileKind::IFK_SIL) {
+SourceFile::ImplicitModuleImportKind CompilerInstance::createSILModuleIfNecessary(const std::vector<unsigned> &BufferIDs,
+                                                                                  unsigned MainBufferID) {
+  if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
     assert(BufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
     // Assume WMO, if a -primary-file option was not provided.
-    createSILModule(!options.PrimaryInput.hasValue());
+    createSILModule(!Invocation.getFrontendOptions().PrimaryInput.hasValue());
     return SourceFile::ImplicitModuleImportKind::None;
   }
   if (Invocation.getParseStdlib()) {
@@ -568,11 +564,12 @@ void CompilerInstance::parseALibraryFile(unsigned BufferID,
   performNameBinding(*NextInput);
 }
 
-OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions(const FrontendOptions &options) {
+OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   OptionSet<TypeCheckingFlags> TypeCheckOptions;
   if (PrimaryBufferID == NO_SUCH_BUFFER) {
     TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
   }
+  const auto &options = Invocation.getFrontendOptions();
   if (options.DebugTimeFunctionBodies) {
     TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
   }
@@ -587,8 +584,7 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions(const 
 
 void CompilerInstance::parseTheMainFile(PersistentParserState &PersistentState,
                                         DelayedParsingCallbacks *DelayedParseCB,
-                                        const OptionSet<TypeCheckingFlags> TypeCheckOptions,
-                                        const FrontendOptions &options) {
+                                        const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   bool mainIsPrimary =
   (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID);
   
@@ -638,9 +634,8 @@ void CompilerInstance::parseTheMainFile(PersistentParserState &PersistentState,
 }
 
 void CompilerInstance::typeCheckTopLevelInputsExcludingMain(PersistentParserState &PersistentState,
-                                                            const OptionSet<TypeCheckingFlags> TypeCheckOptions,
-                                                            const FrontendOptions &options) {
-  for (auto File : MainModule->getFiles())
+                                                            const OptionSet<TypeCheckingFlags> TypeCheckOptions) {
+   for (auto File : MainModule->getFiles())
     if (auto SF = dyn_cast<SourceFile>(File))
       if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
         performTypeChecking(*SF, PersistentState.getTopLevelContext(),
