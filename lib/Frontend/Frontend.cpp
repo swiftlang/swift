@@ -335,13 +335,6 @@ void CompilerInstance::performSema() {
   }
 
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB(computeDelayedParsingCallback());
-  
-  if (Invocation.isCodeCompletion()) {
-    DelayedCB.reset(
-        new CodeCompleteDelayedCallbacks(SourceMgr.getCodeCompletionLoc()));
-  } else if (Invocation.isDelayedFunctionBodyParsing()) {
-    DelayedCB.reset(new AlwaysDelayedCallbacks);
-  }
 
   PersistentParserState PersistentState;
 
