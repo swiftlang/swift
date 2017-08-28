@@ -443,7 +443,7 @@ private:
   void fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules);
   std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();
 
-  void ensureMainFileComesFirst(SourceFile::ImplicitModuleImportKind modImpKind,
+  void ensureMainFileComesFirst(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
                                 ModuleDecl *underlying,
                                 ModuleDecl *importedHeaderModule,
                                 SmallVectorImpl<ModuleDecl *> &importModules);
@@ -451,7 +451,7 @@ private:
                                                                   unsigned MainBufferID);
 
   void parseALibraryFile(unsigned BufferID,
-                         SourceFile::ImplicitModuleImportKind modImpKind,
+                         SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
                          ModuleDecl *underlying,
                          ModuleDecl *importedHeaderModule,
                          SmallVectorImpl<ModuleDecl *> &importModules,
