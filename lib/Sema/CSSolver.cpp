@@ -1437,7 +1437,11 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   // If we don't have more than one component, just solve the whole
   // system.
   if (numComponents < 2) {
-    return solveSimplified(solutions, allowFreeTypeVariables);
+    SmallVector<Constraint *, 8> disjunctions;
+    collectDisjunctions(disjunctions);
+
+    return solveSimplified(selectDisjunction(disjunctions), solutions,
+                           allowFreeTypeVariables);
   }
 
   if (TC.Context.LangOpts.DebugConstraintSolver) {
@@ -1475,14 +1479,27 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       constraintComponent[constraint] = component++;
   }
 
-  // Sort the constraints into buckets based on component number.
-  std::unique_ptr<ConstraintList[]> constraintBuckets(
-                                      new ConstraintList[numComponents]);
+  // Sort the constraints into component buckets based on component number.
+  std::unique_ptr<Component[]> buckets(new Component[numComponents]);
+
   while (!InactiveConstraints.empty()) {
     auto *constraint = &InactiveConstraints.front();
     InactiveConstraints.pop_front();
-    constraintBuckets[constraintComponent[constraint]].push_back(constraint);
+    buckets[constraintComponent[constraint]].record(constraint);
   }
+
+  // Create component ordering based on the information associated
+  // with constraints in each bucket - e.g. number of disjunctions.
+  std::vector<unsigned> componentOrdering;
+  // First seed the ordering with original indexes of the components.
+  for (unsigned component = 0; component != numComponents; ++component)
+    componentOrdering.push_back(component);
+  // Now sort the components in the ordering based on the scores of the buckets.
+  std::sort(
+      componentOrdering.begin(), componentOrdering.end(),
+      [&](const unsigned &componentA, const unsigned &componentB) -> bool {
+        return buckets[componentA] < buckets[componentB];
+      });
 
   // Remove all of the orphaned constraints; we'll introduce them as needed.
   auto allOrphanedConstraints = CG.takeOrphanedConstraints();
@@ -1491,10 +1508,8 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   // back to the list of constraints.
   auto returnAllConstraints = [&] {
     assert(InactiveConstraints.empty() && "Already have constraints?");
-    for (unsigned component = 0; component != numComponents; ++component) {
-      InactiveConstraints.splice(InactiveConstraints.end(), 
-                                 constraintBuckets[component]);
-    }
+    for (unsigned component = 0; component != numComponents; ++component)
+      buckets[component].reinstateTo(InactiveConstraints);
     CG.setOrphanedConstraints(std::move(allOrphanedConstraints));
   };
 
@@ -1502,14 +1517,13 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   std::unique_ptr<SmallVector<Solution, 4>[]> 
     partialSolutions(new SmallVector<Solution, 4>[numComponents]);
   Optional<Score> PreviousBestScore = solverState->BestScore;
-  for (unsigned component = 0; component != numComponents; ++component) {
-    assert(InactiveConstraints.empty() && 
+
+  for (auto &component : componentOrdering) {
+    assert(InactiveConstraints.empty() &&
            "Some constraints were not transferred?");
     ++solverState->NumComponentsSplit;
 
-    // Collect the constraints for this component.
-    InactiveConstraints.splice(InactiveConstraints.end(),
-                               constraintBuckets[component]);
+    auto &bucket = buckets[component];
 
     llvm::SmallVector<TypeVariableType *, 16> allTypeVariables
       = std::move(TypeVariables);
@@ -1532,27 +1546,16 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     }
     CG.setOrphanedConstraint(orphaned);
 
-    // Solve for this component. If it fails, we're done.
-    bool failed;
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2) << "(solving component #" 
-                                         << component << "\n";
+      log.indent(solverState->depth * 2)
+          << "(solving component #" << component << "\n";
     }
-    {
-      // Introduce a scope for this partial solution.
-      SolverScope scope(*this);
-      llvm::SaveAndRestore<SolverScope *> 
-        partialSolutionScope(solverState->PartialSolutionScope, &scope);
 
-      failed = solveSimplified(partialSolutions[component], 
+    // Solve for this component. If it fails, we're done.
+    bool failed = bucket.solve(*this, partialSolutions[component],
                                allowFreeTypeVariables);
-    }
 
-    // Put the constraints back into their original bucket.
-    auto &bucket = constraintBuckets[component];
-    bucket.splice(bucket.end(), InactiveConstraints);
-    
     if (failed) {
       if (TC.getLangOpts().DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -1744,12 +1747,40 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
   return false;
 }
 
-bool ConstraintSystem::solveSimplified(
-    SmallVectorImpl<Solution> &solutions,
-    FreeTypeVariableBinding allowFreeTypeVariables) {
+Constraint *ConstraintSystem::selectDisjunction(
+    SmallVectorImpl<Constraint *> &disjunctions) {
+  if (disjunctions.empty())
+    return nullptr;
 
-  SmallVector<Constraint *, 4> disjunctions;
-  collectDisjunctions(disjunctions);
+  // Pick the smallest disjunction.
+  // FIXME: This heuristic isn't great, but it helped somewhat for
+  // overload sets.
+  auto disjunction = disjunctions[0];
+  auto bestSize = disjunction->countActiveNestedConstraints();
+  if (bestSize > 2) {
+    for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
+      unsigned newSize = contender->countActiveNestedConstraints();
+      if (newSize < bestSize) {
+        bestSize = newSize;
+        disjunction = contender;
+
+        if (bestSize == 2)
+          break;
+      }
+    }
+  }
+
+  // If there are no active constraints in the disjunction, there is
+  // no solution.
+  if (bestSize == 0)
+    return nullptr;
+
+  return disjunction;
+}
+
+bool ConstraintSystem::solveSimplified(
+    Constraint *disjunction, SmallVectorImpl<Solution> &solutions,
+    FreeTypeVariableBinding allowFreeTypeVariables) {
 
   TypeVariableType *bestTypeVar = nullptr;
   PotentialBindings bestBindings;
@@ -1757,8 +1788,8 @@ bool ConstraintSystem::solveSimplified(
 
   // If we have a binding that does not involve type variables, or we have
   // no other option, go ahead and try the bindings for this type variable.
-  if (bestBindings && 
-      (disjunctions.empty() ||
+  if (bestBindings &&
+      (!disjunction ||
        (!bestBindings.InvolvesTypeVariables && !bestBindings.FullyBound &&
         bestBindings.LiteralBinding == LiteralBindingKind::None))) {
     return tryTypeVariableBindings(solverState->depth, bestTypeVar,
@@ -1768,7 +1799,7 @@ bool ConstraintSystem::solveSimplified(
 
   // If there are no disjunctions we can't solve this system unless we have
   // free type variables and are allowing them in the solution.
-  if (disjunctions.empty()) {
+  if (!disjunction) {
     if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow ||
         !hasFreeTypeVariables())
       return true;
@@ -1799,29 +1830,6 @@ bool ConstraintSystem::solveSimplified(
     solutions.push_back(std::move(solution));
     return false;
   }
-
-  // Pick the smallest disjunction.
-  // FIXME: This heuristic isn't great, but it helped somewhat for
-  // overload sets.
-  auto disjunction = disjunctions[0];
-  auto bestSize = disjunction->countActiveNestedConstraints();
-  if (bestSize > 2) {
-    for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
-      unsigned newSize = contender->countActiveNestedConstraints();
-      if (newSize < bestSize) {
-        bestSize = newSize;
-        disjunction = contender;
-
-        if (bestSize == 2)
-          break;
-      }
-    }
-  }
-
-  // If there are no active constraints in the disjunction, there is
-  // no solution.
-  if (bestSize == 0)
-    return true;
 
   // Remove this disjunction constraint from the list.
   auto afterDisjunction = InactiveConstraints.erase(disjunction);

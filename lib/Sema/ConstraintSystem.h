@@ -883,6 +883,7 @@ public:
   friend class OverloadChoice;
   friend class ConstraintGraph;
   friend class DisjunctionChoice;
+  friend class Component;
 
   class SolverScope;
 
@@ -2648,13 +2649,17 @@ private:
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///
+  /// \param disjunction The disjunction to try and solve using simplified
+  /// constraint system.
+  ///
   /// \param solutions The set of solutions to this system of constraints.
   ///
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool solveSimplified(SmallVectorImpl<Solution> &solutions,
+  bool solveSimplified(Constraint *disjunction,
+                       SmallVectorImpl<Solution> &solutions,
                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
@@ -2665,6 +2670,16 @@ private:
   ///
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
+
+  /// \brief Pick a disjunction from the given list, which,
+  /// based on the associated constraints, is the most viable to
+  /// reduce depth of the search tree.
+  ///
+  /// \param disjunctions A collection of disjunctions to examine.
+  ///
+  /// \returns The disjunction with most weight relative to others, based
+  /// on the number of constraints associated with it, or nullptr otherwise.
+  Constraint *selectDisjunction(SmallVectorImpl<Constraint *> &disjunctions);
 
   bool simplifyForConstraintPropagation();
   void collectNeighboringBindOverloadDisjunctions(
@@ -3013,6 +3028,60 @@ private:
     auto *decl = choice.getDecl();
     return decl->isOperator() ? decl : nullptr;
   }
+};
+
+/// \brief Constraint System "component" represents
+/// a single solvable unit, but the process of assigning
+/// types in some cases allows it to be further split into
+/// multiple smaller parts.
+///
+/// This helps to abstract away logic of holding and
+/// returning sub-set of the constraints in the system,
+/// as well as its partial solving and result tracking.
+class Component {
+  ConstraintList Constraints;
+  SmallVector<Constraint *, 8> Disjunctions;
+
+public:
+  void reinstateTo(ConstraintList &workList) {
+    workList.splice(workList.end(), Constraints);
+  }
+
+  void record(Constraint *constraint) {
+    Constraints.push_back(constraint);
+    if (constraint->getKind() == ConstraintKind::Disjunction)
+      Disjunctions.push_back(constraint);
+  }
+
+  bool solve(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions,
+             FreeTypeVariableBinding allowFreeTypeVariables) {
+    // Return constraints from the bucket back into circulation.
+    reinstateTo(cs.InactiveConstraints);
+
+    // Solve for this component. If it fails, we're done.
+    bool failed;
+
+    {
+      // Introduce a scope for this partial solution.
+      ConstraintSystem::SolverScope scope(cs);
+      llvm::SaveAndRestore<ConstraintSystem::SolverScope *>
+          partialSolutionScope(cs.solverState->PartialSolutionScope, &scope);
+
+      failed = cs.solveSimplified(cs.selectDisjunction(Disjunctions), solutions,
+                                  allowFreeTypeVariables);
+    }
+
+    // Put the constraints back into their original bucket.
+    Constraints.splice(Constraints.end(), cs.InactiveConstraints);
+    return failed;
+  }
+
+  bool operator<(const Component &other) const {
+    return disjunctionCount() < other.disjunctionCount();
+  }
+
+private:
+  unsigned disjunctionCount() const { return Disjunctions.size(); }
 };
 } // end namespace constraints
 
