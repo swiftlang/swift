@@ -4199,6 +4199,23 @@ public:
 
     assert(!F->hasForeignBody());
 
+    if (F->hasSemanticsAttr("stdlib_binary_only")) {
+      require(F->getLinkage() == SILLinkage::Public,
+              "@_semantics(\"stdlib_binary_only\") functions should have a "
+              "public SIL linkage");
+    }
+
+    if (F->getModule().getOptions().SILSerializeAll &&
+        F->getName().startswith("global_init")) {
+      require(hasPublicVisibility(F->getLinkage()) &&
+                  F->hasSemanticsAttr("stdlib_binary_only"),
+              "global_init should be public in -sil-serialize-all mode");
+    }
+
+    if (F->isTransparent()) {
+      require(F->isDefinition(), "@_transparent functions should have a body");
+    }
+
     // Make sure that our SILFunction only has context generic params if our
     // SILFunctionType is non-polymorphic.
     if (F->getGenericEnvironment()) {
