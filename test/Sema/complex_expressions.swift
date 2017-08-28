@@ -94,7 +94,6 @@ func sr1794(pt: P, p0: P, p1: P) -> Bool {
 let v1 = (1 - 2 / 3 * 6) as UInt
 let v2 = (([1 + 2 * 3, 4, 5])) as [UInt]
 let v3 = ["hello": 1 + 2, "world": 3 + 4 + 5 * 3] as Dictionary<String, UInt>
-// expected-warning@-1 {{mixed-type arithmetics}}
 let v4 = [1 + 2 + 3, 4] as [UInt32] + [2 * 3] as [UInt32]
 let v5 = ([1 + 2 + 3, 4] as [UInt32]) + ([2 * 3] as [UInt32])
 let v6 = [1 + 2 + 3, 4] as Set<UInt32>
