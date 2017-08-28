@@ -190,8 +190,8 @@ public:
 
   void visitFinalAttr(FinalAttr *attr) {
     // Reject combining 'final' with 'open'.
-    if (auto accessibility = D->getAttrs().getAttribute<AccessibilityAttr>()) {
-      if (accessibility->getAccess() == Accessibility::Open) {
+    if (auto accessAttr = D->getAttrs().getAttribute<AccessControlAttr>()) {
+      if (accessAttr->getAccess() == AccessLevel::Open) {
         TC.diagnose(attr->getLocation(), diag::open_decl_cannot_be_final,
                     D->getDescriptiveKind());
         return;
@@ -249,9 +249,9 @@ public:
   void visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr);
   void visitNSManagedAttr(NSManagedAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
-  void visitAccessibilityAttr(AccessibilityAttr *attr);
-  void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
-  bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
+  void visitAccessControlAttr(AccessControlAttr *attr);
+  void visitSetterAccessAttr(SetterAccessAttr *attr);
+  bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
   void visitSILStoredAttr(SILStoredAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
 };
@@ -630,9 +630,9 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   }
 }
 
-bool AttributeEarlyChecker::visitAbstractAccessibilityAttr(
-    AbstractAccessibilityAttr *attr) {
-  // Accessibility attr may only be used on value decls and extensions.
+bool AttributeEarlyChecker::visitAbstractAccessControlAttr(
+    AbstractAccessControlAttr *attr) {
+  // Access control attr may only be used on value decls and extensions.
   if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
     diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
     return true;
@@ -661,18 +661,18 @@ bool AttributeEarlyChecker::visitAbstractAccessibilityAttr(
   return false;
 }
 
-void AttributeEarlyChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
-  visitAbstractAccessibilityAttr(attr);
+void AttributeEarlyChecker::visitAccessControlAttr(AccessControlAttr *attr) {
+  visitAbstractAccessControlAttr(attr);
 }
 
-void AttributeEarlyChecker::visitSetterAccessibilityAttr(
-    SetterAccessibilityAttr *attr) {
+void AttributeEarlyChecker::visitSetterAccessAttr(
+    SetterAccessAttr *attr) {
   auto storage = dyn_cast<AbstractStorageDecl>(D);
   if (!storage)
     return diagnoseAndRemoveAttr(attr, diag::access_control_setter,
                                  attr->getAccess());
 
-  if (visitAbstractAccessibilityAttr(attr))
+  if (visitAbstractAccessControlAttr(attr))
     return;
 
   if (!storage->isSettable(storage->getDeclContext())) {
@@ -838,8 +838,8 @@ public:
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
 
-  void visitAccessibilityAttr(AccessibilityAttr *attr);
-  void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
+  void visitAccessControlAttr(AccessControlAttr *attr);
+  void visitSetterAccessAttr(SetterAccessAttr *attr);
 
   void checkApplicationMainAttribute(DeclAttribute *attr,
                                      Identifier Id_ApplicationDelegate,
@@ -1413,9 +1413,9 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   attr->setInvalid();
 }
 
-void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
+void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
   if (auto extension = dyn_cast<ExtensionDecl>(D)) {
-    if (attr->getAccess() == Accessibility::Open) {
+    if (attr->getAccess() == AccessLevel::Open) {
       TC.diagnose(attr->getLocation(), diag::access_control_extension_open)
         .fixItReplace(attr->getRange(), "public");
       attr->setInvalid();
@@ -1423,7 +1423,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
     }
 
     Type extendedTy = extension->getExtendedType();
-    Accessibility typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
+    AccessLevel typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
       TC.diagnose(attr->getLocation(), diag::access_control_extension_more,
                   typeAccess,
@@ -1435,9 +1435,9 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
     }
 
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
-    TC.computeDefaultAccessibility(extension);
-    Accessibility maxAccess = extension->getMaxAccessibility();
-    if (std::min(attr->getAccess(), Accessibility::Public) > maxAccess) {
+    TC.computeDefaultAccessLevel(extension);
+    AccessLevel maxAccess = extension->getMaxAccessLevel();
+    if (std::min(attr->getAccess(), AccessLevel::Public) > maxAccess) {
       // FIXME: It would be nice to say what part of the requirements actually
       // end up being problematic.
       auto diag =
@@ -1446,23 +1446,23 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                       attr->getAccess(),
                       D->getDescriptiveKind(),
                       maxAccess);
-      swift::fixItAccessibility(diag, cast<ValueDecl>(D), maxAccess);
+      swift::fixItAccess(diag, cast<ValueDecl>(D), maxAccess);
       return;
     }
 
-    auto extAttr = extension->getAttrs().getAttribute<AccessibilityAttr>();
+    auto extAttr = extension->getAttrs().getAttribute<AccessControlAttr>();
     if (extAttr && attr->getAccess() > extAttr->getAccess()) {
       auto diag = TC.diagnose(attr->getLocation(),
                               diag::access_control_ext_member_more,
                               attr->getAccess(),
                               D->getDescriptiveKind(),
                               extAttr->getAccess());
-      swift::fixItAccessibility(diag, cast<ValueDecl>(D), extAttr->getAccess());
+      swift::fixItAccess(diag, cast<ValueDecl>(D), extAttr->getAccess());
       return;
     }
   }
 
-  if (attr->getAccess() == Accessibility::Open) {
+  if (attr->getAccess() == AccessLevel::Open) {
     if (!isa<ClassDecl>(D) && !D->isPotentiallyOverridable() &&
         !attr->isInvalid()) {
       TC.diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
@@ -1473,7 +1473,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
 }
 
 void
-AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
+AttributeChecker::visitSetterAccessAttr(SetterAccessAttr *attr) {
   auto getterAccess = cast<ValueDecl>(D)->getFormalAccess();
   if (attr->getAccess() > getterAccess) {
     // This must stay in sync with diag::access_control_setter_more.
@@ -1872,7 +1872,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
 
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
                                     /*respectVersionedAttr=*/true);
-  if (access < Accessibility::Public) {
+  if (access < AccessLevel::Public) {
     TC.diagnose(attr->getLocation(),
                 diag::fixed_layout_attr_on_internal_type,
                 VD->getFullName(),
@@ -1886,7 +1886,7 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
   // FIXME: Once protocols can contain nominal types, do we want to allow
-  // these nominal types to have accessibility (and also @_versioned)?
+  // these nominal types to have access control (and also @_versioned)?
   if (isa<ProtocolDecl>(VD->getDeclContext())) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_attr_in_protocol)
@@ -1896,9 +1896,8 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
   }
 
   // @_versioned can only be applied to internal declarations.
-  if (VD->getFormalAccess() != Accessibility::Internal) {
-    TC.diagnose(attr->getLocation(),
-                diag::versioned_attr_with_explicit_accessibility,
+  if (VD->getFormalAccess() != AccessLevel::Internal) {
+    TC.diagnose(attr->getLocation(), diag::versioned_attr_with_explicit_access,
                 VD->getFullName(),
                 VD->getFormalAccess())
         .fixItRemove(attr->getRangeWithAt());
@@ -1928,7 +1927,7 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
   // declarations.
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
                                     /*respectVersionedAttr=*/true);
-  if (access < Accessibility::Public) {
+  if (access < AccessLevel::Public) {
     TC.diagnose(attr->getLocation(),
                 diag::inlineable_decl_not_public,
                 VD->getBaseName(),

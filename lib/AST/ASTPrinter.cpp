@@ -429,41 +429,41 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printAccessibility(Accessibility access, StringRef suffix = "") {
+  void printAccess(AccessLevel access, StringRef suffix = "") {
     switch (access) {
-    case Accessibility::Private:
+    case AccessLevel::Private:
       Printer << tok::kw_private;
       break;
-    case Accessibility::FilePrivate:
+    case AccessLevel::FilePrivate:
       Printer << tok::kw_fileprivate;
       break;
-    case Accessibility::Internal:
-      if (!Options.PrintInternalAccessibilityKeyword)
+    case AccessLevel::Internal:
+      if (!Options.PrintInternalAccessKeyword)
         return;
       Printer << tok::kw_internal;
       break;
-    case Accessibility::Public:
+    case AccessLevel::Public:
       Printer << tok::kw_public;
       break;
-    case Accessibility::Open:
+    case AccessLevel::Open:
       Printer.printKeyword("open");
       break;
     }
     Printer << suffix << " ";
   }
 
-  void printAccessibility(const ValueDecl *D) {
-    if (!Options.PrintAccessibility || !D->hasAccessibility() ||
-        D->getAttrs().hasAttribute<AccessibilityAttr>())
+  void printAccess(const ValueDecl *D) {
+    if (!Options.PrintAccess || !D->hasAccess() ||
+        D->getAttrs().hasAttribute<AccessControlAttr>())
       return;
 
-    printAccessibility(D->getFormalAccess());
+    printAccess(D->getFormalAccess());
 
     if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (auto setter = storageDecl->getSetter()) {
-        Accessibility setterAccess = setter->getFormalAccess();
+        AccessLevel setterAccess = setter->getFormalAccess();
         if (setterAccess != D->getFormalAccess())
-          printAccessibility(setterAccess, "(set)");
+          printAccess(setterAccess, "(set)");
       }
     }
   }
@@ -1266,9 +1266,8 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
 
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (Options.AccessibilityFilter > Accessibility::Private &&
-        VD->hasAccessibility() &&
-        VD->getFormalAccess() < Options.AccessibilityFilter)
+    if (Options.AccessFilter > AccessLevel::Private &&
+        VD->hasAccess() && VD->getFormalAccess() < Options.AccessFilter)
       return false;
   }
 
@@ -1914,7 +1913,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   // after type-checking, but it's close enough for now.
   if (anyVar) {
     printAttributes(anyVar);
-    printAccessibility(anyVar);
+    printAccess(anyVar);
   }
 
   if (decl->isStatic())
@@ -1975,7 +1974,7 @@ void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << tok::kw_typealias << " ";
   printContextIfNeeded(decl);
@@ -2040,7 +2039,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     ASTContext &Ctx = decl->getASTContext();
@@ -2068,7 +2067,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
 void PrintAST::visitStructDecl(StructDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     ASTContext &Ctx = decl->getASTContext();
@@ -2096,7 +2095,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
 void PrintAST::visitClassDecl(ClassDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     ASTContext &Ctx = decl->getASTContext();
@@ -2126,7 +2125,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     ASTContext &Ctx = decl->getASTContext();
@@ -2203,7 +2202,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       !decl->getAttrs().hasAttribute<SILStoredAttr>())
     Printer << "@sil_stored ";
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
   if (!Options.SkipIntroducerKeywords) {
     if (decl->isStatic())
       printStaticKeyword(decl->getCorrectStaticSpelling());
@@ -2504,7 +2503,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   } else {
     printDocumentationComment(decl);
     printAttributes(decl);
-    printAccessibility(decl);
+    printAccess(decl);
 
     if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
       ASTContext &Ctx = decl->getASTContext();
@@ -2654,7 +2653,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
   printContextIfNeeded(decl);
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
@@ -2678,7 +2677,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  printAccessibility(decl);
+  printAccess(decl);
 
   if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
        decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&

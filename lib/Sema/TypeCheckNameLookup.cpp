@@ -199,7 +199,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       loc,
       /*IsTypeLookup=*/false,
       options.contains(NameLookupFlags::ProtocolMembers),
-      options.contains(NameLookupFlags::IgnoreAccessibility));
+      options.contains(NameLookupFlags::IgnoreAccessControl));
 
   LookupResult result;
   LookupResultBuilder builder(*this, result, dc, options,
@@ -235,7 +235,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
         loc,
         /*IsTypeLookup=*/true,
         /*AllowProtocolMembers=*/false,
-        options.contains(NameLookupFlags::IgnoreAccessibility));
+        options.contains(NameLookupFlags::IgnoreAccessControl));
 
     if (!lookup.Results.empty() ||
         !options.contains(NameLookupFlags::ProtocolMembers)) {
@@ -255,7 +255,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
         loc,
         /*IsTypeLookup=*/true,
         /*AllowProtocolMembers=*/true,
-        options.contains(NameLookupFlags::IgnoreAccessibility));
+        options.contains(NameLookupFlags::IgnoreAccessControl));
 
     return LookupResult(lookup.Results);
   }
@@ -272,8 +272,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::DynamicLookup))
     subOptions |= NL_DynamicLookup;
-  if (options.contains(NameLookupFlags::IgnoreAccessibility))
-    subOptions |= NL_IgnoreAccessibility;
+  if (options.contains(NameLookupFlags::IgnoreAccessControl))
+    subOptions |= NL_IgnoreAccessControl;
 
   if (options.contains(NameLookupFlags::ProtocolMembers))
     subOptions |= NL_ProtocolMembers;
@@ -346,8 +346,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::ProtocolMembers))
     subOptions |= NL_ProtocolMembers;
-  if (options.contains(NameLookupFlags::IgnoreAccessibility))
-    subOptions |= NL_IgnoreAccessibility;
+  if (options.contains(NameLookupFlags::IgnoreAccessControl))
+    subOptions |= NL_IgnoreAccessControl;
 
   if (!dc->lookupQualified(type, name, subOptions, this, decls))
     return result;

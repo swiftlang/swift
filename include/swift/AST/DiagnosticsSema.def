@@ -115,17 +115,17 @@ ERROR(could_not_use_member_on_existential,none,
 ERROR(candidate_inaccessible,none,
       "%0 is inaccessible due to "
       "'%select{private|fileprivate|internal|%error|%error}1' protection level",
-      (DeclName, Accessibility))
+      (DeclName, AccessLevel))
 
 NOTE(note_candidate_inaccessible,none,
      "%0 is inaccessible due to "
      "'%select{private|fileprivate|internal|%error|%error}1' protection level",
-     (DeclName, Accessibility))
+     (DeclName, AccessLevel))
 
 ERROR(init_candidate_inaccessible,none,
       "%0 initializer is inaccessible due to "
       "'%select{private|fileprivate|internal|%error|%error}1' protection level",
-      (Type, Accessibility))
+      (Type, AccessLevel))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
@@ -1085,30 +1085,30 @@ ERROR(access_control_in_protocol,none,
 ERROR(access_control_setter,none,
       "'%select{private|fileprivate|internal|public|open}0(set)' modifier can only "
       "be applied to variables and subscripts",
-      (Accessibility))
+      (AccessLevel))
 ERROR(access_control_setter_read_only,none,
       "'%select{private|fileprivate|internal|public|%error}0(set)' modifier cannot be "
       "applied to %select{constants|read-only variables|read-only properties"
       "|read-only subscripts}1",
-      (Accessibility, unsigned))
+      (AccessLevel, unsigned))
 ERROR(access_control_setter_more,none,
       "%select{private|fileprivate|internal|public|%error}0 "
       "%select{variable|property|subscript}1 cannot have "
       "%select{%error|a fileprivate|an internal|a public|an open}2 setter",
-      (Accessibility, unsigned, Accessibility))
+      (AccessLevel, unsigned, AccessLevel))
 WARNING(access_control_ext_member_more,none,
     "declaring %select{%error|a fileprivate|an internal|a public|open}0 %1 in "
     "%select{a private|a fileprivate|an internal|public|%error}2 extension",
-    (Accessibility, DescriptiveDeclKind, Accessibility))
+    (AccessLevel, DescriptiveDeclKind, AccessLevel))
 ERROR(access_control_ext_requirement_member_more,none,
     "cannot declare %select{%error|a fileprivate|an internal|a public|an open}0 %1 "
     "in an extension with %select{private|fileprivate|internal|public|%error}2 "
     "requirements",
-    (Accessibility, DescriptiveDeclKind, Accessibility))
+    (AccessLevel, DescriptiveDeclKind, AccessLevel))
 ERROR(access_control_extension_more,none,
       "extension of %select{private|fileprivate|internal|%error|%error}0 %1 cannot "
       "be declared %select{%error|fileprivate|internal|public|%error}2",
-      (Accessibility, DescriptiveDeclKind, Accessibility))
+      (AccessLevel, DescriptiveDeclKind, AccessLevel))
 ERROR(access_control_extension_open,none,
       "extensions cannot use 'open' as their default access; use 'public'",
       ())
@@ -1214,14 +1214,14 @@ ERROR(pattern_type_access,none,
       "%select{in this context|fileprivate|internal|public|open}3}2 "
       "because its type uses "
       "%select{a private|a fileprivate|an internal|%error|%error}5 type",
-      (bool, bool, bool, Accessibility, bool, Accessibility))
+      (bool, bool, bool, AccessLevel, bool, AccessLevel))
 WARNING(pattern_type_access_warn,none,
         "%select{%select{variable|constant}0|property}1 "
         "%select{should be declared %select{private|fileprivate|internal|%error|%error}5"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}3}2 "
         "because its type uses "
         "%select{a private|a fileprivate|an internal|%error|%error}5 type",
-        (bool, bool, bool, Accessibility, bool, Accessibility))
+        (bool, bool, bool, AccessLevel, bool, AccessLevel))
 ERROR(pattern_type_access_inferred,none,
       "%select{%select{variable|constant}0|property}1 "
       "%select{must be declared %select{"
@@ -1230,14 +1230,14 @@ ERROR(pattern_type_access_inferred,none,
       "%select{in this context|fileprivate|internal|public|open}3}2 "
       "because its type %6 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}5 type",
-      (bool, bool, bool, Accessibility, bool, Accessibility, Type))
+      (bool, bool, bool, AccessLevel, bool, AccessLevel, Type))
 WARNING(pattern_type_access_inferred_warn,none,
         "%select{%select{variable|constant}0|property}1 "
         "%select{should be declared %select{private|fileprivate|internal|%error|%error}5"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}3}2 "
         "because its type %6 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}5 type",
-        (bool, bool, bool, Accessibility, bool, Accessibility, Type))
+        (bool, bool, bool, AccessLevel, bool, AccessLevel, Type))
 ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
@@ -1283,7 +1283,7 @@ ERROR(type_alias_underlying_type_access,none,
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its underlying type uses "
       "%select{a private|a fileprivate|an internal|%error|%error}2 type",
-      (bool, Accessibility, Accessibility, bool))
+      (bool, AccessLevel, AccessLevel, bool))
 WARNING(type_alias_underlying_type_access_warn,none,
         "type alias %select{should be declared "
         "%select{private|fileprivate|internal|%error|%error}2"
@@ -1291,7 +1291,7 @@ WARNING(type_alias_underlying_type_access_warn,none,
         "%select{in this context|fileprivate|internal|public|open}1}0 "
         "because its underlying type uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
-        (bool, Accessibility, Accessibility, bool))
+        (bool, AccessLevel, AccessLevel, bool))
 
 // Subscripts
 ERROR(subscript_type_access,none,
@@ -1301,14 +1301,14 @@ ERROR(subscript_type_access,none,
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its %select{index|element type}3 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}2 type",
-      (bool, Accessibility, Accessibility, bool))
+      (bool, AccessLevel, AccessLevel, bool))
 WARNING(subscript_type_access_warn,none,
         "subscript %select{should be declared "
         "%select{private|fileprivate|internal|%error|%error}2"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its %select{index|element type}3 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
-        (bool, Accessibility, Accessibility, bool))
+        (bool, AccessLevel, AccessLevel, bool))
 
 // Functions
 ERROR(function_type_access,none,
@@ -1319,14 +1319,14 @@ ERROR(function_type_access,none,
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its %select{parameter|result}5 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}3 type",
-      (bool, Accessibility, bool, Accessibility, unsigned, bool))
+      (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
 WARNING(function_type_access_warn,none,
         "%select{function|method|initializer}4 "
         "%select{should be declared %select{private|fileprivate|internal|%error|%error}3"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its %select{parameter|result}5 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}3 type",
-        (bool, Accessibility, bool, Accessibility, unsigned, bool))
+        (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
 ERROR(noreturn_not_supported,none,
       "'@noreturn' has been removed; functions that never return should have a "
       "return type of 'Never' instead", ())
@@ -1454,21 +1454,21 @@ ERROR(witness_not_accessible_proto,none,
       "%select{%error|fileprivate|internal|public|%error}3 because it matches a "
       "requirement in %select{private|fileprivate|internal|public|%error}4 protocol "
       "%5",
-      (RequirementKind, DeclName, bool, Accessibility, Accessibility, DeclName))
+      (RequirementKind, DeclName, bool, AccessLevel, AccessLevel, DeclName))
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
       "type because it matches a requirement in protocol %5",
-      (RequirementKind, DeclName, bool, Accessibility, Accessibility, DeclName))
+      (RequirementKind, DeclName, bool, AccessLevel, AccessLevel, DeclName))
 ERROR(type_witness_not_accessible_proto,none,
       "%0 %1 must be declared %select{%error|fileprivate|internal|public|%error}2 "
       "because it matches a requirement in "
       "%select{%error|fileprivate|internal|public|%error}2 protocol %3",
-      (DescriptiveDeclKind, DeclName, Accessibility, DeclName))
+      (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
 ERROR(type_witness_not_accessible_type,none,
       "%0 %1 must be as accessible as its enclosing type because it "
       "matches a requirement in protocol %3",
-      (DescriptiveDeclKind, DeclName, Accessibility, DeclName))
+      (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
 
 ERROR(protocol_refine_access,none,
       "%select{protocol must be declared %select{"
@@ -1477,13 +1477,13 @@ ERROR(protocol_refine_access,none,
       "|%select{in this context|fileprivate|internal|public|%error}1 "
       "protocol cannot refine}0 "
       "%select{a private|a fileprivate|an internal|%error|%error}2 protocol",
-      (bool, Accessibility, Accessibility, bool))
+      (bool, AccessLevel, AccessLevel, bool))
 WARNING(protocol_refine_access_warn,none,
         "%select{protocol should be declared "
         "%select{private|fileprivate|internal|%error|%error}2 because it refines"
         "|%select{in this context|fileprivate|internal|public|%error}1 protocol should not "
         "refine}0 %select{a private|a fileprivate|an internal|%error|%error}2 protocol",
-        (bool, Accessibility, Accessibility, bool))
+        (bool, AccessLevel, AccessLevel, bool))
 ERROR(protocol_property_must_be_computed_var,none,
       "immutable property requirement must be declared as 'var' with a "
       "'{ get }' specifier", ())
@@ -1519,13 +1519,13 @@ ERROR(associated_type_access,none,
       "uses "
       "%select{a private|a fileprivate|an internal|%error|%error}1 type in its "
       "%select{default definition|requirement}2 ",
-      (Accessibility, Accessibility, unsigned))
+      (AccessLevel, AccessLevel, unsigned))
 WARNING(associated_type_access_warn,none,
         "associated type in "
         "%select{a private|a fileprivate|an internal|a public|%error}0 protocol uses "
         "%select{a private|a fileprivate|an internal|%error|%error}1 type in its "
         "%select{default definition|requirement}2 ",
-        (Accessibility, Accessibility, unsigned))
+        (AccessLevel, AccessLevel, unsigned))
 
 NOTE(bad_associated_type_deduction,none,
      "unable to infer associated type %0 for protocol %1",
@@ -1635,9 +1635,9 @@ NOTE(optional_req_near_match_move,none,
      (DeclName, unsigned))
 NOTE(optional_req_near_match_nonobjc,none,
      "add '@nonobjc' to silence this %select{warning|error}0", (bool))
-NOTE(optional_req_near_match_accessibility,none,
+NOTE(optional_req_near_match_access,none,
      "make %0 %select{ERROR|private|private|non-public|non-public}1 to silence this "
-     "warning", (DeclName, Accessibility))
+     "warning", (DeclName, AccessLevel))
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
@@ -1756,14 +1756,14 @@ ERROR(generic_param_access,none,
       "%select{in this context|fileprivate|internal|public|open}2}1 "
       "because its generic %select{parameter|requirement}5 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}3 type",
-      (DescriptiveDeclKind, bool, Accessibility, Accessibility, bool, bool))
+      (DescriptiveDeclKind, bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(generic_param_access_warn,none,
         "%0 %select{should be declared "
         "%select{private|fileprivate|internal|%error|%error}3"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}2}1 "
         "because its generic %select{parameter|requirement}5 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}3 type",
-        (DescriptiveDeclKind, bool, Accessibility, Accessibility, bool, bool))
+        (DescriptiveDeclKind, bool, AccessLevel, AccessLevel, bool, bool))
 
 ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
@@ -1977,11 +1977,11 @@ WARNING(class_inherits_anyobject,none,
 ERROR(enum_case_access,none,
       "enum case in %select{a private|a fileprivate|an internal|a public|%error}0 enum "
       "uses %select{a private|a fileprivate|an internal|%error|%error}1 type",
-      (Accessibility, Accessibility))
+      (AccessLevel, AccessLevel))
 WARNING(enum_case_access_warn,none,
         "enum case in %select{a private|a fileprivate|an internal|a public|%error}0 enum "
         "uses %select{a private|a fileprivate|an internal|%error|%error}1 type",
-        (Accessibility, Accessibility))
+        (AccessLevel, AccessLevel))
 ERROR(enum_stored_property,none,
       "enums may not contain stored properties", ())
 
@@ -2010,14 +2010,14 @@ ERROR(enum_raw_type_access,none,
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its raw type uses "
       "%select{a private|a fileprivate|an internal|%error|%error}2 type",
-      (bool, Accessibility, Accessibility, bool))
+      (bool, AccessLevel, AccessLevel, bool))
 WARNING(enum_raw_type_access_warn,none,
         "enum %select{should be declared "
         "%select{private|fileprivate|internal|%error|%error}2"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its raw type uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
-        (bool, Accessibility, Accessibility, bool))
+        (bool, AccessLevel, AccessLevel, bool))
 
 NOTE(enum_here,none,
      "enum %0 declared here", (Identifier))
@@ -2092,7 +2092,7 @@ NOTE(decodable_super_init_not_designated_here,none,
 NOTE(decodable_inaccessible_super_init_here,none,
      "cannot automatically synthesize %0 because implementation would need to call %1, which is inaccessible due to "
      "'%select{private|fileprivate|internal|%error|%error}2' protection level",
-     (DeclName, DeclName, Accessibility))
+     (DeclName, DeclName, AccessLevel))
 NOTE(decodable_super_init_is_failable_here,none,
      "cannot automatically synthesize %0 because implementation would need to call %1, which is failable", (DeclName, DeclName))
 NOTE(decodable_suggest_overriding_init_here,none,
@@ -3074,14 +3074,14 @@ ERROR(class_super_access,none,
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its superclass is "
       "%select{private|fileprivate|internal|%error|%error}2",
-      (bool, Accessibility, Accessibility, bool))
+      (bool, AccessLevel, AccessLevel, bool))
 WARNING(class_super_access_warn,none,
         "class %select{should be declared "
         "%select{private|fileprivate|internal|%error|%error}2"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its superclass is "
         "%select{private|fileprivate|internal|%error|%error}2",
-        (bool, Accessibility, Accessibility, bool))
+        (bool, AccessLevel, AccessLevel, bool))
 ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
@@ -3616,12 +3616,12 @@ ERROR(fixed_layout_attr_on_internal_type,
       none, "'@_fixed_layout' attribute can only be applied to '@_versioned' "
       "or public declarations, but %0 is "
       "%select{private|fileprivate|internal|%error|%error}1",
-      (DeclName, Accessibility))
+      (DeclName, AccessLevel))
 
-ERROR(versioned_attr_with_explicit_accessibility,
+ERROR(versioned_attr_with_explicit_access,
       none, "'@_versioned' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
-      (DeclName, Accessibility))
+      (DeclName, AccessLevel))
 
 ERROR(versioned_attr_in_protocol,none,
       "'@_versioned' attribute cannot be used in protocols", ())
@@ -3639,7 +3639,7 @@ ERROR(local_type_in_inlineable_function,
 ERROR(resilience_decl_unavailable,
       none, "%0 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
       "cannot be referenced from " FRAGILE_FUNC_KIND "3",
-      (DescriptiveDeclKind, DeclName, Accessibility, unsigned))
+      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned))
 
 #undef FRAGILE_FUNC_KIND
 
@@ -3669,7 +3669,7 @@ ERROR(inlineable_stored_property,
 ERROR(inlineable_decl_not_public,
       none, "'@_inlineable' attribute can only be applied to public declarations, "
       "but %0 is %select{private|fileprivate|internal|%error|%error}1",
-      (DeclBaseName, Accessibility))
+      (DeclBaseName, AccessLevel))
 
 //------------------------------------------------------------------------------
 // @_specialize diagnostics

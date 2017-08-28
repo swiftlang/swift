@@ -357,20 +357,20 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
 void
 TypeChecker::prepareGenericParamList(GenericParamList *gp,
                                      DeclContext *dc) {
-  Accessibility access;
+  AccessLevel access;
   if (auto *fd = dyn_cast<FuncDecl>(dc))
     access = fd->getFormalAccess();
   else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
     access = nominal->getFormalAccess();
   else
-    access = Accessibility::Internal;
-  access = std::max(access, Accessibility::Internal);
+    access = AccessLevel::Internal;
+  access = std::max(access, AccessLevel::Internal);
 
   unsigned depth = gp->getDepth();
   for (auto paramDecl : *gp) {
     paramDecl->setDepth(depth);
-    if (!paramDecl->hasAccessibility())
-      paramDecl->setAccessibility(access);
+    if (!paramDecl->hasAccess())
+      paramDecl->setAccess(access);
   }
 }
 

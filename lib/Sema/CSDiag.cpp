@@ -1104,7 +1104,7 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
       
       // Likewise, if the candidate is inaccessible from the scope it is being
       // accessed from, mark it as inaccessible or a general mismatch.
-      if (VD->hasAccessibility() && !VD->isAccessibleFrom(CS.DC)) {
+      if (VD->hasAccess() && !VD->isAccessibleFrom(CS.DC)) {
         // If this was an exact match, downgrade it to inaccessible, so that
         // accessible decls that are also an exact match will take precedence.
         // Otherwise consider it to be a general mismatch so we only list it in
@@ -1564,7 +1564,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     // TODO: figure out right value for isKnownPrivate
     if (instanceType->mayHaveMembers()) {
       auto ctors = CS.TC.lookupConstructors(
-          CS.DC, instanceType, NameLookupFlags::IgnoreAccessibility);
+          CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
       for (auto ctor : ctors)
         if (ctor.getValueDecl()->hasInterfaceType())
           candidates.push_back({ ctor.getValueDecl(), 1 });

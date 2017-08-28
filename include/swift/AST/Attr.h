@@ -206,19 +206,19 @@ protected:
   enum { NumObjCAttrBits = NumDeclAttrBits + 3 };
   static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
 
-  class AccessibilityAttrBitFields {
-    friend class AbstractAccessibilityAttr;
+  class AccessControlAttrBitFields {
+    friend class AbstractAccessControlAttr;
     unsigned : NumDeclAttrBits;
 
     unsigned AccessLevel : 3;
   };
-  enum { NumAccessibilityAttrBits = NumDeclAttrBits + 3 };
-  static_assert(NumAccessibilityAttrBits <= 32, "fits in an unsigned");
+  enum { NumAccessControlAttrBits = NumDeclAttrBits + 3 };
+  static_assert(NumAccessControlAttrBits <= 32, "fits in an unsigned");
 
   union {
     DeclAttrBitFields DeclAttrBits;
     ObjCAttrBitFields ObjCAttrBits;
-    AccessibilityAttrBitFields AccessibilityAttrBits;
+    AccessControlAttrBitFields AccessControlAttrBits;
   };
 
   DeclAttribute *Next = nullptr;
@@ -858,51 +858,51 @@ public:
   }
 };
 
-/// Represents any sort of accessibility modifier.
-class AbstractAccessibilityAttr : public DeclAttribute {
+/// Represents any sort of access control modifier.
+class AbstractAccessControlAttr : public DeclAttribute {
 protected:
-  AbstractAccessibilityAttr(DeclAttrKind DK, SourceLoc atLoc, SourceRange range,
-                            Accessibility access, bool implicit)
+  AbstractAccessControlAttr(DeclAttrKind DK, SourceLoc atLoc, SourceRange range,
+                            AccessLevel access, bool implicit)
       : DeclAttribute(DK, atLoc, range, implicit) {
-    AccessibilityAttrBits.AccessLevel = static_cast<unsigned>(access);
-    assert(getAccess() == access && "not enough bits for accessibility");
+    AccessControlAttrBits.AccessLevel = static_cast<unsigned>(access);
+    assert(getAccess() == access && "not enough bits for access control");
   }
 
 public:
-  Accessibility getAccess() const {
-    return static_cast<Accessibility>(AccessibilityAttrBits.AccessLevel);
+  AccessLevel getAccess() const {
+    return static_cast<AccessLevel>(AccessControlAttrBits.AccessLevel);
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Accessibility ||
-           DA->getKind() == DAK_SetterAccessibility;
+    return DA->getKind() == DAK_AccessControl ||
+           DA->getKind() == DAK_SetterAccess;
   }
 };
 
 /// Represents a 'private', 'internal', or 'public' marker on a declaration.
-class AccessibilityAttr : public AbstractAccessibilityAttr {
+class AccessControlAttr : public AbstractAccessControlAttr {
 public:
-  AccessibilityAttr(SourceLoc atLoc, SourceRange range, Accessibility access,
+  AccessControlAttr(SourceLoc atLoc, SourceRange range, AccessLevel access,
                     bool implicit = false)
-      : AbstractAccessibilityAttr(DAK_Accessibility, atLoc, range, access,
+      : AbstractAccessControlAttr(DAK_AccessControl, atLoc, range, access,
                                   implicit) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Accessibility;
+    return DA->getKind() == DAK_AccessControl;
   }
 };
 
 /// Represents a 'private', 'internal', or 'public' marker for a setter on a
 /// declaration.
-class SetterAccessibilityAttr : public AbstractAccessibilityAttr {
+class SetterAccessAttr : public AbstractAccessControlAttr {
 public:
-  SetterAccessibilityAttr(SourceLoc atLoc, SourceRange range,
-                          Accessibility access, bool implicit = false)
-      : AbstractAccessibilityAttr(DAK_SetterAccessibility, atLoc, range, access,
+  SetterAccessAttr(SourceLoc atLoc, SourceRange range,
+                          AccessLevel access, bool implicit = false)
+      : AbstractAccessControlAttr(DAK_SetterAccess, atLoc, range, access,
                                   implicit) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_SetterAccessibility;
+    return DA->getKind() == DAK_SetterAccess;
   }
 };
 

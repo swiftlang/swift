@@ -69,14 +69,13 @@ PrintOptions PrintOptions::printTypeInterface(Type T) {
 
 PrintOptions PrintOptions::printDocInterface() {
   PrintOptions result = PrintOptions::printModuleInterface();
-  result.PrintAccessibility = false;
+  result.PrintAccess = false;
   result.SkipUnavailable = false;
   result.ExcludeAttrList.push_back(DAK_Available);
   result.ArgAndParamPrinting =
-  PrintOptions::ArgAndParamPrintingMode::BothAlways;
+      PrintOptions::ArgAndParamPrintingMode::BothAlways;
   result.PrintDocumentationComments = false;
   result.PrintRegularClangComments = false;
-  result.PrintAccessibility = false;
   result.PrintFunctionRepresentationAttrs = false;
   return result;
 }

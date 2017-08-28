@@ -890,7 +890,7 @@ void SwiftEditorDocument::Implementation::buildSwiftInv(
 
 namespace  {
 
-static UIdent getAccessibilityUID(Accessibility Access) {
+static UIdent getAccessLevelUID(AccessLevel Access) {
   static UIdent AccessOpen("source.lang.swift.accessibility.open");
   static UIdent AccessPublic("source.lang.swift.accessibility.public");
   static UIdent AccessInternal("source.lang.swift.accessibility.internal");
@@ -898,50 +898,50 @@ static UIdent getAccessibilityUID(Accessibility Access) {
   static UIdent AccessPrivate("source.lang.swift.accessibility.private");
 
   switch (Access) {
-  case Accessibility::Private:
+  case AccessLevel::Private:
     return AccessPrivate;
-  case Accessibility::FilePrivate:
+  case AccessLevel::FilePrivate:
     return AccessFilePrivate;
-  case Accessibility::Internal:
+  case AccessLevel::Internal:
     return AccessInternal;
-  case Accessibility::Public:
+  case AccessLevel::Public:
     return AccessPublic;
-  case Accessibility::Open:
+  case AccessLevel::Open:
     return AccessOpen;
   }
 
-  llvm_unreachable("Unhandled Accessibility in switch.");
+  llvm_unreachable("Unhandled access level in switch.");
 }
 
-static Optional<Accessibility> getAccessibilityStrictly(const ExtensionDecl *ED) {
-  if (ED->hasDefaultAccessibility())
-    return ED->getDefaultAccessibility();
+static Optional<AccessLevel> getAccessLevelStrictly(const ExtensionDecl *ED) {
+  if (ED->hasDefaultAccessLevel())
+    return ED->getDefaultAccessLevel();
 
-  // Check if the decl has an explicit accessibility attribute.
-  if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
 
   return None;
 }
 
-static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
-  if (auto StrictAccess = getAccessibilityStrictly(ED))
+static AccessLevel inferDefaultAccessLevel(const ExtensionDecl *ED) {
+  if (auto StrictAccess = getAccessLevelStrictly(ED))
     return StrictAccess.getValue();
 
   // Assume "internal", which is the most common thing anyway.
-  return Accessibility::Internal;
+  return AccessLevel::Internal;
 }
 
-/// If typechecking was performed we use the computed accessibility, otherwise
-/// we fallback to inferring accessibility syntactically. This may not be as
+/// If typechecking was performed we use the computed access level, otherwise
+/// we fallback to inferring access syntactically. This may not be as
 /// accurate but it's only until we have typechecked the AST.
-static Accessibility inferAccessibility(const ValueDecl *D) {
+static AccessLevel inferAccessLevel(const ValueDecl *D) {
   assert(D);
-  if (D->hasAccessibility())
+  if (D->hasAccess())
     return D->getFormalAccess();
 
-  // Check if the decl has an explicit accessibility attribute.
-  if (auto *AA = D->getAttrs().getAttribute<AccessibilityAttr>())
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
 
   DeclContext *DC = D->getDeclContext();
@@ -952,26 +952,26 @@ static Accessibility inferAccessibility(const ValueDecl *D) {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
-    return Accessibility::Private;
+    return AccessLevel::Private;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
-    return Accessibility::Internal;
+    return AccessLevel::Internal;
   case DeclContextKind::GenericTypeDecl: {
     auto Nominal = cast<GenericTypeDecl>(DC);
-    Accessibility Access = inferAccessibility(Nominal);
+    AccessLevel Access = inferAccessLevel(Nominal);
     if (!isa<ProtocolDecl>(Nominal))
-      Access = std::min(Access, Accessibility::Internal);
+      Access = std::min(Access, AccessLevel::Internal);
     return Access;
   }
   case DeclContextKind::ExtensionDecl:
-    return inferDefaultAccessibility(cast<ExtensionDecl>(DC));
+    return inferDefaultAccessLevel(cast<ExtensionDecl>(DC));
   }
 
   llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
-static Optional<Accessibility>
-inferSetterAccessibility(const AbstractStorageDecl *D) {
+static Optional<AccessLevel>
+inferSetterAccessLevel(const AbstractStorageDecl *D) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->isLet())
       return None;
@@ -982,10 +982,10 @@ inferSetterAccessibility(const AbstractStorageDecl *D) {
   // FIXME: Have the parser detect as read-only the syntactic form of generated
   // interfaces, which is "var foo : Int { get }"
 
-  if (auto *AA = D->getAttrs().getAttribute<SetterAccessibilityAttr>())
+  if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
     return AA->getAccess();
   else
-    return inferAccessibility(D);
+    return inferAccessLevel(D);
 }
 
 class SwiftDocumentStructureWalker: public ide::SyntaxModelWalker {
@@ -1043,15 +1043,15 @@ public:
     if (Node.Kind != SyntaxStructureKind::Parameter &&
         Node.Kind != SyntaxStructureKind::LocalVariable) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
-        AccessLevel = getAccessibilityUID(inferAccessibility(VD));
+        AccessLevel = getAccessLevelUID(inferAccessLevel(VD));
       } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
-        if (auto StrictAccess = getAccessibilityStrictly(ED))
-          AccessLevel = getAccessibilityUID(StrictAccess.getValue());
+        if (auto StrictAccess = getAccessLevelStrictly(ED))
+          AccessLevel = getAccessLevelUID(StrictAccess.getValue());
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
-        Optional<Accessibility> SetAccess = inferSetterAccessibility(ASD);
+        Optional<swift::AccessLevel> SetAccess = inferSetterAccessLevel(ASD);
         if (SetAccess.hasValue()) {
-          SetterAccessLevel = getAccessibilityUID(SetAccess.getValue());
+          SetterAccessLevel = getAccessLevelUID(SetAccess.getValue());
         }
       }
     }
