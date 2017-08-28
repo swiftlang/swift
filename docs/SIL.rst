@@ -1346,6 +1346,139 @@ be triggered by valid SIL emitted by a correct Swift program using a correct
 standard library, but cannot in all cases be diagnosed or verified at the SIL
 level.
 
+Ownership Model
+---------------
+
+The SIL Ownership Model allows for static lifetime invariants to be expressed
+and enforced by the SIL IR along SSA edges. For more information on SSA and
+ownership see the next section, `Ownership SSA Form`_. The ownership relations
+are described by the enum ``ValueOwnershipKind`` and its cases:
+
+* **Trivial** - ``@trivial`` - An value with independent lifetime that has no
+  lifetime constraints.
+* **Owned** - ``@owned`` - A value with a unique, independent lifetime.
+* **Guaranteed** - ``@guaranteed`` - An immutable value whose scoped lifetime is
+  dependent on a different value with owned ownership. This dependence
+  constrains the owned value's lifetime such that the owned value must be alive
+  for the entire lifetime of the guaranteed value.
+* **Unowned** - ``@unowned`` - A value with a transient lifetime that must be copied before any
+  side-effect having uses.
+* **Any** - Undefined ownership. This is mainly used for ``SILUndef``.
+
+For more information see the `ValueOwnershipKind`_ section.
+
+Ownership SSA Form
+~~~~~~~~~~~~~~~~~~
+
+`Ownership SSA` or `OSSA` is a derived form of SSA that expresses ownership
+invariants along def-use edges. SILGen initially emits SIL in OSSA form. Once
+optimizations that depend on ownership have been completed, the SIL is lowered
+to normal SSA form by the SIL pass called the ``OwnershipModelEliminator``.
+
+OSSA augments the usual SSA properties (e.g. dominance) with the following
+properties:
+
+1. All defs (``SILValue``) must define a static ``ValueOwnershipKind`` that
+   defines the ownership semantics of the def.
+2. Every use (``Operand``) should specify a set of "allowed"
+   ``ValueOwnershipKind`` that all defs (``SILValue``) of the operand must
+   produce.
+3. A program is considered ill-formed if any defs have a use that will not
+   accept the def's ``ValueOwnershipKind``.
+4. A program is considered ill-formed if any def's use violates a per
+   ``ValueOwnershipKind`` dataflow rule. These dataflow rules enable us to make
+   program guarantees such as regions of code without leaks, use-after-frees, or
+   dangling pointers. We describe the dataflow constraints in the section on
+   `ValueOwnershipKind`_.
+
+ValueOwnershipKind
+~~~~~~~~~~~~~~~~~~
+
+All defs produce a ``ValueOwnershipKind`` that defines a set of dataflow rules
+that the def and its uses (and potentially derived uses) must obey. This is
+implemented by all defs having the ability to partition their user set into a
+set of "lifetime-ending uses" and "normal uses" and then applying a
+``ValueOwnershipKind`` specific dataflow rule, as described in the next section.
+
+Trivial
+```````
+
+A SILValue with ``@trivial`` ownership is an independent, unmanaged value like
+``Int``, ``UnsafePointer<T>``, ``Builtin.RawPointer``, and
+``Unmanaged<T>``. Ownership SIL classifies all uses of a trivial value as
+non-lifetime ending uses and thus does not provide any dataflow guarantees on
+trivial values. See the `Derived Properties`_ section for an example. Of course,
+Ownership SIL does guarantee that trivial values will not be passed to uses that
+can not accept a trivial value.
+
+Owned
+`````
+
+A SILValue with ``@owned`` ownership is an independent, managed value like
+``Array<T>`` or a class. Ownership SIL defines ``@owned`` values as having the
+following dataflow guarantees::
+
+1. The value will be consumed entirely, exactly once along any path through the
+   program. This ensures that the compiler can prevent memory leaks and double
+   frees.
+2. Any non-consuming uses of the value will occur before any consuming uses of
+   the value. This ensures that the compiler can prevent any use after frees.
+
+Guaranteed
+``````````
+
+A value with ``@guaranteed`` ownership is a scoped-lifetime, immutable value
+that is derived from an ``@owned`` value. The ``@guaranteed`` value's lifetime
+acts as a constraint on the lifetime of the ``@owned`` value and statically
+prevent the ``@owned`` value from being destroyed until the ``@guaranteed``
+value's lifetime has ended. A ``@guaranteed`` value can be introduced via the
+following SILNodes:
+
+* ``load_borrow``
+* ``begin_borrow``
+* ``@guaranteed SILArgument``
+
+The values derivable from these SILNodes must be paired with exactly one
+``end_borrow`` use along all paths through the program.
+
+**NOTE** The act of producing an ``@guaranteed`` value is also known by the term
+of art "shared borrow". Often times colloquially an ``@guaranteed`` value will
+be called a "borrowed" value and the scoped-lifetime of the value a "borrow
+scope".
+
+**NOTE** In order to reduce the size of emitted SIL, we require recursive borrow
+scopes to be flattened into parent borrow scopes. In practice this means:
+
+1. ``@guaranteed`` function arguments are required to not be paired with any
+   ``end_borrow``. This is because the ``@guaranteed`` argument in the callee
+   acts as a sub-scope of a borrow scope in all caller bodies implying
+   redundancy.
+2. ``begin_borrow`` and ``end_borrow`` applied to an already borrowed value are
+   trivially dead.
+
+Unowned
+```````
+
+A SILValue with ``@unowned`` ownership kind is an independent value that has a
+lifetime that is only guaranteed to last until the next program visible
+side-effect. To maintain the lifetime of an ``@unowned`` value, it must be
+converted to an owned representation via a ``copy_value`` before any other uses
+of it.
+
+``@unowned`` ownership kind occurs mainly along method/function boundaries in
+between Swift and Objective-C code. This is because ``@unowned`` is the normal
+argument convention used in Objective-C.
+
+Any
+```
+
+A SILValue with undefined ownership. It can pair with /any/ ownership kind. This
+means that it could take on /any/ ownership semantics. This is meant only to
+model ``SILUndef`` and to express certain situations where we use unqualified
+ownership. This is a tool in migration that over time will be increasingly
+restricted until in the SIL ownership model, it will only be used to model
+``SILUndef``.
+
 Calling Convention
 ------------------
 
