@@ -341,7 +341,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
     if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
         typeAliasDecl->getGenericParams() == nullptr) {
       TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
-      if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
+      if (typeAliasDecl->getFormalAccess() <= AccessLevel::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 
       // Note: recursion into old type checker is okay when passing in an

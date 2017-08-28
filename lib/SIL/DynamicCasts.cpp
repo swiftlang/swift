@@ -58,12 +58,12 @@ static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
                                                  bool isWholeModuleOpts) {
   while (CD) {
     // Open classes can always be extended
-    if (CD->getEffectiveAccess() == Accessibility::Open)
+    if (CD->getEffectiveAccess() == AccessLevel::Open)
       return true;
 
     // Internal and public classes can be extended, if we are not in
     // whole-module-optimization mode.
-    if (CD->getEffectiveAccess() >= Accessibility::Internal &&
+    if (CD->getEffectiveAccess() >= AccessLevel::Internal &&
         !isWholeModuleOpts)
       return true;
 
@@ -144,8 +144,8 @@ classifyDynamicCastToProtocol(CanType source,
   // then conformances cannot be changed at run-time, because only this
   // file could have implemented them, but no conformances were found.
   // Therefore it is safe to make a negative decision at compile-time.
-  if (SourceNominalTy->getEffectiveAccess() <= Accessibility::FilePrivate ||
-      TargetProtocol->getEffectiveAccess() <= Accessibility::FilePrivate) {
+  if (SourceNominalTy->getEffectiveAccess() <= AccessLevel::FilePrivate ||
+      TargetProtocol->getEffectiveAccess() <= AccessLevel::FilePrivate) {
     // This cast is always false. Replace it with a branch to the
     // failure block.
     return DynamicCastFeasibility::WillFail;
@@ -157,8 +157,8 @@ classifyDynamicCastToProtocol(CanType source,
   // module could have implemented them, but no conformances were found.
   // Therefore it is safe to make a negative decision at compile-time.
   if (isWholeModuleOpts &&
-      (SourceNominalTy->getEffectiveAccess() <= Accessibility::Internal ||
-       TargetProtocol->getEffectiveAccess() <= Accessibility::Internal)) {
+      (SourceNominalTy->getEffectiveAccess() <= AccessLevel::Internal ||
+       TargetProtocol->getEffectiveAccess() <= AccessLevel::Internal)) {
     return DynamicCastFeasibility::WillFail;
   }
 

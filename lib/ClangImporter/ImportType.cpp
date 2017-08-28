@@ -1691,7 +1691,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // It doesn't actually matter which DeclContext we use, so just use the
     // imported header unit.
     auto paramInfo = createDeclWithClangNode<ParamDecl>(
-        param, Accessibility::Private,
+        param, AccessLevel::Private,
         VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
         dc->mapTypeIntoContext(swiftParamTy),
@@ -2128,7 +2128,7 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Set up the parameter info.
     auto paramInfo
-      = createDeclWithClangNode<ParamDecl>(param, Accessibility::Private,
+      = createDeclWithClangNode<ParamDecl>(param, AccessLevel::Private,
                                            VarDecl::Specifier::Owned,
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
@@ -2247,7 +2247,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
     SourceLoc nameLoc = importSourceLoc(param->getLocation());
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
     auto paramInfo
-      = createDeclWithClangNode<ParamDecl>(param, Accessibility::Private,
+      = createDeclWithClangNode<ParamDecl>(param, AccessLevel::Private,
                                            VarDecl::Specifier::Owned,
                                            /*let loc*/SourceLoc(),
                                            /*label loc*/SourceLoc(),

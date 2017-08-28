@@ -314,8 +314,8 @@ std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
 
 #ifdef USE_NEW_MANGLING_FOR_OBJC_RUNTIME_NAMES
 static bool isPrivate(const NominalTypeDecl *Nominal) {
-  return Nominal->hasAccessibility() &&
-         Nominal->getFormalAccess() <= Accessibility::FilePrivate;
+  return Nominal->hasAccess() &&
+         Nominal->getFormalAccess() <= AccessLevel::FilePrivate;
 }
 #endif
 
@@ -456,7 +456,7 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
     return false;
 
   auto *nominal = declaredType->getAnyNominal();
-  if (nominal->getFormalAccess() <= Accessibility::FilePrivate)
+  if (nominal->getFormalAccess() <= AccessLevel::FilePrivate)
     return true;
   return isInPrivateOrLocalContext(nominal);
 }
@@ -502,8 +502,8 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
 }
 
 static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
-  if (!decl->hasAccessibility() ||
-      decl->getFormalAccess() > Accessibility::FilePrivate ||
+  if (!decl->hasAccess() ||
+      decl->getFormalAccess() > AccessLevel::FilePrivate ||
       isInPrivateOrLocalContext(decl)) {
     return StringRef();
   }

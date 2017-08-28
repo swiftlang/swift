@@ -1866,7 +1866,7 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
     AvailKind = RenameAvailableKind::Unavailable_has_no_location;
   } else if (!VD->hasName()) {
     AvailKind = RenameAvailableKind::Unavailable_has_no_name;
-  } else if(!VD->hasAccessibility()) {
+  } else if (!VD->hasAccess()) {
     return llvm::makeArrayRef(Scratch);
   }
 

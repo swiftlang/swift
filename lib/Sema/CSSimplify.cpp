@@ -3320,9 +3320,9 @@ retry_after_fail:
       includeInaccessibleMembers) {
     NameLookupOptions lookupOptions = defaultMemberLookupOptions;
     
-    // Ignore accessibility so we get candidates that might have been missed
+    // Ignore access control so we get candidates that might have been missed
     // before.
-    lookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    lookupOptions |= NameLookupFlags::IgnoreAccessControl;
     // This is only used for diagnostics, so always use KnownPrivate.
     lookupOptions |= NameLookupFlags::KnownPrivate;
     

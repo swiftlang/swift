@@ -1681,43 +1681,43 @@ public:
     ExtensionDeclBits.CheckedInheritanceClause = checked;
   }
 
-  bool hasDefaultAccessibility() const {
+  bool hasDefaultAccessLevel() const {
     return ExtensionDeclBits.DefaultAndMaxAccessLevel != 0;
   }
 
-  Accessibility getDefaultAccessibility() const {
-    assert(hasDefaultAccessibility() && "not computed yet");
+  AccessLevel getDefaultAccessLevel() const {
+    assert(hasDefaultAccessLevel() && "not computed yet");
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(Accessibility::FilePrivate) - 1)))
-      return Accessibility::FilePrivate;
+        (1 << (static_cast<unsigned>(AccessLevel::FilePrivate) - 1)))
+      return AccessLevel::FilePrivate;
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(Accessibility::Internal) - 1)))
-      return Accessibility::Internal;
-    return Accessibility::Public;
+        (1 << (static_cast<unsigned>(AccessLevel::Internal) - 1)))
+      return AccessLevel::Internal;
+    return AccessLevel::Public;
   }
 
-  Accessibility getMaxAccessibility() const {
-    assert(hasDefaultAccessibility() && "not computed yet");
+  AccessLevel getMaxAccessLevel() const {
+    assert(hasDefaultAccessLevel() && "not computed yet");
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(Accessibility::Public) - 1)))
-      return Accessibility::Public;
+        (1 << (static_cast<unsigned>(AccessLevel::Public) - 1)))
+      return AccessLevel::Public;
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(Accessibility::Internal) - 1)))
-      return Accessibility::Internal;
-    return Accessibility::FilePrivate;
+        (1 << (static_cast<unsigned>(AccessLevel::Internal) - 1)))
+      return AccessLevel::Internal;
+    return AccessLevel::FilePrivate;
   }
 
-  void setDefaultAndMaxAccessibility(Accessibility defaultAccess,
-                                     Accessibility maxAccess) {
-    assert(!hasDefaultAccessibility() && "default accessibility already set");
+  void setDefaultAndMaxAccess(AccessLevel defaultAccess,
+                              AccessLevel maxAccess) {
+    assert(!hasDefaultAccessLevel() && "default access level already set");
     assert(maxAccess >= defaultAccess);
-    assert(maxAccess != Accessibility::Private && "private not valid");
-    assert(defaultAccess != Accessibility::Private && "private not valid");
+    assert(maxAccess != AccessLevel::Private && "private not valid");
+    assert(defaultAccess != AccessLevel::Private && "private not valid");
     ExtensionDeclBits.DefaultAndMaxAccessLevel =
         (1 << (static_cast<unsigned>(defaultAccess) - 1)) |
         (1 << (static_cast<unsigned>(maxAccess) - 1));
-    assert(getDefaultAccessibility() == defaultAccess && "not enough bits");
-    assert(getMaxAccessibility() == maxAccess && "not enough bits");
+    assert(getDefaultAccessLevel() == defaultAccess && "not enough bits");
+    assert(getMaxAccessLevel() == maxAccess && "not enough bits");
   }
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
@@ -2076,7 +2076,7 @@ public:
 class ValueDecl : public Decl {
   DeclName Name;
   SourceLoc NameLoc;
-  llvm::PointerIntPair<Type, 3, OptionalEnum<Accessibility>> TypeAndAccess;
+  llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
 
 protected:
   ValueDecl(DeclKind K,
@@ -2147,12 +2147,12 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  bool hasAccessibility() const {
+  bool hasAccess() const {
     return TypeAndAccess.getInt().hasValue();
   }
 
   /// \see getFormalAccess
-  Accessibility getFormalAccessImpl(const DeclContext *useDC) const;
+  AccessLevel getFormalAccessImpl(const DeclContext *useDC) const;
 
   bool isVersionedInternalDecl() const;
 
@@ -2165,18 +2165,18 @@ public:
   /// taken into account.
   ///
   /// \sa getFormalAccessScope
-  Accessibility getFormalAccess(const DeclContext *useDC = nullptr,
-                                bool respectVersionedAttr = false) const {
-    assert(hasAccessibility() && "accessibility not computed yet");
-    Accessibility result = TypeAndAccess.getInt().getValue();
+  AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
+                              bool respectVersionedAttr = false) const {
+    assert(hasAccess() && "access not computed yet");
+    AccessLevel result = TypeAndAccess.getInt().getValue();
     if (respectVersionedAttr &&
-        result == Accessibility::Internal &&
+        result == AccessLevel::Internal &&
         isVersionedInternalDecl()) {
       assert(!useDC);
-      return Accessibility::Public;
+      return AccessLevel::Public;
     }
-    if (useDC && (result == Accessibility::Internal ||
-                  result == Accessibility::Public))
+    if (useDC && (result == AccessLevel::Internal ||
+                  result == AccessLevel::Public))
       return getFormalAccessImpl(useDC);
     return result;
   }
@@ -2203,16 +2203,17 @@ public:
   ///
   /// This is the access used when making optimization and code generation
   /// decisions. It should not be used at the AST or semantic level.
-  Accessibility getEffectiveAccess() const;
+  AccessLevel getEffectiveAccess() const;
 
-  void setAccessibility(Accessibility access) {
-    assert(!hasAccessibility() && "accessibility already set");
-    overwriteAccessibility(access);
+  void setAccess(AccessLevel access) {
+    assert(!hasAccess() && "access already set");
+    overwriteAccess(access);
   }
 
-  /// Overwrite the accessibility of this declaration.
-  // This is needed in the LLDB REPL.
-  void overwriteAccessibility(Accessibility access) {
+  /// Overwrite the access of this declaration.
+  ///
+  /// This is needed in the LLDB REPL.
+  void overwriteAccess(AccessLevel access) {
     TypeAndAccess.setInt(access);
   }
 
@@ -3961,8 +3962,8 @@ private:
   void configureObservingRecord(ObservingRecord *record,
                                 FuncDecl *willSet, FuncDecl *didSet);
 
-  llvm::PointerIntPair<GetSetRecord*, 3, OptionalEnum<Accessibility>> GetSetInfo;
-  llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<Accessibility>>
+  llvm::PointerIntPair<GetSetRecord*, 3, OptionalEnum<AccessLevel>> GetSetInfo;
+  llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<AccessLevel>>
     BehaviorInfo;
 
   ObservingRecord &getDidSetInfo() const {
@@ -4179,18 +4180,18 @@ public:
     return nullptr;
   }
 
-  Accessibility getSetterAccessibility() const {
-    assert(hasAccessibility());
+  AccessLevel getSetterFormalAccess() const {
+    assert(hasAccess());
     assert(GetSetInfo.getInt().hasValue());
     return GetSetInfo.getInt().getValue();
   }
 
-  void setSetterAccessibility(Accessibility accessLevel) {
+  void setSetterAccess(AccessLevel accessLevel) {
     assert(!GetSetInfo.getInt().hasValue());
-    overwriteSetterAccessibility(accessLevel);
+    overwriteSetterAccess(accessLevel);
   }
 
-  void overwriteSetterAccessibility(Accessibility accessLevel);
+  void overwriteSetterAccess(AccessLevel accessLevel);
 
   /// \brief Retrieve the materializeForSet function, if this
   /// declaration has one.
@@ -6277,12 +6278,12 @@ NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
 }
 
 inline void
-AbstractStorageDecl::overwriteSetterAccessibility(Accessibility accessLevel) {
+AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
   GetSetInfo.setInt(accessLevel);
   if (auto setter = getSetter())
-    setter->overwriteAccessibility(accessLevel);
+    setter->overwriteAccess(accessLevel);
   if (auto materializeForSet = getMaterializeForSetFunc())
-    materializeForSet->overwriteAccessibility(accessLevel);
+    materializeForSet->overwriteAccess(accessLevel);
 }
 
 inline bool AbstractStorageDecl::isStatic() const {

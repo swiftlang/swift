@@ -158,10 +158,10 @@ namespace {
                          unsigned &bestIdx,
                          bool &doNotDiagnoseMatches);
 
-    bool checkWitnessAccessibility(AccessScope &requiredAccessScope,
-                                   ValueDecl *requirement,
-                                   ValueDecl *witness,
-                                   bool *isSetter);
+    bool checkWitnessAccess(AccessScope &requiredAccessScope,
+                            ValueDecl *requirement,
+                            ValueDecl *witness,
+                            bool *isSetter);
 
     bool checkWitnessAvailability(ValueDecl *requirement,
                                   ValueDecl *witness,
@@ -264,11 +264,11 @@ namespace {
     Success,
 
     /// The witness is less accessible than the requirement.
-    Accessibility,
+    Access,
 
     /// The witness is storage whose setter is less accessible than the
     /// requirement.
-    AccessibilityOfSetter,
+    AccessOfSetter,
 
     /// The witness is less available than the requirement.
     Availability,
@@ -1476,11 +1476,10 @@ bool WitnessChecker::findBestWitness(
   return isReallyBest;
 }
 
-bool WitnessChecker::
-checkWitnessAccessibility(AccessScope &requiredAccessScope,
-                          ValueDecl *requirement,
-                          ValueDecl *witness,
-                          bool *isSetter) {
+bool WitnessChecker::checkWitnessAccess(AccessScope &requiredAccessScope,
+                                        ValueDecl *requirement,
+                                        ValueDecl *witness,
+                                        bool *isSetter) {
   *isSetter = false;
 
   auto scopeIntersection =
@@ -1537,11 +1536,11 @@ checkWitness(AccessScope requiredAccessScope,
     return CheckKind::OptionalityConflict;
 
   bool isSetter = false;
-  if (checkWitnessAccessibility(requiredAccessScope, requirement,
-                                match.Witness, &isSetter)) {
+  if (checkWitnessAccess(requiredAccessScope, requirement, match.Witness,
+                         &isSetter)) {
     CheckKind kind = (isSetter
-                      ? CheckKind::AccessibilityOfSetter
-                      : CheckKind::Accessibility);
+                      ? CheckKind::AccessOfSetter
+                      : CheckKind::Access);
     return RequirementCheck(kind, requiredAccessScope);
   }
 
@@ -2514,8 +2513,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     AccessScope requiredAccessScope =
         Adoptee->getAnyNominal()->getFormalAccessScope(DC);
     bool isSetter = false;
-    if (checkWitnessAccessibility(requiredAccessScope, assocType, typeDecl,
-                                  &isSetter)) {
+    if (checkWitnessAccess(requiredAccessScope, assocType, typeDecl,
+                           &isSetter)) {
       assert(!isSetter);
 
       // Avoid relying on the lifetime of 'this'.
@@ -2523,8 +2522,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       diagnoseOrDefer(assocType, false,
         [DC, typeDecl, requiredAccessScope](
           NormalProtocolConformance *conformance) {
-        Accessibility requiredAccess =
-          requiredAccessScope.requiredAccessibilityForDiagnostics();
+        AccessLevel requiredAccess =
+          requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
@@ -2538,7 +2537,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                    typeDecl->getFullName(),
                                    requiredAccess,
                                    proto->getName());
-        fixItAccessibility(diag, typeDecl, requiredAccess);
+        fixItAccess(diag, typeDecl, requiredAccess);
       });
     }
   } else {
@@ -2578,14 +2577,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      TC.computeAccessibility(nominal);
+      TC.computeAccessLevel(nominal);
       // FIXME: Ideally this would use the protocol's access too---that is,
       // a typealias added for an internal protocol shouldn't need to be
       // public---but that can be problematic if the same type conforms to two
       // protocols with different access levels.
-      Accessibility aliasAccess = nominal->getFormalAccess();
-      aliasAccess = std::max(aliasAccess, Accessibility::Internal);
-      aliasDecl->setAccessibility(aliasAccess);
+      AccessLevel aliasAccess = nominal->getFormalAccess();
+      aliasAccess = std::max(aliasAccess, AccessLevel::Internal);
+      aliasDecl->setAccess(aliasAccess);
 
       if (nominal == DC) {
         nominal->addMember(aliasDecl);
@@ -2637,14 +2636,14 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   ExtraIndentStreamPrinter Printer(OS, StubIndent);
   Printer.printNewline();
 
-  Accessibility Access =
+  AccessLevel Access =
     std::min(
       /* Access of the context */
       Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
       /* Access of the protocol */
       Requirement->getDeclContext()->getAsProtocolOrProtocolExtensionContext()->
         getFormalAccess());
-  if (Access == Accessibility::Public)
+  if (Access == AccessLevel::Public)
     Printer << "public ";
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
@@ -2663,8 +2662,8 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 
     PrintOptions Options = PrintOptions::printForDiagnostics();
     Options.PrintDocumentationComments = false;
-    Options.AccessibilityFilter = Accessibility::Private;
-    Options.PrintAccessibility = false;
+    Options.AccessFilter = AccessLevel::Private;
+    Options.PrintAccess = false;
     Options.SkipAttributes = true;
     Options.FunctionBody = [](const ValueDecl *VD) { return getCodePlaceholder(); };
     Options.setBaseType(AdopterTy);
@@ -2934,16 +2933,16 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     case CheckKind::Success:
       break;
 
-    case CheckKind::Accessibility:
-    case CheckKind::AccessibilityOfSetter: {
+    case CheckKind::Access:
+    case CheckKind::AccessOfSetter: {
       // Avoid relying on the lifetime of 'this'.
       const DeclContext *DC = this->DC;
       diagnoseOrDefer(requirement, false,
         [DC, witness, check, requirement](
           NormalProtocolConformance *conformance) {
         auto requiredAccessScope = check.RequiredAccessScope;
-        Accessibility requiredAccess =
-          requiredAccessScope.requiredAccessibilityForDiagnostics();
+        AccessLevel requiredAccess =
+          requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
@@ -2951,7 +2950,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto diagKind = protoForcesAccess
                           ? diag::witness_not_accessible_proto
                           : diag::witness_not_accessible_type;
-        bool isSetter = (check.Kind == CheckKind::AccessibilityOfSetter);
+        bool isSetter = (check.Kind == CheckKind::AccessOfSetter);
 
         auto &diags = DC->getASTContext().Diags;
         auto diag = diags.diagnose(
@@ -2960,9 +2959,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                              witness->getFullName(),
                              isSetter,
                              requiredAccess,
-                             protoAccessScope.accessibilityForDiagnostics(),
+                             protoAccessScope.accessLevelForDiagnostics(),
                              proto->getName());
-        fixItAccessibility(diag, witness, requiredAccess, isSetter);
+        fixItAccess(diag, witness, requiredAccess, isSetter);
       });
       break;
     }
@@ -5969,7 +5968,7 @@ static unsigned getNameLength(DeclName name) {
 /// match for the given optional requirement.
 static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
                                             ValueDecl *witness,
-                                            Accessibility accessibility,
+                                            AccessLevel access,
                                             unsigned score) {
   // If the warning couldn't be suppressed, don't warn.
   if (!canSuppressPotentialWitnessWarningWithMovement(req, witness) &&
@@ -5982,8 +5981,8 @@ static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
 
   // Don't warn if the potential witness has been explicitly given less
   // visibility than the conformance.
-  if (witness->getFormalAccess() < accessibility) {
-    if (auto attr = witness->getAttrs().getAttribute<AccessibilityAttr>())
+  if (witness->getFormalAccess() < access) {
+    if (auto attr = witness->getAttrs().getAttribute<AccessControlAttr>())
       if (!attr->isImplicit()) return false;
   }
 
@@ -6004,7 +6003,7 @@ static void diagnosePotentialWitness(TypeChecker &tc,
                                      NormalProtocolConformance *conformance,
                                      ValueDecl *req,
                                      ValueDecl *witness,
-                                     Accessibility accessibility) {
+                                     AccessLevel access) {
   auto proto = cast<ProtocolDecl>(req->getDeclContext());
 
   // Primary warning.
@@ -6039,11 +6038,10 @@ static void diagnosePotentialWitness(TypeChecker &tc,
   }
 
   // If adding 'private', 'fileprivate', or 'internal' can help, suggest that.
-  if (accessibility > Accessibility::FilePrivate &&
-      !witness->getAttrs().hasAttribute<AccessibilityAttr>()) {
-    tc.diagnose(witness, diag::optional_req_near_match_accessibility,
-                witness->getFullName(),
-                accessibility)
+  if (access > AccessLevel::FilePrivate &&
+      !witness->getAttrs().hasAttribute<AccessControlAttr>()) {
+    tc.diagnose(witness, diag::optional_req_near_match_access,
+                witness->getFullName(), access)
       .fixItInsert(witness->getAttributeInsertionLoc(true), "private ");
   }
 
@@ -6113,9 +6111,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
     return;
 
-  // Determine the accessibility of this conformance.
+  // Determine the access level of this conformance.
   Decl *currentDecl = nullptr;
-  Accessibility defaultAccessibility;
+  AccessLevel defaultAccess;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     Type extendedTy = ext->getExtendedType();
     if (!extendedTy)
@@ -6123,10 +6121,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     const NominalTypeDecl *nominal = extendedTy->getAnyNominal();
     if (!nominal)
       return;
-    defaultAccessibility = nominal->getFormalAccess();
+    defaultAccess = nominal->getFormalAccess();
     currentDecl = ext;
   } else {
-    defaultAccessibility = cast<NominalTypeDecl>(dc)->getFormalAccess();
+    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
     currentDecl = cast<NominalTypeDecl>(dc);
   }
 
@@ -6152,7 +6150,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     if (tracker)
       tracker->addUsedMember({conformance->getProtocol(), Identifier()},
-                             defaultAccessibility > Accessibility::FilePrivate);
+                             defaultAccess > AccessLevel::FilePrivate);
 
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
     // have unstable archival names.
@@ -6176,17 +6174,17 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
             kind = UnstableNameKind::Local;
         } else {
           switch (classDecl->getFormalAccess()) {
-          case Accessibility::FilePrivate:
+          case AccessLevel::FilePrivate:
             kind = UnstableNameKind::FilePrivate;
             break;
 
-          case Accessibility::Private:
+          case AccessLevel::Private:
             kind = UnstableNameKind::Private;
             break;
 
-          case Accessibility::Internal:
-          case Accessibility::Open:
-          case Accessibility::Public:
+          case AccessLevel::Internal:
+          case AccessLevel::Open:
+          case AccessLevel::Public:
             break;
           }
         }
@@ -6368,8 +6366,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
             bestOptionalReqs.begin(),
             bestOptionalReqs.end(),
             [&](ValueDecl *req) {
-              return !shouldWarnAboutPotentialWitness(req, value,
-                                                      defaultAccessibility,
+              return !shouldWarnAboutPotentialWitness(req, value, defaultAccess,
                                                       bestScore);
             }),
           bestOptionalReqs.end());
@@ -6383,7 +6380,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           if (conformance->getProtocol() == req->getDeclContext()) {
             diagnosePotentialWitness(*this,
                                      conformance->getRootNormalConformance(),
-                                     req, value, defaultAccessibility);
+                                     req, value, defaultAccess);
             diagnosed = true;
             break;
           }

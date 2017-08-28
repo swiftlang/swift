@@ -1274,8 +1274,8 @@ ERROR(attr_interpolated_string,none,
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 
-// accessibility
-ERROR(attr_accessibility_expected_set,none,
+// Access control
+ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
 
 // availability

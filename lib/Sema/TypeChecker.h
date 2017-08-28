@@ -258,7 +258,7 @@ enum class NameLookupFlags {
   DynamicLookup = 0x08,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
-  IgnoreAccessibility = 0x10,
+  IgnoreAccessControl = 0x10,
 };
 
 /// A set of options that control name lookup.
@@ -1039,8 +1039,8 @@ public:
   /// Perform just enough validation for looking up names using the Decl.
   void validateDeclForNameLookup(ValueDecl *D);
 
-  /// Resolves the accessibility of the given declaration.
-  void validateAccessibility(ValueDecl *D);
+  /// Resolves the access control of the given declaration.
+  void validateAccessControl(ValueDecl *D);
 
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
@@ -1273,11 +1273,11 @@ public:
 
   void checkOwnershipAttr(VarDecl *D, OwnershipAttr *attr);
 
-  void computeAccessibility(ValueDecl *D);
-  void computeDefaultAccessibility(ExtensionDecl *D);
+  void computeAccessLevel(ValueDecl *D);
+  void computeDefaultAccessLevel(ExtensionDecl *D);
 
-  virtual void resolveAccessibility(ValueDecl *VD) override {
-    validateAccessibility(VD);
+  virtual void resolveAccessControl(ValueDecl *VD) override {
+    validateAccessControl(VD);
   }
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {

@@ -192,17 +192,17 @@ SIMPLE_DECL_ATTR(override, Override,
 SIMPLE_DECL_ATTR(sil_stored, SILStored, OnVar | NotSerialized | SILOnly,
                  /* Not serialized */45)
 
-DECL_ATTR(private, Accessibility,
+DECL_ATTR(private, AccessControl,
           OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
           OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
           DeclModifier | NotSerialized,
           /* Not serialized */ 46)
-DECL_ATTR_ALIAS(fileprivate, Accessibility)
-DECL_ATTR_ALIAS(internal, Accessibility)
-DECL_ATTR_ALIAS(public, Accessibility)
+DECL_ATTR_ALIAS(fileprivate, AccessControl)
+DECL_ATTR_ALIAS(internal, AccessControl)
+DECL_ATTR_ALIAS(public, AccessControl)
 
 
-DECL_ATTR(__accessibility, SetterAccessibility,
+DECL_ATTR(__setter_access, SetterAccess,
           OnVar | OnSubscript | DeclModifier | NotSerialized | RejectByParser,
           /* Not serialized */ 47)
 

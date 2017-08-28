@@ -111,7 +111,7 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
 
   diagnose(loc, diag::resilience_decl_unavailable,
            D->getDescriptiveKind(), D->getFullName(),
-           D->getFormalAccessScope().accessibilityForDiagnostics(),
+           D->getFormalAccessScope().accessLevelForDiagnostics(),
            getFragileFunctionKind(DC));
 
   bool isDefaultArgument = false;

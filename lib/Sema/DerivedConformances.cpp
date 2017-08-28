@@ -171,8 +171,8 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     interfaceType = FunctionType::get({selfParam}, interfaceType,
                                       FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccessibility(std::max(typeDecl->getFormalAccess(),
-                                        Accessibility::Internal));
+  getterDecl->setAccess(std::max(typeDecl->getFormalAccess(),
+                                 AccessLevel::Internal));
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -202,7 +202,7 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                          SourceLoc());
-  propDecl->setAccessibility(getterDecl->getFormalAccess());
+  propDecl->setAccess(getterDecl->getFormalAccess());
   propDecl->setInterfaceType(propertyInterfaceType);
 
   // If this is supposed to be a final property, mark it as such.

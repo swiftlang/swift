@@ -828,15 +828,15 @@ public:
       if (D->hasInterfaceType())
         verifyChecked(D->getInterfaceType());
 
-      if (D->hasAccessibility()) {
+      if (D->hasAccess()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
         if (D->getFormalAccessScope().isPublic() &&
-            D->getFormalAccess() < Accessibility::Public) {
+            D->getFormalAccess() < AccessLevel::Public) {
           Out << "non-public decl has no formal access scope\n";
           D->dump(Out);
           abort();
         }
-        if (D->getEffectiveAccess() == Accessibility::Private) {
+        if (D->getEffectiveAccess() == AccessLevel::Private) {
           Out << "effective access should use 'fileprivate' for 'private'\n";
           D->dump(Out);
           abort();
@@ -2002,10 +2002,10 @@ public:
     }
 
     void verifyChecked(ValueDecl *VD) {
-      if (!VD->hasAccessibility() && !VD->getDeclContext()->isLocalContext() &&
+      if (!VD->hasAccess() && !VD->getDeclContext()->isLocalContext() &&
           !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
         dumpRef(VD);
-        Out << " does not have accessibility";
+        Out << " does not have access";
         abort();
       }
 
@@ -2034,12 +2034,12 @@ public:
     }
 
     void verifyChecked(AbstractStorageDecl *ASD) {
-      if (ASD->hasAccessibility() && ASD->isSettable(nullptr)) {
-        auto setterAccess = ASD->getSetterAccessibility();
+      if (ASD->hasAccess() && ASD->isSettable(nullptr)) {
+        auto setterAccess = ASD->getSetterFormalAccess();
         if (ASD->getSetter() &&
             ASD->getSetter()->getFormalAccess() != setterAccess) {
-          Out << "AbstractStorageDecl's setter accessibility is out of sync"
-                 " with the accessibility actually on the setter";
+          Out << "AbstractStorageDecl's setter access is out of sync"
+                 " with the access actually on the setter";
           abort();
         }
       }
