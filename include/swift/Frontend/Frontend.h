@@ -458,6 +458,13 @@ private:
                          PersistentParserState &PersistentState,
                          DelayedParsingCallbacks *DelayedParseCB);
   
+  bool parsePartialModulesAndLibraryFiles(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
+                                          ModuleDecl *objCModuleUnderlyingMixedFramework,
+                                          ModuleDecl *importedHeaderModule,
+                                          SmallVectorImpl<ModuleDecl *> &importModules,
+                                          PersistentParserState &PersistentState,
+                                          DelayedParsingCallbacks *DelayedParseCB);
+  
   void parseMainAndTypeCheckTopLevelFiles(PersistentParserState &PersistentState,
                                           DelayedParsingCallbacks *DelayedParseCB);
   
