@@ -436,6 +436,10 @@ public:
   void freeContextAndSIL();
   
 private:
+  void parseTheMainFile(PersistentParserState &PersistentState,
+                        DelayedParsingCallbacks *DelayedParseCB,
+                        const OptionSet<TypeCheckingFlags> TypeCheckOptions,
+                        const FrontendOptions &options);
   void typeCheckTopLevelInputsExcludingMain(PersistentParserState &PersistentState,
                                             const OptionSet<TypeCheckingFlags> TypeCheckOptions,
                                             const FrontendOptions &options);
