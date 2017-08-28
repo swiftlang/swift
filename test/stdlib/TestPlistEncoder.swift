@@ -148,6 +148,28 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     }
   }
 
+  func testEncodingTopLevelData() {
+    let data = try! JSONSerialization.data(withJSONObject: [], options: [])
+    _testRoundTrip(of: data, in: .binary, expectedPlist: try! PropertyListSerialization.data(fromPropertyList: data, format: .binary, options: 0))
+    _testRoundTrip(of: data, in: .xml, expectedPlist: try! PropertyListSerialization.data(fromPropertyList: data, format: .xml, options: 0))
+  }
+
+  func testInterceptData() {
+    let data = try! JSONSerialization.data(withJSONObject: [], options: [])
+    let topLevel = TopLevelWrapper(data)
+    let plist = ["value": data]
+    _testRoundTrip(of: topLevel, in: .binary, expectedPlist: try! PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0))
+    _testRoundTrip(of: topLevel, in: .xml, expectedPlist: try! PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0))
+  }
+
+  func testInterceptDate() {
+    let date = Date(timeIntervalSinceReferenceDate: 0)
+    let topLevel = TopLevelWrapper(date)
+    let plist = ["value": date]
+    _testRoundTrip(of: topLevel, in: .binary, expectedPlist: try! PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0))
+    _testRoundTrip(of: topLevel, in: .xml, expectedPlist: try! PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0))
+  }
+
   // MARK: - Helper Functions
   private var _plistEmptyDictionaryBinary: Data {
     return Data(base64Encoded: "YnBsaXN0MDDQCAAAAAAAAAEBAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAJ")!
@@ -669,5 +691,8 @@ PropertyListEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { 
 PropertyListEncoderTests.test("testEncodingTopLevelNullableType") { TestPropertyListEncoder().testEncodingTopLevelNullableType() }
 PropertyListEncoderTests.test("testNestedContainerCodingPaths") { TestPropertyListEncoder().testNestedContainerCodingPaths() }
 PropertyListEncoderTests.test("testSuperEncoderCodingPaths") { TestPropertyListEncoder().testSuperEncoderCodingPaths() }
+PropertyListEncoderTests.test("testEncodingTopLevelData") { TestPropertyListEncoder().testEncodingTopLevelData() }
+PropertyListEncoderTests.test("testInterceptData") { TestPropertyListEncoder().testInterceptData() }
+PropertyListEncoderTests.test("testInterceptDate") { TestPropertyListEncoder().testInterceptDate() }
 runAllTests()
 #endif
