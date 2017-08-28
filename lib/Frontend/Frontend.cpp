@@ -576,6 +576,10 @@ void CompilerInstance::performSema() {
         performWholeModuleTypeChecking(*SF);
   }
 
+  finishTypeCheckingMainModule();
+}
+
+void CompilerInstance::finishTypeCheckingMainModule() {
   for (auto File : MainModule->getFiles())
     if (auto SF = dyn_cast<SourceFile>(File))
       if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
