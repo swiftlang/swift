@@ -261,6 +261,32 @@ ModuleDecl *CompilerInstance::getMainModule() {
   return MainModule;
 }
 
+static void addAdditionalInitialImportsTo(SourceFile *SF,
+                                          ModuleDecl *underlying,
+                                          ModuleDecl *importedHeaderModule,
+                                          SmallVectorImpl<ModuleDecl *> &importModules) {
+  if (!underlying && !importedHeaderModule && importModules.empty())
+    return;
+  
+  using ImportPair =
+  std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
+  SmallVector<ImportPair, 4> additionalImports;
+  
+  if (underlying)
+    additionalImports.push_back({ { /*accessPath=*/{}, underlying },
+      SourceFile::ImportFlags::Exported });
+  if (importedHeaderModule)
+    additionalImports.push_back({ { /*accessPath=*/{}, importedHeaderModule },
+      SourceFile::ImportFlags::Exported });
+  if (!importModules.empty()) {
+    for (auto &importModule : importModules) {
+      additionalImports.push_back({ { /*accessPath=*/{}, importModule }, {} });
+    }
+  }
+  
+  SF->addImports(additionalImports);
+}
+
 void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
   const InputFileKind Kind = Invocation.getInputKind();
@@ -365,35 +391,12 @@ void CompilerInstance::performSema() {
     }
   }
 
-  auto addAdditionalInitialImports = [&](SourceFile *SF) {
-    if (!underlying && !importedHeaderModule && importModules.empty())
-      return;
-
-    using ImportPair =
-        std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
-    SmallVector<ImportPair, 4> additionalImports;
-
-    if (underlying)
-      additionalImports.push_back({ { /*accessPath=*/{}, underlying },
-                                    SourceFile::ImportFlags::Exported });
-    if (importedHeaderModule)
-      additionalImports.push_back({ { /*accessPath=*/{}, importedHeaderModule },
-                                    SourceFile::ImportFlags::Exported });
-    if (!importModules.empty()) {
-      for (auto &importModule : importModules) {
-        additionalImports.push_back({ { /*accessPath=*/{}, importModule }, {} });
-      }
-    }
-
-    SF->addImports(additionalImports);
-  };
-
   if (Kind == InputFileKind::IFK_Swift_REPL) {
     auto *SingleInputFile =
       new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
                                 None, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
     MainModule->addFile(*SingleInputFile);
-    addAdditionalInitialImports(SingleInputFile);
+    addAdditionalInitialImportsTo(SingleInputFile, underlying, importedHeaderModule, importModules);
     return;
   }
 
@@ -422,7 +425,7 @@ void CompilerInstance::performSema() {
                                                MainBufferID, modImpKind,
                                                Invocation.getLangOptions().KeepTokensInSourceFile);
     MainModule->addFile(*MainFile);
-    addAdditionalInitialImports(MainFile);
+    addAdditionalInitialImportsTo(MainFile, underlying, importedHeaderModule, importModules);
 
     if (MainBufferID == PrimaryBufferID)
       setPrimarySourceFile(MainFile);
@@ -449,7 +452,7 @@ void CompilerInstance::performSema() {
                                                 modImpKind,
                                                 Invocation.getLangOptions().KeepTokensInSourceFile);
     MainModule->addFile(*NextInput);
-    addAdditionalInitialImports(NextInput);
+    addAdditionalInitialImportsTo(NextInput, underlying, importedHeaderModule, importModules);
 
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);
