@@ -1541,9 +1541,11 @@ public:
   }
   
   TypeBase* getFavoredType(Expr *E) {
+    assert(E != nullptr);
     return this->FavoredTypes[E];
   }
   void setFavoredType(Expr *E, TypeBase *T) {
+    assert(E != nullptr);
     this->FavoredTypes[E] = T;
   }
 
@@ -1552,6 +1554,7 @@ public:
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
   void setType(Expr *E, Type T) {
+    assert(E != nullptr && "Expected non-null expression!");
     assert(T && "Expected non-null type!");
 
     // FIXME: We sometimes set the type and then later set it to a
@@ -1570,6 +1573,7 @@ public:
 
   /// Check to see if we have a type for an expression.
   bool hasType(const Expr *E) const {
+    assert(E != nullptr && "Expected non-null expression!");
     return ExprTypes.find(E) != ExprTypes.end();
   }
 
@@ -1593,12 +1597,14 @@ public:
   }
 
   void setContextualType(Expr *E, TypeLoc T, ContextualTypePurpose purpose) {
+    assert(E != nullptr && "Expected non-null expression!");
     contextualTypeNode = E;
     contextualType = T;
     contextualTypePurpose = purpose;
   }
 
   Type getContextualType(Expr *E) const {
+    assert(E != nullptr && "Expected non-null expression!");
     return E == contextualTypeNode ? contextualType.getType() : Type();
   }
   Type getContextualType() const {
