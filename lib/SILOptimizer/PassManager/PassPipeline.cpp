@@ -405,7 +405,6 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LateLoopOpt");
 
   // Delete dead code and drop the bodies of shared functions.
-  P.addExternalFunctionDefinitionsElimination();
   P.addDeadFunctionElimination();
 
   // Perform the final lowering transformations.
@@ -528,12 +527,6 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
   P.addUsePrespecialized();
 
   P.startPipeline("Rest of Onone");
-  // Don't keep external functions from stdlib and other modules.
-  // We don't want that our unoptimized version will be linked instead
-  // of the optimized version from the stdlib.
-  // Here we just convert external definitions to declarations. LLVM will
-  // eventually remove unused declarations.
-  P.addExternalDefsToDecls();
 
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
