@@ -292,17 +292,7 @@ void CompilerInstance::performSema() {
   const InputFileKind Kind = Invocation.getInputKind();
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
-  auto modImpKind = SourceFile::ImplicitModuleImportKind::Stdlib;
-
-  if (Kind == InputFileKind::IFK_SIL) {
-    assert(BufferIDs.size() == 1);
-    assert(MainBufferID != NO_SUCH_BUFFER);
-    // Assume WMO, if a -primary-file option was not provided.
-    createSILModule(!options.PrimaryInput.hasValue());
-    modImpKind = SourceFile::ImplicitModuleImportKind::None;
-  } else if (Invocation.getParseStdlib()) {
-    modImpKind = SourceFile::ImplicitModuleImportKind::Builtin;
-  }
+  const auto modImpKind = createSILModuleIfNecessary(options, BufferIDs, MainBufferID, Kind);
 
   switch (modImpKind) {
   case SourceFile::ImplicitModuleImportKind::None:
@@ -487,6 +477,22 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+SourceFile::ImplicitModuleImportKind CompilerInstance::createSILModuleIfNecessary(const FrontendOptions &options,
+                                                                                  const std::vector<unsigned> &BufferIDs,
+                                                                                  unsigned MainBufferID,
+                                                                                  const InputFileKind Kind) {
+  if (Kind == InputFileKind::IFK_SIL) {
+    assert(BufferIDs.size() == 1);
+    assert(MainBufferID != NO_SUCH_BUFFER);
+    // Assume WMO, if a -primary-file option was not provided.
+    createSILModule(!options.PrimaryInput.hasValue());
+    return SourceFile::ImplicitModuleImportKind::None;
+  } else if (Invocation.getParseStdlib()) {
+    return SourceFile::ImplicitModuleImportKind::Builtin;
+  }
+  return SourceFile::ImplicitModuleImportKind::Stdlib;
 }
 
 void CompilerInstance::parseALibraryFile(unsigned BufferID,

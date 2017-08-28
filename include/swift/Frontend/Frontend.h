@@ -436,6 +436,11 @@ public:
   void freeContextAndSIL();
   
 private:
+  SourceFile::ImplicitModuleImportKind createSILModuleIfNecessary(const FrontendOptions &options,
+                                                                  const std::vector<unsigned> &BufferIDs,
+                                                                  unsigned MainBufferID,
+                                                                  const InputFileKind Kind);
+
   void parseALibraryFile(unsigned BufferID,
                          SourceFile::ImplicitModuleImportKind modImpKind,
                          ModuleDecl *underlying,
