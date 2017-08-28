@@ -264,9 +264,7 @@ ModuleDecl *CompilerInstance::getMainModule() {
 void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
   const InputFileKind Kind = Invocation.getInputKind();
-  bool KeepTokens = Invocation.getLangOptions().KeepTokensInSourceFile;
-  ModuleDecl *MainModule = getMainModule();
-  Context->LoadedModules[MainModule->getName()] = MainModule;
+  Context->LoadedModules[MainModule->getName()] = getMainModule();
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::Stdlib;
 
@@ -393,7 +391,7 @@ void CompilerInstance::performSema() {
   if (Kind == InputFileKind::IFK_Swift_REPL) {
     auto *SingleInputFile =
       new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
-                                None, modImpKind, KeepTokens);
+                                None, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
     MainModule->addFile(*SingleInputFile);
     addAdditionalInitialImports(SingleInputFile);
     return;
@@ -422,7 +420,7 @@ void CompilerInstance::performSema() {
     auto *MainFile = new (*Context) SourceFile(*MainModule,
                                                Invocation.getSourceFileKind(),
                                                MainBufferID, modImpKind,
-                                               KeepTokens);
+                                               Invocation.getLangOptions().KeepTokensInSourceFile);
     MainModule->addFile(*MainFile);
     addAdditionalInitialImports(MainFile);
 
@@ -449,7 +447,7 @@ void CompilerInstance::performSema() {
                                                 SourceFileKind::Library,
                                                 BufferID,
                                                 modImpKind,
-                                                KeepTokens);
+                                                Invocation.getLangOptions().KeepTokensInSourceFile);
     MainModule->addFile(*NextInput);
     addAdditionalInitialImports(NextInput);
 
