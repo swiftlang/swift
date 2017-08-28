@@ -501,52 +501,7 @@ void CompilerInstance::performSema() {
 
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    bool mainIsPrimary =
-      (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID);
-
-    SourceFile &MainFile =
-      MainModule->getMainSourceFile(Invocation.getSourceFileKind());
-
-    auto &Diags = MainFile.getASTContext().Diags;
-    auto DidSuppressWarnings = Diags.getSuppressWarnings();
-    Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
-
-    SILParserState SILContext(TheSILModule.get());
-    unsigned CurTUElem = 0;
-    bool Done;
-    do {
-      // Pump the parser multiple times if necessary.  It will return early
-      // after parsing any top level code in a main module, or in SIL mode when
-      // there are chunks of swift decls (e.g. imports and types) interspersed
-      // with 'sil' definitions.
-      parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
-                          TheSILModule ? &SILContext : nullptr,
-                          &PersistentState, DelayedCB.get());
-      if (mainIsPrimary) {
-        performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
-                            TypeCheckOptions, CurTUElem,
-                            options.WarnLongFunctionBodies,
-                            options.WarnLongExpressionTypeChecking,
-                            options.SolverExpressionTimeThreshold);
-      }
-      CurTUElem = MainFile.Decls.size();
-    } while (!Done);
-
-    Diags.setSuppressWarnings(DidSuppressWarnings);
-    
-    if (mainIsPrimary && !Context->hadError() &&
-        Invocation.getFrontendOptions().PCMacro) {
-      performPCMacro(MainFile, PersistentState.getTopLevelContext());
-    }
-    
-    // Playground transform knows to look out for PCMacro's changes and not
-    // to playground log them.
-    if (mainIsPrimary && !Context->hadError() &&
-        Invocation.getFrontendOptions().PlaygroundTransform)
-      performPlaygroundTransform(MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
-    if (!mainIsPrimary) {
-      performNameBinding(MainFile);
-    }
+    parseTheMainFile(PersistentState, DelayedCB.get(), TypeCheckOptions, options);
   }
 
   typeCheckTopLevelInputsExcludingMain(PersistentState, TypeCheckOptions, options);
@@ -565,6 +520,58 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+void CompilerInstance::parseTheMainFile(PersistentParserState &PersistentState,
+                                        DelayedParsingCallbacks *DelayedParseCB,
+                                        const OptionSet<TypeCheckingFlags> TypeCheckOptions,
+                                        const FrontendOptions &options) {
+  bool mainIsPrimary =
+  (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID);
+  
+  SourceFile &MainFile =
+  MainModule->getMainSourceFile(Invocation.getSourceFileKind());
+  
+  auto &Diags = MainFile.getASTContext().Diags;
+  auto DidSuppressWarnings = Diags.getSuppressWarnings();
+  Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
+  
+  SILParserState SILContext(TheSILModule.get());
+  unsigned CurTUElem = 0;
+  bool Done;
+  do {
+    // Pump the parser multiple times if necessary.  It will return early
+    // after parsing any top level code in a main module, or in SIL mode when
+    // there are chunks of swift decls (e.g. imports and types) interspersed
+    // with 'sil' definitions.
+    parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
+                        TheSILModule ? &SILContext : nullptr,
+                        &PersistentState, DelayedParseCB);
+    if (mainIsPrimary) {
+      performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
+                          TypeCheckOptions, CurTUElem,
+                          options.WarnLongFunctionBodies,
+                          options.WarnLongExpressionTypeChecking,
+                          options.SolverExpressionTimeThreshold);
+    }
+    CurTUElem = MainFile.Decls.size();
+  } while (!Done);
+  
+  Diags.setSuppressWarnings(DidSuppressWarnings);
+  
+  if (mainIsPrimary && !Context->hadError() &&
+      Invocation.getFrontendOptions().PCMacro) {
+    performPCMacro(MainFile, PersistentState.getTopLevelContext());
+  }
+  
+  // Playground transform knows to look out for PCMacro's changes and not
+  // to playground log them.
+  if (mainIsPrimary && !Context->hadError() &&
+      Invocation.getFrontendOptions().PlaygroundTransform)
+    performPlaygroundTransform(MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
+  if (!mainIsPrimary) {
+    performNameBinding(MainFile);
+  }
 }
 
 void CompilerInstance::typeCheckTopLevelInputsExcludingMain(PersistentParserState &PersistentState,
