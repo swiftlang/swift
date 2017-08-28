@@ -436,6 +436,8 @@ public:
   void freeContextAndSIL();
   
 private:
+  void fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules,
+                                                                            const FrontendOptions &options);
   std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();
 
   void ensureMainFileComesFirst(const InputFileKind Kind,
