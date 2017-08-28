@@ -436,6 +436,11 @@ public:
   void freeContextAndSIL();
   
 private:
+  void ensureMainFileComesFirst(const InputFileKind Kind,
+                                SourceFile::ImplicitModuleImportKind modImpKind,
+                                ModuleDecl *underlying,
+                                ModuleDecl *importedHeaderModule,
+                                SmallVectorImpl<ModuleDecl *> &importModules);
   SourceFile::ImplicitModuleImportKind createSILModuleIfNecessary(const FrontendOptions &options,
                                                                   const std::vector<unsigned> &BufferIDs,
                                                                   unsigned MainBufferID,
