@@ -436,6 +436,8 @@ public:
   void freeContextAndSIL();
   
 private:
+  std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();
+
   void ensureMainFileComesFirst(const InputFileKind Kind,
                                 SourceFile::ImplicitModuleImportKind modImpKind,
                                 ModuleDecl *underlying,

@@ -390,7 +390,8 @@ void CompilerInstance::performSema() {
     return;
   }
 
-  std::unique_ptr<DelayedParsingCallbacks> DelayedCB;
+  std::unique_ptr<DelayedParsingCallbacks> DelayedCB(computeDelayedParsingCallback());
+  
   if (Invocation.isCodeCompletion()) {
     DelayedCB.reset(
         new CodeCompleteDelayedCallbacks(SourceMgr.getCodeCompletionLoc()));
@@ -458,6 +459,17 @@ void CompilerInstance::performSema() {
     performWholeModuleTypeCheckingOnMainModule();
   }
   finishTypeCheckingMainModule();
+}
+
+std::unique_ptr<DelayedParsingCallbacks> &&CompilerInstance::computeDelayedParsingCallback() {
+  std::unique_ptr<DelayedParsingCallbacks> DelayedCB;
+  if (Invocation.isCodeCompletion()) {
+    DelayedCB.reset(
+                    new CodeCompleteDelayedCallbacks(SourceMgr.getCodeCompletionLoc()));
+  } else if (Invocation.isDelayedFunctionBodyParsing()) {
+    DelayedCB.reset(new AlwaysDelayedCallbacks);
+  }
+  return std::move(DelayedCB);
 }
 
 // Make sure the main file is the first file in the module. This may only be
