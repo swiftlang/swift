@@ -433,6 +433,9 @@ public:
   /// Frees up the ASTContext and SILModule objects that this instance is
   /// holding on.
   void freeContextAndSIL();
+  
+private:
+  void finishTypeCheckingMainModule();
 };
 
 } // namespace swift
