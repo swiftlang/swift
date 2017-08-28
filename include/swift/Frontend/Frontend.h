@@ -18,25 +18,25 @@
 #ifndef SWIFT_FRONTEND_H
 #define SWIFT_FRONTEND_H
 
-#include "swift/Basic/DiagnosticOptions.h"
-#include "swift/Basic/LangOptions.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SILOptions.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/Parser.h"
+#include "swift/AST/SearchPathOptions.h"
+#include "swift/Basic/DiagnosticOptions.h"
+#include "swift/Basic/LangOptions.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Migrator/MigratorOptions.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/Parser.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Option/ArgList.h"
@@ -434,52 +434,61 @@ public:
   /// Frees up the ASTContext and SILModule objects that this instance is
   /// holding on.
   void freeContextAndSIL();
-  
+
 private:
   void loadStdlibAndMaybeSwiftOnoneSupport();
   ModuleDecl *importUnderlyingModule(ClangImporter *clangImporter);
   ModuleDecl *importBridgingHeader(ClangImporter *clangImporter);
-  
-  void fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules);
-  void supplyREPLFileWithImports(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-                                 ModuleDecl *objCModuleUnderlyingMixedFramework,
-                                 ModuleDecl *importedHeaderModule,
-                                 SmallVectorImpl<ModuleDecl *> &importModules);
+
+  void fillInModulesToImportFromImplicitImportModuleNames(
+      SmallVectorImpl<ModuleDecl *> &importModules);
+  void supplyREPLFileWithImports(
+      SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
+      ModuleDecl *objCModuleUnderlyingMixedFramework,
+      ModuleDecl *importedHeaderModule,
+      SmallVectorImpl<ModuleDecl *> &importModules);
   std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();
 
-  void ensureMainFileComesFirst(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-                                ModuleDecl *objCModuleUnderlyingMixedFramework,
-                                ModuleDecl *importedHeaderModule,
-                                SmallVectorImpl<ModuleDecl *> &importModules);
-  SourceFile::ImplicitModuleImportKind createSILModuleIfNecessary(const std::vector<unsigned> &BufferIDs,
-                                                                  unsigned MainBufferID);
+  void ensureMainFileComesFirst(
+      SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
+      ModuleDecl *objCModuleUnderlyingMixedFramework,
+      ModuleDecl *importedHeaderModule,
+      SmallVectorImpl<ModuleDecl *> &importModules);
+  SourceFile::ImplicitModuleImportKind
+  createSILModuleIfNecessary(const std::vector<unsigned> &BufferIDs,
+                             unsigned MainBufferID);
 
-  void parseALibraryFile(unsigned BufferID,
-                         SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-                         ModuleDecl *objCModuleUnderlyingMixedFramework,
-                         ModuleDecl *importedHeaderModule,
-                         SmallVectorImpl<ModuleDecl *> &importModules,
-                         PersistentParserState &PersistentState,
-                         DelayedParsingCallbacks *DelayedParseCB);
-  
-  bool parsePartialModulesAndLibraryFiles(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-                                          ModuleDecl *objCModuleUnderlyingMixedFramework,
-                                          ModuleDecl *importedHeaderModule,
-                                          SmallVectorImpl<ModuleDecl *> &importModules,
-                                          PersistentParserState &PersistentState,
-                                          DelayedParsingCallbacks *DelayedParseCB);
-  
-  void parseMainAndTypeCheckTopLevelFiles(PersistentParserState &PersistentState,
-                                          DelayedParsingCallbacks *DelayedParseCB);
-  
+  void parseALibraryFile(
+      unsigned BufferID,
+      SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
+      ModuleDecl *objCModuleUnderlyingMixedFramework,
+      ModuleDecl *importedHeaderModule,
+      SmallVectorImpl<ModuleDecl *> &importModules,
+      PersistentParserState &PersistentState,
+      DelayedParsingCallbacks *DelayedParseCB);
+
+  bool parsePartialModulesAndLibraryFiles(
+      SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
+      ModuleDecl *objCModuleUnderlyingMixedFramework,
+      ModuleDecl *importedHeaderModule,
+      SmallVectorImpl<ModuleDecl *> &importModules,
+      PersistentParserState &PersistentState,
+      DelayedParsingCallbacks *DelayedParseCB);
+
+  void
+  parseMainAndTypeCheckTopLevelFiles(PersistentParserState &PersistentState,
+                                     DelayedParsingCallbacks *DelayedParseCB);
+
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
-  
-  void parseAndTypeCheckTheMainFile(PersistentParserState &PersistentState,
-                        DelayedParsingCallbacks *DelayedParseCB,
-                        const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+
+  void parseAndTypeCheckTheMainFile(
+      PersistentParserState &PersistentState,
+      DelayedParsingCallbacks *DelayedParseCB,
+      const OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performTypeCheckingAndDelayedParsing();
-  void typeCheckTopLevelInputsExcludingMain(PersistentParserState &PersistentState,
-                                            const OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void typeCheckTopLevelInputsExcludingMain(
+      PersistentParserState &PersistentState,
+      const OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void typeCheckMainModule(OptionSet<TypeCheckingFlags> TypeCheckOptions);
   void performWholeModuleTypeCheckingOnMainModule();
   void finishTypeCheckingMainModule();

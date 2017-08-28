@@ -1291,10 +1291,12 @@ SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
 }
 
-static void performAutoImport(SourceFile &SF,
-                              SourceFile::ImplicitModuleImportKind implicitModuleImportKind) {
+static void performAutoImport(
+    SourceFile &SF,
+    SourceFile::ImplicitModuleImportKind implicitModuleImportKind) {
   if (SF.Kind == SourceFileKind::SIL)
-    assert(implicitModuleImportKind == SourceFile::ImplicitModuleImportKind::None);
+    assert(implicitModuleImportKind ==
+           SourceFile::ImplicitModuleImportKind::None);
 
   ASTContext &Ctx = SF.getASTContext();
   ModuleDecl *M = nullptr;
