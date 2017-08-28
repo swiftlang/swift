@@ -262,18 +262,18 @@ ModuleDecl *CompilerInstance::getMainModule() {
 }
 
 static void addAdditionalInitialImportsTo(SourceFile *SF,
-                                          ModuleDecl *underlying,
+                                          ModuleDecl *objCModuleUnderlyingMixedFramework,
                                           ModuleDecl *importedHeaderModule,
                                           SmallVectorImpl<ModuleDecl *> &importModules) {
-  if (!underlying && !importedHeaderModule && importModules.empty())
+  if (!objCModuleUnderlyingMixedFramework && !importedHeaderModule && importModules.empty())
     return;
   
   using ImportPair =
   std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
   SmallVector<ImportPair, 4> additionalImports;
   
-  if (underlying)
-    additionalImports.push_back({ { /*accessPath=*/{}, underlying },
+  if (objCModuleUnderlyingMixedFramework)
+    additionalImports.push_back({ { /*accessPath=*/{}, objCModuleUnderlyingMixedFramework },
       SourceFile::ImportFlags::Exported });
   if (importedHeaderModule)
     additionalImports.push_back({ { /*accessPath=*/{}, importedHeaderModule },
@@ -320,7 +320,7 @@ void CompilerInstance::performSema() {
   auto clangImporter =
     static_cast<ClangImporter *>(Context->getClangModuleLoader());
 
-  ModuleDecl *underlying = options.ImportUnderlyingModule ? importUnderlyingModule(clangImporter) : nullptr;
+  ModuleDecl *objCModuleUnderlyingMixedFramework = options.ImportUnderlyingModule ? importUnderlyingModule(clangImporter) : nullptr;
 
   ModuleDecl *importedHeaderModule = importBridgingHeader(options.ImplicitObjCHeaderPath, clangImporter);
 
@@ -332,7 +332,7 @@ void CompilerInstance::performSema() {
       new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
                                 None, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
     MainModule->addFile(*SingleInputFile);
-    addAdditionalInitialImportsTo(SingleInputFile, underlying, importedHeaderModule, importModules);
+    addAdditionalInitialImportsTo(SingleInputFile, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
     return;
   }
 
@@ -347,7 +347,7 @@ void CompilerInstance::performSema() {
 
   PersistentParserState PersistentState;
 
-  ensureMainFileComesFirst(Kind, modImpKind, underlying, importedHeaderModule, importModules);
+  ensureMainFileComesFirst(Kind, modImpKind, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
 
   bool hadLoadError = false;
 
@@ -364,7 +364,7 @@ void CompilerInstance::performSema() {
     if (BufferID != MainBufferID)
       parseALibraryFile(BufferID,
                         modImpKind,
-                        underlying,
+                        objCModuleUnderlyingMixedFramework,
                         importedHeaderModule,
                         importModules,
                         PersistentState,
@@ -429,11 +429,11 @@ void CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport(FrontendOptions::Acti
 }
 
 ModuleDecl *CompilerInstance::importUnderlyingModule(ClangImporter *clangImporter) {
-  ModuleDecl *underlying = clangImporter->loadModule(SourceLoc(),
+  ModuleDecl *objCModuleUnderlyingMixedFramework = clangImporter->loadModule(SourceLoc(),
                                                      std::make_pair(MainModule->getName(),
                                                                     SourceLoc()));
-  if (underlying)
-    return underlying;
+  if (objCModuleUnderlyingMixedFramework)
+    return objCModuleUnderlyingMixedFramework;
   Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
                        MainModule->getName());
   return nullptr;
@@ -492,7 +492,7 @@ std::unique_ptr<DelayedParsingCallbacks> &&CompilerInstance::computeDelayedParsi
 // files in the module.
 void CompilerInstance::ensureMainFileComesFirst(const InputFileKind Kind,
                                                 SourceFile::ImplicitModuleImportKind modImpKind,
-                                                ModuleDecl *underlying,
+                                                ModuleDecl *objCModuleUnderlyingMixedFramework,
                                                 ModuleDecl *importedHeaderModule,
                                                 SmallVectorImpl<ModuleDecl *> &importModules) {
   if (MainBufferID != NO_SUCH_BUFFER) {
@@ -505,7 +505,7 @@ void CompilerInstance::ensureMainFileComesFirst(const InputFileKind Kind,
                                                Invocation.getSourceFileKind(),
                                                MainBufferID, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
     MainModule->addFile(*MainFile);
-    addAdditionalInitialImportsTo(MainFile, underlying, importedHeaderModule, importModules);
+    addAdditionalInitialImportsTo(MainFile, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
     
     if (MainBufferID == PrimaryBufferID)
       setPrimarySourceFile(MainFile);
@@ -532,7 +532,7 @@ SourceFile::ImplicitModuleImportKind CompilerInstance::createSILModuleIfNecessar
 
 void CompilerInstance::parseALibraryFile(unsigned BufferID,
                                          SourceFile::ImplicitModuleImportKind modImpKind,
-                                         ModuleDecl *underlying,
+                                         ModuleDecl *objCModuleUnderlyingMixedFramework,
                                          ModuleDecl *importedHeaderModule,
                                          SmallVectorImpl<ModuleDecl *> &importModules,
                                          PersistentParserState &PersistentState,
@@ -544,7 +544,7 @@ void CompilerInstance::parseALibraryFile(unsigned BufferID,
                                               modImpKind,
                                               Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*NextInput);
-  addAdditionalInitialImportsTo(NextInput, underlying, importedHeaderModule, importModules);
+  addAdditionalInitialImportsTo(NextInput, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
   
   if (BufferID == PrimaryBufferID)
     setPrimarySourceFile(NextInput);
