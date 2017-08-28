@@ -7968,6 +7968,10 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
+  static RecursiveSharedTimer timer("ClangImporterLoadAllMembers");
+  auto guard = RecursiveSharedTimer::Guard(timer);
+  (void)guard;
+
   assert(D);
 
   // Check whether we're importing an Objective-C container of some sort.
