@@ -304,9 +304,9 @@ static bool shouldImplicityImportSwiftOnoneSupportModule(SILOptions::SILOptMode 
 void CompilerInstance::performSema() {
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
-  const SourceFile::ImplicitModuleImportKind modImpKind = createSILModuleIfNecessary(BufferIDs, MainBufferID);
+  const SourceFile::ImplicitModuleImportKind implicitModuleImportKind = createSILModuleIfNecessary(BufferIDs, MainBufferID);
 
-  switch (modImpKind) {
+  switch (implicitModuleImportKind) {
     case SourceFile::ImplicitModuleImportKind::None:
     case SourceFile::ImplicitModuleImportKind::Builtin:
       break;
@@ -321,14 +321,14 @@ void CompilerInstance::performSema() {
   ModuleDecl *objCModuleUnderlyingMixedFramework = Invocation.getFrontendOptions().ImportUnderlyingModule ? importUnderlyingModule(clangImporter) : nullptr;
 
   ModuleDecl *importedHeaderModule = importBridgingHeader(clangImporter);
-
+   
   SmallVector<ModuleDecl *, 4> importModules;
   fillInModulesToImportFromImplicitImportModuleNames(importModules);
 
   if (Invocation.getInputKind() == InputFileKind::IFK_Swift_REPL) {
     auto *SingleInputFile =
       new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
-                                None, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
+                                None, implicitModuleImportKind, Invocation.getLangOptions().KeepTokensInSourceFile);
     MainModule->addFile(*SingleInputFile);
     addAdditionalInitialImportsTo(SingleInputFile, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
     return;
@@ -345,7 +345,7 @@ void CompilerInstance::performSema() {
 
   PersistentParserState PersistentState;
 
-  ensureMainFileComesFirst(modImpKind, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
+  ensureMainFileComesFirst(implicitModuleImportKind, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules, );
 
   bool hadLoadError = false;
 
@@ -361,7 +361,7 @@ void CompilerInstance::performSema() {
   for (auto BufferID : BufferIDs) {
     if (BufferID != MainBufferID)
       parseALibraryFile(BufferID,
-                        modImpKind,
+                        implicitModuleImportKind,
                         objCModuleUnderlyingMixedFramework,
                         importedHeaderModule,
                         importModules,
@@ -488,7 +488,7 @@ std::unique_ptr<DelayedParsingCallbacks> &&CompilerInstance::computeDelayedParsi
 // a source file, or it may be a SIL file, which requires pumping the parser.
 // We parse it last, though, to make sure that it can use decls from other
 // files in the module.
-void CompilerInstance::ensureMainFileComesFirst(SourceFile::ImplicitModuleImportKind modImpKind,
+void CompilerInstance::ensureMainFileComesFirst(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
                                                 ModuleDecl *objCModuleUnderlyingMixedFramework,
                                                 ModuleDecl *importedHeaderModule,
                                                 SmallVectorImpl<ModuleDecl *> &importModules) {
@@ -503,7 +503,7 @@ void CompilerInstance::ensureMainFileComesFirst(SourceFile::ImplicitModuleImport
   
   auto *MainFile = new (*Context) SourceFile(*MainModule,
                                              Invocation.getSourceFileKind(),
-                                             MainBufferID, modImpKind, Invocation.getLangOptions().KeepTokensInSourceFile);
+                                             MainBufferID, implicitModuleImportKind, Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*MainFile);
   addAdditionalInitialImportsTo(MainFile, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
   
@@ -527,7 +527,7 @@ SourceFile::ImplicitModuleImportKind CompilerInstance::createSILModuleIfNecessar
 }
 
 void CompilerInstance::parseALibraryFile(unsigned BufferID,
-                                         SourceFile::ImplicitModuleImportKind modImpKind,
+                                         SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
                                          ModuleDecl *objCModuleUnderlyingMixedFramework,
                                          ModuleDecl *importedHeaderModule,
                                          SmallVectorImpl<ModuleDecl *> &importModules,
@@ -537,7 +537,7 @@ void CompilerInstance::parseALibraryFile(unsigned BufferID,
   auto *NextInput = new (*Context) SourceFile(*MainModule,
                                               SourceFileKind::Library,
                                               BufferID,
-                                              modImpKind,
+                                              implicitModuleImportKind,
                                               Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*NextInput);
   addAdditionalInitialImportsTo(NextInput, objCModuleUnderlyingMixedFramework, importedHeaderModule, importModules);
@@ -669,7 +669,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
          "only supports parsing .swift files");
   (void)Kind;
 
-  auto modImpKind = SourceFile::ImplicitModuleImportKind::None;
+  auto implicitModuleImportKind = SourceFile::ImplicitModuleImportKind::None;
 
   // Make sure the main file is the first file in the module but parse it last,
   // to match the parsing logic used when performing Sema.
@@ -678,8 +678,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
     SourceMgr.setHashbangBufferID(MainBufferID);
 
     auto *MainFile = new (*Context) SourceFile(
-        *MainModule, Invocation.getSourceFileKind(), MainBufferID, modImpKind,
-                                               KeepTokens);
+        *MainModule, Invocation.getSourceFileKind(), MainBufferID, implicitModuleImportKind, KeepTokens);
     MainModule->addFile(*MainFile);
 
     if (MainBufferID == PrimaryBufferID)
@@ -694,9 +693,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
       continue;
 
     auto *NextInput = new (*Context)
-        SourceFile(*MainModule, SourceFileKind::Library, BufferID, modImpKind,
-                   KeepTokens);
-
+        SourceFile(*MainModule, SourceFileKind::Library, BufferID, implicitModuleImportKind, KeepTokens);
     MainModule->addFile(*NextInput);
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);
