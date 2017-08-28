@@ -444,7 +444,7 @@ private:
   std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();
 
   void ensureMainFileComesFirst(SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-                                ModuleDecl *underlying,
+                                ModuleDecl *objCModuleUnderlyingMixedFramework,
                                 ModuleDecl *importedHeaderModule,
                                 SmallVectorImpl<ModuleDecl *> &importModules);
   SourceFile::ImplicitModuleImportKind createSILModuleIfNecessary(const std::vector<unsigned> &BufferIDs,
@@ -452,7 +452,7 @@ private:
 
   void parseALibraryFile(unsigned BufferID,
                          SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-                         ModuleDecl *underlying,
+                         ModuleDecl *objCModuleUnderlyingMixedFramework,
                          ModuleDecl *importedHeaderModule,
                          SmallVectorImpl<ModuleDecl *> &importModules,
                          PersistentParserState &PersistentState,
