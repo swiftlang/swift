@@ -435,6 +435,7 @@ public:
   void freeContextAndSIL();
   
 private:
+  void performWholeModuleTypeCheckingOnMainModule();
   void finishTypeCheckingMainModule();
 };
 

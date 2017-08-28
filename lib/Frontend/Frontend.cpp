@@ -569,14 +569,16 @@ void CompilerInstance::performSema() {
                           Invocation.getCodeCompletionFactory());
   }
 
-  // Perform whole-module type checking.
   if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
-    for (auto File : MainModule->getFiles())
-      if (auto SF = dyn_cast<SourceFile>(File))
-        performWholeModuleTypeChecking(*SF);
+    performWholeModuleTypeCheckingOnMainModule();
   }
-
   finishTypeCheckingMainModule();
+}
+
+void CompilerInstance::performWholeModuleTypeCheckingOnMainModule() {
+  for (auto File : MainModule->getFiles())
+    if (auto SF = dyn_cast<SourceFile>(File))
+      performWholeModuleTypeChecking(*SF);
 }
 
 void CompilerInstance::finishTypeCheckingMainModule() {
