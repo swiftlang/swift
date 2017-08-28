@@ -287,6 +287,7 @@ static void addAdditionalInitialImportsTo(SourceFile *SF,
   SF->addImports(additionalImports);
 }
 
+
 void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
   const InputFileKind Kind = Invocation.getInputKind();
@@ -356,30 +357,7 @@ void CompilerInstance::performSema() {
   }
 
   SmallVector<ModuleDecl *, 4> importModules;
-  if (!options.ImplicitImportModuleNames.empty()) {
-    for (auto &ImplicitImportModuleName : options.ImplicitImportModuleNames) {
-      if (Lexer::isIdentifier(ImplicitImportModuleName)) {
-        auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
-        ModuleDecl *importModule = Context->getModule(std::make_pair(moduleID,
-                                                                 SourceLoc()));
-        if (importModule) {
-          importModules.push_back(importModule);
-        } else {
-          Diagnostics.diagnose(SourceLoc(), diag::sema_no_import,
-                               ImplicitImportModuleName);
-          if (Invocation.getSearchPathOptions().SDKPath.empty() &&
-              llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
-            Diagnostics.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
-            Diagnostics.diagnose(SourceLoc(),
-                                 diag::sema_no_import_no_sdk_xcrun);
-          }
-        }
-      } else {
-        Diagnostics.diagnose(SourceLoc(), diag::error_bad_module_name,
-                             ImplicitImportModuleName, false);
-      }
-    }
-  }
+  fillInModulesToImportFromImplicitImportModuleNames(importModules, options);
 
   if (Kind == InputFileKind::IFK_Swift_REPL) {
     auto *SingleInputFile =
@@ -460,6 +438,34 @@ void CompilerInstance::performSema() {
   }
   finishTypeCheckingMainModule();
 }
+
+
+void CompilerInstance::fillInModulesToImportFromImplicitImportModuleNames(SmallVectorImpl<ModuleDecl *> &importModules,
+                                                                          const FrontendOptions &options) {
+  for (auto &ImplicitImportModuleName : options.ImplicitImportModuleNames) {
+    if (Lexer::isIdentifier(ImplicitImportModuleName)) {
+      auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
+      ModuleDecl *importModule = Context->getModule(std::make_pair(moduleID,
+                                                                   SourceLoc()));
+      if (importModule) {
+        importModules.push_back(importModule);
+      } else {
+        Diagnostics.diagnose(SourceLoc(), diag::sema_no_import,
+                             ImplicitImportModuleName);
+        if (Invocation.getSearchPathOptions().SDKPath.empty() &&
+            llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
+          Diagnostics.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
+          Diagnostics.diagnose(SourceLoc(),
+                               diag::sema_no_import_no_sdk_xcrun);
+        }
+      }
+    } else {
+      Diagnostics.diagnose(SourceLoc(), diag::error_bad_module_name,
+                           ImplicitImportModuleName, false);
+    }
+  }
+}
+
 
 std::unique_ptr<DelayedParsingCallbacks> &&CompilerInstance::computeDelayedParsingCallback() {
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB;
