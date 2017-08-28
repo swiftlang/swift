@@ -4513,7 +4513,9 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
           suppliedMissingMember = MissingMemberDecl::forInitializer(
               context, containingProto, error.getName(),
               error.needsVTableEntry(), error.needsAllocatingVTableEntry());
-        } else if (error.needsVTableEntry()) {
+              return;
+        }
+        if (error.needsVTableEntry()) {
           suppliedMissingMember = MissingMemberDecl::forMethod(
               context, containingProto, error.getName(),
               error.needsVTableEntry());
