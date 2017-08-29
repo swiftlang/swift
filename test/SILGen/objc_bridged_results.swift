@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -Xllvm -sil-print-debuginfo -import-objc-header %S/Inputs/objc_bridged_results.h | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -Xllvm -sil-print-debuginfo -import-objc-header %S/Inputs/objc_bridged_results.h -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
 // CHECK-LABEL: sil hidden @_T020objc_bridged_results11testNonnullSayypGSo4TestCF
-// CHECK: bb0([[ARG:%.*]] : $Test):
+// CHECK: bb0([[ARG:%.*]] : @owned $Test):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $Test, #Test.nonnullArray!getter.1.foreign : (Test) -> () -> [Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
 // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
@@ -23,13 +23,13 @@ func testNonnull(_ obj: Test) -> [Any] {
 
 // CHECK-LABEL: sil hidden @_T020objc_bridged_results12testNullableSayypGSgSo4TestCF
 func testNullable(_ obj: Test) -> [Any]? {
-  // CHECK: bb0([[ARG:%.*]] : $Test):
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $Test, #Test.nullableArray!getter.1.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt.1: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
   //
-  // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : $NSArray):
+  // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : @owned $NSArray):
   // CHECK-NOT: unchecked_enum_data
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0Sa10FoundationE36_unconditionallyBridgeFromObjectiveCSayxGSo7NSArrayCSgFZ
   // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
@@ -42,7 +42,7 @@ func testNullable(_ obj: Test) -> [Any]? {
   // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.none!enumelt
   // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<Any>>)
   
-  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $Optional<Array<Any>>):
+  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : @owned $Optional<Array<Any>>):
   // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK: destroy_value [[ARG]] : $Test
   // CHECK: return [[RESULT]] : $Optional<Array<Any>>
@@ -51,13 +51,13 @@ func testNullable(_ obj: Test) -> [Any]? {
 
 // CHECK-LABEL: sil hidden @_T020objc_bridged_results19testNullUnspecifiedSQySayypGGSo4TestCF
 func testNullUnspecified(_ obj: Test) -> [Any]! {
-  // CHECK: bb0([[ARG:%.*]] : $Test):
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [Any]!, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt.1: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
 
-  // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : $NSArray):
+  // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : @owned $NSArray):
   // CHECK-NOT: unchecked_enum_data
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0Sa10FoundationE36_unconditionallyBridgeFromObjectiveCSayxGSo7NSArrayCSgFZ
   // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
@@ -70,7 +70,7 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
   // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.none!enumelt
   // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<Any>>)
 
-  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $Optional<Array<Any>>):
+  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : @owned $Optional<Array<Any>>):
   // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK: destroy_value [[ARG]] : $Test
   // CHECK: return [[RESULT]] : $Optional<Array<Any>>
@@ -80,7 +80,7 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
 
 // CHECK-LABEL: sil hidden @_T020objc_bridged_results21testNonnullDictionarys0F0Vys11AnyHashableVypGSo4TestCF
 func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
-  // CHECK: bb0([[ARG:%.*]] : $Test):
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [AnyHashable : Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
@@ -95,7 +95,7 @@ func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
 
 // CHECK-LABEL: sil hidden @_T020objc_bridged_results14testNonnullSets0F0Vys11AnyHashableVGSo4TestCF
 func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
-  // CHECK: bb0([[ARG:%.*]] : $Test):
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $Test, #Test.nonnullSet!getter.1.foreign : (Test) -> () -> Set<AnyHashable>, $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
@@ -110,7 +110,7 @@ func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
 
 // CHECK-LABEL: sil hidden @_T020objc_bridged_results17testNonnullStringSSSo4TestCF
 func testNonnullString(_ obj: Test) -> String {
-  // CHECK: bb0([[ARG:%.*]] : $Test):
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $Test, #Test.nonnullString!getter.1.foreign : (Test) -> () -> String, $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
@@ -142,7 +142,7 @@ func testClassProp() -> String {
 // not to crash trying to generate the thunk.
 // CHECK-LABEL: sil hidden @_T020objc_bridged_results20testNonnullSubscriptSayypGSo4TestCF
 func testNonnullSubscript(_ obj: Test) -> [Any] {
-  // CHECK: bb0([[ARG:%.*]] : $Test):
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $Test, #Test.subscript!getter.1.foreign : (Test) -> (Int) -> [Any], $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, [[BORROWED_ARG]]) : $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
@@ -158,7 +158,7 @@ func testNonnullSubscript(_ obj: Test) -> [Any] {
 
 // CHECK-LABEL: sil hidden @_T020objc_bridged_results19testPerformSelectorySo8NSObjectCF
 func testPerformSelector(_ obj: NSObject) {
-  // CHECK: bb0([[ARG:%.*]] : $NSObject):
+  // CHECK: bb0([[ARG:%.*]] : @owned $NSObject):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $NSObject, #NSObject.perform!1.foreign
   // CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, {{%[0-9]+}}, [[BORROWED_ARG]])
