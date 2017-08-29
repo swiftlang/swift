@@ -24,7 +24,7 @@ namespace swift {
   class SourceManager;
 
 namespace ide {
-  struct SemaToken;
+  struct ResolvedCursorInfo;
 
 enum class RefactoringKind : int8_t {
   None,
@@ -137,7 +137,7 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
                              llvm::ArrayRef<DiagnosticConsumer*> DiagConsumers);
 
 ArrayRef<RefactoringKind>
-collectAvailableRefactorings(SourceFile *SF, SemaToken Tok,
+collectAvailableRefactorings(SourceFile *SF, ResolvedCursorInfo CursorInfo,
                              std::vector<RefactoringKind> &Scratch,
                              bool ExcludeRename);
 

@@ -596,10 +596,10 @@ tryRemappingLocToLatestSnapshot(SwiftLangSupport &Lang,
 static bool passCursorInfoForModule(ModuleEntity Mod,
                                     SwiftInterfaceGenMap &IFaceGenContexts,
                                     const CompilerInvocation &Invok,
-                             std::function<void(const CursorInfo &)> Receiver) {
+                       std::function<void(const CursorInfoData &)> Receiver) {
   std::string Name = Mod.getName();
   std::string FullName = Mod.getFullName();
-  CursorInfo Info;
+  CursorInfoData Info;
   Info.Kind = SwiftLangSupport::getUIDForModuleRef();
   Info.Name = Name;
   Info.ModuleName = FullName;
@@ -650,12 +650,13 @@ serializeRefactoringKinds(ArrayRef<RefactoringKind> AllKinds,
 }
 
 static void
-collectAvailableRefactoringsOtherThanRename(SourceFile *SF, SemaToken Tok,
+collectAvailableRefactoringsOtherThanRename(SourceFile *SF,
+                                            ResolvedCursorInfo CursorInfo,
                                             std::vector<UIdent> &RefactoringIds,
                                       DelayedStringRetriever &RefactroingNameOS,
                                   DelayedStringRetriever &RefactoringReasonOS) {
   std::vector<RefactoringKind> Scratch;
-  serializeRefactoringKinds(collectAvailableRefactorings(SF, Tok, Scratch,
+  serializeRefactoringKinds(collectAvailableRefactorings(SF, CursorInfo, Scratch,
     /*ExcludeRename*/true), RefactoringIds, RefactroingNameOS,
     RefactoringReasonOS);
 }
@@ -697,14 +698,14 @@ static bool passCursorInfoForDecl(SourceFile* SF,
                                   const Type ContainerTy,
                                   bool IsRef,
                                   bool RetrieveRefactoring,
-                                  SemaToken TheTok,
+                                  ResolvedCursorInfo TheTok,
                                   Optional<unsigned> OrigBufferID,
                                   SourceLoc CursorLoc,
                         ArrayRef<RefactoringInfo> KownRefactoringInfoFromRange,
                                   SwiftLangSupport &Lang,
                                   const CompilerInvocation &Invok,
                             ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps,
-                             std::function<void(const CursorInfo &)> Receiver) {
+                        std::function<void(const CursorInfoData &)> Receiver) {
   if (AvailableAttr::isUnavailable(VD))
     return true;
 
@@ -935,7 +936,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   bool IsSystem = VD->getModuleContext()->isSystemModule();
   std::string TypeInterface;
 
-  CursorInfo Info;
+  CursorInfoData Info;
   Info.Kind = Kind;
   Info.Name = Name;
   Info.USR = USR;
@@ -1024,15 +1025,16 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
 }
 
 /// Returns true for failure to resolve.
-static bool passNameInfoForDecl(SemaToken SemaTok, NameTranslatingInfo &Info,
+static bool passNameInfoForDecl(ResolvedCursorInfo CursorInfo,
+                                NameTranslatingInfo &Info,
                     std::function<void(const NameTranslatingInfo &)> Receiver) {
-  auto *VD = SemaTok.ValueD;
+  auto *VD = CursorInfo.ValueD;
 
   // If the given name is not a function name, and the cursor points to
   // a contructor call, we use the type declaration instead of the init
   // declaration to translate the name.
   if (Info.ArgNames.empty() && !Info.IsZeroArgSelector) {
-    if (auto *TD = SemaTok.CtorTyRef) {
+    if (auto *TD = CursorInfo.CtorTyRef) {
       VD = TD;
     }
   }
@@ -1188,12 +1190,12 @@ static void resolveCursor(SwiftLangSupport &Lang,
                           SwiftInvocationRef Invok,
                           bool TryExistingAST,
                           bool CancelOnSubsequentRequest,
-                          std::function<void(const CursorInfo &)> Receiver) {
+                          std::function<void(const CursorInfoData &)> Receiver) {
   assert(Invok);
 
   class CursorInfoConsumer : public CursorRangeInfoConsumer {
     bool Actionables;
-    std::function<void(const CursorInfo &)> Receiver;
+    std::function<void(const CursorInfoData &)> Receiver;
 
   public:
     CursorInfoConsumer(StringRef InputFile, unsigned Offset,
@@ -1202,7 +1204,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
                        SwiftInvocationRef ASTInvok,
                        bool TryExistingAST,
                        bool CancelOnSubsequentRequest,
-                       std::function<void(const CursorInfo &)> Receiver)
+                       std::function<void(const CursorInfoData &)> Receiver)
     : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
                               TryExistingAST, CancelOnSubsequentRequest),
       Actionables(Actionables),
@@ -1261,7 +1263,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
           });
         }
         if (!RangeStartMayNeedRename) {
-          CursorInfo Info;
+          CursorInfoData Info;
 
           // FIXME: This Kind does not mean anything.
           Info.Kind = SwiftLangSupport::getUIDForModuleRef();
@@ -1276,27 +1278,29 @@ static void resolveCursor(SwiftLangSupport &Lang,
         // info request to get the available rename kinds.
       }
 
-      SemaLocResolver Resolver(AstUnit->getPrimarySourceFile());
-      SemaToken SemaTok = Resolver.resolve(Loc);
-      if (SemaTok.isInvalid()) {
+      CursorInfoResolver Resolver(AstUnit->getPrimarySourceFile());
+      ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
+      if (CursorInfo.isInvalid()) {
         Receiver({});
         return;
       }
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
-      switch (SemaTok.Kind) {
-      case SemaTokenKind::ModuleRef:
-        passCursorInfoForModule(SemaTok.Mod, Lang.getIFaceGenContexts(),
+      switch (CursorInfo.Kind) {
+      case CursorInfoKind::ModuleRef:
+        passCursorInfoForModule(CursorInfo.Mod, Lang.getIFaceGenContexts(),
                                 CompInvok, Receiver);
         return;
-      case SemaTokenKind::ValueRef: {
-        ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
+      case CursorInfoKind::ValueRef: {
+        ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
         bool Failed = passCursorInfoForDecl(&AstUnit->getPrimarySourceFile(),
                                             VD, MainModule,
-                                            SemaTok.ContainerType,
-                                            SemaTok.ContainerType,
-                                            SemaTok.IsRef, Actionables, SemaTok,
+                                            CursorInfo.ContainerType,
+                                            CursorInfo.ContainerType,
+                                            CursorInfo.IsRef,
+                                            Actionables,
+                                            CursorInfo,
                                             BufferID, Loc,
                                             AvailableRefactorings,
                                             Lang, CompInvok,
@@ -1314,18 +1318,18 @@ static void resolveCursor(SwiftLangSupport &Lang,
         }
         return;
       }
-      case SemaTokenKind::ExprStart:
-      case SemaTokenKind::StmtStart: {
+      case CursorInfoKind::ExprStart:
+      case CursorInfoKind::StmtStart: {
         if (Actionables) {
           SmallString<64> SS;
           std::vector<UIdent> RefactoringIds;
           DelayedStringRetriever NameRetriever(SS);
           DelayedStringRetriever ReasonRetriever(SS);
           collectAvailableRefactoringsOtherThanRename(
-            &AstUnit->getPrimarySourceFile(), SemaTok, RefactoringIds,
+            &AstUnit->getPrimarySourceFile(), CursorInfo, RefactoringIds,
             NameRetriever, ReasonRetriever);
           if (auto Size = RefactoringIds.size()) {
-            CursorInfo Info;
+            CursorInfoData Info;
 
             // FIXME: This Kind does not mean anything.
             Info.Kind = SwiftLangSupport::getUIDForModuleRef();
@@ -1342,14 +1346,14 @@ static void resolveCursor(SwiftLangSupport &Lang,
         Receiver({});
         return;
       }
-      case SemaTokenKind::Invalid: {
+      case CursorInfoKind::Invalid: {
         llvm_unreachable("bad sema token kind");
       }
       }
     }
 
     void cancelled() override {
-      CursorInfo Info;
+      CursorInfoData Info;
       Info.IsCancelled = true;
       Receiver(Info);
     }
@@ -1415,9 +1419,9 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
                        {std::make_pair("Offset", std::to_string(Offset))});
       }
 
-      SemaLocResolver Resolver(AstUnit->getPrimarySourceFile());
-      SemaToken SemaTok = Resolver.resolve(Loc);
-      if (SemaTok.isInvalid()) {
+      CursorInfoResolver Resolver(AstUnit->getPrimarySourceFile());
+      ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
+      if (CursorInfo.isInvalid()) {
         Receiver({});
         return;
       }
@@ -1425,12 +1429,12 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
-      switch(SemaTok.Kind) {
-      case SemaTokenKind::ModuleRef:
+      switch(CursorInfo.Kind) {
+      case CursorInfoKind::ModuleRef:
         return;
 
-      case SemaTokenKind::ValueRef: {
-        bool Failed = passNameInfoForDecl(SemaTok, Input, Receiver);
+      case CursorInfoKind::ValueRef: {
+        bool Failed = passNameInfoForDecl(CursorInfo, Input, Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
@@ -1442,12 +1446,12 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         }
         return;
       }
-      case SemaTokenKind::ExprStart:
-      case SemaTokenKind::StmtStart: {
+      case CursorInfoKind::ExprStart:
+      case CursorInfoKind::StmtStart: {
         Receiver({});
         return;
       }
-      case SemaTokenKind::Invalid:
+      case CursorInfoKind::Invalid:
         llvm_unreachable("bad sema token kind.");
       }
     }
@@ -1555,7 +1559,7 @@ static void resolveRange(SwiftLangSupport &Lang,
 void SwiftLangSupport::getCursorInfo(
     StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
     bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-    std::function<void(const CursorInfo &)> Receiver) {
+    std::function<void(const CursorInfoData &)> Receiver) {
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
     trace::TracedOperation TracedOp;
@@ -1585,7 +1589,7 @@ void SwiftLangSupport::getCursorInfo(
           // it's not necessary.
           passCursorInfoForDecl(
               /*SourceFile*/nullptr, Entity.Dcl, /*MainModule*/ nullptr, Type(),
-              Type(), Entity.IsRef, Actionables, SemaToken(),
+              Type(), Entity.IsRef, Actionables, ResolvedCursorInfo(),
               /*OrigBufferID=*/None, SourceLoc(),
               {}, *this, Invok, {}, Receiver);
         }
@@ -1689,7 +1693,7 @@ static void
 resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
                      SwiftInvocationRef Invok, bool TryExistingAST,
                      bool CancelOnSubsequentRequest,
-                     std::function<void(const CursorInfo &)> Receiver) {
+                     std::function<void(const CursorInfoData &)> Receiver) {
   assert(Invok);
 
   class CursorInfoConsumer : public SwiftASTConsumer {
@@ -1699,14 +1703,14 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
     SwiftInvocationRef ASTInvok;
     const bool TryExistingAST;
     bool CancelOnSubsequentRequest;
-    std::function<void(const CursorInfo &)> Receiver;
+    std::function<void(const CursorInfoData &)> Receiver;
     SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
 
   public:
     CursorInfoConsumer(StringRef InputFile, StringRef USR,
                        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
                        bool TryExistingAST, bool CancelOnSubsequentRequest,
-                       std::function<void(const CursorInfo &)> Receiver)
+                       std::function<void(const CursorInfoData &)> Receiver)
         : InputFile(InputFile), USR(USR), Lang(Lang),
           ASTInvok(std::move(ASTInvok)), TryExistingAST(TryExistingAST),
           CancelOnSubsequentRequest(CancelOnSubsequentRequest),
@@ -1775,7 +1779,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
         }
         bool Failed =
             passCursorInfoForDecl(/*SourceFile*/nullptr, VD, MainModule, selfTy,
-                                  Type(), /*IsRef=*/false, false, SemaToken(),
+                                  Type(), /*IsRef=*/false, false, ResolvedCursorInfo(),
                                   BufferID, SourceLoc(), {}, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
         if (Failed) {
@@ -1792,7 +1796,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
     }
 
     void cancelled() override {
-      CursorInfo Info;
+      CursorInfoData Info;
       Info.IsCancelled = true;
       Receiver(Info);
     }
@@ -1816,7 +1820,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 void SwiftLangSupport::getCursorInfoFromUSR(
     StringRef filename, StringRef USR, bool CancelOnSubsequentRequest,
     ArrayRef<const char *> args,
-    std::function<void(const CursorInfo &)> receiver) {
+    std::function<void(const CursorInfoData &)> receiver) {
   if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
     LOG_WARN_FUNC("info from usr for generated interface not implemented yet");
     receiver({});
@@ -1949,19 +1953,19 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         if (Loc.isInvalid())
           return;
 
-        SemaLocResolver Resolver(SrcFile);
-        SemaToken SemaTok = Resolver.resolve(Loc);
-        if (SemaTok.isInvalid())
+        CursorInfoResolver Resolver(SrcFile);
+        ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
+        if (CursorInfo.isInvalid())
           return;
-        if (SemaTok.IsKeywordArgument)
+        if (CursorInfo.IsKeywordArgument)
           return;
 
-        ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
+        ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
         if (!VD)
           return; // This was a module reference.
 
         // Only accept pointing to an identifier.
-        if (!SemaTok.IsRef &&
+        if (!CursorInfo.IsRef &&
             (isa<ConstructorDecl>(VD) ||
              isa<DestructorDecl>(VD) ||
              isa<SubscriptDecl>(VD)))
