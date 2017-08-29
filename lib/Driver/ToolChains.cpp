@@ -617,7 +617,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     llvm_unreachable("invalid mode for backend job");
   }
 
-  // Only white-listed flags below are allowed to be embedded.
+  // -embed-bitcode only supports a restricted set of flags.
   Arguments.push_back("-target");
   Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
 

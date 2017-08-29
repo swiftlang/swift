@@ -2208,7 +2208,7 @@ namespace {
 
         // Import 'typedef struct __Blah *BlahRef;' and
         // 'typedef const void *FooRef;' as CF types if they have the
-        // right attributes or match our name whitelist.
+        // right attributes or match our list of known types.
         if (!SwiftType) {
           auto DC = Impl.importDeclContextOf(
               Decl, importedName.getEffectiveContext());

@@ -2320,7 +2320,7 @@ void swift::trySpecializeApplyOfGeneric(
   SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
   if (SpecializedF) {
     // Even if the pre-specialization exists already, try to preserve it
-    // if it is whitelisted.
+    // if it is one of our known pre-specializations for -Onone support.
     linkSpecialization(M, SpecializedF);
   } else {
     SpecializedF = FuncSpecializer.tryCreateSpecialization();
@@ -2435,11 +2435,12 @@ static void keepSpecializationAsPublic(SILFunction *F) {
 static bool linkSpecialization(SILModule &M, SILFunction *F) {
   if (F->isKeepAsPublic())
     return true;
-  // Do not remove functions from the white-list. Keep them around.
-  // Change their linkage to public, so that other applications can refer to it.
+  // Do not remove functions that are known prespecializations.
+  // Keep them around. Change their linkage to public, so that other
+  // applications can refer to them.
   if (M.getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
       F->getModule().getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT) {
-    if (isWhitelistedSpecialization(F->getName())) {
+    if (isKnownPrespecialization(F->getName())) {
       keepSpecializationAsPublic(F);
       return true;
     }
@@ -2447,9 +2448,9 @@ static bool linkSpecialization(SILModule &M, SILFunction *F) {
   return false;
 }
 
-/// The whitelist of classes and functions from the stdlib,
+/// The list of classes and functions from the stdlib
 /// whose specializations we want to preserve.
-static const char *const WhitelistedSpecializations[] = {
+static const char *const KnownPrespecializations[] = {
     "Array",
     "_ArrayBuffer",
     "_ContiguousArrayBuffer",
@@ -2477,9 +2478,7 @@ static const char *const WhitelistedSpecializations[] = {
     "_toStringReadOnlyPrintable",
 };
 
-/// Check of a given name could be a name of a white-listed
-/// specialization.
-bool swift::isWhitelistedSpecialization(StringRef SpecName) {
+bool swift::isKnownPrespecialization(StringRef SpecName) {
   // TODO: Once there is an efficient API to check if
   // a given symbol is a specialization of a specific type,
   // use it instead. Doing demangling just for this check
@@ -2489,7 +2488,7 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
 
   StringRef DemangledName = DemangledNameString;
 
-  DEBUG(llvm::dbgs() << "Check if whitelisted: " << DemangledName << "\n");
+  DEBUG(llvm::dbgs() << "Check if known: " << DemangledName << "\n");
 
   auto pos = DemangledName.find("generic ", 0);
   auto oldpos = pos;
@@ -2522,7 +2521,7 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
 
   pos += OfStr.size();
 
-  for (auto NameStr: WhitelistedSpecializations) {
+  for (auto NameStr : KnownPrespecializations) {
     StringRef Name = NameStr;
     auto pos1 = DemangledName.find(Name, pos);
     if (pos1 == pos && !isalpha(DemangledName[pos1+Name.size()])) {
@@ -2546,7 +2545,7 @@ static SILFunction *lookupExistingSpecialization(SILModule &M,
   // TODO: Cache optimized specializations and perform lookup here?
   // Only check that this function exists, but don't read
   // its body. It can save some compile-time.
-  if (isWhitelistedSpecialization(FunctionName))
+  if (isKnownPrespecialization(FunctionName))
     return M.findFunction(FunctionName, SILLinkage::PublicExternal);
 
   return nullptr;

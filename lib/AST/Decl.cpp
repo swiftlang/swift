@@ -393,10 +393,12 @@ bool AbstractFunctionDecl::isTransparent() const {
   return false;
 }
 
-bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
+bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   const Decl *D = this;
-  if (auto ExtD = dyn_cast<ExtensionDecl>(D))
-    return ExtD->getExtendedType().isPrivateStdlibType(whitelistProtocols);
+  if (auto ExtD = dyn_cast<ExtensionDecl>(D)) {
+    Type extTy = ExtD->getExtendedType();
+    return extTy.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+  }
 
   DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
   if (DC->getParentModule()->isBuiltinModule() ||
@@ -449,7 +451,7 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
       return true;
     if (NameStr.startswith("_ExpressibleBy"))
       return true;
-    if (whitelistProtocols)
+    if (treatNonBuiltinProtocolsAsPublic)
       return false;
   }
 

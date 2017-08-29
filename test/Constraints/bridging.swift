@@ -13,7 +13,8 @@ public class BridgedClass : NSObject, NSCopying {
 
 public class BridgedClassSub : BridgedClass { }
 
-// Attempt to bridge to a non-whitelisted type from another module.
+// Attempt to bridge to a type from another module. We only allow this for a
+// few specific types, like String.
 extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{conformance of 'LazyFilterIterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
   public typealias _ObjectiveCType = BridgedClassSub
 

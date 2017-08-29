@@ -717,7 +717,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // - member references T.foo, T.Type, T.self, etc.
       // - constructor calls T()
       if (auto *ParentExpr = Parent.getAsExpr()) {
-        // This is the white-list of accepted syntactic forms.
+        // This is an exhaustive list of the accepted syntactic forms.
         if (isa<ErrorExpr>(ParentExpr) ||
             isa<DotSelfExpr>(ParentExpr) ||               // T.self
             isa<CallExpr>(ParentExpr) ||                  // T()

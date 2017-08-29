@@ -2867,7 +2867,7 @@ bool SimplifyCFG::run() {
 
 /// Is an argument from this terminator considered mandatory?
 static bool hasMandatoryArgument(TermInst *term) {
-  // It's more maintainable to just white-list the instructions that
+  // It's more maintainable to just explicitly list the instructions that
   // *do* have mandatory arguments.
   return (!isa<BranchInst>(term) && !isa<CondBranchInst>(term));
 }
