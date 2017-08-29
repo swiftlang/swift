@@ -387,6 +387,13 @@ bb0(%0 : @owned $SuperKlass):
   return %9999 : $()
 }
 
+sil @test_isnonnull : $@convention(thin) (@owned SuperKlass) -> Builtin.Int1 {
+bb0(%0 : @owned $SuperKlass):
+  %1 = is_nonnull %0 : $SuperKlass
+  destroy_value %0 : $SuperKlass
+  return %1 : $Builtin.Int1
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////
