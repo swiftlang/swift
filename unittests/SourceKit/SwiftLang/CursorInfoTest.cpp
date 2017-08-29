@@ -137,7 +137,7 @@ public:
 
     TestCursorInfo TestInfo;
     getLang().getCursorInfo(DocName, Offset, 0, false, false, Args,
-      [&](const CursorInfo &Info) {
+      [&](const CursorInfoData &Info) {
         TestInfo.Name = Info.Name;
         TestInfo.Typename = Info.TypeName;
         TestInfo.Filename = Info.Filename;

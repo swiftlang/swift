@@ -437,7 +437,7 @@ public:
                      unsigned Length, bool Actionables,
                      bool CancelOnSubsequentRequest,
                      ArrayRef<const char *> Args,
-                     std::function<void(const CursorInfo &)> Receiver) override;
+                 std::function<void(const CursorInfoData &)> Receiver) override;
 
   void getNameInfo(StringRef Filename, unsigned Offset,
                    NameTranslatingInfo &Input,
@@ -451,7 +451,7 @@ public:
   void getCursorInfoFromUSR(
       StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args,
-      std::function<void(const CursorInfo &)> Receiver) override;
+      std::function<void(const CursorInfoData &)> Receiver) override;
 
   void findRelatedIdentifiersInFile(StringRef Filename, unsigned Offset,
                                     bool CancelOnSubsequentRequest,

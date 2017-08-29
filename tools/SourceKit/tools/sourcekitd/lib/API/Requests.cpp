@@ -118,7 +118,7 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            StringRef ModuleName,
                                            ArrayRef<const char *> Args);
 
-static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec);
+static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec);
 
 static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec);
 
@@ -758,12 +758,12 @@ handleSemanticRequest(RequestDict Req,
       Req.getInt64(KeyRetrieveRefactorActions, Actionables, /*isOptional=*/true);
       return Lang.getCursorInfo(
           *SourceFile, Offset, Length, Actionables, CancelOnSubsequentRequest,
-          Args, [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
+          Args, [Rec](const CursorInfoData &Info) { reportCursorInfo(Info, Rec); });
     }
     if (auto USR = Req.getString(KeyUSR)) {
       return Lang.getCursorInfoFromUSR(
           *SourceFile, *USR, CancelOnSubsequentRequest, Args,
-          [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
+          [Rec](const CursorInfoData &Info) { reportCursorInfo(Info, Rec); });
     }
 
     return Rec(createErrorRequestInvalid(
@@ -1445,7 +1445,7 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
 // ReportCursorInfo
 //===----------------------------------------------------------------------===//
 
-static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
+static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec) {
 
   if (Info.IsCancelled)
     return Rec(createErrorRequestCancelled());
