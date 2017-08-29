@@ -1621,7 +1621,7 @@ struct COWStringTest {
 }
 
 var testStrings: [COWStringTest] {
-  return [/*COWStringTest(test: getCOWStaticString(), name: "Static"),*/
+  return [
           COWStringTest(test: getCOWAsciiString(), name: "ASCII"),
           COWStringTest(test: getCOWUnicodeString(), name: "Unicode")
         ]
