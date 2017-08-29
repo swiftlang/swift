@@ -112,8 +112,12 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   retain_value %new : $*T
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
-      TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
-                              TypeLowering::getLoweringStyle(expand));
+      if (expand) {
+        TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
+                                TypeLowering::LoweringStyle::Deep);
+      } else {
+        TL.emitCopyValue(Builder, CA->getLoc(), New);
+      }
     }
 
     // If we are not initializing:
@@ -121,8 +125,12 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   *or*
     // release_value %old : $*T
     if (Old) {
-      TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
-                                 TypeLowering::getLoweringStyle(expand));
+      if (expand) {
+        TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
+                                   TypeLowering::LoweringStyle::Deep);
+      } else {
+        TL.emitDestroyValue(Builder, CA->getLoc(), Old);
+      }
     }
   }
 
@@ -155,8 +163,11 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
     LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr,
                                       LoadOwnershipQualifier::Unqualified);
     auto &TL = Module.getTypeLowering(Type);
-    TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
-                               TypeLowering::getLoweringStyle(expand));
+    if (expand)
+      TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
+                                 TypeLowering::LoweringStyle::Deep);
+    else
+      TL.emitDestroyValue(Builder, DA->getLoc(), LI);
   }
 
   ++NumExpand;
