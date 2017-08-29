@@ -1904,6 +1904,14 @@ extension Collection {
   }
 }
 
+extension Collection {
+  // FIXME: <rdar://problem/34142121>
+  // This typealias should be removed as it predates the source compatibility
+  // guarantees of Swift 3, but it cannot due to a bug.
+  @available(*, unavailable, renamed: "Iterator")
+  public typealias Generator = Iterator
+}
+
 extension _IndexableBase {
   @available(swift, deprecated: 3.2, renamed: "Element")
   public typealias _Element = Element
