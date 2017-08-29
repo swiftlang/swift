@@ -360,10 +360,9 @@ let source2 = Array("hack hack cough cough cough spork".utf8)
 (%"hack ")*.searchTest(in: source2)
 (%"cough ")+.searchTest(in: source2)
 
-// The final * steps around <rdar://29229409>
 let fancyPattern
   = %"quick "..((%"brown" | %"black" | %"fox" | %"chicken") .. %" ")+ 
-  .. (%__)* .. %"do"
+  .. (%__)
 
 fancyPattern.searchTest(in: source)
 
