@@ -427,7 +427,9 @@ extension Hoozit {
     // CHECK: [[CTOR:%[0-9]+]] = class_method [volatile] [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : (Hoozit.Type) -> (Int) -> Hoozit, $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
     // CHECK: [[NEW_SELF:%[0-9]+]] = apply [[CTOR]]
     // CHECK: store [[NEW_SELF]] to [init] [[PB_BOX]] : $*Hoozit
-    // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[NEW_SELF]] : $Hoozit
+    // CHECK: [[RELOADED_SELF:%.*]] = load_borrow [[PB_BOX]]
+    // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[RELOADED_SELF]] : $Hoozit
+    // CHECK: end_borrow [[RELOADED_SELF]] from [[PB_BOX]]
     // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
     // CHECK: [[NULL_BB]]:
     // CHECK-NEXT: destroy_value [[X_BOX]] : ${ var X }
