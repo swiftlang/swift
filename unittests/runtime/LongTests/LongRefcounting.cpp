@@ -279,7 +279,7 @@ TEST(LongRefcountingTest, unowned_retain_overflow_DeathTest) {
   EXPECT_EQ(0u, deinited);
   EXPECT_ALLOCATED(object);
   ASSERT_DEATH(swift_unownedRetain(object),
-               "object's unowned reference was retained too many times");
+               "Object's unowned reference was retained too many times");
 }
 
 TEST(LongRefcountingTest, nonatomic_unowned_retain_max) {
@@ -326,7 +326,7 @@ TEST(LongRefcountingTest, nonatomic_unowned_retain_overflow_DeathTest) {
   EXPECT_EQ(0u, deinited);
   EXPECT_ALLOCATED(object);
   ASSERT_DEATH(swift_nonatomic_unownedRetain(object),
-               "object's unowned reference was retained too many times");
+               "Object's unowned reference was retained too many times");
 }
 
 
