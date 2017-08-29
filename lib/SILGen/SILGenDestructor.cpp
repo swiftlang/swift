@@ -239,13 +239,18 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Call the superclass's -dealloc.
   SILType superclassSILTy = getLoweredLoadableType(superclassTy);
   SILValue superSelf = B.createUpcast(cleanupLoc, selfValue, superclassSILTy);
+  assert(superSelf.getOwnershipKind() == ValueOwnershipKind::Owned);
+
   auto subMap
     = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                               superclass);
 
   auto substDtorType = superclassDtorType.substGenericArgs(SGM.M, subMap);
-  SILFunctionConventions dtorConv(substDtorType.castTo<SILFunctionType>(),
-                                  SGM.M);
+  CanSILFunctionType substFnType = substDtorType.castTo<SILFunctionType>();
+  SILFunctionConventions dtorConv(substFnType, SGM.M);
+  assert(substFnType->getSelfParameter().getConvention() ==
+             ParameterConvention::Direct_Unowned &&
+         "Objective C deinitializing destructor takes self as unowned");
 
   SmallVector<Substitution, 4> subs;
     if (auto *genericSig = superclass->getGenericSignature())
@@ -253,6 +258,11 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
 
   B.createApply(cleanupLoc, superclassDtorValue, substDtorType,
                 dtorConv.getSILResultType(), subs, superSelf);
+
+  // We know that the givne value came in at +1, but we pass the relevant value
+  // as unowned to the destructor. Create a fake balance for the verifier to be
+  // happy.
+  B.createEndLifetime(cleanupLoc, superSelf);
 
   // Return.
   B.createReturn(returnLoc, emitEmptyTuple(cleanupLoc));
