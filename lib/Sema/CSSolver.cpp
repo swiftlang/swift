@@ -1842,7 +1842,8 @@ bool ConstraintSystem::solveSimplified(
   auto constraints = disjunction->getNestedConstraints();
   // Try each of the constraints within the disjunction.
   for (auto index : indices(constraints)) {
-    auto currentChoice = DisjunctionChoice(this, constraints[index]);
+    auto currentChoice =
+        DisjunctionChoice(this, disjunction, constraints[index]);
     if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
       continue;
 
@@ -1923,6 +1924,7 @@ DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
                          FreeTypeVariableBinding allowFreeTypeVariables) {
   CS->simplifyDisjunctionChoice(Choice);
 
+  propagateConversionInfo();
   if (CS->solveRec(solutions, allowFreeTypeVariables))
     return None;
 
@@ -1971,4 +1973,51 @@ bool DisjunctionChoice::isSymmetricOperator() const {
   auto secondType =
       paramList->get(1)->getInterfaceType()->getWithoutSpecifierType();
   return firstType->isEqual(secondType);
+}
+
+void DisjunctionChoice::propagateConversionInfo() const {
+  if (!CS->isExplicitConversionConstraint(Disjunction))
+    return;
+
+  auto LHS = Choice->getFirstType();
+  auto typeVar = LHS->getAs<TypeVariableType>();
+  if (!typeVar)
+    return;
+
+  // Use the representative (if any) to lookup constraints
+  // and potentially bind the coercion type to.
+  typeVar = typeVar->getImpl().getRepresentative(nullptr);
+
+  // If the representative already has a type assigned to it
+  // we can't really do anything here.
+  if (typeVar->getImpl().getFixedType(nullptr))
+    return;
+
+  auto bindings = CS->getPotentialBindings(typeVar);
+  if (bindings.InvolvesTypeVariables || bindings.Bindings.size() != 1)
+    return;
+
+  auto conversionType = bindings.Bindings[0].BindingType;
+  SmallVector<Constraint *, 4> constraints;
+  CS->CG.gatherConstraints(typeVar, constraints,
+                           ConstraintGraph::GatheringKind::EquivalenceClass);
+
+  bool viableForBinding = true;
+  for (auto adjacent : constraints) {
+    switch (adjacent->getKind()) {
+    case ConstraintKind::Conversion:
+    case ConstraintKind::Defaultable:
+    case ConstraintKind::ConformsTo:
+    case ConstraintKind::LiteralConformsTo:
+      break;
+
+    default:
+      viableForBinding = false;
+      break;
+    }
+  }
+
+  if (viableForBinding)
+    CS->addConstraint(ConstraintKind::Bind, typeVar, conversionType,
+                      Choice->getLocator());
 }
