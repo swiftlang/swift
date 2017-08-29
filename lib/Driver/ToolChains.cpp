@@ -1063,10 +1063,13 @@ getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
 }
 
 static std::string
-getSanitizerRuntimeLibNameForDarwin(StringRef Sanitizer, const llvm::Triple &Triple) {
+getSanitizerRuntimeLibNameForDarwin(StringRef Sanitizer,
+                                    const llvm::Triple &Triple,
+                                    bool shared = true) {
   return (Twine("libclang_rt.")
       + Sanitizer + "_"
-      + getDarwinLibraryNameSuffixForTriple(Triple) + "_dynamic.dylib").str();
+      + getDarwinLibraryNameSuffixForTriple(Triple)
+      + (shared ? "_dynamic.dylib" : ".a")).str();
 }
 
 static std::string
@@ -1141,7 +1144,10 @@ addLinkRuntimeLibForLinux(const ArgList &Args, ArgStringList &Arguments,
 static void
 addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
                                  ArgStringList &Arguments,
-                                 StringRef Sanitizer, const ToolChain &TC) {
+                                 StringRef Sanitizer,
+                                 const ToolChain &TC,
+                                 bool shared = true
+                                 ) {
   // Sanitizer runtime libraries requires C++.
   Arguments.push_back("-lc++");
   // Add explicit dependency on -lc++abi, as -lc++ doesn't re-export
@@ -1149,8 +1155,8 @@ addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
   Arguments.push_back("-lc++abi");
 
   addLinkRuntimeLibForDarwin(Args, Arguments,
-      getSanitizerRuntimeLibNameForDarwin(Sanitizer, TC.getTriple()),
-      /*AddRPath=*/ true, TC);
+      getSanitizerRuntimeLibNameForDarwin(Sanitizer, TC.getTriple(), shared),
+      /*AddRPath=*/ shared, TC);
 }
 
 static void
@@ -1173,40 +1179,6 @@ addLinkSanitizerLibArgsForLinux(const ArgList &Args,
   if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
       TC.getTriple().getOS() != llvm::Triple::RTEMS)
     Arguments.push_back("-ldl");
-}
-
-static void
-addLinkFuzzerLibArgsForDarwin(const ArgList &Args,
-                       ArgStringList &Arguments,
-                       const ToolChain &TC) {
-
-  // libFuzzer requires C++.
-  Arguments.push_back("-lc++");
-
-  // Link libfuzzer.
-  SmallString<128> Dir;
-  getRuntimeLibraryPath(Dir, Args, TC);
-  llvm::sys::path::remove_filename(Dir);
-  llvm::sys::path::append(Dir, "llvm", "libLLVMFuzzer.a");
-  SmallString<128> P(Dir);
-
-  Arguments.push_back(Args.MakeArgString(P));
-}
-
-static void
-addLinkFuzzerLibArgsForLinux(const ArgList &Args,
-                             ArgStringList &Arguments,
-                             const ToolChain &TC) {
-  Arguments.push_back("-lstdc++");
-
-  // Link libfuzzer.
-  SmallString<128> Dir;
-  getRuntimeLibraryPath(Dir, Args, TC);
-  llvm::sys::path::remove_filename(Dir);
-  llvm::sys::path::append(Dir, "llvm", "libLLVMFuzzer.a");
-  SmallString<128> P(Dir);
-
-  Arguments.push_back(Args.MakeArgString(P));
 }
 
 ToolChain::InvocationInfo
@@ -1348,7 +1320,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   // Only link in libFuzzer for executables.
   if (job.getKind() == LinkKind::Executable &&
       (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
-    addLinkFuzzerLibArgsForDarwin(context.Args, Arguments, *this);
+    addLinkSanitizerLibArgsForDarwin(
+        context.Args, Arguments, "fuzzer", *this, /*shared=*/false);
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {
@@ -1724,7 +1697,9 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
 
       if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
-        addLinkFuzzerLibArgsForLinux(context.Args, Arguments, *this);
+        addLinkRuntimeLibForLinux(context.Args, Arguments,
+            getSanitizerRuntimeLibNameForLinux(
+                "fuzzer", this->getTriple()), *this);
     }
   }
 
