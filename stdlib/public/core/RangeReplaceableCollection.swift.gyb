@@ -691,7 +691,7 @@ extension RangeReplaceableCollection {
   @_inlineable
   @discardableResult
   public mutating func remove(at position: Index) -> Element {
-    _precondition(!isEmpty, "can't remove from an empty collection")
+    _precondition(!isEmpty, "Can't remove from an empty collection")
     let result: Element = self[position]
     replaceSubrange(position..<index(after: position), with: EmptyCollection())
     return result
@@ -739,9 +739,9 @@ extension RangeReplaceableCollection {
   @_inlineable
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
-    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
-      "can't remove more items from a collection than it has")
+      "Can't remove more items from a collection than it has")
     let end = index(startIndex, offsetBy: numericCast(n))
     removeSubrange(startIndex..<end)
   }
@@ -765,7 +765,7 @@ extension RangeReplaceableCollection {
   @discardableResult
   public mutating func removeFirst() -> Element {
     _precondition(!isEmpty,
-      "can't remove first element from an empty collection")
+      "Can't remove first element from an empty collection")
     let firstElement = first!
     removeFirst(1)
     return firstElement
@@ -859,7 +859,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   @_inlineable
   @discardableResult
   public mutating func removeFirst() -> Element {
-    _precondition(!isEmpty, "can't remove items from an empty collection")
+    _precondition(!isEmpty, "Can't remove items from an empty collection")
     let element = first!
     self = self[index(after: startIndex)..<endIndex]
     return element
@@ -883,9 +883,9 @@ extension RangeReplaceableCollection where SubSequence == Self {
   @_inlineable
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
-    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
-      "can't remove more items from a collection than it contains")
+      "Can't remove more items from a collection than it contains")
     self = self[index(startIndex, offsetBy: numericCast(n))..<endIndex]
   }
 }
@@ -1007,7 +1007,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   @_inlineable
   @discardableResult
   public mutating func removeLast() -> Element {
-    _precondition(!isEmpty, "can't remove last element from an empty collection")
+    _precondition(!isEmpty, "Can't remove last element from an empty collection")
     if let result = _customRemoveLast() {
       return result
     }
@@ -1032,9 +1032,9 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   @_inlineable
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
-    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
-      "can't remove more items from a collection than it contains")
+      "Can't remove more items from a collection than it contains")
     if _customRemoveLast(n) {
       return
     }
@@ -1064,7 +1064,7 @@ extension RangeReplaceableCollection
   @_inlineable
   @discardableResult
   public mutating func removeLast() -> Element {
-    _precondition(!isEmpty, "can't remove last element from an empty collection")
+    _precondition(!isEmpty, "Can't remove last element from an empty collection")
     if let result = _customRemoveLast() {
       return result
     }
@@ -1089,9 +1089,9 @@ extension RangeReplaceableCollection
   @_inlineable
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
-    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
-      "can't remove more items from a collection than it contains")
+      "Can't remove more items from a collection than it contains")
     if _customRemoveLast(n) {
       return
     }

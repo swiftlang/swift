@@ -151,14 +151,14 @@ public struct ${Self}<
   }
 
   public func index(after i: Index) -> Index {
-    _precondition(i.base < _base.endIndex, "can't advance past endIndex")
+    _precondition(i.base < _base.endIndex, "Can't advance past endIndex")
     return LazyDropWhileIndex(base: _base.index(after: i.base))
   }
 
 %   if Traversal == 'Bidirectional':
 
   public func index(before i: Index) -> Index {
-    _precondition(i > startIndex, "can't move before startIndex")
+    _precondition(i > startIndex, "Can't move before startIndex")
     return LazyDropWhileIndex(base: _base.index(before: i.base))
   }
 

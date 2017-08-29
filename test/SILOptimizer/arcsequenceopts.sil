@@ -1580,7 +1580,7 @@ bb4:
 
 bb5:
   %39 = function_ref @fatalError : $@convention(thin) (StaticString, StaticString, StaticString) -> Never
-  %40 = string_literal utf8 "fatal error"
+  %40 = string_literal utf8 "Fatal error"
   %41 = integer_literal $Builtin.Word, 11
   %42 = integer_literal $Builtin.Int8, 11
   %43 = struct $StaticString (%40 : $Builtin.RawPointer, %41 : $Builtin.Word, %42 : $Builtin.Int8)
