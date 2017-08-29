@@ -3043,11 +3043,19 @@ namespace {
 
       // Don't visit CoerceExpr with an empty sub expression. They may occur
       // if the body of a closure was not visited while pre-checking because
-      // of an error in the closure's signature
+      // of an error in the closure's signature.
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
         if (!coerceExpr->getSubExpr()) {
           return { false, expr };
         }
+      }
+
+      // Don't visit IfExpr with empty sub expressions. They may occur
+      // if the body of a closure was not visited while pre-checking because
+      // of an error in the closure's signature.
+      if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
+        if (!ifExpr->getThenExpr() || !ifExpr->getElseExpr())
+          return { false, expr };
       }
 
       return { true, expr };

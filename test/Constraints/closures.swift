@@ -600,3 +600,9 @@ func testSR5666(cs: [SR5666?]) -> [String?] {
 
 // Ensure that we still do the appropriate pointer conversion here.
 _ = "".withCString { UnsafeMutableRawPointer(mutating: $0) }
+
+// rdar://problem/34077439 - Crash when pre-checking bails out and
+// leaves us with unfolded SequenceExprs inside closure body.
+_ = { (offset) -> T in // expected-error {{use of undeclared type 'T'}}
+  return offset ? 0 : 0
+}
