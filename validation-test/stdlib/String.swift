@@ -1660,8 +1660,6 @@ for test in testStrings {
     assert((s.startIndex >= s.endIndex) == empty)
     assert(!(s.startIndex > s.endIndex))
     assert(identity1 == s._rawIdentifier())
-
-    assert(s[startIndex].hashValue > 0)
     assert(identity1 == s._rawIdentifier())
   }
 }
