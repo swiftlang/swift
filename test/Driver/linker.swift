@@ -129,6 +129,7 @@
 // LINUX-x86_64: -o [[OBJECTFILE:.*]]
 
 // LINUX-x86_64: clang++{{"? }}
+// LINUX-x86_64-DAG: -pie
 // LINUX-x86_64-DAG: [[OBJECTFILE]]
 // LINUX-x86_64-DAG: -lswiftCore
 // LINUX-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
@@ -144,6 +145,7 @@
 // LINUX-armv6: -o [[OBJECTFILE:.*]]
 
 // LINUX-armv6: clang++{{"? }}
+// LINUX-armv6-DAG: -pie
 // LINUX-armv6-DAG: [[OBJECTFILE]]
 // LINUX-armv6-DAG: -lswiftCore
 // LINUX-armv6-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
@@ -160,6 +162,7 @@
 // LINUX-armv7: -o [[OBJECTFILE:.*]]
 
 // LINUX-armv7: clang++{{"? }}
+// LINUX-armv7-DAG: -pie
 // LINUX-armv7-DAG: [[OBJECTFILE]]
 // LINUX-armv7-DAG: -lswiftCore
 // LINUX-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
@@ -176,6 +179,7 @@
 // LINUX-thumbv7: -o [[OBJECTFILE:.*]]
 
 // LINUX-thumbv7: clang++{{"? }}
+// LINUX-thumbv7-DAG: -pie
 // LINUX-thumbv7-DAG: [[OBJECTFILE]]
 // LINUX-thumbv7-DAG: -lswiftCore
 // LINUX-thumbv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
@@ -192,6 +196,7 @@
 // ANDROID-armv7: -o [[OBJECTFILE:.*]]
 
 // ANDROID-armv7: clang++{{"? }}
+// ANDROID-armv7-DAG: -pie
 // ANDROID-armv7-DAG: [[OBJECTFILE]]
 // ANDROID-armv7-DAG: -lswiftCore
 // ANDROID-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
