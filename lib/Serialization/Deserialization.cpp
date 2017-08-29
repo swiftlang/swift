@@ -4472,6 +4472,80 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   return typeOrOffset;
 }
 
+Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
+                                             llvm::Error &&error,
+                                             ClassDecl *containingClass) {
+  Decl *suppliedMissingMember = nullptr;
+  auto handleMissingClassMember = [&](const DeclDeserializationError &error) {
+    if (error.isDesignatedInitializer())
+      containingClass->setHasMissingDesignatedInitializers();
+    if (error.needsVTableEntry() || error.needsAllocatingVTableEntry())
+      containingClass->setHasMissingVTableEntries();
+
+    if (error.getName().getBaseName() == context.Id_init) {
+      suppliedMissingMember = MissingMemberDecl::forInitializer(
+          context, containingClass, error.getName(), error.needsVTableEntry(),
+          error.needsAllocatingVTableEntry());
+    } else if (error.needsVTableEntry()) {
+      suppliedMissingMember = MissingMemberDecl::forMethod(
+          context, containingClass, error.getName(), error.needsVTableEntry());
+    }
+    // FIXME: Handle other kinds of missing members: properties,
+    // subscripts, and methods that don't need vtable entries.
+  };
+  llvm::handleAllErrors(std::move(error), handleMissingClassMember);
+  return suppliedMissingMember;
+}
+
+Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
+                                             llvm::Error &&error,
+                                             ProtocolDecl *containingProto) {
+  Decl *suppliedMissingMember = nullptr;
+
+  auto handleMissingProtocolMember =
+      [&](const DeclDeserializationError &error) {
+        assert(!error.needsAllocatingVTableEntry());
+        if (error.needsVTableEntry())
+          containingProto->setHasMissingRequirements(true);
+
+        if (error.getName().getBaseName() == context.Id_init) {
+          suppliedMissingMember = MissingMemberDecl::forInitializer(
+              context, containingProto, error.getName(),
+              error.needsVTableEntry(), error.needsAllocatingVTableEntry());
+              return;
+        }
+        if (error.needsVTableEntry()) {
+          suppliedMissingMember = MissingMemberDecl::forMethod(
+              context, containingProto, error.getName(),
+              error.needsVTableEntry());
+        }
+        // FIXME: Handle other kinds of missing members: properties,
+        // subscripts, and methods that don't need vtable entries.
+      };
+  llvm::handleAllErrors(std::move(error), handleMissingProtocolMember);
+  return suppliedMissingMember;
+}
+
+Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) {
+  llvm::consumeError(std::move(error));
+  return nullptr;
+}
+
+Decl *handleErrorAndSupplyMissingMember(ASTContext &context, Decl *container,
+                                        llvm::Error &&error) {
+  // Drop the member if it had a problem.
+  // FIXME: Handle overridable members in class extensions too, someday.
+  if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
+    return handleErrorAndSupplyMissingClassMember(context, std::move(error),
+                                                  containingClass);
+  }
+  if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
+    return handleErrorAndSupplyMissingProtoMember(context, std::move(error),
+                                                  containingProto);
+  }
+  return handleErrorAndSupplyMissingMiscMember(std::move(error));
+}
+
 void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", container);
   ++NumMemberListsLoaded;
@@ -4506,60 +4580,18 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   members.reserve(rawMemberIDs.size());
   for (DeclID rawID : rawMemberIDs) {
     Expected<Decl *> next = getDeclChecked(rawID);
-    if (!next) {
+    if (next) {
+      assert(next.get() && "unchecked error deserializing next member");
+      members.push_back(next.get());
+    } else {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(next.takeError());
 
-      // Drop the member if it had a problem.
-      // FIXME: Handle overridable members in class extensions too, someday.
-      if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
-        auto handleMissingClassMember =
-            [&](const DeclDeserializationError &error) {
-          if (error.isDesignatedInitializer())
-            containingClass->setHasMissingDesignatedInitializers();
-          if (error.needsVTableEntry() || error.needsAllocatingVTableEntry())
-            containingClass->setHasMissingVTableEntries();
-
-          if (error.getName().getBaseName() == getContext().Id_init) {
-            members.push_back(MissingMemberDecl::forInitializer(
-                getContext(), containingClass, error.getName(),
-                error.needsVTableEntry(), error.needsAllocatingVTableEntry()));
-          } else if (error.needsVTableEntry()) {
-            members.push_back(MissingMemberDecl::forMethod(
-                getContext(), containingClass, error.getName(),
-                error.needsVTableEntry()));
-          }
-          // FIXME: Handle other kinds of missing members: properties,
-          // subscripts, and methods that don't need vtable entries.
-        };
-        llvm::handleAllErrors(next.takeError(), handleMissingClassMember);
-      } else if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
-        auto handleMissingProtocolMember =
-            [&](const DeclDeserializationError &error) {
-          assert(!error.needsAllocatingVTableEntry());
-          if (error.needsVTableEntry())
-            containingProto->setHasMissingRequirements(true);
-
-          if (error.getName().getBaseName() == getContext().Id_init) {
-            members.push_back(MissingMemberDecl::forInitializer(
-                getContext(), containingProto, error.getName(),
-                error.needsVTableEntry(), error.needsAllocatingVTableEntry()));
-          } else if (error.needsVTableEntry()) {
-            members.push_back(MissingMemberDecl::forMethod(
-                getContext(), containingProto, error.getName(),
-                error.needsVTableEntry()));
-          }
-          // FIXME: Handle other kinds of missing members: properties,
-          // subscripts, and methods that don't need vtable entries.
-        };
-        llvm::handleAllErrors(next.takeError(), handleMissingProtocolMember);
-      } else {
-        llvm::consumeError(next.takeError());
-      }
-      continue;
+      Decl *suppliedMissingMember = handleErrorAndSupplyMissingMember(
+          getContext(), container, next.takeError());
+      if (suppliedMissingMember)
+        members.push_back(suppliedMissingMember);
     }
-    assert(next.get() && "unchecked error deserializing next member");
-    members.push_back(next.get());
   }
 
   for (auto member : members)
