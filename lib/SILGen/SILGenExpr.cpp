@@ -3473,8 +3473,20 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
       !calledCtor->isImplicit() &&
       usesObjCAllocator(classDecl)) {
 
-    // Check whether the new self is null.
-    SILValue isNonnullSelf = SGF.B.createIsNonnull(E, newSelf.getValue());
+    // Check whether the new self is null. *NOTE* At this point, we can not
+    // access the actual new value using newSelf anymore. We need to grab self
+    // via the normal manner of doing so.
+    SILValue isNonnullSelf;
+    {
+      Scope S(SGF, E);
+      RValue selfRValue =
+          SGF.emitRValueForDecl(E, selfDecl, selfTy->getCanonicalType(),
+                                AccessSemantics::DirectToStorage,
+                                SGFContext::AllowGuaranteedPlusZero);
+      ManagedValue reloadedSelf =
+          std::move(selfRValue).getAsSingleValue(SGF, E);
+      isNonnullSelf = SGF.B.createIsNonnull(E, reloadedSelf.getValue());
+    }
     Condition cond = SGF.emitCondition(isNonnullSelf, E, 
                                        /*hasFalseCode=*/false,
                                        /*invertValue=*/true,
