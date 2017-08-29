@@ -500,8 +500,9 @@ public:
   ///
   /// \param selfValue The 'self' value.
   /// \param cd The class declaration whose members are being destroyed.
-  void emitClassMemberDestruction(SILValue selfValue, ClassDecl *cd,
+  void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
                                   CleanupLocation cleanupLoc);
+
   /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
   void emitCurryThunk(SILDeclRef thunk);

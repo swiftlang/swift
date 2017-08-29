@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -18,7 +18,7 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT: return [[RESULT]] : $X
 
   // CHECK-LABEL: sil hidden @_T012objc_dealloc10SwiftGizmoC{{[_0-9a-zA-Z]*}}fc
-  // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
+  // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : @owned $SwiftGizmo):
   override init() {
     // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var SwiftGizmo }, let, name "self"
     // CHECK:   [[SELF_UNINIT:%.*]] = mark_uninitialized [derivedselfonly] [[SELF_BOX]] : ${ var SwiftGizmo }
@@ -36,7 +36,7 @@ class SwiftGizmo : Gizmo {
 
   // CHECK-LABEL: sil hidden @_T012objc_dealloc10SwiftGizmoCfD : $@convention(method) (@owned SwiftGizmo) -> ()
   deinit {
-    // CHECK: bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
+    // CHECK: bb0([[SELF:%[0-9]+]] : @owned $SwiftGizmo):
     // Call onDestruct()
     // CHECK:   [[ONDESTRUCT_REF:%[0-9]+]] = function_ref @_T012objc_dealloc10onDestructyyF : $@convention(thin) () -> ()
     // CHECK:   [[ONDESTRUCT_RESULT:%[0-9]+]] = apply [[ONDESTRUCT_REF]]() : $@convention(thin) () -> ()
@@ -56,7 +56,7 @@ class SwiftGizmo : Gizmo {
 
   // Objective-C deallocation deinit thunk (i.e., -dealloc).
   // CHECK-LABEL: sil hidden [thunk] @_T012objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> ()
-  // CHECK: bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
+  // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $SwiftGizmo):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
 
   // CHECK:   [[GIZMO_DTOR:%[0-9]+]] = function_ref @_T012objc_dealloc10SwiftGizmoCfD : $@convention(method) (@owned SwiftGizmo) -> ()
@@ -65,7 +65,7 @@ class SwiftGizmo : Gizmo {
 
   // Objective-C IVar initializer (i.e., -.cxx_construct)
   // CHECK-LABEL: sil hidden @_T012objc_dealloc10SwiftGizmoCfeTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo
-  // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
+  // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : @owned $SwiftGizmo):
   // CHECK-NEXT:   debug_value [[SELF_PARAM]] : $SwiftGizmo, let, name "self"
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $SwiftGizmo
   // CHECK:        [[XINIT:%[0-9]+]] = function_ref @_T012objc_dealloc10SwiftGizmoC1xAA1XCvfi
@@ -80,10 +80,12 @@ class SwiftGizmo : Gizmo {
 
   // Objective-C IVar destroyer (i.e., -.cxx_destruct)
   // CHECK-LABEL: sil hidden @_T012objc_dealloc10SwiftGizmoCfETo : $@convention(objc_method) (SwiftGizmo) -> ()
-  // CHECK:      bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
-  // CHECK-NEXT:  debug_value [[SELF]] : $SwiftGizmo, let, name "self"
-  // CHECK-NEXT: [[X:%[0-9]+]] = ref_element_addr [[SELF]] : $SwiftGizmo, #SwiftGizmo.x
+  // CHECK:      bb0([[SELF:%[0-9]+]] : @unowned $SwiftGizmo):
+  // CHECK-NEXT: debug_value [[SELF]] : $SwiftGizmo, let, name "self"
+  // CHECK-NEXT: [[SELF_BORROW:%.*]] = begin_borrow [[SELF]]
+  // CHECK-NEXT: [[X:%[0-9]+]] = ref_element_addr [[SELF_BORROW]] : $SwiftGizmo, #SwiftGizmo.x
   // CHECK-NEXT: destroy_addr [[X]] : $*X
+  // CHECK-NEXT: end_borrow [[SELF_BORROW]] from [[SELF]]
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[RESULT]] : $()
 }

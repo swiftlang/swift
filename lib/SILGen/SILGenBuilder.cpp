@@ -192,10 +192,19 @@ AllocExistentialBoxInst *SILGenBuilder::createAllocExistentialBox(
 ManagedValue SILGenBuilder::createStructExtract(SILLocation loc,
                                                 ManagedValue base,
                                                 VarDecl *decl) {
-  ManagedValue borrowedBase = SGF.emitManagedBeginBorrow(loc, base.getValue());
+  ManagedValue borrowedBase = base.borrow(SGF, loc);
   SILValue extract =
       SILBuilder::createStructExtract(loc, borrowedBase.getValue(), decl);
   return ManagedValue::forUnmanaged(extract);
+}
+
+ManagedValue SILGenBuilder::createRefElementAddr(SILLocation loc,
+                                                 ManagedValue operand,
+                                                 VarDecl *field,
+                                                 SILType resultTy) {
+  operand = operand.borrow(SGF, loc);
+  SILValue result = createRefElementAddr(loc, operand.getValue(), field);
+  return ManagedValue::forUnmanaged(result);
 }
 
 ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
