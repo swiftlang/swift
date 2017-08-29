@@ -49,6 +49,7 @@ class SwiftGizmo : Gizmo {
     // CHECK:   [[SUPER_DEALLOC:%[0-9]+]] = super_method [[SELF]] : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> ()
     // CHECK:   [[SUPER:%[0-9]+]] = upcast [[SELF]] : $SwiftGizmo to $Gizmo
     // CHECK:   [[SUPER_DEALLOC_RESULT:%[0-9]+]] = apply [[SUPER_DEALLOC]]([[SUPER]]) : $@convention(objc_method) (Gizmo) -> ()
+    // CHECK:   end_lifetime [[SUPER]]
     // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
     // CHECK:   return [[RESULT]] : $()
   }
