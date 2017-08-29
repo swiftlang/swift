@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -69,7 +69,7 @@ extension FinalGizmo {
 }
 
 // CHECK-LABEL: sil hidden @_T019objc_attr_NSManaged9testFinalSSAA0E5GizmoCF : $@convention(thin) (@owned FinalGizmo) -> @owned String {
-// CHECK: bb0([[ARG:%.*]] : $FinalGizmo):
+// CHECK: bb0([[ARG:%.*]] : @owned $FinalGizmo):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: class_method [volatile] [[BORROWED_ARG]] : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()
 // CHECK-NOT: return

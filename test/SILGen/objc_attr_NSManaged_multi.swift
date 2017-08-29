@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s %S/objc_attr_NSManaged.swift -I %S/Inputs -enable-source-import -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s %S/objc_attr_NSManaged.swift -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
 // CHECK-LABEL: sil hidden @_T025objc_attr_NSManaged_multi9testMultiyXlAA10SwiftGizmoCF : $@convention(thin) (@owned SwiftGizmo) -> @owned AnyObject {
-// CHECK: bb0([[ARG:%.*]] : $SwiftGizmo):
+// CHECK: bb0([[ARG:%.*]] : @owned $SwiftGizmo):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: = class_method [volatile] [[BORROWED_ARG]] : $SwiftGizmo, #SwiftGizmo.kvc!1.foreign : (SwiftGizmo) -> () -> (), $@convention(objc_method) (SwiftGizmo) -> ()
 // CHECK-NOT: return
@@ -22,7 +22,7 @@ func testMulti(_ obj: SwiftGizmo) -> AnyObject {
 }
 
 // CHECK-LABEL: sil hidden @_T025objc_attr_NSManaged_multi14testFinalMultiSSAA0F5GizmoCF : $@convention(thin) (@owned FinalGizmo) -> @owned String {
-// CHECK: bb0([[ARG:%.*]] : $FinalGizmo):
+// CHECK: bb0([[ARG:%.*]] : @owned $FinalGizmo):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: class_method [volatile] [[BORROWED_ARG]] : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()
 // CHECK-NOT: return
