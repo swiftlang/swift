@@ -579,3 +579,12 @@ _ = "".withCString { UnsafeMutableRawPointer(mutating: $0) }
 _ = { (offset) -> T in // expected-error {{use of undeclared type 'T'}}
   return offset ? 0 : 0
 }
+
+struct SR5202<T> {
+  func map<R>(fn: (T) -> R) {}
+}
+
+SR5202<()>().map{ return 0 }
+SR5202<()>().map{ _ in return 0 }
+SR5202<Void>().map{ return 0 }
+SR5202<Void>().map{ _ in return 0 }
