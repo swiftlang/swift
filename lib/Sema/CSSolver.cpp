@@ -1786,12 +1786,15 @@ bool ConstraintSystem::solveSimplified(
   PotentialBindings bestBindings;
   std::tie(bestBindings, bestTypeVar) = determineBestBindings();
 
-  // If we have a binding that does not involve type variables, or we have
-  // no other option, go ahead and try the bindings for this type variable.
+  // If we have a binding that does not involve type variables, and is
+  // not fully bound, and is either not a literal or is a collection
+  // literal, or we have no disjunction to attempt instead, go ahead
+  // and try the bindings for this type variable.
   if (bestBindings &&
       (!disjunction ||
        (!bestBindings.InvolvesTypeVariables && !bestBindings.FullyBound &&
-        bestBindings.LiteralBinding == LiteralBindingKind::None))) {
+        (bestBindings.LiteralBinding == LiteralBindingKind::None ||
+         bestBindings.LiteralBinding == LiteralBindingKind::Collection)))) {
     return tryTypeVariableBindings(solverState->depth, bestTypeVar,
                                    bestBindings.Bindings, solutions,
                                    allowFreeTypeVariables);
