@@ -40,6 +40,11 @@ extension String {
   var capacity: Int {
     return _core.nativeBuffer?.capacity ?? 0
   }
+  func _rawIdentifier() -> (UInt, UInt) {
+    let triple = unsafeBitCast(self, to: (UInt, UInt, UInt).self)
+    let minusCount = (triple.0, triple.2)
+    return minusCount
+  }
 }
 
 extension Substring {
@@ -1567,6 +1572,235 @@ StringTests.test("String.removeSubrange()/closedRange") {
       test.closedExpected,
       theString,
       stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// COW(🐄) tests
+//===----------------------------------------------------------------------===//
+
+public var testSuffix = "z"
+StringTests.test("COW.Smoke") {
+  var s1 = "Cypseloides" + testSuffix
+  var identity1 = s1._rawIdentifier()
+  
+  var s2 = s1
+  expectEqual(identity1, s2._rawIdentifier())
+  
+  s2.append(" cryptus")
+  assert(identity1 != s2._rawIdentifier())
+  
+  s1.remove(at: s1.startIndex)
+  expectEqual(identity1, s1._rawIdentifier())
+  
+  _fixLifetime(s1)
+  _fixLifetime(s2)  
+}
+
+func getCOWStaticString() -> String {
+  let s = "Electricity"
+  return s
+}
+
+func getCOWAsciiString() -> String {
+  var s = "abcdefg"
+  s += "hijklmnop"
+  s += "qrstuvwxy"
+  return s
+}
+
+func getCOWUnicodeString() -> String {
+  var s = "🐮🐄"
+  s += "🤠"
+  return s
+}
+
+struct COWStringTest {
+  let test: String
+  let name: String
+}
+
+var testStrings: [COWStringTest] {
+  return [/*COWStringTest(test: getCOWStaticString(), name: "Static"),*/
+          COWStringTest(test: getCOWAsciiString(), name: "ASCII"),
+          COWStringTest(test: getCOWUnicodeString(), name: "Unicode")
+        ]
+}
+
+for test in testStrings {
+  StringTests.test("COW.\(test.name).IndexesDontAffectUniquenessCheck") {
+    var s = test.test + testSuffix
+    let identity1 = s._rawIdentifier()
+  
+    var startIndex = s.startIndex
+    var endIndex = s.endIndex
+    assert(startIndex != endIndex)
+    assert(startIndex < endIndex)
+    assert(startIndex <= endIndex)
+    assert(!(startIndex >= endIndex))
+    assert(!(startIndex > endIndex))
+  
+    assert(identity1 == s._rawIdentifier())
+  
+    // Keep indexes alive during the calls above
+    _fixLifetime(startIndex)
+    _fixLifetime(endIndex)
+  }
+}
+
+for test in testStrings {
+  StringTests.test("COW.\(test.name).SubscriptWithIndexDoesNotReallocate") {
+    var s = test.test + testSuffix
+    var identity1 = s._rawIdentifier()
+
+    var startIndex = s.startIndex
+    let empty = startIndex == s.endIndex
+    assert((s.startIndex < s.endIndex) == !empty)
+    assert(s.startIndex <= s.endIndex)
+    assert((s.startIndex >= s.endIndex) == empty)
+    assert(!(s.startIndex > s.endIndex))
+    assert(identity1 == s._rawIdentifier())
+
+    assert(s[startIndex].hashValue > 0)
+    assert(identity1 == s._rawIdentifier())
+  }
+}
+
+for test in testStrings {
+  StringTests.test("COW.\(test.name).RemoveAtDoesNotReallocate") {
+    do {
+      var s = test.test + testSuffix
+      var identity1 = s._rawIdentifier()
+
+      let index1 = s.startIndex
+      assert(identity1 == s._rawIdentifier())
+
+      let _ = s.remove(at: index1)
+
+      expectEqual(identity1, s._rawIdentifier())
+    }
+
+    do {
+      var s1 = test.test + testSuffix
+      var identity1 = s1._rawIdentifier()
+
+      var s2 = s1
+      expectEqual(identity1, s1._rawIdentifier())
+      expectEqual(identity1, s2._rawIdentifier())
+
+      var index1 = s1.startIndex
+      expectEqual(identity1, s1._rawIdentifier())
+      expectEqual(identity1, s2._rawIdentifier())
+
+      let removed = s2.remove(at: index1)
+
+      expectEqual(identity1, s1._rawIdentifier())
+      assert(identity1 != s2._rawIdentifier())
+    }
+  }
+}
+
+for test in testStrings {
+  StringTests.test("COW.\(test.name).RemoveAtDoesNotReallocate") {
+    do {
+      var s = test.test + testSuffix
+      assert(s.count > 0)
+
+      s.removeAll()
+      var identity1 = s._rawIdentifier()
+      assert(s.count == 0)
+      assert(identity1 == s._rawIdentifier())
+    }
+
+    do {
+      var s = test.test + testSuffix
+      var identity1 = s._rawIdentifier()
+      assert(s.count > 3)
+
+      s.removeAll(keepingCapacity: true)
+      assert(identity1 == s._rawIdentifier())
+      assert(s.count == 0)
+    }
+
+    do {
+      var s1 = test.test + testSuffix
+      var identity1 = s1._rawIdentifier()
+      assert(s1.count > 0)
+
+      var s2 = s1
+      s2.removeAll()
+      var identity2 = s2._rawIdentifier()
+      assert(identity1 == s1._rawIdentifier())
+      assert(identity2 != identity1)
+      assert(s1.count > 0)
+      assert(s2.count == 0)
+
+      // Keep variables alive.
+      _fixLifetime(s1)
+      _fixLifetime(s2)
+    }
+
+    do {
+      var s1 = test.test + testSuffix
+      var identity1 = s1._rawIdentifier()
+      assert(s1.count > 0)
+
+      var s2 = s1
+      s2.removeAll(keepingCapacity: true)
+      var identity2 = s2._rawIdentifier()
+      assert(identity1 == s1._rawIdentifier())
+      assert(identity2 != identity1)
+      assert(s1.count > 0)
+      assert(s2.count == 0)
+
+      // Keep variables alive.
+      _fixLifetime(s1)
+      _fixLifetime(s2)
+    }
+  }
+}
+
+for test in testStrings {
+  StringTests.test("COW.\(test.name).CountDoesNotReallocate") {
+    var s = test.test + testSuffix
+    var identity1 = s._rawIdentifier()
+
+    assert(s.count > 0)
+    assert(identity1 == s._rawIdentifier())
+  } 
+}
+
+for test in testStrings {
+  StringTests.test("COW.\(test.name).GenerateDoesNotReallocate") {
+    var s = test.test + testSuffix
+    var identity1 = s._rawIdentifier()
+
+    var iter = s.makeIterator()
+    var copy = String()
+    while let value = iter.next() {
+      copy.append(value)
+    }
+    expectEqual(copy, s)
+    assert(identity1 == s._rawIdentifier())
+  }
+}
+
+for test in testStrings {
+  StringTests.test("COW.\(test.name).EqualityTestDoesNotReallocate") {
+    var s1 = test.test + testSuffix
+    var identity1 = s1._rawIdentifier()
+
+    var s2 = test.test + testSuffix
+    var identity2 = s2._rawIdentifier()
+
+    assert(s1 == s2)
+    assert(identity1 == s1._rawIdentifier())
+    assert(identity2 == s2._rawIdentifier())
+
+    s2.remove(at: s2.startIndex)
+    assert(s1 != s2)
+    assert(identity1 == s1._rawIdentifier())
+    assert(identity2 == s2._rawIdentifier())
   }
 }
 
