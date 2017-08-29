@@ -458,29 +458,32 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBeforeInIfConfig(E))
     return {false, E};
 
-  auto addCallArgExpr = [&](const Expr *Elem, TupleExpr *ParentTupleExpr) {
+  auto addCallArgExpr = [&](Expr *Elem, TupleExpr *ParentTupleExpr) {
     if (isCurrentCallArgExpr(ParentTupleExpr)) {
-      CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, E);
+      CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
       SyntaxStructureNode SN;
       SN.Kind = SyntaxStructureKind::Argument;
       SN.NameRange = NR;
-      SN.BodyRange = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+      SN.BodyRange = charSourceRangeFromSourceRange(SM, Elem->getSourceRange());
       if (NR.isValid()) {
         SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
-                                                                  E->getEndLoc()));
+                                                            Elem->getEndLoc()));
         passTokenNodesUntil(NR.getStart(),
                             PassNodesBehavior::ExcludeNodeAtLocation);
       }
       else
         SN.Range = SN.BodyRange;
 
-      pushStructureNode(SN, E);
+      pushStructureNode(SN, Elem);
     }
   };
 
   if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
+    // the argument value is a tuple expression already, we can just extract it
     addCallArgExpr(E, ParentTupleExpr);
   } else if (auto *ParentOptionalExpr = dyn_cast_or_null<OptionalEvaluationExpr>(Parent.getAsExpr())) {
+    // if an argument value is an optional expression, we should extract the
+    // argument from the subexpression
     if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(ParentOptionalExpr->getSubExpr())) {
       addCallArgExpr(E, ParentTupleExpr);
     }
