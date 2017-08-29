@@ -2439,7 +2439,7 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  SemaLocResolver Resolver(*SF);
+  CursorInfoResolver Resolver(*SF);
   SourceManager &SM = SF->getASTContext().SourceMgr;
   auto Offset = SM.resolveFromLineCol(BufID, Pair.getValue().first,
                                       Pair.getValue().second);

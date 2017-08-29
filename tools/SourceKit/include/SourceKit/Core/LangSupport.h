@@ -257,7 +257,7 @@ struct RefactoringInfo {
   StringRef UnavailableReason;
 };
 
-struct CursorInfo {
+struct CursorInfoData {
   bool IsCancelled = false;
   UIdent Kind;
   StringRef Name;
@@ -567,7 +567,7 @@ public:
                              unsigned Length, bool Actionables,
                              bool CancelOnSubsequentRequest,
                              ArrayRef<const char *> Args,
-                          std::function<void(const CursorInfo &)> Receiver) = 0;
+                      std::function<void(const CursorInfoData &)> Receiver) = 0;
 
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
@@ -584,7 +584,7 @@ public:
   getCursorInfoFromUSR(StringRef Filename, StringRef USR,
                        bool CancelOnSubsequentRequest,
                        ArrayRef<const char *> Args,
-                       std::function<void(const CursorInfo &)> Receiver) = 0;
+                     std::function<void(const CursorInfoData &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,

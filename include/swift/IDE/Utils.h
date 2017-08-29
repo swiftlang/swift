@@ -147,7 +147,7 @@ class XMLEscapingPrinter : public StreamPrinter {
   void printXML(StringRef Text);
 };
 
-enum class SemaTokenKind {
+enum class CursorInfoKind {
   Invalid,
   ValueRef,
   ModuleRef,
@@ -155,8 +155,8 @@ enum class SemaTokenKind {
   StmtStart,
 };
 
-struct SemaToken {
-  SemaTokenKind Kind = SemaTokenKind::Invalid;
+struct ResolvedCursorInfo {
+  CursorInfoKind Kind = CursorInfoKind::Invalid;
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
@@ -170,32 +170,48 @@ struct SemaToken {
   Stmt *TrailingStmt = nullptr;
   Expr *TrailingExpr = nullptr;
 
-  SemaToken() = default;
-  SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-            SourceLoc Loc, bool IsRef, Type Ty, Type ContainerType) :
-            Kind(SemaTokenKind::ValueRef), ValueD(ValueD), CtorTyRef(CtorTyRef),
-            ExtTyRef(ExtTyRef), Loc(Loc), IsRef(IsRef), Ty(Ty),
-            DC(ValueD->getDeclContext()), ContainerType(ContainerType) {}
-  SemaToken(ModuleEntity Mod, SourceLoc Loc) : Kind(SemaTokenKind::ModuleRef),
-                                               Mod(Mod), Loc(Loc) { }
-  SemaToken(Stmt *TrailingStmt) : Kind(SemaTokenKind::StmtStart),
-                                  TrailingStmt(TrailingStmt) {}
-  SemaToken(Expr* TrailingExpr) : Kind(SemaTokenKind::ExprStart),
-                                  TrailingExpr(TrailingExpr) {}
+  ResolvedCursorInfo() = default;
+  ResolvedCursorInfo(ValueDecl *ValueD,
+                     TypeDecl *CtorTyRef,
+                     ExtensionDecl *ExtTyRef,
+                     SourceLoc Loc,
+                     bool IsRef,
+                     Type Ty,
+                     Type ContainerType) :
+                        Kind(CursorInfoKind::ValueRef),
+                        ValueD(ValueD),
+                        CtorTyRef(CtorTyRef),
+                        ExtTyRef(ExtTyRef),
+                        Loc(Loc),
+                        IsRef(IsRef),
+                        Ty(Ty),
+                        DC(ValueD->getDeclContext()),
+                        ContainerType(ContainerType) {}
+  ResolvedCursorInfo(ModuleEntity Mod,
+                     SourceLoc Loc) :
+                        Kind(CursorInfoKind::ModuleRef),
+                        Mod(Mod),
+                        Loc(Loc) { }
+  ResolvedCursorInfo(Stmt *TrailingStmt) :
+                        Kind(CursorInfoKind::StmtStart),
+                        TrailingStmt(TrailingStmt) {}
+  ResolvedCursorInfo(Expr* TrailingExpr) :
+                        Kind(CursorInfoKind::ExprStart),
+                        TrailingExpr(TrailingExpr) {}
   bool isValid() const { return !isInvalid(); }
-  bool isInvalid() const { return Kind == SemaTokenKind::Invalid; }
+  bool isInvalid() const { return Kind == CursorInfoKind::Invalid; }
 };
 
-class SemaLocResolver : public SourceEntityWalker {
+class CursorInfoResolver : public SourceEntityWalker {
   SourceFile &SrcFile;
   SourceLoc LocToResolve;
-  SemaToken SemaTok;
+  ResolvedCursorInfo CursorInfo;
   Type ContainerType;
   llvm::SmallVector<Expr*, 4> TrailingExprStack;
 
 public:
-  explicit SemaLocResolver(SourceFile &SrcFile) : SrcFile(SrcFile) { }
-  SemaToken resolve(SourceLoc Loc);
+  explicit CursorInfoResolver(SourceFile &SrcFile) : SrcFile(SrcFile) { }
+  ResolvedCursorInfo resolve(SourceLoc Loc);
   SourceManager &getSourceMgr() const;
 private:
   bool walkToExprPre(Expr *E) override;
@@ -215,7 +231,7 @@ private:
   bool rangeContainsLoc(SourceRange Range) const {
     return getSourceMgr().rangeContainsTokenLoc(Range, LocToResolve);
   }
-  bool isDone() const { return SemaTok.isValid(); }
+  bool isDone() const { return CursorInfo.isValid(); }
   bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                   SourceLoc Loc, bool IsRef, Type Ty = Type());
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);

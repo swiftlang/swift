@@ -68,64 +68,64 @@ void XMLEscapingPrinter::printXML(StringRef Text) {
   OS << Text;
 }
 
-SourceManager &SemaLocResolver::getSourceMgr() const
+SourceManager &CursorInfoResolver::getSourceMgr() const
 {
   return SrcFile.getASTContext().SourceMgr;
 }
 
-bool SemaLocResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
+bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
                                  ExtensionDecl *ExtTyRef, SourceLoc Loc,
                                  bool IsRef, Type Ty) {
   if (!D->hasName())
     return false;
 
   if (Loc == LocToResolve) {
-    SemaTok = { D, CtorTyRef, ExtTyRef, Loc, IsRef, Ty, ContainerType };
+    CursorInfo = { D, CtorTyRef, ExtTyRef, Loc, IsRef, Ty, ContainerType };
     return true;
   }
   return false;
 }
 
-bool SemaLocResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
+bool CursorInfoResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
   if (Loc == LocToResolve) {
-    SemaTok = { Mod, Loc };
+    CursorInfo = { Mod, Loc };
     return true;
   }
   return false;
 }
 
-bool SemaLocResolver::tryResolve(Stmt *St) {
+bool CursorInfoResolver::tryResolve(Stmt *St) {
   if (auto *LST = dyn_cast<LabeledStmt>(St)) {
     if (LST->getStartLoc() == LocToResolve) {
-      SemaTok = { St };
+      CursorInfo = { St };
       return true;
     }
   }
   if (auto *CS = dyn_cast<CaseStmt>(St)) {
     if (CS->getStartLoc() == LocToResolve) {
-      SemaTok = { St };
+      CursorInfo = { St };
       return true;
     }
   }
   return false;
 }
 
-bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
   return visitDeclReference(D, Range, nullptr, nullptr, Type(),
                     ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
 }
 
-SemaToken SemaLocResolver::resolve(SourceLoc Loc) {
+ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
   assert(Loc.isValid());
   LocToResolve = Loc;
-  SemaTok = SemaToken();
+  CursorInfo = ResolvedCursorInfo();
   walk(SrcFile);
-  return SemaTok;
+  return CursorInfo;
 }
 
-bool SemaLocResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
+bool CursorInfoResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
   if (!rangeContainsLoc(D->getSourceRange()))
     return false;
 
@@ -139,7 +139,7 @@ bool SemaLocResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
   return true;
 }
 
-bool SemaLocResolver::walkToDeclPost(Decl *D) {
+bool CursorInfoResolver::walkToDeclPost(Decl *D) {
   if (isDone())
     return false;
   if (getSourceMgr().isBeforeInBuffer(LocToResolve, D->getStartLoc()))
@@ -147,7 +147,7 @@ bool SemaLocResolver::walkToDeclPost(Decl *D) {
   return true;
 }
 
-bool SemaLocResolver::walkToStmtPre(Stmt *S) {
+bool CursorInfoResolver::walkToStmtPre(Stmt *S) {
   // FIXME: Even implicit Stmts should have proper ranges that include any
   // non-implicit Stmts (fix Stmts created for lazy vars).
   if (!S->isImplicit() && !rangeContainsLoc(S->getSourceRange()))
@@ -155,7 +155,7 @@ bool SemaLocResolver::walkToStmtPre(Stmt *S) {
   return !tryResolve(S);
 }
 
-bool SemaLocResolver::walkToStmtPost(Stmt *S) {
+bool CursorInfoResolver::walkToStmtPost(Stmt *S) {
   if (isDone())
     return false;
   // FIXME: Even implicit Stmts should have proper ranges that include any
@@ -166,16 +166,17 @@ bool SemaLocResolver::walkToStmtPost(Stmt *S) {
   return true;
 }
 
-bool SemaLocResolver::visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                         TypeDecl *CtorTyRef,
-                                         ExtensionDecl *ExtTyRef, Type T,
-                                         ReferenceMetaData Data) {
+bool CursorInfoResolver::visitDeclReference(ValueDecl *D,
+                                            CharSourceRange Range,
+                                            TypeDecl *CtorTyRef,
+                                            ExtensionDecl *ExtTyRef, Type T,
+                                            ReferenceMetaData Data) {
   if (isDone())
     return false;
   return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
 }
 
-bool SemaLocResolver::walkToExprPre(Expr *E) {
+bool CursorInfoResolver::walkToExprPre(Expr *E) {
   if (!isDone()) {
     if (auto SAE = dyn_cast<SelfApplyExpr>(E)) {
       if (SAE->getFn()->getStartLoc() == LocToResolve) {
@@ -195,36 +196,37 @@ bool SemaLocResolver::walkToExprPre(Expr *E) {
   return true;
 }
 
-bool SemaLocResolver::walkToExprPost(Expr *E) {
+bool CursorInfoResolver::walkToExprPost(Expr *E) {
   if (isDone())
     return false;
   if (!TrailingExprStack.empty() && TrailingExprStack.back() == E) {
     // We return the outtermost expression in the token info.
-    SemaTok = { TrailingExprStack.front() };
+    CursorInfo = { TrailingExprStack.front() };
     return false;
   }
   return true;
 }
 
-bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,
-                                       ValueDecl *D) {
+bool CursorInfoResolver::visitCallArgName(Identifier Name,
+                                          CharSourceRange Range,
+                                          ValueDecl *D) {
   if (isDone())
     return false;
   bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
   if (Found)
-    SemaTok.IsKeywordArgument = true;
+    CursorInfo.IsKeywordArgument = true;
   return !Found;
 }
 
-bool SemaLocResolver::
+bool CursorInfoResolver::
 visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc, ValueDecl *D) {
   if (isDone())
     return false;
   return !tryResolve(D, nullptr, nullptr, StartLoc, /*IsRef=*/false);
 }
 
-bool SemaLocResolver::visitModuleReference(ModuleEntity Mod,
-                                           CharSourceRange Range) {
+bool CursorInfoResolver::visitModuleReference(ModuleEntity Mod,
+                                              CharSourceRange Range) {
   if (isDone())
     return false;
   if (Mod.isBuiltinModule())

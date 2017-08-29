@@ -617,7 +617,7 @@ RefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
 /// rename or reverse if statement.
 class TokenBasedRefactoringAction : public RefactoringAction {
 protected:
-  SemaToken SemaTok;
+  ResolvedCursorInfo CursorInfo;
   bool CanProceed;
 public:
   TokenBasedRefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
@@ -630,9 +630,9 @@ public:
       return;
 
     // Resolve the sema token and save it for later use.
-    SemaLocResolver Resolver(*TheFile);
-    SemaTok = Resolver.resolve(StartLoc);
-    CanProceed = SemaTok.isValid();
+    CursorInfoResolver Resolver(*TheFile);
+    CursorInfo = Resolver.resolve(StartLoc);
+    CanProceed = CursorInfo.isValid();
   }
 };
 
@@ -643,7 +643,7 @@ class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
                           SourceEditConsumer &EditConsumer,                   \
                           DiagnosticConsumer &DiagConsumer) :                 \
     TokenBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
-  static bool isApplicable(SemaToken Tok);                                    \
+  static bool isApplicable(ResolvedCursorInfo Tok);                           \
   bool performChange() override;                                              \
 };
 #include "swift/IDE/RefactoringKinds.def"
@@ -673,10 +673,10 @@ class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
 };
 #include "swift/IDE/RefactoringKinds.def"
 
-bool RefactoringActionLocalRename::isApplicable(SemaToken Tok) {
-  if (Tok.Kind != SemaTokenKind::ValueRef)
+bool RefactoringActionLocalRename::isApplicable(ResolvedCursorInfo CursorInfo) {
+  if (CursorInfo.Kind != CursorInfoKind::ValueRef)
     return false;
-  auto RenameOp = getAvailableRenameForDecl(Tok.ValueD);
+  auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD);
   return RenameOp.hasValue() &&
     RenameOp.getValue() == RefactoringKind::LocalRename;
 }
@@ -712,10 +712,10 @@ bool RefactoringActionLocalRename::performChange() {
                         MD->getNameStr());
     return true;
   }
-  SemaLocResolver Resolver(*TheFile);
-  SemaToken SemaT = Resolver.resolve(StartLoc);
-  if (SemaT.isValid() && SemaT.ValueD) {
-    ValueDecl *VD = SemaT.ValueD;
+  CursorInfoResolver Resolver(*TheFile);
+  ResolvedCursorInfo CursorInfo = Resolver.resolve(StartLoc);
+  if (CursorInfo.isValid() && CursorInfo.ValueD) {
+    ValueDecl *VD = CursorInfo.ValueD;
     llvm::SmallVector<DeclContext *, 8> Scopes;
     analyzeRenameScope(VD, DiagEngine, Scopes);
     if (Scopes.empty())
@@ -1507,7 +1507,7 @@ public:
 
   FillProtocolStubContext() : DC(nullptr), Adopter(), FillingContents({}) {};
 
-  static FillProtocolStubContext getContextFromSemaTok(SemaToken Tok);
+  static FillProtocolStubContext getContextFromCursorInfo(ResolvedCursorInfo Tok);
 
   ArrayRef<ValueDecl*> getFillingContents() const {
     return llvm::makeArrayRef(FillingContents);
@@ -1526,14 +1526,14 @@ public:
 };
 
 FillProtocolStubContext FillProtocolStubContext::
-getContextFromSemaTok(SemaToken Tok) {
-  assert(Tok.isValid());
-  if (!Tok.IsRef) {
+getContextFromCursorInfo(ResolvedCursorInfo CursorInfo) {
+  assert(CursorInfo.isValid());
+  if (!CursorInfo.IsRef) {
     // If the type name is on the declared nominal, e.g. "class A {}"
-    if (auto ND = dyn_cast<NominalTypeDecl>(Tok.ValueD)) {
+    if (auto ND = dyn_cast<NominalTypeDecl>(CursorInfo.ValueD)) {
       return FillProtocolStubContext(ND);
     }
-  } else if (auto *ED = Tok.ExtTyRef) {
+  } else if (auto *ED = CursorInfo.ExtTyRef) {
     // If the type ref is on a declared extension, e.g. "extension A {}"
     return FillProtocolStubContext(ED);
   }
@@ -1556,8 +1556,8 @@ getUnsatisfiedRequirements(const DeclContext *DC) {
   return NonWitnessedReqs;
 }
 
-bool RefactoringActionFillProtocolStub::isApplicable(SemaToken Tok) {
-  return FillProtocolStubContext::getContextFromSemaTok(Tok).canProceed();
+bool RefactoringActionFillProtocolStub::isApplicable(ResolvedCursorInfo Tok) {
+  return FillProtocolStubContext::getContextFromCursorInfo(Tok).canProceed();
 };
 
 bool RefactoringActionFillProtocolStub::performChange() {
@@ -1567,7 +1567,7 @@ bool RefactoringActionFillProtocolStub::performChange() {
 
   // Get the filling protocol context from the input token.
   FillProtocolStubContext Context = FillProtocolStubContext::
-  getContextFromSemaTok(SemaTok);
+  getContextFromCursorInfo(CursorInfo);
 
   // If the filling context disallows continue, abort.
   if (!Context.canProceed())
@@ -1603,31 +1603,31 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
   DiagnosticEngine DiagEngine(SM);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
-  SemaLocResolver Resolver(*SF);
+  CursorInfoResolver Resolver(*SF);
   SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().getValue(), Line, Column);
   if (Loc.isInvalid())
     return {};
-  SemaToken Tok = Resolver.resolve(Lexer::getLocForStartOfToken(SM, Loc));
+  ResolvedCursorInfo Tok = Resolver.resolve(Lexer::getLocForStartOfToken(SM, Loc));
   return collectAvailableRefactorings(SF, Tok, Scratch, /*Exclude rename*/false);
 }
 
-bool RefactoringActionExpandDefault::isApplicable(SemaToken Tok) {
-  if (Tok.Kind != SemaTokenKind::StmtStart)
+bool RefactoringActionExpandDefault::isApplicable(ResolvedCursorInfo CursorInfo) {
+  if (CursorInfo.Kind != CursorInfoKind::StmtStart)
     return false;
-  if (auto *CS = dyn_cast<CaseStmt>(Tok.TrailingStmt)) {
+  if (auto *CS = dyn_cast<CaseStmt>(CursorInfo.TrailingStmt)) {
     return CS->isDefault();
   }
   return false;
 }
 
 bool RefactoringActionExpandDefault::performChange() {
-  if (!isApplicable(SemaTok)) {
+  if (!isApplicable(CursorInfo)) {
     DiagEngine.diagnose(SourceLoc(), diag::invalid_default_location);
     return true;
   }
 
   // Try to find the switch statement enclosing the default statement.
-  auto *CS = static_cast<CaseStmt*>(SemaTok.TrailingStmt);
+  auto *CS = static_cast<CaseStmt*>(CursorInfo.TrailingStmt);
   auto IsSwitch = [](ASTNode Node) {
     return Node.is<Stmt*>() &&
       Node.get<Stmt*>()->getKind() == StmtKind::Switch;
@@ -1693,8 +1693,8 @@ bool RefactoringActionExpandDefault::performChange() {
   return false;
 }
 
-static Expr *findLocalizeTarget(SemaToken Tok) {
-  if (Tok.Kind != SemaTokenKind::ExprStart)
+static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
+  if (CursorInfo.Kind != CursorInfoKind::ExprStart)
     return nullptr;
   struct StringLiteralFinder: public SourceEntityWalker {
     SourceLoc StartLoc;
@@ -1711,17 +1711,17 @@ static Expr *findLocalizeTarget(SemaToken Tok) {
       }
       return true;
     }
-  } Walker(Tok.TrailingExpr->getStartLoc());
-  Walker.walk(Tok.TrailingExpr);
+  } Walker(CursorInfo.TrailingExpr->getStartLoc());
+  Walker.walk(CursorInfo.TrailingExpr);
   return Walker.Target;
 }
 
-bool RefactoringActionLocalizeString::isApplicable(SemaToken Tok) {
+bool RefactoringActionLocalizeString::isApplicable(ResolvedCursorInfo Tok) {
   return findLocalizeTarget(Tok);
 }
 
 bool RefactoringActionLocalizeString::performChange() {
-  Expr* Target = findLocalizeTarget(SemaTok);
+  Expr* Target = findLocalizeTarget(CursorInfo);
    if (!Target)
     return true;
   EditConsumer.accept(SM, Target->getStartLoc(), "NSLocalizedString(");
@@ -1898,25 +1898,26 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
 }
 
 ArrayRef<RefactoringKind> swift::ide::
-collectAvailableRefactorings(SourceFile *SF, SemaToken Tok,
+collectAvailableRefactorings(SourceFile *SF,
+                             ResolvedCursorInfo CursorInfo,
                              std::vector<RefactoringKind> &Scratch,
                              bool ExcludeRename) {
   llvm::SmallVector<RefactoringKind, 2> AllKinds;
-  switch(Tok.Kind) {
-  case SemaTokenKind::ModuleRef:
-  case SemaTokenKind::Invalid:
-  case SemaTokenKind::StmtStart:
-  case SemaTokenKind::ExprStart:
+  switch(CursorInfo.Kind) {
+  case CursorInfoKind::ModuleRef:
+  case CursorInfoKind::Invalid:
+  case CursorInfoKind::StmtStart:
+  case CursorInfoKind::ExprStart:
     break;
-  case SemaTokenKind::ValueRef: {
-    auto RenameOp = getAvailableRenameForDecl(Tok.ValueD);
+  case CursorInfoKind::ValueRef: {
+    auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD);
     if (RenameOp.hasValue() &&
         RenameOp.getValue() == RefactoringKind::GlobalRename)
       AllKinds.push_back(RenameOp.getValue());
     }
   }
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
-  if (RefactoringAction##KIND::isApplicable(Tok))                              \
+  if (RefactoringAction##KIND::isApplicable(CursorInfo))                       \
     AllKinds.push_back(RefactoringKind::KIND);
 #include "swift/IDE/RefactoringKinds.def"
 
@@ -1960,7 +1961,7 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
   ResolvedRangeInfo Result = Resolver.resolve();
 
 #define RANGE_REFACTORING(KIND, NAME, ID)                                     \
-  if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))         \
+  if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))              \
     Scratch.push_back(RefactoringKind::KIND);
 #include "swift/IDE/RefactoringKinds.def"
 
@@ -2127,13 +2128,13 @@ int swift::ide::findLocalRenameRanges(
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));
 
-  SemaLocResolver Resolver(*SF);
-  SemaToken SemaT = Resolver.resolve(StartLoc);
-  if (!SemaT.isValid() || !SemaT.ValueD) {
+  CursorInfoResolver Resolver(*SF);
+  ResolvedCursorInfo CursorInfo = Resolver.resolve(StartLoc);
+  if (!CursorInfo.isValid() || !CursorInfo.ValueD) {
     Diags.diagnose(StartLoc, diag::unresolved_location);
     return true;
   }
-  ValueDecl *VD = SemaT.ValueD;
+  ValueDecl *VD = CursorInfo.ValueD;
   llvm::SmallVector<DeclContext *, 8> Scopes;
   analyzeRenameScope(VD, Diags, Scopes);
   if (Scopes.empty())

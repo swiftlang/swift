@@ -22,18 +22,18 @@ specified by a cursor position in a Swift source file, such as rename refactorin
 In contrast, **range-based refactoring** needs a start and end position to specify
 its target, such as Extract Method refactoring. To facilitate the implementation
 of these two categories, the Swift repository provides pre-analyzed results called
-[SemaToken] and [RangeInfo] to answer several common questions about a cursor
+[ResolvedCursorInfo] and [RangeInfo] to answer several common questions about a cursor
 position or a range in a Swift source file.
 
-For instance, [SemaToken] can tell us whether a location in the source file
+For instance, [ResolvedCursorInfo] can tell us whether a location in the source file
 points to the start of an expression and, if so, provide the corresponding compiler object of that
-expression. Alternatively, if the cursor points to a name, [SemaToken] gives
+expression. Alternatively, if the cursor points to a name, [ResolvedCursorInfo] gives
 us the declaration corresponding to that name. Similarly, [RangeInfo] encapsulates
 information about a given source range, such as whether the range has multiple entry or exit points.
 
 To implement a new refactoring for Swift, we don't
 need to start from the raw representation of a cursor or a range position;
-instead, we can start with [SemaToken] and [RangeInfo] upon which a refactoring-specific
+instead, we can start with [ResolvedCursorInfo] and [RangeInfo] upon which a refactoring-specific
 analysis can be derived.
 
 ## Cursor-based Refactoring
@@ -48,13 +48,13 @@ Specifically, for displaying the available actions:
 
 1. The user selects a location from the Xcode editor.
 2. Xcode makes a request to [sourcekitd] to see what available refactoring actions exist for that location.
-3. Each implemented refactoring action is queried with a `SemaToken` object to see if the action is applicable for that location.
+3. Each implemented refactoring action is queried with a `ResolvedCursorInfo` object to see if the action is applicable for that location.
 4. The list of applicable actions is returned as response from [sourcekitd] and displayed to the user by Xcode.
 
 When the user selects one of the available actions:
 
 1. Xcode makes a request to [sourcekitd] to perform the selected action on the source location.
-2. The specific refactoring action is queried with a `SemaToken` object, derived from the same location, to verify that the action is applicable.
+2. The specific refactoring action is queried with a `ResolvedCursorInfo` object, derived from the same location, to verify that the action is applicable.
 3. The refactoring action is asked to perform the transformation with textual source edits.
 4. The source edits are returned as response from [sourcekitd] and are applied by the Xcode editor.
 
@@ -66,7 +66,7 @@ refactoring in the [RefactoringKinds.def] file with an entry like:
 ~~~
 
 `CURSOR_REFACTORING` specifies that this refactoring is initialized at a cursor
-location and thus will use [SemaToken] in the implementation. The first field,
+location and thus will use [ResolvedCursorInfo] in the implementation. The first field,
 `LocalizeString`, specifies the internal name of this refactoring in the Swift
 codebase. In this example, the class corresponding to this refactoring is named
 `RefactoringActionLocalizeString`. The string literal `"Localize String"` is the
@@ -90,16 +90,16 @@ of `RefactoringActionLocalizeString` in [Refactoring.cpp], as below:
 
 ~~~cpp
 1  bool RefactoringActionLocalizeString::
-2  isApplicable(SemaToken SemaTok) {
-3    if (SemaTok.Kind == SemaTokenKind::ExprStart) {
-4      if (auto *Literal = dyn_cast<StringLiteralExpr>(SemaTok.TrailingExpr) {
+2  isApplicable(ResolvedCursorInfo CursorInfo) {
+3    if (CursorInfo.Kind == CursorInfoKind::ExprStart) {
+4      if (auto *Literal = dyn_cast<StringLiteralExpr>(CursorInfo.TrailingExpr) {
 5        return !Literal->hasInterpolation(); // Not real API.
 6      }
 7    }
 8  }
 ~~~
 
-Taking a [SemaToken] object as input, it's almost trivial to check
+Taking a [ResolvedCursorInfo] object as input, it's almost trivial to check
 when to populate the available refactoring menu with
 “localize string”. In this case, checking that the cursor points to the start of
 an expression (Line 3), and the expression is a string literal (Line 4) without
@@ -108,7 +108,7 @@ interpolation (Line 5) is sufficient.
 Next, we need to implement how the code under the cursor should be
 changed if the refactoring action is applied. To do this, we
 have to implement the [performChange] method of `RefactoringActionLocalizeString`.
-In the implementation of `performChange`, we can access the same `SemaToken` object that [isApplicable] received.
+In the implementation of `performChange`, we can access the same `ResolvedCursorInfo` object that [isApplicable] received.
 
 ~~~cpp
 1  bool RefactoringActionLocalizeString::
@@ -143,7 +143,7 @@ a stable key of "extract.expr" for service communication purposes.
 
 To teach Xcode when this refactoring should be available, we
 also need to implement [isApplicable] for this refactoring in [Refactoring.cpp],
-with the slight difference that the input is a [RangeInfo] instead of a [SemaToken] .
+with the slight difference that the input is a [RangeInfo] instead of a [ResolvedCursorInfo] .
 
 ~~~cpp
 1  bool RefactoringActionExtractExpr::
@@ -337,7 +337,7 @@ Swift's [issue database](https://bugs.swift.org) contains [several ideas of refa
 For further help with implementing refactoring transformations, please see the [documentation] or feel free to ask questions on the [swift-dev](https://lists.swift.org/mailman/listinfo/swift-dev) mailing list.
 
 [sourcekitd]: https://github.com/apple/swift/tree/master/tools/SourceKit
-[SemaToken]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L158
+[ResolvedCursorInfo]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L158
 [RangeInfo]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L344
 [performChange]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/lib/IDE/Refactoring.cpp#L599
 [RefactoringKinds.def]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/RefactoringKinds.def
