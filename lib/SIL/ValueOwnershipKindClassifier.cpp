@@ -82,7 +82,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, IsUniqueOrPinned)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkFunctionEscape)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
-CONSTANT_OWNERSHIP_INST(Trivial, ObjCProtocol) // Is this right?
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCToThickMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialBox)
@@ -120,6 +119,7 @@ CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, RefToUnowned)
 CONSTANT_OWNERSHIP_INST(Unowned, UnmanagedToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
+CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 #undef CONSTANT_OWNERSHIP_INST
 
 #define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, INST)                    \

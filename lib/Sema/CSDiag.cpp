@@ -7212,18 +7212,21 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
 }
 
 bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
-  auto typeCheckClauseExpr = [&](Expr *clause) -> Expr * {
-    return typeCheckChildIndependently(clause, Type(), CTP_Unused, TCCOptions(),
-                                       nullptr, false);
+  auto typeCheckClauseExpr = [&](Expr *clause, Type contextType = Type(),
+                                 ContextualTypePurpose convertPurpose =
+                                     CTP_Unused) -> Expr * {
+    // Provide proper contextual type when type conversion is specified.
+    return typeCheckChildIndependently(clause, contextType, convertPurpose,
+                                       TCCOptions(), nullptr, false);
   };
-
   // Check all of the subexpressions independently.
   auto condExpr = typeCheckClauseExpr(IE->getCondExpr());
   if (!condExpr) return true;
-  auto trueExpr = typeCheckClauseExpr(IE->getThenExpr());
+  auto trueExpr = typeCheckClauseExpr(IE->getThenExpr(), CS.getContextualType(),
+                                      CS.getContextualTypePurpose());
   if (!trueExpr) return true;
-
-  auto falseExpr = typeCheckClauseExpr(IE->getElseExpr());
+  auto falseExpr = typeCheckClauseExpr(
+      IE->getElseExpr(), CS.getContextualType(), CS.getContextualTypePurpose());
   if (!falseExpr) return true;
 
   // If the true/false values already match, it must be a contextual problem.

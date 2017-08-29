@@ -192,6 +192,14 @@ namespace {
       return fieldInfo.getStructIndex();
     }
 
+    Optional<unsigned> getFieldIndexIfNotEmpty(IRGenModule &IGM,
+                                               VarDecl *field) const {
+      auto &fieldInfo = getFieldInfo(field);
+      if (fieldInfo.isEmpty())
+        return None;
+      return fieldInfo.getStructIndex();
+    }
+
     // For now, just use extra inhabitants from the first field.
     // FIXME: generalize
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -760,9 +768,10 @@ irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
   FOR_STRUCT_IMPL(IGM, baseType, getFieldAccessStrategy, baseType, field);
 }
 
-unsigned irgen::getPhysicalStructFieldIndex(IRGenModule &IGM, SILType baseType,
-                                            VarDecl *field) {
-  FOR_STRUCT_IMPL(IGM, baseType, getFieldIndex, field);
+Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
+                                                      SILType baseType,
+                                                      VarDecl *field) {
+  FOR_STRUCT_IMPL(IGM, baseType, getFieldIndexIfNotEmpty, field);
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {

@@ -41,7 +41,7 @@ func test1b(_ b : Bool) {
 
 enum MaybeInt {
   case none
-  case some(Int)
+  case some(Int) // expected-note {{did you mean 'some'?}}
 
   init(_ i: Int) { self = MaybeInt.some(i) }
 }
@@ -87,6 +87,7 @@ func test3(_ a: ZeroOneTwoThree) {
   
   var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{type '(Int, Int) -> ZeroOneTwoThree' has no member 'Two'}}
   var _ : Int = .Two // expected-error{{type 'Int' has no member 'Two'}}
+  var _ : MaybeInt = 0 > 3 ? .none : .soma(3) // expected-error {{type 'MaybeInt' has no member 'soma'}}
 }
 
 func test3a(_ a: ZeroOneTwoThree) {
@@ -97,7 +98,9 @@ func test3a(_ a: ZeroOneTwoThree) {
 
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
-
+  
+  var i = 0 > 3 ? .none : .some(3) // expected-error {{reference to member 'none' cannot be resolved without a contextual type}}
+  
   test3a;  // expected-error {{unused function}}
   .Zero   // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
   test3a   // expected-error {{unused function}}
