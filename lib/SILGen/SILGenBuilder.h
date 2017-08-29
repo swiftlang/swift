@@ -134,10 +134,15 @@ public:
   //
 
   using SILBuilder::createStructExtract;
-  using SILBuilder::createCopyValue;
-  using SILBuilder::createCopyUnownedValue;
   ManagedValue createStructExtract(SILLocation loc, ManagedValue base,
                                    VarDecl *decl);
+
+  using SILBuilder::createRefElementAddr;
+  ManagedValue createRefElementAddr(SILLocation loc, ManagedValue operand,
+                                    VarDecl *field, SILType resultTy);
+
+  using SILBuilder::createCopyValue;
+  using SILBuilder::createCopyUnownedValue;
 
   /// Emit a +1 copy on \p originalValue that lives until the end of the current
   /// lexical scope.
