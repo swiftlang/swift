@@ -149,10 +149,6 @@ extension PrintingRenamed {
     // CHECK-DIAGS-3: [[@LINE+1]]:{{[0-9]+}}: warning: use of 'print' treated as a reference to instance method
     print(self)
     // CHECK-DIAGS-4-NOT: [[@LINE-1]]:{{[0-9]+}}:
-
-    // CHECK-DIAGS-3-NOT: [[@LINE+1]]:{{[0-9]+}}:
-    print(self, options: self)
-    // CHECK-DIAGS-4: [[@LINE-1]]:{{[0-9]+}}: error: argument labels '(_:, options:)' do not match any available overloads
   }
 
   static func testDroppingRenamedPrints() {
@@ -163,10 +159,6 @@ extension PrintingRenamed {
     // CHECK-DIAGS-3: [[@LINE+1]]:{{[0-9]+}}: warning: use of 'print' treated as a reference to class method
     print(self)
     // CHECK-DIAGS-4-NOT: [[@LINE-1]]:{{[0-9]+}}:
-
-    // CHECK-DIAGS-3-NOT: [[@LINE+1]]:{{[0-9]+}}:
-    print(self, options: self)
-    // CHECK-DIAGS-4: [[@LINE-1]]:{{[0-9]+}}: error: argument labels '(_:, options:)' do not match any available overloads
   }
 }
 

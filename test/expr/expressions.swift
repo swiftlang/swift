@@ -893,27 +893,6 @@ let _ = (x, 3).1
 x = (x,(3,y)).1.1
 
 
-// SE-0101 sizeof family functions are reconfigured into MemoryLayout
-protocol Pse0101 {
-  associatedtype Value
-  func getIt() -> Value
-}
-class Cse0101<U> {
-  typealias T = U
-  var val: U { fatalError() }
-}
-func se0101<P: Pse0101>(x: Cse0101<P>) {
-  // Note: The first case is actually not allowed, but it is very common and can be compiled currently.
-  _ = sizeof(P) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{15-16=>.size}} {{none}}
-                // expected-warning@-1 {{missing '.self' for reference to metatype of type 'P'}}
-  _ = sizeof(P.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{15-21=>.size}} {{none}}
-  _ = sizeof(P.Value.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{21-27=>.size}} {{none}}
-  _ = sizeof(Cse0101<P>.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{24-30=>.size}} {{none}}
-  _ = alignof(Cse0101<P>.T.self) // expected-error {{'alignof' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-15=MemoryLayout<}} {{27-33=>.alignment}} {{none}}
-  _ = strideof(P.Type.self) // expected-error {{'strideof' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-16=MemoryLayout<}} {{22-28=>.stride}} {{none}}
-  _ = sizeof(type(of: x)) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-26=MemoryLayout<Cse0101<P>>.size}} {{none}}
-}
-
 // SR-3439 subscript with pound exprssions.
 Sr3439: do {
   class B {
