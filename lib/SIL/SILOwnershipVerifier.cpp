@@ -499,7 +499,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InitEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InitExistentialAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InitExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InjectEnumAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsNonnull)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsUnique)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsUniqueOrPinned)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load)
@@ -581,6 +580,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(UncheckedTrivialBitCast)
 ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
+ACCEPTS_ANY_OWNERSHIP_INST(IsNonnull)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
