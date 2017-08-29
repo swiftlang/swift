@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_GENSTRUCT_H
 #define SWIFT_IRGEN_GENSTRUCT_H
 
+#include "llvm/ADT/Optional.h"
+
 namespace llvm {
   class Constant;
 }
@@ -63,8 +65,14 @@ namespace irgen {
   getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
                                         SILType baseType, VarDecl *field);
 
-  unsigned getPhysicalStructFieldIndex(IRGenModule &IGM, SILType baseType,
-                                       VarDecl *field);
+  /// Returns the index of the element in the llvm struct type which represents
+  /// \p field in \p baseType.
+  ///
+  /// Returns None if \p field has an empty type and therefore has no
+  /// corresponding element in the llvm type.
+  llvm::Optional<unsigned> getPhysicalStructFieldIndex(IRGenModule &IGM,
+                                                       SILType baseType,
+                                                       VarDecl *field);
 
 } // end namespace irgen
 } // end namespace swift
