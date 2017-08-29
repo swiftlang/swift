@@ -33,6 +33,9 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.cygwin.txt
 // RUN: %FileCheck -check-prefix CYGWIN-x86_64 %s < %t.cygwin.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-unknown-linux-gnu %s -Lbar -o dynlib.out 2>&1 > %t.linux.dynlib.txt
+// RUN: %FileCheck -check-prefix LINUX_DYNLIB-x86_64 %s < %t.linux.dynlib.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Fsystem car -F cdr -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
@@ -235,6 +238,23 @@
 // COMPLEX-DAG: -macosx_version_min 10.9.1
 // COMPLEX: -o sdk.out
 
+// LINUX_DYNLIB-x86_64: swift
+// LINUX_DYNLIB-x86_64: -o [[OBJECTFILE:.*]]
+// LINUX_DYNLIB-x86_64: -o [[AUTOLINKFILE:.*]]
+
+// LINUX_DYNLIB-x86_64: clang++{{"? }}
+// LINUX_DYNLIB-x86_64-DAG: -shared
+// LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
+// LINUX_DYNLIB-x86_64-NOT: -pie
+// LINUX_DYNLIB-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+/lib/swift/linux]]
+// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swift_begin.o
+// LINUX_DYNLIB-x86_64-DAG: [[OBJECTFILE]]
+// LINUX_DYNLIB-x86_64-DAG: @[[AUTOLINKFILE]]
+// LINUX_DYNLIB-x86_64-DAG: [[STDLIB_PATH]]
+// LINUX_DYNLIB-x86_64-DAG: -lswiftCore
+// LINUX_DYNLIB-x86_64-DAG: -L bar
+// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swift_end.o
+// LINUX_DYNLIB-x86_64: -o dynlib.out
 
 // DEBUG: bin/swift
 // DEBUG-NEXT: bin/swift
