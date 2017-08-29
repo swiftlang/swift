@@ -1597,34 +1597,15 @@ StringTests.test("COW.Smoke") {
   _fixLifetime(s2)  
 }
 
-func getCOWStaticString() -> String {
-  let s = "Electricity"
-  return s
-}
-
-func getCOWAsciiString() -> String {
-  var s = "abcdefg"
-  s += "hijklmnop"
-  s += "qrstuvwxy"
-  return s
-}
-
-func getCOWUnicodeString() -> String {
-  var s = "🐮🐄"
-  s += "🤠"
-  return s
-}
-
 struct COWStringTest {
   let test: String
   let name: String
 }
 
 var testStrings: [COWStringTest] {
-  return [
-          COWStringTest(test: getCOWAsciiString(), name: "ASCII"),
-          COWStringTest(test: getCOWUnicodeString(), name: "Unicode")
-        ]
+  return [ COWStringTest(test: "abcdefg", name: "ASCII"),
+           COWStringTest(test: "🐮🐄🤠", name: "Unicode") 
+         ]
 }
 
 for test in testStrings {
@@ -1674,7 +1655,6 @@ for test in testStrings {
       assert(identity1 == s._rawIdentifier())
 
       let _ = s.remove(at: index1)
-
       expectEqual(identity1, s._rawIdentifier())
     }
 
