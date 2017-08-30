@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -48,7 +48,7 @@ func testNonNullMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb2([[RESULT:%.*]] : $NSString):
+  // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.fetchNonnullString() as NSString)
@@ -63,7 +63,7 @@ func testForcedMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb2([[RESULT:%.*]] : $NSString):
+  // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.fetchNullproneString() as NSString)
@@ -107,7 +107,7 @@ func testNonNullPropertyValue(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb2([[RESULT:%.*]] : $NSString):
+  // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.nonnullStringProperty as NSString)
@@ -122,7 +122,7 @@ func testForcedPropertyValue(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb2([[RESULT:%.*]] : $NSString):
+  // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.nullproneStringProperty as NSString)
@@ -154,7 +154,7 @@ func testNonnullSubscriptGet(object: NonnullSubscript, index: AnyObject) {
   // CHECK-NEXT: destroy_value [[INDEX]] : $AnyObject
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart
-  // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : $NSString):
+  // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : @owned $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK:      end_borrow [[SELF]] from %0
   useNS(object[index] as NSString)
@@ -196,7 +196,7 @@ func testNullproneSubscriptGet(object: NullproneSubscript, index: AnyObject) {
   // CHECK-NEXT: destroy_value [[INDEX]] : $AnyObject
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart
-  // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : $NSString):
+  // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : @owned $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK:      end_borrow [[SELF]] from %0
   useNS(object[index] as NSString)

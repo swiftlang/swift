@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class C {
   var member: Int = 0
@@ -6,7 +6,7 @@ class C {
   // Methods have method calling convention.
   // CHECK-LABEL: sil hidden @_T05types1CC3fooySi1x_tF : $@convention(method) (Int, @guaranteed C) -> () {
   func foo(x x: Int) {
-    // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
+    // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int, [[THIS:%[0-9]+]] : @guaranteed $C):
     member = x
 
     // CHECK-NOT: copy_value
@@ -24,7 +24,7 @@ struct S {
   mutating
   func foo(x x: Int) {
     var x = x
-    // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
+    // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int, [[THIS:%[0-9]+]] : @trivial $*S):
     member = x
     // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
     // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
@@ -70,7 +70,7 @@ enum ReferencedFromFunctionEnum {
 }
 
 // CHECK-LABEL: sil hidden @_T05types34referencedFromFunctionStructFieldsyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF{{.*}} : $@convention(thin) (@owned ReferencedFromFunctionStruct) -> (@owned @callee_owned (@owned ReferencedFromFunctionStruct) -> (), @owned @callee_owned (@owned ReferencedFromFunctionEnum) -> ()) {
-// CHECK: bb0([[X:%.*]] : $ReferencedFromFunctionStruct):
+// CHECK: bb0([[X:%.*]] : @owned $ReferencedFromFunctionStruct):
 // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
 // CHECK:   [[F:%.*]] = struct_extract [[BORROWED_X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.f
 // CHECK:   [[COPIED_F:%.*]] = copy_value [[F]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()
@@ -89,8 +89,8 @@ func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
 }
 
 // CHECK-LABEL: sil hidden @_T05types32referencedFromFunctionEnumFieldsyAA010ReferencedcdE0OcSg_yAA0gcD6StructVcSgtADF
-// CHECK:       bb{{[0-9]+}}([[F:%.*]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()):
-// CHECK:       bb{{[0-9]+}}([[G:%.*]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()):
+// CHECK:       bb{{[0-9]+}}([[F:%.*]] : @owned $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()):
+// CHECK:       bb{{[0-9]+}}([[G:%.*]] : @owned $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()):
 func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
     -> (
       ((ReferencedFromFunctionEnum) -> ())?,

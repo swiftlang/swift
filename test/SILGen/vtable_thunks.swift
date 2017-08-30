@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
 
 protocol AddrOnly {}
 
@@ -133,7 +133,7 @@ class F: D {
 // forthcoming commits.
 //
 // CHECK-LABEL: sil private @_T013vtable_thunks1DC3iuo{{[_0-9a-zA-Z]*}}FTV
-// CHECK: bb0([[X:%.*]] : $B, [[Y:%.*]] : $Optional<B>, [[Z:%.*]] : $B, [[W:%.*]] : $D):
+// CHECK: bb0([[X:%.*]] : @owned $B, [[Y:%.*]] : @owned $Optional<B>, [[Z:%.*]] : @owned $B, [[W:%.*]] : @guaranteed $D):
 // CHECK:   [[WRAP_X:%.*]] = enum $Optional<B>, #Optional.some!enumelt.1, [[X]] : $B
 // CHECK:   switch_enum [[Y]] : $Optional<B>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
@@ -142,7 +142,7 @@ class F: D {
 // CHECK:   apply [[DIAGNOSE_UNREACHABLE_FUNC]]
 // CHECK:   unreachable
 
-// CHECK: [[SOME_BB]]([[UNWRAP_Y:%.*]] : $B):
+// CHECK: [[SOME_BB]]([[UNWRAP_Y:%.*]] : @owned $B):
 // CHECK:   [[THUNK_FUNC:%.*]] = function_ref @_T013vtable_thunks1DC3iuo{{.*}}
 // CHECK:   [[RES:%.*]] = apply [[THUNK_FUNC]]([[WRAP_X]], [[UNWRAP_Y]], [[Z]], [[W]])
 // CHECK:   [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]

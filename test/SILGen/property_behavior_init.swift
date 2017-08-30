@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-property-behaviors -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-property-behaviors -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 protocol diBehavior {
   associatedtype Value
   var storage: Value { get set }
@@ -25,7 +25,7 @@ struct Foo {
   // var xx: (Int, Int) __behavior diBehavior
 
   // CHECK-LABEL: sil hidden @_T022property_behavior_init3FooV{{[_0-9a-zA-Z]*}}fC
-  // CHECK:       bb0([[X:%.*]] : $Int,
+  // CHECK:       bb0([[X:%.*]] : @trivial $Int,
   init(x: Int) {
     // CHECK: [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [rootself]
     // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]

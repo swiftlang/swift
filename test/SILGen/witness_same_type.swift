@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -sil-serialize-witness-tables %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-silgen -sil-serialize-witness-tables -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-ir %s
 
 protocol Fooable {
   associatedtype Bar
