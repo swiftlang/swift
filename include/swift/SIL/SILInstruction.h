@@ -73,6 +73,7 @@ enum class SILInstructionKind : std::underlying_type<ValueKind>::type {
 class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   friend llvm::ilist_traits<SILInstruction>;
   friend llvm::ilist_traits<SILBasicBlock>;
+  friend SILBasicBlock;
 
   /// A backreference to the containing basic block.  This is maintained by
   /// ilist_traits<SILInstruction>.
