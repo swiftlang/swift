@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -8,7 +8,7 @@ func trap() -> Never {
 
 
 // CHECK-LABEL: sil @main
-// CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+// CHECK: bb0({{%.*}} : @trivial $Int32, {{%.*}} : @trivial $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
 // -- initialize x
 // CHECK: alloc_global @_T08toplevel1xSiv
@@ -75,7 +75,7 @@ print_y()
 // -- treat 'guard' vars as locals
 // CHECK-LABEL: function_ref toplevel.A.__allocating_init
 // CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.some!enumelt.1: [[SOME_CASE:.+]], case #Optional.none!
-// CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
+// CHECK: [[SOME_CASE]]([[VALUE:%.+]] : @owned $A):
 // CHECK: store [[VALUE]] to [init] [[BOX:%.+]] : $*A
 // CHECK-NOT: destroy_value
 // CHECK: [[SINK:%.+]] = function_ref @_T08toplevel8markUsedyxlF

@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
 // CHECK-LABEL: sil hidden @_T010objc_error20NSErrorError_erasures0D0_pSo0C0CF : $@convention(thin) (@owned NSError) -> @owned Error {
-// CHECK:         bb0([[ERROR:%.*]] : $NSError):
+// CHECK:         bb0([[ERROR:%.*]] : @owned $NSError):
 // CHECK:           [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
 // CHECK:           [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]]
 // CHECK:           [[ERROR_TYPE:%.*]] = init_existential_ref [[ERROR_COPY]] : $NSError : $NSError, $Error
@@ -21,7 +21,7 @@ func NSErrorError_erasure(_ x: NSError) -> Error {
 }
 
 // CHECK-LABEL: sil hidden @_T010objc_error30NSErrorError_archetype_erasures0D0_pxSo0C0CRbzlF : $@convention(thin) <T where T : NSError> (@owned T) -> @owned Error {
-// CHECK:         bb0([[ERROR:%.*]] : $T):
+// CHECK:         bb0([[ERROR:%.*]] : @owned $T):
 // CHECK:           [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
 // CHECK:           [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]]
 // CHECK:           [[T0:%.*]] = upcast [[ERROR_COPY]] : $T to $NSError
@@ -141,7 +141,7 @@ func eraseFictionalServerError() -> Error {
 // SR-1562
 extension Error {
   // CHECK-LABEL: sil hidden @_T0s5ErrorP10objc_errorE16convertToNSErrorSo0F0CyF
-  // CHECK: bb0([[SELF:%[0-9]+]] : $*Self)
+  // CHECK: bb0([[SELF:%[0-9]+]] : @trivial $*Self)
 	func convertToNSError() -> NSError {
     // CHECK: [[COPY:%.*]] = alloc_stack $Self
     // CHECK: copy_addr [[SELF]] to [initialization] [[COPY]]
@@ -153,7 +153,7 @@ extension Error {
     // CHECK-SAME: case #Optional.some!enumelt.1: [[SUCCESS:bb[0-9]+]],
     // CHECK-SAME: case #Optional.none!enumelt: [[FAILURE:bb[0-9]+]]
 
-    // CHECK: [[SUCCESS]]([[EMBEDDED_RESULT:%.*]] : $AnyObject):
+    // CHECK: [[SUCCESS]]([[EMBEDDED_RESULT:%.*]] : @owned $AnyObject):
     // CHECK: [[EMBEDDED_NSERROR:%[0-9]+]] = unchecked_ref_cast [[EMBEDDED_RESULT]] : $AnyObject to $NSError
     // CHECK: [[ERROR:%[0-9]+]] = init_existential_ref [[EMBEDDED_NSERROR]] : $NSError : $NSError, $Error
     // CHECK: destroy_addr [[COPY]] : $*Self
@@ -165,7 +165,7 @@ extension Error {
     // CHECK: copy_addr [take] [[COPY]] to [initialization] [[ERROR_PROJECTED]] : $*Self
     // CHECK: br [[CONTINUATION]]([[ERROR_BOX]] : $Error)
 
-    // CHECK: [[CONTINUATION]]([[ERROR_ARG:%[0-9]+]] : $Error):
+    // CHECK: [[CONTINUATION]]([[ERROR_ARG:%[0-9]+]] : @owned $Error):
 		return self as NSError
 	}
 }

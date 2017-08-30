@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func takeClosure(_ fn: () -> Int) {}
 
@@ -11,7 +11,7 @@ struct A {
 }
 _ = A(x: C())
 // CHECK-LABEL: sil hidden @_T07unowned1AV{{[_0-9a-zA-Z]*}}fC
-// CHECK: bb0([[X:%.*]] : $C, %1 : $@thin A.Type):
+// CHECK: bb0([[X:%.*]] : @owned $C, %1 : @trivial $@thin A.Type):
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
 // CHECK:   [[X_UNOWNED_COPY:%.*]] = copy_value [[X_UNOWNED]]
 // CHECK:   destroy_value [[X]]
@@ -28,7 +28,7 @@ struct AddressOnly {
 }
 _ = AddressOnly(x: C(), p: X())
 // CHECK-LABEL: sil hidden @_T07unowned11AddressOnlyV{{[_0-9a-zA-Z]*}}fC
-// CHECK: bb0([[RET:%.*]] : $*AddressOnly, [[X:%.*]] : $C, {{.*}}):
+// CHECK: bb0([[RET:%.*]] : @trivial $*AddressOnly, [[X:%.*]] : @owned $C, {{.*}}):
 // CHECK:   [[X_ADDR:%.*]] = struct_element_addr [[RET]] : $*AddressOnly, #AddressOnly.x
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
 // CHECK:   [[X_UNOWNED_COPY:%.*]] = copy_value [[X_UNOWNED]] : $@sil_unowned C
@@ -38,7 +38,7 @@ _ = AddressOnly(x: C(), p: X())
 
 // CHECK-LABEL:    sil hidden @_T07unowned5test0yAA1CC1c_tF : $@convention(thin) (@owned C) -> () {
 func test0(c c: C) {
-  // CHECK: bb0([[ARG:%.*]] : $C):
+  // CHECK: bb0([[ARG:%.*]] : @owned $C):
 
   var a: A
   // CHECK:   [[A1:%.*]] = alloc_box ${ var A }, var, name "a"
@@ -117,13 +117,15 @@ func test_unowned_let_capture(_ aC : C) {
 }
 
 // CHECK-LABEL: sil private @_T07unowned05test_A12_let_captureyAA1CCFSiycfU_ : $@convention(thin) (@owned @sil_unowned C) -> Int {
-// CHECK: bb0([[ARG:%.*]] : $@sil_unowned C):
+// CHECK: bb0([[ARG:%.*]] : @owned $@sil_unowned C):
 // CHECK-NEXT:   debug_value %0 : $@sil_unowned C, let, name "bC", argno 1
 // CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = copy_unowned_value [[ARG]] : $@sil_unowned C
 // CHECK-NEXT:   [[BORROWED_UNOWNED_ARG:%.*]] = begin_borrow [[UNOWNED_ARG]]
 // CHECK-NEXT:   [[FUN:%.*]] = class_method [[BORROWED_UNOWNED_ARG]] : $C, #C.f!1 : (C) -> () -> Int, $@convention(method) (@guaranteed C) -> Int
 // CHECK-NEXT:   end_borrow [[BORROWED_UNOWNED_ARG]]
-// CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[UNOWNED_ARG]]) : $@convention(method) (@guaranteed C) -> Int
+// CHECK-NEXT:   [[BORROWED_UNOWNED_ARG:%.*]] = begin_borrow [[UNOWNED_ARG]]
+// CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[BORROWED_UNOWNED_ARG]]) : $@convention(method) (@guaranteed C) -> Int
+// CHECK-NEXT:   end_borrow [[BORROWED_UNOWNED_ARG]]
 // CHECK-NEXT:   destroy_value [[UNOWNED_ARG]]
 // CHECK-NEXT:   destroy_value [[ARG]] : $@sil_unowned C
 // CHECK-NEXT:   return [[RESULT]] : $Int
@@ -139,7 +141,7 @@ class TestUnownedMember {
 }
 
 // CHECK-LABEL: sil hidden @_T07unowned17TestUnownedMemberCAcA1CC5inval_tcfc :
-// CHECK: bb0([[ARG1:%.*]] : $C, [[SELF_PARAM:%.*]] : $TestUnownedMember):
+// CHECK: bb0([[ARG1:%.*]] : @owned $C, [[SELF_PARAM:%.*]] : @owned $TestUnownedMember):
 // CHECK:   [[SELF:%.*]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $TestUnownedMember
 // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sil-serialize-witness-tables -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -sil-serialize-witness-tables -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -47,12 +47,12 @@ extension Gizmo : Bells {
 }
 
 // CHECK: sil private [transparent] [thunk] @_T0So5GizmoC14objc_witnesses5BellsA2cDP{{[_0-9a-zA-Z]*}}fCTW
-// CHECK: bb0([[SELF:%[0-9]+]] : $*Gizmo, [[I:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick Gizmo.Type):
+// CHECK: bb0([[SELF:%[0-9]+]] : @trivial $*Gizmo, [[I:%[0-9]+]] : @trivial $Int, [[META:%[0-9]+]] : @trivial $@thick Gizmo.Type):
 
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @_T0So5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[I]], [[META]]) : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   switch_enum [[IUO_RESULT]]
-// CHECK: bb2([[UNWRAPPED_RESULT:%.*]] : $Gizmo):
+// CHECK: bb2([[UNWRAPPED_RESULT:%.*]] : @owned $Gizmo):
 // CHECK:   store [[UNWRAPPED_RESULT]] to [init] [[SELF]] : $*Gizmo
 
 // Test extension of a native @objc class to conform to a protocol with a

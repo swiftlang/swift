@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -12,7 +12,7 @@ import gizmo
   // Bridging set parameters
   // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC16bridge_Set_param{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (NSSet, Foo) -> ()
   func bridge_Set_param(_ s: Set<Foo>) {
-    // CHECK: bb0([[NSSET:%[0-9]+]] : $NSSet, [[SELF:%[0-9]+]] : $Foo):
+    // CHECK: bb0([[NSSET:%[0-9]+]] : @unowned $NSSet, [[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE36_unconditionallyBridgeFromObjectiveCAByxGSo5NSSetCSgFZ
@@ -31,7 +31,7 @@ import gizmo
   // Bridging set results
   // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC17bridge_Set_result{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet {
   func bridge_Set_result() -> Set<Foo> { 
-    // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
+    // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC17bridge_Set_result{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
@@ -51,7 +51,7 @@ import gizmo
 
   // Property getter
   // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
-  // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
+  // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[SELF_COPY]] = copy_value [[SELF]] : $Foo
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fg : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
@@ -68,7 +68,7 @@ import gizmo
   
   // Property setter
   // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fsTo : $@convention(objc_method) (NSSet, Foo) -> () {
-  // CHECK: bb0([[NSSET:%[0-9]+]] : $NSSet, [[SELF:%[0-9]+]] : $Foo):
+  // CHECK: bb0([[NSSET:%[0-9]+]] : @unowned $NSSet, [[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE36_unconditionallyBridgeFromObjectiveCAByxGSo5NSSetCSgFZ

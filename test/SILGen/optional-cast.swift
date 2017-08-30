@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class A {}
 class B : A {}
 
 // CHECK-LABEL: sil hidden @_T04main3fooyAA1ACSgF : $@convention(thin) (@owned Optional<A>) -> () {
-// CHECK:    bb0([[ARG:%.*]] : $Optional<A>):
+// CHECK:    bb0([[ARG:%.*]] : @owned $Optional<A>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 //   Check whether the temporary holds a value.
@@ -24,13 +24,13 @@ class B : A {}
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //
 //   If so, materialize that and inject it into x.
-// CHECK:    [[IS_B]]([[T0:%.*]] : $B):
+// CHECK:    [[IS_B]]([[T0:%.*]] : @owned $B):
 // CHECK-NEXT: store [[T0]] to [init] [[X_VALUE]] : $*B
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT: br [[CONT:bb[0-9]+]]
 //
 //   If not, destroy_value the A and inject nothing into x.
-// CHECK:    [[NOT_B]]([[ORIGINAL_VALUE:%.*]] : $A):
+// CHECK:    [[NOT_B]]([[ORIGINAL_VALUE:%.*]] : @owned $A):
 // CHECK-NEXT: destroy_value [[ORIGINAL_VALUE]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<B>, #Optional.none
 // CHECK-NEXT: br [[CONT]]
@@ -56,7 +56,7 @@ func foo(_ y : A?) {
 }
 
 // CHECK-LABEL: sil hidden @_T04main3baryAA1ACSgSgSgSgF : $@convention(thin) (@owned Optional<Optional<Optional<Optional<A>>>>) -> () {
-// CHECK:    bb0([[ARG:%.*]] : $Optional<Optional<Optional<Optional<A>>>>):
+// CHECK:    bb0([[ARG:%.*]] : @owned $Optional<Optional<Optional<Optional<A>>>>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<Optional<Optional<B>>> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // -- Check for some(...)
@@ -106,18 +106,18 @@ func foo(_ y : A?) {
 //
 //   If so, inject it back into an optional.
 //   TODO: We're going to switch back out of this; we really should peephole it.
-// CHECK:    [[IS_B]]([[T0:%.*]] : $B):
+// CHECK:    [[IS_B]]([[T0:%.*]] : @owned $B):
 // CHECK-NEXT: enum $Optional<B>, #Optional.some!enumelt.1, [[T0]]
 // CHECK-NEXT: br [[SWITCH_OB2:bb[0-9]+]](
 //
 //   If not, inject nothing into an optional.
-// CHECK:    [[NOT_B]]([[ORIGINAL_VALUE:%.*]] : $A):
+// CHECK:    [[NOT_B]]([[ORIGINAL_VALUE:%.*]] : @owned $A):
 // CHECK-NEXT: destroy_value [[ORIGINAL_VALUE]]
 // CHECK-NEXT: enum $Optional<B>, #Optional.none!enumelt
 // CHECK-NEXT: br [[SWITCH_OB2]](
 //
 //   Switch out on the value in [[OB2]].
-// CHECK:    [[SWITCH_OB2]]([[VAL:%[0-9]+]] : $Optional<B>):
+// CHECK:    [[SWITCH_OB2]]([[VAL:%[0-9]+]] : @owned $Optional<B>):
 // CHECK:    [[T0:%.*]] = select_enum [[VAL]]
 // CHECK:    cond_br [[T0]], [[HAVE_B:bb[0-9]+]], [[FINISH_NIL_4:bb[0-9]+]]
 //
@@ -164,7 +164,7 @@ func bar(_ y : A????) {
 
 
 // CHECK-LABEL: sil hidden @_T04main3bazyyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> () {
-// CHECK:       bb0([[ARG:%.*]] : $Optional<AnyObject>):
+// CHECK:       bb0([[ARG:%.*]] : @owned $Optional<AnyObject>):
 // CHECK:         [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -174,9 +174,9 @@ func bar(_ y : A????) {
 // CHECK:         [[VAL:%.*]] = unchecked_enum_data [[ARG_COPY]]
 // CHECK-NEXT:    [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT:    checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
-// CHECK:       [[IS_B]]([[CASTED_VALUE:%.*]] : $B):
+// CHECK:       [[IS_B]]([[CASTED_VALUE:%.*]] : @owned $B):
 // CHECK:         store [[CASTED_VALUE]] to [init] [[X_VALUE]]
-// CHECK:       [[NOT_B]]([[ORIGINAL_VALUE:%.*]] : $AnyObject):
+// CHECK:       [[NOT_B]]([[ORIGINAL_VALUE:%.*]] : @owned $AnyObject):
 // CHECK:         destroy_value [[ORIGINAL_VALUE]]
 // CHECK: } // end sil function '_T04main3bazyyXlSgF'
 func baz(_ y : AnyObject?) {
@@ -187,7 +187,7 @@ func baz(_ y : AnyObject?) {
 // <rdar://problem/17013042> T! <-> T? conversions should not produce a diamond
 
 // CHECK-LABEL: sil hidden @_T04main07opt_to_B8_trivialSQySiGSiSgF
-// CHECK:       bb0(%0 : $Optional<Int>):
+// CHECK:       bb0(%0 : @trivial $Optional<Int>):
 // CHECK-NEXT:  debug_value %0 : $Optional<Int>, let, name "x"
 // CHECK-NEXT:  return %0 : $Optional<Int>
 // CHECK-NEXT:}
@@ -196,7 +196,7 @@ func opt_to_opt_trivial(_ x: Int?) -> Int! {
 }
 
 // CHECK-LABEL: sil hidden @_T04main07opt_to_B10_referenceAA1CCSgSQyADGF :
-// CHECK:  bb0([[ARG:%.*]] : $Optional<C>):
+// CHECK:  bb0([[ARG:%.*]] : @owned $Optional<C>):
 // CHECK:    debug_value [[ARG]] : $Optional<C>, let, name "x"
 // CHECK:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:    [[RESULT:%.*]] = copy_value [[BORROWED_ARG]]
@@ -206,7 +206,7 @@ func opt_to_opt_trivial(_ x: Int?) -> Int! {
 func opt_to_opt_reference(_ x : C!) -> C? { return x }
 
 // CHECK-LABEL: sil hidden @_T04main07opt_to_B12_addressOnly{{[_0-9a-zA-Z]*}}F
-// CHECK:       bb0(%0 : $*Optional<T>, %1 : $*Optional<T>):
+// CHECK:       bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $*Optional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*Optional<T>, let, name "x"
 // CHECK-NEXT:  copy_addr %1 to [initialization] %0
 // CHECK-NEXT:  destroy_addr %1
@@ -218,7 +218,7 @@ public struct TestAddressOnlyStruct<T> {
   func f(_ a : T?) {}
   
   // CHECK-LABEL: sil hidden @_T04main21TestAddressOnlyStructV8testCall{{[_0-9a-zA-Z]*}}F
-  // CHECK: bb0(%0 : $*Optional<T>, %1 : $TestAddressOnlyStruct<T>):
+  // CHECK: bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $TestAddressOnlyStruct<T>):
   // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
   // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPBUF]]
   // CHECK-NEXT: apply {{.*}}<T>([[TMPBUF]], %1)
@@ -228,7 +228,7 @@ public struct TestAddressOnlyStruct<T> {
 }
 
 // CHECK-LABEL: sil hidden @_T04main35testContextualInitOfNonAddrOnlyTypeySiSgF
-// CHECK: bb0(%0 : $Optional<Int>):
+// CHECK: bb0(%0 : @trivial $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
 // CHECK-NEXT: [[X:%.*]] = alloc_box ${ var Optional<Int> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]

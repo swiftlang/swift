@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 protocol UID {
     func uid() -> Int
@@ -64,6 +64,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[READ1:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X1:%.*]] = load [copy] [[READ1]]
   // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSifs
+  // CHECK: [[BORROWED_X1:%.*]] = begin_borrow [[X1]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X:%.*]] = load [copy] [[READ]]
@@ -74,7 +75,8 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
   // CHECK: destroy_value [[X2]]
   // -- call secondNextCLSID from class-constrained protocol ext
-  // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[X1]])
+  // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[BORROWED_X1]])
+  // CHECK: end_borrow [[BORROWED_X1]] from [[X1]]
   // CHECK: destroy_value [[X1]]
   x.secondNextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID, x.secondNextCLSID)
