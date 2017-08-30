@@ -631,7 +631,7 @@ importer::findSwiftNameAttr(const clang::Decl *decl,
   // used for naming in Swift 2.
   if (attr->isImplicit()) return nullptr;
 
-  // Whitelist certain explicitly-written Swift names that were
+  // Hardcode certain kinds of explicitly-written Swift names that were
   // permitted and used in Swift 2. All others are ignored, so that we are
   // assuming a more direct translation from the Objective-C APIs into Swift.
 
@@ -1684,7 +1684,7 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
   if (macro->isFunctionLike())
     return true;
 
-  // Consult the blacklist of macros to suppress.
+  // Consult the list of macros to suppress.
   auto suppressMacro = llvm::StringSwitch<bool>(name)
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
 #include "MacroTable.def"

@@ -5295,7 +5295,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   emitDelayedDiags();
 
-  // Except in specific whitelisted cases for Foundation/Swift
+  // Except in specific hardcoded cases for Foundation/Swift
   // standard library compatibility, an _ObjectiveCBridgeable
   // conformance must appear in the same module as the definition of
   // the conforming type.

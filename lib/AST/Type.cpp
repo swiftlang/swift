@@ -4046,23 +4046,27 @@ TypeTraitResult TypeBase::canBeClass() {
   return TypeTraitResult::IsNot;
 }
 
-bool Type::isPrivateStdlibType(bool whitelistProtocols) const {
+bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
   Type Ty = *this;
   if (!Ty)
     return false;
 
   // A 'public' typealias can have an 'internal' type.
-  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
-    return NAT->getDecl()->isPrivateStdlibDecl(whitelistProtocols);
+  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+    auto *AliasDecl = NAT->getDecl();
+    return AliasDecl->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic);
+  }
 
-  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer()))
-    return Paren->getUnderlyingType().isPrivateStdlibType(whitelistProtocols);
+  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer())) {
+    Type Underlying = Paren->getUnderlyingType();
+    return Underlying.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+  }
 
   if (Type Unwrapped = Ty->getAnyOptionalObjectType())
-    return Unwrapped.isPrivateStdlibType(whitelistProtocols);
+    return Unwrapped.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
 
   if (auto TyD = Ty->getAnyNominal())
-    if (TyD->isPrivateStdlibDecl(whitelistProtocols))
+    if (TyD->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic))
       return true;
 
   return false;

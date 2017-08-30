@@ -1418,7 +1418,7 @@ collectLoads(SILInstruction *user, SILInstruction *address,
   // destroy the source. This way, we know that the destroy_addr instructions
   // that we recorded cover all the temporary's lifetime termination points.
   //
-  // Currently we whitelist address projections and loads.
+  // Currently this includes address projections and loads.
   //
   // TODO: handle non-destructive projections of enums
   // (unchecked_take_enum_data_addr of Optional is nondestructive.)

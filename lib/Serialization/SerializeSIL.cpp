@@ -2261,12 +2261,12 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // mandatory function bodies.
   for (const SILFunction &F : *SILMod) {
     if (emitDeclarationsForOnoneSupport) {
-      // Only declarations of whitelisted pre-specializations from with
+      // Only declarations of hardcoded pre-specializations with
       // public linkage need to be serialized as they will be used
-      // by UsePrespecializations pass during -Onone compilation to
+      // by the UsePrespecializations pass during -Onone compilation to
       // check for availability of concrete pre-specializations.
       if (!hasPublicVisibility(F.getLinkage()) ||
-          !isWhitelistedSpecialization(F.getName()))
+          !isKnownPrespecialization(F.getName()))
         continue;
     }
 

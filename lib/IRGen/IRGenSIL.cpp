@@ -1101,8 +1101,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                   f->getDebugScope(), f->getLocation()),
     CurSILFn(f) {
   // Apply sanitizer attributes to the function.
-  // TODO: Check if the function is ASan black listed either in the external
-  // file or via annotations.
+  // TODO: Check if the function is supposed to be excluded from ASan either by
+  // being in the external file or via annotations.
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address)
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {

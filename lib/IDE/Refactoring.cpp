@@ -769,14 +769,15 @@ public:
   ExtractCheckResult(ArrayRef<CannotExtractReason> AllReasons):
     KnownFailure(false), AllReasons(AllReasons.begin(), AllReasons.end()) {}
   bool success() { return success({}); }
-  bool success(llvm::ArrayRef<CannotExtractReason> WhiteList) {
+  bool success(llvm::ArrayRef<CannotExtractReason> ExpectedReasons) {
     if (KnownFailure)
       return false;
     bool Result = true;
 
-    // Check if any reasons are out of the white list provided by the client.
+    // Check if any reasons aren't covered by the list of expected reasons
+    // provided by the client.
     for (auto R: AllReasons) {
-      Result &= llvm::is_contained(WhiteList, R);
+      Result &= llvm::is_contained(ExpectedReasons, R);
     }
     return Result;
   }
@@ -1739,8 +1740,8 @@ static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
           return true;
 
         // When callling an instance method inside another instance method,
-        // we have a dot sytnax call whose dot and base are both implicit. We
-        // need to whitelist the specific case here.
+        // we have a dot syntax call whose dot and base are both implicit. We
+        // need to explicitly allow the specific case here.
         if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
           if (DSC->getBase()->isImplicit() &&
               DSC->getFn()->getStartLoc() == Info.TokensInRange.front().getLoc())

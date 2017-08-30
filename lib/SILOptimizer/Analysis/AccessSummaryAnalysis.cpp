@@ -108,8 +108,9 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       // begin access markers. Ignore these for now. But we really should
       // add SIL verification to ensure all loads and stores have associated
       // access markers. Once SIL verification is implemented, enable the
-      // following assert to verify that the whitelist above is comprehensive,
-      // which guarnatees that exclusivity enforcement is complete.
+      // following assert to verify that the cases handled above are
+      // comprehensive, which guarantees that exclusivity enforcement is
+      // complete.
       //   assert(false && "Unrecognized argument use");
       break;
     }

@@ -284,7 +284,7 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
 
 static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
   // Hide private stdlib declarations.
-  if (D->isPrivateStdlibDecl(/*whitelistProtocols*/false) ||
+  if (D->isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/false) ||
       // ShowInInterfaceAttr is for decls to show in interface as exception but
       // they are not intended to be used directly.
       D->getAttrs().hasAttribute<ShowInInterfaceAttr>())
