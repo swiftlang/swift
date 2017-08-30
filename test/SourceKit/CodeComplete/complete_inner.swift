@@ -14,6 +14,33 @@ class FooBar {
   let prop: FooBar { return FooBar() }
   subscript(x: Foo) -> Foo {}
 }
+
+enum E1 {
+  case one
+  case two
+}
+
+// Note: this test uses line:column inputs as a workaround for a complete-test limitation.
+func test010(x: E1, y: FooBar) {
+  switch x {
+    case .:
+      break
+    case two:
+      y.
+  }
+}
+
+// RUN: %sourcekitd-test -req=complete.open -pos=26:11 -req-opts=filtertext=one %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0
+// INNER_POSTFIX_0-NOT: key.description: "one{{.+}}"
+// INNER_POSTFIX_0: key.description: "one",{{$}}
+// INNER_POSTFIX_0-NOT: key.description: "one{{.+}}"
+
+// RUN: %sourcekitd-test -req=complete.open -pos=29:9 -req-opts=filtertext=prop %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_1
+// INNER_POSTFIX_1-NOT: key.description: "prop{{.+}}"
+// INNER_POSTFIX_1: key.description: "prop",{{$}}
+// INNER_POSTFIX_1-NOT: key.description: "prop{{.+}}"
+
+
 func test001() {
   #^TOP_LEVEL_0,fo,foo,foob,foobar^#
 }
