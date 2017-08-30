@@ -681,13 +681,21 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     Arg->setOwnershipKind(Ownershipkind);
   }
 
-  // Create the thunk body !
+  // Create the thunk body!
   F->setThunk(IsThunk);
   // The thunk now carries the information on how the signature is
   // optimized. If we inline the thunk, we will get the benefit of calling
   // the signature optimized function without additional setup on the
   // caller side.
   F->setInlineStrategy(AlwaysInline);
+  // If the new callee is @_semantics("stdlib_binary_only"), it is fine to call
+  // it, because it will be exposed as a public symbol in the object file.
+  if (F->hasSemanticsAttr("stdlib_binary_only")) {
+    NewF->addSemanticsAttr("stdlib_binary_only");
+    // The thunk doesn't need to be stdlib_binary_only anymore.
+    F->removeSemanticsAttr("stdlib_binary_only");
+    F->setLinkage(SILLinkage::Public);
+  }
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
     ThunkBody->createFunctionArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
