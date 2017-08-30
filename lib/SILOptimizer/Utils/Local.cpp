@@ -225,13 +225,10 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
                                    CallbackTy Callback) {
-  for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;) {
+  while (!Inst->use_empty()) {
+    auto UI = Inst->use_begin();
     auto *User = UI->getUser();
-    UI++;
-    // User have already been deleted by our recursive eraser
-    if (!User) {
-      continue;
-    }
+    assert(User && "User should never be NULL!");
 
     // If the instruction itself has any uses, recursively zap them so that
     // nothing uses this instruction.
