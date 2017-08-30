@@ -452,7 +452,8 @@ SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
         F->setLinkage(constant.getLinkage(ForDefinition));
       }
       if (isMakeModuleFragile()) {
-        F->setSerialized(IsSerialized);
+        if (!F->hasSemanticsAttr("stdlib_binary_only"))
+          F->setSerialized(IsSerialized);
       }
     }
     return F;
@@ -501,7 +502,8 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   if (isMakeModuleFragile()) {
     SILLinkage linkage = constant.getLinkage(forDefinition);
     if (linkage != SILLinkage::PublicExternal) {
-      F->setSerialized(IsSerialized);
+      if (!F->hasSemanticsAttr("stdlib_binary_only"))
+        F->setSerialized(IsSerialized);
     }
   }
 
@@ -972,13 +974,13 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                       .withRepresentation(FunctionType::Representation::Thin));
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
-  auto *f =
-      M.createFunction(SILLinkage::Private,
-                       funcName, initSILType, nullptr,
-                       SILLocation(binding), IsNotBare, IsNotTransparent,
-                       isMakeModuleFragile()
-                           ? IsSerialized
-                           : IsNotSerialized);
+  auto *f = M.createFunction(
+      isMakeModuleFragile() ? SILLinkage::Public : SILLinkage::Private,
+      funcName, initSILType, nullptr, SILLocation(binding), IsNotBare,
+      IsNotTransparent, isMakeModuleFragile() ? IsSerialized : IsNotSerialized);
+  // Do not serialize the initializer in the -sil-serialize-all mode.
+  if (isMakeModuleFragile())
+    f->addSemanticsAttr("stdlib_binary_only");
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
   f->verify();
