@@ -328,7 +328,7 @@ public:
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
 
-  bool isPrivateStdlibType(bool whitelistProtocols=true) const;
+  bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   void dump() const;
   void dump(raw_ostream &os, unsigned indent = 0) const;

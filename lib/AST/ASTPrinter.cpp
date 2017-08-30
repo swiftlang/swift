@@ -1272,8 +1272,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
   }
 
   if (Options.SkipPrivateStdlibDecls &&
-      D->isPrivateStdlibDecl(
-                /*whitelistProtocols=*/!Options.SkipUnderscoredStdlibProtocols))
+      D->isPrivateStdlibDecl(!Options.SkipUnderscoredStdlibProtocols))
     return false;
 
   if (Options.SkipEmptyExtensionDecls && isa<ExtensionDecl>(D)) {

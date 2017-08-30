@@ -296,9 +296,9 @@ public:
 // Prespecialized symbol lookup.
 // =============================================================================
 
-/// Checks if a given mangled name could be a name of a whitelisted
-/// specialization.
-bool isWhitelistedSpecialization(StringRef SpecName);
+/// Checks if a given mangled name could be a name of a known
+/// prespecialization for -Onone support.
+bool isKnownPrespecialization(StringRef SpecName);
 
 /// Create a new apply based on an old one, but with a different
 /// function being applied.

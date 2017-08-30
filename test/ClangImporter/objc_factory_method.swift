@@ -89,7 +89,7 @@ func testNonsplittableFactoryMethod() {
   _ = NSObjectFactory.factoryBuildingWidgets()
 }
 
-func testFactoryMethodBlacklist() {
+func testFactoryMethodAPINotes() {
   _ = NCWidgetController.widgetController()
 }
 

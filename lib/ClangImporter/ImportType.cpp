@@ -1591,7 +1591,7 @@ Type ClangImporter::Implementation::importFunctionReturnType(
      clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
      clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>());
 
-  // Check if we know more about the type from our whitelists.
+  // Fix up optionality.
   OptionalTypeKind OptionalityOfReturn;
   if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
     OptionalityOfReturn = OTK_None;

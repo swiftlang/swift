@@ -103,9 +103,9 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
         is_apply_expr<typename std::remove_pointer<Kind>::type>::value,
         Kind>::type node) {
   if (V.shouldVerify(node)) {
-    // Whitelist any inout_to_pointer or array_to_pointer that we see in
+    // Record any inout_to_pointer or array_to_pointer that we see in
     // the proper position.
-    V.updateExprToPointerWhitelist(node, node->getArg());
+    V.maybeRecordValidPointerConversion(node, node->getArg());
     return {true, node};
   }
   V.cleanup(node);
@@ -119,9 +119,9 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
         is_autoclosure_expr<typename std::remove_pointer<Kind>::type>::value,
         Kind>::type node) {
   if (V.shouldVerify(node)) {
-    // Whitelist any inout_to_pointer or array_to_pointer that we see in
+    // Record any inout_to_pointer or array_to_pointer that we see in
     // the proper position.
-    V.updateExprToPointerWhitelist(node, node->getSingleExpressionBody());
+    V.maybeRecordValidPointerConversion(node, node->getSingleExpressionBody());
     return {true, node};
   }
   V.cleanup(node);
@@ -219,8 +219,8 @@ class Verifier : public ASTWalker {
   ///
   /// Any other inout to pointer expr that we see is invalid and the verifier
   /// will assert.
-  llvm::DenseSet<InOutToPointerExpr *> WhitelistedInOutToPointerExpr;
-  llvm::DenseSet<ArrayToPointerExpr *> WhitelistedArrayToPointerExpr;
+  llvm::DenseSet<InOutToPointerExpr *> ValidInOutToPointerExprs;
+  llvm::DenseSet<ArrayToPointerExpr *> ValidArrayToPointerExprs;
 
   /// A key into ClosureDiscriminators is a combination of a
   /// ("canonicalized") local DeclContext* and a flag for whether to
@@ -1277,8 +1277,8 @@ public:
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying InOutToPointer", E);
 
-      if (!WhitelistedInOutToPointerExpr.count(E)) {
-        Out << "Unwhitelisted InOutToPointerExpr?!\n";
+      if (!ValidInOutToPointerExprs.count(E)) {
+        Out << "InOutToPointerExpr in unexpected position!\n";
         E->print(Out);
         Out << "\n";
         abort();
@@ -1310,7 +1310,7 @@ public:
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying ArrayToPointer", E);
 
-      if (!WhitelistedArrayToPointerExpr.count(E)) {
+      if (!ValidArrayToPointerExprs.count(E)) {
         Out << "ArrayToPointer in invalid position?!\n";
         E->print(Out);
         Out << "\n";
@@ -1450,7 +1450,7 @@ public:
       verifyCheckedBase(E);
     }
 
-    void updateExprToPointerWhitelist(Expr *Base, Expr *Arg) {
+    void maybeRecordValidPointerConversion(Expr *Base, Expr *Arg) {
       auto handleSubExpr = [&](Expr *origSubExpr) {
         auto subExpr = origSubExpr;
         unsigned optionalDepth = 0;
@@ -1486,16 +1486,16 @@ public:
           break;
         }
 
-        // Whitelist inout-to-pointer conversions.
+        // Record inout-to-pointer conversions.
         if (auto *inOutToPtr = dyn_cast<InOutToPointerExpr>(subExpr)) {
-          WhitelistedInOutToPointerExpr.insert(inOutToPtr);
+          ValidInOutToPointerExprs.insert(inOutToPtr);
           checkIsBindOptional(inOutToPtr->getSubExpr());
           return;
         }
 
-        // Whitelist array-to-pointer conversions.
+        // Record array-to-pointer conversions.
         if (auto *arrayToPtr = dyn_cast<ArrayToPointerExpr>(subExpr)) {
-          WhitelistedArrayToPointerExpr.insert(arrayToPtr);
+          ValidArrayToPointerExprs.insert(arrayToPtr);
           checkIsBindOptional(arrayToPtr->getSubExpr());
           return;
         }
