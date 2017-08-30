@@ -506,7 +506,8 @@ def report(args, rng, runs):
         except ValueError:
             pass
         if not one_fit:
-            print("failed to fit either polynomial or exponential model")
+            print("failed to fit either polynomial or exponential model to " +
+                  repr(vals))
             return True
         if p_r2 >= e_r2:
             # polynomial is best
@@ -532,6 +533,9 @@ def report(args, rng, runs):
             print("O(%s) : %s" % (formatted, k))
             if args.values:
                 print("                = ", vals)
+
+    if args.invert_result:
+        bad = not bad
     return bad
 
 
@@ -600,6 +604,9 @@ def main():
     parser.add_argument(
         '--expected-exit-code', type=int, default=0,
         help='exit code expected from the compiler invocation')
+    parser.add_argument(
+        '--invert-result', action='store_true',
+        default=False, help='invert the result of the data fitting')
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
