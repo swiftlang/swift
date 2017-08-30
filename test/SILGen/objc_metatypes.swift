@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -11,7 +11,7 @@ class A {
 
   // CHECK-LABEL: sil hidden [thunk] @_T014objc_metatypes1AC3fooAA9ObjCClassCmAFmFTo
   @objc dynamic func foo(_ m: ObjCClass.Type) -> ObjCClass.Type {
-    // CHECK: bb0([[M:%[0-9]+]] : $@objc_metatype ObjCClass.Type, [[SELF:%[0-9]+]] : $A):
+    // CHECK: bb0([[M:%[0-9]+]] : @trivial $@objc_metatype ObjCClass.Type, [[SELF:%[0-9]+]] : @unowned $A):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $A
     // CHECK:   [[M_AS_THICK:%[0-9]+]] = objc_to_thick_metatype [[M]] : $@objc_metatype ObjCClass.Type to $@thick ObjCClass.Type
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -28,7 +28,7 @@ class A {
   // CHECK-LABEL: sil hidden @_T014objc_metatypes1AC3bar{{[_0-9a-zA-Z]*}}FZ
 
   // CHECK-LABEL: sil hidden [thunk] @_T014objc_metatypes1AC3bar{{[_0-9a-zA-Z]*}}FZTo
-  // CHECK: bb0([[SELF:%[0-9]+]] : $@objc_metatype A.Type):
+  // CHECK: bb0([[SELF:%[0-9]+]] : @trivial $@objc_metatype A.Type):
   // CHECK-NEXT:   [[OBJC_SELF:%[0-9]+]] = objc_to_thick_metatype [[SELF]] : $@objc_metatype A.Type to $@thick A.Type
   // CHECK:   [[BAR:%[0-9]+]] = function_ref @_T014objc_metatypes1AC3bar{{[_0-9a-zA-Z]*}}FZ
   // CHECK-NEXT:   [[RESULT:%[0-9]+]] = apply [[BAR]]([[OBJC_SELF]]) : $@convention(method) (@thick A.Type) -> ()

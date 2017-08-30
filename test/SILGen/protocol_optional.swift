@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
 
 @objc protocol P1 {
   @objc optional func method(_ x: Int)
@@ -11,7 +11,7 @@
 // CHECK-LABEL: sil hidden @_T017protocol_optional0B13MethodGenericyx1t_tAA2P1RzlF : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalMethodGeneric<T : P1>(t t : T) {
   var t = t
-  // CHECK: bb0([[T:%[0-9]+]] : $T):
+  // CHECK: bb0([[T:%[0-9]+]] : @owned $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
   // CHECK:   [[T_BORROW:%.*]] = begin_borrow [[T]]
@@ -31,7 +31,7 @@ func optionalMethodGeneric<T : P1>(t t : T) {
 // CHECK-LABEL: sil hidden @_T017protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalPropertyGeneric<T : P1>(t t : T) {
   var t = t
-  // CHECK: bb0([[T:%[0-9]+]] : $T):
+  // CHECK: bb0([[T:%[0-9]+]] : @owned $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
   // CHECK:   [[T_BORROW:%.*]] = begin_borrow [[T]]
@@ -51,7 +51,7 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
 // CHECK-LABEL: sil hidden @_T017protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalSubscriptGeneric<T : P1>(t t : T) {
   var t = t
-  // CHECK: bb0([[T:%[0-9]+]] : $T):
+  // CHECK: bb0([[T:%[0-9]+]] : @owned $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
   // CHECK:   [[T_BORROW:%.*]] = begin_borrow [[T]]

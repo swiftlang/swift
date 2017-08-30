@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 protocol Fooable {
   func foo(_ x: Int) -> Int?
