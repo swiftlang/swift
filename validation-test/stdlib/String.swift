@@ -1579,7 +1579,7 @@ StringTests.test("String.removeSubrange()/closedRange") {
 // COW(🐄) tests
 //===----------------------------------------------------------------------===//
 
-public var testSuffix = "z"
+public let testSuffix = "z"
 StringTests.test("COW.Smoke") {
   var s1 = "Cypseloides" + testSuffix
   var identity1 = s1._rawIdentifier()
@@ -1588,7 +1588,7 @@ StringTests.test("COW.Smoke") {
   expectEqual(identity1, s2._rawIdentifier())
   
   s2.append(" cryptus")
-  assert(identity1 != s2._rawIdentifier())
+  expectTrue(identity1 != s2._rawIdentifier())
   
   s1.remove(at: s1.startIndex)
   expectEqual(identity1, s1._rawIdentifier())
@@ -1602,26 +1602,26 @@ struct COWStringTest {
   let name: String
 }
 
-var testStrings: [COWStringTest] {
+var testCases: [COWStringTest] {
   return [ COWStringTest(test: "abcdefg", name: "ASCII"),
            COWStringTest(test: "🐮🐄🤠", name: "Unicode") 
          ]
 }
 
-for test in testStrings {
+for test in testCases {
   StringTests.test("COW.\(test.name).IndexesDontAffectUniquenessCheck") {
     var s = test.test + testSuffix
     let identity1 = s._rawIdentifier()
   
     var startIndex = s.startIndex
     var endIndex = s.endIndex
-    assert(startIndex != endIndex)
-    assert(startIndex < endIndex)
-    assert(startIndex <= endIndex)
-    assert(!(startIndex >= endIndex))
-    assert(!(startIndex > endIndex))
+    expectNotEqual(startIndex, endIndex)
+    expectLT(startIndex, endIndex)
+    expectLE(startIndex, endIndex)
+    expectGT(endIndex, startIndex)
+    expectGE(endIndex, startIndex)
   
-    assert(identity1 == s._rawIdentifier())
+    expectEqual(identity1, s._rawIdentifier())
   
     // Keep indexes alive during the calls above
     _fixLifetime(startIndex)
@@ -1629,30 +1629,29 @@ for test in testStrings {
   }
 }
 
-for test in testStrings {
+for test in testCases {
   StringTests.test("COW.\(test.name).SubscriptWithIndexDoesNotReallocate") {
     var s = test.test + testSuffix
     var identity1 = s._rawIdentifier()
 
     var startIndex = s.startIndex
     let empty = startIndex == s.endIndex
-    assert((s.startIndex < s.endIndex) == !empty)
-    assert(s.startIndex <= s.endIndex)
-    assert((s.startIndex >= s.endIndex) == empty)
-    assert(!(s.startIndex > s.endIndex))
-    assert(identity1 == s._rawIdentifier())
-    assert(identity1 == s._rawIdentifier())
+    expectNotEqual((s.startIndex < s.endIndex), empty)
+    expectLE(s.startIndex, s.endIndex)
+    expectEqual((s.startIndex >= s.endIndex), empty)
+    expectGT(s.endIndex, s.startIndex)
+    expectEqual(identity1, s._rawIdentifier())
   }
 }
 
-for test in testStrings {
+for test in testCases {
   StringTests.test("COW.\(test.name).RemoveAtDoesNotReallocate") {
     do {
       var s = test.test + testSuffix
       var identity1 = s._rawIdentifier()
 
       let index1 = s.startIndex
-      assert(identity1 == s._rawIdentifier())
+      expectEqual(identity1, s._rawIdentifier())
 
       let _ = s.remove(at: index1)
       expectEqual(identity1, s._rawIdentifier())
@@ -1673,45 +1672,45 @@ for test in testStrings {
       let removed = s2.remove(at: index1)
 
       expectEqual(identity1, s1._rawIdentifier())
-      assert(identity1 != s2._rawIdentifier())
+      expectTrue(identity1 == s2._rawIdentifier())
     }
   }
 }
 
-for test in testStrings {
+for test in testCases {
   StringTests.test("COW.\(test.name).RemoveAtDoesNotReallocate") {
     do {
       var s = test.test + testSuffix
-      assert(s.count > 0)
+      expectGT(s.count, 0)
 
       s.removeAll()
       var identity1 = s._rawIdentifier()
-      assert(s.count == 0)
-      assert(identity1 == s._rawIdentifier())
+      expectEqual(0, s.count)
+      expectEqual(identity1, s._rawIdentifier())
     }
 
     do {
       var s = test.test + testSuffix
       var identity1 = s._rawIdentifier()
-      assert(s.count > 3)
+      expectGT(s.count, 3)
 
       s.removeAll(keepingCapacity: true)
-      assert(identity1 == s._rawIdentifier())
-      assert(s.count == 0)
+      expectEqual(identity1, s._rawIdentifier())
+      expectEqual(0, s.count)
     }
 
     do {
       var s1 = test.test + testSuffix
       var identity1 = s1._rawIdentifier()
-      assert(s1.count > 0)
+      expectGT(s1.count, 0)
 
       var s2 = s1
       s2.removeAll()
       var identity2 = s2._rawIdentifier()
-      assert(identity1 == s1._rawIdentifier())
-      assert(identity2 != identity1)
-      assert(s1.count > 0)
-      assert(s2.count == 0)
+      expectEqual(identity1, s1._rawIdentifier())
+      expectTrue(identity2 != identity1)
+      expectGT(s1.count, 0)
+      expectEqual(0, s2.count)
 
       // Keep variables alive.
       _fixLifetime(s1)
@@ -1721,15 +1720,15 @@ for test in testStrings {
     do {
       var s1 = test.test + testSuffix
       var identity1 = s1._rawIdentifier()
-      assert(s1.count > 0)
+      expectGT(s1.count, 0)
 
       var s2 = s1
       s2.removeAll(keepingCapacity: true)
       var identity2 = s2._rawIdentifier()
-      assert(identity1 == s1._rawIdentifier())
-      assert(identity2 != identity1)
-      assert(s1.count > 0)
-      assert(s2.count == 0)
+      expectEqual(identity1, s1._rawIdentifier())
+      expectTrue(identity2 != identity1)
+      expectGT(s1.count, 0)
+      expectEqual(0, s2.count)
 
       // Keep variables alive.
       _fixLifetime(s1)
@@ -1738,17 +1737,17 @@ for test in testStrings {
   }
 }
 
-for test in testStrings {
+for test in testCases {
   StringTests.test("COW.\(test.name).CountDoesNotReallocate") {
     var s = test.test + testSuffix
     var identity1 = s._rawIdentifier()
 
-    assert(s.count > 0)
-    assert(identity1 == s._rawIdentifier())
+    expectGT(s.count, 0)
+    expectEqual(identity1, s._rawIdentifier())
   } 
 }
 
-for test in testStrings {
+for test in testCases {
   StringTests.test("COW.\(test.name).GenerateDoesNotReallocate") {
     var s = test.test + testSuffix
     var identity1 = s._rawIdentifier()
@@ -1759,11 +1758,11 @@ for test in testStrings {
       copy.append(value)
     }
     expectEqual(copy, s)
-    assert(identity1 == s._rawIdentifier())
+    expectEqual(identity1, s._rawIdentifier())
   }
 }
 
-for test in testStrings {
+for test in testCases {
   StringTests.test("COW.\(test.name).EqualityTestDoesNotReallocate") {
     var s1 = test.test + testSuffix
     var identity1 = s1._rawIdentifier()
@@ -1771,14 +1770,14 @@ for test in testStrings {
     var s2 = test.test + testSuffix
     var identity2 = s2._rawIdentifier()
 
-    assert(s1 == s2)
-    assert(identity1 == s1._rawIdentifier())
-    assert(identity2 == s2._rawIdentifier())
+    expectEqual(s1, s2)
+    expectEqual(identity1, s1._rawIdentifier())
+    expectEqual(identity2, s2._rawIdentifier())
 
     s2.remove(at: s2.startIndex)
-    assert(s1 != s2)
-    assert(identity1 == s1._rawIdentifier())
-    assert(identity2 == s2._rawIdentifier())
+    expectNotEqual(s1, s2)
+    expectEqual(identity1, s1._rawIdentifier())
+    expectEqual(identity2, s2._rawIdentifier())
   }
 }
 
