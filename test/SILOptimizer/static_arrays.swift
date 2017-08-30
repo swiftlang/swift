@@ -117,6 +117,15 @@ func overwriteLiteral(_ x: Int) -> [Int] {
   return a
 }
 
+struct Empty { }
+
+// CHECK-LABEL: sil {{.*}}arrayWithEmptyElements{{.*}} : $@convention(thin) () -> @owned Array<Empty> {
+func arrayWithEmptyElements() -> [Empty] {
+  // CHECK:    alloc_ref
+  // CHECK:    return
+  return [Empty()]
+}
+
 // CHECK-OUTPUT:      [100, 101, 102]
 print(globalVariable)
 // CHECK-OUTPUT-NEXT: 11
