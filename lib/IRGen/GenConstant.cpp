@@ -97,12 +97,13 @@ llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
   // appropriate.
   for (unsigned i = 0, e = inst->getElements().size(); i != e; i++) {
     auto operand = inst->getOperand(i);
-    unsigned index = nextIndex(IGM, type, i);
+    Optional<unsigned> index = nextIndex(IGM, type, i);
+    if (index.hasValue()) {
+      assert(elts[index.getValue()] == nullptr &&
+             "Unexpected constant struct field overlap");
 
-    assert(elts[index] == nullptr &&
-           "Unexpected constant struct field overlap");
-
-    elts[index] = emitConstantValue(IGM, operand);
+      elts[index.getValue()] = emitConstantValue(IGM, operand);
+    }
   }
 
   // fill in any gaps, which are the explicit padding that swiftc inserts.
@@ -138,5 +139,6 @@ llvm::Constant *irgen::emitConstantStruct(IRGenModule &IGM, StructInst *SI) {
 }
 
 llvm::Constant *irgen::emitConstantTuple(IRGenModule &IGM, TupleInst *TI) {
-  return emitConstantStructOrTuple(IGM, TI, irgen::getTupleElementStructIndex);
+  return emitConstantStructOrTuple(IGM, TI,
+                                   irgen::getPhysicalTupleElementStructIndex);
 }

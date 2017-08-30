@@ -535,9 +535,10 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         idKind = KeyPathComponentHeader::StoredPropertyIndex;
         if (baseTy->getStructOrBoundGenericStruct()) {
           idResolved = true;
-          idValue = llvm::ConstantInt::get(SizeTy,
-            getPhysicalStructFieldIndex(*this,
-                           SILType::getPrimitiveAddressType(baseTy), property));
+          Optional<unsigned> structIdx =  getPhysicalStructFieldIndex(*this,
+                            SILType::getPrimitiveAddressType(baseTy), property);
+          assert(structIdx.hasValue() && "empty property");
+          idValue = llvm::ConstantInt::get(SizeTy, structIdx.getValue());
         } else if (baseTy->getClassOrBoundGenericClass()) {
           // TODO: This field index would require runtime resolution with Swift
           // native class resilience. We never directly access ObjC-imported

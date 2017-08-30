@@ -129,8 +129,11 @@ namespace {
       llvm_unreachable("bad element layout kind");
     }
 
-    unsigned getElementStructIndex(IRGenModule &IGM, unsigned fieldNo) const {
+    Optional<unsigned> getElementStructIndex(IRGenModule &IGM,
+                                             unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
+      if (field.isEmpty())
+        return None;
       return field.getStructIndex();
     }
 
@@ -412,7 +415,8 @@ Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
   FOR_TUPLE_IMPL(IGM, tupleType, getFixedElementOffset, fieldNo);
 }
 
-unsigned irgen::getTupleElementStructIndex(IRGenModule &IGM, SILType tupleType,
-                                           unsigned fieldNo) {
+Optional<unsigned> irgen::getPhysicalTupleElementStructIndex(IRGenModule &IGM,
+                                                             SILType tupleType,
+                                                             unsigned fieldNo) {
   FOR_TUPLE_IMPL(IGM, tupleType, getElementStructIndex, fieldNo);
 }
