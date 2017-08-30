@@ -381,6 +381,15 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // FIXME: @objc declarations should be too, but we currently have no way
   // of marking them "used" other than making them external. 
   ValueDecl *d = getDecl();
+
+  // stdlib_binary_only functions should have a public SIL linkage.
+  auto Attrs = d->getAttrs();
+  for (auto *A : Attrs.getAttributes<SemanticsAttr>()) {
+    if (A->Value == "stdlib_binary_only") {
+      return maybeAddExternal(SILLinkage::Public);
+    }
+  }
+
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
     if (!isForeign && moduleContext->isLocalContext()) {
