@@ -686,6 +686,13 @@ ManagedValue SILGenBuilder::createSuperMethod(SILLocation loc,
   return ManagedValue::forUnmanaged(v);
 }
 
+ManagedValue SILGenBuilder::
+createValueMetatype(SILLocation loc, SILType metatype,
+                    ManagedValue base) {
+  SILValue v = createValueMetatype(loc, metatype, base.getValue());
+  return ManagedValue::forUnmanaged(v);
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//
