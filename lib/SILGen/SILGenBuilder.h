@@ -301,6 +301,10 @@ public:
   ManagedValue createSuperMethod(SILLocation loc, ManagedValue operand,
                                  SILDeclRef member, SILType methodTy,
                                  bool isVolatile = false);
+
+  using SILBuilder::createValueMetatype;
+  ManagedValue createValueMetatype(SILLocation loc, SILType metatype,
+                                   ManagedValue base);
 };
 
 class SwitchCaseFullExpr;
