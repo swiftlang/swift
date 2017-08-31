@@ -47,9 +47,9 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-SAME: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
 // CHECK-SAME: }
 
-// CHECK: [[A_REQTS]] = internal unnamed_addr constant [1 x %swift.protocol_requirement] [%swift.protocol_requirement { i32 1, i32 0 }]
-// CHECK: [[B_REQTS]] = internal unnamed_addr constant [1 x %swift.protocol_requirement] [%swift.protocol_requirement { i32 1, i32 0 }]
-// CHECK: [[C_REQTS]] = internal unnamed_addr constant [1 x %swift.protocol_requirement] [%swift.protocol_requirement { i32 1, i32 0 }]
+// CHECK: [[A_REQTS]] = internal unnamed_addr constant [1 x %swift.protocol_requirement] [%swift.protocol_requirement { i32 17, i32 0 }]
+// CHECK: [[B_REQTS]] = internal unnamed_addr constant [1 x %swift.protocol_requirement] [%swift.protocol_requirement { i32 17, i32 0 }]
+// CHECK: [[C_REQTS]] = internal unnamed_addr constant [1 x %swift.protocol_requirement] [%swift.protocol_requirement { i32 17, i32 0 }]
 
 // -- @objc protocol OPT uses ObjC symbol mangling and layout
 // CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, [4 x i8*]*, i8*, i8* } {
@@ -67,7 +67,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK:   %swift.protocol* @_T017protocol_metadata1AMp,
 // CHECK:   %swift.protocol* @_T017protocol_metadata1BMp
 // CHECK: }
-// CHECK: [[AB_REQTS:@.*]] = internal unnamed_addr constant [3 x %swift.protocol_requirement] [%swift.protocol_requirement zeroinitializer, %swift.protocol_requirement zeroinitializer, %swift.protocol_requirement { i32 1, i32 0 }]
+// CHECK: [[AB_REQTS:@.*]] = internal unnamed_addr constant [3 x %swift.protocol_requirement] [%swift.protocol_requirement zeroinitializer, %swift.protocol_requirement zeroinitializer, %swift.protocol_requirement { i32 17, i32 0 }]
 // CHECK: @_T017protocol_metadata2ABMp = hidden constant %swift.protocol { 
 // CHECK-SAME:   [[AB_INHERITED]]
 // CHECK-SAME:   i32 72, i32 7,
@@ -81,6 +81,27 @@ protocol ABO : A, B, O { func abo() }
 // CHECK:   %swift.protocol* @_T017protocol_metadata1BMp,
 // CHECK:   {{.*}}* @_PROTOCOL__TtP17protocol_metadata1O_
 // CHECK: }
+
+protocol Comprehensive {
+  associatedtype Assoc : A
+  init()
+  func instanceMethod()
+  static func staticMethod()
+  var instance: Assoc { get set }
+  static var global: Assoc { get set }
+}
+// CHECK: [[COMPREHENSIVE_REQTS:@.*]] = internal unnamed_addr constant [11 x %swift.protocol_requirement]
+// CHECK-SAME:  [%swift.protocol_requirement { i32 6, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 2, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 1, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 19, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 20, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 21, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 3, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 4, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 5, i32 0 }]
 
 func reify_metadata<T>(_ x: T) {}
 

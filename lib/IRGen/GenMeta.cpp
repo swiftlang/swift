@@ -2083,29 +2083,30 @@ void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
 /** Nominal Type Descriptor Emission *****************************************/
 /*****************************************************************************/
 
-template <class Kind>
-static Kind classifyMethodKind(ValueDecl *fn) {
+template <class Flags>
+static Flags getMethodDescriptorFlags(ValueDecl *fn) {
   if (isa<ConstructorDecl>(fn))
-    return Kind::Init;
+    return Flags(Flags::Kind::Init); // 'init' is considered static
 
-  switch (cast<FuncDecl>(fn)->getAccessorKind()) {
-  case AccessorKind::NotAccessor:
-    return (fn->isStatic()
-              ? Kind::StaticMethod
-              : Kind::InstanceMethod);
-  case AccessorKind::IsGetter:
-    return Kind::Getter;
-  case AccessorKind::IsSetter:
-    return Kind::Setter;
-  case AccessorKind::IsMaterializeForSet:
-    return Kind::MaterializeForSet;
-  case AccessorKind::IsWillSet:
-  case AccessorKind::IsDidSet:
-  case AccessorKind::IsAddressor:
-  case AccessorKind::IsMutableAddressor:
-    llvm_unreachable("these accessors never appear in protocols or v-tables");
-  }
-  llvm_unreachable("bad kind");
+  auto kind = [&] {
+    switch (cast<FuncDecl>(fn)->getAccessorKind()) {
+    case AccessorKind::NotAccessor:
+      return Flags::Kind::Method;
+    case AccessorKind::IsGetter:
+      return Flags::Kind::Getter;
+    case AccessorKind::IsSetter:
+      return Flags::Kind::Setter;
+    case AccessorKind::IsMaterializeForSet:
+      return Flags::Kind::MaterializeForSet;
+    case AccessorKind::IsWillSet:
+    case AccessorKind::IsDidSet:
+    case AccessorKind::IsAddressor:
+    case AccessorKind::IsMutableAddressor:
+      llvm_unreachable("these accessors never appear in protocols or v-tables");
+    }
+    llvm_unreachable("bad kind");
+  }();
+  return Flags(kind).withIsInstance(!fn->isStatic());
 }
 
 namespace {  
@@ -2445,8 +2446,7 @@ namespace {
 
       // Classify the method.
       using Flags = MethodDescriptorFlags;
-      Flags::Kind kind = classifyMethodKind<Flags::Kind>(fn.getDecl());
-      auto flags = MethodDescriptorFlags(kind);
+      auto flags = getMethodDescriptorFlags<Flags>(fn.getDecl());
 
       // Remember if the declaration was dynamic.
       if (fn.getDecl()->isDynamic())
@@ -5422,8 +5422,7 @@ namespace {
       auto func = entry.getFunction();
 
       // Classify the function.
-      auto kind = classifyMethodKind<Flags::Kind>(func);
-      auto flags = Flags(kind);
+      auto flags = getMethodDescriptorFlags<Flags>(func);
 
       // Look for a default witness.
       llvm::Constant *defaultImpl = findDefaultWitness(func);
