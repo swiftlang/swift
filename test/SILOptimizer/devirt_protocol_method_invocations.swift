@@ -7,7 +7,10 @@ protocol PPP {
 protocol QQQ : PPP {
 }
 
-struct S : QQQ {}
+protocol RRR : QQQ {
+}
+
+struct S : RRR {}
 
 extension QQQ {
     @_semantics("optimize.sil.never")
@@ -24,6 +27,18 @@ extension QQQ {
 public func testInheritedConformance() {
     (S() as QQQ).f()
 }
+
+// Test that a witness_method instructions is not devirtualized yet, because
+// it uses indirect inheritance.
+// This test used to crash the compiler because it uses inherited conformances.
+// CHECK-LABEL: sil @_T034devirt_protocol_method_invocations34testIndirectlyInheritedConformanceyyF : $@convention(thin) () -> ()
+// CHECK: witness_method
+// CHECK: apply
+// CHECK: // end sil function '_T034devirt_protocol_method_invocations34testIndirectlyInheritedConformanceyyF'
+public func testIndirectlyInheritedConformance() {
+  (S() as RRR).f()
+}
+
 
 public protocol Foo { 
   func foo(_ x:Int) -> Int
