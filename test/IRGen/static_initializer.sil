@@ -65,6 +65,22 @@ sil_global @static_array : $TestArrayStorage = {
 }
 // CHECK: @static_array = {{(protected )?}}global %T18static_initializer16TestArrayStorageC_tailelems0c { i64 0, %T18static_initializer16TestArrayStorageC_tailelems0 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }>, [4 x i8] undef, %Ts5Int64V <{ i64 10 }>, %Ts5Int64V <{ i64 20 }> }> }, align 8
 
+final class ClassWithEmptyField {
+  @sil_stored var x: Int32
+  @sil_stored var y: ()
+  init()
+}
+
+sil_vtable ClassWithEmptyField { }
+
+sil_global @static_class_with_empty_field : $ClassWithEmptyField = {
+  %0 = integer_literal $Builtin.Int32, 2
+  %3 = struct $Int32 (%0 : $Builtin.Int32)
+  %5 = tuple ()
+  %initval = object $ClassWithEmptyField (%3 : $Int32, %5 : $())
+}
+// CHECK: @static_class_with_empty_field = {{(protected )?}}global %T18static_initializer19ClassWithEmptyFieldC_tailelems1c { i64 0, %T18static_initializer19ClassWithEmptyFieldC_tailelems1 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }> }> }, align 8
+
 // CHECK-LABEL: define{{( protected)?}} swiftcc i8* @_TF2cha1xSi() {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret i8* bitcast (%Ts5Int32V* @_T02ch1xSiv to i8*)
