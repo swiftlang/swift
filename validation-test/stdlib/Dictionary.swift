@@ -1264,18 +1264,7 @@ DictionaryTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
   var iter = d.makeIterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = iter.next() {
-    // FIXME: This doesn't work (<rdar://problem/17751308> Can't +=
-    // with array literal of pairs)
-    // pairs += [(key.value, value.value)]
-
-    // FIXME: This doesn't work (<rdar://problem/17750582> generics over tuples)
-    // pairs.append((key.value, value.value))
-
-    // FIXME: This doesn't work (<rdar://problem/17751359>)
-    // pairs.append(key.value, value.value)
-
-    let kv = (key.value, value.value)
-    pairs += [kv]
+    pairs += [(key.value, value.value)]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   assert(identity1 == d._rawIdentifier())
