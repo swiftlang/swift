@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -o /dev/null
 
 class SomeClass {}
 
