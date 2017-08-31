@@ -105,7 +105,7 @@ func getZim(_ f: Foo) -> Bool {
 }
 
 // CHECK-ios-i386-LABEL: sil hidden @_T013objc_bridging6getZim{{.*}}F
-// CHECK-ios-i386: bb0([[SELF:%.*]] : $Foo):
+// CHECK-ios-i386: bb0([[SELF:%.*]] : @owned $Foo):
 // CHECK-ios-i386:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-ios-i386:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
 // CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
@@ -116,7 +116,7 @@ func getZim(_ f: Foo) -> Bool {
 // CHECK-ios-i386: }
 
 // CHECK-watchos-i386-LABEL: sil hidden @_T013objc_bridging6getZim{{.*}}F
-// CHECK-watchos-i386: bb0([[SELF:%.*]] : $Foo):
+// CHECK-watchos-i386: bb0([[SELF:%.*]] : @owned $Foo):
 // CHECK-watchos-i386:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-watchos-i386:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Boo
 // CHECK-watchos-i386:   [[BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]]) : $@convention(objc_method) (Foo) -> Bool
@@ -136,7 +136,7 @@ func getZim(_ f: Foo) -> Bool {
 // CHECK-macosx-x86_64: }
 
 // CHECK-ios-x86_64-LABEL: sil hidden @_T013objc_bridging6getZim{{.*}}F
-// CHECK-ios-x86_64: bb0([[SELF:%.*]] : $Foo):
+// CHECK-ios-x86_64: bb0([[SELF:%.*]] : @owned $Foo):
 // CHECK-ios-x86_64:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-ios-x86_64:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Boo
 // CHECK-ios-x86_64:   [[BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]]) : $@convention(objc_method) (Foo) -> Bool
@@ -145,7 +145,7 @@ func getZim(_ f: Foo) -> Bool {
 // CHECK-ios-x86_64: }
 
 // CHECK-arm64-LABEL: sil hidden @_T013objc_bridging6getZim{{.*}}F
-// CHECK-arm64: bb0([[SELF:%.*]] : $Foo):
+// CHECK-arm64: bb0([[SELF:%.*]] : @owned $Foo):
 // CHECK-arm64:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-arm64:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Boo
 // CHECK-arm64:   [[BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]]) : $@convention(objc_method) (Foo) -> Bool
@@ -158,7 +158,7 @@ func setZim(_ f: Foo, b: Bool) {
   f.setZim(b)
 }
 // CHECK-ios-i386-LABEL: sil hidden @_T013objc_bridging6setZim{{.*}}F
-// CHECK-ios-i386: bb0([[ARG0:%.*]] : $Foo, [[ARG1:%.*]] : $Bool):
+// CHECK-ios-i386: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-ios-i386:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
 // CHECK-ios-i386:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
@@ -180,7 +180,7 @@ func setZim(_ f: Foo, b: Bool) {
 // CHECK-macosx-x86_64: }
 
 // CHECK-ios-x86_64-LABEL: sil hidden @_T013objc_bridging6setZim{{.*}}F
-// CHECK-ios-x86_64: bb0([[ARG0:%.*]] : $Foo, [[ARG1:%.*]] : $Bool):
+// CHECK-ios-x86_64: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-ios-x86_64:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
 // CHECK-ios-x86_64:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-ios-x86_64:   apply [[METHOD]]([[ARG1]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
@@ -189,7 +189,7 @@ func setZim(_ f: Foo, b: Bool) {
 // CHECK-ios-x86_64: }
 
 // CHECK-arm64-LABEL: sil hidden @_T013objc_bridging6setZim{{.*}}F
-// CHECK-arm64: bb0([[ARG0:%.*]] : $Foo, [[ARG1:%.*]] : $Bool):
+// CHECK-arm64: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-arm64:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
 // CHECK-arm64:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-arm64:   apply [[METHOD]]([[ARG1]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
@@ -198,7 +198,7 @@ func setZim(_ f: Foo, b: Bool) {
 // CHECK-arm64: }
 
 // CHECK-watchos-i386-LABEL: sil hidden @_T013objc_bridging6setZim{{.*}}F
-// CHECK-watchos-i386: bb0([[ARG0:%.*]] : $Foo, [[ARG1:%.*]] : $Bool):
+// CHECK-watchos-i386: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-watchos-i386:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
 // CHECK-watchos-i386:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-watchos-i386:   apply [[METHOD]]([[ARG1]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
