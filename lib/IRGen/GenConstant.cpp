@@ -160,9 +160,12 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
   // Construct the object init value including tail allocated elements.
   for (unsigned i = 0; i != NumElems; i++) {
     SILValue Val = OI->getAllElements()[i];
-    unsigned EltIdx = ClassLayout->getElements()[i].getStructIndex();
-    assert(EltIdx != 0 && "the first element is the object header");
-    elts[EltIdx] = emitConstantValue(IGM, Val);
+    const ElementLayout &EL = ClassLayout->getElements()[i];
+    if (!EL.isEmpty()) {
+      unsigned EltIdx = EL.getStructIndex();
+      assert(EltIdx != 0 && "the first element is the object header");
+      elts[EltIdx] = emitConstantValue(IGM, Val);
+    }
   }
   // Construct the object header.
   llvm::Type *ObjectHeaderTy = sTy->getElementType(0);

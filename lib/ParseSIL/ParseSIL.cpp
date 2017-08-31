@@ -3767,21 +3767,18 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
 
     // Parse a list of SILValue.
+    bool OpsAreTailElems = false;
     unsigned NumBaseElems = 0;
     if (P.Tok.isNot(tok::r_paren)) {
       do {
         if (Opcode == ValueKind::ObjectInst) {
-          bool StartOfTailElems = false;
-          if (parseSILOptional(StartOfTailElems, *this, "tail_elems"))
+          if (parseSILOptional(OpsAreTailElems, *this, "tail_elems"))
             return true;
-          if (StartOfTailElems) {
-            if (NumBaseElems)
-              return true;
-            NumBaseElems = OpList.size();
-          }
         }
         if (parseTypedValueRef(Val, B)) return true;
         OpList.push_back(Val);
+        if (!OpsAreTailElems)
+          NumBaseElems = OpList.size();
       } while (P.consumeIf(tok::comma));
     }
     if (P.parseToken(tok::r_paren,

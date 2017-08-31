@@ -1020,6 +1020,19 @@ static bool isValidInitVal(SILValue V) {
   return false;
 }
 
+/// Check if \p V is an empty tuple or empty struct.
+static bool isEmptyInitVal(SILValue V) {
+  if (!isa<StructInst>(V) && !isa<TupleInst>(V))
+    return false;
+
+  // If any of the operands is not empty, the whole struct/tuple is not empty.
+  for (Operand &Op : cast<SILInstruction>(V)->getAllOperands()) {
+    if (!isEmptyInitVal(Op.get()))
+      return false;
+  }
+  return true;
+}
+
 /// Check if a use of an object may prevent outlining the object.
 ///
 /// If \p isCOWObject is true, then the object reference is wrapped into a
@@ -1096,6 +1109,11 @@ bool SILGlobalOpt::handleTailAddr(int TailIdx, SILInstruction *TailAddr,
   if (TailIdx >= 0 && TailIdx < (int)TailStores.size()) {
     if (auto *SI = dyn_cast<StoreInst>(TailAddr)) {
       if (!isValidInitVal(SI->getSrc()) || TailStores[TailIdx])
+        return false;
+      // We don't optimize arrays with an empty element type. This would
+      // generate a wrong initializer with zero-sized elements. But the stride
+      // of zero sized types is (artificially) set to 1 in IRGen.
+      if (isEmptyInitVal(SI->getSrc()))
         return false;
       TailStores[TailIdx] = SI;
       return true;
