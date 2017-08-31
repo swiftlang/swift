@@ -746,11 +746,7 @@ StringRef getDefaultPreferredName(RefactoringKind Kind) {
       return "extractedExpr";
     case RefactoringKind::ExtractFunction:
       return "extractedFunc";
-    case RefactoringKind::ExpandDefault:
-    case RefactoringKind::FillProtocolStub:
-    case RefactoringKind::FindGlobalRenameRanges:
-    case RefactoringKind::FindLocalRenameRanges:
-    case RefactoringKind::LocalizeString:
+    default:
       return "";
   }
 }
