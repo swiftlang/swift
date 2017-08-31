@@ -205,61 +205,10 @@ func getCOWSlowArray() -> Array<COWBox<Int>> {
   return a
 }
 
-ArrayTestSuite.test("COW.Fast.IndexesDontAffectUniquenessCheck") {
-  var a = getCOWFastArray()
-  let identity1 = a._rawIdentifier()
-  
-  var startIndex = a.startIndex
-  var endIndex = a.endIndex
-  expectNotEqual(startIndex, endIndex)
-  expectLT(startIndex, endIndex)
-  expectLE(startIndex, endIndex)
-  expectGT(endIndex, startIndex)
-  expectGE(endIndex, startIndex)
-  
-  expectEqual(identity1, a._rawIdentifier())
-  
-  a[0] = 4
-  expectEqual(identity1, a._rawIdentifier())
-  
-  // Keep indexes alive during the calls above
-  _blackHole(startIndex)
-  _blackHole(endIndex)
-}
-
-ArrayTestSuite.test("COW.Slow.IndexesDontAffectUniquenessCheck") {
-  var a = getCOWSlowArray()
-  let identity1 = a._rawIdentifier()
-  
-  var startIndex = a.startIndex
-  var endIndex = a.endIndex
-  expectNotEqual(startIndex, endIndex)
-  expectLT(startIndex, endIndex)
-  expectLE(startIndex, endIndex)
-  expectGT(endIndex, startIndex)
-  expectGE(endIndex, startIndex)
-  
-  expectEqual(identity1, a._rawIdentifier())
-  
-  a[0] = COWBox(4)
-  expectEqual(identity1, a._rawIdentifier())
-  
-  // Keep indexes alive during the calls above
-  _blackHole(startIndex)
-  _blackHole(endIndex)
-}
-
 ArrayTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
   var a = getCOWFastArray()
   var identity1 = a._rawIdentifier()
-
   var startIndex = a.startIndex
-  let empty = startIndex == a.endIndex
-  expectNotEqual((a.startIndex < a.endIndex), empty)
-  expectLE(a.startIndex, a.endIndex)
-  expectEqual((a.startIndex >= a.endIndex), empty)
-  expectGT(a.endIndex, a.startIndex)
-  expectEqual(identity1, a._rawIdentifier())
 
   expectNotEqual(0, a[startIndex])
   expectEqual(identity1, a._rawIdentifier())
@@ -268,14 +217,7 @@ ArrayTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
 ArrayTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
   var a = getCOWSlowArray()
   var identity1 = a._rawIdentifier()
-
   var startIndex = a.startIndex
-  let empty = startIndex == a.endIndex
-  expectNotEqual((a.startIndex < a.endIndex), empty)
-  expectLE(a.startIndex, a.endIndex)
-  expectEqual((a.startIndex >= a.endIndex), empty)
-  expectGE(a.endIndex, a.startIndex)
-  expectEqual(identity1, a._rawIdentifier())
 
   expectNotEqual(0, a[startIndex].value)
   expectEqual(identity1, a._rawIdentifier())
