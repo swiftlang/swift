@@ -795,12 +795,23 @@ getConformanceAndConcreteType(FullApplySite AI,
     if (Requirement == Protocol) {
       return std::make_tuple(Conformance, ConcreteType, ConcreteTypeDef);
     }
-    if (Requirement->inheritsFrom(Protocol)) {
-      // If Requirement != Protocol, then the abstract conformance cannot be used
-      // as is and we need to create a proper conformance.
-      return std::make_tuple(Conformance.getInherited(Protocol), ConcreteType,
-                             ConcreteTypeDef);
-    }
+    // If Requirement != Protocol, then the abstract conformance cannot be
+    // used as is and we need to create a proper conformance.
+    // FIXME: We can handle only direct inheritance at the moment due to some
+    // limitations of the init_existential_* instructions representation.
+    // Once these instructions start using generic signatures instead of
+    // conformances lists, it should be fairly easy to support the indirect
+    // inheritance here by something like:
+    // Substitution Sub(ConcreteType, Conformances);
+    // IE->getGenericSignature()
+    //   ->getSubstitutionMap({Sub}).lookupConformance(GP00, Protocol);
+    auto InheritedProtocols = Requirement->getInheritedProtocols();
+    if (std::find(InheritedProtocols.begin(), InheritedProtocols.end(),
+                  Protocol) == InheritedProtocols.end())
+      return None;
+    // Requirement is directly inherited from Protocol.
+    return std::make_tuple(Conformance.getInherited(Protocol), ConcreteType,
+                           ConcreteTypeDef);
   }
 
   llvm_unreachable("couldn't find matching conformance in substitution?");
