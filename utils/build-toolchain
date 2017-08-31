@@ -14,7 +14,7 @@ cd "$(dirname $0)/.." || exit
 SRC_DIR=$PWD
 
 DRY_RUN=
-if [[ "$1" == "-n" || "$1" == "--dry-run" ]] ; then
+if [[ "$2" == "-n" || "$2" == "--dry-run" ]] ; then
     DRY_RUN="-n"
     shift
 fi
@@ -40,7 +40,11 @@ SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
 if [[ "$(uname -s)" == "Darwin" ]] ; then
     SWIFT_PACKAGE=buildbot_osx_package
 else
-    SWIFT_PACKAGE=buildbot_linux,no_test
+    if [[ "$2" == "-t" || "$2" == "--test" ]] ; then
+        SWIFT_PACKAGE=buildbot_linux
+    else
+        SWIFT_PACKAGE=buildbot_linux,no_test
+    fi
 fi
 
 ./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
