@@ -111,8 +111,7 @@ class MethodDescriptorFlags {
 public:
   typedef uint32_t int_type;
   enum class Kind {
-    InstanceMethod,
-    StaticMethod,
+    Method,
     Init,
     Getter,
     Setter,
@@ -122,7 +121,8 @@ public:
 private:
   enum : int_type {
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
-    DynamicMask = 0x10,
+    IsInstanceMask = 0x10,
+    IsDynamicMask = 0x20,
   };
 
   int_type Value;
@@ -130,19 +130,34 @@ private:
 public:
   MethodDescriptorFlags(Kind kind) : Value(unsigned(kind)) {}
 
+  MethodDescriptorFlags withIsInstance(bool isInstance) const {
+    auto copy = *this;
+    if (isInstance) {
+      copy.Value |= IsInstanceMask;
+    } else {
+      copy.Value &= ~IsInstanceMask;
+    }
+    return copy;
+  }
+
   MethodDescriptorFlags withIsDynamic(bool isDynamic) const {
     auto copy = *this;
     if (isDynamic)
-      copy.Value |= DynamicMask;
+      copy.Value |= IsDynamicMask;
     else
-      copy.Value &= ~DynamicMask;
+      copy.Value &= ~IsDynamicMask;
     return copy;
   }
 
   Kind getKind() const { return Kind(Value & KindMask); }
 
   /// Is the method marked 'dynamic'?
-  bool isDynamic() const { return Value & DynamicMask; }
+  bool isDynamic() const { return Value & IsDynamicMask; }
+
+  /// Is the method an instance member?
+  ///
+  /// Note that 'init' is not considered an instance member.
+  bool isInstance() const { return Value & IsInstanceMask; }
 
   int_type getIntValue() const { return Value; }
 };
@@ -454,8 +469,7 @@ public:
   typedef uint32_t int_type;
   enum class Kind {
     BaseProtocol,
-    InstanceMethod,
-    StaticMethod,
+    Method,
     Init,
     Getter,
     Setter,
@@ -467,6 +481,7 @@ public:
 private:
   enum : int_type {
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
+    IsInstanceMask = 0x10,
   };
 
   int_type Value;
@@ -474,7 +489,22 @@ private:
 public:
   ProtocolRequirementFlags(Kind kind) : Value(unsigned(kind)) {}
 
+  ProtocolRequirementFlags withIsInstance(bool isInstance) const {
+    auto copy = *this;
+    if (isInstance) {
+      copy.Value |= IsInstanceMask;
+    } else {
+      copy.Value &= ~IsInstanceMask;
+    }
+    return copy;
+  }
+
   Kind getKind() const { return Kind(Value & KindMask); }
+
+  /// Is the method an instance member?
+  ///
+  /// Note that 'init' is not considered an instance member.
+  bool isInstance() const { return Value & IsInstanceMask; }
 
   int_type getIntValue() const { return Value; }
 };

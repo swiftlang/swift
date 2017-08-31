@@ -973,17 +973,17 @@ struct TestProtocol {
 
     using Flags = ProtocolRequirementFlags;
 
-    requirements[0].Flags = Flags(Flags::Kind::InstanceMethod);
+    requirements[0].Flags = Flags(Flags::Kind::Method);
     requirements[0].DefaultImplementation = nullptr;
-    requirements[1].Flags = Flags(Flags::Kind::InstanceMethod);
+    requirements[1].Flags = Flags(Flags::Kind::Method);
     requirements[1].DefaultImplementation = nullptr;
-    requirements[2].Flags = Flags(Flags::Kind::InstanceMethod);
+    requirements[2].Flags = Flags(Flags::Kind::Method);
     requirements[2].DefaultImplementation = nullptr;
-    requirements[3].Flags = Flags(Flags::Kind::InstanceMethod);
+    requirements[3].Flags = Flags(Flags::Kind::Method);
     initializeRelativePointer(
       (int32_t *) &requirements[3].DefaultImplementation,
       fakeDefaultWitness1);
-    requirements[4].Flags = Flags(Flags::Kind::InstanceMethod);
+    requirements[4].Flags = Flags(Flags::Kind::Method);
     initializeRelativePointer(
       (int32_t *) &requirements[4].DefaultImplementation,
       fakeDefaultWitness2);
