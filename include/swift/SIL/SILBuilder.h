@@ -508,6 +508,14 @@ public:
     return createLoad(Loc, LV, Qualifier);
   }
 
+  LoadInst *createTrivialLoadOr(SILLocation Loc, SILValue LV,
+                                LoadOwnershipQualifier Qualifier) {
+    if (LV->getType().isTrivial(getModule())) {
+      return createLoad(Loc, LV, LoadOwnershipQualifier::Trivial);
+    }
+    return createLoad(Loc, LV, Qualifier);
+  }
+
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
