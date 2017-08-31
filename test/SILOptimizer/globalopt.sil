@@ -108,6 +108,22 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @dont_outline_objc_allocation
+// CHECK: alloc_ref
+// CHECK: return
+sil @dont_outline_objc_allocation : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  // A hack, because Obj is not really an ObjC class. But for the test it should be ok.
+  %7 = alloc_ref [objc] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
 sil @take_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
 
 // CHECK-LABEL: sil @dont_outline_global_unknown_addr_use
