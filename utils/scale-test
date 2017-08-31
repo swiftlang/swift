@@ -167,6 +167,11 @@ def run_many(args):
 
     ast = gyb.parse_template(args.file.name, args.file.read())
     rng = range(args.begin, args.end, args.step)
+    if args.step > (args.end - args.begin):
+        print("Step value", args.step,
+              "is too large for the range", str((args.begin, args.end)) + ".",
+              "Have you forgotten to override it?")
+        exit(1)
     if args.multi_file or args.sum_multi:
         return (rng, [run_once(args, ast, range(i)) for i in rng])
     else:
