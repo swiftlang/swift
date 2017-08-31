@@ -13,7 +13,6 @@
 // REQUIRES: executable_test
 
 //===--- Niceties ---------------------------------------------------------===//
-typealias Element_<S: Sequence> = S.Iterator.Element
 extension Collection {
   func index(_ d: IndexDistance) -> Index {
     return index(startIndex, offsetBy: d)
@@ -67,8 +66,8 @@ extension Pattern {
 // KMP/Boyer-Moore[-Galil]/Sustik-Moore/Z-algorithm which run in O(pattern.count
 // + c.count)
 struct LiteralMatch<T: Collection, Index: Comparable> : Pattern
-where Element_<T> : Equatable {
-  typealias Element = Element_<T>
+where T.Element : Equatable {
+  typealias Element = T.Element
   init(_ pattern: T) { self.pattern = pattern }
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
@@ -166,7 +165,7 @@ struct RepeatMatch<M0: Pattern> : Pattern {
   var repeatLimits: ClosedRange<Int>
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<M0.Index, MatchData>
-  where C.Index == M0.Index, Element_<C> == M0.Element
+  where C.Index == M0.Index, C.Element == M0.Element
   // The following requirements go away with upcoming generics features
   , C.SubSequence : Collection  
   {
@@ -236,7 +235,7 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
   typealias MatchData = OneOf<M0.MatchData,M1.MatchData>
 
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
-  where C.Index == Index, Element_<C> == Element
+  where C.Index == Index, C.Element == Element
   // The following requirements go away with upcoming generics features
   , C.SubSequence : Collection  
   {
@@ -292,7 +291,7 @@ struct MatchStaticString : Pattern {
   init(_ x: StaticString) { content = x }
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
-  where C.Index == Index, Element_<C> == Element 
+  where C.Index == Index, C.Element == Element 
   // The following requirements go away with upcoming generics features
   , C.SubSequence : Collection  
 {
@@ -382,7 +381,7 @@ struct Paired<T: Hashable, I: Comparable> : Pattern {
   let pairs: Dictionary<T,T>
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
-  where C.Index == Index, Element_<C> == Element
+  where C.Index == Index, C.Element == Element
   // The following requirements go away with upcoming generics features
   , C.SubSequence : Collection  
   {
