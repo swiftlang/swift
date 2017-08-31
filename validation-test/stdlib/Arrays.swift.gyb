@@ -6,6 +6,12 @@ import StdlibCollectionUnittest
 
 let CopyToNativeArrayBufferTests = TestSuite("CopyToNativeArrayBufferTests")
 
+extension Array {
+  func _rawIdentifier() -> Int {
+    return unsafeBitCast(self, to: Int.self)
+  }
+}
+
 CopyToNativeArrayBufferTests.test("Sequence._copyToContiguousArray()") {
   do {
     // Call from a static context.
@@ -138,12 +144,379 @@ ArrayTestSuite.test("${Kind}/popLast") {
 }
 % end
 
-public struct ArrayIndexTest<T: Collection> {
-  public enum RangeBox {
-    case closed(ClosedRange<Int>)
-    case halfClosed(Range<Int>)
+//===----------------------------------------------------------------------===//
+// COW(🐄) tests
+//===----------------------------------------------------------------------===//
+
+class COWBox<
+  T: Equatable & CustomStringConvertible>
+  : Equatable, CustomStringConvertible {
+  var value: T
+  
+  init(_ value: T) {
+    self.value = value
   }
   
+  var description: String {
+    return "Boxed: \(value.description)"
+  }
+  
+  static func ==(lhs: COWBox, rhs: COWBox) -> Bool {
+    return lhs.value == rhs.value
+  }
+}
+
+ArrayTestSuite.test("COW.Smoke") {
+  var a1 = Array<COWBox<Int>>(repeating: COWBox(0), count: 10)
+  var identity1 = a1._rawIdentifier()
+  
+  a1[0] = COWBox(1)
+  a1[1] = COWBox(2)
+  a1[2] = COWBox(3)
+  
+  var a2 = a1
+  expectEqual(identity1, a2._rawIdentifier())
+  
+  a2[3] = COWBox(4)
+  expectNotEqual(identity1, a2._rawIdentifier())
+  
+  a1[4] = COWBox(5)
+  expectEqual(identity1, a1._rawIdentifier())
+  
+  _blackHole(a1)
+  _blackHole(a2)  
+}
+
+func getCOWFastArray() -> Array<Int> {
+  var a = Array<Int>()
+  a.reserveCapacity(10)
+  a.append(1)
+  a.append(2)
+  a.append(3)
+  return a
+}
+
+func getCOWSlowArray() -> Array<COWBox<Int>> {
+  var a = Array<COWBox<Int>>()
+  a.reserveCapacity(10)
+  a.append(COWBox(1))
+  a.append(COWBox(2))
+  a.append(COWBox(3))
+  return a
+}
+
+ArrayTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
+  var a = getCOWFastArray()
+  var identity1 = a._rawIdentifier()
+  var startIndex = a.startIndex
+
+  expectNotEqual(0, a[startIndex])
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
+  var a = getCOWSlowArray()
+  var identity1 = a._rawIdentifier()
+  var startIndex = a.startIndex
+
+  expectNotEqual(0, a[startIndex].value)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
+  do {
+    var a = getCOWFastArray()
+    var identity1 = a._rawIdentifier()
+
+    let index1 = 1
+    expectEqual(identity1, a._rawIdentifier())
+
+    expectEqual(2, a[index1])
+
+    let removed = a.remove(at: index1)
+    expectEqual(2, removed)
+
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    var identity1 = a1._rawIdentifier()
+
+    var a2 = a1
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    var index1 = 1
+    expectEqual(2, a2[index1])
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    let removed = a2.remove(at: index1)
+    expectEqual(2, removed)
+
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity1, a2._rawIdentifier())
+  }
+}
+
+ArrayTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
+  do {
+    var a = getCOWSlowArray()
+    var identity1 = a._rawIdentifier()
+
+    let index1 = 1
+    expectEqual(identity1, a._rawIdentifier())
+
+    expectEqual(2, a[index1].value)
+
+    let removed = a.remove(at: index1)
+    expectEqual(2, removed.value)
+
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a1 = getCOWSlowArray()
+    var identity1 = a1._rawIdentifier()
+
+    var a2 = a1
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    var index1 = 1
+    expectEqual(2, a2[index1].value)
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    let removed = a2.remove(at: index1)
+    expectEqual(2, removed.value)
+
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity1, a2._rawIdentifier())
+  }
+}
+
+ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
+  do {
+    var a = getCOWFastArray()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1])
+
+    a.removeAll()
+    var identity1 = a._rawIdentifier()
+    expectLT(a.capacity, originalCapacity)
+    expectEqual(0, a.count)
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a = getCOWFastArray()
+    var identity1 = a._rawIdentifier()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1])
+
+    a.removeAll(keepingCapacity: true)
+    expectEqual(identity1, a._rawIdentifier())
+    expectEqual(originalCapacity, a.capacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    var identity1 = a1._rawIdentifier()
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+
+    var a2 = a1
+    a2.removeAll()
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    var identity1 = a1._rawIdentifier()
+    let originalCapacity = a1.capacity
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+    expectEqual(originalCapacity, a2.capacity)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+}
+
+ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
+  do {
+    var a = getCOWSlowArray()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1].value)
+
+    a.removeAll()
+    var identity1 = a._rawIdentifier()
+    expectLT(a.capacity, originalCapacity)
+    expectEqual(0, a.count)
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a = getCOWSlowArray()
+    var identity1 = a._rawIdentifier()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1].value)
+
+    a.removeAll(keepingCapacity: true)
+    expectEqual(identity1, a._rawIdentifier())
+    expectEqual(originalCapacity, a.capacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getCOWSlowArray()
+    var identity1 = a1._rawIdentifier()
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+
+    var a2 = a1
+    a2.removeAll()
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+
+  do {
+    var a1 = getCOWSlowArray()
+    var identity1 = a1._rawIdentifier()
+    let originalCapacity = a1.capacity
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+    expectEqual(originalCapacity, a2.capacity)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+}
+
+ArrayTestSuite.test("COW.Fast.CountDoesNotReallocate") {
+  var a = getCOWFastArray()
+  var identity1 = a._rawIdentifier()
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.CountDoesNotReallocate") {
+  var a = getCOWSlowArray()
+  var identity1 = a._rawIdentifier()
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
+  var a = getCOWFastArray()
+  var identity1 = a._rawIdentifier()
+
+  var iter = a.makeIterator()
+  var copy = Array<Int>()
+  while let value = iter.next() {
+    copy.append(value)
+  }
+  expectEqual(copy, [ 1, 2, 3 ])
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
+  var a = getCOWSlowArray()
+  var identity1 = a._rawIdentifier()
+
+  var iter = a.makeIterator()
+  var copy = Array<Int>()
+  while let value = iter.next() {
+    copy.append(value.value)
+  }
+  expectEqual(copy, [ 1, 2, 3 ])
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Fast.EqualityTestDoesNotReallocate") {
+  var a1 = getCOWFastArray()
+  var identity1 = a1._rawIdentifier()
+
+  var a2 = getCOWFastArray()
+  var identity2 = a2._rawIdentifier()
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+
+  a2[1] = 5
+  expectTrue(a1 != a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
+  var a1 = getCOWSlowArray()
+  var identity1 = a1._rawIdentifier()
+
+  var a2 = getCOWSlowArray()
+  var identity2 = a2._rawIdentifier()
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+
+  a2[2] = COWBox(5)
+  expectTrue(a1 != a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+//===----------------------------------------------------------------------===//
+// Index tests
+//===----------------------------------------------------------------------===//
+public struct ArrayIndexTest<T: Collection> {  
   public enum Operation {
     case append(Int)
     case insert(Int, at: Int)
@@ -701,7 +1074,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
         expectCrashLater()
       }
       a.replaceSubrange(0..<rangeMax, with: evil)
-      _fixLifetime(b)
+      _blackHole(b)
     }
   }
 
