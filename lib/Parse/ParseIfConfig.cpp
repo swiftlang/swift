@@ -36,6 +36,7 @@ Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
     .Case("arch", PlatformConditionKind::Arch)
     .Case("_endian", PlatformConditionKind::Endianness)
     .Case("_runtime", PlatformConditionKind::Runtime)
+    .Case("canImport", PlatformConditionKind::CanImport)
     .Default(None);
 }
 
@@ -289,7 +290,7 @@ public:
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_runtime' ) '(' identifier ')''
+    // ( 'os' | 'arch' | '_endian' | '_runtime' | 'canImport') '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.hasValue()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
@@ -331,6 +332,8 @@ public:
         DiagName = "architecture"; break;
       case PlatformConditionKind::Endianness:
         DiagName = "endianness"; break;
+      case PlatformConditionKind::CanImport:
+        DiagName = "import conditional"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
@@ -450,6 +453,9 @@ public:
           Str, SourceLoc(), nullptr).getValue();
       auto thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
       return thisVersion >= Val;
+    } else if (KindName == "canImport") {
+      auto Str = extractExprSource(Ctx.SourceMgr, Arg);
+      return Ctx.canImportModule({ Ctx.getIdentifier(Str) , E->getLoc()  });
     }
 
     auto Val = getDeclRefStr(Arg);
@@ -567,9 +573,10 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     Expr *Condition = nullptr;
     bool isActive = false;
 
-    // Parse and evaluate the directive.
+    // Parse the condition.  Evaluate it to determine the active
+    // clause unless we're doing a parse-only pass.
     if (isElse) {
-      isActive = !foundActive;
+      isActive = !foundActive && State->PerformConditionEvaluation;
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
@@ -582,8 +589,9 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
         // Error in the condition;
         isActive = false;
         isVersionCondition = false;
-      } else if (!foundActive) {
-        // Evaluate the condition only if we haven't found any active one.
+      } else if (!foundActive && State->PerformConditionEvaluation) {
+        // Evaluate the condition only if we haven't found any active one and
+        // we're not in parse-only mode.
         isActive = evaluateIfConfigCondition(Condition, Context);
         isVersionCondition = isVersionIfConfigCondition(Condition);
       }
