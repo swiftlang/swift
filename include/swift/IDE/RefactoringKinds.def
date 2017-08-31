@@ -36,6 +36,8 @@ CURSOR_REFACTORING(ExpandDefault, "Expand Default", expand.default)
 
 CURSOR_REFACTORING(LocalizeString, "Localize String", localize.string)
 
+CURSOR_REFACTORING(SimplifyNumberLiteral, "Simplify Long Number Literal", simplify.long.number.literal)
+
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 
 RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)

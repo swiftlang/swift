@@ -1726,6 +1726,98 @@ bool RefactoringActionLocalizeString::performChange() {
   return false;
 }
 
+/// Given a cursor position, this function tries to collect a number literal
+/// expression immediately following the cursor.
+static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
+  // This cursor must point to the start of an expression.
+  if (Tok.Kind != CursorInfoKind::ExprStart)
+    return nullptr;
+  Expr *Parent = Tok.TrailingExpr;
+  assert(Parent);
+
+  // Check if an expression is a number literal.
+  auto IsLiteralNumber = [&](Expr *E) -> NumberLiteralExpr* {
+    if (auto *NL = dyn_cast<NumberLiteralExpr>(E)) {
+
+      // The sub-expression must have the same start loc with the outermost
+      // expression, i.e. the cursor position.
+      if (Parent->getStartLoc().getOpaquePointerValue() ==
+        E->getStartLoc().getOpaquePointerValue()) {
+        return NL;
+      }
+    }
+    return nullptr;
+  };
+  // For every sub-expression, try to find the literal expression that matches
+  // our criteria.
+  for (auto Pair: Parent->getDepthMap()) {
+    if (auto Result = IsLiteralNumber(Pair.getFirst())) {
+      return Result;
+    }
+  }
+  return nullptr;
+}
+
+static std::string insertUnderscore(StringRef Text) {
+  llvm::SmallString<64> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+  for (auto It = Text.begin(); It != Text.end(); It++) {
+    unsigned Distance = It - Text.begin();
+    if (Distance && !(Distance % 3)) {
+      OS << '_';
+    }
+    OS << *It;
+  }
+  return OS.str().str();
+}
+
+static void insertUnderscoreInDigits(StringRef Digits,
+                                     llvm::raw_ostream &OS) {
+  std::string BeforePoint, AfterPoint;
+  std::tie(BeforePoint, AfterPoint) = Digits.split('.');
+
+  // Insert '_' for the part before the decimal point.
+  std::reverse(BeforePoint.begin(), BeforePoint.end());
+  BeforePoint = insertUnderscore(BeforePoint);
+  std::reverse(BeforePoint.begin(), BeforePoint.end());
+  OS << BeforePoint;
+
+  // Insert '_' for the part after the decimal point, if necessary.
+  if (!AfterPoint.empty()) {
+    OS << '.';
+    OS << insertUnderscore(AfterPoint);
+  }
+}
+
+bool RefactoringActionSimplifyNumberLiteral::
+isApplicable(ResolvedCursorInfo Tok) {
+  if (auto *Literal = getTrailingNumberLiteral(Tok)) {
+    llvm::SmallString<64> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+    StringRef Digits = Literal->getDigitsText();
+    insertUnderscoreInDigits(Digits, OS);
+
+    // If inserting '_' results in a different digit sequence, this refactoring
+    // is applicable.
+    return OS.str() != Digits;
+  }
+  return false;
+}
+
+bool RefactoringActionSimplifyNumberLiteral::performChange() {
+  if (auto *Literal = getTrailingNumberLiteral(CursorInfo)) {
+    llvm::SmallString<64> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+    StringRef Digits = Literal->getDigitsText();
+    insertUnderscoreInDigits(Digits, OS);
+    EditConsumer.accept(SM, CharSourceRange(SM, Literal->getDigitsLoc(),
+                          Lexer::getLocForEndOfToken(SM, Literal->getEndLoc())),
+                        OS.str());
+    return false;
+  }
+  return true;
+}
+
 static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
   switch(Info.Kind) {
     case RangeKind::SingleExpression: {
