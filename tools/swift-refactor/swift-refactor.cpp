@@ -38,6 +38,8 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "expand-default", "Perform expand default statement refactoring"),
            clEnumValN(RefactoringKind::LocalizeString,
                       "localize-string", "Perform string localization refactoring"),
+           clEnumValN(RefactoringKind::SimplifyNumberLiteral,
+                      "simplify-long-number", "Perform simplify long number literal refactoring"),
            clEnumValN(RefactoringKind::ExtractFunction,
                       "extract-function", "Perform extract function refactoring"),
            clEnumValN(RefactoringKind::GlobalRename,
@@ -46,6 +48,7 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "find-rename-ranges", "Find detailed ranges for syntactic rename"),
            clEnumValN(RefactoringKind::FindLocalRenameRanges,
                       "find-local-rename-ranges", "Find detailed ranges for local rename")));
+
 
 static llvm::cl::opt<std::string>
 ModuleName("module-name", llvm::cl::desc("The module name of the given test."),
