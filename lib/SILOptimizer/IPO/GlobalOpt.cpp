@@ -1191,6 +1191,10 @@ public:
 ///       return [1, 2, 3]
 ///     }
 void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
+
+  if (ARI->isObjC())
+    return;
+
   // Check how many tail allocated elements are on the object.
   ArrayRef<Operand> TailCounts = ARI->getTailAllocatedCounts();
   SILType TailType;
