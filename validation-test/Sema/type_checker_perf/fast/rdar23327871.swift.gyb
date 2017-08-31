@@ -1,4 +1,4 @@
-// RUN: not %scale-test --begin 1 --end 5 --step 1 --select incrementScopeCounter %s
+// RUN: %scale-test --begin 5 --end 10 --step 1 --select incrementScopeCounter %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
