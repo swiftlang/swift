@@ -9,6 +9,11 @@
 
 import Darwin
 
+class Foo {
+  func bar() {
+    print("foobar")
+  }
+}
 // FIXME: We should have a reliable way of triggering an indirect call in the
 // LLVM IR generated from this code.
 func test() {
@@ -18,6 +23,9 @@ func test() {
   // Comparison is to trigger insertion of __sanitizer_cov_trace_cmp
   let z = x == y
   print("\(z)")
+  // Trigger an indirect call.
+  let foo = Foo()
+  foo.bar()
 }
 
 test()
