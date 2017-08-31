@@ -6232,6 +6232,10 @@ public:
     }
 
     void visitDynamicAttr(DynamicAttr *attr) {
+      // Final overrides are not dynamic.
+      if (Override->isFinal())
+        return;
+
       makeDynamic(TC.Context, Override);
     }
 
