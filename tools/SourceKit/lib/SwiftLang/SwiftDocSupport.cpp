@@ -1366,7 +1366,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     Error = "Compiler invocation set up failed";
     return nullptr;
   }
-  ParseCI.performParseOnly();
+  ParseCI.performParseOnly(/*EvaluateConditionals*/true);
 
   SourceFile *SF = nullptr;
   unsigned BufferID = ParseCI.getInputBufferIDs().back();

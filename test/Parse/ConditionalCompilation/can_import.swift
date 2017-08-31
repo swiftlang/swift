@@ -1,8 +1,6 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library
 // RUN: %target-typecheck-verify-swift -D WITH_PERFORM -primary-file %s %S/Inputs/can_import_nonprimary_file.swift
 
-// REQUIRES: can_import
-
 public struct LibraryDependentBool : ExpressibleByBooleanLiteral {
 #if canImport(Swift)
   var _description: String

@@ -43,8 +43,9 @@ namespace swift {
     Endianness,
     /// Runtime support (_ObjC or _Native)
     Runtime,
+    /// Conditional import of module
+    CanImport,
   };
-  enum { NumPlatformConditionKind = 4 };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
   /// emitted.
@@ -341,8 +342,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>,
-                      NumPlatformConditionKind>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 4>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };

@@ -1458,12 +1458,18 @@ bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
   if (getLoadedModule(ModulePath) != nullptr)
     return true;
 
+  // If we've failed loading this module before, don't look for it again.
+  if (FailedModuleImportNames.count(ModulePath.first))
+    return false;
+
   // Otherwise, ask the module loaders.
   for (auto &importer : Impl.ModuleLoaders) {
     if (importer->canImportModule(ModulePath)) {
       return true;
     }
   }
+
+  FailedModuleImportNames.insert(ModulePath.first);
   return false;
 }
 
