@@ -69,39 +69,6 @@ public func hasArrayOfClosedEnums(closed: [ClosedEnum]) {
   print(closed[0])
 }
 
-// CHECK-LABEL: _T07newtype11compareABIsyyF
-public func compareABIs() {
-  let new = getMyABINewType()
-  let old = getMyABIOldType()
-  takeMyABINewType(new)
-  takeMyABIOldType(old)
-
-  takeMyABINewTypeNonNull(new!)
-  takeMyABIOldTypeNonNull(old!)
-
-  let newNS = getMyABINewTypeNS()
-  let oldNS = getMyABIOldTypeNS()
-  takeMyABINewTypeNonNullNS(newNS!)
-  takeMyABIOldTypeNonNullNS(oldNS!)
-
-  // Make sure that the calling conventions align correctly, that is we don't
-  // have double-indirection or anything else like that
-  // CHECK: declare %struct.__CFString* @getMyABINewType()
-  // CHECK: declare %struct.__CFString* @getMyABIOldType()
-  //
-  // CHECK: declare void @takeMyABINewType(%struct.__CFString*)
-  // CHECK: declare void @takeMyABIOldType(%struct.__CFString*)
-  //
-  // CHECK: declare void @takeMyABINewTypeNonNull(%struct.__CFString*)
-  // CHECK: declare void @takeMyABIOldTypeNonNull(%struct.__CFString*)
-  //
-  // CHECK: declare %0* @getMyABINewTypeNS()
-  // CHECK: declare %0* @getMyABIOldTypeNS()
-  //
-  // CHECK: declare void @takeMyABINewTypeNonNullNS(%0*)
-  // CHECK: declare void @takeMyABIOldTypeNonNullNS(%0*)
-}
-
 // OPT-LABEL: define swiftcc i1 @_T07newtype12compareInitsSbyF
 public func compareInits() -> Bool {
   let mf = MyInt(rawValue: 1)
@@ -225,4 +192,35 @@ public func mutateRef() {
   // OPT: ret void
 }
 
+// CHECK-LABEL: _T07newtype11compareABIsyyF
+public func compareABIs() {
+  let new = getMyABINewType()
+  let old = getMyABIOldType()
+  takeMyABINewType(new)
+  takeMyABIOldType(old)
 
+  takeMyABINewTypeNonNull(new!)
+  takeMyABIOldTypeNonNull(old!)
+
+  let newNS = getMyABINewTypeNS()
+  let oldNS = getMyABIOldTypeNS()
+  takeMyABINewTypeNonNullNS(newNS!)
+  takeMyABIOldTypeNonNullNS(oldNS!)
+
+  // Make sure that the calling conventions align correctly, that is we don't
+  // have double-indirection or anything else like that
+  // CHECK: declare %struct.__CFString* @getMyABINewType()
+  // CHECK: declare %struct.__CFString* @getMyABIOldType()
+  //
+  // CHECK: declare void @takeMyABINewType(%struct.__CFString*)
+  // CHECK: declare void @takeMyABIOldType(%struct.__CFString*)
+  //
+  // CHECK: declare void @takeMyABINewTypeNonNull(%struct.__CFString*)
+  // CHECK: declare void @takeMyABIOldTypeNonNull(%struct.__CFString*)
+  //
+  // CHECK: declare %0* @getMyABINewTypeNS()
+  // CHECK: declare %0* @getMyABIOldTypeNS()
+  //
+  // CHECK: declare void @takeMyABINewTypeNonNullNS(%0*)
+  // CHECK: declare void @takeMyABIOldTypeNonNullNS(%0*)
+}

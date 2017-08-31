@@ -2,7 +2,8 @@
 
 // CHECK-DAG: define linkonce_odr hidden swiftcc void @shared_external_test()
 // CHECK-DAG: declare swiftcc void @public_external_test()
-// CHECK-DAG: declare hidden swiftcc void @hidden_external_test()
+// Any non-public external functions are re-emitted into the client.
+// CHECK-DAG: define available_externally hidden swiftcc void @hidden_external_test()
 // CHECK-NOT: public_external_unused_test
 
 

@@ -15,7 +15,7 @@ doSomething2()
 
 // CHECK: sil @unknown
 
-// CHECK: sil [serialized] [noinline] [_semantics "stdlib_binary_only"] @{{.*}}doSomething3{{.*}}
+// CHECK: sil [noinline] [_semantics "stdlib_binary_only"] @{{.*}}doSomething3{{.*}}
 // CHECK-NOT: return
 
 // CHECK: sil {{.*}} @_T0s1AV{{[_0-9a-zA-Z]*}}fC
