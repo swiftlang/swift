@@ -4970,6 +4970,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
       decl->getUnderlyingType(), ImportTypeKind::Value, isInSystemModule(dc),
       Bridgeability::None, OTK_None);
 
+  if (!storedUnderlyingType)
+    return nullptr;
+
   if (auto objTy = storedUnderlyingType->getAnyOptionalObjectType())
     storedUnderlyingType = objTy;
 
