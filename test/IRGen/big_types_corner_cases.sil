@@ -111,3 +111,31 @@ bb0(%0 : $*@block_storage @callee_owned (@owned BigStruct) -> (), %1 : $BigStruc
   %ret = tuple ()                                  // user: %22
   return %ret : $()                                // id: %22
 }
+
+
+sil public_external @c_return_func : $@convention(thin) () -> () -> @owned BigStruct
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @part_apply_caller() #0 {
+// CHECK: [[CALLEXT:%.*]] = call swiftcc { i8*, %swift.refcounted* } @c_return_func()
+// CHECK: [[VALEXT:%.*]] = extractvalue { i8*, %swift.refcounted* } [[CALLEXT]], 1
+// CHECK: store %swift.refcounted* [[VALEXT]], %swift.refcounted**
+// CHECK: [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%T22big_types_corner_cases9BigStructV*, i64, %swift.refcounted*)* @_T017part_apply_calleeTA to i8*), %swift.refcounted* undef }, %swift.refcounted*
+// CHECK: ret { i8*, %swift.refcounted* } [[RET]]
+
+// CHECK-LABEL: define internal swiftcc void @_T017part_apply_calleeTA(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i64, %swift.refcounted* swiftself) #0 {
+// CHECK: bitcast %swift.refcounted* %2 to <{ %swift.refcounted, %swift.function }>*
+// CHECK: ret void
+
+sil @part_apply_caller : $@convention(thin) () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct {
+bb0:
+  %ref_c = function_ref @c_return_func :$@convention(thin) () -> () -> @owned BigStruct
+  %apply_c = apply %ref_c() : $@convention(thin) () -> () -> @owned BigStruct
+  %ref_part_apply = function_ref @part_apply_callee : $@convention(thin) (@owned Builtin.Int64, () -> @owned BigStruct) -> @owned BigStruct
+  %ret = partial_apply %ref_part_apply(%apply_c) : $@convention(thin) (@owned Builtin.Int64, () -> @owned BigStruct) -> @owned BigStruct
+  return %ret : $@callee_owned (@owned Builtin.Int64) -> @owned BigStruct
+}
+
+sil private @part_apply_callee : $@convention(thin) (@owned Builtin.Int64, () -> @owned BigStruct) -> @owned BigStruct {
+bb0(%0 : $Builtin.Int64, %1 : $() -> @owned BigStruct):
+  return undef : $BigStruct
+}

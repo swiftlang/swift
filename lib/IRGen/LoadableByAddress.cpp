@@ -2164,6 +2164,39 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
   }
 }
 
+static SILValue
+getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
+                                  IRGenModule &Mod, SILBuilder &builder) {
+  SILType currSILType = op->getType();
+  CanType currCanType = currSILType.getSwiftRValueType();
+  SILFunctionType *funcType = dyn_cast<SILFunctionType>(currCanType);
+  if (funcType) {
+    CanSILFunctionType canFuncType = CanSILFunctionType(funcType);
+    GenericEnvironment *genEnv =
+        containingInstr->getFunction()->getGenericEnvironment();
+    if (!genEnv && canFuncType->isPolymorphic()) {
+      genEnv = getGenericEnvironment(containingInstr->getModule(), canFuncType);
+    }
+    SILType newSILType = getNewSILFunctionType(genEnv, funcType, Mod);
+    if (currSILType.isAddress()) {
+      newSILType = newSILType.getAddressType(); // we need address for loads
+      if (newSILType != currSILType) {
+        auto castInstr = builder.createUncheckedAddrCast(
+            containingInstr->getLoc(), op, newSILType);
+        return castInstr;
+      }
+      return op;
+    }
+    assert(currSILType.isObject() && "Expected an object type");
+    if (newSILType != currSILType) {
+      auto castInstr = builder.createUncheckedBitCast(containingInstr->getLoc(),
+                                                      op, newSILType);
+      return castInstr;
+    }
+  }
+  return op;
+}
+
 static SmallVector<Substitution, 4>
 getNewSubs(SubstitutionList origSubs, swift::irgen::IRGenModule *currIRMod,
            swift::GenericEnvironment *genEnv) {
@@ -2232,6 +2265,8 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   // Collect arg operands
   for (Operand &operand : applySite.getArgumentOperands()) {
     SILValue currOperand = operand.get();
+    currOperand = getOperandTypeWithCastIfNecessary(applyInst, currOperand,
+                                                    *currIRMod, applyBuilder);
     callArgs.push_back(currOperand);
   }
   // Recreate apply with new operands due to substitution-type cache
@@ -2290,25 +2325,8 @@ void LoadableByAddress::recreateLoadInstrs() {
     // If this is a load of a function for which we changed the return type:
     // add UncheckedBitCast before the load
     auto loadOp = loadInstr->getOperand();
-    SILType currSILType = loadOp->getType();
-    CanType currCanType = currSILType.getSwiftRValueType();
-    SILFunctionType *funcType = dyn_cast<SILFunctionType>(currCanType);
-    if (funcType) {
-      CanSILFunctionType canFuncType = CanSILFunctionType(funcType);
-      GenericEnvironment *genEnv =
-          loadInstr->getFunction()->getGenericEnvironment();
-      if (!genEnv && canFuncType->isPolymorphic()) {
-        genEnv = getGenericEnvironment(loadInstr->getModule(), canFuncType);
-      }
-      SILType newSILType =
-          getNewSILFunctionType(genEnv, funcType, *getIRGenModule());
-      newSILType = newSILType.getAddressType(); // we need address for loads
-      if (newSILType != currSILType) {
-        auto castInstr = loadBuilder.createUncheckedAddrCast(
-            loadInstr->getLoc(), loadOp, newSILType);
-        loadOp = castInstr;
-      }
-    }
+    loadOp = getOperandTypeWithCastIfNecessary(loadInstr, loadOp,
+                                               *getIRGenModule(), loadBuilder);
     auto *newInstr = loadBuilder.createLoad(loadInstr->getLoc(), loadOp,
                                             loadInstr->getOwnershipQualifier());
     loadInstr->replaceAllUsesWith(newInstr);
