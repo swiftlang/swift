@@ -9530,6 +9530,11 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = TC.Context.TypeCheckerDebug->getStream();
+    log << "---Attempting to salvage and emit diagnostics---\n";
+  }
+
   // Attempt to solve again, capturing all states that come from our attempts to
   // select overloads or bind type variables.
   //
