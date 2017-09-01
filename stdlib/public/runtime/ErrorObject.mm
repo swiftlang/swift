@@ -269,7 +269,7 @@ static const HashableWitnessTable *getNSErrorConformanceToHashable() {
 bool SwiftError::isPureNSError() const {
   // We can do an exact type check; _SwiftNativeNSError shouldn't be subclassed
   // or proxied.
-  return _swift_getClass(this) == (ClassMetadata *)getSwiftNativeNSErrorClass();
+  return _swift_getClass(this) != (ClassMetadata *)getSwiftNativeNSErrorClass();
 }
 
 const Metadata *SwiftError::getType() const {
