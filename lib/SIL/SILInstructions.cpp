@@ -1572,19 +1572,27 @@ DynamicMethodBranchInst::create(SILDebugLocation Loc, SILValue Operand,
       DynamicMethodBranchInst(Loc, Operand, Member, HasMethodBB, NoMethodBB);
 }
 
-/// Create a witness method, creating a witness table declaration if we don't
-/// have a witness table for it. Later on if someone wants the real definition,
-/// lookUpWitnessTable will deserialize it for us if we can.
+/// Create a witness method call of a protocol requirement, passing in a lookup
+/// type and conformance.
 ///
-/// This is following the same model of how we deal with SILFunctions in
-/// function_ref. There we always just create a declaration and then later
-/// deserialize the actual function definition if we need to.
+/// At runtime, the witness is looked up in the conformance of the lookup type
+/// to the protocol.
+///
+/// The lookup type is usually an archetype, but it will be concrete if the
+/// witness_method instruction is inside a function body that was specialized.
+///
+/// The conformance must exactly match the requirement; the caller must handle
+/// the case where the requirement is defined in a base protocol that is
+/// refined by the conforming protocol.
 WitnessMethodInst *
 WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                           ProtocolConformanceRef Conformance, SILDeclRef Member,
                           SILType Ty, SILFunction *F,
                           SILOpenedArchetypesState &OpenedArchetypes,
                           bool Volatile) {
+  assert(cast<ProtocolDecl>(Member.getDecl()->getDeclContext())
+         == Conformance.getRequirement());
+
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,

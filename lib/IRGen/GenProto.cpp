@@ -2823,11 +2823,10 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                               CanSILFunctionType fnType) {
   auto fn = cast<AbstractFunctionDecl>(member.getDecl());
   auto fnProto = cast<ProtocolDecl>(fn->getDeclContext());
-  
-  conformance = conformance.getInherited(fnProto);
+
+  assert(conformance.getRequirement() == fnProto);
 
   // Find the witness table.
-  // FIXME conformance for concrete type
   llvm::Value *wtable = emitWitnessTableRef(IGF, baseTy, baseMetadataCache,
                                             conformance);
 
