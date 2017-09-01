@@ -1293,7 +1293,7 @@ class RefCounts {
 
 
   private:
-  HeapObject *getHeapObject() const;
+  HeapObject *getHeapObject();
   
   HeapObjectSideTableEntry* allocateSideTable();
 };
@@ -1548,14 +1548,14 @@ doDecrementNonAtomicSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
 
 
 template <> inline
-HeapObject* RefCounts<InlineRefCountBits>::getHeapObject() const {
+HeapObject* RefCounts<InlineRefCountBits>::getHeapObject() {
   auto offset = sizeof(void *);
   auto prefix = ((char *)this - offset);
   return (HeapObject *)prefix;
 }
 
 template <> inline
-HeapObject* RefCounts<SideTableRefCountBits>::getHeapObject() const {
+HeapObject* RefCounts<SideTableRefCountBits>::getHeapObject() {
   auto offset = HeapObjectSideTableEntry::refCountsOffset();
   auto prefix = ((char *)this - offset);
   return *(HeapObject **)prefix;
