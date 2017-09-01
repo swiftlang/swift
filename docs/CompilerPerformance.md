@@ -1090,9 +1090,8 @@ code-generation tool. The process is straightforward:
      ```
 
   3. Focus in on a single problematic counter if you see any, and make a
-     regression scale-test -- with a `// RUN: %scale-test` or `// RUN: not
-     %scale-test` line in it depending on whether it's a positive or negative
-     test -- that runs in as little time as possible while still capturing the
+     regression scale-test -- a file with a `// RUN: %scale-test` line --
+     that runs in as little time as possible while still capturing the
      scaling pattern. Adjust the scaling ranges with `--begin`, `--end`,
      `--step` and the counters selected with `--select`. It can be helpful to
      pass `--values` to see the values being extracted. Scale-test uses a
@@ -1106,8 +1105,9 @@ code-generation tool. The process is straightforward:
   4. Add the test to the regression suite. If you're testing a case that you
      have a fix for, commit the case along with the fix as a positive case, that
      passes (i.e. shows the bug is fixed). If you're testing a case you do _not_
-     yet have a fix for, commit the case with `// RUN: not %scale-test` and
-     leave it as essentially an XFAIL for others to look at.
+     yet have a fix for, add a case with `// RUN: %scale-test --invert-result`
+     and leave it as essentially an XFAIL for others to look at: a test that
+     shows how the current code _scales badly_.
 
   5. If you did _not_ find a problematic counter, it's still important to write
      and commit a testcase, since it will be able to catch _future_ regressions
