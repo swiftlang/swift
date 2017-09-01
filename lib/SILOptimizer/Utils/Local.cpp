@@ -1517,7 +1517,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto *AI = Builder.createApply(Loc, FuncRef, Subs, Args, false);
 
   // If the source of a cast should be destroyed, emit a release.
-  if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(Inst)) {
+  if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
     Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
   }
 
