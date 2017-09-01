@@ -40,7 +40,7 @@ from swift_build_support.swift_build_support.SwiftBuildSupport import (
     SWIFT_REPO_NAME,
     SWIFT_SOURCE_ROOT,
     get_all_preset_names,
-    get_preset_options,  
+    get_preset_options,
 )
 
 from swift_build_support.swift_build_support.cmake import CMake

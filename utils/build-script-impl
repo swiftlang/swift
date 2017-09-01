@@ -376,7 +376,7 @@ function is_llvm_module_build_enabled() {
 # Check if the named action should be run in the given script invocation.
 function should_execute_action() {
     local name="$1"
-    
+
     if [[ "${ONLY_EXECUTE}" = "all" ]] ||
            [[ "${ONLY_EXECUTE}" = "${name}" ]]; then
         echo 1
@@ -412,7 +412,7 @@ function set_build_options_for_host() {
 
     # Hosts which can be cross-compiled must specify:
     # SWIFT_HOST_TRIPLE and llvm_target_arch (as well as usual HOST_VARIANT flags)
-    
+
     case ${host} in
         freebsd-x86_64)
             SWIFT_HOST_VARIANT="freebsd"
@@ -516,7 +516,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="iphonesimulator"
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
-                    
+
                     cmake_osx_deployment_target=""
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
@@ -534,7 +534,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="iphoneos"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     SWIFT_HOST_VARIANT_ARCH="armv7"
-                    
+
                     cmake_osx_deployment_target=""
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
@@ -588,7 +588,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="appletvsimulator"
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
-                    
+
                     cmake_osx_deployment_target=""
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
@@ -1003,8 +1003,8 @@ function not() {
     fi
 }
 
-function join { 
-    local IFS="$1"; shift; echo "$*"; 
+function join {
+    local IFS="$1"; shift; echo "$*";
 }
 
 function false_true() {
@@ -1090,7 +1090,7 @@ splitSemicolonDelimitedInstallPrefixes
 
 function get_host_install_prefix() {
     local host="$1"
-   
+
     if [[ $(is_cross_tools_host ${host}) ]] && [[ ${#CROSS_COMPILE_INSTALL_PREFIXES[@]} -gt 0 ]]; then
 
         # Find the host's index in CROSS_COMPILE_HOSTS.
@@ -1133,7 +1133,7 @@ function is_cross_tools_host() {
 function should_include_host_in_lipo() {
     local host="$1"
     if [[ $(has_cross_compile_hosts) ]] && [[ -z "${SKIP_MERGE_LIPO_CROSS_COMPILE_TOOLS}" ]]; then
-        case ${host} in 
+        case ${host} in
             iphone* | appletv* | watch* )
                 echo 1
                 ;;
@@ -1143,7 +1143,7 @@ function should_include_host_in_lipo() {
 
 function host_has_darwin_symbols() {
     local host="$1"
-    case ${host} in 
+    case ${host} in
         macosx* | iphone* | appletv* | watch* )
             echo 1
             ;;
@@ -1155,11 +1155,11 @@ function get_stdlib_targets_for_host() {
 # FIXME: STDLIB_DEPLOYMENT_TARGETS argument assumed to apply when Host == Build
 # Cross-compile Hosts are only built with their native standard libraries.
 # To fix this, we would need to pass in a list of stdlib targets _per host_,
-# and the SWIFT_SDKS parameters would need to be able to capture both the SDK 
+# and the SWIFT_SDKS parameters would need to be able to capture both the SDK
 # and architecture of each stdlib target -- currently it only captures the SDK.
 #
 # We turn these targets in to SWIFT_SDKS in `calculate_targets_for_host()`
-    
+
     if [[ $(is_cross_tools_host $1) ]] ; then
         echo "$1"
     else
@@ -1298,7 +1298,7 @@ function get_host_specific_variable() {
 
 function calculate_targets_for_host() {
     local host=$1
-    
+
     SWIFT_STDLIB_TARGETS=()
     SWIFT_SDKS=()
     SWIFT_BENCHMARK_TARGETS=()
@@ -1692,7 +1692,7 @@ function cmake_config_opt() {
                 ;;
             foundation)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
-                ;;            
+                ;;
             libdispatch)
                 ;;
             libicu)
@@ -2015,7 +2015,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCLANG_TOOL_CLANG_FORMAT_BUILD=NO
                     )
                 fi
-                
+
                 if [[ $(true_false "${LLVM_INCLUDE_TESTS}") == "FALSE" ]]; then
                     cmake_options+=(
                         -DLLVM_INCLUDE_TESTS=NO
@@ -2358,7 +2358,7 @@ for host in "${ALL_HOSTS[@]}"; do
             swiftpm)
                 set_swiftpm_bootstrap_command
                 call "${swiftpm_bootstrap_command[@]}"
-                
+
                 # swiftpm installs itself with a bootstrap method. No further cmake building is performed.
                 continue
                 ;;
@@ -2366,13 +2366,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
-                
+
                 # Staging: require opt-in for building with dispatch
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                     LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
                 fi
-                
+
                 # Use XCTEST_BUILD_TYPE to build either --debug or --release.
                 if [[ "${XCTEST_BUILD_TYPE}" ==  "Debug" ]] ; then
                     XCTEST_BUILD_ARGS="--debug"
@@ -2410,7 +2410,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     SWIFT_USE_LINKER="-fuse-ld=gold"
                 fi
 
-                # FIXME CROSSCOMPILING: 
+                # FIXME CROSSCOMPILING:
                 # Foundation is a target library (like the Swift standard library),
                 # so technically we should build it for all stdlib_targets, not just for the host.
                 # However, we only have the triple and sysroot for the host.
@@ -2427,7 +2427,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "Skipping Foundation on OS X -- use the Xcode project instead"
                     continue
                 fi
-    
+
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call env SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
                       SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="$(get_host_install_destdir ${host})" PREFIX="$(get_host_install_prefix ${host})" ./configure "${FOUNDATION_BUILD_TYPE}" ${FOUNDATION_BUILD_ARGS[@]} -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS
@@ -2758,7 +2758,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     # Use the clang that was just built in the tree.
                     LLDB_DOTEST_CC_OPTS="-C $(build_directory $LOCAL_HOST llvm)"/bin/clang
                 fi
-                
+
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
                            call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
@@ -2950,7 +2950,7 @@ for host in "${ALL_HOSTS[@]}"; do
     # Calculate the directory to install products in to.
     host_install_destdir=$(get_host_install_destdir ${host})
     host_install_prefix=$(get_host_install_prefix ${host})
-    
+
     if [[ $(should_include_host_in_lipo ${host}) ]]; then
         LIPO_SRC_DIRS+=( "${host_install_destdir}" )
     fi
@@ -3260,7 +3260,7 @@ function build_and_test_installable_package() {
 
         # Get the directory where the products where installed.
         # If INSTALL_DESTDIR not given, we couldn't have installed anything.
-        
+
         if [[ -z "${INSTALL_DESTDIR}" ]] ; then
             echo "--install-destdir required to build a package. Skipping."
             return
@@ -3312,14 +3312,14 @@ function build_and_test_installable_package() {
 
           if [[ "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" ]] ; then
             echo "-- Codesign xctoolchain --"
-            call "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" "${host_install_destdir}${TOOLCHAIN_PREFIX}/" 
+            call "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" "${host_install_destdir}${TOOLCHAIN_PREFIX}/"
           fi
           if [[ "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" ]] ; then
             echo "-- Create Installer --"
             call "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${host_install_destdir}${TOOLCHAIN_PREFIX}/" "${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}" \
                 "${DARWIN_TOOLCHAIN_INSTALLER_CERT}" "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" "${DARWIN_TOOLCHAIN_INSTALL_LOCATION}" \
                 "${DARWIN_TOOLCHAIN_VERSION}" "${SWIFT_SOURCE_DIR}/utils/darwin-installer-scripts"
-          fi 
+          fi
 
           # host_install_destdir contains the toolchain prefix.
           # We want to create the package in host_install_destdir_nonprefixed.
@@ -3362,32 +3362,32 @@ function build_and_test_installable_package() {
 
 # Build and test packages.
 for host in "${ALL_HOSTS[@]}"; do
-    
+
     # Check if we should perform this action.
     if ! [[ $(should_execute_action "${host}-package") ]]; then
         continue
     fi
-    
+
     if [[ $(should_include_host_in_lipo ${host}) ]]; then
             continue
-    fi    
-    
+    fi
+
     build_and_test_installable_package ${host}
 done
 
 # Lipo those products which require it, optionally build and test an installable package.
 if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
-    # This is from multiple hosts; Which host should we say it is? 
+    # This is from multiple hosts; Which host should we say it is?
     # Let's call it 'merged-hosts' so that we can identify it.
     mergedHost="merged-hosts"
-    
+
     # Check if we should perform this action.
     if ! [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
         continue
     fi
-    
+
     echo "--- Merging and running lipo ---"
-    
+
     # Allow passing lipo with --host-lipo
     if [[ -z "${HOST_LIPO}" ]] ; then
         LIPO_PATH=$(xcrun_find_tool lipo)
