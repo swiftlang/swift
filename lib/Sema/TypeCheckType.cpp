@@ -1754,9 +1754,6 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
         return applyNonEscapingFromContext(DC, result, options);
       return result;
     }
-    auto extInfo = SILFunctionType::ExtInfo();
-    // FIXME: Should the noescape attribute be set by default for SIL functions?
-    //        SILFunctionType::ExtInfo().withNoEscape(true);
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
   }
   case TypeReprKind::SILBox:

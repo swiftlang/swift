@@ -3543,8 +3543,8 @@ public:
     if (info.isPseudogeneric()) {
       Printer.printSimpleAttr("@pseudogeneric") << " ";
     }
-    if (!info.isNoEscape()) {
-      Printer.printSimpleAttr("@escaping") << " ";
+    if (info.isNoEscape()) {
+      Printer.printSimpleAttr("@noescape") << " ";
     }
   }
 
