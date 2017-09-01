@@ -28,11 +28,12 @@ public func testInheritedConformance() {
     (S() as QQQ).f()
 }
 
-// Test that a witness_method instructions is not devirtualized yet, because
-// it uses indirect inheritance.
+// Test that a witness_method instruction using an indirectly-inherited conformance
+// is devirtualized.
+//
 // This test used to crash the compiler because it uses inherited conformances.
 // CHECK-LABEL: sil @_T034devirt_protocol_method_invocations34testIndirectlyInheritedConformanceyyF : $@convention(thin) () -> ()
-// CHECK: witness_method
+// CHECK-NOT: witness_method
 // CHECK: apply
 // CHECK: // end sil function '_T034devirt_protocol_method_invocations34testIndirectlyInheritedConformanceyyF'
 public func testIndirectlyInheritedConformance() {

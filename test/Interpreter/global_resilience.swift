@@ -13,7 +13,7 @@
 // REQUIRES: executable_test
 
 // <rdar://problem/34148403>
-// UNSUPPORTED: OS=ios
+// REQUIRES: OS=macosx
 
 import StdlibUnittest
 
