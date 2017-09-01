@@ -688,12 +688,18 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // the signature optimized function without additional setup on the
   // caller side.
   F->setInlineStrategy(AlwaysInline);
+
+  assert(F->isSerialized() == NewF->isSerialized());
+
   // If the new callee is @_semantics("stdlib_binary_only"), it is fine to call
   // it, because it will be exposed as a public symbol in the object file.
-  if (F->hasSemanticsAttr("stdlib_binary_only")) {
+  if (//NewF->isSerialized() == IsNotSerialized &&
+      F->hasSemanticsAttr("stdlib_binary_only")) {
     NewF->addSemanticsAttr("stdlib_binary_only");
+    //NewF->setSerialized(IsNotSerialized);
     // The thunk doesn't need to be stdlib_binary_only anymore.
     F->removeSemanticsAttr("stdlib_binary_only");
+    F->setSerialized(IsSerialized);
     F->setLinkage(SILLinkage::Public);
   }
   SILBasicBlock *ThunkBody = F->createBasicBlock();

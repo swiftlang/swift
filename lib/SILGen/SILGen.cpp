@@ -974,13 +974,11 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                       .withRepresentation(FunctionType::Representation::Thin));
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
+  // Do not serialize the initializer in the -sil-serialize-all mode.
   auto *f = M.createFunction(
       isMakeModuleFragile() ? SILLinkage::Public : SILLinkage::Private,
       funcName, initSILType, nullptr, SILLocation(binding), IsNotBare,
-      IsNotTransparent, isMakeModuleFragile() ? IsSerialized : IsNotSerialized);
-  // Do not serialize the initializer in the -sil-serialize-all mode.
-  if (isMakeModuleFragile())
-    f->addSemanticsAttr("stdlib_binary_only");
+      IsNotTransparent, IsNotSerialized);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
   f->verify();

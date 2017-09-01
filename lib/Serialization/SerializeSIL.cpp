@@ -2163,6 +2163,13 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
       !(isReference && hasSharedVisibility(F->getLinkage())))
     return false;
 
+  // Bail if function should not be serialized.
+  if (F->isSerialized() == IsNotSerialized)
+    return false;
+
+  return true;
+
+#if 0
   // Never serialize @_semantics("stdlib_binary_only") functions.
   if (F->hasSemanticsAttr("stdlib_binary_only")) {
     return false;
@@ -2175,6 +2182,7 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   // If F is serialized, we should always emit its body.
   if (F->isSerialized() == IsSerialized)
     return true;
+#endif
 
   return false;
 }
