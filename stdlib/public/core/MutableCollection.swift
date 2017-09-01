@@ -311,21 +311,15 @@ public protocol MutableCollection : _MutableIndexable, Collection
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
+    _ body: (inout UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R?
-  // FIXME(ABI)#53 (Type Checker): the signature should use
-  // UnsafeMutableBufferPointer, but the compiler can't handle that.
-  //
-  // <rdar://problem/21933004> Restore the signature of
-  // _withUnsafeMutableBufferPointerIfSupported() that mentions
-  // UnsafeMutableBufferPointer
 }
 
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
   @_inlineable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
+    _ body: (inout UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R? {
     return nil
   }
