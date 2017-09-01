@@ -710,7 +710,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
         [&](CanType origTy, Type substTy,
             ProtocolType *proto) -> Optional<ProtocolConformanceRef> {
           if (substTy->isEqual(ConcreteType)) {
-            return Conformance.getInherited(proto->getDecl());
+            assert(proto->getDecl() == Conformance.getRequirement());
+            return Conformance;
           }
           return ProtocolConformanceRef(proto->getDecl());
         });
