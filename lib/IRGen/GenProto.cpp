@@ -2347,9 +2347,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // more concrete than we're expecting.
   // TODO: make a best effort to devirtualize, maybe?
   auto concreteConformance = conformance.getConcrete();
-  if (concreteConformance->getProtocol() != proto) {
-    concreteConformance = concreteConformance->getInheritedConformance(proto);
-  }
+  assert(concreteConformance->getProtocol() == proto);
 
   // Check immediately for an existing cache entry.
   auto wtable = IGF.tryGetLocalTypeData(
@@ -2823,11 +2821,10 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                               CanSILFunctionType fnType) {
   auto fn = cast<AbstractFunctionDecl>(member.getDecl());
   auto fnProto = cast<ProtocolDecl>(fn->getDeclContext());
-  
-  conformance = conformance.getInherited(fnProto);
+
+  assert(conformance.getRequirement() == fnProto);
 
   // Find the witness table.
-  // FIXME conformance for concrete type
   llvm::Value *wtable = emitWitnessTableRef(IGF, baseTy, baseMetadataCache,
                                             conformance);
 
