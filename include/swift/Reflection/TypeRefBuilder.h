@@ -62,7 +62,7 @@ public:
   }
 
   size_t size() const {
-    return (char *)End - (char *)Begin;
+    return (const char *)End - (const char *)Begin;
   }
 };
 
