@@ -29,7 +29,10 @@ public func _log(_ message: @autoclosure () -> String) {
   // print(message())
 }
 
-extension FixedWidthInteger where Words : Collection {
+extension FixedWidthInteger where
+  Words : Collection,
+  Words.Element == UInt,
+  Words.Index : BinaryInteger {
   /// a hex representation of every bit in the number
   func hexBits(_ bitWidth: Int) -> String {
     let hexDigits: [Unicode.Scalar] = [
@@ -72,7 +75,11 @@ func expectEqual<T : FixedWidthInteger>(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
-) where T.Words : Collection {
+) where
+  T.Words : Collection,
+  T.Words.Element == UInt,
+  T.Words.Index : BinaryInteger
+{
   if expected != actual {
     expectationFailure(
       "expected: \(String(reflecting: expected))"
