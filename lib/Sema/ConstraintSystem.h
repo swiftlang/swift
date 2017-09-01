@@ -2556,6 +2556,9 @@ private:
     /// Is this type variable on the RHS of a BindParam constraint?
     bool IsRHSOfBindParam = false;
 
+    /// Number of (non-literal) conformances related to given type variable.
+    unsigned NumConformanceConstraints = 0;
+
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
@@ -2573,13 +2576,15 @@ private:
                              x.SubtypeOfExistentialType,
                              static_cast<unsigned char>(x.LiteralBinding),
                              x.InvolvesTypeVariables,
-                             -(x.Bindings.size() - x.NumDefaultableBindings)) <
+                             -(x.Bindings.size() - x.NumDefaultableBindings),
+                             x.NumConformanceConstraints) <
              std::make_tuple(!y.hasNonDefaultableBindings(),
                              y.FullyBound, y.IsRHSOfBindParam,
                              y.SubtypeOfExistentialType,
                              static_cast<unsigned char>(y.LiteralBinding),
                              y.InvolvesTypeVariables,
-                             -(y.Bindings.size() - y.NumDefaultableBindings));
+                             -(y.Bindings.size() - y.NumDefaultableBindings),
+                             y.NumConformanceConstraints);
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {

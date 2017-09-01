@@ -250,6 +250,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       continue;
 
     case ConstraintKind::ConformsTo:
+      ++result.NumConformanceConstraints;
+      LLVM_FALLTHROUGH;
     case ConstraintKind::SelfObjectOfProtocol:
       // Swift 3 allowed the use of default types for normal conformances
       // to expressible-by-literal protocols.
