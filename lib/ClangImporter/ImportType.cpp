@@ -1745,7 +1745,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     // Nullable trailing closure parameters default to 'nil'.
     if (isLastParameter &&
         (type->isFunctionPointerType() || type->isBlockPointerType()))
-      return DefaultArgumentKind::Nil;
+      return DefaultArgumentKind::NilLiteral;
 
     // NSZone parameters default to 'nil'.
     if (auto ptrType = type->getAs<clang::PointerType>()) {
@@ -1753,7 +1753,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
             = ptrType->getPointeeType()->getAs<clang::RecordType>()) {
         if (recType->isStructureOrClassType() &&
             recType->getDecl()->getName() == "_NSZone")
-          return DefaultArgumentKind::Nil;
+          return DefaultArgumentKind::NilLiteral;
       }
     }
   }
@@ -1786,7 +1786,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
 
         auto emptyDictionaryKind = DefaultArgumentKind::EmptyDictionary;
         if (clangOptionality == OTK_Optional)
-          emptyDictionaryKind = DefaultArgumentKind::Nil;
+          emptyDictionaryKind = DefaultArgumentKind::NilLiteral;
 
         bool sawInfo = false;
         for (auto word : reversed(camel_case::getWords(searchStr))) {
