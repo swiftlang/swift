@@ -1570,7 +1570,8 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(A->getValue()));
   }
 
-  if (getTriple().getOS() == llvm::Triple::Linux) {
+  if (getTriple().getOS() == llvm::Triple::Linux &&
+      job.getKind() == LinkKind::Executable) {
     Arguments.push_back("-pie");
   }
 
