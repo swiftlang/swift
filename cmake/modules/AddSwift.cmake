@@ -994,7 +994,7 @@ function(_add_swift_library_single target name)
         "${SWIFTLIB_SINGLE_LINK_LIBRARIES}"
         "OBJECT_LIBRARY may not link to anything")
   else()
-    target_link_libraries("${target}" INTERFACE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
+    target_link_libraries("${target}" PUBLIC ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
   endif()
 
   # Don't add the icucore target.
