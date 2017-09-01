@@ -752,15 +752,16 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
 /// Derive a concrete type of self and conformance from the init_existential
 /// instruction.
-static Optional<std::tuple<ProtocolConformanceRef, CanType, SILValue>>
+static Optional<std::tuple<ProtocolConformanceRef, CanType, SILValue, SILValue>>
 getConformanceAndConcreteType(FullApplySite AI,
                               SILInstruction *InitExistential,
                               ProtocolDecl *Protocol,
-                              SILValue &NewSelf,
                               ArrayRef<ProtocolConformanceRef> &Conformances) {
   // Try to derive the concrete type of self from the found init_existential.
   CanType ConcreteType;
   SILValue ConcreteTypeDef;
+  SILValue NewSelf;
+
   if (auto IE = dyn_cast<InitExistentialAddrInst>(InitExistential)) {
     Conformances = IE->getConformances();
     ConcreteType = IE->getFormalConcreteType();
@@ -793,7 +794,8 @@ getConformanceAndConcreteType(FullApplySite AI,
   for (auto Conformance : Conformances) {
     auto Requirement = Conformance.getRequirement();
     if (Requirement == Protocol) {
-      return std::make_tuple(Conformance, ConcreteType, ConcreteTypeDef);
+      return std::make_tuple(Conformance, ConcreteType, ConcreteTypeDef,
+                             NewSelf);
     }
     // If Requirement != Protocol, then the abstract conformance cannot be
     // used as is and we need to create a proper conformance.
@@ -811,7 +813,7 @@ getConformanceAndConcreteType(FullApplySite AI,
       return None;
     // Requirement is directly inherited from Protocol.
     return std::make_tuple(Conformance.getInherited(Protocol), ConcreteType,
-                           ConcreteTypeDef);
+                           ConcreteTypeDef, NewSelf);
   }
 
   llvm_unreachable("couldn't find matching conformance in substitution?");
@@ -851,16 +853,16 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   // Try to derive the concrete type of self and a related conformance from
   // the found init_existential.
   ArrayRef<ProtocolConformanceRef> Conformances;
-  auto NewSelf = SILValue();
   auto ConformanceAndConcreteType =
       getConformanceAndConcreteType(AI, InitExistential,
-                                    Protocol, NewSelf, Conformances);
+                                    Protocol, Conformances);
   if (!ConformanceAndConcreteType)
     return nullptr;
 
   ProtocolConformanceRef Conformance = std::get<0>(*ConformanceAndConcreteType);
   CanType ConcreteType = std::get<1>(*ConformanceAndConcreteType);
   SILValue ConcreteTypeDef = std::get<2>(*ConformanceAndConcreteType);
+  SILValue NewSelf = std::get<3>(*ConformanceAndConcreteType);
 
   SILOpenedArchetypesTracker *OldOpenedArchetypesTracker =
       Builder.getOpenedArchetypesTracker();
