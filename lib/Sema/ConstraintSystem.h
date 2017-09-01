@@ -2553,8 +2553,8 @@ private:
     /// The number of defaultable bindings.
     unsigned NumDefaultableBindings = 0;
 
-    /// Is this type variable on the RHS of a BindParam constraint?
-    bool IsRHSOfBindParam = false;
+    /// Is this type variable on the RHS of a BindParam or SubtypeOf constraint?
+    bool IsRHSOfBindParamOrSubtypeOf = false;
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
@@ -2569,17 +2569,19 @@ private:
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
       return std::make_tuple(!x.hasNonDefaultableBindings(),
-                             x.FullyBound, x.IsRHSOfBindParam,
+                             x.FullyBound,
                              x.SubtypeOfExistentialType,
                              static_cast<unsigned char>(x.LiteralBinding),
                              x.InvolvesTypeVariables,
-                             -(x.Bindings.size() - x.NumDefaultableBindings)) <
+                             -(x.Bindings.size() - x.NumDefaultableBindings),
+                             x.IsRHSOfBindParamOrSubtypeOf) <
              std::make_tuple(!y.hasNonDefaultableBindings(),
-                             y.FullyBound, y.IsRHSOfBindParam,
+                             y.FullyBound,
                              y.SubtypeOfExistentialType,
                              static_cast<unsigned char>(y.LiteralBinding),
                              y.InvolvesTypeVariables,
-                             -(y.Bindings.size() - y.NumDefaultableBindings));
+                             -(y.Bindings.size() - y.NumDefaultableBindings),
+                             y.IsRHSOfBindParamOrSubtypeOf);
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
