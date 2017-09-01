@@ -1215,6 +1215,38 @@ class TestData : TestDataSuper {
         data.replaceSubrange(4 ..< 4, with: Data(bytes: []))
         expectEqual(expected, data.count)
     }
+
+    func test_discontiguousIndexing() {
+        let dataToEncode = "Hello World".data(using: .utf8)!
+
+        let subdata1 = dataToEncode.withUnsafeBytes { bytes in
+            return DispatchData(bytes: UnsafeBufferPointer(start: bytes, count: dataToEncode.count))
+        }
+        let subdata2 = dataToEncode.withUnsafeBytes { bytes in
+            return DispatchData(bytes: UnsafeBufferPointer(start: bytes, count: dataToEncode.count))
+        }
+        var dispatchData = subdata1
+        dispatchData.append(subdata2)
+
+        let data = (dispatchData as AnyObject) as! Data
+
+        func getRegionCount(_ data: Data) -> Int {
+            var numChunks = 0
+            data.enumerateBytes() { _, _, _ in
+                numChunks += 1
+            }
+            return numChunks
+        }
+
+        let expected = getRegionCount(data)
+        _ = data[0]
+        let afterIndexing = getRegionCount(data)
+        expectEqual(expected, afterIndexing)
+
+        _ = data[3..<6]
+        let afterSlicing = getRegionCount(data)
+        expectEqual(expected, afterSlicing)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1282,6 +1314,7 @@ DataTests.test("test_reversedDataInit") { TestData().test_reversedDataInit() }
 DataTests.test("test_replaceSubrangeReferencingMutable") { TestData().test_replaceSubrangeReferencingMutable() }
 DataTests.test("test_replaceSubrangeReferencingImmutable") { TestData().test_replaceSubrangeReferencingImmutable() }
 DataTests.test("test_replaceSubrangeFromBridged") { TestData().test_replaceSubrangeFromBridged() }
+DataTests.test("test_discontiguousIndexing") { TestData().test_discontiguousIndexing() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
