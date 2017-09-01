@@ -2347,9 +2347,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // more concrete than we're expecting.
   // TODO: make a best effort to devirtualize, maybe?
   auto concreteConformance = conformance.getConcrete();
-  if (concreteConformance->getProtocol() != proto) {
-    concreteConformance = concreteConformance->getInheritedConformance(proto);
-  }
+  assert(concreteConformance->getProtocol() == proto);
 
   // Check immediately for an existing cache entry.
   auto wtable = IGF.tryGetLocalTypeData(
