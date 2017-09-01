@@ -1038,6 +1038,44 @@ code) from cost-centers that "shouldn't" be expensive (but are, because they
 have a bug or design flaw). One tool that's useful for differentiating these
 cases is the `utils/scale-test` script.
 
+Scale-test runs on counters, so it's worth taking a short digression into
+the set of counters that exist in the Swift compiler and how they fit together.
+
+#### Compiler counters
+
+The Swift compiler has two separate (though related) subsystems for counting
+the work it does.
+
+  1. The LLVM `STATISTIC()` system included by `#include "llvm/ADT/Statistic.h"`
+     and lightly wrapped by `#include "swift/Basic/Statistic.h"`. This system
+     consists of macros and helper structures for atomic, static counters that
+     self-register in a global list. This subsystem is shared with Clang and
+     LLVM in general, and so decisions about whether to enable or disable it
+     (or indeed, conditionally compile it out) are typically shared across all
+     three projects. In practice, most of these definitions are compiled-out of
+     a non-assert build, because the level of atomic counting and memory-fencing
+     is considered inappropriate and potentially too expensive to count inner
+     loops in production builds. When present, these counters are reported
+     by `-Xfrontend -print-stats`
+
+  2. The Swift-specific `UnifiedStatsReporter` system also included by
+     `#include "swift/Basic/Statistic.h"`. This (newer) system consists of a
+     Swift-specific struct full of counters passed around between subsystems
+     of interest. These counters are _always compiled-in_ to a Swift build,
+     regardless of build setting. As such, should have _negligible cost_
+     when not counting/reporting: as much as possible, access is arranged
+     to either involve a non-atomic operation (in an inner loop) or a single
+     high-level check before a batch of measurements (outside a loop). These
+     counters are reported by `-stats-output-dir <dir>`
+
+The `UnifiedStatsReporter` system has `Unified` in its name partly because it
+_subsumes_ the other statistic and timer reporting systems in LLVM: it merges
+its counters with any LLVM `STATISTIC()` counters that existed in the current
+build, as well as any timers in the compiler, when reporting. Thus whenever
+possible, you should rely on the output from this subsystem by passing
+`-stats-output-dir <dir>` and parsing the resulting JSON files; it will always
+be as good as the output from the `STATISTIC()` counters, if they're present.
+
 #### Scale-test
 
 This script works with parametrized templates of code (in the same `gyb` format
@@ -1149,15 +1187,21 @@ internals of the compiler, just time and patience.
     with the fix! Straightforward fixes to performance regressions are likely to
     be merged straight away.
 
+  - Add `STATISTIC()` or `SWIFT_FUNC_STAT`-type counters to the compiler, as
+    described in the scale-tests section. Alternatively, if you want a
+    counter that will be "always available" in production builds (and
+    potentially tracked by Apple's performance-tracking CI system),
+    add a counter to `UnifiedStatsReporter`.
+
   - Add scale-tests, to eliminate the possibility of the compiler performing
     quadratic-or-worse work where it's expected to be linear, or linear-or-worse
     work where it's expected to be constant.
 
   - Add Open Source projects to the
     [source-compatibility testsuite](https://swift.org/source-compatibility/).
-    Apple's internal CI infastructure is now tracking diagnostic counters on those
-    projects, and the team is far more likely to catch a regression if it's
-    shown by a project in the testsuite.
+    Apple's internal CI infastructure is now tracking selected non-assert-build
+    `UnifiedStatsReporter` counters on those projects, and the team is far
+    more likely to catch a regression if it's shown by a project in the testsuite.
 
   - If you're comfortable making changes to the compiler itself, and don't have
     a specific testcase you're concerned with, consider working on some of the
