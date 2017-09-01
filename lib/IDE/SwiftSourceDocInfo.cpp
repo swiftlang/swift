@@ -1194,11 +1194,13 @@ public:
         // For each continue/break statement, record its target's range and the
         // orphan kind.
         if (auto *CS = dyn_cast<ContinueStmt>(S)) {
-          Ranges.emplace_back(CS->getTarget()->getSourceRange(),
-                              OrphanKind::Continue);
+          if (auto Target = CS->getTarget()) {
+            Ranges.emplace_back(Target->getSourceRange(), OrphanKind::Continue);
+          }
         } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
-          Ranges.emplace_back(BS->getTarget()->getSourceRange(),
-                              OrphanKind::Break);
+          if (auto *Target = BS->getTarget()) {
+            Ranges.emplace_back(Target->getSourceRange(), OrphanKind::Break);
+          }
         }
         return true;
       }
@@ -1315,6 +1317,11 @@ public:
 
   void analyzeDeclRef(ValueDecl *VD, SourceLoc Start, Type Ty,
                       ReferenceMetaData Data) {
+    // Add defensive check in case the given type is null.
+    // FIXME: we should receive error type instead of null type.
+    if (Ty.isNull())
+      return;
+
     // Only collect decl ref.
     if (Data.Kind != SemaReferenceKind::DeclRef)
       return;
