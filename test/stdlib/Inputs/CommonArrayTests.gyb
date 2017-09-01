@@ -277,10 +277,9 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
     do {
       // Read.
       var result = a._withUnsafeMutableBufferPointerIfSupported {
-        (baseAddress, count) -> OpaqueValue<[OpaqueValue<Int>]> in
-        let bufferPointer =
-          UnsafeMutableBufferPointer(start: baseAddress, count: count)
-        return OpaqueValue(Array(bufferPointer))
+        (bufferPointer) -> OpaqueValue<[OpaqueValue<Int>]> in
+        let r = OpaqueValue(Array(bufferPointer))
+        return r
       }
       expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
       expectEqualSequence(test.sequence, result!.value.map { $0.value })
@@ -289,9 +288,7 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
     do {
       // Read and write.
       var result = a._withUnsafeMutableBufferPointerIfSupported {
-        (baseAddress, count) -> OpaqueValue<Array<OpaqueValue<Int>>> in
-        let bufferPointer =
-          UnsafeMutableBufferPointer(start: baseAddress, count: count)
+        (bufferPointer) -> OpaqueValue<Array<OpaqueValue<Int>>> in
         let result = OpaqueValue(Array(bufferPointer))
         for i in bufferPointer.indices {
           bufferPointer[i] = OpaqueValue(bufferPointer[i].value * 10)
@@ -314,7 +311,7 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
   .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
-    (baseAddress, count) -> OpaqueValue<Int> in
+    (bufferPointer) -> OpaqueValue<Int> in
     // buffer = UnsafeMutableBufferPointer(start: buffer.baseAddress, count: 0)
     // FIXME: does not trap since the buffer is not passed inout.
     // expectCrashLater()
@@ -328,7 +325,7 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
   .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
-    (baseAddress, count) -> OpaqueValue<Int> in
+    (bufferPointer) -> OpaqueValue<Int> in
     // buffer = UnsafeMutableBufferPointer(start: nil, count: 1)
     // FIXME: does not trap since the buffer is not passed inout.
     // expectCrashLater()

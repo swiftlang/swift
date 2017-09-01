@@ -168,9 +168,7 @@ extension MutableCollection where Self : BidirectionalCollection {
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
     let maybeOffset = try _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> Int in
-      var bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, count: count)
+      (bufferPointer) -> Int in
       let unsafeBufferPivot = try bufferPointer.partition(
         by: belongsInSecondPartition)
       return unsafeBufferPivot - bufferPointer.startIndex
@@ -365,9 +363,7 @@ extension MutableCollection
   public mutating func sort() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> Void in
-      var bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, count: count)
+      (bufferPointer) -> Void in
       bufferPointer.sort()
       return ()
     }
@@ -443,9 +439,7 @@ ${orderingExplanation}
 
     let didSortUnsafeBuffer: Void? =
       try _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> Void in
-      var bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, count: count)
+      (bufferPointer) -> Void in
       try bufferPointer.sort(by: areInIncreasingOrder)
       return ()
     }
