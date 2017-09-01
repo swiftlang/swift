@@ -1049,7 +1049,14 @@ public:
                            AccessSemantics semantics,
                            SGFContext C = SGFContext());
 
-  /// Produce an RValue for a load from the specified property.
+  /// Produce a singular RValue for a load from the specified property.
+  ///
+  /// This is designed to work with RValue ManagedValue bases that are either +0
+  /// or +1.
+  ///
+  /// \arg isBaseGuaranteed This should /only/ be set to true if we know that
+  /// the base value will stay alive as long as the returned RValue implying
+  /// that it is safe to load/use values as +0.
   RValue emitRValueForPropertyLoad(SILLocation loc,
                                    ManagedValue base,
                                    CanType baseFormalType,
@@ -1057,7 +1064,7 @@ public:
                                    SubstitutionList substitutions,
                                    AccessSemantics semantics, Type propTy,
                                    SGFContext C,
-                                   bool isGuaranteedValid = false);
+                                   bool isBaseGuaranteed = false);
 
   void emitCaptures(SILLocation loc,
                     AnyFunctionRef TheClosure,

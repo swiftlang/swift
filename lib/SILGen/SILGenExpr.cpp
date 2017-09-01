@@ -1164,13 +1164,13 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   return result;
 }
 
-/// Produce a singular RValue for a load from the specified property.  This
-/// is designed to work with RValue ManagedValue bases that are either +0 or +1.
+/// Produce a singular RValue for a load from the specified property.  This is
+/// designed to work with RValue ManagedValue bases that are either +0 or +1.
 RValue SILGenFunction::emitRValueForPropertyLoad(
     SILLocation loc, ManagedValue base, CanType baseFormalType,
     bool isSuper, VarDecl *field, SubstitutionList substitutions,
     AccessSemantics semantics, Type propTy, SGFContext C,
-    bool isGuaranteedValid) {
+    bool isBaseGuaranteed) {
   AccessStrategy strategy =
     field->getAccessStrategy(semantics, AccessKind::Read);
 
@@ -1237,7 +1237,7 @@ RValue SILGenFunction::emitRValueForPropertyLoad(
     LValue LV = emitPropertyLValue(loc, base, baseFormalType, field,
                                    LValueOptions(), AccessKind::Read,
                                    AccessSemantics::DirectToStorage);
-    return emitLoadOfLValue(loc, std::move(LV), C, isGuaranteedValid);
+    return emitLoadOfLValue(loc, std::move(LV), C, isBaseGuaranteed);
   }
 
   ManagedValue result;
@@ -1252,7 +1252,7 @@ RValue SILGenFunction::emitRValueForPropertyLoad(
 
     } else if (hasAbstractionChange ||
                (!C.isImmediatePlusZeroOk() &&
-                !(C.isGuaranteedPlusZeroOk() && isGuaranteedValid))) {
+                !(C.isGuaranteedPlusZeroOk() && isBaseGuaranteed))) {
       // If we have an abstraction change or if we have to produce a result at
       // +1, then copy the value. If we know that our base will stay alive for
       // the entire usage of this value, we can borrow the value at +0 for a
