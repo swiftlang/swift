@@ -355,6 +355,12 @@ public:
   RValue emitRValueForSelfInDelegationInit(SILLocation loc, CanType refType,
                                            SILValue result, SGFContext C);
 
+  /// A version of emitRValueForSelfInDelegationInit that uses formal evaluation
+  /// operations instead of normal scoped operations.
+  RValue emitFormalEvaluationRValueForSelfInDelegationInit(SILLocation loc,
+                                                           CanType refType,
+                                                           SILValue addr,
+                                                           SGFContext C);
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 

@@ -2072,7 +2072,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind,
         ManagedValue selfLValue =
             SGF.emitLValueForDecl(DRE, vd, DRE->getType()->getCanonicalType(),
                                   AccessKind::Read, DRE->getAccessSemantics());
-        rv = SGF.emitRValueForSelfInDelegationInit(
+        rv = SGF.emitFormalEvaluationRValueForSelfInDelegationInit(
                     e, DRE->getType()->getCanonicalType(),
                     selfLValue.getLValueAddress(), Ctx)
                  .getScalarValue();

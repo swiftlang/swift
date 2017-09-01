@@ -40,13 +40,9 @@ class GY<T> : GX<[T]> { }
 // CHECK-LABEL: sil hidden @_T012dynamic_self23testDynamicSelfDispatch{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Y) -> ()
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
 // CHECK:   [[BORROWED_Y:%.*]] = begin_borrow [[Y]]
-// CHECK:   [[Y_COPY:%.*]] = copy_value [[BORROWED_Y]]
-// CHECK:   [[Y_AS_X_COPY:%[0-9]+]] = upcast [[Y_COPY]] : $Y to $X
-// CHECK:   [[BORROWED_Y_AS_X_COPY:%.*]] = begin_borrow [[Y_AS_X_COPY]]
-// CHECK:   [[X_F:%[0-9]+]] = class_method [[BORROWED_Y_AS_X_COPY]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X, $@convention(method) (@guaranteed X) -> @owned X
-// => SEMANTIC SIL TODO: This argument here needs to be borrowed.
-// CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X_COPY]]) : $@convention(method) (@guaranteed X) -> @owned X
-// CHECK:   destroy_value [[Y_AS_X_COPY]]
+// CHECK:   [[BORROWED_Y_AS_X:%[0-9]+]] = upcast [[BORROWED_Y]] : $Y to $X
+// CHECK:   [[X_F:%[0-9]+]] = class_method [[BORROWED_Y_AS_X]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X, $@convention(method) (@guaranteed X) -> @owned X
+// CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[BORROWED_Y_AS_X]]) : $@convention(method) (@guaranteed X) -> @owned X
 // CHECK:   [[Y_RESULT:%[0-9]+]] = unchecked_ref_cast [[X_RESULT]] : $X to $Y
 // CHECK:   destroy_value [[Y_RESULT]] : $Y
 // CHECK:   end_borrow [[BORROWED_Y]] from [[Y]]
@@ -59,12 +55,9 @@ func testDynamicSelfDispatch(y: Y) {
 func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK: bb0([[GY:%[0-9]+]] : $GY<Int>):
   // CHECK:   [[BORROWED_GY:%.*]] = begin_borrow [[GY]]
-  // CHECK:   [[GY_COPY:%.*]] = copy_value [[BORROWED_GY]]
-  // CHECK:   [[GY_AS_GX_COPY:%[0-9]+]] = upcast [[GY_COPY]] : $GY<Int> to $GX<Array<Int>>
-  // CHECK:   [[BORROWED_GY_AS_GX_COPY:%.*]] = begin_borrow [[GY_AS_GX_COPY]]
-  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[BORROWED_GY_AS_GX_COPY]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T>, $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
-  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
-  // CHECK:   destroy_value [[GY_AS_GX_COPY]]
+  // CHECK:   [[BORROWED_GY_AS_GX:%[0-9]+]] = upcast [[BORROWED_GY]] : $GY<Int> to $GX<Array<Int>>
+  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[BORROWED_GY_AS_GX]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T>, $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[BORROWED_GY_AS_GX]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
   // CHECK:   destroy_value [[GY_RESULT]] : $GY<Int>
   // CHECK:   end_borrow [[BORROWED_GY]] from [[GY]]
@@ -166,13 +159,9 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK-LABEL: sil hidden @_T012dynamic_self18testOptionalResultyAA0dE9InheritorC1v_tF : $@convention(thin) (@owned OptionalResultInheritor) -> () {
 // CHECK: bb0([[ARG:%.*]] : $OptionalResultInheritor):
 // CHECK:      [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:      [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:      [[CAST_COPY_ARG:%.*]] = upcast [[COPY_ARG]]
-// CHECK:      [[BORROWED_CAST_COPY_ARG:%.*]] = begin_borrow [[CAST_COPY_ARG]]
-// CHECK:      [[T0:%.*]] = class_method [[BORROWED_CAST_COPY_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult?, $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
-// CHECK-NEXT: end_borrow [[BORROWED_CAST_COPY_ARG]] from [[CAST_COPY_ARG]]
-// CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[CAST_COPY_ARG]])
-// CHECK-NEXT: destroy_value [[CAST_COPY_ARG]]
+// CHECK:      [[CAST_BORROWED_ARG:%.*]] = upcast [[BORROWED_ARG]]
+// CHECK:      [[T0:%.*]] = class_method [[CAST_BORROWED_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult?, $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
+// CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[CAST_BORROWED_ARG]])
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[RES]] : $Optional<OptionalResult> to $Optional<OptionalResultInheritor>
 
 func id<T>(_ t: T) -> T { return t }
