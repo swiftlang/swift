@@ -11,7 +11,5 @@ add_swift_library(swiftModelIO ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_O
   SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation CoreGraphics Dispatch Foundation IOKit ObjectiveC simd # auto-updated
   SWIFT_MODULE_DEPENDS_IOS Darwin CoreFoundation CoreGraphics Dispatch Foundation ObjectiveC simd # auto-updated
   SWIFT_MODULE_DEPENDS_TVOS Darwin CoreFoundation CoreGraphics Dispatch Foundation ObjectiveC simd # auto-updated
-  FRAMEWORK_DEPENDS ModelIO
-
-  DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_MODELIO_OSX}
+  FRAMEWORK_DEPENDS_WEAK ModelIO
 )
