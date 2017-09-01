@@ -862,8 +862,13 @@ public:
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
-  
-  /// Whether our effective Swift version is in the Swift 3 family
+
+  /// Retrieve a generic signature with a single type parameter conforming
+  /// to the given existential type.
+  CanGenericSignature getExistentialSignature(CanType existential,
+                                              ModuleDecl *mod);
+
+  /// Whether our effective Swift version is in the Swift 3 family.
   bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
 
 private:
