@@ -2909,6 +2909,39 @@ public:
       void dump() LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
   void print(raw_ostream &out);
+
+  /// Find the set of type variables that are inferable from the given type.
+  ///
+  /// \param type The type to search.
+  /// \param typeVars Collects the type variables that are inferable from the
+  /// given type. This set is not cleared, so that multiple types can be
+  /// explored and introduce their results into the same set.
+  static void
+  findInferableTypeVars(Type type,
+                        SmallPtrSetImpl<TypeVariableType *> &typeVars) {
+    type = type->getCanonicalType();
+    if (!type->hasTypeVariable())
+      return;
+
+    class Walker : public TypeWalker {
+      SmallPtrSetImpl<TypeVariableType *> &typeVars;
+
+    public:
+      explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
+          : typeVars(typeVars) {}
+
+      Action walkToTypePre(Type ty) override {
+        if (ty->is<DependentMemberType>())
+          return Action::SkipChildren;
+
+        if (auto typeVar = ty->getAs<TypeVariableType>())
+          typeVars.insert(typeVar);
+        return Action::Continue;
+      }
+    };
+
+    type.walk(Walker(typeVars));
+  }
 };
 
 /// \brief Compute the shuffle required to map from a given tuple type to
