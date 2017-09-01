@@ -17,174 +17,14 @@
 
 import argparse
 import csv
-import datetime
 import json
 import os
 import platform
-import random
-import re
 import sys
 import time
 import urllib
 import urllib2
-
-
-class JobStats:
-
-    def __init__(self, jobkind, jobid, module, start_usec, dur_usec,
-                 jobargs, stats):
-        self.jobkind = jobkind
-        self.jobid = jobid
-        self.module = module
-        self.start_usec = start_usec
-        self.dur_usec = dur_usec
-        self.jobargs = jobargs
-        self.stats = stats
-
-    def is_driver_job(self):
-        return self.jobkind == 'driver'
-
-    def is_frontend_job(self):
-        return self.jobkind == 'frontend'
-
-    def driver_jobs_ran(self):
-        assert(self.is_driver_job())
-        return self.stats.get("Driver.NumDriverJobsRun", 0)
-
-    def driver_jobs_skipped(self):
-        assert(self.is_driver_job())
-        return self.stats.get("Driver.NumDriverJobsSkipped", 0)
-
-    def driver_jobs_total(self):
-        assert(self.is_driver_job())
-        return self.driver_jobs_ran() + self.driver_jobs_skipped()
-
-    def merged_with(self, other):
-        merged_stats = {}
-        for k, v in self.stats.items() + other.stats.items():
-            merged_stats[k] = v + merged_stats.get(k, 0.0)
-        merged_kind = self.jobkind
-        if other.jobkind != merged_kind:
-            merged_kind = "<merged>"
-        merged_module = self.module
-        if other.module != merged_module:
-            merged_module = "<merged>"
-        merged_start = min(self.start_usec, other.start_usec)
-        merged_end = max(self.start_usec + self.dur_usec,
-                         other.start_usec + other.dur_usec)
-        merged_dur = merged_end - merged_start
-        return JobStats(merged_kind, random.randint(0, 1000000000),
-                        merged_module, merged_start, merged_dur,
-                        self.jobargs + other.jobargs, merged_stats)
-
-    def incrementality_percentage(self):
-        assert(self.is_driver_job())
-        ran = self.driver_jobs_ran()
-        total = self.driver_jobs_total()
-        return round((float(ran) / float(total)) * 100.0, 2)
-
-    # Return a JSON-formattable object of the form preferred by google chrome's
-    # 'catapult' trace-viewer.
-    def to_catapult_trace_obj(self):
-        return {"name": self.module,
-                "cat": self.jobkind,
-                "ph": "X",              # "X" == "complete event"
-                "pid": self.jobid,
-                "tid": 1,
-                "ts": self.start_usec,
-                "dur": self.dur_usec,
-                "args": self.jobargs}
-
-    def start_timestr(self):
-        t = datetime.datetime.fromtimestamp(self.start_usec / 1000000.0)
-        return t.strftime("%Y-%m-%d %H:%M:%S")
-
-    def end_timestr(self):
-        t = datetime.datetime.fromtimestamp((self.start_usec +
-                                             self.dur_usec) / 1000000.0)
-        return t.strftime("%Y-%m-%d %H:%M:%S")
-
-    def pick_lnt_metric_suffix(self, metric_name):
-        if "BytesOutput" in metric_name:
-            return "code_size"
-        if "RSS" in metric_name or "BytesAllocated" in metric_name:
-            return "mem"
-        return "compile"
-
-    # Return a JSON-formattable object of the form preferred by LNT's
-    # 'submit' format.
-    def to_lnt_test_obj(self, args):
-        run_info = {
-            "run_order": str(args.lnt_order),
-            "tag": str(args.lnt_tag),
-        }
-        run_info.update(dict(args.lnt_run_info))
-        stats = self.stats
-        return {
-            "Machine":
-            {
-                "Name": args.lnt_machine,
-                "Info": dict(args.lnt_machine_info)
-            },
-            "Run":
-            {
-                "Start Time": self.start_timestr(),
-                "End Time": self.end_timestr(),
-                "Info": run_info
-            },
-            "Tests":
-            [
-                {
-                    "Data": [v],
-                    "Info": {},
-                    "Name": "%s.%s.%s.%s" % (args.lnt_tag, self.module,
-                                             k, self.pick_lnt_metric_suffix(k))
-                }
-                for (k, v) in stats.items()
-            ]
-        }
-
-
-# Return an array of JobStats objects
-def load_stats_dir(path):
-    jobstats = []
-    auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
-              r"-(?P<out>[^-]+)-(?P<opt>[^-]+)")
-    fpat = (r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-" +
-            auxpat +
-            r"-(?P<pid>\d+)(-.*)?.json$")
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            m = re.match(fpat, f)
-            if m:
-                # NB: "pid" in fpat is a random number, not unix pid.
-                mg = m.groupdict()
-                jobkind = mg['kind']
-                jobid = int(mg['pid'])
-                start_usec = int(mg['start'])
-                module = mg["module"]
-                jobargs = [mg["input"], mg["triple"], mg["out"], mg["opt"]]
-
-                j = json.load(open(os.path.join(root, f)))
-                dur_usec = 1
-                patstr = (r"time\.swift-" + jobkind + r"\." + auxpat +
-                          r"\.wall$")
-                pat = re.compile(patstr)
-                stats = dict()
-                for (k, v) in j.items():
-                    if k.startswith("time."):
-                        v = int(1000000.0 * float(v))
-                    stats[k] = v
-                    tm = re.match(pat, k)
-                    if tm:
-                        dur_usec = v
-
-                e = JobStats(jobkind=jobkind, jobid=jobid,
-                             module=module, start_usec=start_usec,
-                             dur_usec=dur_usec, jobargs=jobargs,
-                             stats=stats)
-                jobstats.append(e)
-    return jobstats
+from jobstats import load_stats_dir, merge_all_jobstats
 
 
 # Passed args with 2-element remainder ["old", "new"], return a list of tuples
@@ -238,16 +78,6 @@ def write_lnt_values(args):
                 print "server response:\tError"
                 print "error:\t", response['error']
                 sys.exit(1)
-
-
-def merge_all_jobstats(jobstats):
-    m = None
-    for j in jobstats:
-        if m is None:
-            m = j
-        else:
-            m = m.merged_with(j)
-    return m
 
 
 def show_paired_incrementality(args):
