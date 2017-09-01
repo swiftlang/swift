@@ -1024,6 +1024,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
       isDebugCompilation = true;
       break;
     case SILOptions::SILOptMode::Optimize:
+    case SILOptions::SILOptMode::OptimizeForSize:
     case SILOptions::SILOptMode::OptimizeUnchecked:
       isDebugCompilation = false;
       break;
@@ -1123,6 +1124,8 @@ silOptModeArgStr(SILOptions::SILOptMode mode) {
    return "O";
  case SILOptions::SILOptMode::OptimizeUnchecked:
    return "Ounchecked";
+ case SILOptions::SILOptMode::OptimizeForSize:
+   return "Osize";
  default:
    return "Onone";
   }
