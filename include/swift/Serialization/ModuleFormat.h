@@ -307,7 +307,7 @@ enum class DefaultArgumentKind : uint8_t {
   Function,
   Inherited,
   DSOHandle,
-  Nil,
+  NilLiteral,
   EmptyArray,
   EmptyDictionary,
 };

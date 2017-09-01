@@ -282,7 +282,7 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
     case DefaultArgumentKind::Function: return "#function";
     case DefaultArgumentKind::Inherited: return "inherited";
     case DefaultArgumentKind::Line: return "#line";
-    case DefaultArgumentKind::Nil: return "nil";
+    case DefaultArgumentKind::NilLiteral: return "nil";
     case DefaultArgumentKind::EmptyArray: return "[]";
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";

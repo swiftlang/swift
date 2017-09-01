@@ -2213,7 +2213,7 @@ public:
 
         case DefaultArgumentKind::Normal:
         case DefaultArgumentKind::Inherited:
-        case DefaultArgumentKind::Nil:
+        case DefaultArgumentKind::NilLiteral:
         case DefaultArgumentKind::EmptyArray:
         case DefaultArgumentKind::EmptyDictionary:
           return !includeDefaultArgs;

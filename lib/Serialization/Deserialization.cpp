@@ -226,8 +226,8 @@ getActualDefaultArgKind(uint8_t raw) {
     return swift::DefaultArgumentKind::Function;
   case serialization::DefaultArgumentKind::DSOHandle:
     return swift::DefaultArgumentKind::DSOHandle;
-  case serialization::DefaultArgumentKind::Nil:
-    return swift::DefaultArgumentKind::Nil;
+  case serialization::DefaultArgumentKind::NilLiteral:
+    return swift::DefaultArgumentKind::NilLiteral;
   case serialization::DefaultArgumentKind::EmptyArray:
     return swift::DefaultArgumentKind::EmptyArray;
   case serialization::DefaultArgumentKind::EmptyDictionary:
