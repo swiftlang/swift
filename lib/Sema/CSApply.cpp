@@ -4555,7 +4555,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
                               /*implicit=*/true);
     break;
 
-  case DefaultArgumentKind::Nil:
+  case DefaultArgumentKind::NilLiteral:
     init = new (tc.Context) NilLiteralExpr(loc, /*Implicit=*/true);
     break;
 
