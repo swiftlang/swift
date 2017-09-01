@@ -705,16 +705,31 @@ the Swift compiler -- say, by generating too much code -- so it can sometimes be
 helpful to look at the files the compiler outputs directly. The following tools
 are helpful in such cases:
 
-  - `llvm-objdump`, `llvm-otool` and `llvm-size` (which are LLVM-project
-    implementations of the `objdump`, `otool` and `size` tools) permit analysis
-    of object files: their sizes, their headers, and even their complete
-    disassembled contents.
+  - `llvm-objdump`, `llvm-otool` and `llvm-size`, `llvm-nm` (which are
+    LLVM-project implementations of the `objdump`, `otool`, `size` and `nm`
+    tools) permit analysis of object files: their sizes, their headers, the
+    set of symbols within them, and even their complete disassembled contents.
+
+  - `c++filt` and `swift-demangle` are commands that read from stdin and
+    write to stdout, transforming the text they read by _demangling names_
+    in C++ and Swift, respectively. If you ever seen long, ugly symbol names
+    in diagnostic output from a tool reading a binary artifact, it may read
+    much better after being piped through one or another of these tools.
 
   - `llvm-bcanalyzer` can print (in rough form) the contents of LLVM bitcode
     streams, such as Swift module files and the PCH/PCM files clang stores its
     serialized ASTs in. The latter requires combing `llvm-objdump` and
     `llvm-bcanalyzer` in the following fashion: `llvm-objdump -raw-clang-ast
     file.pcm | llvm-bcanalyzer -dump`
+
+  - `llvm-dwarfdump` and `llvm-dis` can be used to print textual representations
+    of DWARF debug information and LLVM bitcode, respectively. These are usually
+    a bit lower-level than necessary when doing performance analysis, but can be
+    helpful in certain cases.
+
+  - `utils/cmpcodesize/cmpcodesize.py` provides a detailed, organized set of
+    size comparisons between the artifacts in a pair of object files emitted by
+    the Swift compiler.
 
 #### Minimizers
 
@@ -842,6 +857,16 @@ Note that, as with `git-bisect`, any measurement tool will work in place of
 `count_instructions`; if you are looking at a regression-range in which all the
 compilers have `-stats-output-dir` support, for example, you may well prefer to
 use `utils/process-stats-dir.py --compare-to-csv-baseline`, for example.
+
+
+##### General bisection
+
+When all else fails, coding up a manual bisection is often possible given a
+numbered set of testcases. The LLVM project ships with a very generic helper
+script for this, `llvm/util/bisect`, that takes a numeric range and a general
+subprocess and bisects the range until it finds the place the process changes
+from success to failure.
+
 
 ### Isolating a regression
 
