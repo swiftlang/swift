@@ -939,7 +939,7 @@ func bindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
 
 // SIL Test. This makes sure that we properly clean up in -Onone SIL.
 // CANONICAL-LABEL: sil hidden @_T08builtins6retain{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CANONICAL: bb0([[P:%.*]] : @owned $Builtin.NativeObject):
+// CANONICAL: bb0([[P:%.*]] : $Builtin.NativeObject):
 // CANONICAL-NOT: retain
 // CANONICAL-NOT: release
 // CANONICAL: } // end sil function '_T08builtins6retain{{[_0-9a-zA-Z]*}}F'
@@ -961,7 +961,7 @@ func retain(ptr: Builtin.NativeObject) {
 
 // SIL Test. Make sure even in -Onone code, we clean this up properly:
 // CANONICAL-LABEL: sil hidden @_T08builtins7release{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CANONICAL: bb0([[P:%.*]] : @owned $Builtin.NativeObject):
+// CANONICAL: bb0([[P:%.*]] : $Builtin.NativeObject):
 // CANONICAL-NEXT:   debug_value
 // CANONICAL-NEXT:   tuple
 // CANONICAL-NEXT:   strong_release [[P]]
