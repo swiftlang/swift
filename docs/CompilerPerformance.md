@@ -290,8 +290,8 @@ improvement:
     sometimes behave super-linearly or even exponentially.
   - Periodically the analysis phase of a SIL optimization fails to cache
     overlapping subproblems, causing a super-linear slowdown.
-  - Some SIL-to-IR lowerings (eg. large value types, ARC operations) can
-    generate too much LLVM IR, increasing the time spent in LLVM.
+  - Some SIL-to-IR lowerings (eg. large value types) can generate too much
+    LLVM IR, increasing the time spent in LLVM.
 
 (Subsystem experts: please add further areas of concern here.)
 
@@ -424,8 +424,7 @@ scripted; the main disadvantages are that it lacks any sort of GUI and only runs
 on Linux, so you can't use it to diagnose problems in builds that need macOS or
 iOS frameworks or run under `xcodebuild`.
 
-Perf is
-documented
+Perf is documented
 [on the kernel wiki](https://perf.wiki.kernel.org/index.php/Main_Page) as well
 as on [Brendan Gregg's website](http://www.brendangregg.com/perf.html).
 
@@ -831,7 +830,7 @@ VNEW=$(count_instructions ${NEW} -frontend -c ${INPUT})
 VDIFF=$((${VNEW} - ${VOLD}))
 if [ ${VDIFF} -gt ${THRESHOLD} ]
 then
-  # Interestin
+  # Interesting
   exit 0
 else
   # Not interesting
@@ -1096,7 +1095,7 @@ code-generation tool. The process is straightforward:
      Statistics are easy to add to a file, it takes only a few simple steps:
      - Add a define like `#define DEBUG_TYPE "subsystem-name"` to the file
      - Add an include like `#include <swift/Basic/Statistic.h>` to the file
-     - Add `SWIFT_FUNC_STAT;` to the entry of any function you want to measure
+     - Add `SWIFT_FUNC_STAT;` to the first line of a function to measure
      - Optionally, add separate `STATISTIC(SomeStat, "description");`
        definitions and manually increment `SomeStat++;` where you like;
        `SWIFT_FUNC_STAT;` is just a short-form of declaring and incrementing a
