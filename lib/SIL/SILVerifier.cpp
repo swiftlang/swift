@@ -3875,6 +3875,11 @@ public:
         matched = false;
       }
 
+      // If we do not have qualified ownership, do not check ownership.
+      if (!F.hasQualifiedOwnership()) {
+        return;
+      }
+
       if (bbarg->getOwnershipKind() != ownershipkind) {
         llvm::errs() << what << " ownership kind mismatch!\n";
         llvm::errs() << "  argument: " << bbarg->getOwnershipKind() << '\n';
@@ -4098,6 +4103,7 @@ public:
       auto *CBI = dyn_cast<CondBranchInst>(TI);
       if (!CBI)
         continue;
+
       if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {
         require(
             llvm::all_of(CBI->getTrueArgs(),
