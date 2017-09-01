@@ -1194,7 +1194,7 @@ public:
         // For each continue/break statement, record its target's range and the
         // orphan kind.
         if (auto *CS = dyn_cast<ContinueStmt>(S)) {
-          if (auto Target = CS->getTarget()) {
+          if (auto *Target = CS->getTarget()) {
             Ranges.emplace_back(Target->getSourceRange(), OrphanKind::Continue);
           }
         } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
