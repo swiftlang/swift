@@ -791,13 +791,6 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   encodeDecl->setInterfaceType(interfaceType);
   encodeDecl->setAccess(std::max(target->getFormalAccess(),
                                  AccessLevel::Internal));
-
-  // If the type was not imported, the derived conformance is either from the
-  // type itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (target->hasClangNode())
-    tc.Context.addExternalDecl(encodeDecl);
-
   target->addMember(encodeDecl);
   return encodeDecl;
 }
@@ -1138,13 +1131,6 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   initDecl->setInitializerInterfaceType(initializerType);
   initDecl->setAccess(std::max(target->getFormalAccess(),
                                AccessLevel::Internal));
-
-  // If the type was not imported, the derived conformance is either from the
-  // type itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (target->hasClangNode())
-    tc.Context.addExternalDecl(initDecl);
-
   target->addMember(initDecl);
   return initDecl;
 }
@@ -1262,13 +1248,20 @@ ValueDecl *DerivedConformance::deriveEncodable(TypeChecker &tc,
     return nullptr;
   }
 
-  // Conformance can't be synthesized in an extension.
+  // Conformance can only be synthesized as part of a declaration on the
+  // original type, or in a same-file extension.
   auto encodableProto = tc.Context.getProtocol(KnownProtocolKind::Encodable);
   auto encodableType = encodableProto->getDeclaredType();
   if (target != parentDecl) {
-    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                encodableType);
-    return nullptr;
+    // We're in an extension. Diagnose if the target is in a different source
+    // file than the extension.
+    if (target->getParentSourceFile() !=
+        parentDecl->getDeclContext()->getParentSourceFile()) {
+      tc.diagnose(parentDecl->getLoc(),
+                  diag::cannot_synthesize_in_different_file, encodableType,
+                  target->getDeclaredInterfaceType());
+      return nullptr;
+    }
   }
 
   // We're about to try to synthesize Encodable. If something goes wrong,
@@ -1316,13 +1309,20 @@ ValueDecl *DerivedConformance::deriveDecodable(TypeChecker &tc,
     return nullptr;
   }
 
-  // Conformance can't be synthesized in an extension.
+  // Conformance can only be synthesized as part of a declaration on the
+  // original type, or in a same-file extension.
   auto decodableProto = tc.Context.getProtocol(KnownProtocolKind::Decodable);
   auto decodableType = decodableProto->getDeclaredType();
   if (target != parentDecl) {
-    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                decodableType);
-    return nullptr;
+    // We're in an extension. Diagnose if the target is in a different source
+    // file than the extension.
+    if (target->getParentSourceFile() !=
+        parentDecl->getDeclContext()->getParentSourceFile()) {
+      tc.diagnose(parentDecl->getLoc(),
+                  diag::cannot_synthesize_in_different_file, decodableType,
+                  target->getDeclaredInterfaceType());
+      return nullptr;
+    }
   }
 
   // We're about to try to synthesize Decodable. If something goes wrong,

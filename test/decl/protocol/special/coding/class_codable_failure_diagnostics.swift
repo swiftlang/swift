@@ -125,9 +125,3 @@ class C6 : Codable {
   // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
   // CHECK: note: cannot automatically synthesize 'Decodable' because 'b' does not have a matching CodingKey and does not have a default value
 }
-
-// Classes cannot yet synthesize Encodable or Decodable in extensions.
-class C7 {}
-extension C7 : Codable {}
-// CHECK: error: implementation of 'Decodable' cannot be automatically synthesized in an extension yet
-// CHECK: error: implementation of 'Encodable' cannot be automatically synthesized in an extension yet

@@ -2051,8 +2051,8 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
 
 // Derived conformances
 
-ERROR(cannot_synthesize_in_extension,none,
-      "implementation of %0 cannot be automatically synthesized in an extension yet", (Type))
+ERROR(cannot_synthesize_in_different_file,none,
+      "implementation of %0 can only be synthesized in the same source file as %1", (Type, Type))
 
 ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())

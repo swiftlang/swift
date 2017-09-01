@@ -63,10 +63,6 @@ struct S5 : Codable {
   }
 }
 
-// Structs cannot yet synthesize Encodable or Decodable in extensions.
-struct S6 {}
-extension S6 : Codable {}
-
 // Decodable diagnostics are output first here {
 
 // CHECK: error: type 'S1' does not conform to protocol 'Decodable'
@@ -91,8 +87,6 @@ extension S6 : Codable {}
 // CHECK: note: protocol requires initializer 'init(from:)' with type 'Decodable'
 // CHECK: note: cannot automatically synthesize 'Decodable' because 'b' does not have a matching CodingKey and does not have a default value
 
-// CHECK: error: implementation of 'Decodable' cannot be automatically synthesized in an extension yet
-
 // }
 
 // Encodable {
@@ -114,7 +108,5 @@ extension S6 : Codable {}
 // CHECK: note: CodingKey case 'a2' does not match any stored properties
 // CHECK: note: CodingKey case 'b2' does not match any stored properties
 // CHECK: note: CodingKey case 'c2' does not match any stored properties
-
-// CHECK: error: implementation of 'Encodable' cannot be automatically synthesized in an extension yet
 
 // }
