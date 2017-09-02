@@ -5881,223 +5881,223 @@ public:
                                      return !match.IsExact;
                                    }), matches.end());
 
-    // If we have a single match (exact or not), take it.
-    if (matches.size() == 1) {
-      auto matchDecl = matches.front().Decl;
-      auto matchType = matches.front().SubstType;
-      bool emittedMatchError = false;
-
-      // If the name of our match differs from the name we were looking for,
-      // complain.
-      if (decl->getFullName() != matchDecl->getFullName()) {
-        auto diag = TC.diagnose(decl, diag::override_argument_name_mismatch,
-                                isa<ConstructorDecl>(decl),
-                                decl->getFullName(),
-                                matchDecl->getFullName());
-        fixDeclarationName(diag, cast<AbstractFunctionDecl>(decl),
-                           matchDecl->getFullName());
-        emittedMatchError = true;
-      }
-
-      // If we have an explicit ownership modifier and our parent doesn't,
-      // complain.
-      auto parentAttr = matchDecl->getAttrs().getAttribute<OwnershipAttr>();
-      if (auto ownershipAttr = decl->getAttrs().getAttribute<OwnershipAttr>()) {
-        Ownership parentOwnership;
-        if (parentAttr)
-          parentOwnership = parentAttr->get();
-        else
-          parentOwnership = Ownership::Strong;
-        if (parentOwnership != ownershipAttr->get()) {
-          TC.diagnose(decl, diag::override_ownership_mismatch,
-                      (unsigned)parentOwnership,
-                      (unsigned)ownershipAttr->get());
-          TC.diagnose(matchDecl, diag::overridden_here);
-        }
-      }
-
-      // Check that the override has the required access level.
-      // Overrides have to be at least as accessible as what they
-      // override, except:
-      //   - they don't have to be more accessible than their class and
-      //   - a final method may be public instead of open.
-      // Also diagnose attempts to override a non-open method from outside its
-      // defining module.  This is not required for constructors, which are
-      // never really "overridden" in the intended sense here, because of
-      // course derived classes will change how the class is initialized.
-      AccessLevel matchAccess = matchDecl->getFormalAccess(dc);
-      if (matchAccess < AccessLevel::Open &&
-          matchDecl->getModuleContext() != decl->getModuleContext() &&
-          !isa<ConstructorDecl>(decl)) {
-        TC.diagnose(decl, diag::override_of_non_open,
-                    decl->getDescriptiveKind());
-
-      } else if (matchAccess == AccessLevel::Open &&
-                 classDecl->getFormalAccess(dc) ==
-                   AccessLevel::Open &&
-                 decl->getFormalAccess() != AccessLevel::Open &&
-                 !decl->isFinal()) {
-        {
-          auto diag = TC.diagnose(decl, diag::override_not_accessible,
-                                  /*setter*/false,
-                                  decl->getDescriptiveKind(),
-                                  /*fromOverridden*/true);
-          fixItAccess(diag, decl, AccessLevel::Open);
-        }
-        TC.diagnose(matchDecl, diag::overridden_here);
-
-      } else if (!isa<ConstructorDecl>(decl)) {
-        auto matchAccessScope =
-          matchDecl->getFormalAccessScope(dc);
-        auto classAccessScope =
-          classDecl->getFormalAccessScope(dc);
-        auto requiredAccessScope =
-          matchAccessScope.intersectWith(classAccessScope);
-        auto scopeDC = requiredAccessScope->getDeclContext();
-
-        bool shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
-
-        bool shouldDiagnoseSetter = false;
-        if (!shouldDiagnose && matchDecl->isSettable(dc)){
-          auto matchASD = cast<AbstractStorageDecl>(matchDecl);
-          if (matchASD->isSetterAccessibleFrom(dc)) {
-            auto matchSetterAccessScope = matchASD->getSetter()
-              ->getFormalAccessScope(dc);
-            auto requiredSetterAccessScope =
-              matchSetterAccessScope.intersectWith(classAccessScope);
-            auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
-
-            const auto *ASD = cast<AbstractStorageDecl>(decl);
-            shouldDiagnoseSetter =
-                ASD->isSettable(setterScopeDC) &&
-                !ASD->isSetterAccessibleFrom(setterScopeDC);
-          }
-        }
-
-        if (shouldDiagnose || shouldDiagnoseSetter) {
-          bool overriddenForcesAccess =
-            (requiredAccessScope->hasEqualDeclContextWith(matchAccessScope) &&
-             matchAccess != AccessLevel::Open);
-          AccessLevel requiredAccess =
-            requiredAccessScope->requiredAccessForDiagnostics();
-          {
-            auto diag = TC.diagnose(decl, diag::override_not_accessible,
-                                    shouldDiagnoseSetter,
-                                    decl->getDescriptiveKind(),
-                                    overriddenForcesAccess);
-            fixItAccess(diag, decl, requiredAccess,
-                               shouldDiagnoseSetter);
-          }
-          TC.diagnose(matchDecl, diag::overridden_here);
-        }
-      }
-
-      bool mayHaveMismatchedOptionals =
-          (attempt == OverrideCheckingAttempt::MismatchedOptional ||
-           attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional);
-
-      // If this is an exact type match, we're successful!
-      if (declTy->isEqual(matchType)) {
-        // Nothing to do.
-        
-      } else if (method) {
-        if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
-          auto diagKind = diag::method_does_not_override;
-          if (ctor)
-            diagKind = diag::initializer_does_not_override;
-          TC.diagnose(decl, diagKind);
-          noteFixableMismatchedTypes(TC, decl, matchDecl);
-          TC.diagnose(matchDecl, diag::overridden_near_match_here,
-                      matchDecl->getDescriptiveKind(),
-                      matchDecl->getFullName());
-          emittedMatchError = true;
-
-        } else if ((!isa<FuncDecl>(method) ||
-                    !cast<FuncDecl>(method)->isAccessor()) &&
-                   (matchDecl->isObjC() || mayHaveMismatchedOptionals)) {
-          // Private migration help for overrides of Objective-C methods.
-          TypeLoc resultTL;
-          if (auto *methodAsFunc = dyn_cast<FuncDecl>(method))
-            resultTL = methodAsFunc->getBodyResultTypeLoc();
-          emittedMatchError |=
-              diagnoseMismatchedOptionals(TC, method,
-                                          method->getParameterList(1), resultTL,
-                                          matchDecl, owningTy,
-                                          mayHaveMismatchedOptionals);
-        }
-      } else if (auto subscript =
-                   dyn_cast_or_null<SubscriptDecl>(abstractStorage)) {
-        // Otherwise, if this is a subscript, validate that covariance is ok.
-        // If the parent is non-mutable, it's okay to be covariant.
-        auto parentSubscript = cast<SubscriptDecl>(matchDecl);
-        if (parentSubscript->getSetter()) {
-          TC.diagnose(subscript, diag::override_mutable_covariant_subscript,
-                      declTy, matchType);
-          TC.diagnose(matchDecl, diag::subscript_override_here);
-          return true;
-        }
-
-        if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
-          TC.diagnose(decl, diag::subscript_does_not_override);
-          noteFixableMismatchedTypes(TC, decl, matchDecl);
-          TC.diagnose(matchDecl, diag::overridden_near_match_here,
-                      matchDecl->getDescriptiveKind(),
-                      matchDecl->getFullName());
-          emittedMatchError = true;
-
-        } else if (mayHaveMismatchedOptionals) {
-          emittedMatchError |=
-              diagnoseMismatchedOptionals(TC, subscript,
-                                          subscript->getIndices(),
-                                          subscript->getElementTypeLoc(),
-                                          matchDecl, owningTy,
-                                          mayHaveMismatchedOptionals);
-        }
-      } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
-        auto propertyTy = property->getInterfaceType();
-        auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
-            matchDecl, decl, matchDecl->getInterfaceType());
-        
-        if (!propertyTy->matches(parentPropertyTy,
-                                 TypeMatchFlags::AllowOverride,
-                                 &TC)) {
-          TC.diagnose(property, diag::override_property_type_mismatch,
-                      property->getName(), propertyTy, parentPropertyTy);
-          noteFixableMismatchedTypes(TC, decl, matchDecl);
-          TC.diagnose(matchDecl, diag::property_override_here);
-          return true;
-        }
-        
-        // Differing only in Optional vs. ImplicitlyUnwrappedOptional is fine.
-        bool IsSilentDifference = false;
-        if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
-          if (auto parentPropertyTyNoOptional =
-              parentPropertyTy->getAnyOptionalObjectType())
-            if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
-              IsSilentDifference = true;
-        
-        // The overridden property must not be mutable.
-        if (cast<AbstractStorageDecl>(matchDecl)->getSetter() &&
-            !IsSilentDifference) {
-          TC.diagnose(property, diag::override_mutable_covariant_property,
-                      property->getName(), parentPropertyTy, propertyTy);
-          TC.diagnose(matchDecl, diag::property_override_here);
-          return true;
-        }
-      }
-
-      // Catch-all to make sure we don't silently accept something we shouldn't.
-      if (attempt != OverrideCheckingAttempt::PerfectMatch &&
-          !emittedMatchError) {
-        diagnoseGeneralOverrideFailure(TC, decl, matches, attempt);
-      }
-
-      return recordOverride(TC, decl, matchDecl);
+    // If we override more than one declaration, complain.
+    if (matches.size() > 1) {
+      diagnoseGeneralOverrideFailure(TC, decl, matches, attempt);
+      return true;
     }
 
-    // We override more than one declaration. Complain.
-    diagnoseGeneralOverrideFailure(TC, decl, matches, attempt);
-    return true;
+    // If we have a single match (exact or not), take it.
+    auto matchDecl = matches.front().Decl;
+    auto matchType = matches.front().SubstType;
+    bool emittedMatchError = false;
+
+    // If the name of our match differs from the name we were looking for,
+    // complain.
+    if (decl->getFullName() != matchDecl->getFullName()) {
+      auto diag = TC.diagnose(decl, diag::override_argument_name_mismatch,
+                              isa<ConstructorDecl>(decl),
+                              decl->getFullName(),
+                              matchDecl->getFullName());
+      fixDeclarationName(diag, cast<AbstractFunctionDecl>(decl),
+                         matchDecl->getFullName());
+      emittedMatchError = true;
+    }
+
+    // If we have an explicit ownership modifier and our parent doesn't,
+    // complain.
+    auto parentAttr = matchDecl->getAttrs().getAttribute<OwnershipAttr>();
+    if (auto ownershipAttr = decl->getAttrs().getAttribute<OwnershipAttr>()) {
+      Ownership parentOwnership;
+      if (parentAttr)
+        parentOwnership = parentAttr->get();
+      else
+        parentOwnership = Ownership::Strong;
+      if (parentOwnership != ownershipAttr->get()) {
+        TC.diagnose(decl, diag::override_ownership_mismatch,
+                    (unsigned)parentOwnership,
+                    (unsigned)ownershipAttr->get());
+        TC.diagnose(matchDecl, diag::overridden_here);
+      }
+    }
+
+    // Check that the override has the required access level.
+    // Overrides have to be at least as accessible as what they
+    // override, except:
+    //   - they don't have to be more accessible than their class and
+    //   - a final method may be public instead of open.
+    // Also diagnose attempts to override a non-open method from outside its
+    // defining module.  This is not required for constructors, which are
+    // never really "overridden" in the intended sense here, because of
+    // course derived classes will change how the class is initialized.
+    AccessLevel matchAccess = matchDecl->getFormalAccess(dc);
+    if (matchAccess < AccessLevel::Open &&
+        matchDecl->getModuleContext() != decl->getModuleContext() &&
+        !isa<ConstructorDecl>(decl)) {
+      TC.diagnose(decl, diag::override_of_non_open,
+                  decl->getDescriptiveKind());
+
+    } else if (matchAccess == AccessLevel::Open &&
+               classDecl->getFormalAccess(dc) ==
+                 AccessLevel::Open &&
+               decl->getFormalAccess() != AccessLevel::Open &&
+               !decl->isFinal()) {
+      {
+        auto diag = TC.diagnose(decl, diag::override_not_accessible,
+                                /*setter*/false,
+                                decl->getDescriptiveKind(),
+                                /*fromOverridden*/true);
+        fixItAccess(diag, decl, AccessLevel::Open);
+      }
+      TC.diagnose(matchDecl, diag::overridden_here);
+
+    } else if (!isa<ConstructorDecl>(decl)) {
+      auto matchAccessScope =
+        matchDecl->getFormalAccessScope(dc);
+      auto classAccessScope =
+        classDecl->getFormalAccessScope(dc);
+      auto requiredAccessScope =
+        matchAccessScope.intersectWith(classAccessScope);
+      auto scopeDC = requiredAccessScope->getDeclContext();
+
+      bool shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
+
+      bool shouldDiagnoseSetter = false;
+      if (!shouldDiagnose && matchDecl->isSettable(dc)){
+        auto matchASD = cast<AbstractStorageDecl>(matchDecl);
+        if (matchASD->isSetterAccessibleFrom(dc)) {
+          auto matchSetterAccessScope = matchASD->getSetter()
+            ->getFormalAccessScope(dc);
+          auto requiredSetterAccessScope =
+            matchSetterAccessScope.intersectWith(classAccessScope);
+          auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
+
+          const auto *ASD = cast<AbstractStorageDecl>(decl);
+          shouldDiagnoseSetter =
+              ASD->isSettable(setterScopeDC) &&
+              !ASD->isSetterAccessibleFrom(setterScopeDC);
+        }
+      }
+
+      if (shouldDiagnose || shouldDiagnoseSetter) {
+        bool overriddenForcesAccess =
+          (requiredAccessScope->hasEqualDeclContextWith(matchAccessScope) &&
+           matchAccess != AccessLevel::Open);
+        AccessLevel requiredAccess =
+          requiredAccessScope->requiredAccessForDiagnostics();
+        {
+          auto diag = TC.diagnose(decl, diag::override_not_accessible,
+                                  shouldDiagnoseSetter,
+                                  decl->getDescriptiveKind(),
+                                  overriddenForcesAccess);
+          fixItAccess(diag, decl, requiredAccess,
+                             shouldDiagnoseSetter);
+        }
+        TC.diagnose(matchDecl, diag::overridden_here);
+      }
+    }
+
+    bool mayHaveMismatchedOptionals =
+        (attempt == OverrideCheckingAttempt::MismatchedOptional ||
+         attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional);
+
+    // If this is an exact type match, we're successful!
+    if (declTy->isEqual(matchType)) {
+      // Nothing to do.
+      
+    } else if (method) {
+      if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
+        auto diagKind = diag::method_does_not_override;
+        if (ctor)
+          diagKind = diag::initializer_does_not_override;
+        TC.diagnose(decl, diagKind);
+        noteFixableMismatchedTypes(TC, decl, matchDecl);
+        TC.diagnose(matchDecl, diag::overridden_near_match_here,
+                    matchDecl->getDescriptiveKind(),
+                    matchDecl->getFullName());
+        emittedMatchError = true;
+
+      } else if ((!isa<FuncDecl>(method) ||
+                  !cast<FuncDecl>(method)->isAccessor()) &&
+                 (matchDecl->isObjC() || mayHaveMismatchedOptionals)) {
+        // Private migration help for overrides of Objective-C methods.
+        TypeLoc resultTL;
+        if (auto *methodAsFunc = dyn_cast<FuncDecl>(method))
+          resultTL = methodAsFunc->getBodyResultTypeLoc();
+        emittedMatchError |=
+            diagnoseMismatchedOptionals(TC, method,
+                                        method->getParameterList(1), resultTL,
+                                        matchDecl, owningTy,
+                                        mayHaveMismatchedOptionals);
+      }
+    } else if (auto subscript =
+                 dyn_cast_or_null<SubscriptDecl>(abstractStorage)) {
+      // Otherwise, if this is a subscript, validate that covariance is ok.
+      // If the parent is non-mutable, it's okay to be covariant.
+      auto parentSubscript = cast<SubscriptDecl>(matchDecl);
+      if (parentSubscript->getSetter()) {
+        TC.diagnose(subscript, diag::override_mutable_covariant_subscript,
+                    declTy, matchType);
+        TC.diagnose(matchDecl, diag::subscript_override_here);
+        return true;
+      }
+
+      if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
+        TC.diagnose(decl, diag::subscript_does_not_override);
+        noteFixableMismatchedTypes(TC, decl, matchDecl);
+        TC.diagnose(matchDecl, diag::overridden_near_match_here,
+                    matchDecl->getDescriptiveKind(),
+                    matchDecl->getFullName());
+        emittedMatchError = true;
+
+      } else if (mayHaveMismatchedOptionals) {
+        emittedMatchError |=
+            diagnoseMismatchedOptionals(TC, subscript,
+                                        subscript->getIndices(),
+                                        subscript->getElementTypeLoc(),
+                                        matchDecl, owningTy,
+                                        mayHaveMismatchedOptionals);
+      }
+    } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
+      auto propertyTy = property->getInterfaceType();
+      auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
+          matchDecl, decl, matchDecl->getInterfaceType());
+      
+      if (!propertyTy->matches(parentPropertyTy,
+                               TypeMatchFlags::AllowOverride,
+                               &TC)) {
+        TC.diagnose(property, diag::override_property_type_mismatch,
+                    property->getName(), propertyTy, parentPropertyTy);
+        noteFixableMismatchedTypes(TC, decl, matchDecl);
+        TC.diagnose(matchDecl, diag::property_override_here);
+        return true;
+      }
+      
+      // Differing only in Optional vs. ImplicitlyUnwrappedOptional is fine.
+      bool IsSilentDifference = false;
+      if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
+        if (auto parentPropertyTyNoOptional =
+            parentPropertyTy->getAnyOptionalObjectType())
+          if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
+            IsSilentDifference = true;
+      
+      // The overridden property must not be mutable.
+      if (cast<AbstractStorageDecl>(matchDecl)->getSetter() &&
+          !IsSilentDifference) {
+        TC.diagnose(property, diag::override_mutable_covariant_property,
+                    property->getName(), parentPropertyTy, propertyTy);
+        TC.diagnose(matchDecl, diag::property_override_here);
+        return true;
+      }
+    }
+
+    // Catch-all to make sure we don't silently accept something we shouldn't.
+    if (attempt != OverrideCheckingAttempt::PerfectMatch &&
+        !emittedMatchError) {
+      diagnoseGeneralOverrideFailure(TC, decl, matches, attempt);
+    }
+
+    return recordOverride(TC, decl, matchDecl);
   }
 
   /// Attribute visitor that checks how the given attribute should be
