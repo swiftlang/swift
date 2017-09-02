@@ -5964,10 +5964,16 @@ public:
           if (!shouldDiagnose && matchDecl->isSettable(dc)){
             auto matchASD = cast<AbstractStorageDecl>(matchDecl);
             if (matchASD->isSetterAccessibleFrom(dc)) {
+              auto matchSetterAccessScope = matchASD->getSetter()
+                ->getFormalAccessScope(dc);
+              auto requiredSetterAccessScope =
+                matchSetterAccessScope.intersectWith(classAccessScope);
+              auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
+
               const auto *ASD = cast<AbstractStorageDecl>(decl);
               shouldDiagnoseSetter =
-                  ASD->isSettable(scopeDC) &&
-                  !ASD->isSetterAccessibleFrom(scopeDC);
+                  ASD->isSettable(setterScopeDC) &&
+                  !ASD->isSetterAccessibleFrom(setterScopeDC);
             }
           }
         }
