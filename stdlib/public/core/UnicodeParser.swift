@@ -121,6 +121,8 @@ extension Unicode {
 }
 
 extension Unicode._ParsingIterator : IteratorProtocol, Sequence {
+  public typealias Element = Parser.Encoding.EncodedScalar
+  
   @inline(__always)
   @_inlineable
   public mutating func next() -> Parser.Encoding.EncodedScalar? {

@@ -135,7 +135,9 @@ protocol MyMutableCollectionType : MyCollectionType {
   associatedtype SubSequence = MyMutableSlice<Self>
 }
 
-struct S : MyMutableCollectionType {}
+struct S : MyMutableCollectionType {
+  typealias SubSequence = MyMutableSlice<S>
+}
 
 // CHECK: MyMutableSlice<S>()
 print(S.SubSequence())
