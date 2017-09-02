@@ -5946,37 +5946,34 @@ public:
         }
         TC.diagnose(matchDecl, diag::overridden_here);
 
-      } else {
+      } else if (!isa<ConstructorDecl>(decl)) {
         auto matchAccessScope =
           matchDecl->getFormalAccessScope(dc);
         auto classAccessScope =
           classDecl->getFormalAccessScope(dc);
         auto requiredAccessScope =
           matchAccessScope.intersectWith(classAccessScope);
+        auto scopeDC = requiredAccessScope->getDeclContext();
 
+        bool shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
 
-        bool shouldDiagnose = false;
         bool shouldDiagnoseSetter = false;
-        if (!isa<ConstructorDecl>(decl)) {
-          auto scopeDC = requiredAccessScope->getDeclContext();
-          shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
+        if (!shouldDiagnose && matchDecl->isSettable(dc)){
+          auto matchASD = cast<AbstractStorageDecl>(matchDecl);
+          if (matchASD->isSetterAccessibleFrom(dc)) {
+            auto matchSetterAccessScope = matchASD->getSetter()
+              ->getFormalAccessScope(dc);
+            auto requiredSetterAccessScope =
+              matchSetterAccessScope.intersectWith(classAccessScope);
+            auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
 
-          if (!shouldDiagnose && matchDecl->isSettable(dc)){
-            auto matchASD = cast<AbstractStorageDecl>(matchDecl);
-            if (matchASD->isSetterAccessibleFrom(dc)) {
-              auto matchSetterAccessScope = matchASD->getSetter()
-                ->getFormalAccessScope(dc);
-              auto requiredSetterAccessScope =
-                matchSetterAccessScope.intersectWith(classAccessScope);
-              auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
-
-              const auto *ASD = cast<AbstractStorageDecl>(decl);
-              shouldDiagnoseSetter =
-                  ASD->isSettable(setterScopeDC) &&
-                  !ASD->isSetterAccessibleFrom(setterScopeDC);
-            }
+            const auto *ASD = cast<AbstractStorageDecl>(decl);
+            shouldDiagnoseSetter =
+                ASD->isSettable(setterScopeDC) &&
+                !ASD->isSetterAccessibleFrom(setterScopeDC);
           }
         }
+
         if (shouldDiagnose || shouldDiagnoseSetter) {
           bool overriddenForcesAccess =
             (requiredAccessScope->hasEqualDeclContextWith(matchAccessScope) &&
