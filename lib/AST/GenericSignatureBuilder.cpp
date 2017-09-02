@@ -455,6 +455,7 @@ bool RequirementSource::isInferredRequirement(bool includeQuietInferred) const {
       return true;
 
     case QuietlyInferred:
+    case NestedTypeNameMatch:
       return includeQuietInferred;
 
     case ConcreteTypeBinding:
@@ -462,7 +463,6 @@ bool RequirementSource::isInferredRequirement(bool includeQuietInferred) const {
 
     case Concrete:
     case Explicit:
-    case NestedTypeNameMatch:
     case Parent:
     case ProtocolRequirement:
     case RequirementSignatureSelf:
@@ -3468,11 +3468,10 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
   assert(allNested.back() == nestedPA);
   if (allNested.size() > 1) {
     auto firstPA = allNested.front();
-    auto sameNamedSource =
-      FloatingRequirementSource::forNestedTypeNameMatch(
-                                                nestedPA->getNestedName());
+    auto quietlyInferredSource =
+      FloatingRequirementSource::forInferred(nullptr, /*quietly=*/true);
 
-    addSameTypeRequirement(firstPA, nestedPA, sameNamedSource,
+    addSameTypeRequirement(firstPA, nestedPA, quietlyInferredSource,
                            UnresolvedHandlingKind::GenerateConstraints);
     return;
   }
