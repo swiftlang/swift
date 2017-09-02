@@ -139,6 +139,7 @@ CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
 // without additional work, in SIL we require opened archetypes to
 // be borrowed sub-objects of the parent CoW box.
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, OpenExistentialValue)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, OpenExistentialBoxValue)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 
 // unchecked_bitwise_cast is a bitwise copy. It produces a trivial or unowned
@@ -287,7 +288,6 @@ FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
-FORWARDING_OWNERSHIP_INST(OpenExistentialBoxValue)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(SelectValue)
 FORWARDING_OWNERSHIP_INST(Object)

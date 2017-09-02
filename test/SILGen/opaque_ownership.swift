@@ -1,8 +1,10 @@
 // RUN: %target-swift-frontend -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-frontend -target x86_64-apple-macosx10.9 -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck --check-prefix=CHECK-OSX %s
 
 public typealias AnyObject = Builtin.AnyObject
 
 precedencegroup CastingPrecedence {}
+precedencegroup AssignmentPrecedence {}
 
 public protocol _ObjectiveCBridgeable {}
 
@@ -16,12 +18,12 @@ public protocol Decoder {
 
 // Test open_existential_value ownership
 // ---
-// CHECK-LABEL: sil @_T0s11takeDecoderBi1_s0B0_p4from_tKF : $@convention(thin) (@in Decoder) -> (Builtin.Int1, @error Builtin.NativeObject) {
+// CHECK-LABEL: sil @_T0s11takeDecoderBi1_s0B0_p4from_tKF : $@convention(thin) (@in Decoder) -> (Builtin.Int1, @error Error) {
 // CHECK: bb0(%0 : @owned $Decoder):
 // CHECK:  [[BORROW1:%.*]] = begin_borrow %0 : $Decoder
 // CHECK:  [[OPENED:%.*]] = open_existential_value [[BORROW1]] : $Decoder to $@opened("{{.*}}") Decoder
-// CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}") Decoder, #Decoder.unkeyedContainer!1 : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %4 : $@opened("{{.*}}") Decoder : $@convention(witness_method) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Builtin.NativeObject)
-// CHECK:  try_apply [[WT]]<@opened("{{.*}}") Decoder>([[OPENED]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Builtin.NativeObject), normal bb2, error bb1
+// CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}") Decoder, #Decoder.unkeyedContainer!1 : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %4 : $@opened("{{.*}}") Decoder : $@convention(witness_method) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error)
+// CHECK:  try_apply [[WT]]<@opened("{{.*}}") Decoder>([[OPENED]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error), normal bb2, error bb1
 //
 // CHECK:bb{{.*}}([[RET1:%.*]] : @owned $UnkeyedDecodingContainer):
 // CHECK:  end_borrow [[BORROW1]] from %0 : $Decoder, $Decoder
@@ -58,10 +60,44 @@ public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
 
 #if os(OSX)
 // Test open_existential_value used in a conversion context.
+// (the actual bridging call is dropped because we don't import Swift).
 // ---
-// 
+// CHECK-OSX-LABEL: sil @_T0s26_unsafeDowncastToAnyObjectyXlyp04fromD0_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
+// CHECK-OSX: bb0(%0 : @owned $Any):
+// CHECK-OSX:   [[BORROW:%.*]] = begin_borrow %0 : $Any
+// CHECK-OSX:   [[COPY:%.*]] = copy_value [[BORROW]] : $Any
+// CHECK-OSX:   [[BORROW2:%.*]] = begin_borrow [[COPY]] : $Any
+// CHECK-OSX:   [[VAL:%.*]] = open_existential_value [[BORROW2]] : $Any to $@opened
+// CHECK-OSX:   [[COPY2:%.*]] = copy_value [[VAL]] : $@opened
+// CHECK-OSX:   destroy_value [[COPY2]] : $@opened
+// CHECK-OSX:   end_borrow [[BORROW2]] from [[COPY]] : $Any, $Any
+// CHECK-OSX:   destroy_value [[COPY]] : $Any
+// CHECK-OSX:   end_borrow [[BORROW]] from %0 : $Any, $Any
+// CHECK-OSX:   destroy_value %0 : $Any
+// CHECK-OSX:   return undef : $AnyObject
+// CHECK-OSX-LABEL: } // end sil function '_T0s26_unsafeDowncastToAnyObjectyXlyp04fromD0_tF'
 public func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   return any as AnyObject
+}
+#endif
+
+public protocol Error {}
+
+#if os(OSX)
+// Test open_existential_box_value in a conversion context.
+// ---
+// CHECK-OSX-LABEL: sil @_T0s3fooys5Error_pSg1e_tF : $@convention(thin) (@owned Optional<Error>) -> () {
+// CHECK-OSX: [[BORROW:%.*]] = begin_borrow %{{.*}} : $Error
+// CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened
+// CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
+// CHECK-OSX: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened
+// CHECK-OSX: end_borrow [[BORROW]] from %{{.*}} : $Error, $Error
+// CHECK-OSX-LABEL: } // end sil function '_T0s3fooys5Error_pSg1e_tF'
+public func foo(e: Error?) {
+  if let u = e {
+    let a: Any = u
+    _ = a
+  }
 }
 #endif
 
