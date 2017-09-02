@@ -665,6 +665,15 @@ ManagedValue SILGenBuilder::createOpenExistentialValue(SILLocation loc,
   return ManagedValue::forUnmanaged(openedExistential);
 }
 
+ManagedValue SILGenBuilder::createOpenExistentialBoxValue(SILLocation loc,
+                                                          ManagedValue original,
+                                                          SILType type) {
+  ManagedValue borrowedExistential = original.borrow(SGF, loc);
+  SILValue openedExistential = SILBuilder::createOpenExistentialBoxValue(
+      loc, borrowedExistential.getValue(), type);
+  return ManagedValue::forUnmanaged(openedExistential);
+}
+
 ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
                                         SILValue address,
                                         StoreOwnershipQualifier qualifier) {
