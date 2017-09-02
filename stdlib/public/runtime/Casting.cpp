@@ -2915,7 +2915,8 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
   // Handle metatypes.
   if (isa<ExistentialMetatypeMetadata>(srcType)
       || isa<MetatypeMetadata>(srcType)) {
-    auto srcMetatypeValue = reinterpret_cast<const Metadata *>(src);
+    const Metadata *srcMetatypeValue;
+    memcpy(&srcMetatypeValue, src, sizeof(srcMetatypeValue));
     
     // Class metatypes bridge to their class object.
     if (isa<ClassMetadata>(srcMetatypeValue)
