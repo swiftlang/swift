@@ -188,10 +188,11 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       continue;
 
     switch (constraint->getKind()) {
+    case ConstraintKind::Subtype:
     case ConstraintKind::BindParam:
       if (simplifyType(constraint->getSecondType())
               ->getAs<TypeVariableType>() == typeVar) {
-        result.IsRHSOfBindParam = true;
+        result.IsRHSOfBindParamOrSubtypeOf = true;
       }
 
       LLVM_FALLTHROUGH;
@@ -199,7 +200,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
     case ConstraintKind::BindToPointerType:
-    case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
