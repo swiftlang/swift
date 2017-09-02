@@ -5083,7 +5083,6 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
       // Remove derived-via-concrete constraints.
       (void)removeSelfDerived(constraints, /*proto=*/nullptr);
-        anyDerivedViaConcrete = true;
     }
   }
 
