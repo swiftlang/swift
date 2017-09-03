@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
-// REQUIRES: rdar33888321
 
 import StdlibUnittest
 import Foundation

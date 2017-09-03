@@ -847,14 +847,39 @@ if(NOT DEFINED SWIFT_API_NOTES_INPUTS)
 endif()
 
 # Add all of the subdirectories, where we actually do work.
+
+###############
+# PLEASE READ #
+###############
+#
+# We have to include stdlib/ before tools/.
+# Do not move add_subdirectory(stdlib) after add_subdirectory(tools)!                                             
+#
+# We must include stdlib/ before tools/ because stdlib/CMakeLists.txt
+# declares the swift-stdlib-* set of targets. These targets will then
+# implicitly depend on any targets declared with IS_STDLIB or
+# TARGET_LIBRARY.
+#
+# One such library that declares IS_STDLIB is SwiftSyntax, living in
+# tools/SwiftSyntax. If we include stdlib/ after tools/,
+# the swift-stdlib-* set of targets will not have been generated yet,
+# causing the implicit dependency for SwiftSyntax to silently not be
+# created. This then will cause SwiftSyntax to fail to build.
+#
+# https://bugs.swift.org/browse/SR-5975
+add_subdirectory(stdlib)
+
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
+  
+  # Always include this after including stdlib/!
+  # Refer to the large comment above the add_subdirectory(stdlib) call.
+  # https://bugs.swift.org/browse/SR-5975
   add_subdirectory(tools)
 endif()
 
 add_subdirectory(utils)
-add_subdirectory(stdlib)
 
 if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
   add_subdirectory(tools/swift-reflection-test)
