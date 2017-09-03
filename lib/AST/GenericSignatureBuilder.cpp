@@ -4808,9 +4808,8 @@ void GenericSignatureBuilder::checkConformanceConstraints(
 ///
 /// \returns the best archetype anchor seen so far.
 static PotentialArchetype *sameTypeDFS(PotentialArchetype *pa,
-                        unsigned component,
-                        llvm::SmallDenseMap<PotentialArchetype *, unsigned>
-                          &paToComponent) {
+          unsigned component,
+          llvm::SmallDenseMap<PotentialArchetype *, unsigned> &paToComponent) {
   PotentialArchetype *anchor = pa;
 
   // If we've already visited this potential archetype, we're done.
@@ -4818,10 +4817,16 @@ static PotentialArchetype *sameTypeDFS(PotentialArchetype *pa,
 
   // Visit its adjacent potential archetypes.
   for (const auto &constraint : pa->getSameTypeConstraints()) {
+    // Treat nested-type-name-match constraints specially.
+    if (constraint.source->getRoot()->kind ==
+          RequirementSource::NestedTypeNameMatch)
+      continue;
+
     // Skip non-derived constraints.
     if (!constraint.source->isDerivedRequirement()) continue;
 
-    auto newAnchor = sameTypeDFS(constraint.value, component, paToComponent);
+    auto newAnchor =
+      sameTypeDFS(constraint.value, component, paToComponent);
 
     // If this type is better than the anchor, use it for the anchor.
     if (compareDependentTypes(&newAnchor, &anchor) < 0)
@@ -4932,9 +4937,6 @@ static void computeDerivedSameTypeComponents(
         concrete.source->compare(bestConcreteTypeSource) < 0)
       bestConcreteTypeSource = concrete.source;
   }
-
-  // Sort the components.
-  llvm::array_pod_sort(components.begin(), components.end());
 }
 
 namespace {
@@ -4944,6 +4946,7 @@ namespace {
     unsigned source;
     unsigned target;
     Constraint<PotentialArchetype *> constraint;
+    bool isSelfDerived = false;
 
     IntercomponentEdge(unsigned source, unsigned target,
                        const Constraint<PotentialArchetype *> &constraint)
@@ -4962,18 +4965,226 @@ namespace {
 
       // Prefer non-inferred requirement sources.
       bool lhsIsInferred =
-        lhs.constraint.source->isInferredRequirement(
-          /*includeQuietInferred=*/false);
+      lhs.constraint.source->isInferredRequirement(
+                                            /*includeQuietInferred=*/false);
       bool rhsIsInferred =
-        rhs.constraint.source->isInferredRequirement(
-          /*includeQuietInferred=*/false);
+      rhs.constraint.source->isInferredRequirement(
+                                            /*includeQuietInferred=*/false);
       if (lhsIsInferred != rhsIsInferred)
         return rhsIsInferred;;
 
       return lhs.constraint < rhs.constraint;
     }
+
+    LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                              "only for use in the debugger");
   };
-} // end anonymous namespace
+}
+
+void IntercomponentEdge::dump() const {
+  llvm::errs() << constraint.archetype->getDebugName() << " -- "
+    << constraint.value->getDebugName() << ": ";
+  constraint.source->print(llvm::errs(), nullptr);
+  llvm::errs() << "\n";
+}
+
+/// Find the representative in a simple union-find data structure of
+/// integral values.
+static unsigned findRepresentative(SmallVectorImpl<unsigned> &parents,
+                                   unsigned index) {
+  if (parents[index] == index) return index;
+
+  return parents[index] = findRepresentative(parents, parents[index]);
+}
+
+
+/// Union the same-type components denoted by \c index1 and \c index2.
+///
+/// \returns \c true if the two components were separate and have now
+/// been joined; \c false if they were already in the same set.
+static bool unionSets(SmallVectorImpl<unsigned> &parents,
+                      unsigned index1, unsigned index2) {
+  // Find the representatives of each component class.
+  unsigned rep1 = findRepresentative(parents, index1);
+  unsigned rep2 = findRepresentative(parents, index2);
+  if (rep1 == rep2) return false;
+
+  // Point at the lowest-numbered representative.
+  if (rep1 < rep2)
+    parents[rep2] = rep1;
+  else
+    parents[rep1] = rep2;
+
+  return true;
+}
+
+static bool removalDisconnectsEquivalenceClass(
+               EquivalenceClass *equivClass,
+               llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
+               std::vector<IntercomponentEdge> &sameTypeEdges,
+               unsigned edgeIndex,
+               PotentialArchetype *from,
+               PotentialArchetype *to) {
+  // Which component are "from" and "to" in within the intercomponent edges?
+  assert(componentOf.count(from) > 0);
+  auto fromComponentIndex = componentOf[from];
+  assert(componentOf.count(to) > 0);
+  auto toComponentIndex = componentOf[to];
+
+  // If they're in the same component, they're always connected (due to
+  // derived edges).
+  if (fromComponentIndex == toComponentIndex) return false;
+
+  /// Describes the parents in the equivalance classes we're forming.
+  SmallVector<unsigned, 4> parents;
+  for (unsigned i : range(equivClass->derivedSameTypeComponents.size())) {
+    parents.push_back(i);
+  }
+
+  for (const auto existingEdgeIndex : indices(sameTypeEdges)) {
+    if (existingEdgeIndex == edgeIndex) continue;
+
+    const auto &edge = sameTypeEdges[existingEdgeIndex];
+    if (edge.isSelfDerived) continue;
+
+    if (unionSets(parents, edge.source, edge.target) &&
+        findRepresentative(parents, fromComponentIndex) ==
+          findRepresentative(parents, toComponentIndex))
+      return false;
+  }
+
+  const auto &edge = sameTypeEdges[edgeIndex];
+
+  return !unionSets(parents, edge.source, edge.target) ||
+    findRepresentative(parents, fromComponentIndex) !=
+      findRepresentative(parents, toComponentIndex);
+}
+
+static bool isSelfDerivedNestedTypeNameMatchEdge(
+              EquivalenceClass *equivClass,
+              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
+              std::vector<IntercomponentEdge> &sameTypeEdges,
+              unsigned edgeIndex) {
+  const auto &edge = sameTypeEdges[edgeIndex];
+  PotentialArchetype *source = edge.constraint.archetype;
+  PotentialArchetype *target = edge.constraint.value;
+  while (source->getParent() && target->getParent() &&
+         source->getResolvedAssociatedType() ==
+           target->getResolvedAssociatedType()) {
+    source = source->getParent();
+    target = target->getParent();
+
+    if (source->isInSameEquivalenceClassAs(target) &&
+        source->getEquivalenceClassIfPresent() == equivClass &&
+        !removalDisconnectsEquivalenceClass(equivClass, componentOf,
+                                            sameTypeEdges, edgeIndex,
+                                            source, target))
+      return true;
+  }
+
+  return false;
+}
+
+static void resolveSameTypeEdges(
+              EquivalenceClass *equivClass,
+              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf,
+              std::vector<IntercomponentEdge> &sameTypeEdges) {
+  SmallVector<unsigned, 4> collapsedParents;
+  for (unsigned i : indices(equivClass->derivedSameTypeComponents))
+    collapsedParents.push_back(i);
+
+  unsigned remainingComponents = equivClass->derivedSameTypeComponents.size();
+  for (unsigned edgeIndex : indices(sameTypeEdges)) {
+    auto &edge = sameTypeEdges[edgeIndex];
+
+    // If this edge is self-derived, remove it.
+    if (isSelfDerivedNestedTypeNameMatchEdge(equivClass, componentOf,
+                                             sameTypeEdges, edgeIndex)) {
+      auto eraseConstraint = [&](PotentialArchetype *archetype) {
+        auto &constraints = equivClass->sameTypeConstraints[archetype];
+        auto known =
+          std::find_if(constraints.begin(), constraints.end(),
+                       [&](const Constraint<PotentialArchetype *> &existing) {
+                         // Check the requirement source, first.
+                         if (existing.source != edge.constraint.source)
+                           return false;
+
+                         return
+                           (existing.archetype == edge.constraint.archetype &&
+                            existing.value == edge.constraint.value) ||
+                           (existing.archetype == edge.constraint.value &&
+                            existing.value == edge.constraint.archetype);
+                       });
+        assert(known != constraints.end());
+        constraints.erase(known);
+      };
+
+      // Note that this edge is self-derived, so we don't consider it again.
+      edge.isSelfDerived = true;
+
+      // Erase the constraint in both directions.
+      eraseConstraint(edge.constraint.archetype);
+      eraseConstraint(edge.constraint.value);
+
+      continue;
+    }
+
+    // Otherwise, collapse the derived same-type components along this edge,
+    // because it's derived.
+    if (unionSets(collapsedParents, edge.source, edge.target))
+      --remainingComponents;
+  }
+
+  // If needed, collapse the same-type components merged by a derived
+  // nested-type-name-match edge.
+  unsigned maxComponents = equivClass->derivedSameTypeComponents.size();
+  if (remainingComponents < maxComponents) {
+    std::vector<DerivedSameTypeComponent> newComponents;
+    std::vector<unsigned> newIndices(maxComponents, maxComponents);
+
+    for (unsigned oldIndex : range(0, maxComponents)) {
+      auto &oldComponent = equivClass->derivedSameTypeComponents[oldIndex];
+      unsigned oldRepresentativeIndex =
+        findRepresentative(collapsedParents, oldIndex);
+
+      // If this is the representative, it's a new component; record it.
+      if (oldRepresentativeIndex == oldIndex) {
+        assert(newIndices[oldIndex] == maxComponents &&
+               "Already saw this component?");
+        unsigned newIndex = newComponents.size();
+        newIndices[oldIndex] = newIndex;
+        newComponents.push_back(
+          {oldComponent.anchor, oldComponent.concreteTypeSource});
+        continue;
+      }
+
+      // This is not the representative; merge it into the representative
+      // component.
+      auto newRepresentativeIndex = newIndices[oldRepresentativeIndex];
+      assert(newRepresentativeIndex != maxComponents &&
+             "Representative should have come earlier");
+      auto &newComponent = newComponents[newRepresentativeIndex];
+
+      // If the old component has a better anchor, keep it.
+      if (compareDependentTypes(&oldComponent.anchor, &newComponent.anchor) < 0)
+        newComponent.anchor = oldComponent.anchor;
+
+      // If the old component has a better concrete type source, keep it.
+      if (!newComponent.concreteTypeSource ||
+          (oldComponent.concreteTypeSource &&
+           oldComponent.concreteTypeSource
+             ->compare(newComponent.concreteTypeSource) < 0))
+        newComponent.concreteTypeSource = oldComponent.concreteTypeSource;
+    }
+
+    // Move the new results into place.
+    equivClass->derivedSameTypeComponents = std::move(newComponents);
+  }
+
+  // Sort the components.
+  llvm::array_pod_sort(equivClass->derivedSameTypeComponents.begin(),
+                       equivClass->derivedSameTypeComponents.end());
+}
 
 void GenericSignatureBuilder::checkSameTypeConstraints(
                           ArrayRef<GenericTypeParamType *> genericParams,
@@ -5024,6 +5235,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // Intercomponent edges are stored as one big list, which tracks the
   // source/target components.
   std::vector<IntercomponentEdge> intercomponentEdges;
+  std::vector<IntercomponentEdge> nestedTypeNameMatchEdges;
   for (auto &entry : equivClass->sameTypeConstraints) {
     auto &constraints = entry.second;
     for (const auto &constraint : constraints) {
@@ -5053,15 +5265,27 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       // Determine which component each of the source/destination fall into.
       assert(componentOf.count(constraint.archetype) > 0 &&
              "unknown potential archetype?");
-      unsigned firstComponent = componentOf[constraint.archetype];
+      unsigned firstComponentIdx = componentOf[constraint.archetype];
       assert(componentOf.count(constraint.value) > 0 &&
              "unknown potential archetype?");
-      unsigned secondComponent = componentOf[constraint.value];
+      unsigned secondComponentIdx = componentOf[constraint.value];
+
+      // Separately track nested-type-name-match constraints.
+      if (constraint.source->getRoot()->kind ==
+            RequirementSource::NestedTypeNameMatch) {
+        // If this is an intercomponent edge, record it separately.
+        if (firstComponentIdx != secondComponentIdx) {
+          nestedTypeNameMatchEdges.push_back(
+            IntercomponentEdge(firstComponentIdx, secondComponentIdx, constraint));
+        }
+
+        continue;
+      }
 
       // If both vertices are within the same component, this is an
       // intra-component edge. Record it as such.
-      if (firstComponent == secondComponent) {
-        intracomponentEdges[firstComponent].push_back(constraint);
+      if (firstComponentIdx == secondComponentIdx) {
+        intracomponentEdges[firstComponentIdx].push_back(constraint);
         continue;
       }
 
@@ -5071,7 +5295,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
       // Ignore inferred requirements; we don't want to diagnose them.
       intercomponentEdges.push_back(
-        IntercomponentEdge(firstComponent, secondComponent, constraint));
+        IntercomponentEdge(firstComponentIdx, secondComponentIdx, constraint));
     }
   }
 
@@ -5095,7 +5319,12 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     checkConstraintList<PotentialArchetype *, Type>(
       genericParams, constraints,
       [](const Constraint<PotentialArchetype *> &) { return true; },
-      [](const Constraint<PotentialArchetype *> &) {
+      [](const Constraint<PotentialArchetype *> &constraint) {
+        // Ignore nested-type-name-match constraints.
+        if (constraint.source->getRoot()->kind ==
+              RequirementSource::NestedTypeNameMatch)
+          return ConstraintRelation::Unrelated;
+
         return ConstraintRelation::Redundant;
       },
       None,
@@ -5188,6 +5417,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       connected[edge.target] = true;
     }
   }
+
+  resolveSameTypeEdges(equivClass, componentOf, nestedTypeNameMatchEdges);
 }
 
 /// Resolve any unresolved dependent member types using the given builder.
@@ -5484,7 +5715,8 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
       // If we're at the last anchor in the component, do nothing;
       auto nextAnchor = knownAnchor;
       ++nextAnchor;
-      if (nextAnchor != equivClass->derivedSameTypeComponents.end()) {
+      if (nextAnchor != equivClass->derivedSameTypeComponents.end() /* &&
+          !equivClass->areAllRequirementsDerived()*/) {
         // Form a same-type constraint from this anchor within the component
         // to the next.
         // FIXME: Distinguish between explicit and inferred here?
