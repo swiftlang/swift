@@ -5746,7 +5746,7 @@ class EnumElementDecl : public ValueDecl {
   Expr *TypeCheckedRawValueExpr = nullptr;
   
 public:
-  EnumElementDecl(SourceLoc IdentifierLoc, Identifier Name,
+  EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
                   ParameterList *Params,
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,

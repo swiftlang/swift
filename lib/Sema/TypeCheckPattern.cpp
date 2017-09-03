@@ -1231,12 +1231,12 @@ recur:
 
       // If the tuple pattern had a label for the tuple element, it must match
       // the label for the tuple type being matched.
-      if (!hadError && !tupleTy->getElement(i).getName().empty() &&
-          elt.getLabel() != tupleTy->getElement(i).getName()) {
-        diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
-                 elt.getLabel(), tupleTy->getElement(i).getName());
-        hadError = true;
-      }
+//      if (!hadError && !tupleTy->getElement(i).getName().empty() &&
+//          elt.getLabel() != tupleTy->getElement(i).getName()) {
+//        diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
+//                 elt.getLabel(), tupleTy->getElement(i).getName());
+//        hadError = true;
+//      }
       
       hadError |= coercePatternToType(pattern, dc, CoercionType,
                                       options, resolver);

@@ -596,6 +596,21 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
 
       case CheckInput: {
+        if (auto *ED1 = dyn_cast<EnumElementDecl>(decl1)) {
+          if (auto *ED2 = dyn_cast<EnumElementDecl>(decl2)) {
+            assert(ED1->hasAssociatedValues() || ED2->hasAssociatedValues());
+
+            // If the first function has fewer effective parameters than the
+            // second, it is more specialized.
+            if (!ED1->hasAssociatedValues() && ED2->hasAssociatedValues())
+              return true;
+            if (ED1->hasAssociatedValues() && !ED2->hasAssociatedValues())
+              return false;
+
+            // Else, fall through to compare function type specialization.
+          }
+        }
+
         // Check whether the first function type's input is a subtype of the
         // second type's inputs, i.e., can we forward the arguments?
         auto funcTy1 = openedType1->castTo<FunctionType>();

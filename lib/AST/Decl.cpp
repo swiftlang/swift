@@ -1805,6 +1805,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsInstanceMember = isInstanceMember();
   signature.IsProperty = isa<VarDecl>(this);
 
+  // Unary operators also include prefix/postfix.
   if (auto func = dyn_cast<FuncDecl>(this)) {
     if (func->isUnaryOperator()) {
       signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
@@ -1842,11 +1843,10 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                       funcTy->getExtInfo())
               ->getCanonicalType();
     }
-
     return interfaceType;
-  }
-
-  if (isa<VarDecl>(this)) {
+  } else if (isa<EnumElementDecl>(this)) {
+    return getInterfaceType()->getCanonicalType();
+  } else if (isa<VarDecl>(this)) {
     // If the variable declaration occurs within a generic extension context,
     // consider the generic signature of the extension.
     auto ext = dyn_cast<ExtensionDecl>(getDeclContext());

@@ -1074,13 +1074,14 @@ namespace decls_block {
 
   using EnumElementLayout = BCRecordLayout<
     ENUM_ELEMENT_DECL,
-    IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // interface type
     BCFixed<1>,  // implicit?
     EnumElementRawValueKindField,  // raw value kind
     BCFixed<1>,  // negative raw value?
-    BCBlob       // raw value
+    IdentifierIDField, // raw value
+    BCVBR<5>, // number of parameter name components
+    BCArray<IdentifierIDField> // name components,
 
     // The record is trailed by:
     // - its argument parameters, if any

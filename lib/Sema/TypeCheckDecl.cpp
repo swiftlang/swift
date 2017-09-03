@@ -2334,7 +2334,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *complainRepr,
                                  DowngradeToWarning downgradeToWarning) {
-        auto typeAccess = typeAccessScope.accessibilityForDiagnostics();
+        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
         auto diagID = diag::enum_case_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::enum_case_access_warn;
@@ -4462,10 +4462,10 @@ public:
       }
       {
         // Check for duplicate enum members.
-        llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
+        llvm::DenseMap<DeclName, EnumElementDecl *> Elements;
         bool hasErrors = false;
         for (auto *EED : ED->getAllElements()) {
-          auto Res = Elements.insert({ EED->getName(), EED });
+          auto Res = Elements.insert({ EED->getFullName(), EED });
           if (!Res.second) {
             EED->setInvalid();
 

@@ -3717,24 +3717,43 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
   }
 
   case decls_block::ENUM_ELEMENT_DECL: {
-    IdentifierID nameID;
     DeclContextID contextID;
     TypeID interfaceTypeID;
     bool isImplicit; bool isNegative;
     unsigned rawValueKindID;
+    IdentifierID blobData;
+    unsigned numArgNames;
+    ArrayRef<uint64_t> argNameAndDependencyIDs;
 
-    decls_block::EnumElementLayout::readRecord(scratch, nameID,
-                                               contextID,
+    decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                interfaceTypeID,
                                                isImplicit, rawValueKindID,
-                                               isNegative);
+                                               isNegative,
+                                               blobData,
+                                               numArgNames,
+                                               argNameAndDependencyIDs);
+
+    // Resolve the name ids.
+    Identifier baseName = getIdentifier(argNameAndDependencyIDs.front());
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameAndDependencyIDs.slice(1, numArgNames-1))
+      argNames.push_back(getIdentifier(argNameID));
+    DeclName name(ctx, baseName, argNames);
+
+    for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames+1)) {
+      auto dependency = getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+          name, takeErrorInfo(dependency.takeError()));
+      }
+    }
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto elem = createDecl<EnumElementDecl>(SourceLoc(),
-                                            getIdentifier(nameID),
+                                            name,
                                             maybeReadParameterList(),
                                             SourceLoc(),
                                             nullptr,
@@ -3746,8 +3765,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     case EnumElementRawValueKind::None:
       break;
     case EnumElementRawValueKind::IntegerLiteral: {
-      auto literalText = getContext().AllocateCopy(blobData);
-      auto literal = new (getContext()) IntegerLiteralExpr(literalText,
+      auto literalText = getIdentifier(blobData);
+      auto literal = new (getContext()) IntegerLiteralExpr(literalText.get(),
                                                            SourceLoc(),
                                                            /*implicit*/ true);
       if (isNegative)
