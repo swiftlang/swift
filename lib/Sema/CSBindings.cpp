@@ -22,9 +22,10 @@ using namespace constraints;
 
 std::pair<ConstraintSystem::PotentialBindings, TypeVariableType *>
 ConstraintSystem::determineBestBindings() {
-  // Look for potential type variable bindings.
-  TypeVariableType *bestTypeVar = nullptr;
-  PotentialBindings bestBindings;
+  llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> potentialBindings;
+
+  // Collect all of the bindings for type variables
+  // present in the constraint system.
   for (auto typeVar : getTypeVariables()) {
     // Skip any type variables that are bound.
     if (typeVar->getImpl().hasRepresentativeOrFixed())
@@ -40,11 +41,62 @@ ConstraintSystem::determineBestBindings() {
       bindings.dump(typeVar, log, solverState->depth * 2);
     }
 
+    potentialBindings.insert({typeVar, std::move(bindings)});
+  }
+
+  for (auto &constraint : getConstraints()) {
+    switch (constraint.getKind()) {
+    case ConstraintKind::BindParam:
+    case ConstraintKind::Subtype: {
+      auto *lhsTypeVar =
+          simplifyType(constraint.getFirstType())->getAs<TypeVariableType>();
+      auto *rhsTypeVar =
+          simplifyType(constraint.getSecondType())->getAs<TypeVariableType>();
+
+      if (!lhsTypeVar || !rhsTypeVar || lhsTypeVar == rhsTypeVar)
+        continue;
+
+      auto lhs = potentialBindings.find(lhsTypeVar);
+      auto rhs = potentialBindings.find(rhsTypeVar);
+
+      if (lhs == potentialBindings.end() || rhs == potentialBindings.end())
+        continue;
+
+      auto &lhsBindings = lhs->getSecond();
+      auto &rhsBindings = rhs->getSecond();
+
+      // If right-hand side bindings are not strictly better than
+      // what is available for left-hand side, always prefer left.
+      if (!(rhsBindings < lhsBindings))
+        potentialBindings.erase(rhsTypeVar);
+
+      break;
+    }
+
+    default:
+      break;
+    }
+  }
+
+  // Look for potential type variable bindings.
+  TypeVariableType *bestTypeVar = nullptr;
+  PotentialBindings bestBindings;
+
+  // Potential type variable bindings have to be checked in
+  // type variable order, otherwise it creates problem with
+  // determining best ones, because they are not sorted.
+  for (auto *typeVar : getTypeVariables()) {
+    auto entry = potentialBindings.find(typeVar);
+    if (entry == potentialBindings.end())
+      continue;
+
+    auto &bindings = entry->getSecond();
+
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
     if (!bestTypeVar || bindings < bestBindings) {
       bestBindings = std::move(bindings);
-      bestTypeVar = typeVar;
+      bestTypeVar = entry->getFirst();
     }
   }
 
@@ -189,13 +241,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 
     switch (constraint->getKind()) {
     case ConstraintKind::BindParam:
-      if (simplifyType(constraint->getSecondType())
-              ->getAs<TypeVariableType>() == typeVar) {
-        result.IsRHSOfBindParam = true;
-      }
-
-      LLVM_FALLTHROUGH;
-
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
     case ConstraintKind::BindToPointerType:

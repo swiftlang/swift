@@ -504,3 +504,21 @@ func rdar27700622<E: Comparable>(_ input: [E]) -> [E] {
 
   return rdar27700622(lhs) + [pivot] + rdar27700622(rhs) // Ok
 }
+
+// rdar://problem/22898292 - Type inference failure with constrained subclass
+public protocol P_22898292 {}
+public func init_22898292<T: P_22898292>(_ construct: () -> T) -> T {}
+
+class C_22898292 { init() {} }
+class S_22898292 : C_22898292 { override init() {} }
+
+extension S_22898292: P_22898292 {}
+
+func foo_22898292(_ expr: String) -> S_22898292 {}
+func bar_22898292(_ name: String, _ value: C_22898292) {}
+
+func rdar_22898292() {
+  let x = init_22898292 { foo_22898292("B") } // returns S_22898292
+  bar_22898292("A", x) // Ok
+  bar_22898292("A", init_22898292 { foo_22898292("B") }) // Ok
+}
