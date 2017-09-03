@@ -58,7 +58,7 @@ struct Node {
 struct DocStructureArrayBuilder::Implementation {
   typedef CompactArrayBuilder<StringRef> InheritedTypesBuilder;
   SmallVector<char, 256> inheritedTypesBuffer;
-  typedef CompactArrayBuilder<UIdent> AttrsBuilder;
+  typedef CompactArrayBuilder<UIdent, unsigned, unsigned> AttrsBuilder;
   SmallVector<char, 256> attrsBuffer;
   typedef CompactArrayBuilder<UIdent, unsigned, unsigned> ElementsBuilder;
   SmallVector<char, 256> elementsBuffer;
@@ -91,7 +91,7 @@ struct DocStructureArrayBuilder::Implementation {
   SmallVector<unsigned, 16> topIndices;
 
   unsigned addInheritedTypes(ArrayRef<StringRef> inheritedTypes);
-  unsigned addAttrs(ArrayRef<UIdent> attrs);
+  unsigned addAttrs(ArrayRef<std::tuple<UIdent, unsigned, unsigned>> attrs);
   unsigned addElements(ArrayRef<Node::Element> elements);
   unsigned addChildren(ArrayRef<unsigned> offsets);
 
@@ -122,13 +122,17 @@ unsigned DocStructureArrayBuilder::Implementation::addInheritedTypes(
 }
 
 unsigned
-DocStructureArrayBuilder::Implementation::addAttrs(ArrayRef<UIdent> attrs) {
+DocStructureArrayBuilder::Implementation::addAttrs(ArrayRef<std::tuple<UIdent, unsigned, unsigned>> attrs) {
   if (attrs.empty())
     return 0;
 
   AttrsBuilder builder;
-  for (UIdent uid : attrs)
-    builder.addEntry(uid);
+  for (auto attr : attrs) {
+    UIdent uid;
+    unsigned offset, length;
+    std::tie(uid, offset, length) = attr;
+    builder.addEntry(uid, offset, length);
+  }
 
   unsigned offset = attrsBuffer.size();
   builder.appendTo(attrsBuffer);
@@ -174,7 +178,8 @@ void DocStructureArrayBuilder::beginSubStructure(
     unsigned BodyLength, unsigned DocOffset, unsigned DocLength,
     StringRef DisplayName, StringRef TypeName,
     StringRef RuntimeName, StringRef SelectorName,
-    ArrayRef<StringRef> InheritedTypes, ArrayRef<UIdent> Attrs) {
+    ArrayRef<StringRef> InheritedTypes,
+    ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) {
 
   Node node = {
       Offset,
@@ -437,7 +442,7 @@ struct InheritedTypeReader {
 };
 
 struct AttributesReader {
-  typedef CompactArrayReader<sourcekitd_uid_t> CompactArrayReaderTy;
+  typedef CompactArrayReader<sourcekitd_uid_t, unsigned, unsigned> CompactArrayReaderTy;
 
   static bool
   dictionary_apply(void *buffer, size_t index,
@@ -446,8 +451,13 @@ struct AttributesReader {
 
     CompactArrayReaderTy reader(buffer);
     sourcekitd_uid_t value;
-    reader.readEntries(index, value);
+    unsigned offset;
+    unsigned length;
+    reader.readEntries(index, value, offset, length);
+
     APPLY(KeyAttribute, UID, value);
+    APPLY(KeyOffset, Int, offset);
+    APPLY(KeyLength, Int, length);
     return true;
   }
 };

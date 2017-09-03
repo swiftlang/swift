@@ -38,7 +38,7 @@ public:
                          llvm::StringRef RuntimeName,
                          llvm::StringRef SelectorName,
                          llvm::ArrayRef<llvm::StringRef> InheritedTypes,
-                         llvm::ArrayRef<SourceKit::UIdent> Attrs);
+                         llvm::ArrayRef<std::tuple<SourceKit::UIdent, unsigned, unsigned>> Attrs);
 
   void addElement(SourceKit::UIdent Kind, unsigned Offset, unsigned Length);
 
