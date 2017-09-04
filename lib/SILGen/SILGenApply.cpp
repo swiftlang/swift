@@ -5822,8 +5822,11 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 }
 
 ManagedValue ArgumentScope::popPreservingValue(ManagedValue mv) {
-  CleanupCloner cloner(SGF, mv);
-  SILValue value = mv.forward(SGF);
-  pop();
-  return cloner.clone(value);
+  formalEvalScope.pop();
+  return normalScope.popPreservingValue(mv);
+}
+
+RValue ArgumentScope::popPreservingValue(RValue &&rv) {
+  formalEvalScope.pop();
+  return normalScope.popPreservingValue(std::move(rv));
 }
