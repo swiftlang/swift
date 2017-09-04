@@ -1254,9 +1254,11 @@ RValue SILGenFunction::emitRValueForPropertyLoad(
                (!C.isImmediatePlusZeroOk() &&
                 !(C.isGuaranteedPlusZeroOk() && isGuaranteedValid))) {
       // If we have an abstraction change or if we have to produce a result at
-      // +1, then emit a RetainValue. If we know that our base will stay alive,
-      // we can emit at +0 for a guaranteed consumer. Otherwise, since we do not
-      // have enough information, we can only emit at +0 for immediate clients.
+      // +1, then copy the value. If we know that our base will stay alive for
+      // the entire usage of this value, we can borrow the value at +0 for a
+      // guaranteed consumer. Otherwise, since we do not have enough information
+      // to know if the base's lifetime last's as long as our use of the access,
+      // we can only emit at +0 for immediate clients.
       result = result.copyUnmanaged(*this, loc);
     }
   } else {
