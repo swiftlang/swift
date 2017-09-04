@@ -62,6 +62,9 @@ public:
   /// Pop the formal evaluation and argument scopes preserving the value mv.
   ManagedValue popPreservingValue(ManagedValue mv);
 
+  // Pop the formal evaluation and argument scopes, preserving rv.
+  RValue popPreservingValue(RValue &&rv);
+
   void verify() {
     formalEvalScope.verify();
   }
