@@ -351,9 +351,7 @@ public:
     if (!validateForwardCapture(DRE->getDecl()))
       return { false, DRE };
 
-    bool isInOut = (isa<ParamDecl>(D) &&
-                    cast<ParamDecl>(D)->hasType() &&
-                    cast<ParamDecl>(D)->getType()->is<InOutType>());
+    bool isInOut = (isa<ParamDecl>(D) && cast<ParamDecl>(D)->isInOut());
     bool isNested = false;
     if (auto f = AFR.getAbstractFunctionDecl())
       isNested = f->getDeclContext()->isLocalContext();
