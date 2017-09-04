@@ -28,7 +28,11 @@
 // CHECK-native:  call void @__swift_fixLifetime(%swift.refcounted*
 // CHECK-native:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC**)*)(%T11fixlifetime1CC**
 
+import Builtin
+
 sil_stage canonical
+
+typealias AnyObject = Builtin.AnyObject
 
 class C {}
 sil_vtable C {}

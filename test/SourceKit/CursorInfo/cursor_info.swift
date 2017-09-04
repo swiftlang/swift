@@ -599,7 +599,7 @@ func hasLocalizationKey2() {}
 // FIXME: ref.class - rdar://problem/25014968
 
 // RUN: %sourcekitd-test -req=cursor -pos=150:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK66
-// CHECK66: <decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P2</decl.name> :  <syntaxtype.keyword>class</syntaxtype.keyword>, <ref.protocol usr="s:11cursor_info2P1P">P1</ref.protocol></decl.protocol>
+// CHECK66: <decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P2</decl.name> : <ref.typealias usr="s:s9AnyObjecta">AnyObject</ref.typealias>, <ref.protocol usr="s:11cursor_info2P1P">P1</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr="s:11cursor_info2P2P4Selfxmfp">Self</ref.generic_type_param> : AnyObject</decl.generic_type_requirement></decl.protocol>
 
 // RUN: %sourcekitd-test -req=cursor -pos=114:18 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK67
 // CHECK67: source.lang.swift.decl.associatedtype (114:18-114:19)
