@@ -27,7 +27,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		case unmap
 
 		/// A custom deallocator
-		case custom(DispatchQueue?, @convention(block) @escaping () -> Void)
+		case custom(DispatchQueue?, @convention(block) () -> Void)
 
 		fileprivate var _deallocator: (DispatchQueue?, @convention(block) () -> Void) {
 			switch self {

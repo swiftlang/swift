@@ -1425,11 +1425,10 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
                                         Type ty,
                                         TypeResolutionOptions options) {
   // Remember whether this is a function parameter.
-  bool isFunctionParam =
-    options.contains(TypeResolutionFlags::FunctionInput) ||
-    options.contains(TypeResolutionFlags::ImmediateFunctionInput);
-
-  bool defaultNoEscape = isFunctionParam;
+  bool defaultNoEscape =
+    !options.contains(TypeResolutionFlags::EnumCase) &&
+    (options.contains(TypeResolutionFlags::FunctionInput) ||
+     options.contains(TypeResolutionFlags::ImmediateFunctionInput);
 
   // Desugar here
   auto *funcTy = ty->castTo<FunctionType>();

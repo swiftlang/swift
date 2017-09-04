@@ -1018,7 +1018,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         case none
         
         /// A custom deallocator.
-        case custom(@escaping (UnsafeMutableRawPointer, Int) -> Void)
+        case custom((UnsafeMutableRawPointer, Int) -> Void)
         
         fileprivate var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void) {
 #if DEPLOYMENT_RUNTIME_SWIFT
