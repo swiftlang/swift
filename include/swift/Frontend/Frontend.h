@@ -436,7 +436,7 @@ public:
   void freeContextAndSIL();
 
 private:
-  void loadStdlibAndMaybeSwiftOnoneSupport();
+  bool loadStdlibAndMaybeSwiftOnoneSupport();
   ModuleDecl *importUnderlyingModule(ClangImporter *clangImporter);
   ModuleDecl *importBridgingHeader(ClangImporter *clangImporter);
 
