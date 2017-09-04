@@ -145,6 +145,16 @@ enum class DescriptiveDeclKind : uint8_t {
   MissingMember,
 };
 
+/// Keeps track of stage of validation state for the given decl.
+enum class ValidationState {
+  /// The decl has not yet been validated.
+  NotValidated,
+  /// We're currently validating the decl.
+  Validating,
+  /// The decl has already been validated.
+  Validated,
+};
+
 /// Keeps track of stage of circularity checking for the given protocol.
 enum class CircularityCheck {
   /// Circularity has not yet been checked.
@@ -251,12 +261,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// FIXME: This is ugly.
     unsigned EarlyAttrValidation : 1;
 
-    /// \brief Whether this declaration is currently being validated.
-    unsigned BeingValidated : 1;
-
-    /// \brief Whether we have started validating the declaration; this *isn't*
-    /// reset after finishing it.
-    unsigned ValidationStarted : 1;
+    /// \brief The validation state.
+    unsigned ValidationBits : 2;
 
     /// \brief Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
@@ -663,8 +669,8 @@ protected:
     DeclBits.Implicit = false;
     DeclBits.FromClang = false;
     DeclBits.EarlyAttrValidation = false;
-    DeclBits.BeingValidated = false;
-    DeclBits.ValidationStarted = false;
+    DeclBits.ValidationBits =
+      static_cast<unsigned>(ValidationState::NotValidated);
     DeclBits.EscapedFromIfConfig = false;
   }
 
@@ -803,6 +809,21 @@ public:
   /// \brief Mark this declaration as implicit.
   void setImplicit(bool implicit = true) { DeclBits.Implicit = implicit; }
 
+  /// Get the current validation state
+  ValidationState getValidationState() const {
+    return static_cast<ValidationState>(DeclBits.ValidationBits);
+  }
+
+  /// Manually set that validation state for the declaration.
+  ///
+  /// Use with caution.
+  void setValidationState(ValidationState State) {
+    //assert(State > getValidationState());
+    // Ignore attemps to force 'validated' while validating.
+    if (getValidationState() != ValidationState::Validating)
+      DeclBits.ValidationBits = static_cast<unsigned>(State);
+  }
+
   /// Whether we have already done early attribute validation.
   bool didEarlyAttrValidation() const { return DeclBits.EarlyAttrValidation; }
 
@@ -814,25 +835,33 @@ public:
   /// Whether the declaration has a valid interface type and
   /// generic signature.
   bool isBeingValidated() const {
-    return DeclBits.BeingValidated;
+    return getValidationState() == ValidationState::Validating;
   }
 
   /// Toggle whether or not the declaration is being validated.
   void setIsBeingValidated(bool ibv = true) {
-    assert(DeclBits.BeingValidated != ibv);
-    DeclBits.BeingValidated = ibv;
     if (ibv) {
-      DeclBits.ValidationStarted = true;
+      assert(getValidationState() < ValidationState::Validating);
+      setValidationState(ValidationState::Validating);
+    } else {
+      assert(getValidationState() == ValidationState::Validating);
+      DeclBits.ValidationBits=static_cast<unsigned>(ValidationState::Validated);
     }
   }
 
-  bool hasValidationStarted() const { return DeclBits.ValidationStarted; }
+  bool hasValidationStarted() const {
+    return getValidationState() >= ValidationState::Validating;
+  }
 
   /// Manually indicate that validation has started for the declaration.
   ///
   /// This is implied by setIsBeingValidated(true) (i.e. starting validation)
   /// and so rarely needs to be called directly.
-  void setValidationStarted() { DeclBits.ValidationStarted = true; }
+  void setValidationStarted() {
+    if (getValidationState() != ValidationState::Validating)
+      setValidationState(ValidationState::Validated);
+  }
+
 
   bool escapedFromIfConfig() const {
     return DeclBits.EscapedFromIfConfig;
