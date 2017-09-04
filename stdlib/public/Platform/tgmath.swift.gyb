@@ -214,7 +214,7 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 @available(*, deprecated, message: "use the floatingPointClass property.")
 public func fpclassify(_ value: ${T}) -> Int {
 %if T == 'Double':
-#if os(Linux)
+#if os(Linux) && !os(Android)
   return Int(__fpclassify(CDouble(value)))
 #elseif os(Windows) 
   return Int(_dclass(CDouble(value)))
