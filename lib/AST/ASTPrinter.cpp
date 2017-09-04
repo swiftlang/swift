@@ -1310,8 +1310,12 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
 
     // A requirement like Self : Protocol or Self.T : Class might be from an
     // inheritance, or might be a where clause.
-    if (req.getKind() != RequirementKind::Layout && result.second) {
-      auto inherited = req.getSecondType();
+    if (result.second) {
+      Type inherited;
+      if (req.getKind() == RequirementKind::Layout)
+        inherited = proto->getASTContext().getAnyObjectType();
+      else
+        inherited = req.getSecondType();
       inWhereClause =
           none_of(result.first->getInherited(), [&](const TypeLoc &loc) {
             return loc.getType()->isEqual(inherited);
