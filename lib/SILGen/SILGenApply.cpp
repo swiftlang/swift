@@ -3617,9 +3617,9 @@ public:
 };
 } // end anonymous namespace
 
-static CleanupHandle enterDeallocBoxCleanup(SILGenFunction &SGF, SILValue box) {
-  SGF.Cleanups.pushCleanup<DeallocateUninitializedBox>(box);
-  return SGF.Cleanups.getTopCleanup();
+CleanupHandle SILGenFunction::enterDeallocBoxCleanup(SILValue box) {
+  Cleanups.pushCleanup<DeallocateUninitializedBox>(box);
+  return Cleanups.getTopCleanup();
 }
 
 /// This is an initialization for a box.
@@ -3706,7 +3706,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
 
     CleanupHandle initCleanup = enterDestroyCleanup(box);
     Cleanups.setCleanupState(initCleanup, CleanupState::Dormant);
-    CleanupHandle uninitCleanup = enterDeallocBoxCleanup(*this, box);
+    CleanupHandle uninitCleanup = enterDeallocBoxCleanup(box);
 
     BoxInitialization dest(box, addr, uninitCleanup, initCleanup);
 

@@ -1668,6 +1668,8 @@ public:
   CleanupHandle enterDormantTemporaryCleanup(SILValue temp,
                                              const TypeLowering &tempTL);
 
+  CleanupHandle enterDeallocBoxCleanup(SILValue box);
+
   /// Enter a currently-dormant cleanup to destroy the value in the
   /// given address.
   CleanupHandle
