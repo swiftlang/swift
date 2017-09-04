@@ -98,9 +98,13 @@ RValue Scope::popPreservingValue(RValue &&rv) {
   pop();
 
   // Then create cleanups for any lifetime extending boxes that we may have to
-  // ensure that the boxes are cleaned up /after/ the value stored in the box.
+  // ensure that the boxes are cleaned up /after/ the value stored in the
+  // box. We assume that our values will be destroyed via a destroy_addr or the
+  // like /before/ the end of our box's lifetime, implying that the value inside
+  // the box should be uninitialized when the box is destroyed, so it is
+  // important that we use a dealloc_box.
   for (auto v : lifetimeExtendingBoxes) {
-    SGF.emitManagedRValueWithCleanup(v);
+    SGF.enterDeallocBoxCleanup(v);
   }
 
   // Reconstruct the managed values from the underlying sil values in the outer
