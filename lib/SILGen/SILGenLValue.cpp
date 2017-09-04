@@ -2717,18 +2717,19 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   return lv;
 }
 
+// This is emitLoad that will handle re-abstraction and bridging for the client.
 ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                                       AbstractionPattern origFormalType,
                                       CanType substFormalType,
                                       const TypeLowering &rvalueTL,
                                       SGFContext C, IsTake_t isTake,
-                                      bool isGuaranteedValid) {
+                                      bool isAddressGuaranteed) {
   assert(addr->getType().isAddress());
   SILType addrRValueType = addr->getType().getReferenceStorageReferentType();
 
   // Fast path: the types match exactly.
   if (addrRValueType == rvalueTL.getLoweredType().getAddressType()) {
-    return emitLoad(loc, addr, rvalueTL, C, isTake, isGuaranteedValid);
+    return emitLoad(loc, addr, rvalueTL, C, isTake, isAddressGuaranteed);
   }
 
   // Otherwise, we need to reabstract or bridge.
@@ -2742,7 +2743,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
   return emitConvertedRValue(loc, conversion, C,
       [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
     return SGF.emitLoad(loc, addr, getTypeLowering(addrRValueType),
-                        C, isTake, isGuaranteedValid);
+                        C, isTake, isAddressGuaranteed);
   });
 }
 
@@ -2750,13 +2751,13 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
 ///
 /// \param rvalueTL - the type lowering for the type-of-rvalue
 ///   of the address
-/// \param isGuaranteedValid - true if the value in this address
+/// \param isAddrGuaranteed - true if the value in this address
 ///   is guaranteed to be valid for the duration of the current
 ///   evaluation (see SGFContext::AllowGuaranteedPlusZero)
 ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                                       const TypeLowering &rvalueTL,
                                       SGFContext C, IsTake_t isTake,
-                                      bool isGuaranteedValid) {
+                                      bool isAddrGuaranteed) {
   // Get the lowering for the address type.  We can avoid a re-lookup
   // in the very common case of this being equivalent to the r-value
   // type.
@@ -2766,7 +2767,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
 
   // Never do a +0 load together with a take.
   bool isPlusZeroOk = (isTake == IsNotTake &&
-                       (isGuaranteedValid ? C.isGuaranteedPlusZeroOk()
+                       (isAddrGuaranteed ? C.isGuaranteedPlusZeroOk()
                                           : C.isImmediatePlusZeroOk()));
 
   if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
@@ -2775,7 +2776,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
     // address RValue.
     if (isPlusZeroOk && rvalueTL.getLoweredType() == addrTL.getLoweredType())
       return ManagedValue::forUnmanaged(addr);
-        
+
     // Copy the address-only value.
     return B.bufferForExpr(
         loc, rvalueTL.getLoweredType(), rvalueTL, C,
@@ -2801,14 +2802,14 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
 ///
 /// \param rvalueTL - the type lowering for the type-of-rvalue
 ///   of the address
-/// \param isGuaranteedValid - true if the value in this address
+/// \param isAddressGuaranteed - true if the value in this address
 ///   is guaranteed to be valid for the duration of the current
 ///   evaluation (see SGFContext::AllowGuaranteedPlusZero)
 ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
                                                   SILValue addr,
                                                   const TypeLowering &rvalueTL,
                                                   SGFContext C, IsTake_t isTake,
-                                                  bool isGuaranteedValid) {
+                                                  bool isAddressGuaranteed) {
   // Get the lowering for the address type.  We can avoid a re-lookup
   // in the very common case of this being equivalent to the r-value
   // type.
@@ -2818,7 +2819,7 @@ ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
 
   // Never do a +0 load together with a take.
   bool isPlusZeroOk =
-      (isTake == IsNotTake && (isGuaranteedValid ? C.isGuaranteedPlusZeroOk()
+      (isTake == IsNotTake && (isAddressGuaranteed ? C.isGuaranteedPlusZeroOk()
                                                  : C.isImmediatePlusZeroOk()));
 
   if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
@@ -3205,7 +3206,7 @@ static ArgumentSource emitBaseValueForAccessor(SILGenFunction &SGF,
 }
 
 RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
-                                        SGFContext C, bool isGuaranteedValid) {
+                                        SGFContext C, bool isBaseGuaranteed) {
   // Any writebacks should be scoped to after the load.
   FormalEvaluationScope scope(*this);
 
@@ -3223,7 +3224,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
     return RValue(*this, loc, substFormalType,
                   emitLoad(loc, addr.getValue(),
                            rvalueTL, C, IsNotTake,
-                           isGuaranteedValid));
+                           isBaseGuaranteed));
   }
 
   // If the last component is logical, emit a get.
