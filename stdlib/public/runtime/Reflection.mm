@@ -755,52 +755,6 @@ extern "C" const Metadata STRUCT_METADATA_SYM(s6UInt16);
 extern "C" const Metadata STRUCT_METADATA_SYM(s6UInt32);
 extern "C" const Metadata STRUCT_METADATA_SYM(s6UInt64);
 
-// Set to 1 to enable reflection of objc ivars.
-#define REFLECT_OBJC_IVARS 0
-
-/// Map an ObjC type encoding string to a Swift type metadata object.
-///
-#if REFLECT_OBJC_IVARS
-static const Metadata *getMetadataForEncoding(const char *encoding) {
-  switch (*encoding) {
-  case 'c': // char
-    return &STRUCT_METADATA_SYM(s4Int8);
-  case 's': // short
-    return &STRUCT_METADATA_SYM(s5Int16);
-  case 'i': // int
-    return &STRUCT_METADATA_SYM(s5Int32);
-  case 'l': // long
-    return &METADATA_SYM(Si);
-  case 'q': // long long
-    return &STRUCT_METADATA_SYM(s5Int64);
-
-  case 'C': // unsigned char
-    return &STRUCT_METADATA_SYM(s5UInt8);
-  case 'S': // unsigned short
-    return &STRUCT_METADATA_SYM(s6UInt16);
-  case 'I': // unsigned int
-    return &STRUCT_METADATA_SYM(s6UInt32);
-  case 'L': // unsigned long
-    return &METADATA_SYM(Su);
-  case 'Q': // unsigned long long
-    return &STRUCT_METADATA_SYM(s6UInt64);
-
-  case 'B': // _Bool
-    return &METADATA_SYM(Sb);
-
-  case '@': { // Class
-    // TODO: Better metadata?
-    const OpaqueMetadata *M = &METADATA_SYM(BO);
-    return &M->base;
-  }
-
-  default: // TODO
-    // Return 'void' as the type of fields we don't understand.
-    return &METADATA_SYM(EMPTY_TUPLE_MANGLING);
-  }
-}
-#endif
-
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -810,17 +764,6 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   auto isa = (Class)type;
 
   unsigned count = 0;
-#if REFLECT_OBJC_IVARS
-  // Don't reflect ivars of classes that lie about their layout.
-  if (objcClassLiesAboutLayout(isa)) {
-    count = 0;
-  } else {
-    // Copying the ivar list just to free it is lame, but we have
-    // nowhere to save it.
-    Ivar *ivars = class_copyIvarList(isa, &count);
-    free(ivars);
-  }
-#else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
 
@@ -830,7 +773,6 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
 
   swift_release(owner);
   return count;
-#endif
 }
 
 static Mirror ObjC_getMirrorForSuperclass(Class sup,
@@ -845,9 +787,6 @@ void swift_ObjCMirror_subscript(String *outString,
                                 HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
-#if REFLECT_OBJC_IVARS
-  id object = *reinterpret_cast<const id *>(value);
-#endif
   auto isa = (Class)type;
 
   // If there's a superclass, it becomes the first child.
@@ -861,44 +800,9 @@ void swift_ObjCMirror_subscript(String *outString,
     }
     --i;
   }
-
-#if REFLECT_OBJC_IVARS
-  // Copying the ivar list just to free it is lame, but we have
-  // no room to save it.
-  unsigned count;
-  Ivar *ivars;
-  // Don't reflect ivars of classes that lie about their layout.
-  if (objcClassLiesAboutLayout(isa)) {
-    count = 0;
-    ivars = nullptr;
-  } else {
-    // Copying the ivar list just to free it is lame, but we have
-    // nowhere to save it.
-    ivars = class_copyIvarList(isa, &count);
-  }
-
-  if (i < 0 || (uintptr_t)i >= (uintptr_t)count)
-    swift::crash("Swift mirror subscript bounds check failure");
-
-  const char *name = ivar_getName(ivars[i]);
-  ptrdiff_t offset = ivar_getOffset(ivars[i]);
-  const char *typeEncoding = ivar_getTypeEncoding(ivars[i]);
-  free(ivars);
-
-  const OpaqueValue *ivar =
-    reinterpret_cast<const OpaqueValue *>(
-    reinterpret_cast<const char*>(object) + offset);
-
-  const Metadata *ivarType = getMetadataForEncoding(typeEncoding);
-
-  new (outString) String(name, strlen(name));
-  // 'owner' is consumed by this call.
-  new (outMirror) Mirror(reflect(owner, ivar, ivarType));
-#else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
   abort();
-#endif
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
