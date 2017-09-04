@@ -3,8 +3,9 @@
 
 public typealias AnyObject = Builtin.AnyObject
 
-precedencegroup CastingPrecedence {}
 precedencegroup AssignmentPrecedence {}
+precedencegroup CastingPrecedence {}
+precedencegroup ComparisonPrecedence {}
 
 public protocol _ObjectiveCBridgeable {}
 
@@ -56,6 +57,117 @@ public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
 // CHECK-LABEL: } // end sil function '_T0s13unsafeBitCastq_x_q_m2totr0_lF'
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
+}
+
+// A lot of standard library support is necessary to support raw enums.
+// --------------------------------------------------------------------
+
+infix operator  == : ComparisonPrecedence
+infix operator  ~= : ComparisonPrecedence
+
+public struct Bool {
+  var _value: Builtin.Int1
+
+  public init() {
+    let zero: Int64 = 0
+    self._value = Builtin.trunc_Int64_Int1(zero._value)
+  }
+
+  internal init(_ v: Builtin.Int1) { self._value = v }
+
+  public init(_ value: Bool) {
+    self = value
+  }
+}
+
+extension Bool {
+  public func _getBuiltinLogicValue() -> Builtin.Int1 {
+    return _value
+  }
+}
+
+public protocol Equatable {
+  /// Returns a Boolean value indicating whether two values are equal.
+  ///
+  /// Equality is the inverse of inequality. For any values `a` and `b`,
+  /// `a == b` implies that `a != b` is `false`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to compare.
+  ///   - rhs: Another value to compare.
+  static func == (lhs: Self, rhs: Self) -> Bool
+}
+
+public func ~= <T : Equatable>(a: T, b: T) -> Bool {
+  return a == b
+}
+
+public protocol RawRepresentable {
+  associatedtype RawValue
+
+  init?(rawValue: RawValue)
+
+  var rawValue: RawValue { get }
+}
+
+public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
+  where T.RawValue : Equatable {
+  return lhs.rawValue == rhs.rawValue
+}
+
+public typealias _MaxBuiltinIntegerType = Builtin.Int2048
+
+public protocol _ExpressibleByBuiltinIntegerLiteral {
+  init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
+}
+
+public protocol ExpressibleByIntegerLiteral {
+  associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
+
+  init(integerLiteral value: IntegerLiteralType)
+}
+
+extension ExpressibleByIntegerLiteral
+  where Self : _ExpressibleByBuiltinIntegerLiteral {
+  @_transparent
+  public init(integerLiteral value: Self) {
+    self = value
+  }
+}
+
+public protocol ExpressibleByStringLiteral {}
+public protocol ExpressibleByFloatLiteral {}
+public protocol ExpressibleByUnicodeScalarLiteral {}
+public protocol ExpressibleByExtendedGraphemeClusterLiteral {}
+
+public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerLiteral, Equatable {
+  public var _value: Builtin.Int64
+  public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
+    _value = Builtin.s_to_s_checked_trunc_Int2048_Int64(x).0
+  }
+  public typealias IntegerLiteralType = Int64
+  public init(integerLiteral value: Int64) {
+    self = value
+  }
+  public static func ==(_ lhs: Int64, rhs: Int64) -> Bool {
+    return Bool(Builtin.cmp_eq_Int64(lhs._value, rhs._value))
+  }
+}
+
+// Test ownership of multi-case Enum values in the context of @trivial to @in thunks.
+// ---
+// CHECK-LABEL: sil private [transparent] [thunk] @_T0s17FloatingPointSignOs9EquatablessACP2eeoiSbx_xtFZTW : $@convention(witness_method) (@in FloatingPointSign, @in FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
+// CHECK: bb0(%0 : @trivial $FloatingPointSign, %1 : @trivial $FloatingPointSign, %2 : @trivial $@thick FloatingPointSign.Type):
+// CHECK:   %3 = function_ref @_T0s2eeoiSbx_xts16RawRepresentableRzs9Equatable0B5ValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK:   %4 = apply %3<FloatingPointSign, Int64>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK:   return %4 : $Bool
+// CHECK-LABEL: } // end sil function '_T0s17FloatingPointSignOs9EquatablessACP2eeoiSbx_xtFZTW'
+public enum FloatingPointSign: Int64 {
+  /// The sign for a positive value.
+  case plus
+
+  /// The sign for a negative value.
+  case minus
 }
 
 #if os(OSX)
