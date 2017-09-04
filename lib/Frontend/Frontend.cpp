@@ -319,7 +319,8 @@ void CompilerInstance::performSema() {
   case SourceFile::ImplicitModuleImportKind::Builtin:
     break;
   case SourceFile::ImplicitModuleImportKind::Stdlib:
-    loadStdlibAndMaybeSwiftOnoneSupport();
+    if (!loadStdlibAndMaybeSwiftOnoneSupport())
+      return;
     break;
   }
 
@@ -361,21 +362,22 @@ void CompilerInstance::performSema() {
   parseMainAndTypeCheckTopLevelFiles(PersistentState, DelayedCB.get());
 }
 
-void CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport() {
+// Return true if should continue, i.e. no error
+bool CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport() {
   SharedTimer timer("performSema-loadStdlibAndMaybeSwiftOnoneSupport");
   ModuleDecl *M = Context->getStdlibModule(true);
 
   if (!M) {
     Diagnostics.diagnose(SourceLoc(), diag::error_stdlib_not_found,
                          Invocation.getTargetTriple());
-    return;
+    return false;
   }
 
   // If we failed to load, we should have already diagnosed
   if (M->failedToLoad()) {
     assert(Diagnostics.hadAnyError() &&
            "Module failed to load but nothing was diagnosed?");
-    return;
+    return false;
   }
   if (shouldImplicityImportSwiftOnoneSupportModule(
           Invocation.getSILOptions().Optimization,
@@ -383,6 +385,7 @@ void CompilerInstance::loadStdlibAndMaybeSwiftOnoneSupport() {
     Invocation.getFrontendOptions().ImplicitImportModuleNames.push_back(
         SWIFT_ONONE_SUPPORT);
   }
+  return true;
 }
 
 ModuleDecl *
