@@ -594,11 +594,9 @@ private:
   void printInherited(const Decl *decl,
                       ArrayRef<TypeLoc> inherited,
                       ArrayRef<ProtocolDecl *> protos,
-                      Type superclass = {},
-                      bool explicitClass = false);
+                      Type superclass = {});
 
-  void printInherited(const NominalTypeDecl *decl,
-                      bool explicitClass = false);
+  void printInherited(const NominalTypeDecl *decl);
   void printInherited(const EnumDecl *D);
   void printInherited(const ExtensionDecl *decl);
   void printInherited(const GenericTypeParamDecl *D);
@@ -917,8 +915,12 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
 
     // A requirement like Self : Protocol or Self.T : Class might be from an
     // inheritance, or might be a where clause.
-    if (req.getKind() != RequirementKind::Layout && result.second) {
-      auto inherited = req.getSecondType();
+    if (result.second) {
+      Type inherited;
+      if (req.getKind() == RequirementKind::Layout)
+        inherited = proto->getASTContext().getAnyObjectType();
+      else
+        inherited = req.getSecondType();
       inWhereClause =
           none_of(result.first->getInherited(), [&](const TypeLoc &loc) {
             return loc.getType()->isEqual(inherited);
@@ -1635,9 +1637,8 @@ void PrintAST::printNominalDeclGenericRequirements(NominalTypeDecl *decl) {
 void PrintAST::printInherited(const Decl *decl,
                               ArrayRef<TypeLoc> inherited,
                               ArrayRef<ProtocolDecl *> protos,
-                              Type superclass,
-                              bool explicitClass) {
-  if (inherited.empty() && superclass.isNull() && !explicitClass) {
+                              Type superclass) {
+  if (inherited.empty() && superclass.isNull()) {
     if (protos.empty())
       return;
   }
@@ -1646,10 +1647,7 @@ void PrintAST::printInherited(const Decl *decl,
     bool PrintedColon = false;
     bool PrintedInherited = false;
 
-    if (explicitClass) {
-      Printer << " : " << tok::kw_class;
-      PrintedInherited = true;
-    } else if (superclass) {
+    if (superclass) {
       bool ShouldPrintSuper = true;
       if (auto NTD = superclass->getAnyNominal()) {
         ShouldPrintSuper = shouldPrint(NTD);
@@ -1701,9 +1699,6 @@ void PrintAST::printInherited(const Decl *decl,
 
     Printer << " : ";
 
-    if (explicitClass)
-      Printer << " " << tok::kw_class << ", ";
-
     interleave(TypesToPrint, [&](TypeLoc TL) {
       printTypeLoc(TL);
     }, [&]() {
@@ -1712,9 +1707,8 @@ void PrintAST::printInherited(const Decl *decl,
   }
 }
 
-void PrintAST::printInherited(const NominalTypeDecl *decl,
-                              bool explicitClass) {
-  printInherited(decl, decl->getInherited(), { }, nullptr, explicitClass);
+void PrintAST::printInherited(const NominalTypeDecl *decl) {
+  printInherited(decl, decl->getInherited(), { }, nullptr);
 }
 
 void PrintAST::printInherited(const EnumDecl *decl) {
@@ -2139,23 +2133,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
         Printer.printName(decl->getName());
       });
 
-    // Figure out whether we need an explicit 'class' in the inheritance.
-    bool explicitClass = false;
-    if (decl->requiresClass() && !decl->isObjC()) {
-      bool inheritsRequiresClass = false;
-      for (auto proto : decl->getLocalProtocols(
-                          ConformanceLookupKind::OnlyExplicit)) {
-        if (proto->requiresClass()) {
-          inheritsRequiresClass = true;
-          break;
-        }
-      }
-
-      if (!inheritsRequiresClass)
-        explicitClass = true;
-    }
-
-    printInherited(decl, explicitClass);
+    printInherited(decl);
 
     // The trailing where clause is a syntactic thing, which isn't serialized
     // (etc.) and thus isn't available for printing things out of

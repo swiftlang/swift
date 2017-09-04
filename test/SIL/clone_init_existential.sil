@@ -7,6 +7,8 @@ sil_stage canonical
 
 import Builtin
 
+typealias AnyObject = Builtin.AnyObject
+
 protocol ClassProto1 : class {
 }
 

@@ -2,7 +2,7 @@
 // REQUIRES: asserts
 // REQUIRES: objc_interop
 
-@objc protocol NSBurrito : class {}
+@objc protocol NSBurrito {}
 
 class Protocol : NSBurrito {}
 

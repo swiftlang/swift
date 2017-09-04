@@ -15,7 +15,7 @@ import Builtin
 
 sil @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
 
-public protocol AnyObject : class {}
+typealias AnyObject = Builtin.AnyObject
 
 public protocol Error {}
 
