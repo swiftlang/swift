@@ -486,7 +486,7 @@ protocol d0130_TestProtocol {
 }
 
 protocol d0150_TestClassProtocol : class {}
-// PASS_COMMON-LABEL: {{^}}protocol d0150_TestClassProtocol : class {{{$}}
+// PASS_COMMON-LABEL: {{^}}protocol d0150_TestClassProtocol : AnyObject where Self : AnyObject {{{$}}
 
 @objc protocol d0151_TestClassProtocol {}
 // PASS_COMMON-LABEL: {{^}}@objc protocol d0151_TestClassProtocol {{{$}}

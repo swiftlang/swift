@@ -3,6 +3,8 @@
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
 
+import Builtin
+
 //   These types end up in a completely different order with interop disabled.
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
@@ -12,6 +14,7 @@
 
 class C {}
 sil_vtable C {}
+typealias AnyObject = Builtin.AnyObject
 protocol P : class {
   func explode()
 }

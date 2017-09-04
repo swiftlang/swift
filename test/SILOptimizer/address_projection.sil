@@ -5,6 +5,7 @@ import Builtin
 sil_stage canonical
 // CHECK: sil_stage lowered
 
+typealias AnyObject = Builtin.AnyObject
 typealias Int = Builtin.Int64
 
 // CHECK-LABEL: sil hidden @f010_addrlower_identity : $@convention(thin) <T> (@in T) -> @out T {

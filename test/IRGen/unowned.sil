@@ -7,8 +7,12 @@
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[A:%T7unowned1AV]] = type <{ %swift.unowned }>
 
+import Builtin
+
 class C {}
 sil_vtable C {}
+
+typealias AnyObject = Builtin.AnyObject
 protocol P : class {
   func explode()
 }
