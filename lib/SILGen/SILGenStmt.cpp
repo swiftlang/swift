@@ -563,7 +563,9 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
 
   // Emit the condition bindings, branching to the bodyBB if they fail.  Since
   // we didn't push a scope, the bound variables are live after this statement.
-  SGF.emitStmtCondition(S->getCond(), bodyBB, S);
+  auto NumFalseTaken = SGF.loadProfilerCount(S->getBody());
+  auto NumNonTaken = ProfileCounter::subtract(SGF.loadProfilerCount(S), NumFalseTaken);
+  SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {
