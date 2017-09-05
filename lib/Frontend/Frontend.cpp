@@ -455,17 +455,14 @@ void CompilerInstance::supplyREPLFileWithImports(
                                 importedHeaderModule, importModules);
 }
 
-std::unique_ptr<DelayedParsingCallbacks> &&
-CompilerInstance::computeDelayedParsingCallback() {
+DelayedParsingCallbacks *CompilerInstance::computeDelayedParsingCallback() {
   SharedTimer timer("performSema-computeDelayedParsingCallback");
-  std::unique_ptr<DelayedParsingCallbacks> DelayedCB;
-  if (Invocation.isCodeCompletion()) {
-    DelayedCB.reset(
-        new CodeCompleteDelayedCallbacks(SourceMgr.getCodeCompletionLoc()));
-  } else if (Invocation.isDelayedFunctionBodyParsing()) {
-    DelayedCB.reset(new AlwaysDelayedCallbacks);
+  if (Invocation.isCodeCompletion())
+    return new CodeCompleteDelayedCallbacks(SourceMgr.getCodeCompletionLoc());
+  if (Invocation.isDelayedFunctionBodyParsing()) {
+    return new AlwaysDelayedCallbacks;
   }
-  return std::move(DelayedCB);
+  return nullptr;
 }
 
 // Make sure the main file is the first file in the module. This may only be

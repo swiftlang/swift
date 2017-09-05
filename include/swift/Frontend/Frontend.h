@@ -447,7 +447,7 @@ private:
       ModuleDecl *objCModuleUnderlyingMixedFramework,
       ModuleDecl *importedHeaderModule,
       SmallVectorImpl<ModuleDecl *> &importModules);
-  std::unique_ptr<DelayedParsingCallbacks> &&computeDelayedParsingCallback();
+  DelayedParsingCallbacks *computeDelayedParsingCallback();
 
   void ensureMainFileComesFirst(
       SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
