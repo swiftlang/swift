@@ -9637,7 +9637,7 @@ public:
       } else if (currentDepth == longestPath - 1) {
         auto steps = step->getNextSteps();
         failedAt.append(steps.begin(), steps.end());
-        return true;
+        return false;
       }
 
       // Right now we can't replay the state of the system,
@@ -9788,6 +9788,19 @@ private:
       }
     }
 
+    auto getNumElements = [](Type type) -> unsigned {
+      if (auto *PT = dyn_cast<ParenType>(type.getPointer()))
+        return 1;
+
+      if (auto *TT = type->getAs<TupleType>())
+        return TT->getNumElements();
+
+      return 0;
+    };
+
+    auto numArgs = getNumElements(error.LHS);
+    auto numParams = getNumElements(error.RHS);
+
     auto *fnExpr = AE->getFn();
     auto *argExpr = AE->getArg();
 
@@ -9796,7 +9809,7 @@ private:
 
     CalleeCandidateInfo CCI(fnExpr, callArgHasTrailingClosure(argExpr), CS);
 
-    if (!matchStructurally) {
+    if (!matchStructurally && numArgs == numParams) {
       auto args = decomposeArgType(CS.getType(argExpr), argLabels);
       TC.diagnose(AE->getLoc(), diag::wrong_argument_labels_overload,
                   getParamListAsString(args));
@@ -9812,7 +9825,7 @@ private:
     auto candidate = CCI[0];
     auto params = candidate.getUncurriedFunctionType()->getParams();
     SmallVector<bool, 4> defaultMap;
-    computeDefaultMap(error.LHS, candidate.getDecl(), candidate.level,
+    computeDefaultMap(error.RHS, candidate.getDecl(), candidate.level,
                       defaultMap);
 
     auto args = decomposeArgType(error.LHS, argLabels);
