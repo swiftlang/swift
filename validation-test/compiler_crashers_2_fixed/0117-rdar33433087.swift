@@ -1,7 +1,7 @@
-// RUN: not %target-swift-frontend %s -typecheck
+// RUN: %target-typecheck-verify-swift %s
 
 class C {
-  private init() {} // expected-error {{declared here}}
+  private init() {} // expected-note {{declared here}}
   init(n: Int) {}
 }
 
