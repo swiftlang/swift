@@ -138,7 +138,7 @@ public func dispatch_io_set_interval(_ channel: DispatchIO, _ interval: UInt64, 
 	fatalError()
 }
 
-@available(*, unavailable, renamed:"DispatchQueue.apply(attributes:iterations:execute:)")
+@available(*, unavailable, message:"Use DispatchQueue.concurrentPerform(iterations:execute:). The 'queue' argument is not required because the system chooses the appropriate execution context for the block")
 public func dispatch_apply(_ iterations: Int, _ queue: DispatchQueue, _ block: (Int) -> Void) 
 {
 	fatalError()
