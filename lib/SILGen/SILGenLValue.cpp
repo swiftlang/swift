@@ -2045,10 +2045,19 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
                                          AccessKind accessKind,
                                          LValueOptions options,
                                          AbstractionPattern orig) {
-  SGFContext ctx;
   auto &SGF = SGL.SGF;
 
-  if (auto *DRE = dyn_cast<DeclRefExpr>(e)) {
+  // For an rvalue base, apply the reabstraction (if any) eagerly, since
+  // there's no need for writeback.
+  if (orig.isValid()) {
+    return SGF.emitRValueAsOrig(
+        e, orig, SGF.getTypeLowering(orig, e->getType()->getRValueType()));
+  }
+
+  // Ok, at this point we know that re-abstraction is not required.
+  SGFContext ctx;
+
+  if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
     // Any reference to "self" can be done at +0 so long as it is a direct
     // access, since we know it is guaranteed.
     //
@@ -2056,27 +2065,28 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
     // point where we can see that the parameter is +0 guaranteed.  Note that
     // this handles the case in initializers where there is actually a stack
     // allocation for it as well.
-    if (isa<ParamDecl>(DRE->getDecl()) &&
-        DRE->getDecl()->getFullName() == SGF.getASTContext().Id_self &&
-        DRE->getDecl()->isImplicit()) {
+    if (isa<ParamDecl>(dre->getDecl()) &&
+        dre->getDecl()->getFullName() == SGF.getASTContext().Id_self &&
+        dre->getDecl()->isImplicit()) {
       ctx = SGFContext::AllowGuaranteedPlusZero;
       if (SGF.SelfInitDelegationState != SILGenFunction::NormalSelf) {
         // This needs to be inlined since there is a Formal Evaluation Scope
         // in emitRValueForDecl that causing any borrow for this LValue to be
         // popped too soon.
-        auto *vd = cast<ParamDecl>(DRE->getDecl());
+        auto *vd = cast<ParamDecl>(dre->getDecl());
         ManagedValue selfLValue =
-            SGF.emitLValueForDecl(DRE, vd, DRE->getType()->getCanonicalType(),
-                                  AccessKind::Read, DRE->getAccessSemantics());
-        return SGF
-            .emitFormalEvaluationRValueForSelfInDelegationInit(
-                e, DRE->getType()->getCanonicalType(),
-                selfLValue.getLValueAddress(), ctx)
-            .getAsSingleValue(SGF, e);
+            SGF.emitLValueForDecl(dre, vd, dre->getType()->getCanonicalType(),
+                                  AccessKind::Read, dre->getAccessSemantics());
+        selfLValue = SGF.emitFormalEvaluationRValueForSelfInDelegationInit(
+                            e, dre->getType()->getCanonicalType(),
+                            selfLValue.getLValueAddress(), ctx)
+                         .getAsSingleValue(SGF, e);
+
+        return selfLValue;
       }
     }
 
-    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+    if (auto *VD = dyn_cast<VarDecl>(dre->getDecl())) {
       // All let values are guaranteed to be held alive across their lifetime,
       // and won't change once initialized.  Any loaded value is good for the
       // duration of this expression evaluation.
@@ -2090,14 +2100,6 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
     ctx = SGFContext::AllowGuaranteedPlusZero;
   }
 
-  // For an rvalue base, apply the reabstraction (if any) eagerly, since
-  // there's no need for writeback.
-  if (orig.isValid()) {
-    return SGF.emitRValueAsOrig(
-        e, orig, SGF.getTypeLowering(orig, e->getType()->getRValueType()));
-  }
-
-  // Otherwise, just go through normal emission.
   return SGF.emitRValueAsSingleValue(e, ctx);
 }
 
