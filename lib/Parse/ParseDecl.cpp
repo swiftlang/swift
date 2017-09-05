@@ -2651,7 +2651,8 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 ///     type-identifier
 /// \endverbatim
 ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
-                                      bool allowClassRequirement) {
+                                      bool allowClassRequirement,
+                                      bool allowAnyObject) {
   Scope S(this, ScopeKind::InheritanceClause);
   consumeToken(tok::colon);
 
@@ -2665,9 +2666,16 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       // If we aren't allowed to have a class requirement here, complain.
       auto classLoc = consumeToken();
       if (!allowClassRequirement) {
-        SourceLoc endLoc = Tok.is(tok::comma) ? Tok.getLoc() : classLoc;
-        diagnose(classLoc, diag::invalid_class_requirement)
-          .fixItRemove(SourceRange(classLoc, endLoc));
+        diagnose(classLoc, diag::unexpected_class_constraint);
+
+        // Note that it makes no sense to suggest fixing
+        // 'struct S : class' to 'struct S : AnyObject' for
+        // example; in that case we just complain about
+        // 'class' being invalid here.
+        if (allowAnyObject) {
+          diagnose(classLoc, diag::suggest_anyobject)
+            .fixItReplace(classLoc, "AnyObject");
+        }
         continue;
       }
 
@@ -2957,7 +2965,9 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
-    status |= parseInheritance(Inherited, /*allowClassRequirement=*/false);
+    status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/false);
 
   // Parse the optional where-clause.
   TrailingWhereClause *trailingWhereClause = nullptr;
@@ -3296,7 +3306,9 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   // FIXME: Allow class requirements here.
   SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
-    Status |= parseInheritance(Inherited, /*allowClassRequirement=*/false);
+    Status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/true);
   
   ParserResult<TypeRepr> UnderlyingTy;
   if (Tok.is(tok::equal)) {
@@ -5036,7 +5048,9 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
     SmallVector<TypeLoc, 2> Inherited;
-    Status |= parseInheritance(Inherited, /*allowClassRequirement=*/false);
+    Status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/false);
     ED->setInherited(Context.AllocateCopy(Inherited));
   }
 
@@ -5296,7 +5310,9 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
     SmallVector<TypeLoc, 2> Inherited;
-    Status |= parseInheritance(Inherited, /*allowClassRequirement=*/false);
+    Status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/false);
     SD->setInherited(Context.AllocateCopy(Inherited));
   }
 
@@ -5381,7 +5397,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
     SmallVector<TypeLoc, 2> Inherited;
-    Status |= parseInheritance(Inherited, /*allowClassRequirement=*/false);
+    Status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/false);
     CD->setInherited(Context.AllocateCopy(Inherited));
   }
 
@@ -5469,7 +5487,8 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::colon)) {
     colonLoc = Tok.getLoc();
     Status |= parseInheritance(InheritedProtocols,
-                               /*allowClassRequirement=*/true);
+                               /*allowClassRequirement=*/true,
+                               /*allowAnyObject=*/true);
   }
 
   TrailingWhereClause *TrailingWhere = nullptr;

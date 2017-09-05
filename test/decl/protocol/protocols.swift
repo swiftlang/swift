@@ -209,6 +209,12 @@ struct IntStringGetter : GetATuple {
   func getATuple() -> Tuple {}
 }
 
+protocol ClassConstrainedAssocType {
+  associatedtype T : class
+  // expected-error@-1 {{'class' constraint can only appear on protocol declarations}}
+  // expected-note@-2 {{did you mean to write an 'AnyObject' constraint?}}{{22-27=AnyObject}}
+}
+
 //===----------------------------------------------------------------------===//
 // Default arguments
 //===----------------------------------------------------------------------===//

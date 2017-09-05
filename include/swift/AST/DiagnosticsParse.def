@@ -1418,7 +1418,7 @@ ERROR(expected_generics_parameter_name,PointsToFirstBadToken,
 ERROR(unexpected_class_constraint,none,
        "'class' constraint can only appear on protocol declarations", ())
 NOTE(suggest_anyobject,none,
-     "did you mean to constrain %0 with the 'AnyObject' protocol?", (Identifier))
+     "did you mean to write an 'AnyObject' constraint?", ())
 ERROR(expected_generics_type_restriction,none,
       "expected a class type or protocol-constrained type restricting %0",
       (Identifier))
@@ -1427,8 +1427,6 @@ ERROR(requires_single_equal,none,
 ERROR(expected_requirement_delim,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())
-ERROR(invalid_class_requirement,none,
-      "'class' requirement only applies to protocols", ())
 ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,

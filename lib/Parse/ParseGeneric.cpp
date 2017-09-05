@@ -76,7 +76,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
                                      diag::expected_ident_type_in_inheritance);
       } else if (Tok.is(tok::kw_class)) {
         diagnose(Tok, diag::unexpected_class_constraint);
-        diagnose(Tok, diag::suggest_anyobject, Name)
+        diagnose(Tok, diag::suggest_anyobject)
           .fixItReplace(Tok.getLoc(), "AnyObject");
         consumeToken();
         Invalid = true;
