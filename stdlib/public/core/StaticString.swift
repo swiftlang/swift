@@ -271,16 +271,3 @@ extension StaticString {
     return Mirror(reflecting: description)
   }
 }
-
-extension StaticString {
-  @available(*, unavailable, renamed: "utf8CodeUnitCount")
-  public var byteSize: Int {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "use the 'String(_:)' initializer")
-  public var stringValue: String {
-    Builtin.unreachable()
-  }
-}
-

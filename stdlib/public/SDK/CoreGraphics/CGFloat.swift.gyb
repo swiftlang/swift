@@ -484,34 +484,6 @@ extension CGFloat : Strideable {
 //===----------------------------------------------------------------------===//
 
 @_transparent
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public prefix func ++(rhs: inout CGFloat) -> CGFloat {
-  fatalError("++ is not available")
-}
-
-@_transparent
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public prefix func --(rhs: inout CGFloat) -> CGFloat {
-  fatalError("-- is not available")
-}
-
-@_transparent
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public postfix func ++(lhs: inout CGFloat) -> CGFloat {
-  fatalError("++ is not available")
-}
-
-@_transparent
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public postfix func --(lhs: inout CGFloat) -> CGFloat {
-  fatalError("-- is not available")
-}
-
-@_transparent
 @available(*, unavailable, message: "Use truncatingRemainder instead")
 public func %(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
   fatalError("% is not available.")

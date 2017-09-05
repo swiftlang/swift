@@ -358,7 +358,3 @@ extension OptionSet where RawValue : FixedWidthInteger {
     self = Self(rawValue: self.rawValue ^ other.rawValue)
   }
 }
-
-@available(*, unavailable, renamed: "OptionSet")
-public typealias OptionSetType = OptionSet
-

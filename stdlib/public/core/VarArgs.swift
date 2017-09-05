@@ -481,9 +481,3 @@ final internal class _VaListBuilder {
 }
 
 #endif
-
-@available(*, unavailable, renamed: "CVarArg")
-public typealias CVarArgType = CVarArg
-
-@available(*, unavailable)
-final public class VaListBuilder {}

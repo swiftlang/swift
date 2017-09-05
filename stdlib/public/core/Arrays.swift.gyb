@@ -2380,34 +2380,6 @@ extension ArraySlice {
   }
 }
 
-%for (Self, a_Self) in arrayTypes:
-extension ${Self} {
-  @available(*, unavailable, message: "Please use init(repeating:count:) instead")
-  init(count: Int, repeatedValue: Element) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "remove(at:)")
-  public mutating func removeAtIndex(_ index: Int) -> Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "replaceSubrange(_:with:)")
-  public mutating func replaceRange<C>(
-    _ subRange: Range<Int>,
-    with newElements: C
-  ) where C : Collection, C.Element == Element {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Element == Element {
-    Builtin.unreachable()
-  }
-}
-%end
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

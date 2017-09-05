@@ -111,24 +111,3 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   }
 }
 #endif
-
-extension ImplicitlyUnwrappedOptional {
-  @available(*, unavailable, message: "Please use nil literal instead.")
-  public init() {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Has been removed in Swift 3.")
-  public func map<U>(
-    _ f: (Wrapped) throws -> U
-  ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Has been removed in Swift 3.")
-  public func flatMap<U>(
-      _ f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
-  ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    Builtin.unreachable()
-  }
-}

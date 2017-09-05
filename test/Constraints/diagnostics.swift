@@ -760,7 +760,7 @@ func read<T : BinaryInteger>() -> T? {
 
 func f23213302() {
   var s = Set<Int>()
-  s.subtractInPlace(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Int>'}}
+  s.subtract(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Int>'}}
 }
 
 // <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
