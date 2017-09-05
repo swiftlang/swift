@@ -3487,4 +3487,741 @@ SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=true"
   expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
+//===---
+// Check SetAlgebra conformance
+//===---
+
+// Test isEmpty
+
+SetTestSuite.test("SetAlgebra.IsEmpty.SingleEntry") {
+  let s = Set<Int>([1050])
+  
+  expectFalse(s.isEmpty)
+}
+
+SetTestSuite.test("SetAlgebra.IsEmpty.MultipleEntries") {
+  let s: Set<Int> = [1010, 1020, 1030, 1040, 1050]
+  
+  expectFalse(s.isEmpty)
+}
+
+SetTestSuite.test("SetAlgebra.IsEmpty.EmptySet") {
+  var s: Set<Int> = []
+  
+  expectTrue(s.isEmpty)
+  
+  s.insert(1010)
+  
+  expectFalse(s.isEmpty)
+}
+
+// Test equality operator
+
+SetTestSuite.test("SetAlgebra.==.SingleEntry") {
+  let s1 = Set<Int>([1010])
+  let s2 = Set<Int>([1010])
+  let s3: Set<Int> = [1010, 1020, 1030]
+
+  expectEqual(s1, s2)
+  expectNotEqual(s1, s3)
+}
+
+SetTestSuite.test("SetAlgebra.==.MultipleEntries") {
+  let s1: Set<Int> = [1010, 1020, 1030]
+  let s2: Set<Int> = [1010, 1020, 1030]
+  let s3: Set<Int> = [1030, 1040, 1050]
+
+  expectEqual(s1, s2)
+  expectNotEqual(s1, s3)
+}
+
+SetTestSuite.test("SetAlgebra.==.EmptySet") {
+  let s1: Set<Int> = []
+  let s2: Set<Int> = []
+  let s3: Set<Int> = [1010, 1020, 1030]
+
+  expectEqual(s1, s2)
+  expectNotEqual(s1, s3)
+}
+
+// Test contains()
+
+SetTestSuite.test("SetAlgebra.Contains.SingleEntry") {
+  let s = Set<Int>([1050])
+  
+  expectFalse(s.contains(1010))
+  expectTrue(s.contains(1050))
+}
+
+SetTestSuite.test("SetAlgebra.Contains.MultipleEntries") {
+  let s: Set<Int> = [1010, 1020, 1030, 1040, 1050]
+
+  expectFalse(s.contains(1060))
+  expectFalse(s.contains(1070))
+  expectTrue(s.contains(1010))
+  expectTrue(s.contains(1020))
+  expectTrue(s.contains(1030))
+  expectTrue(s.contains(1040))
+  expectTrue(s.contains(1050))
+}
+
+SetTestSuite.test("SetAlgebra.Contains.EmptySet") {
+  let s: Set<Int> = []
+  
+  expectFalse(s.contains(1010))
+  expectFalse(s.contains(1020))
+  expectFalse(s.contains(1030))
+  expectFalse(s.contains(1040))
+  expectFalse(s.contains(1050))
+  expectFalse(s.contains(1060))
+  expectFalse(s.contains(1070))
+}
+
+// Test formItersection()
+
+SetTestSuite.test("SetAlgebra.FormIntersection.SingleEntry") {
+  do {
+    var s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1010, 1020, 1030]
+  
+    s1.formIntersection(s2)
+    
+    expectTrue(s1.contains(1010))
+    expectFalse(s1.contains(1020))
+    expectFalse(s1.contains(1070))
+  }
+  do {
+    var s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1020, 1030, 1050]
+  
+    s1.formIntersection(s2)
+    
+    expectFalse(s1.contains(1010))
+    expectFalse(s1.contains(1020))
+    expectFalse(s1.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.FormIntersection.MultipleEntries") {
+  do {
+    var s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1030, 1040, 1050]
+  
+    s1.formIntersection(s2)
+    
+    expectTrue(s1.contains(1030))
+    expectFalse(s1.contains(1020))
+    expectFalse(s1.contains(1070))
+  }
+  do {
+    var s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1040, 1050, 1060]
+  
+    s1.formIntersection(s2)
+    
+    expectFalse(s1.contains(1030))
+    expectFalse(s1.contains(1040))
+    expectFalse(s1.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.FormIntersection.EmptySet") {
+  var s1: Set<Int> = []
+  let s2: Set<Int> = [1010, 1020, 1030]
+
+  s1.formIntersection(s2)
+  
+  expectFalse(s1.contains(1030))
+  expectFalse(s1.contains(1040))
+}
+
+// Test formSymmetricDifference()
+
+SetTestSuite.test("SetAlgebra.FormSymmetricDifference.SingleEntry") {
+  do {
+    var s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1010, 1020, 1030]
+  
+    s1.formSymmetricDifference(s2)
+
+    expectTrue(s1.contains(1020))
+    expectFalse(s1.contains(1010))
+    expectFalse(s1.contains(1070))
+  }
+  do {
+    var s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1020, 1030, 1050]
+  
+    s1.formSymmetricDifference(s2)
+    
+    expectTrue(s1.contains(1010))
+    expectTrue(s1.contains(1020))
+    expectFalse(s1.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.FormSymmetricDifference.MultipleEntries") {
+  do {
+    var s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1030, 1040, 1050]
+  
+    s1.formSymmetricDifference(s2)
+
+    expectTrue(s1.contains(1020))
+    expectFalse(s1.contains(1030))
+    expectFalse(s1.contains(1070))
+  }
+  do {
+    var s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1040, 1050, 1060]
+  
+    s1.formSymmetricDifference(s2)
+    expectTrue(s1.contains(1030))
+    expectTrue(s1.contains(1040))
+    expectFalse(s1.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.FormSymmetricDifference.EmptySet") {
+  var s1: Set<Int> = []
+  let s2: Set<Int> = [1010, 1020, 1030]
+
+  s1.formSymmetricDifference(s2)
+  expectTrue(s1.contains(1030))
+  expectFalse(s1.contains(1040))
+}
+
+// Test formUnion()
+
+SetTestSuite.test("SetAlgebra.FormUnion.SingleEntry") {
+  do {
+    var s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1010, 1020, 1030]
+  
+    s1.formUnion(s2)
+    expectTrue(s1.contains(1010))
+    expectTrue(s1.contains(1020))
+    expectFalse(s1.contains(1070))
+  }
+  do {
+    var s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1020, 1030, 1050]
+  
+    s1.formUnion(s2)
+    expectTrue(s1.contains(1010))
+    expectTrue(s1.contains(1020))
+    expectFalse(s1.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.FormUnion.MultipleEntries") {
+  do {
+    var s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1030, 1040, 1050]
+  
+    s1.formUnion(s2)
+    expectTrue(s1.contains(1030))
+    expectTrue(s1.contains(1020))
+    expectFalse(s1.contains(1070))
+  }
+  do {
+    var s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1040, 1050, 1060]
+  
+    s1.formUnion(s2)
+    expectTrue(s1.contains(1030))
+    expectTrue(s1.contains(1040))
+    expectFalse(s1.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.FormUnion.EmptySet") {
+  var s1: Set<Int> = []
+  let s2: Set<Int> = [1010, 1020, 1030]
+
+  s1.formUnion(s2)
+  expectTrue(s1.contains(1030))
+  expectFalse(s1.contains(1040))
+}
+
+// Test insert()
+
+SetTestSuite.test("SetAlgebra.Insert.SingleEntry") {
+  var s = Set<Int>([1010])
+  
+  expectFalse(s.contains(1020))
+  
+  let (inserted1, member1) = s.insert(1020)
+
+  expectTrue(s.contains(1010))
+  expectTrue(s.contains(1020))
+  expectFalse(s.contains(1070))
+  expectTrue(inserted1)
+  expectEqual(1020, member1)
+  
+  let (inserted2, member2) = s.insert(1020)
+  expectFalse(inserted2)
+  expectEqual(1020, member2)
+}
+
+SetTestSuite.test("SetAlgebra.Insert.MultipleEntries") {
+  var s: Set<Int> = [1010, 1020, 1030]
+  
+  expectFalse(s.contains(1050))
+  
+  let (inserted1, member1) = s.insert(1050)
+  
+  expectTrue(s.contains(1010))
+  expectTrue(s.contains(1050))
+  expectFalse(s.contains(1070))
+  expectTrue(inserted1)
+  expectEqual(1050, member1)
+  
+  let (inserted2, member2) = s.insert(1050)
+  expectFalse(inserted2)
+  expectEqual(1050, member2)
+}
+
+SetTestSuite.test("SetAlgebra.Insert.EmptySet") {
+  var s: Set<Int> = []
+
+  expectFalse(s.contains(1010))
+  
+  let (inserted1, member1) = s.insert(1010)
+  
+  expectTrue(s.contains(1010))
+  expectTrue(inserted1)
+  expectEqual(1010, member1)
+  
+  let (inserted2, member2) = s.insert(1010)
+  expectFalse(inserted2)
+  expectEqual(1010, member2)
+}
+
+// Test intersection()
+
+SetTestSuite.test("SetAlgebra.Intersection.SingleEntry") {
+  do {
+    let s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1010, 1020, 1030]
+  
+    let intersection = s1.intersection(s2)
+    expectTrue(intersection.contains(1010))
+    expectFalse(intersection.contains(1020))
+    expectFalse(intersection.contains(1070))
+  }
+  do {
+    let s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1020, 1030, 1050]
+  
+    let intersection = s1.intersection(s2)
+    expectFalse(intersection.contains(1010))
+    expectFalse(intersection.contains(1020))
+    expectFalse(intersection.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.Intersection.MultipleEntries") {
+  do {
+    let s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1030, 1040, 1050]
+  
+    let intersection = s1.intersection(s2)
+    expectTrue(intersection.contains(1030))
+    expectFalse(intersection.contains(1020))
+    expectFalse(intersection.contains(1070))
+  }
+  do {
+    let s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1040, 1050, 1060]
+  
+    let intersection = s1.intersection(s2)
+    expectFalse(intersection.contains(1030))
+    expectFalse(intersection.contains(1040))
+    expectFalse(intersection.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.Intersection.EmptySet") {
+  let s1: Set<Int> = []
+  let s2: Set<Int> = [1010, 1020, 1030]
+
+  let intersection = s1.intersection(s2)
+  expectFalse(intersection.contains(1030))
+  expectFalse(intersection.contains(1040))
+}
+
+// Test isDisjointUnion(with:)
+
+SetTestSuite.test("SetAlgebra.IsDisjointWith.SingleEntry") {
+  let s1 = Set<Int>([1010])
+  let s2: Set<Int> = [1010, 1020, 1030]
+  let s3: Set<Int> = [1020, 1030]
+
+  expectFalse(s1.isDisjoint(with: s2))
+  expectTrue(s1.isDisjoint(with: s3))
+}
+
+SetTestSuite.test("SetAlgebra.IsDisjointWith.MultipleEntries") {
+  let s1: Set<Int> = [1010, 1020, 1030]
+  let s2: Set<Int> = [1020, 1030]
+  let s3: Set<Int> = [1040, 1050, 1060]
+
+  expectFalse(s1.isDisjoint(with: s2))
+  expectTrue(s1.isDisjoint(with: s3))
+}
+
+SetTestSuite.test("SetAlgebra.IsDisjointWith.EmptySet") {
+  let s1: Set<Int> = []
+  let s2: Set<Int> = [1020, 1030]
+
+  expectTrue(s1.isDisjoint(with: s2))
+}
+
+// Test isSubset(of:)
+
+SetTestSuite.test("SetAlgebra.IsSubsetOf.SingleEntry") {
+  let s1 = Set<Int>([1010])
+  let s2: Set<Int> = [1010, 1020, 1030]
+  let s3: Set<Int> = [1020, 1030]
+
+  expectTrue(s1.isSubset(of: s2))
+  expectFalse(s1.isSubset(of: s3))
+}
+
+SetTestSuite.test("SetAlgebra.IsSubsetOf.MultipleEntries") {
+  let s1: Set<Int> = [1010, 1020]
+  let s2: Set<Int> = [1010, 1020, 1030]
+  let s3: Set<Int> = [1040, 1050, 1060]
+
+  expectTrue(s1.isSubset(of: s2))
+  expectFalse(s1.isSubset(of: s3))
+}
+
+SetTestSuite.test("SetAlgebra.IsSubsetOf.EmptySet") {
+  let s1: Set<Int> = []
+  let s2: Set<Int> = [1020, 1030]
+
+  expectTrue(s1.isSubset(of: s2))
+}
+
+// Test isSuperset(of:)
+
+SetTestSuite.test("SetAlgebra.IsSupersetOf.SingleEntry") {
+  let s1 = Set<Int>([1010])
+  let s2: Set<Int> = [1010]
+  let s3: Set<Int> = [1020, 1030]
+  let s4: Set<Int> = []
+
+  expectTrue(s1.isSuperset(of: s2))
+  expectFalse(s1.isSuperset(of: s3))
+  expectTrue(s1.isSuperset(of: s4))
+}
+
+SetTestSuite.test("SetAlgebra.IsSupersetOf.MultipleEntries") {
+  let s1: Set<Int> = [1010, 1020]
+  let s2: Set<Int> = [1010, 1020]
+  let s3: Set<Int> = [1010]
+  let s4: Set<Int> = [1040, 1050, 1060]
+
+  expectTrue(s1.isSuperset(of: s2))
+  expectTrue(s1.isSuperset(of: s3))
+  expectFalse(s1.isSuperset(of: s4))
+}
+
+SetTestSuite.test("SetAlgebra.IsSupersetOf.EmptySet") {
+  let s1: Set<Int> = []
+  let s2: Set<Int> = [1020, 1030]
+  let s3: Set<Int> = []
+
+  expectFalse(s1.isSuperset(of: s2))
+  expectTrue(s1.isSuperset(of: s3))
+}
+
+// Test remove()
+
+SetTestSuite.test("SetAlgebra.Remove.SingleEntry") {
+  var s = Set<Int>([1010])
+  
+  expectTrue(s.contains(1010))
+  
+  let removed = s.remove(1010)
+
+  expectFalse(s.contains(1010))
+  expectFalse(s.contains(1070))
+  expectEqual(1010, removed)
+}
+
+SetTestSuite.test("SetAlgebra.Remove.MultipleEntries") {
+  var s: Set<Int> = [1010, 1020, 1030]
+  
+  expectTrue(s.contains(1020))
+  
+  let removed = s.remove(1020)
+  
+  expectTrue(s.contains(1010))
+  expectFalse(s.contains(1020))
+  expectFalse(s.contains(1070))
+  expectEqual(1020, removed)
+}
+
+SetTestSuite.test("SetAlgebra.Remove.EmptySet") {
+  var s: Set<Int> = []
+
+  expectFalse(s.contains(1010))
+  
+  let removed = s.remove(1010)
+  
+  expectFalse(s.contains(1010))
+  expectNil(removed)
+}
+
+// Test subtract()
+
+SetTestSuite.test("SetAlgebra.Subtract.SingleEntry") {
+  do {
+    var s = Set<Int>([1010])
+    
+    s.subtract([1010])
+    
+    expectFalse(s.contains(1010))
+  }
+  do {
+    var s = Set<Int>([1010])
+    
+    s.subtract([1020])
+    
+    expectTrue(s.contains(1010))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.Subtract.MultipleEntries") {
+  do {
+    var s: Set<Int> = [1010, 1020, 1030]
+    
+    s.subtract([1010])
+    
+    expectFalse(s.contains(1010))
+    expectTrue(s.contains(1020))
+  }
+  do {
+    var s: Set<Int> = [1010, 1020, 1030]
+    
+    s.subtract([1050])
+    
+    expectTrue(s.contains(1010))
+    expectFalse(s.contains(1050))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.Subtract.EmptySet") {
+  var s: Set<Int> = []
+  
+  s.subtract([1010])
+  
+  expectFalse(s.contains(1010))
+  expectFalse(s.contains(1020))
+}
+
+// Test subtracting()
+
+SetTestSuite.test("SetAlgebra.Subtracting.SingleEntry") {
+  do {
+    let s = Set<Int>([1010])
+    
+    let difference = s.subtracting([1010])
+    
+    expectFalse(difference.contains(1010))
+  }
+  do {
+    let s = Set<Int>([1010])
+    
+    let difference = s.subtracting([1020])
+    
+    expectTrue(difference.contains(1010))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.Subtracting.MultipleEntries") {
+  do {
+    let s: Set<Int> = [1010, 1020, 1030]
+    
+    let difference = s.subtracting([1010])
+    
+    expectFalse(difference.contains(1010))
+    expectTrue(difference.contains(1020))
+  }
+  do {
+    let s: Set<Int> = [1010, 1020, 1030]
+    
+    let difference = s.subtracting([1050])
+    
+    expectTrue(difference.contains(1010))
+    expectFalse(difference.contains(1050))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.Subtracting.EmptySet") {
+  let s: Set<Int> = []
+  
+  let difference = s.subtracting([1010])
+  
+  expectFalse(difference.contains(1010))
+  expectFalse(difference.contains(1020))
+}
+
+// Test symmetricDifference()
+
+SetTestSuite.test("SetAlgebra.SymmetricDifference.SingleEntry") {
+  do {
+    let s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1010, 1020, 1030]
+  
+    let difference = s1.symmetricDifference(s2)
+    expectFalse(difference.contains(1010))
+    expectTrue(difference.contains(1020))
+    expectFalse(difference.contains(1070))
+  }
+  do {
+    let s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1020, 1030, 1050]
+  
+    let difference = s1.symmetricDifference(s2)
+    expectTrue(difference.contains(1010))
+    expectTrue(difference.contains(1020))
+    expectFalse(difference.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.SymmetricDifference.MultipleEntries") {
+  do {
+    let s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1030, 1040, 1050]
+  
+    let difference = s1.symmetricDifference(s2)
+    expectFalse(difference.contains(1030))
+    expectTrue(difference.contains(1020))
+    expectFalse(difference.contains(1070))
+  }
+  do {
+    let s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1040, 1050, 1060]
+  
+    let difference = s1.symmetricDifference(s2)
+    expectTrue(difference.contains(1030))
+    expectTrue(difference.contains(1040))
+    expectFalse(difference.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.SymmetricDifference.EmptySet") {
+  let s1: Set<Int> = []
+  let s2: Set<Int> = [1010, 1020, 1030]
+
+  let difference = s1.symmetricDifference(s2)
+  expectTrue(difference.contains(1030))
+  expectFalse(difference.contains(1040))
+}
+
+// Test union()
+
+SetTestSuite.test("SetAlgebra.Union.SingleEntry") {
+  do {
+    let s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1010, 1020, 1030]
+  
+    let union = s1.union(s2)
+    expectTrue(union.contains(1010))
+    expectTrue(union.contains(1020))
+    expectFalse(union.contains(1070))
+  }
+  do {
+    let s1 = Set<Int>([1010])
+    let s2: Set<Int> = [1020, 1030, 1050]
+  
+    let union = s1.union(s2)
+    expectTrue(union.contains(1010))
+    expectTrue(union.contains(1020))
+    expectFalse(union.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.Union.MultipleEntries") {
+  do {
+    let s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1030, 1040, 1050]
+  
+    let union = s1.union(s2)
+    expectTrue(union.contains(1030))
+    expectTrue(union.contains(1020))
+    expectFalse(union.contains(1070))
+  }
+  do {
+    let s1: Set<Int> = [1010, 1020, 1030]
+    let s2: Set<Int> = [1040, 1050, 1060]
+  
+    let union = s1.union(s2)
+    expectTrue(union.contains(1030))
+    expectTrue(union.contains(1040))
+    expectFalse(union.contains(1070))
+  }
+}
+
+SetTestSuite.test("SetAlgebra.Union.EmptySet") {
+  let s1: Set<Int> = []
+  let s2: Set<Int> = [1010, 1020, 1030]
+
+  let union = s1.union(s2)
+  expectTrue(union.contains(1030))
+  expectFalse(union.contains(1040))
+}
+
+// Test update(with:)
+
+SetTestSuite.test("SetAlgebra.UpdateWith.SingleEntry") {
+  var s = Set<Int>([1010])
+  
+  expectFalse(s.contains(1020))
+  
+  let member1 = s.update(with: 1020)
+
+  expectTrue(s.contains(1010))
+  expectTrue(s.contains(1020))
+  expectFalse(s.contains(1070))
+  expectNil(member1)
+  
+  let member2 = s.update(with: 1020)
+  expectOptionalEqual(1020, member2)
+}
+
+SetTestSuite.test("SetAlgebra.UpdateWith.MultipleEntries") {
+  var s: Set<Int> = [1010, 1020, 1030]
+  
+  expectFalse(s.contains(1050))
+  
+  let member1 = s.update(with: 1050)
+  
+  expectTrue(s.contains(1010))
+  expectTrue(s.contains(1050))
+  expectFalse(s.contains(1070))
+  expectNil(member1)
+  
+  let member2 = s.update(with: 1050)
+  expectOptionalEqual(1050, member2)
+}
+
+SetTestSuite.test("SetAlgebra.UpdateWith.EmptySet") {
+  var s: Set<Int> = []
+
+  expectFalse(s.contains(1010))
+  
+  let member1 = s.update(with: 1010)
+  
+  expectTrue(s.contains(1010))
+  expectNil(member1)
+  
+  let member2 = s.update(with: 1010)
+  expectOptionalEqual(1010, member2)
+}
+
 runAllTests()
