@@ -7029,8 +7029,7 @@ void ClangImporter::Implementation::importAttributes(
 
       StringRef message = avail->getMessage();
 
-      clang::VersionTuple deprecated = avail->getDeprecated();
-
+      const auto &deprecated = avail->getDeprecated();
       if (!deprecated.empty()) {
         if (platformAvailability.deprecatedAsUnavailableFilter &&
             platformAvailability.deprecatedAsUnavailableFilter(
@@ -7042,14 +7041,8 @@ void ClangImporter::Implementation::importAttributes(
         }
       }
 
-      clang::VersionTuple obsoleted = avail->getObsoleted();
-      clang::VersionTuple introduced = avail->getIntroduced();
-
-      // Swift only allows "." separators.
-      obsoleted.UseDotAsSeparator();
-      introduced.UseDotAsSeparator();
-      deprecated.UseDotAsSeparator();
-
+      const auto &obsoleted = avail->getObsoleted();
+      const auto &introduced = avail->getIntroduced();
       const auto &replacement = avail->getReplacement();
 
       StringRef swiftReplacement = "";
