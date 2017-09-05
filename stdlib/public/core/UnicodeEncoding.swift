@@ -44,7 +44,7 @@ public protocol _UnicodeEncoding_ {
   /// A type that can be used to parse `CodeUnits` into
   /// `EncodedScalar`s.
   associatedtype ForwardParser : Unicode.Parser
-  // where ForwardParser.Encoding == Self
+    where ForwardParser.Encoding == Self
   
   /// A type that can be used to parse a reversed sequence of
   /// `CodeUnits` into `EncodedScalar`s.

@@ -378,11 +378,7 @@ public func expectTrapping<Bound>(
 public func expectType<T>(_: T.Type, _ x: inout T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
-public func expectSequenceType<X : Sequence>(_ x: X) -> X
-  where
-  X.SubSequence : Sequence,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.SubSequence == X.SubSequence {
+public func expectSequenceType<X : Sequence>(_ x: X) -> X {
   return x
 }
 
@@ -417,13 +413,7 @@ public func expectSequenceAssociatedTypes<X : Sequence>(
   sequenceType: X.Type,
   iteratorType: X.Iterator.Type,
   subSequenceType: X.SubSequence.Type
-) where
-  // FIXME(ABI)#4 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : Sequence,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#5 (Recursive Protocol Constraints): can't have this constraint now.
-  X.SubSequence.SubSequence == X.SubSequence {}
+) {}
 
 /// Check that all associated types of a `Collection` are what we expect them
 /// to be.

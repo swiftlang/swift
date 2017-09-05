@@ -19,7 +19,7 @@
 @_show_in_interface
 public // @testable
 protocol _SequenceWrapper : Sequence {
-  associatedtype Base : Sequence
+  associatedtype Base : Sequence where Base.Element == Element
   associatedtype Iterator = Base.Iterator
   associatedtype SubSequence = Base.SubSequence
   
@@ -51,7 +51,7 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
   }
 }
 
-extension _SequenceWrapper where Element == Base.Element {
+extension _SequenceWrapper {
   public func map<T>(
     _ transform: (Element) throws -> T
 ) rethrows -> [T] {
@@ -93,10 +93,6 @@ extension _SequenceWrapper where SubSequence == Base.SubSequence {
   public func suffix(_ maxLength: Int) -> SubSequence {
     return _base.suffix(maxLength)
   }
-}
-
-extension _SequenceWrapper
-  where SubSequence == Base.SubSequence, Element == Base.Element {
 
   public func drop(
     while predicate: (Element) throws -> Bool
@@ -110,10 +106,6 @@ extension _SequenceWrapper
     return try _base.prefix(while: predicate)
   }
   
-  public func suffix(_ maxLength: Int) -> SubSequence {
-    return _base.suffix(maxLength)
-  }
-
   public func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
     whereSeparator isSeparator: (Element) throws -> Bool
