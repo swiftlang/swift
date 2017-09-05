@@ -1922,6 +1922,9 @@ extension BinaryInteger where
 
   @_transparent
   public func _word(at n: Int) -> UInt {
+    _precondition(
+      words.startIndex..<words.endIndex ~= numericCast(n),
+      "Index out of range")
     return words[numericCast(n)]
   }
 }
