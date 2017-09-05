@@ -45,6 +45,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/Defer.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
@@ -2393,7 +2394,9 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 }
 
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
-  setValidationStarted();
+  bool notBV = !hasValidationStarted();
+  if (notBV) setIsBeingValidated(true);
+  SWIFT_DEFER { if (notBV) setIsBeingValidated(false); };
 
   // lldb creates global typealiases containing archetypes
   // sometimes...

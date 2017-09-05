@@ -4184,7 +4184,7 @@ public:
       return;
     }
 
-    if (SD->hasInterfaceType() || SD->isBeingValidated())
+    if (SD->hasInterfaceType() || SD->hasValidationStarted())
       return;
 
     SD->setIsBeingValidated();
@@ -5045,7 +5045,7 @@ public:
     TC.checkDeclAttributesEarly(FD);
     TC.computeAccessLevel(FD);
 
-    if (FD->hasInterfaceType() || FD->isBeingValidated())
+    if (FD->hasInterfaceType() || FD->hasValidationStarted())
       return;
 
     FD->setIsBeingValidated();
@@ -6572,7 +6572,7 @@ public:
       checkAccessControl(TC, EED);
       return;
     }
-    if (EED->hasInterfaceType() || EED->isBeingValidated())
+    if (EED->hasValidationStarted())
       return;
     
     TC.checkDeclAttributesEarly(EED);
@@ -6739,7 +6739,7 @@ public:
       checkAccessControl(TC, CD);
       return;
     }
-    if (CD->hasInterfaceType() || CD->isBeingValidated())
+    if (CD->hasInterfaceType() || CD->hasValidationStarted())
       return;
 
     CD->setIsBeingValidated();
@@ -6956,7 +6956,7 @@ public:
 
     if (IsSecondPass ||
         DD->hasInterfaceType() ||
-        DD->isBeingValidated()) {
+        DD->hasValidationStarted()) {
       return;
     }
 
@@ -7249,8 +7249,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Check generic parameters, if needed.
     nominal->setIsBeingValidated();
+    SWIFT_DEFER { nominal->setIsBeingValidated(false); };
+
     validateGenericTypeSignature(nominal);
-    nominal->setIsBeingValidated(false);
 
     checkInheritanceClause(D);
 
@@ -7295,8 +7296,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Validate the generic type signature, which is just <Self : P>.
     proto->setIsBeingValidated();
+    SWIFT_DEFER { proto->setIsBeingValidated(false); };
+
     validateGenericTypeSignature(proto);
-    proto->setIsBeingValidated(false);
 
     // See the comment in validateDeclForNameLookup(); we may have validated
     // the alias before we built the protocol's generic environment.
@@ -7368,7 +7370,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
         recordSelfContextType(cast<AbstractFunctionDecl>(VD->getDeclContext()));
       } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
-        if (PBD->isBeingValidated()) {
+        if (PBD->hasValidationStarted()) {
           diagnose(VD, diag::pattern_used_in_type, VD->getName());
 
         } else {
@@ -7577,7 +7579,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         ProtocolRequirementTypeResolver resolver;
         TypeResolutionOptions options;
 
-        if (typealias->isBeingValidated()) return;
+        if (typealias->hasValidationStarted()) return;
 
         typealias->setIsBeingValidated();
         SWIFT_DEFER { typealias->setIsBeingValidated(false); };
