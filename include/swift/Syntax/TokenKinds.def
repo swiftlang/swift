@@ -287,6 +287,8 @@ MISC(dollarident)
 MISC(sil_local_name)       // %42 in SIL mode.
 MISC(comment)
 
+MISC(string_interpolation_anchor)
+
 #undef KEYWORD
 #undef SWIFT_KEYWORD
 #undef DECL_KEYWORD

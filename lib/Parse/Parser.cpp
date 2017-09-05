@@ -291,6 +291,67 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                    : CommentRetentionMode::None)), SF, SIL, PersistentState){
 }
 
+namespace {
+  class TokenRecorder: public ConsumeTokenReceiver {
+    static bool tokComp(const Token &A, const Token &B) {
+      return A.getLoc().getOpaquePointerValue() <
+             B.getLoc().getOpaquePointerValue();
+    }
+    ASTContext &Ctx;
+    SourceManager &SM;
+    std::vector<Token> &Bag;
+    unsigned BufferID;
+    llvm::DenseMap<const void*, tok> TokenKindChangeMap;
+  public:
+    TokenRecorder(SourceFile &SF):
+      Ctx(SF.getASTContext()),
+      SM(SF.getASTContext().SourceMgr),
+      Bag(SF.getTokenVector()),
+      BufferID(SF.getBufferID().getValue()) {};
+
+    void registerTokenKindChange(SourceLoc Loc, tok NewKind) override {
+      TokenKindChangeMap[Loc.getOpaquePointerValue()] = NewKind;
+    }
+
+    void receive(Token Tok) override {
+
+      // If a token with the same location is already in the bag, skip this token.
+      auto Pos = std::lower_bound(Bag.begin(), Bag.end(), Tok, tokComp);
+      if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
+          Tok.getLoc().getOpaquePointerValue()) {
+        return;
+      }
+
+      // Update Token kind if necessary.
+      auto Found = TokenKindChangeMap.find(Tok.getLoc().
+                                           getOpaquePointerValue());
+      if (Found != TokenKindChangeMap.end()) {
+        Tok.setKind(Found->getSecond());
+      }
+
+      llvm::SmallVector<Token, 4> TokensToConsume;
+      if (Tok.hasComment()) {
+        CharSourceRange CommentRange = Tok.getCommentRange();
+        Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+                CommentRetentionMode::ReturnAsTokens,
+                TriviaRetentionMode::WithoutTrivia,
+                SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
+                SM.getLocOffsetInBuffer(CommentRange.getEnd(), BufferID));
+        while(true) {
+          Token Result;
+          L.lex(Result);
+          if (Result.is(tok::eof))
+            break;
+          assert(Result.is(tok::comment));
+          TokensToConsume.push_back(Result);
+        }
+      }
+      TokensToConsume.push_back(Tok);
+      Bag.insert(Pos, TokensToConsume.begin(), TokensToConsume.end());
+    }
+  };
+}
+
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState)
@@ -300,7 +361,10 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     L(Lex.release()),
     SIL(SIL),
     CurDeclContext(&SF),
-    Context(SF.getASTContext()) {
+    Context(SF.getASTContext()),
+    TokReceiver(SF.shouldKeepTokens() ?
+                new TokenRecorder(SF) :
+                new ConsumeTokenReceiver())  {
 
   State = PersistentState;
   if (!State) {
@@ -323,23 +387,32 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 
 Parser::~Parser() {
   delete L;
+  delete TokReceiver;
 }
 
 const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
 
-SourceLoc Parser::consumeToken() {
+SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
   SourceLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
 
   if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
     SF.recordInterfaceToken(Tok.getText());
   }
-
   L->lex(Tok);
   PreviousLoc = Loc;
   return Loc;
+}
+
+void Parser::consumeExtraToken(Token Extra) {
+  TokReceiver->receive(Extra);
+}
+
+SourceLoc Parser::consumeToken() {
+  TokReceiver->receive(Tok);
+  return consumeTokenWithoutFeedingReceiver();
 }
 
 SourceLoc Parser::getEndOfPreviousLoc() {
@@ -766,7 +839,8 @@ struct ParserUnit::Implementation {
       SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
-            SourceFile::ImplicitModuleImportKind::None)) {
+            SourceFile::ImplicitModuleImportKind::None,
+            Opts.KeepTokensInSourceFile)) {
   }
 };
 

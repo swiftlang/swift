@@ -1788,28 +1788,48 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
 ParserResult<Expr> Parser::parseExprStringLiteral() {
   SmallVector<Lexer::StringSegment, 1> Segments;
   L->getStringLiteralSegments(Tok, Segments);
-  SourceLoc Loc = consumeToken();
-    
+
+  Token EntireTok = Tok;
+
+  // The start location of the entire string literal.
+  SourceLoc Loc = Tok.getLoc();
+
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
       Segments.front().Kind == Lexer::StringSegment::Literal) {
+    consumeToken();
     return makeParserResult(
         createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
   }
 
+  consumeTokenWithoutFeedingReceiver();
   ParserStatus Status;
   SmallVector<Expr*, 4> Exprs;
   bool First = true;
   for (auto Segment : Segments) {
     switch (Segment.Kind) {
     case Lexer::StringSegment::Literal: {
+
+      // The end location of the entire string literal.
+      SourceLoc EndLoc = EntireTok.getLoc().getAdvancedLoc(EntireTok.getLength());
+
       auto TokenLoc = First ? Loc : Segment.Loc;
       Exprs.push_back(
           createStringLiteralExprFromSegment(Context, L, Segment, TokenLoc));
-
       // Since the string is already parsed, Tok already points to the first
       // token after the whole string, but PreviousLoc is not exactly correct.
       PreviousLoc = TokenLoc;
+      SourceLoc TokEnd = Segment.IsLastSegment ? EndLoc : Segment.getEndLoc();
+      unsigned CommentLength = 0;
+
+      // First segment shall inherit the attached comments.
+      if (First && EntireTok.hasComment()) {
+        CommentLength = SourceMgr.getByteDistance(EntireTok.getCommentRange().
+          getStart(), TokenLoc);
+      }
+      consumeExtraToken(Token(tok::string_literal,
+                              CharSourceRange(SourceMgr, TokenLoc, TokEnd).str(),
+                              CommentLength));
       break;
     }
         
@@ -1835,9 +1855,10 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       // We might be at tok::eof now, so ensure that consumeToken() does not
       // assert about lexing past eof.
       Tok.setKind(tok::unknown);
-      consumeToken();
+      consumeTokenWithoutFeedingReceiver();
       assert(Tok.is(tok::l_paren));
-      
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::string_interpolation_anchor);
       ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
       Status |= E;
       if (E.isNonNull()) {
@@ -1845,6 +1866,9 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
         if (!Tok.is(tok::eof)) {
           diagnose(Tok, diag::string_interpolation_extra);
+        } else if (Tok.getText() == ")") {
+          Tok.setKind(tok::string_interpolation_anchor);
+          consumeToken();
         }
       }
       break;
@@ -2121,7 +2145,7 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
       // Temporarily swap out the parser's current lexer with our new one.
       llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
       Tok.setKind(tok::unknown); // we might be at tok::eof now.
-      consumeToken();
+      consumeTokenWithoutFeedingReceiver();
       return parseType().getPtrOrNull();
     };
 

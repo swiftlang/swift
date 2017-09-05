@@ -411,6 +411,10 @@ public:
       Result.IndentToStrip = 0;
       return Result;
     }
+
+    SourceLoc getEndLoc() {
+      return Loc.getAdvancedLoc(Length);
+    }
   };
   
   /// \brief Compute the bytes that the actual string literal should codegen to.

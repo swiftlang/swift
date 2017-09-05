@@ -788,7 +788,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
 
   CompilerInvocation Invocation;
   Opts.applyTo(Invocation);
-
+  Invocation.getLangOptions().KeepTokensInSourceFile = true;
   for (auto &Content : Contents)
     Invocation.addInputBuffer(Content.Buffer.get());
 

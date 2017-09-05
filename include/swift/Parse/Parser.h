@@ -71,6 +71,13 @@ namespace swift {
     ActiveConditionalBlock,
   };
 
+class ConsumeTokenReceiver {
+public:
+  virtual void receive(Token Tok) {}
+  virtual void registerTokenKindChange(SourceLoc Loc, tok NewKind) {};
+  virtual ~ConsumeTokenReceiver() = default;
+};
+
 /// The main class used for parsing a source file (.swift or .sil).
 ///
 /// Rather than instantiating a Parser yourself, use one of the parsing APIs
@@ -173,6 +180,8 @@ public:
 
   /// \brief This is the current token being considered by the parser.
   Token Tok;
+
+  ConsumeTokenReceiver *TokReceiver;
 
   /// \brief The location of the previous token.
   SourceLoc PreviousLoc;
@@ -356,7 +365,7 @@ public:
     // We might be at tok::eof now, so ensure that consumeToken() does not
     // assert about lexing past eof.
     Tok.setKind(tok::unknown);
-    consumeToken();
+    consumeTokenWithoutFeedingReceiver();
 
     PreviousLoc = PP.PreviousLoc;
   }
@@ -369,7 +378,7 @@ public:
     // We might be at tok::eof now, so ensure that consumeToken() does not
     // assert about lexing past eof.
     Tok.setKind(tok::unknown);
-    consumeToken();
+    consumeTokenWithoutFeedingReceiver();
 
     PreviousLoc = PP.PreviousLoc;
   }
@@ -421,6 +430,8 @@ public:
   /// \brief Return the next token that will be installed by \c consumeToken.
   const Token &peekToken();
 
+  void consumeExtraToken(Token K);
+  SourceLoc consumeTokenWithoutFeedingReceiver();
   SourceLoc consumeToken();
   SourceLoc consumeToken(tok K) {
     assert(Tok.is(K) && "Consuming wrong token kind");

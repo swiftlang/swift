@@ -1326,9 +1326,12 @@ static void performAutoImport(SourceFile &SF,
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       ImplicitModuleImportKind ModImpKind)
+                       ImplicitModuleImportKind ModImpKind,
+                       bool KeepTokens)
   : FileUnit(FileUnitKind::Source, M),
-    BufferID(bufferID ? *bufferID : -1), Kind(K) {
+    BufferID(bufferID ? *bufferID : -1),
+    Kind(K),
+    EnabledAndAllCorrectedTokens(KeepTokens, std::vector<Token>()) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 

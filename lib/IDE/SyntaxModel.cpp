@@ -51,12 +51,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   : Impl(*new Implementation(SrcFile)) {
   const bool IsPlayground = Impl.LangOpts.Playground;
   const SourceManager &SM = Impl.SrcMgr;
-  std::vector<Token> Tokens = swift::tokenize(Impl.LangOpts, SM,
-                                              *Impl.SrcFile.getBufferID(),
-                                              /*Offset=*/0,
-                                              /*EndOffset=*/0,
-                                              /*KeepComments=*/true,
-                                           /*TokenizeInterpolatedString=*/true);
+  ArrayRef<Token> Tokens = SrcFile.getAllTokens();
   std::vector<SyntaxNode> Nodes;
   SourceLoc AttrLoc;
   SourceLoc UnaryMinusLoc;
@@ -188,31 +183,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         AttrLoc = Tok.getLoc();
         continue;
 
-      case tok::l_paren: {
-        // Check if this is a string interpolation paren.
-        if (I == 0)
-          continue;
-        auto &PrevTok = Tokens[I-1];
-        if (PrevTok.getKind() != tok::string_literal)
-          continue;
-        StringRef StrText = PrevTok.getText();
-        if (StrText.size() > 1 && StrText.back() == '\"' &&
-            !StrText.endswith("\\\""))
-          continue;
-        Kind = SyntaxNodeKind::StringInterpolationAnchor;
-        break;
-      }
-
-      case tok::r_paren: {
-        // Check if this is a string interpolation paren.
-        if (I+1 == E)
-          continue;
-        auto &NextTok = Tokens[I+1];
-        if (NextTok.getKind() != tok::string_literal)
-          continue;
-        StringRef StrText = NextTok.getText();
-        if (StrText.size() > 1 && StrText.front() == '\"')
-          continue;
+      case tok::string_interpolation_anchor: {
         Kind = SyntaxNodeKind::StringInterpolationAnchor;
         break;
       }
