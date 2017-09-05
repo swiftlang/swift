@@ -4299,6 +4299,14 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     if (!assocType->hasValidationStarted())
       TC.validateDecl(assocType);
+
+    auto *proto = assocType->getProtocol();
+    if (proto->isObjC()) {
+      TC.diagnose(assocType->getLoc(),
+                  diag::associated_type_objc,
+                  assocType->getName(),
+                  proto->getName());
+    }
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {

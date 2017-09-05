@@ -1749,6 +1749,10 @@ WARNING(associated_type_override_typealias,none,
         "associated type %0 is redundant with type %0 declared in inherited "
         "%1 %2", (DeclName, DescriptiveDeclKind, Type))
 
+ERROR(associated_type_objc,none,
+      "associated type %0 cannot be declared inside '@objc' protocol %1",
+      (DeclName, DeclName))
+
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
