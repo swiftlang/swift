@@ -28,7 +28,6 @@ typealias Any2 = protocol< > // expected-error {{'protocol<>' syntax has been re
 // Okay to inherit a typealias for Any type.
 protocol P5 : Any { }
 protocol P6 : protocol<> { } // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}}
-                             // expected-error@-1 {{protocol-constrained type is neither allowed nor needed here}}
 typealias P7 = Any & Any1
 
 extension Int : P5 { }
@@ -153,9 +152,9 @@ typealias T07 = P1 & protocol<P2, P3> // expected-error {{protocol<...>' composi
 func fT07(x: T07) -> P1 & P2 & P3 { return x } // OK, 'P1 & protocol<P2, P3>' is parsed as 'P1 & P2 & P3'.
 let _: P1 & P2 & P3 -> P1 & P2 & P3 = fT07 // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{20-20=)}}
 
-struct S01: P5 & P6 {} // expected-error {{protocol-constrained type is neither allowed nor needed here}} {{none}}
+struct S01: P5 & P6 {}
 struct S02: P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
-struct S03: Optional<P5> & P6 {} // expected-error {{inheritance from non-protocol type 'Optional<P5>'}} expected-error {{protocol-constrained type is neither allowed nor needed here}}
+struct S03: Optional<P5> & P6 {} // expected-error {{non-protocol, non-class type 'Optional<P5>' cannot be used within a protocol-constrained type}}
 struct S04<T : P5 & (P6)> {} // expected-error {{inheritance from non-named type '(P6)'}}
 struct S05<T> where T : P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
 

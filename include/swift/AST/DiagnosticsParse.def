@@ -747,8 +747,6 @@ ERROR(tuple_type_multiple_labels,none,
 // Protocol Types
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol-constrained type", ())
-ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
-      "protocol-constrained type is neither allowed nor needed here", ())
 
 WARNING(swift3_deprecated_protocol_composition,none,
         "'protocol<...>' composition syntax is deprecated; join the protocols using '&'", ())

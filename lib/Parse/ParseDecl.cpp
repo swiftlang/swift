@@ -2705,43 +2705,10 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       continue;
     }
 
-    bool usesDeprecatedCompositionSyntax =
-      Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
-    bool isAny = Tok.is(tok::kw_Any); // We allow (redundant) inheritance from Any
-
     auto ParsedTypeResult = parseTypeForInheritance(
         diag::expected_identifier_for_type,
         diag::expected_ident_type_in_inheritance);
     Status |= ParsedTypeResult;
-
-    // Recover and emit nice diagnostic for composition.
-    if (auto Composition = dyn_cast_or_null<CompositionTypeRepr>(
-          ParsedTypeResult.getPtrOrNull())) {
-      // Record the protocols inside the composition.
-      Inherited.append(Composition->getTypes().begin(),
-                       Composition->getTypes().end());
-      // We can inherit from Any
-      if (!isAny) {
-        if (usesDeprecatedCompositionSyntax) {
-          // Provide fixits to remove the composition, leaving the types intact.
-          auto compositionRange = Composition->getCompositionRange();
-          auto token = Lexer::getTokenAtLocation(SourceMgr, compositionRange.End);
-          diagnose(Composition->getSourceLoc(),
-                   diag::disallowed_protocol_composition)
-            .highlight({Composition->getStartLoc(), compositionRange.End})
-            .fixItRemove({Composition->getSourceLoc(), compositionRange.Start})
-            .fixItRemove(startsWithGreater(token)
-                         ? compositionRange.End
-                         : SourceLoc());
-        } else {
-          diagnose(Composition->getStartLoc(),
-                   diag::disallowed_protocol_composition)
-            .highlight(Composition->getSourceRange());
-          // TODO: Decompose 'A & B & C' list to 'A, B, C'
-        }
-      }
-      continue;
-    }
 
     // Record the type if its a single type.
     if (ParsedTypeResult.isNonNull())
