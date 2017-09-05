@@ -73,19 +73,27 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 #if SWIFT_OBJC_INTEROP
   if (!isObjCTaggedPointer(object))
     return _swift_getClassOfAllocated(object);
-  return reinterpret_cast<const ClassMetadata*>(object_getClass((id) object));
+  return reinterpret_cast<const ClassMetadata*>(
+    object_getClass(id_const_cast(object)));
 #else
   return _swift_getClassOfAllocated(object);
 #endif
 }
 
 #if SWIFT_OBJC_INTEROP
+
 /// \brief Replacement for ObjC object_isClass(), which is unavailable on
 /// deployment targets macOS 10.9 and iOS 7.
 static bool objcObjectIsClass(id object) {
   // same as object_isClass(object)
   return class_isMetaClass(object_getClass(object));
 }
+
+/// Same as _swift_getClassOfAllocated() but returns type Class.
+static Class _swift_getObjCClassOfAllocated(const void *object) {
+  return class_const_cast(_swift_getClassOfAllocated(object));
+}
+
 #endif
 
 /// \brief Fetch the type metadata associated with the formal dynamic
@@ -194,21 +202,22 @@ static NSString *_getClassDescription(Class cls) {
   return self;
 }
 - (Class)class {
-  return (Class) _swift_getClassOfAllocated(self);
+  return _swift_getObjCClassOfAllocated(self);
 }
 + (Class)superclass {
-  return (Class) _swift_getSuperclass((const ClassMetadata*) self);
+  return class_const_cast(_swift_getSuperclass((const ClassMetadata*) self));
 }
 - (Class)superclass {
-  return (Class) _swift_getSuperclass(_swift_getClassOfAllocated(self));
+  return
+    class_const_cast(_swift_getSuperclass(_swift_getClassOfAllocated(self)));
 }
 
 + (BOOL)isMemberOfClass:(Class)cls {
-  return cls == (Class) _swift_getClassOfAllocated(self);
+  return cls ==  _swift_getObjCClassOfAllocated(self);
 }
 
 - (BOOL)isMemberOfClass:(Class)cls {
-  return cls == (Class) _swift_getClassOfAllocated(self);
+  return cls == _swift_getObjCClassOfAllocated(self);
 }
 
 - (instancetype)self {
@@ -224,7 +233,7 @@ static NSString *_getClassDescription(Class cls) {
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
-  Class cls = (Class) _swift_getClassOfAllocated(self);
+  Class cls = _swift_getObjCClassOfAllocated(self);
   fatalError(/* flags = */ 0,
              "Unrecognized selector %c[%s %s]\n",
              class_isMetaClass(cls) ? '+' : '-',
@@ -309,12 +318,12 @@ static NSString *_getClassDescription(Class cls) {
 
 + (BOOL)respondsToSelector:(SEL)sel {
   if (!sel) return NO;
-  return class_respondsToSelector((Class) _swift_getClassOfAllocated(self), sel);
+  return class_respondsToSelector(_swift_getObjCClassOfAllocated(self), sel);
 }
 
 - (BOOL)respondsToSelector:(SEL)sel {
   if (!sel) return NO;
-  return class_respondsToSelector((Class) _swift_getClassOfAllocated(self), sel);
+  return class_respondsToSelector(_swift_getObjCClassOfAllocated(self), sel);
 }
 
 + (BOOL)instancesRespondToSelector:(SEL)sel {
@@ -338,7 +347,7 @@ static NSString *_getClassDescription(Class cls) {
 
 - (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
-  auto selfClass = (Class) _swift_getClassOfAllocated(self);
+  auto selfClass = _swift_getObjCClassOfAllocated(self);
 
   // Walk the superclass chain.
   while (selfClass) {
@@ -1050,7 +1059,7 @@ swift::swift_dynamicCastObjCClass(const void *object,
   if (object == nullptr)
     return nullptr;
 
-  if ([(id)object isKindOfClass:(Class)targetType]) {
+  if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
   }
 
@@ -1064,11 +1073,11 @@ swift::swift_dynamicCastObjCClassUnconditional(const void *object,
   if (object == nullptr)
     return nullptr;
 
-  if ([(id)object isKindOfClass:(Class)targetType]) {
+  if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
   }
 
-  Class sourceType = object_getClass((id)object);
+  Class sourceType = object_getClass(id_const_cast(object));
   swift_dynamicCastFailure(reinterpret_cast<const Metadata *>(sourceType),
                            targetType);
 }
@@ -1090,13 +1099,15 @@ swift::swift_dynamicCastForeignClassUnconditional(
 
 bool swift::objectConformsToObjCProtocol(const void *theObject,
                                          const ProtocolDescriptor *protocol) {
-  return [((id) theObject) conformsToProtocol: (Protocol*) protocol];
+  return [id_const_cast(theObject)
+          conformsToProtocol: protocol_const_cast(protocol)];
 }
 
 
 bool swift::classConformsToObjCProtocol(const void *theClass,
                                         const ProtocolDescriptor *protocol) {
-  return [((Class) theClass) conformsToProtocol: (Protocol*) protocol];
+  return [class_const_cast(theClass)
+          conformsToProtocol: protocol_const_cast(protocol)];
 }
 
 SWIFT_RUNTIME_EXPORT
@@ -1108,13 +1119,10 @@ const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
 
   switch (type->getKind()) {
   case MetadataKind::Class:
-    // Native class metadata is also the class object.
-    classObject = (Class)type;
-    break;
   case MetadataKind::ObjCClassWrapper:
-    // Unwrap to get the class object.
-    classObject = (Class)static_cast<const ObjCClassWrapperMetadata *>(type)
-      ->Class;
+    // Native class metadata is also the class object.
+    // ObjC class wrappers get unwrapped.
+    classObject = type->getObjCClassObject();
     break;
 
   // Other kinds of type can never conform to ObjC protocols.
@@ -1157,13 +1165,10 @@ const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
 
   switch (type->getKind()) {
   case MetadataKind::Class:
-    // Native class metadata is also the class object.
-    classObject = (Class)type;
-    break;
   case MetadataKind::ObjCClassWrapper:
-    // Unwrap to get the class object.
-    classObject = (Class)static_cast<const ObjCClassWrapperMetadata *>(type)
-      ->Class;
+    // Native class metadata is also the class object.
+    // ObjC class wrappers get unwrapped.
+    classObject = type->getObjCClassObject();
     break;
 
   // Other kinds of type can never conform to ObjC protocols.
@@ -1227,7 +1232,7 @@ void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
   static const objc_image_info ImageInfo = {0, 0};
 
   // Ensure the superclass is realized.
-  Class c = (Class) _c;
+  Class c = class_const_cast(_c);
   [class_getSuperclass(c) class];
 
   // Register the class.
@@ -1249,7 +1254,7 @@ Class swift_getInitializedObjCClass(Class c)
 const ClassMetadata *
 swift::swift_dynamicCastObjCClassMetatype(const ClassMetadata *source,
                                           const ClassMetadata *dest) {
-  if ([(Class)source isSubclassOfClass:(Class)dest])
+  if ([class_const_cast(source) isSubclassOfClass:class_const_cast(dest)])
     return source;
   return nil;
 }
@@ -1258,7 +1263,7 @@ const ClassMetadata *
 swift::swift_dynamicCastObjCClassMetatypeUnconditional(
                                                    const ClassMetadata *source,
                                                    const ClassMetadata *dest) {
-  if ([(Class)source isSubclassOfClass:(Class)dest])
+  if ([class_const_cast(source) isSubclassOfClass:class_const_cast(dest)])
     return source;
 
   swift_dynamicCastFailure(source, dest);
@@ -1313,7 +1318,8 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
 #if SWIFT_OBJC_INTEROP
     usesNativeSwiftReferenceCounting_nonNull(object) &&
 #endif
-    SWIFT_RT_ENTRY_CALL(swift_isUniquelyReferenced_nonNull_native)((HeapObject*)object);
+    SWIFT_RT_ENTRY_CALL(swift_isUniquelyReferenced_nonNull_native)(
+      (const HeapObject*)object);
 }
 
 // Given an object reference, return true iff it is non-nil and refers
@@ -1429,7 +1435,7 @@ ClassExtents::Return
 swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
   // Pure ObjC classes never have negative extents.
   if (c->isPureObjC())
-    return ClassExtents{0, class_getInstanceSize((Class)c)};
+    return ClassExtents{0, class_getInstanceSize(class_const_cast(c))};
 
   return swift_class_getInstanceExtents(c);
 }

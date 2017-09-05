@@ -1520,7 +1520,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
   // superclass.
   auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
   auto theSuperMetaclass
-    = (const ClassMetadata *)object_getClass((id)theSuperclass);
+    = (const ClassMetadata *)object_getClass(id_const_cast(theSuperclass));
   theMetaclass->SuperClass = theSuperMetaclass;
 #endif
 

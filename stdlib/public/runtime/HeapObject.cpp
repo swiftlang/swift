@@ -681,7 +681,7 @@ void swift_deallocPartialClassInstance(HeapObject *object,
     if (classMetadata->isPureObjC()) {
       // Set the class to the pure Objective-C superclass, so that when dealloc
       // runs, it starts at that superclass.
-      object_setClass((id)object, (Class)classMetadata);
+      object_setClass((id)object, class_const_cast(classMetadata));
 
       // Release the object.
       objc_release((id)object);
@@ -706,7 +706,7 @@ void swift_deallocPartialClassInstance(HeapObject *object,
 
     // Set the class to the pure Objective-C superclass, so that when dealloc
     // runs, it starts at that superclass.
-    object_setClass((id)object, (Class)classMetadata);
+    object_setClass((id)object, class_const_cast(classMetadata));
 
     // Release the object.
     objc_release((id)object);

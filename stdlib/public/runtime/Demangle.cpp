@@ -129,7 +129,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
-    const char *className = class_getName((Class)objcWrapper->Class);
+    const char *className = class_getName(objcWrapper->getObjCClassObject());
     
     // ObjC classes mangle as being in the magic "__ObjC" module.
     auto module = Dem.createNode(Node::Kind::Module, "__ObjC");
