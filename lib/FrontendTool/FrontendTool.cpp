@@ -73,6 +73,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Target/TargetMachine.h"
@@ -1229,8 +1230,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                          DiagnosticInfo());
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
                          {}, DiagnosticInfo());
-    if (shouldCrash)
+    if (shouldCrash) {
+#ifndef NDEBUG
+      llvm::sys::RunSignalHandlers();
+#endif
       abort();
+    }
   };
   llvm::ScopedFatalErrorHandler handler([](void *rawCallback,
                                            const std::string &reason,
