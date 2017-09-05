@@ -136,6 +136,8 @@ struct MapRegionCounters : public ASTWalker {
 
     } else if (auto *US = dyn_cast<GuardStmt>(S)) {
       CounterMap[US->getBody()] = NextCounter++;
+      // Map the guard statement to the parent's counter.
+      CounterMap[US] = getParentCounter();
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       CounterMap[WS->getBody()] = NextCounter++;
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
