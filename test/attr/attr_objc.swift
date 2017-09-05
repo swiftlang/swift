@@ -204,7 +204,7 @@ enum subject_enum: Int {
   case subject_enumElement2
 
   @objc(subject_enumElement3)
-  case subject_enumElement3, subject_enumElement4 // expected-error {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}{{3-8=}}
+  case subject_enumElement3, subject_enumElement4 // expected-error {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}{{3-30=}}
 
   @objc   // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement5, subject_enumElement6
@@ -221,7 +221,7 @@ enum subject_enum: Int {
 
 enum subject_enum2 {
   @objc(subject_enum2Element1)
-  case subject_enumElement1 // expected-error{{'@objc' enum case is not allowed outside of an '@objc' enum}}{{3-8=}}
+  case subject_enumElement1 // expected-error{{'@objc' enum case is not allowed outside of an '@objc' enum}}{{3-31=}}
 }
 
 @objc
@@ -1839,7 +1839,7 @@ class BadClass2 {
   }
 
   var prop3: Int {
-    @objc(setProperty:) didSet { } // expected-error{{observing accessors are not allowed to be marked @objc}} {{5-10=}}
+    @objc(setProperty:) didSet { } // expected-error{{observing accessors are not allowed to be marked @objc}} {{5-25=}}
   }
 
   @objc

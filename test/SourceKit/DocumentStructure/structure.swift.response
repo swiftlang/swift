@@ -1000,7 +1000,7 @@
       key.attributes: [
         {
           key.offset: 1474,
-          key.length: 5,
+          key.length: 11,
           key.attribute: source.decl.attribute.objc.name
         }
       ],
@@ -1025,7 +1025,7 @@
           key.attributes: [
             {
               key.offset: 1524,
-              key.length: 5,
+              key.length: 10,
               key.attribute: source.decl.attribute.objc.name
             }
           ]
