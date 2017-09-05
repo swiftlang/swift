@@ -450,14 +450,10 @@ internal class _AnyRandomAccessCollectionBox<Element>
 @_fixed_layout
 @_versioned
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
+// FIXME(ABI) (Revert Where Clauses): apply all this only to Sequence:
+%  if Kind != 'Sequence':
   where
   S.SubSequence : ${Kind},
-// FIXME(ABI) (Revert Where Clauses): apply all this only to Sequence:
-%  if Kind == 'Sequence':
-  S.SubSequence.Element == S.Element,
-  S.SubSequence.SubSequence == S.SubSequence
-// FIXME(ABI) (Revert Where Clauses): remove this else clause:
-%  else:
   S.SubSequence.Indices : ${Kind},
   S.Indices : ${Kind}
 %  end
@@ -764,10 +760,7 @@ public struct AnySequence<Element> : Sequence {
   @_inlineable
   public init<S : Sequence>(_ base: S)
     where
-    S.Element == Element,
-    S.SubSequence : Sequence,
-    S.SubSequence.Element == Element,
-    S.SubSequence.SubSequence == S.SubSequence {
+    S.Element == Element {
     self._box = _SequenceBox(_base: base)
   }
 
