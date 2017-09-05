@@ -101,7 +101,7 @@ extension P {
   static func f() {}
 
   func g() {
-    f()   // expected-error {{static member 'f' cannot be used on instance of type 'Self'}} {{12-12=Self.}}
+    f() // expected-error {{static member 'f' cannot be used on instance of type 'Self'}} {{5-5=Self.}}
   }
 }
 
