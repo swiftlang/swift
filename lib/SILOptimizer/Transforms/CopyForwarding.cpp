@@ -535,8 +535,6 @@ propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
   assert(CopyInst->isTakeOfSrc() || hoistingDestroy);
   if (auto *srcCopy = findCopyIntoDeadTemp(CopyInst)) {
     if (forwardDeadTempCopy(srcCopy, CopyInst)) {
-      DEBUG(llvm::dbgs() << "  Temp Copy:" << *srcCopy
-            << "         to " << *CopyInst);
       HasChanged = true;
       ++NumDeadTemp;
       return true;
@@ -648,6 +646,9 @@ CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(CopyAddrInst *destCopy) {
 ///   attempts to destroy this uninitialized value.
 bool CopyForwarding::
 forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy) {
+  DEBUG(llvm::dbgs() << "  Temp Copy:" << *srcCopy
+        << "         to " << *destCopy);
+
   assert(srcCopy->getDest() == destCopy->getSrc());
   
   // This pattern can be trivially folded without affecting %temp destroys:

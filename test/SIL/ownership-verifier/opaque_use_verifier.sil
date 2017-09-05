@@ -58,7 +58,7 @@ bb0(%0 : @guaranteed $T):
   return %4 : $T
 }
 
-public protocol AnyObject : class {}
+typealias AnyObject = Builtin.AnyObject
 
 sil @takeType : $@convention(thin) (@thick AnyObject.Type) -> () {
 bb0(%0 : @trivial $@thick AnyObject.Type):

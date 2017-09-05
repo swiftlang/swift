@@ -905,9 +905,8 @@ SILGenFunction::emitOpenExistential(
                                    loweredOpenedType));
     } else {
       assert(!silConv.useLoweredAddresses());
-      archetypeMV = ManagedValue::forUnmanaged(
-        B.createOpenExistentialBoxValue(loc, existentialValue.getValue(),
-                                        loweredOpenedType));
+      archetypeMV = getBuilder().createOpenExistentialBoxValue(
+        loc, existentialValue, loweredOpenedType);
     }
     // NB: Don't forward the cleanup, because consuming a boxed value won't
     // consume the box reference.
