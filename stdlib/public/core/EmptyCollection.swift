@@ -148,13 +148,3 @@ extension EmptyCollection : Equatable {
     return true
   }
 }
-
-@available(*, unavailable, renamed: "EmptyIterator")
-public struct EmptyGenerator<Element> {}
-
-extension EmptyIterator {
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> EmptyIterator<Element> {
-    Builtin.unreachable()
-  }
-}

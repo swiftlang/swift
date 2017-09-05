@@ -1234,12 +1234,12 @@ bb0(%0 : $Array<X>):
 // CHECK-NEXT:   Con %1.1 Esc: G, Succ:
 // CHECK-NEXT:   Val %3 Esc: %4, Succ:
 // CHECK-NEXT: End
-sil @arraysemantics_withUnsafeMutableBufferPointer : $@convention(thin) (@inout Array<X>, @owned @callee_owned (@inout X) -> (@out (), @error ErrorType)) -> () {
-bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error ErrorType)):
+sil @arraysemantics_withUnsafeMutableBufferPointer : $@convention(thin) (@inout Array<X>, @owned @callee_owned (@inout X) -> (@out (), @error Error)) -> () {
+bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error Error)):
 
-  %2 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
+  %2 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error Error), @inout Array<X>) -> (@out (), @error Error)
   %3 = alloc_stack $()
-  %4 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
+  %4 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error Error), @inout Array<X>) -> (@out (), @error Error)
   dealloc_stack %3 : $*()
 
   %r = tuple()
@@ -1268,7 +1268,7 @@ bb0(%0 : $X):
   return %5 : $Array<X>
 }
 
-sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
+sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error Error), @inout Array<X>) -> (@out (), @error Error)
 sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
 sil [_semantics "array.check_index"] @check_index : $@convention(method) (Int32, @guaranteed Array<X>) -> ()
@@ -1278,8 +1278,8 @@ sil [_semantics "array.get_element_address"] @get_element_address : $@convention
 sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed Array<X>) -> Int32
 sil [_semantics "array.get_capacity"] @get_capacity : $@convention(method) (@guaranteed Array<X>) -> Int32
 
-sil [_semantics "pair_no_escaping_closure"] @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
-sil [_semantics "self_no_escaping_closure"] @unsafeWithNotEscapedSelfPointer: $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+sil [_semantics "pair_no_escaping_closure"] @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
+sil [_semantics "self_no_escaping_closure"] @unsafeWithNotEscapedSelfPointer: $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
 sil [_semantics "array.uninitialized"] @createUninitialized : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
 
 // A simplified version of swift_bufferAllocate
@@ -1292,11 +1292,11 @@ sil @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
 // CHECK-NEXT:   Con %2.1 Esc: G, Succ:
 // CHECK-NEXT:   Val %4 Esc: %5, Succ:
 // CHECK-NEXT: End
-sil @semantics_pair_no_escaping_closure : $@convention(thin) (@owned X, @guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType)) -> () {
-bb(%0 : $X, %1 : $X, %2: $@callee_owned (X, X) -> (@out X, @error ErrorType)):
-  %3 = function_ref @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+sil @semantics_pair_no_escaping_closure : $@convention(thin) (@owned X, @guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error Error)) -> () {
+bb(%0 : $X, %1 : $X, %2: $@callee_owned (X, X) -> (@out X, @error Error)):
+  %3 = function_ref @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
   %4 = alloc_stack $X
-  %6 = apply [nothrow] %3(%4, %0, %2, %1) : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  %6 = apply [nothrow] %3(%4, %0, %2, %1) : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
   dealloc_stack %4 : $*X
   %7 = tuple()
 	return %7 : $()
@@ -1308,11 +1308,11 @@ bb(%0 : $X, %1 : $X, %2: $@callee_owned (X, X) -> (@out X, @error ErrorType)):
 // CHECK-NEXT:   Con %1.1 Esc: G, Succ:
 // CHECK-NEXT:   Val %3 Esc: %4, Succ:
 // CHECK-NEXT: End
-sil @semantics_self_no_escaping_closure : $@convention(thin) (@guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType)) -> () {
-bb(%0 : $X, %1: $@callee_owned (X, X) -> (@out X, @error ErrorType)):
-  %2 = function_ref @unsafeWithNotEscapedSelfPointer : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+sil @semantics_self_no_escaping_closure : $@convention(thin) (@guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error Error)) -> () {
+bb(%0 : $X, %1: $@callee_owned (X, X) -> (@out X, @error Error)):
+  %2 = function_ref @unsafeWithNotEscapedSelfPointer : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
   %3 = alloc_stack $X
-  %6 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  %6 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
   dealloc_stack %3 : $*X
   %7 = tuple()
 	return %7 : $()

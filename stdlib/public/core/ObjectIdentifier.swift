@@ -99,25 +99,3 @@ extension Int {
     self.init(bitPattern: UInt(bitPattern: objectID))
   }
 }
-
-extension ObjectIdentifier {
-  @available(*, unavailable, message: "use the 'UInt(_:)' initializer")
-  public var uintValue: UInt {
-    Builtin.unreachable()
-  }
-}
-
-extension UInt {
-  @available(*, unavailable, renamed: "init(bitPattern:)")
-  public init(_ objectID: ObjectIdentifier) {
-    Builtin.unreachable()
-  }
-}
-
-extension Int {
-  @available(*, unavailable, renamed: "init(bitPattern:)")
-  public init(_ objectID: ObjectIdentifier) {
-    Builtin.unreachable()
-  }
-}
-

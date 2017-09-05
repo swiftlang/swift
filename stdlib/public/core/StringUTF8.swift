@@ -625,13 +625,6 @@ extension String.UTF8View : CustomPlaygroundQuickLookable {
   }
 }
 
-extension String {
-  @available(*, unavailable, message: "Please use String.utf8CString instead.")
-  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
-    Builtin.unreachable()
-  }
-}
-
 // backward compatibility for index interchange.  
 extension String.UTF8View {
   @available(

@@ -335,24 +335,3 @@ public func stride<T>(
 ) -> StrideThrough<T> {
   return StrideThrough(_start: start, end: end, stride: stride)
 }
-
-@available(*, unavailable, renamed: "StrideToIterator")
-public struct StrideToGenerator<Element : Strideable> {}
-
-@available(*, unavailable, renamed: "StrideThroughIterator")
-public struct StrideThroughGenerator<Element : Strideable> {}
-
-extension Strideable {
-  @available(*, unavailable, message: "Use stride(from:to:by:) free function instead")
-  public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
-    Builtin.unreachable()
-  }
-
-  @warn_unqualified_access
-  @available(*, unavailable, message: "Use stride(from:through:by:) free function instead")
-  public func stride(
-    through end: Self, by stride: Stride
-  ) -> StrideThrough<Self> {
-    Builtin.unreachable()
-  }
-}

@@ -191,12 +191,6 @@ public func _errorInMain(_ error: Error) {
 @_silgen_name("swift_getDefaultErrorCode")
 public func _swift_getDefaultErrorCode<T : Error>(_ x: T) -> Int
 
-@available(*, unavailable, renamed: "Error")
-public typealias ErrorType = Error
-
-@available(*, unavailable, renamed: "Error")
-public typealias ErrorProtocol = Error
-
 extension Error {
   public var _code: Int {
     return _swift_getDefaultErrorCode(self)

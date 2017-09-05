@@ -265,9 +265,6 @@ extension ${TraversalCollection} where Self : LazyCollectionProtocol {
 
 % end
 
-@available(*, unavailable, renamed: "LazyCollectionProtocol")
-public typealias LazyCollectionType = LazyCollectionProtocol
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

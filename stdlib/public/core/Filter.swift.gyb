@@ -292,49 +292,6 @@ extension LazyCollectionProtocol
 
 % end
 
-@available(*, unavailable, renamed: "LazyFilterIterator")
-public struct LazyFilterGenerator<Base : IteratorProtocol> {}
-
-extension LazyFilterIterator {
-  @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
-  public init(
-    _ base: Base,
-    whereElementsSatisfy predicate: (Base.Element) -> Bool
-  ) {
-    Builtin.unreachable()
-  }
-}
-
-extension LazyFilterSequence {
-  @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
-  public init(
-    _ base: Base,
-    whereElementsSatisfy predicate: (Base.Element) -> Bool
-  ) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> LazyFilterIterator<Base.Iterator> {
-    Builtin.unreachable()
-  }
-}
-
-extension LazyFilterCollection {
-  @available(*, unavailable, message: "use '.lazy.filter' on the collection")
-  public init(
-    _ base: Base,
-    whereElementsSatisfy predicate: (Base.Element) -> Bool
-  ) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> LazyFilterIterator<Base.Iterator> {
-    Builtin.unreachable()
-  }
-}
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
