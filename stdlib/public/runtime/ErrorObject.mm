@@ -74,7 +74,7 @@ using namespace swift::hashable_support;
   assert(domain
          && "Error box used as NSError before initialization");
   // Don't need to .retain.autorelease since it's immutable.
-  return (NSString*)domain;
+  return cf_const_cast<NSString*>(domain);
 }
 
 - (NSInteger)code {
@@ -88,7 +88,7 @@ using namespace swift::hashable_support;
   assert(userInfo
          && "Error box used as NSError before initialization");
   // Don't need to .retain.autorelease since it's immutable.
-  return (NSDictionary*)userInfo;
+  return cf_const_cast<NSDictionary*>(userInfo);
 }
 
 - (id)copyWithZone:(NSZone *)zone {
@@ -267,15 +267,14 @@ static const HashableWitnessTable *getNSErrorConformanceToHashable() {
 }
 
 bool SwiftError::isPureNSError() const {
-  auto TheSwiftNativeNSError = getSwiftNativeNSErrorClass();
   // We can do an exact type check; _SwiftNativeNSError shouldn't be subclassed
   // or proxied.
-  return (Class)_swift_getClass(this) != TheSwiftNativeNSError;
+  return _swift_getClass(this) != (ClassMetadata *)getSwiftNativeNSErrorClass();
 }
 
 const Metadata *SwiftError::getType() const {
   if (isPureNSError()) {
-    auto asError = (NSError*)this;
+    auto asError = reinterpret_cast<NSError *>(const_cast<SwiftError *>(this));
     return swift_getObjCClassMetadata((ClassMetadata*)[asError class]);
   }
   return type;
@@ -343,23 +342,18 @@ _swift_getErrorValue_(const SwiftError *errorObject,
   // TODO: Would be great if Clang had a return-three convention so we didn't
   // need the out parameter here.
 
+  out->type = errorObject->getType();
+
   // Check for a bridged Cocoa NSError.
   if (errorObject->isPureNSError()) {
     // Return a pointer to the scratch buffer.
-    auto asError = (NSError*)errorObject;
-
     *scratch = (void*)errorObject;
     out->value = (const OpaqueValue *)scratch;
-    out->type = swift_getObjCClassMetadata((ClassMetadata*)[asError class]);
-
     out->errorConformance = getNSErrorConformanceToError();
-    return;
+  } else {
+    out->value = errorObject->getValue();
+    out->errorConformance = errorObject->errorConformance;
   }
-
-  out->value = errorObject->getValue();
-  out->type = errorObject->type;
-  out->errorConformance = errorObject->errorConformance;
-  return;
 }
 
 SWIFT_RUNTIME_EXPORT
@@ -522,22 +516,15 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   // Is the input type an NSError?
   switch (srcType->getKind()) {
   case MetadataKind::Class:
-    // Native class should be an NSError subclass.
-    if (![(Class)srcType isSubclassOfClass: NSErrorClass])
+  case MetadataKind::ObjCClassWrapper:
+    // Native class or ObjC class should be an NSError subclass.
+    if (![srcType->getObjCClassObject() isSubclassOfClass: NSErrorClass])
       return false;
     break;
   case MetadataKind::ForeignClass: {
     // Foreign class should be CFError.
     CFTypeRef srcInstance = *reinterpret_cast<CFTypeRef *>(src);
     if (CFGetTypeID(srcInstance) != CFErrorTypeID)
-      return false;
-    break;
-  }
-  case MetadataKind::ObjCClassWrapper: {
-    // ObjC class should be an NSError subclass.
-    auto srcWrapper = static_cast<const ObjCClassWrapperMetadata *>(srcType);
-    if (![(Class)srcWrapper->getClassObject()
-            isSubclassOfClass: NSErrorClass])
       return false;
     break;
   }
