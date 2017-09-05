@@ -86,9 +86,9 @@ extension Unicode.Scalar :
   ///     }
   ///
   /// - Parameter v: The Unicode code point to use for the scalar. The
-  ///   initializer succeeds if `v` is a valid Unicode scalar value, in the
-  ///   range `0...0xD7FF` or `0xE000...0x10FFFF`. If `v` is an invalid
-  ///   unicode scalar value, the result is `nil`.
+  ///   initializer succeeds if `v` is a valid Unicode scalar value---that is,
+  ///   if `v` is in the range `0...0xD7FF` or `0xE000...0x10FFFF`. If `v` is
+  ///   an invalid Unicode scalar value, the result is `nil`.
   public init?(_ v: UInt32) {
     // Unicode 6.3.0:
     //

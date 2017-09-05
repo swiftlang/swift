@@ -30,11 +30,11 @@ extension String {
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
   ///
-  /// For example, use this initializer to create a string with ten `"ab"`
-  /// strings in a row.
+  /// For example, you can use this initializer to create a string with ten
+  /// `"ab"` strings in a row.
   ///
-  ///     let zeroes = String(repeating: "ab", count: 10)
-  ///     print(zeroes)
+  ///     let s = String(repeating: "ab", count: 10)
+  ///     print(s)
   ///     // Prints "abababababababababab"
   ///
   /// - Parameters:
