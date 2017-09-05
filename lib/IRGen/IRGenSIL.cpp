@@ -5120,7 +5120,7 @@ void IRGenModule::emitSILStaticInitializers() {
       StructLayout *Layout = StaticObjectLayouts[&Global].get();
       llvm::Constant *InitVal = emitConstantObject(*this, OI, Layout);
       auto *ContainerTy = cast<llvm::StructType>(IRGlobal->getValueType());
-      auto *zero = llvm::ConstantInt::get(ContainerTy->getElementType(0), 0);
+      auto *zero = llvm::ConstantAggregateZero::get(ContainerTy->getElementType(0));
       IRGlobal->setInitializer(llvm::ConstantStruct::get(ContainerTy,
                                                          {zero , InitVal}));
       continue;
