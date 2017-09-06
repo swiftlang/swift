@@ -3491,6 +3491,17 @@ SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=true"
 // Check SetAlgebra conformance
 //===---
 
+// Make sure Set conforms to the SetAlgebra protocol
+
+SetTestSuite.test("SetAlgebra.conformance") {
+  func ensureConformance<T: SetAlgebra>(_ s: T) {
+    expectFalse(s.isEmpty)
+  }
+  
+  let s: Set<Int> = [1,2,3,4,5]
+  ensureConformance(s)
+}
+
 // Test isEmpty
 
 SetTestSuite.test("SetAlgebra.IsEmpty.SingleEntry") {
