@@ -2705,9 +2705,7 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       continue;
     }
 
-    auto ParsedTypeResult = parseTypeForInheritance(
-        diag::expected_identifier_for_type,
-        diag::expected_ident_type_in_inheritance);
+    auto ParsedTypeResult = parseType();
     Status |= ParsedTypeResult;
 
     // Record the type if its a single type.

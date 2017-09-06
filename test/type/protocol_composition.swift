@@ -153,10 +153,10 @@ func fT07(x: T07) -> P1 & P2 & P3 { return x } // OK, 'P1 & protocol<P2, P3>' is
 let _: P1 & P2 & P3 -> P1 & P2 & P3 = fT07 // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{20-20=)}}
 
 struct S01: P5 & P6 {}
-struct S02: P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
+struct S02: P5? & P6 {} // expected-error {{non-protocol, non-class type 'P5?' cannot be used within a protocol-constrained type}}
 struct S03: Optional<P5> & P6 {} // expected-error {{non-protocol, non-class type 'Optional<P5>' cannot be used within a protocol-constrained type}}
-struct S04<T : P5 & (P6)> {} // expected-error {{inheritance from non-named type '(P6)'}}
-struct S05<T> where T : P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
+struct S04<T : P5 & (P6)> {}
+struct S05<T> where T : P5? & P6 {} // expected-error 2{{non-protocol, non-class type 'P5?' cannot be used within a protocol-constrained type}}
 
 // SR-3124 - Protocol Composition Often Migrated Incorrectly
 struct S3124<T: protocol<P1, P3>> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{17-34=P1 & P3>}}

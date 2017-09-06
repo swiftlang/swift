@@ -685,8 +685,6 @@ ERROR(expected_identifier_for_type,PointsToFirstBadToken,
       "expected identifier for type name", ())
 ERROR(expected_rangle_generic_arg_list,PointsToFirstBadToken,
       "expected '>' to complete generic argument list", ())
-ERROR(expected_ident_type_in_inheritance,none,
-      "inheritance from non-named type %0", (TypeLoc))
 
 
 // Function types

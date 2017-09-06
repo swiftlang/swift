@@ -25,7 +25,7 @@ protocol Q : A { } // expected-error{{non-class type 'Q' cannot inherit from cla
 extension C : A { } // expected-error{{extension of type 'C' cannot inherit from class 'A'}}
 
 // Keywords in inheritance clauses
-struct S2 : struct { } // expected-error{{expected identifier for type name}}
+struct S2 : struct { } // expected-error{{expected type}}
 
 // Protocol composition in inheritance clauses
 struct S3 : P, P & Q { } // expected-error {{redundant conformance of 'S3' to protocol 'P'}}

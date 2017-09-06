@@ -882,20 +882,6 @@ public:
                                    bool HandleCodeCompletion = true,
                                    bool IsSILFuncDecl = false);
 
-  /// \brief Parse any type, but diagnose all types except type-identifier or
-  /// type-composition with non-type-identifier.
-  ///
-  /// In some places the grammar allows only type-identifier, but when it is
-  /// not ambiguous, we want to parse any type for recovery purposes.
-  ///
-  /// \param MessageID a generic diagnostic for a syntax error in the type
-  /// \param NonIdentifierTypeMessageID a diagnostic for a non-identifier type
-  ///
-  /// \returns null, IdentTypeRepr, CompositionTypeRepr or ErrorTypeRepr.
-  ParserResult<TypeRepr>
-  parseTypeForInheritance(Diag<> MessageID,
-                          Diag<TypeLoc> NonIdentifierTypeMessageID);
-
   ParserResult<TypeRepr> parseTypeSimpleOrComposition();
   ParserResult<TypeRepr>
     parseTypeSimpleOrComposition(Diag<> MessageID,
