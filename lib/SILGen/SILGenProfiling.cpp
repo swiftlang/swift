@@ -378,6 +378,9 @@ struct PGOMapping : public ASTWalker {
       CounterMap[rwsBody] = NextCounter++;
       auto rwsBodyCount = loadExecutionCount(rwsBody);
       LoadedCounterMap[rwsBody] = rwsBodyCount;
+      CounterMap[RWS] = parent;
+      auto count = loadExecutionCount(RWS);
+      LoadedCounterMap[RWS] = count;
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       auto fesBody = FES->getBody();
       CounterMap[fesBody] = NextCounter++;
