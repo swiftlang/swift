@@ -297,75 +297,76 @@ ArrayTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
   }
 }
 
-// ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
-//   do {
-//     var a = getCOWFastArray()
-//     let originalCapacity = a.capacity
-//     expectEqual(3, a.count)
-//     expectEqual(2, a[1])
-//
-//     a.removeAll()
-//     var identity1 = a._rawIdentifier()
-//     expectLT(a.capacity, originalCapacity)
-//     expectEqual(0, a.count)
-//     expectEqual(identity1, a._rawIdentifier())
-//   }
-//
-//   do {
-//     var a = getCOWFastArray()
-//     var identity1 = a._rawIdentifier()
-//     let originalCapacity = a.capacity
-//     expectEqual(3, a.count)
-//     expectEqual(2, a[1])
-//
-//     a.removeAll(keepingCapacity: true)
-//     expectEqual(identity1, a._rawIdentifier())
-//     expectEqual(originalCapacity, a.capacity)
-//     expectEqual(0, a.count)
-//   }
-//
-//   do {
-//     var a1 = getCOWFastArray()
-//     var identity1 = a1._rawIdentifier()
-//     expectEqual(3, a1.count)
-//     expectEqual(2, a1[1])
-//
-//     var a2 = a1
-//     a2.removeAll()
-//     var identity2 = a2._rawIdentifier()
-//     expectEqual(identity1, a1._rawIdentifier())
-//     expectNotEqual(identity2, identity1)
-//     expectEqual(3, a1.count)
-//     expectEqual(2, a1[1])
-//     expectEqual(0, a2.count)
-//
-//     // Keep variables alive.
-//     _blackHole(a1)
-//     _blackHole(a2)
-//   }
-//
-//   do {
-//     var a1 = getCOWFastArray()
-//     var identity1 = a1._rawIdentifier()
-//     let originalCapacity = a1.capacity
-//     expectEqual(3, a1.count)
-//     expectEqual(2, a1[1])
-//
-//     var a2 = a1
-//     a2.removeAll(keepingCapacity: true)
-//     var identity2 = a2._rawIdentifier()
-//     expectEqual(identity1, a1._rawIdentifier())
-//     expectNotEqual(identity2, identity1)
-//     expectEqual(3, a1.count)
-//     expectEqual(2, a1[1])
-//     expectEqual(originalCapacity, a2.capacity)
-//     expectEqual(0, a2.count)
-//
-//     // Keep variables alive.
-//     _blackHole(a1)
-//     _blackHole(a2)
-//   }
-// }
+ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate")
+  .skip(.linuxAny(reason: "This test fails sometimes on Linux")).code {
+  do {
+    var a = getCOWFastArray()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1])
+
+    a.removeAll()
+    var identity1 = a._rawIdentifier()
+    expectLT(a.capacity, originalCapacity)
+    expectEqual(0, a.count)
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a = getCOWFastArray()
+    var identity1 = a._rawIdentifier()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1])
+
+    a.removeAll(keepingCapacity: true)
+    expectEqual(identity1, a._rawIdentifier())
+    expectEqual(originalCapacity, a.capacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    var identity1 = a1._rawIdentifier()
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+
+    var a2 = a1
+    a2.removeAll()
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    var identity1 = a1._rawIdentifier()
+    let originalCapacity = a1.capacity
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    var identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+    expectEqual(originalCapacity, a2.capacity)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+}
 
 ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
@@ -599,7 +600,7 @@ let indexTests: [ArrayIndexTest<[Int]>] = [
     expectedEnd: 1,
     operation: .append(1)
   ),
-  // TODO: re-enable when rdar://problem/33358110 is addressed
+  // FIXME: re-enable when rdar://problem/33358110 is addressed
   // ArrayIndexTest(
   //   data: [ 42, 2525, 3535, 42 ],
   //   expectedStart: 1,
