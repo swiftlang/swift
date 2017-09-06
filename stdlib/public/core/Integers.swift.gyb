@@ -74,11 +74,6 @@ public typealias IntMax = ${IntMax}
 @available(swift, obsoleted: 4.0, renamed: "${UIntMax}")
 public typealias UIntMax = ${UIntMax}
 
-infix operator &<< : BitwiseShiftPrecedence
-infix operator &<<= : AssignmentPrecedence
-infix operator &>> : BitwiseShiftPrecedence
-infix operator &>>= : AssignmentPrecedence
-
 //===----------------------------------------------------------------------===//
 //===--- Bits for the Stdlib ----------------------------------------------===//
 //===----------------------------------------------------------------------===//
