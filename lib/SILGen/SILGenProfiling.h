@@ -44,7 +44,7 @@ private:
   uint64_t FunctionHash;
   std::string PGOFuncName;
   llvm::DenseMap<ASTNode, unsigned> RegionCounterMap;
-  llvm::ErrorOr<llvm::InstrProfRecord> LoadedCounts;
+  llvm::DenseMap<ASTNode, Optional<uint64_t>> PGORegionLoadedCounterMap;
 
   std::vector<std::tuple<std::string, uint64_t, std::string>> CoverageData;
 
@@ -56,9 +56,9 @@ public:
   /// Emit SIL to increment the counter for \c Node.
   void emitCounterIncrement(SILGenBuilder &Builder, ASTNode Node);
 
-  /// Load the execution count corresponding to \p Node from a profile, if one
-  /// is available.
-  Optional<uint64_t> loadExecutionCount(ASTNode Node);
+  /// Get previously Loaded the execution count corresponding to \p Node
+  /// from a profile, if one is available.
+  Optional<uint64_t> getExecutionCount(ASTNode Node);
 
 private:
   /// Map counters to ASTNodes and set them up for profiling the given function.
@@ -77,10 +77,6 @@ struct ProfilerRAII {
 };
 
 } // end namespace Lowering
-
-namespace ProfileCounter {
-  Optional<uint64_t> subtract(Optional<uint64_t> L, Optional<uint64_t> R);
-} // end namespace ProfileCounter
 
 } // end namespace swift
 
