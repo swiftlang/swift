@@ -536,11 +536,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
   
-  // Use a recursive timer in case this func is recursive.
-  static RecursiveSharedTimer timer("Type checking");
-  auto guard = RecursiveSharedTimer::Guard(timer);
-  (void)guard;
-
+  SharedTimer timer("Type checking");
 
   auto &Ctx = SF.getASTContext();
 
