@@ -742,8 +742,12 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   if (SGF.B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
     // to the continuation block.
-    Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false);
-    
+    auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
+    auto NumFalseTaken = SGF.loadProfilerCount(S);
+    Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false,
+                                       /*invertValue*/ false, /*contArgs*/ {},
+                                       NumTrueTaken, NumFalseTaken);
+
     Cond.enterTrue(SGF);
     if (SGF.B.hasValidInsertionPoint()) {
       SGF.B.createBranch(S->getCond(), loopBB);
