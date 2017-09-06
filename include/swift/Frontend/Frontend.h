@@ -305,6 +305,16 @@ public:
   /// identifying the conditions under which the module was built, for use
   /// in generating a cached PCH file for the bridging header.
   std::string getPCHHash() const;
+  
+  SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
+    if (getInputKind() == InputFileKind::IFK_SIL) {
+      return SourceFile::ImplicitModuleImportKind::None;
+    }
+    if (getParseStdlib()) {
+      return SourceFile::ImplicitModuleImportKind::Builtin;
+    }
+    return SourceFile::ImplicitModuleImportKind::Stdlib;
+  }
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -346,7 +356,7 @@ class CompilerInstance {
 
   SourceFile *PrimarySourceFile = nullptr;
 
-  void createSILModule(bool WholeModule = false);
+  void createSILModule();
   void setPrimarySourceFile(SourceFile *SF);
 
 public:
@@ -442,36 +452,32 @@ private:
 
   void fillInModulesToImportFromImplicitImportModuleNames(
       SmallVectorImpl<ModuleDecl *> &importModules);
-  void supplyREPLFileWithImports(
-      SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-      ModuleDecl *objCModuleUnderlyingMixedFramework,
-      ModuleDecl *importedHeaderModule,
-      SmallVectorImpl<ModuleDecl *> &importModules);
+  
+public: // for static functions in Frontend.cpp
+  
+  struct ImplicitImports {
+    SourceFile::ImplicitModuleImportKind kind;
+    ModuleDecl *objCModuleUnderlyingMixedFramework;
+    ModuleDecl *headerModule;
+    SmallVector<ModuleDecl *, 4> modules;
+    
+    ImplicitImports(CompilerInstance &compiler);
+  };
+  
+private:
+  void createREPLFileWithImports(ImplicitImports &implicitImports);
   DelayedParsingCallbacks *computeDelayedParsingCallback();
 
-  void ensureMainFileComesFirst(
-      SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-      ModuleDecl *objCModuleUnderlyingMixedFramework,
-      ModuleDecl *importedHeaderModule,
-      SmallVectorImpl<ModuleDecl *> &importModules);
-  SourceFile::ImplicitModuleImportKind
-  createSILModuleIfNecessary(const std::vector<unsigned> &BufferIDs,
-                             unsigned MainBufferID);
-
+  void createMainFileWithImportsAndAddToModule(ImplicitImports &implicitImports);
+ 
   void parseALibraryFile(
       unsigned BufferID,
-      SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-      ModuleDecl *objCModuleUnderlyingMixedFramework,
-      ModuleDecl *importedHeaderModule,
-      SmallVectorImpl<ModuleDecl *> &importModules,
+      ImplicitImports &implicitImports,
       PersistentParserState &PersistentState,
       DelayedParsingCallbacks *DelayedParseCB);
 
   bool parsePartialModulesAndLibraryFiles(
-      SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-      ModuleDecl *objCModuleUnderlyingMixedFramework,
-      ModuleDecl *importedHeaderModule,
-      SmallVectorImpl<ModuleDecl *> &importModules,
+      ImplicitImports &implicitImports,
       PersistentParserState &PersistentState,
       DelayedParsingCallbacks *DelayedParseCB);
 

@@ -23,10 +23,10 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
@@ -53,8 +53,10 @@ std::string CompilerInvocation::getPCHHash() const {
   return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
 }
 
-void CompilerInstance::createSILModule(bool WholeModule) {
+void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
+  // Assume WMO, if a -primary-file option was not provided.
+  bool WholeModule = !Invocation.getFrontendOptions().PrimaryInput.hasValue();
   TheSILModule = SILModule::createEmptyModule(
     getMainModule(), Invocation.getSILOptions(), WholeModule);
 }
@@ -263,28 +265,24 @@ ModuleDecl *CompilerInstance::getMainModule() {
 }
 
 static void
-addAdditionalInitialImportsTo(SourceFile *SF,
-                              ModuleDecl *objCModuleUnderlyingMixedFramework,
-                              ModuleDecl *importedHeaderModule,
-                              SmallVectorImpl<ModuleDecl *> &importModules) {
-  SharedTimer timer("performSema-addAdditionalInitialImportsTo");
-  if (!objCModuleUnderlyingMixedFramework && !importedHeaderModule &&
-      importModules.empty())
+addAdditionalInitialImportsTo(SourceFile *SF, CompilerInstance::ImplicitImports &implicitImports) {
+  if (!implicitImports.objCModuleUnderlyingMixedFramework && !implicitImports.headerModule &&
+      implicitImports.modules.empty())
     return;
 
   using ImportPair =
       std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
   SmallVector<ImportPair, 4> additionalImports;
 
-  if (objCModuleUnderlyingMixedFramework)
+  if (implicitImports.objCModuleUnderlyingMixedFramework)
     additionalImports.push_back(
-        {{/*accessPath=*/{}, objCModuleUnderlyingMixedFramework},
+        {{/*accessPath=*/{}, implicitImports.objCModuleUnderlyingMixedFramework},
          SourceFile::ImportFlags::Exported});
-  if (importedHeaderModule)
-    additionalImports.push_back({{/*accessPath=*/{}, importedHeaderModule},
+  if (implicitImports.headerModule)
+    additionalImports.push_back({{/*accessPath=*/{}, implicitImports.headerModule},
                                  SourceFile::ImportFlags::Exported});
-  if (!importModules.empty()) {
-    for (auto &importModule : importModules) {
+  if (!implicitImports.modules.empty()) {
+    for (auto &importModule : implicitImports.modules) {
       additionalImports.push_back({{/*accessPath=*/{}, importModule}, {}});
     }
   }
@@ -292,10 +290,10 @@ addAdditionalInitialImportsTo(SourceFile *SF,
   SF->addImports(additionalImports);
 }
 
-// Implicitly import the SwiftOnoneSupport module in non-optimized
-// builds. This allows for use of popular specialized functions
-// from the standard library, which makes the non-optimized builds
-// execute much faster.
+/// Implicitly import the SwiftOnoneSupport module in non-optimized
+/// builds. This allows for use of popular specialized functions
+/// from the standard library, which makes the non-optimized builds
+/// execute much faster.
 static bool shouldImplicityImportSwiftOnoneSupportModule(
     SILOptions::SILOptMode optimization,
     FrontendOptions::ActionType requestedAction) {
@@ -310,37 +308,22 @@ static bool shouldImplicityImportSwiftOnoneSupportModule(
 void CompilerInstance::performSema() {
   SharedTimer timer("performSema");
   Context->LoadedModules[MainModule->getName()] = getMainModule();
-
-  const SourceFile::ImplicitModuleImportKind implicitModuleImportKind =
-      createSILModuleIfNecessary(BufferIDs, MainBufferID);
-
-  switch (implicitModuleImportKind) {
-  case SourceFile::ImplicitModuleImportKind::None:
-  case SourceFile::ImplicitModuleImportKind::Builtin:
-    break;
-  case SourceFile::ImplicitModuleImportKind::Stdlib:
-    if (!loadStdlibAndMaybeSwiftOnoneSupport())
-      return;
-    break;
+  
+  if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
+    assert(BufferIDs.size() == 1);
+    assert(MainBufferID != NO_SUCH_BUFFER);
+    createSILModule();
   }
-
-  auto clangImporter =
-    static_cast<ClangImporter *>(Context->getClangModuleLoader());
-
-  ModuleDecl *objCModuleUnderlyingMixedFramework =
-      Invocation.getFrontendOptions().ImportUnderlyingModule
-          ? importUnderlyingModule(clangImporter)
-          : nullptr;
-
-  ModuleDecl *importedHeaderModule = importBridgingHeader(clangImporter);
-
-  SmallVector<ModuleDecl *, 4> importModules;
-  fillInModulesToImportFromImplicitImportModuleNames(importModules);
-
+  
+  if (Invocation.getImplicitModuleImportKind() == SourceFile::ImplicitModuleImportKind::Stdlib) {
+    if (!loadStdlibAndMaybeSwiftOnoneSupport())
+    return;
+  }
+  
+  ImplicitImports implicitImports(*this);
+  
   if (Invocation.getInputKind() == InputFileKind::IFK_Swift_REPL) {
-    supplyREPLFileWithImports(implicitModuleImportKind,
-                              objCModuleUnderlyingMixedFramework,
-                              importedHeaderModule, importModules);
+    createREPLFileWithImports(implicitImports);
     return;
   }
 
@@ -349,17 +332,32 @@ void CompilerInstance::performSema() {
 
   PersistentParserState PersistentState;
 
-  ensureMainFileComesFirst(implicitModuleImportKind,
-                           objCModuleUnderlyingMixedFramework,
-                           importedHeaderModule, importModules);
+  // Make sure the main file is the first file in the module, so do this now.
+  createMainFileWithImportsAndAddToModule(implicitImports);
 
-  bool hadLoadError = parsePartialModulesAndLibraryFiles(
-      implicitModuleImportKind, objCModuleUnderlyingMixedFramework,
-      importedHeaderModule, importModules, PersistentState, DelayedCB.get());
+  bool hadLoadError = parsePartialModulesAndLibraryFiles(implicitImports, PersistentState, DelayedCB.get());
   if (hadLoadError)
     return;
 
+  // Parse main file last in order to make sure that it can use decls from other
+  // files in the module.
   parseMainAndTypeCheckTopLevelFiles(PersistentState, DelayedCB.get());
+}
+
+CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
+  kind = compiler.Invocation.getImplicitModuleImportKind();
+
+  auto clangImporter =
+  static_cast<ClangImporter *>(compiler.Context->getClangModuleLoader());
+  
+  objCModuleUnderlyingMixedFramework =
+  compiler.Invocation.getFrontendOptions().ImportUnderlyingModule
+  ? compiler.importUnderlyingModule(clangImporter)
+  : nullptr;
+  
+  compiler.fillInModulesToImportFromImplicitImportModuleNames(modules);
+  
+  headerModule = compiler.importBridgingHeader(clangImporter);
 }
 
 // Return true if should continue, i.e. no error
@@ -440,19 +438,13 @@ void CompilerInstance::fillInModulesToImportFromImplicitImportModuleNames(
   }
 }
 
-void CompilerInstance::supplyREPLFileWithImports(
-    SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-    ModuleDecl *objCModuleUnderlyingMixedFramework,
-    ModuleDecl *importedHeaderModule,
-    SmallVectorImpl<ModuleDecl *> &importModules) {
-  SharedTimer timer("performSema-supplyREPLFileWithImports");
+void CompilerInstance::createREPLFileWithImports( ImplicitImports &implicitImports) {
+  SharedTimer timer("performSema-createREPLFileWithImports");
   auto *SingleInputFile =
   new (*Context) SourceFile(*MainModule, Invocation.getSourceFileKind(),
                             None, implicitModuleImportKind, Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*SingleInputFile);
-  addAdditionalInitialImportsTo(SingleInputFile,
-                                objCModuleUnderlyingMixedFramework,
-                                importedHeaderModule, importModules);
+  addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
 
 DelayedParsingCallbacks *CompilerInstance::computeDelayedParsingCallback() {
@@ -465,16 +457,11 @@ DelayedParsingCallbacks *CompilerInstance::computeDelayedParsingCallback() {
   return nullptr;
 }
 
-// Make sure the main file is the first file in the module. This may only be
+// The main file may only be
 // a source file, or it may be a SIL file, which requires pumping the parser.
-// We parse it last, though, to make sure that it can use decls from other
-// files in the module.
-void CompilerInstance::ensureMainFileComesFirst(
-    SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-    ModuleDecl *objCModuleUnderlyingMixedFramework,
-    ModuleDecl *importedHeaderModule,
-    SmallVectorImpl<ModuleDecl *> &importModules) {
-  SharedTimer timer("performSema-ensureMainFileComesFirst");
+
+void CompilerInstance::createMainFileWithImportsAndAddToModule(ImplicitImports &implicitImports) {
+  SharedTimer timer("performSema-createMainFileWithImportsAndAddToModule");
   if (MainBufferID == NO_SUCH_BUFFER)
     return;
 
@@ -488,47 +475,23 @@ void CompilerInstance::ensureMainFileComesFirst(
                                              Invocation.getSourceFileKind(),
                                              MainBufferID, implicitModuleImportKind, Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*MainFile);
-  addAdditionalInitialImportsTo(MainFile, objCModuleUnderlyingMixedFramework,
-                                importedHeaderModule, importModules);
+  addAdditionalInitialImportsTo(MainFile, implicitImports);
 
   if (MainBufferID == PrimaryBufferID)
     setPrimarySourceFile(MainFile);
 }
 
-SourceFile::ImplicitModuleImportKind
-CompilerInstance::createSILModuleIfNecessary(
-    const std::vector<unsigned> &BufferIDs, unsigned MainBufferID) {
-  SharedTimer timer("performSema-createSILModuleIfNecessary");
-  if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
-    assert(BufferIDs.size() == 1);
-    assert(MainBufferID != NO_SUCH_BUFFER);
-    // Assume WMO, if a -primary-file option was not provided.
-    createSILModule(!Invocation.getFrontendOptions().PrimaryInput.hasValue());
-    return SourceFile::ImplicitModuleImportKind::None;
-  }
-  if (Invocation.getParseStdlib()) {
-    return SourceFile::ImplicitModuleImportKind::Builtin;
-  }
-  return SourceFile::ImplicitModuleImportKind::Stdlib;
-}
+void CompilerInstance::parseALibraryFile(
+    unsigned BufferID,
+    ImplicitImports &implicitImports,
+    PersistentParserState &PersistentState,
+    DelayedParsingCallbacks *DelayedParseCB) {
+  SharedTimer timer("performSema-parseALibraryFile");
 
-void CompilerInstance::parseALibraryFile(unsigned BufferID,
-                                         SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-                                         ModuleDecl *objCModuleUnderlyingMixedFramework,
-                                         ModuleDecl *importedHeaderModule,
-                                         SmallVectorImpl<ModuleDecl *> &importModules,
-                                         PersistentParserState &PersistentState,
-                                         DelayedParsingCallbacks *DelayedParseCB) {
-     SharedTimer timer("performSema-parseALibraryFile");
-  
-  auto *NextInput = new (*Context) SourceFile(*MainModule,
-                                              SourceFileKind::Library,
-                                              BufferID,
-                                              implicitModuleImportKind,
-                                              Invocation.getLangOptions().KeepTokensInSourceFile);
+  auto *NextInput = new (*Context) SourceFile(
+      *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
   MainModule->addFile(*NextInput);
-  addAdditionalInitialImportsTo(NextInput, objCModuleUnderlyingMixedFramework,
-                                importedHeaderModule, importModules);
+  addAdditionalInitialImportsTo(NextInput, implicitImports);
 
   if (BufferID == PrimaryBufferID)
     setPrimarySourceFile(NextInput);
@@ -572,10 +535,7 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
 
 // Return true if had load error
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
-    SourceFile::ImplicitModuleImportKind implicitModuleImportKind,
-    ModuleDecl *objCModuleUnderlyingMixedFramework,
-    ModuleDecl *importedHeaderModule,
-    SmallVectorImpl<ModuleDecl *> &importModules,
+    ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB) {
   SharedTimer timer("performSema-parsePartialModulesAndLibraryFiles");
@@ -591,10 +551,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   // Then parse all the library files.
   for (auto BufferID : BufferIDs) {
     if (BufferID != MainBufferID)
-      parseALibraryFile(BufferID, implicitModuleImportKind,
-                        objCModuleUnderlyingMixedFramework,
-                        importedHeaderModule, importModules, PersistentState,
-                        DelayedParseCB);
+      parseALibraryFile(BufferID, implicitImports, PersistentState, DelayedParseCB);
   }
   if (Invocation.isCodeCompletion()) {
     // When we are doing code completion, make sure to emit at least one
