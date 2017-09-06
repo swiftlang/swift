@@ -350,12 +350,8 @@ static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
 
   bool expand = shouldExpand(DAI->getModule(),
                              DAI->getOperand()->getType().getObjectType());
-  if (expand) {
-    TL.emitLoweredDestroyValue(Builder, DAI->getLoc(), NewValue,
-                               Lowering::TypeLowering::LoweringStyle::Deep);
-  } else {
-    TL.emitDestroyValue(Builder, DAI->getLoc(), NewValue);
-  }
+  TL.emitLoweredDestroyValue(Builder, DAI->getLoc(), NewValue,
+                             Lowering::TypeLowering::getLoweringStyle(expand));
   DAI->eraseFromParent();
 }
 
